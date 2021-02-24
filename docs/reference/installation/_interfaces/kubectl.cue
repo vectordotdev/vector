@@ -14,9 +14,9 @@ installation: _interfaces: kubectl: {
 		bin_in_path: null
 		config:      "vector.toml"
 	}
-	platform_name: installation.platforms.kubernetes.name
+	platform_name: "kubernetes"
 
-	roles: [Name=string]: {
+	role_implementations: [Name=string]: {
 		commands: {
 			_deployment_variant:       string
 			_vector_version:           "0.11"
@@ -55,7 +55,7 @@ installation: _interfaces: kubectl: {
 				  # Override the Vector image to avoid use of the sliding tag.
 				  - name: timberio/vector
 				    newName: timberio/vector
-				    newTag: #\(_vector_image_tag)
+				    newTag: \#(_vector_image_tag)
 
 				resources:
 				  # A namespace to keep the resources at.
@@ -105,7 +105,7 @@ installation: _interfaces: kubectl: {
 		}
 	}
 
-	roles: {
+	role_implementations: {
 		agent: {
 			title:       "Agent"
 			description: #"""

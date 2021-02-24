@@ -34,6 +34,9 @@ mod dedupe;
 #[cfg(feature = "sources-docker_logs")]
 mod docker_logs;
 mod elasticsearch;
+mod encoding_transcode;
+#[cfg(feature = "transforms-filter")]
+mod filter;
 #[cfg(feature = "sources-generator")]
 mod generator;
 #[cfg(feature = "transforms-geoip")]
@@ -71,9 +74,12 @@ mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
 mod open;
+#[cfg(feature = "sources-postgresql_metrics")]
+mod postgresql_metrics;
 mod process;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 mod prometheus;
+mod pulsar;
 #[cfg(feature = "transforms-reduce")]
 mod reduce;
 #[cfg(feature = "transforms-regex_parser")]
@@ -81,11 +87,11 @@ mod regex_parser;
 mod remap;
 #[cfg(feature = "transforms-remove_fields")]
 mod remove_fields;
-#[cfg(feature = "transforms-remove_tags")]
-mod remove_tags;
 #[cfg(feature = "transforms-rename_fields")]
 mod rename_fields;
-mod sampler;
+#[cfg(feature = "transforms-route")]
+mod route;
+mod sample;
 #[cfg(feature = "sinks-sematext")]
 mod sematext_metrics;
 mod socket;
@@ -97,14 +103,13 @@ mod statsd_sink;
 #[cfg(feature = "sources-statsd")]
 mod statsd_source;
 mod stdin;
-#[cfg(feature = "transforms-swimlanes")]
-mod swimlanes;
 mod syslog;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 mod tag_cardinality_limit;
 mod tcp;
 #[cfg(feature = "transforms-tokenizer")]
 mod tokenizer;
+mod topology;
 mod udp;
 mod unix;
 mod vector;
@@ -145,12 +150,15 @@ pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-docker_logs")]
 pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
+pub use self::encoding_transcode::*;
 #[cfg(any(
     feature = "sources-file",
     feature = "sources-kubernetes-logs",
     feature = "sinks-file",
 ))]
 pub use self::file::*;
+#[cfg(feature = "transforms-filter")]
+pub use self::filter::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
 #[cfg(feature = "transforms-geoip")]
@@ -160,7 +168,8 @@ pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
 #[cfg(feature = "sources-host_metrics")]
 pub(crate) use self::host_metrics::*;
-pub use self::http::*;
+#[cfg(any(feature = "sources-utils-http", feature = "sinks-http"))]
+pub(crate) use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
 #[cfg(feature = "transforms-json_parser")]
@@ -185,9 +194,12 @@ pub use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
 pub use self::open::*;
+#[cfg(feature = "sources-postgresql_metrics")]
+pub(crate) use self::postgresql_metrics::*;
 pub use self::process::*;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 pub(crate) use self::prometheus::*;
+pub use self::pulsar::*;
 #[cfg(feature = "transforms-reduce")]
 pub(crate) use self::reduce::*;
 #[cfg(feature = "transforms-regex_parser")]
@@ -195,11 +207,11 @@ pub(crate) use self::regex_parser::*;
 pub use self::remap::*;
 #[cfg(feature = "transforms-remove_fields")]
 pub use self::remove_fields::*;
-#[cfg(feature = "transforms-remove_tags")]
-pub use self::remove_tags::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
-pub use self::sampler::*;
+#[cfg(feature = "transforms-route")]
+pub use self::route::*;
+pub use self::sample::*;
 #[cfg(feature = "sinks-sematext")]
 pub use self::sematext_metrics::*;
 pub(crate) use self::socket::*;
@@ -211,14 +223,13 @@ pub use self::statsd_sink::*;
 #[cfg(feature = "sources-statsd")]
 pub use self::statsd_source::*;
 pub use self::stdin::*;
-#[cfg(feature = "transforms-swimlanes")]
-pub use self::swimlanes::*;
 pub use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub(crate) use self::tag_cardinality_limit::*;
 pub use self::tcp::*;
 #[cfg(feature = "transforms-tokenizer")]
 pub(crate) use self::tokenizer::*;
+pub use self::topology::*;
 pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;

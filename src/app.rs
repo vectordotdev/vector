@@ -5,14 +5,14 @@ use crate::{
     config, generate, heartbeat, list, metrics, signal, topology, trace, unit_test, validate,
 };
 use std::cmp::max;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
-use futures::{
-    compat::{Future01CompatExt, Stream01CompatExt},
-    StreamExt,
-};
-use futures01::sync::mpsc;
+use futures::StreamExt;
+use tokio::sync::mpsc;
 
+#[cfg(feature = "sources-host_metrics")]
+use crate::sources::host_metrics;
 #[cfg(feature = "api-client")]
 use crate::top;
 #[cfg(feature = "api")]
@@ -29,7 +29,7 @@ use tokio::runtime;
 use tokio::runtime::Runtime;
 
 pub struct ApplicationConfig {
-    pub config_paths: Vec<PathBuf>,
+    pub config_paths: Vec<(PathBuf, config::FormatHint)>,
     pub topology: RunningTopology,
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
@@ -56,6 +56,7 @@ impl Application {
             level => [
                 format!("vector={}", level),
                 format!("codec={}", level),
+                format!("vrl={}", level),
                 format!("file_source={}", level),
                 "tower_limit=trace".to_owned(),
                 format!("rdkafka={}", level),
@@ -103,7 +104,7 @@ impl Application {
         };
 
         let config = {
-            let config_paths = root_opts.config_paths.clone();
+            let config_paths = root_opts.config_paths_with_formats();
             let watch_config = root_opts.watch_config;
             let require_healthy = root_opts.require_healthy;
 
@@ -118,6 +119,8 @@ impl Application {
                         SubCommand::Top(t) => top::cmd(&t).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
+                        #[cfg(feature = "vrl-cli")]
+                        SubCommand::VRL(s) => vrl_cli::cmd::cmd(&s),
                     };
 
                     return Err(code);
@@ -125,14 +128,18 @@ impl Application {
 
                 info!(message = "Log level is enabled.", level = ?level);
 
+                #[cfg(feature = "sources-host_metrics")]
+                host_metrics::init_roots();
+
                 let config_paths = config::process_paths(&config_paths).ok_or(exitcode::CONFIG)?;
 
                 if watch_config {
                     // Start listening for config changes immediately.
-                    config::watcher::spawn_thread(&config_paths, None).map_err(|error| {
-                        error!(message = "Unable to start config watcher.", %error);
-                        exitcode::CONFIG
-                    })?;
+                    config::watcher::spawn_thread(config_paths.iter().map(|(path, _)| path), None)
+                        .map_err(|error| {
+                            error!(message = "Unable to start config watcher.", %error);
+                            exitcode::CONFIG
+                        })?;
                 }
 
                 info!(
@@ -140,22 +147,27 @@ impl Application {
                     path = ?config_paths
                 );
 
-                let config =
+                let mut config =
                     config::load_from_paths(&config_paths, false).map_err(handle_config_errors)?;
 
                 config::LOG_SCHEMA
                     .set(config.global.log_schema.clone())
                     .expect("Couldn't set schema");
 
+                if !config.healthchecks.enabled {
+                    info!("Health checks are disabled.");
+                }
+                config.healthchecks.set_require_healthy(require_healthy);
+
                 let diff = config::ConfigDiff::initial(&config);
-                let pieces = topology::build_or_log_errors(&config, &diff)
+                let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
                     .await
                     .ok_or(exitcode::CONFIG)?;
 
                 #[cfg(feature = "api")]
                 let api = config.api;
 
-                let result = topology::start_validated(config, diff, pieces, require_healthy).await;
+                let result = topology::start_validated(config, diff, pieces).await;
                 let (topology, graceful_crash) = result.ok_or(exitcode::CONFIG)?;
 
                 Ok(ApplicationConfig {
@@ -178,7 +190,7 @@ impl Application {
     pub fn run(self) {
         let mut rt = self.runtime;
 
-        let graceful_crash = self.config.graceful_crash;
+        let mut graceful_crash = self.config.graceful_crash;
         let mut topology = self.config.topology;
 
         let mut config_paths = self.config.config_paths;
@@ -187,6 +199,10 @@ impl Application {
 
         #[cfg(feature = "api")]
         let api_config = self.config.api;
+
+        // Any internal_logs sources will have grabbed a copy of the
+        // early buffer by this point and set up a subscriber.
+        crate::trace::stop_buffering();
 
         rt.block_on(async move {
             emit!(VectorStarted);
@@ -209,20 +225,20 @@ impl Application {
             let signals = signal::signals();
             tokio::pin!(signals);
             let mut sources_finished = topology.sources_finished();
-            let mut graceful_crash = graceful_crash.compat();
 
             let signal = loop {
                 tokio::select! {
                 Some(signal) = signals.next() => {
                     if signal == SignalTo::Reload {
                         // Reload paths
-                        config_paths = config::process_paths(&opts.config_paths).unwrap_or(config_paths);
+                        config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
                         // Reload config
-                        let new_config = config::load_from_paths(&config_paths,false).map_err(handle_config_errors).ok();
+                        let new_config = config::load_from_paths(&config_paths, false).map_err(handle_config_errors).ok();
 
-                        if let Some(new_config) = new_config {
+                        if let Some(mut new_config) = new_config {
+                            new_config.healthchecks.set_require_healthy(opts.require_healthy);
                             match topology
-                                .reload_config_and_respawn(new_config, opts.require_healthy)
+                                .reload_config_and_respawn(new_config)
                                 .await
                             {
                                 Ok(true) => {
@@ -260,7 +276,7 @@ impl Application {
                 SignalTo::Shutdown => {
                     emit!(VectorStopped);
                     tokio::select! {
-                    _ = topology.stop().compat() => (), // Graceful shutdown finished
+                    _ = topology.stop() => (), // Graceful shutdown finished
                     _ = signals.next() => {
                         // It is highly unlikely that this event will exit from topology.
                         emit!(VectorQuit);

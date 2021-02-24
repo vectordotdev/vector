@@ -290,7 +290,7 @@ config/vector.toml
 ```
 
 Example configurations are located in `config/vector/examples/*`. You can learn more about configuring
-Vector in the [Configuration][docs.configuration] section.
+Vector in the [Configuration][docs.setup.configuration] section.
 
 ### Data Directory
 
@@ -390,7 +390,7 @@ features one has to pass a comma-separated list of component features.
 | `sources-journald`                                   | Enables building of [`journald` source][docs.sources.journald].                                                                            |
 | `sources-kafka`                                      | Enables building of [`kafka` source][docs.sources.kafka]. Requires `rdkafka-plain` or `rdkafka-cmake` feature to be also enabled.          |
 | `sources-kubernetes_logs`                            | Enables building of [`kubernetes_logs` source][docs.sources.kubernetes_logs].                                                              |
-| `sources-logplex`                                    | Enables building of [`logplex` source][docs.sources.logplex].                                                                              |
+| `sources-heroku_logs`                                | Enables building of [`heroku_logs` source][docs.sources.heroku_logs].                                                                              |
 | `sources-prometheus`                                 | Enables building of [`prometheus` source][docs.sources.prometheus].                                                                        |
 | `sources-socket`                                     | Enables building of [`socket` source][docs.sources.socket].                                                                                |
 | `sources-splunk_hec`                                 | Enables building of [`splunk_hec` source][docs.sources.splunk_hec].                                                                        |
@@ -421,9 +421,9 @@ features one has to pass a comma-separated list of component features.
 | `transforms-remove_fields`                           | Enables building of [`remove_fields` transform][docs.transforms.remove_fields].                                                            |
 | `transforms-remove_tags`                             | Enables building of [`remove_tags` transform][docs.transforms.remove_tags].                                                                |
 | `transforms-rename_fields`                           | Enables building of [`rename_fields` transform][docs.transforms.rename_fields].                                                            |
-| `transforms-sampler`                                 | Enables building of [`sampler` transform][docs.transforms.sampler].                                                                        |
+| `transforms-sample`                                  | Enables building of [`sample` transform][docs.transforms.sample].                                                                        |
 | `transforms-split`                                   | Enables building of [`split` transform][docs.transforms.split].                                                                            |
-| `transforms-swimlanes`                               | Enables building of [`swimlanes` transform][docs.transforms.swimlanes].                                                                    |
+| `transforms-route`                                   | Enables building of [`route` transform][docs.transforms.route].                                                                    |
 | `transforms-tag_cardinality_limit`                   | Enables building of [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit].                                            |
 | `transforms-tokenizer`                               | Enables building of [`tokenizer` transform][docs.transforms.tokenizer].                                                                    |
 | `transforms-wasm`                                    | Enables building of [`wasm` transform][docs.transforms.wasm].                                                                              |
@@ -466,7 +466,7 @@ features one has to pass a comma-separated list of component features.
 </p>
 </details>
 
-[docs.configuration]: /docs/setup/configuration/
+[docs.setup.configuration]: /docs/setup/configuration/
 [docs.from_archives]: /docs/setup/installation/manual/from-archives/
 [docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
 [docs.glossary#buffer]: /docs/meta/glossary/#buffer
@@ -517,7 +517,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sources.journald]: /docs/reference/sources/journald/
 [docs.sources.kafka]: /docs/reference/sources/kafka/
 [docs.sources.kubernetes_logs]: /docs/reference/sources/kubernetes_logs/
-[docs.sources.logplex]: /docs/reference/sources/logplex/
+[docs.sources.heroku_logs]: /docs/reference/sources/heroku_logs/
 [docs.sources.prometheus]: /docs/reference/sources/prometheus/
 [docs.sources.socket]: /docs/reference/sources/socket/
 [docs.sources.splunk_hec]: /docs/reference/sources/splunk_hec/
@@ -548,9 +548,9 @@ features one has to pass a comma-separated list of component features.
 [docs.transforms.remove_fields]: /docs/reference/transforms/remove_fields/
 [docs.transforms.remove_tags]: /docs/reference/transforms/remove_tags/
 [docs.transforms.rename_fields]: /docs/reference/transforms/rename_fields/
-[docs.transforms.sampler]: /docs/reference/transforms/sampler/
+[docs.transforms.sample]: /docs/reference/transforms/sample/
 [docs.transforms.split]: /docs/reference/transforms/split/
-[docs.transforms.swimlanes]: /docs/reference/transforms/swimlanes/
+[docs.transforms.route]: /docs/reference/transforms/route/
 [docs.transforms.tag_cardinality_limit]: /docs/reference/transforms/tag_cardinality_limit/
 [docs.transforms.tokenizer]: /docs/reference/transforms/tokenizer/
 [docs.transforms.wasm]: /docs/reference/transforms/wasm/

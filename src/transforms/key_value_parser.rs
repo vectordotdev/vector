@@ -1,10 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformDescription},
-    event::Event,
-    internal_events::{
-        KeyValueEventProcessed, KeyValueFieldDoesNotExist, KeyValueParseFailed,
-        KeyValueTargetExists,
-    },
+    config::{log_schema, DataType, GlobalOptions, TransformConfig, TransformDescription},
+    event::{Event, Value},
+    internal_events::{KeyValueFieldDoesNotExist, KeyValueParseFailed, KeyValueTargetExists},
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
@@ -38,7 +35,7 @@ impl_generate_config_from_default!(KeyValueConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "key_value_parser")]
 impl TransformConfig for KeyValueConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         let conversions = parse_conversion_map(&self.types)?;
         let field = self
             .field
@@ -150,15 +147,13 @@ impl FunctionTransform for KeyValue {
                 }
             }
 
-            emit!(KeyValueEventProcessed);
-
             for (mut key, val) in pairs {
                 if let Some(target_field) = self.target_field.to_owned() {
                     key = format!("{}.{}", target_field, key);
                 }
 
                 if let Some(conv) = self.conversions.get(&key) {
-                    match conv.convert(val.to_string().into()) {
+                    match conv.convert::<Value>(val.into()) {
                         Ok(value) => {
                             log.insert(key, value);
                         }
@@ -188,7 +183,7 @@ impl FunctionTransform for KeyValue {
 mod tests {
     use super::KeyValueConfig;
     use crate::{
-        config::TransformConfig,
+        config::{GlobalOptions, TransformConfig},
         event::{LogEvent, Value},
         Event,
     };
@@ -216,7 +211,7 @@ mod tests {
             trim_key,
             trim_value,
         }
-        .build()
+        .build(&GlobalOptions::default())
         .await
         .unwrap();
 

@@ -1,9 +1,6 @@
 package metadata
 
 components: sources: apache_metrics: {
-	_config_path: "/etc/apache2/httpd.conf"
-	_path:        "/server-status"
-
 	title: "Apache HTTP Server (HTTPD) Metrics"
 
 	classes: {
@@ -12,6 +9,7 @@ components: sources: apache_metrics: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -19,41 +17,7 @@ components: sources: apache_metrics: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				service: {
-					name:     "Apache HTTP server (HTTPD)"
-					thing:    "an \(name)"
-					url:      urls.apache
-					versions: null
-
-					setup: [
-						"""
-							[Install the Apache HTTP server](\(urls.apache_install)).
-							""",
-						"""
-							Enable the [Apache Status module](\(urls.apache_mod_status))
-							in your Apache config:
-
-							```text file="\(_config_path)"
-							<Location "\(_path)">
-							    SetHandler server-status
-							    Require host example.com
-							</Location>
-							```
-							""",
-						"""
-							Optionally enable [`ExtendedStatus` option](\(urls.apache_extended_status))
-							for more detailed metrics (see [Output](#output)). Note,
-							this defaults to `On` in Apache >= 2.3.6.
-
-							```text file="\(_config_path)"
-							ExtendedStatus On
-							```
-							""",
-						"""
-							Start or reload Apache to apply the config changes.
-							""",
-					]
-				}
+				service: services.apache_http
 
 				interface: {
 					socket: {
@@ -71,18 +35,27 @@ components: sources: apache_metrics: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
-		requirements: []
+		requirements: [
+			"""
+			The [Apache Status module](\(urls.apache_mod_status)) must be enabled.
+			""",
+		]
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
@@ -90,7 +63,10 @@ components: sources: apache_metrics: {
 			description: "mod_status endpoints to scrape metrics from."
 			required:    true
 			type: array: {
-				items: type: string: examples: ["http://localhost:8080/server-status/?auto"]
+				items: type: string: {
+					examples: ["http://localhost:8080/server-status/?auto"]
+					syntax: "literal"
+				}
 			}
 		}
 		scrape_interval_secs: {
@@ -109,6 +85,7 @@ components: sources: apache_metrics: {
 			warnings: []
 			type: string: {
 				default: "apache"
+				syntax:  "literal"
 			}
 		}
 	}
@@ -220,4 +197,14 @@ components: sources: apache_metrics: {
 	}
 
 	how_it_works: {}
+
+	telemetry: metrics: {
+		http_error_response_total:    components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total:    components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total
+		requests_completed_total:     components.sources.internal_metrics.output.metrics.requests_completed_total
+		request_duration_nanoseconds: components.sources.internal_metrics.output.metrics.request_duration_nanoseconds
+	}
 }

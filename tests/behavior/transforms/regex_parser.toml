@@ -11,9 +11,12 @@
   [[tests.outputs]]
     extract_from = "regex_parser_simple"
     [[tests.outputs.conditions]]
-      "timestamp.equals" = "2020-01-01T12:34:56Z"
-      "level.equals" = "INFO"
-      "message.equals" = "hello"
+      type = "remap"
+      source = '''
+        .timestamp == "2020-01-01T12:34:56Z" &&
+        .level == "INFO" &&
+        .message == "hello"
+      '''
 
 [transforms.regex_parser_target]
   inputs = []
@@ -29,6 +32,9 @@
   [[tests.outputs]]
     extract_from = "regex_parser_target"
     [[tests.outputs.conditions]]
-      "something.timestamp.equals" = "2020-01-01T12:34:56Z"
-      "something.level.equals" = "INFO"
-      "something.message.equals" = "hello"
+      type = "remap"
+      source = '''
+        .something.timestamp == "2020-01-01T12:34:56Z" &&
+        .something.level == "INFO" &&
+        .something.message == "hello"
+      '''

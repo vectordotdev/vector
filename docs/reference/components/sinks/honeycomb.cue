@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: honeycomb: {
-	title:       "Honeycomb"
-	description: "[Honeycomb](\(urls.honeycomb)) provides full stack observability—designed for high cardinality data and collaborative problem solving, enabling engineers to deeply understand and debug production software together."
+	title: "Honeycomb"
 
 	classes: {
 		commonly_used: false
@@ -10,6 +9,7 @@ components: sinks: honeycomb: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Honeycomb"]
+		stateful: false
 	}
 
 	features: {
@@ -36,15 +36,11 @@ components: sinks: honeycomb: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
 			tls: enabled: false
 			to: {
-				service: {
-					name:     "Honeycomb"
-					thing:    "a \(name) dataset"
-					url:      urls.honeycomb
-					versions: null
-				}
+				service: services.honeycomb
 
 				interface: {
 					socket: {
@@ -62,15 +58,16 @@ components: sinks: honeycomb: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -83,6 +80,7 @@ components: sinks: honeycomb: {
 			warnings: []
 			type: string: {
 				examples: ["${HONEYCOMB_API_KEY}", "some-api-key"]
+				syntax: "literal"
 			}
 		}
 		dataset: {
@@ -91,6 +89,7 @@ components: sinks: honeycomb: {
 			warnings: []
 			type: string: {
 				examples: ["my-honeycomb-dataset"]
+				syntax: "literal"
 			}
 		}
 	}

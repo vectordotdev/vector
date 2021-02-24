@@ -120,11 +120,40 @@ cli: {
 			description: """
 				Read configuration from one or more files. Wildcard paths are
 				supported. If zero files are specified the default config path
-				`/etc/vector/vector.toml` will be targeted
+				`/etc/vector/vector.toml` will be targeted.
+				TOML, YAML and JSON file formats are supported.
+				The format to interpret the file with is determined from
+				the file extension (.toml, .yaml, .json).
+				We will fallback to TOML if we are unable to detect
+				a supported format.
 				"""
 			type:    "string"
 			default: "/etc/vector/vector.toml"
 			env_var: "VECTOR_CONFIG"
+		}
+		"config-toml": {
+			description: """
+				Read configuration from one or more files. Wildcard paths are
+				supported. TOML file format is assumed.
+				"""
+			type:    "string"
+			env_var: "VECTOR_CONFIG_TOML"
+		}
+		"config-json": {
+			description: """
+				Read configuration from one or more files. Wildcard paths are
+				supported. JSON file format is assumed.
+				"""
+			type:    "string"
+			env_var: "VECTOR_CONFIG_JSON"
+		}
+		"config-yaml": {
+			description: """
+				Read configuration from one or more files. Wildcard paths are
+				supported. YAML file format is assumed.
+				"""
+			type:    "string"
+			env_var: "VECTOR_CONFIG_YAML"
 		}
 		"threads": {
 			_short: "t"
@@ -186,6 +215,7 @@ cli: {
 					description: "Format the list in an encoding schema"
 					default:     "text"
 					enum: {
+						avro: "Output components in Apache Avro format"
 						json: "Output components as JSON"
 						text: "Output components as text"
 					}
@@ -199,6 +229,33 @@ cli: {
 				therefore subject to change. For guidance on how to write unit tests check
 				out: https://vector.dev/docs/setup/guides/unit-testing/
 				"""
+
+			options: {
+				"config-toml": {
+					description: """
+						Test configuration from one or more files. Wildcard paths are
+						supported. TOML file format is assumed.
+						"""
+					type:    "string"
+					env_var: "VECTOR_CONFIG_TOML"
+				}
+				"config-json": {
+					description: """
+						Test configuration from one or more files. Wildcard paths are
+						supported. JSON file format is assumed.
+						"""
+					type:    "string"
+					env_var: "VECTOR_CONFIG_JSON"
+				}
+				"config-yaml": {
+					description: """
+						Test configuration from one or more files. Wildcard paths are
+						supported. YAML file format is assumed.
+						"""
+					type:    "string"
+					env_var: "VECTOR_CONFIG_YAML"
+				}
+			}
 
 			args: {
 				paths: _paths_arg & {
@@ -258,12 +315,80 @@ cli: {
 				}
 			}
 
+			options: {
+				"config-toml": {
+					description: """
+						Any number of Vector config files to validate.
+						TOML file format is assumed.
+						"""
+					type: "string"
+				}
+				"config-json": {
+					description: """
+						Any number of Vector config files to validate.
+						JSON file format is assumed.
+						"""
+					type: "string"
+				}
+				"config-yaml": {
+					description: """
+						Any number of Vector config files to validate.
+						YAML file format is assumed.
+						"""
+					type: "string"
+				}
+			}
+
 			args: {
 				paths: _paths_arg & {
 					description: """
 						Any number of Vector config files to validate. If none are specified
 						the default config path `/etc/vector/vector.toml` will be targeted
 						"""
+				}
+			}
+		}
+
+		"vrl": {
+			description: "Vector Remap Language CLI"
+
+			flags: _default_flags & {
+				"print-object": {
+					_short: "o"
+					description: """
+						Print the (modified) object, instead of the result of the final
+						expression.
+
+						The same result can be achieved by using `.` as the final expression.
+						"""
+				}
+			}
+
+			options: {
+				"input": {
+					_short: "i"
+					description: """
+						File containing the object(s) to manipulate. Leave empty to use stdin.
+						"""
+					type: "string"
+				}
+
+				"program": {
+					_short: "p"
+					description: """
+						File containing the program to execute. Can be used instead of `PROGRAM`.
+						"""
+					type: "string"
+				}
+			}
+
+			args: {
+				program: {
+					description: #"""
+						The program to execute. For example, `".foo = true"` sets the object's `foo`
+						field to `true`.
+						"""#
+					type: "string"
 				}
 			}
 		}

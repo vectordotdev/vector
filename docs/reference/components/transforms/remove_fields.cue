@@ -3,10 +3,15 @@ package metadata
 components: transforms: remove_fields: {
 	title: "Remove Fields"
 
+	description: """
+		Removes one or more log fields.
+		"""
+
 	classes: {
 		commonly_used: false
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -14,17 +19,26 @@ components: transforms: remove_fields: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(remove_fields._remap_deprecation_notice)
+
+			```vrl
+			del(.level)
+			```
+			""",
+		]
 		notices: []
 	}
 
@@ -40,7 +54,10 @@ components: transforms: remove_fields: {
 			description: "The log field names to drop."
 			required:    true
 			warnings: []
-			type: array: items: type: string: examples: ["field1", "field2", "parent.child"]
+			type: array: items: type: string: {
+				examples: ["field1", "field2", "parent.child"]
+				syntax: "literal"
+			}
 		}
 	}
 

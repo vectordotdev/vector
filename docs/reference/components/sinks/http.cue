@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: http: {
-	title:       "HTTP"
-	description: "Batches log events to a generic [HTTP](\(urls.http)) endpoint."
+	title: "HTTP"
 
 	classes: {
 		commonly_used: true
@@ -10,6 +9,7 @@ components: sinks: http: {
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -45,6 +45,7 @@ components: sinks: http: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               30
+				headers:                    true
 			}
 			tls: {
 				enabled:                true
@@ -73,15 +74,16 @@ components: sinks: http: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -92,27 +94,30 @@ components: sinks: http: {
 			password_example: "${HTTP_PASSWORD}"
 			username_example: "${HTTP_USERNAME}"
 		}}
-		headers: {
-			common:      false
-			description: "Options for custom headers."
-			required:    false
-			warnings: []
-			type: object: {
-				examples: [
-					{
-						"Authorization": "${HTTP_TOKEN}"
-						"X-Powered-By":  "Vector"
-					},
-				]
-				options: {}
-			}
-		}
 		uri: {
-			description: "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
-			required:    true
+			description: """
+				The full URI to make HTTP requests to. This should include the protocol and host,
+				but can also include the port, path, and any other valid part of a URI.
+				"""
+			required: true
 			warnings: []
 			type: string: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
+				syntax: "literal"
+			}
+		}
+		healthcheck: type: object: options: uri: {
+			common: false
+			description: """
+				The full URI to make HTTP health check request to. This should include the protocol and host,
+				but can also include the port, path, and any other valid part of a URI.
+				"""
+			required: false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["https://10.22.212.22:9000/health"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -123,6 +128,9 @@ components: sinks: http: {
 	}
 
 	telemetry: metrics: {
+		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
 		http_bad_requests_total: components.sources.internal_metrics.output.metrics.http_bad_requests_total
+		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:  components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

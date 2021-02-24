@@ -17,10 +17,10 @@ installation: _interfaces: rpm: {
 		config:      "/etc/vector/vector.{config_format}"
 	}
 
-	roles: [Name=string]: {
-		commands: roles._systemd_commands & {
+	role_implementations: [Name=string]: {
+		commands: role_implementations._systemd_commands & {
 			_config_path: paths.config
-			install:      "sudo rpm -i https://packages.timber.io/vector/{version}/vector-{arch}.rpm"
+			install:      "sudo rpm -i https://packages.timber.io/vector/{version}/vector-{version}-1.{arch}.rpm"
 			uninstall:    "sudo rpm -e vector"
 			upgrade:      null
 		}
@@ -48,8 +48,8 @@ installation: _interfaces: rpm: {
 		}
 	}
 
-	roles: {
-		agent:      roles._journald_agent
-		aggregator: roles._vector_aggregator
+	role_implementations: {
+		agent:      role_implementations._journald_agent
+		aggregator: role_implementations._vector_aggregator
 	}
 }

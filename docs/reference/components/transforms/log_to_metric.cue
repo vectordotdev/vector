@@ -3,10 +3,15 @@ package metadata
 components: transforms: log_to_metric: {
 	title: "Log to Metric"
 
+	description: """
+		Derives one or more metric events from a log event.
+		"""
+
 	classes: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -14,15 +19,16 @@ components: transforms: log_to_metric: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -42,13 +48,14 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							examples: ["duration", "parent.child"]
+							syntax: "literal"
 						}
 					}
 					increment_by_value: {
 						description: """
-	                If `true` the metric will be incremented by the `field` value.
-	                If `false` the metric will be incremented by 1 regardless of the `field` value.
-	                """
+							If `true` the metric will be incremented by the `field` value.
+							If `false` the metric will be incremented by 1 regardless of the `field` value.
+							"""
 						required: false
 						common:   false
 						warnings: []
@@ -64,8 +71,8 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							examples: ["duration_total"]
-							default:      null
-							templateable: true
+							default: null
+							syntax:  "template"
 						}
 					}
 					namespace: {
@@ -75,8 +82,8 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							examples: ["service"]
-							default:      null
-							templateable: true
+							default: null
+							syntax:  "template"
 						}
 					}
 					tags: {
@@ -117,6 +124,7 @@ components: transforms: log_to_metric: {
 								set:       "A [set metric type][docs.data-model.metric#set]."
 								summary:   "A [distribution metric type][docs.data-model.metric#distribution] with summary statistic."
 							}
+							syntax: "literal"
 						}
 					}
 				}
@@ -296,8 +304,7 @@ components: transforms: log_to_metric: {
 					host:   "10.22.11.222"
 				}
 				distribution: {
-					values: [54.2]
-					sample_rates: [1]
+					samples: [{value: 54.2, rate: 1}]
 					statistic: "histogram"
 				}
 			}}]
@@ -332,8 +339,7 @@ components: transforms: log_to_metric: {
 					host:   "10.22.11.222"
 				}
 				distribution: {
-					values: [54.2]
-					sample_rates: [1]
+					samples: [{value: 54.2, rate: 1}]
 					statistic: "summary"
 				}
 			}}]
@@ -407,5 +413,9 @@ components: transforms: log_to_metric: {
 				will not be emitted.
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

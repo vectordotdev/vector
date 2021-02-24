@@ -2,7 +2,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::AwsKinesisStreamsEventSent,
-    rusoto::{self, RegionOrEndpoint},
+    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
@@ -49,7 +49,10 @@ pub struct KinesisSinkConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub assume_role: Option<String>,
+    // Deprecated name. Moved to auth.
+    assume_role: Option<String>,
+    #[serde(default)]
+    pub auth: AWSAuthentication,
 }
 
 lazy_static! {
@@ -130,7 +133,7 @@ impl KinesisSinkConfig {
         let region = (&self.region).try_into()?;
 
         let client = rusoto::client()?;
-        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+        let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
         Ok(KinesisClient::new_with_client(client, region))
@@ -274,7 +277,7 @@ fn encode_event(
             warn!(
                 message = "Partition key does not exist; dropping event.",
                 %partition_key_field,
-                rate_limit_secs = 30,
+                internal_log_rate_secs = 30,
             );
             return None;
         }
@@ -420,6 +423,7 @@ mod integration_tests {
             },
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let cx = SinkContext::new_test();

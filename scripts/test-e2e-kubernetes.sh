@@ -91,7 +91,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
   else
     # Package a .deb file to build a docker container, unless skipped.
     if [[ -z "${SKIP_PACKAGE_DEB:-}" ]]; then
-      make package-deb-x86_64
+      make package-deb-x86_64-unknown-linux-gnu
     fi
 
     # Prepare test image parameters.
@@ -104,7 +104,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
       CHANNEL="test" \
       BASE="$BASE_TAG" \
       TAG="$VERSION_TAG" \
-      PUSH="" \
+      PUSH="false" \
       scripts/build-docker.sh
 
     # Prepare the container image for the deployment command.
@@ -116,6 +116,7 @@ if [[ -z "${SKIP_CONTAINER_IMAGE_PUBLISHING:-}" ]]; then
   # Make the container image accessible to the k8s cluster.
   if is_minikube_cache_enabled; then
     minikube cache add "$CONTAINER_IMAGE"
+    trap 'minikube cache delete "$CONTAINER_IMAGE"' EXIT
   else
     docker push "$CONTAINER_IMAGE"
   fi
@@ -129,19 +130,25 @@ KUBE_TEST_DEPLOY_COMMAND="$(pwd)/scripts/deploy-kubernetes-test.sh"
 export KUBE_TEST_DEPLOY_COMMAND
 
 # Prepare args.
-CARGO_TEST_ARGS=()
+CARGO_TEST_ARGS_CARGO=()
+CARGO_TEST_ARGS_PASSED=()
 if [[ -n "${SCOPE:-}" && "$SCOPE" != '""' ]]; then
-  CARGO_TEST_ARGS+=("$SCOPE")
+  CARGO_TEST_ARGS_PASSED+=("$SCOPE")
+fi
+if [[ -n "${TEST:-}" && "$TEST" != '""' ]]; then
+  CARGO_TEST_ARGS_CARGO+=(--test "$TEST")
+else
+  CARGO_TEST_ARGS_CARGO+=(--tests)
 fi
 
 # Run the tests.
 cd lib/k8s-e2e-tests
 cargo test \
-  --tests \
   --no-fail-fast \
   --no-default-features \
-  --features all \
+  --features e2e-tests \
+  "${CARGO_TEST_ARGS_CARGO[@]}" \
   -- \
   --nocapture \
   --test-threads 1 \
-  "${CARGO_TEST_ARGS[@]}"
+  "${CARGO_TEST_ARGS_PASSED[@]}"

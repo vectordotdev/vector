@@ -3,10 +3,15 @@ package metadata
 components: transforms: json_parser: {
 	title: "JSON Parser"
 
+	description: """
+		Parses a log field value as [JSON](\(urls.json)).
+		"""
+
 	classes: {
 		commonly_used: false
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -20,17 +25,26 @@ components: transforms: json_parser: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(json_parser._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_json(.message)
+			```
+			""",
+		]
 		notices: []
 	}
 
@@ -56,6 +70,7 @@ components: transforms: json_parser: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
+				syntax: "literal"
 			}
 		}
 		overwrite_target: {
@@ -73,6 +88,7 @@ components: transforms: json_parser: {
 			type: string: {
 				default: null
 				examples: ["root_field", "parent.child"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -135,5 +151,9 @@ components: transforms: json_parser: {
 				},
 			]
 		}
+	}
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

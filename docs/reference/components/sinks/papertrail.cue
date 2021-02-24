@@ -1,15 +1,15 @@
 package metadata
 
 components: sinks: papertrail: {
-	title:       "Papertrail"
-	description: "[Papertrail](\(urls.papertrail)) is a web-based log aggregation application used by developers and IT team to search and view logs in real time."
+	title: "Papertrail"
 
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		service_providers: ["Papertrail"]
+		stateful: false
 	}
 
 	features: {
@@ -25,7 +25,9 @@ components: sinks: papertrail: {
 					enum: ["json", "text"]
 				}
 			}
-			request: enabled: false
+			send_buffer_bytes: enabled: true
+			keepalive: enabled:         true
+			request: enabled:           false
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -34,12 +36,7 @@ components: sinks: papertrail: {
 				enabled_default:        true
 			}
 			to: {
-				service: {
-					name:     "Papertrail"
-					thing:    "an \(name) account"
-					url:      urls.papertrail
-					versions: null
-				}
+				service: services.papertrail
 
 				interface: {
 					socket: {
@@ -57,15 +54,16 @@ components: sinks: papertrail: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -77,6 +75,7 @@ components: sinks: papertrail: {
 			required:    true
 			type: string: {
 				examples: ["logs.papertrailapp.com:12345"]
+				syntax: "literal"
 			}
 		}
 	}

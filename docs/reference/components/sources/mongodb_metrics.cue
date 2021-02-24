@@ -1,8 +1,7 @@
 package metadata
 
 components: sources: mongodb_metrics: {
-	title:       "MongoDB Metrics"
-	description: "[MongoDB][urls.mongodb] is a general purpose, document-based, distributed database built for modern application developers and for the cloud era."
+	title: "MongoDB Metrics"
 
 	classes: {
 		commonly_used: false
@@ -10,18 +9,14 @@ components: sources: mongodb_metrics: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				service: {
-					name:     "MongoDB Server"
-					thing:    "an \(name)"
-					url:      urls.mongodb
-					versions: null
-				}
+				service: services.mongodb
 
 				interface: {
 					socket: {
@@ -40,21 +35,29 @@ components: sources: mongodb_metrics: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: [
-			"User from endpoint should have enough privileges for running [serverStatus][urls.mongodb_command_server_status] command",
+			"""
+				User from endpoint should have enough privileges for running
+				[serverStatus][urls.mongodb_command_server_status] command.
+				""",
 		]
 
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
@@ -62,7 +65,10 @@ components: sources: mongodb_metrics: {
 			description: "MongoDB [Connection String URI Format][urls.mongodb_connection_string_uri_format]"
 			required:    true
 			type: array: {
-				items: type: string: examples: ["mongodb://localhost:27017"]
+				items: type: string: {
+					examples: ["mongodb://localhost:27017"]
+					syntax: "literal"
+				}
 			}
 		}
 		scrape_interval_secs: {
@@ -78,7 +84,10 @@ components: sources: mongodb_metrics: {
 			description: "The namespace of metrics. Disabled if empty."
 			common:      false
 			required:    false
-			type: string: default: "mongodb"
+			type: string: {
+				default: "mongodb"
+				syntax:  "literal"
+			}
 		}
 	}
 
@@ -99,7 +108,7 @@ components: sources: mongodb_metrics: {
 	telemetry: metrics: {
 		collect_completed_total:      components.sources.internal_metrics.output.metrics.collect_completed_total
 		collect_duration_nanoseconds: components.sources.internal_metrics.output.metrics.collect_duration_nanoseconds
-		request_error_total:          components.sources.internal_metrics.output.metrics.request_error_total
+		request_errors_total:         components.sources.internal_metrics.output.metrics.request_errors_total
 		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
 	}
 
@@ -748,5 +757,12 @@ components: sources: mongodb_metrics: {
 			default_namespace: "mongodb"
 			tags:              _mongodb_metrics_tags
 		}
+	}
+
+	telemetry: metrics: {
+		collect_completed_total:      components.sources.internal_metrics.output.metrics.collect_completed_total
+		collect_duration_nanoseconds: components.sources.internal_metrics.output.metrics.collect_duration_nanoseconds
+		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
+		request_errors_total:         components.sources.internal_metrics.output.metrics.request_errors_total
 	}
 }

@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    rusoto::{self, RegionOrEndpoint},
+    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
@@ -46,7 +46,10 @@ pub struct KinesisFirehoseSinkConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub assume_role: Option<String>,
+    // Deprecated name. Moved to auth.
+    assume_role: Option<String>,
+    #[serde(default)]
+    pub auth: AWSAuthentication,
 }
 
 lazy_static! {
@@ -127,7 +130,7 @@ impl KinesisFirehoseSinkConfig {
         let region = (&self.region).try_into()?;
 
         let client = rusoto::client()?;
-        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+        let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
         Ok(KinesisFirehoseClient::new_with_client(client, region))
@@ -159,7 +162,7 @@ impl KinesisFirehoseService {
                 cx.acker(),
             )
             .sink_map_err(|error| error!(message = "Fatal kinesis firehose sink error.", %error))
-            .with_flat_map(move |e| stream::iter(encode_event(e, &encoding)).map(Ok));
+            .with_flat_map(move |e| stream::iter(Some(encode_event(e, &encoding))).map(Ok));
 
         Ok(sink)
     }
@@ -237,7 +240,7 @@ enum HealthcheckError {
     StreamNamesMismatch { name: String, stream_name: String },
 }
 
-fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Record> {
+fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Record {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
     let data = match encoding.codec() {
@@ -251,7 +254,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
 
     let data = Bytes::from(data);
 
-    Some(Record { data })
+    Record { data }
 }
 
 #[cfg(test)]
@@ -267,7 +270,7 @@ mod tests {
     #[test]
     fn firehose_encode_event_text() {
         let message = "hello world".to_string();
-        let event = encode_event(message.clone().into(), &Encoding::Text.into()).unwrap();
+        let event = encode_event(message.clone().into(), &Encoding::Text.into());
 
         assert_eq!(&event.data[..], message.as_bytes());
     }
@@ -277,7 +280,7 @@ mod tests {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("key", "value");
-        let event = encode_event(event, &Encoding::Json.into()).unwrap();
+        let event = encode_event(event, &Encoding::Json.into());
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
@@ -333,6 +336,7 @@ mod integration_tests {
                 ..Default::default()
             },
             assume_role: None,
+            auth: Default::default(),
         };
 
         let cx = SinkContext::new_test();
@@ -348,7 +352,7 @@ mod integration_tests {
         delay_for(Duration::from_secs(1)).await;
 
         let config = ElasticSearchConfig {
-            auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
+            auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default {})),
             endpoint: "http://localhost:4571".into(),
             index: Some(stream.clone()),
             ..Default::default()

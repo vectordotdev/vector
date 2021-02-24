@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: statsd: {
-	title:       "Statsd"
-	description: "[StatsD](\(urls.statsd)) is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy](\(urls.etsy)) in Node."
+	title: "Statsd"
 
 	classes: sinks.socket.classes
 
@@ -16,14 +15,13 @@ components: sinks: statsd: {
 				codec: enabled: false
 			}
 			request: sinks.socket.features.send.request
-			tls:     sinks.socket.features.send.tls
+			send_buffer_bytes: {
+				enabled:       true
+				relevant_when: "mode = `tcp` or mode = `udp` && os = `unix`"
+			}
+			tls: sinks.socket.features.send.tls
 			to: {
-				service: {
-					name:     "Statsd receiver"
-					thing:    "a \(name)"
-					url:      urls.statsd
-					versions: null
-				}
+				service: services.statsd_receiver
 
 				interface: {
 					socket: {
@@ -51,6 +49,7 @@ components: sinks: statsd: {
 	}
 
 	configuration: sinks.socket.configuration & {
+		"type": "type": string: enum: statsd: "The type of this component."
 		default_namespace: {
 			common: true
 			description: """
@@ -62,6 +61,7 @@ components: sinks: statsd: {
 			type: string: {
 				default: null
 				examples: ["service"]
+				syntax: "literal"
 			}
 		}
 	}

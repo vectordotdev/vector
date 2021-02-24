@@ -34,7 +34,7 @@ observability data with Vector.
 ## Configuring
 
 As shown above, you can pass a custom
-[Vector configuration file][docs.configuration] via the `-c` flag. You'll want
+[Vector configuration file][docs.setup.configuration] via the `-c` flag. You'll want
 to do this since the
 [default `/etc/vector/vector.toml` configuration file][urls.default_configuration]
 doesn't do anything.
@@ -118,7 +118,7 @@ Vector's Docker source files are located
 [in it's Github repo][urls.vector_docker_source_files].
 
 [docs.administration]: https://vector.dev/docs/administration/
-[docs.configuration]: https://vector.dev/docs/setup/configuration/
+[docs.setup.configuration]: https://vector.dev/docs/setup/configuration/
 [docs.deployment]: https://vector.dev/docs/setup/deployment/
 [docs.sinks]: https://vector.dev/docs/reference/sinks/
 [docs.sources]: https://vector.dev/docs/reference/sources/

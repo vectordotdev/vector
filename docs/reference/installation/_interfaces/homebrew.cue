@@ -17,7 +17,7 @@ installation: _interfaces: homebrew: {
 		config:      "/etc/vector/vector.{config_format}"
 	}
 
-	roles: [Name=string]: {
+	role_implementations: [Name=string]: {
 		commands: {
 			_config_path: paths.config
 			install:      "brew tap timberio/brew && brew install vector"
@@ -37,7 +37,7 @@ installation: _interfaces: homebrew: {
 				},
 				{
 					title:   "Configure Vector"
-					command: "fix me"
+					command: commands.configure
 				},
 				{
 					title:   "Restart Vector"
@@ -47,8 +47,8 @@ installation: _interfaces: homebrew: {
 		}
 	}
 
-	roles: {
-		agent:      roles._file_agent
-		aggregator: roles._vector_aggregator
+	role_implementations: {
+		agent:      role_implementations._file_agent
+		aggregator: role_implementations._vector_aggregator
 	}
 }

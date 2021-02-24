@@ -1,9 +1,8 @@
 package metadata
 
 components: sources: prometheus_scrape: {
-	title:       "Prometheus"
-	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
-	alias:       "prometheus"
+	title: "Prometheus Scrape"
+	alias: "prometheus"
 
 	classes: {
 		commonly_used: false
@@ -11,18 +10,14 @@ components: sources: prometheus_scrape: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				service: {
-					name:     "Prometheus"
-					thing:    "one or more \(name) endpoints"
-					url:      urls.prometheus_client
-					versions: null
-				}
+				service: services.prometheus_client
 
 				interface: socket: {
 					api: {
@@ -46,18 +41,23 @@ components: sources: prometheus_scrape: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
@@ -66,7 +66,10 @@ components: sources: prometheus_scrape: {
 			required:    true
 			warnings: ["You must explicitly add the path to your endpoints. Vector will _not_ automatically add `/metics`."]
 			type: array: {
-				items: type: string: examples: ["http://localhost:9090/metrics"]
+				items: type: string: {
+					examples: ["http://localhost:9090/metrics"]
+					syntax: "literal"
+				}
 			}
 		}
 		scrape_interval_secs: {

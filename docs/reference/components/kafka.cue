@@ -1,30 +1,33 @@
 package metadata
 
 components: _kafka: {
-	description: "[Apache Kafka](\(urls.kafka)) is an open-source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. These features make it an excellent candidate for durably storing logs and metrics data."
-
 	features: {
-		_service: {
-			name:     "Kafka"
-			thing:    "\(name) topics"
-			url:      urls.kafka
-			versions: ">= 0.8"
-		}
-
 		collect: from: {
-			service: _service
-		}
-
-		send: to: {
-			service: _service
+			service: services.kafka
 			interface: {
 				socket: {
 					api: {
-						title: "Influx HTTP API"
-						url:   urls.influxdb_http_api_v2
+						title: "Kafka protocol"
+						url:   urls.kafka_protocol
+					}
+					direction: "incoming"
+					port:      9093
+					protocols: ["tcp"]
+					ssl: "optional"
+				}
+			}
+		}
+
+		send: to: {
+			service: services.kafka
+			interface: {
+				socket: {
+					api: {
+						title: "Kafka protocol"
+						url:   urls.kafka_protocol
 					}
 					direction: "outgoing"
-					protocols: ["http"]
+					protocols: ["tcp"]
 					ssl: "optional"
 				}
 			}
@@ -32,15 +35,16 @@ components: _kafka: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -53,6 +57,7 @@ components: _kafka: {
 			warnings: []
 			type: string: {
 				examples: ["10.14.22.123:9092,10.14.23.332:9092"]
+				syntax: "literal"
 			}
 		}
 		librdkafka_options: {
@@ -94,10 +99,5 @@ components: _kafka: {
 				this dependency is packaged with Vector, meaning you do not need to install it.
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		consumer_offset_updates_failed_total: components.sources.internal_metrics.output.metrics.consumer_offset_updates_failed_total
-		events_failed_total:                  components.sources.internal_metrics.output.metrics.events_failed_total
 	}
 }

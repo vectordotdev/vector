@@ -3,10 +3,15 @@ package metadata
 components: transforms: remove_tags: {
 	title: "Remove Tags"
 
+	description: """
+		Removes one or more metric tags.
+		"""
+
 	classes: {
 		commonly_used: false
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -14,17 +19,26 @@ components: transforms: remove_tags: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(remove_tags._remap_deprecation_notice)
+
+			```vrl
+			del(.tag)
+			```
+			""",
+		]
 		notices: []
 	}
 
@@ -33,7 +47,10 @@ components: transforms: remove_tags: {
 			description: "The tag names to drop."
 			required:    true
 			warnings: []
-			type: array: items: type: string: examples: ["tag1", "tag2"]
+			type: array: items: type: string: {
+				examples: ["tag1", "tag2"]
+				syntax: "literal"
+			}
 		}
 	}
 

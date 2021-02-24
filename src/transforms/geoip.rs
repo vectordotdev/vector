@@ -1,7 +1,7 @@
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{GeoipEventProcessed, GeoipFieldDoesNotExist, GeoipIpAddressParseError},
+    internal_events::{GeoipFieldDoesNotExist, GeoipIpAddressParseError},
     transforms::{FunctionTransform, Transform},
     Result,
 };
@@ -61,7 +61,7 @@ impl GenerateConfig for GeoipConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "geoip")]
 impl TransformConfig for GeoipConfig {
-    async fn build(&self) -> Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform> {
         Ok(Transform::function(Geoip::new(
             self.database.clone(),
             self.source.clone(),
@@ -199,8 +199,6 @@ impl FunctionTransform for Geoip {
         if let Ok(json_value) = json_value {
             event.as_mut_log().insert(target_field, json_value);
         }
-
-        emit!(GeoipEventProcessed);
 
         output.push(event);
     }

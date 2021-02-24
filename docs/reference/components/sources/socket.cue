@@ -11,19 +11,14 @@ components: sources: socket: {
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "socket client"
-					thing:    "a \(name)"
-					url:      urls.prometheus_client
-					versions: null
-				}
-
+				service: services.socket_client
 				interface: socket: {
 					direction: "incoming"
 					port:      _port
@@ -31,7 +26,11 @@ components: sources: socket: {
 					ssl: "optional"
 				}
 			}
-
+			receive_buffer_bytes: {
+				enabled:       true
+				relevant_when: "mode = `tcp` or mode = `udp` && os = `unix`"
+			}
+			keepalive: enabled: true
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -42,46 +41,51 @@ components: sources: socket: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
 	}
 
+	installation: {
+		platform_name: null
+	}
+
 	configuration: {
 		address: {
-			description: "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
-			groups: ["tcp", "udp"]
-			required: true
+			description:   "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
+			relevant_when: "mode = `tcp` or `udp`"
+			required:      true
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
+				syntax: "literal"
 			}
 		}
 		host_key: {
 			category:    "Context"
 			common:      false
-			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.global-options#host_key]."
-			groups: ["tcp", "udp", "unix"]
-			required: false
+			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
+			required:    false
 			warnings: []
 			type: string: {
 				default: "host"
+				syntax:  "literal"
 			}
 		}
 		max_length: {
 			common:      true
 			description: "The maximum bytes size of incoming messages before they are discarded."
-			groups: ["tcp", "udp", "unix"]
-			required: false
+			required:    false
 			warnings: []
 			type: uint: {
 				default: 102400
@@ -90,31 +94,33 @@ components: sources: socket: {
 		}
 		mode: {
 			description: "The type of socket to use."
-			groups: ["tcp", "udp", "unix"]
-			required: true
+			required:    true
 			warnings: []
 			type: string: {
 				enum: {
-					tcp:  "TCP Socket."
-					udp:  "UDP Socket."
-					unix: "Unix Domain Socket."
+					tcp:           "TCP socket."
+					udp:           "UDP socket."
+					unix_datagram: "Unix domain datagram socket."
+					unix_stream:   "Unix domain stream socket."
 				}
+				syntax: "literal"
 			}
 		}
 		path: {
-			description: "The unix socket path. *This should be an absolute path*."
-			groups: ["unix"]
-			required: true
+			description:   "The unix socket path. *This should be an absolute path*."
+			relevant_when: "mode = `unix`"
+			required:      true
 			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
+				syntax: "literal"
 			}
 		}
 		shutdown_timeout_secs: {
-			common:      false
-			description: "The timeout before a connection is forcefully closed during shutdown."
-			groups: ["tcp"]
-			required: false
+			common:        false
+			description:   "The timeout before a connection is forcefully closed during shutdown."
+			relevant_when: "mode = `tcp``"
+			required:      false
 			warnings: []
 			type: uint: {
 				default: 30
@@ -153,6 +159,11 @@ components: sources: socket: {
 	]
 
 	telemetry: metrics: {
-		connection_errors_total: components.sources.internal_metrics.output.metrics.connection_errors_total
+		connection_errors_total:      components.sources.internal_metrics.output.metrics.connection_errors_total
+		connection_failed_total:      components.sources.internal_metrics.output.metrics.connection_failed_total
+		connection_established_total: components.sources.internal_metrics.output.metrics.connection_established_total
+		connection_failed_total:      components.sources.internal_metrics.output.metrics.connection_failed_total
+		connection_send_errors_total: components.sources.internal_metrics.output.metrics.connection_send_errors_total
+		connection_shutdown_total:    components.sources.internal_metrics.output.metrics.connection_shutdown_total
 	}
 }

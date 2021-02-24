@@ -3,7 +3,12 @@ use criterion::{criterion_group, BatchSize, Criterion, Throughput};
 use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 use rand_distr::{Alphanumeric, Distribution, Uniform};
 
-use vector::{config::TransformConfig, event::Event, test_util::runtime, transforms};
+use vector::{
+    config::{GlobalOptions, TransformConfig},
+    event::Event,
+    test_util::runtime,
+    transforms,
+};
 
 fn benchmark_regex(c: &mut Criterion) {
     let lines: Vec<String> = http_access_log_lines().take(10).collect();
@@ -26,7 +31,7 @@ fn benchmark_regex(c: &mut Criterion) {
                 drop_failed: true,
                 ..Default::default()
             }
-            .build()
+            .build(&GlobalOptions::default())
             .await
             .unwrap().into_function()
         });
@@ -67,11 +72,17 @@ fn http_access_log_lines() -> impl Iterator<Item = String> {
                 rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>(), // IP
                 year.sample(&mut rng), mday.sample(&mut rng), // date
                 hour.sample(&mut rng), minsec.sample(&mut rng), minsec.sample(&mut rng), // time
-                (&mut rng).sample_iter(&Alphanumeric).take(url_size).collect::<String>(), // URL
+                (&mut rng).sample_iter(&Alphanumeric).take(url_size).map(char::from).collect::<String>(), // URL
                 code.sample(&mut rng), size.sample(&mut rng),
-                (&mut rng).sample_iter(&Alphanumeric).take(browser_size).collect::<String>(),
+                (&mut rng).sample_iter(&Alphanumeric).take(browser_size).map(char::from).collect::<String>(),
         )
     })
 }
 
-criterion_group!(benches, benchmark_regex);
+criterion_group!(
+    name = benches;
+    // encapsulates CI noise we saw in
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.07);
+    targets = benchmark_regex
+);

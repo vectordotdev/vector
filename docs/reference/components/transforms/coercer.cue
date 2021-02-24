@@ -3,10 +3,15 @@ package metadata
 components: transforms: coercer: {
 	title: "Coercer"
 
+	description: """
+		Coerces log fields into typed values.
+		"""
+
 	classes: {
 		commonly_used: false
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -14,17 +19,30 @@ components: transforms: coercer: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(coercer._remap_deprecation_notice)
+
+			```vrl
+			.bool = to_bool("false")
+			.float = to_float("1.0")
+			.int = to_int("1")
+			.string = to_string(1)
+			.timestamp = to_timestamp("2021-01-15T12:33:22.213221Z")
+			```
+			""",
+		]
 		notices: []
 	}
 
@@ -75,4 +93,8 @@ components: transforms: coercer: {
 			}
 		},
 	]
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+	}
 }

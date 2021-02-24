@@ -18,7 +18,7 @@ installation: _interfaces: msi: {
 		config:      #"\#(_dir)\config\vector.{config_format}"#
 	}
 
-	roles: [Name=string]: {
+	role_implementations: [Name=string]: {
 		commands: {
 			configure: #"""
 						cat <<-VECTORCFG > \#(paths.config)
@@ -26,8 +26,8 @@ installation: _interfaces: msi: {
 						VECTORCFG
 						"""#
 			install: #"""
-				powershell Invoke-WebRequest https://packages.timber.io/vector/{version}/vector-{arch}.msi -OutFile vector-{arch}.msi && \
-					msiexec /i vector-{arch}.msi /quiet
+				powershell Invoke-WebRequest https://packages.timber.io/vector/{version}/vector-{arch}.msi -OutFile vector-{version}-{arch}.msi && \
+					msiexec /i vector-{version}-{arch}.msi /quiet
 				"""#
 			logs:      null
 			reload:    null
@@ -61,8 +61,8 @@ installation: _interfaces: msi: {
 		}
 	}
 
-	roles: {
-		agent:      roles._file_agent
-		aggregator: roles._vector_aggregator
+	role_implementations: {
+		agent:      role_implementations._file_agent
+		aggregator: role_implementations._vector_aggregator
 	}
 }

@@ -2,11 +2,13 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
-    event::Event,
     internal_events::{NatsEventMissingKeys, NatsEventSendFail, NatsEventSendSuccess},
-    sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
-    sinks::util::StreamSink,
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfiguration},
+        StreamSink,
+    },
     template::{Template, TemplateError},
+    Event,
 };
 use async_trait::async_trait;
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
@@ -24,9 +26,9 @@ enum BuildError {
  * Code dealing with the SinkConfig struct.
  */
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NatsSinkConfig {
-    encoding: EncodingConfigWithDefault<Encoding>,
+    encoding: EncodingConfig<Encoding>,
     #[serde(default = "default_name")]
     name: String,
     subject: String,
@@ -38,10 +40,8 @@ fn default_name() -> String {
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
-#[derivative(Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
-    #[derivative(Default)]
     Text,
     Json,
 }
@@ -85,18 +85,16 @@ impl SinkConfig for NatsSinkConfig {
 }
 
 impl NatsSinkConfig {
-    fn to_nats_options(&self) -> crate::Result<nats::Options> {
+    fn to_nats_options(&self) -> nats::Options {
         // Set reconnect_buffer_size on the nats client to 0 bytes so that the
         // client doesn't buffer internally (to avoid message loss).
-        let options = nats::Options::new()
+        nats::Options::new()
             .with_name(&self.name)
-            .reconnect_buffer_size(0);
-
-        Ok(options)
+            .reconnect_buffer_size(0)
     }
 
     async fn connect(&self) -> crate::Result<nats::asynk::Connection> {
-        self.to_nats_options()?
+        self.to_nats_options()
             .connect_async(&self.url)
             .map_err(|e| e.into())
             .await
@@ -127,13 +125,11 @@ pub struct NatsSink {
 impl NatsSink {
     fn new(config: NatsSinkConfig, acker: Acker) -> crate::Result<Self> {
         Ok(NatsSink {
-            acker,
             options: (&config).into(),
+            encoding: config.encoding,
             subject: Template::try_from(config.subject).context(SubjectTemplate)?,
             url: config.url,
-
-            // DEV: the following causes a move; needs to be last.
-            encoding: config.encoding.into(),
+            acker,
         })
     }
 }
@@ -179,12 +175,13 @@ impl StreamSink for NatsSink {
                     emit!(NatsEventSendSuccess {
                         byte_size: message_len,
                     });
-                    self.acker.ack(1);
                 }
                 Err(error) => {
                     emit!(NatsEventSendFail { error });
                 }
             }
+
+            self.acker.ack(1);
         }
 
         Ok(())
@@ -258,10 +255,10 @@ mod integration_tests {
         let subject = format!("test-{}", random_string(10));
 
         let cnf = NatsSinkConfig {
-            encoding: EncodingConfigWithDefault::from(Encoding::Text),
+            encoding: EncodingConfig::from(Encoding::Text),
+            name: "".to_owned(),
             subject: subject.clone(),
             url: "nats://127.0.0.1:4222".to_owned(),
-            ..Default::default()
         };
 
         // Establish the consumer subscription.

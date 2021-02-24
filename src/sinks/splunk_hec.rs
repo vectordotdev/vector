@@ -1,13 +1,10 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
     http::HttpClient,
-    internal_events::{
-        SplunkEventEncodeError, SplunkEventSent, SplunkSourceMissingKeys,
-        SplunkSourceTypeMissingKeys,
-    },
+    internal_events::{SplunkEventEncodeError, SplunkEventSent, SplunkMissingKeys},
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig,
     },
@@ -29,7 +26,7 @@ pub enum BuildError {
     UriMissingScheme,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct HecSinkConfig {
     pub token: String,
@@ -40,14 +37,10 @@ pub struct HecSinkConfig {
     pub host_key: String,
     #[serde(default)]
     pub indexed_fields: Vec<String>,
-    pub index: Option<String>,
+    pub index: Option<Template>,
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -67,9 +60,7 @@ lazy_static! {
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Derivative)]
 #[serde(rename_all = "snake_case")]
-#[derivative(Default)]
 pub enum Encoding {
-    #[derivative(Default)]
     Text,
     Json,
 }
@@ -82,7 +73,25 @@ inventory::submit! {
     SinkDescription::new::<HecSinkConfig>("splunk_hec")
 }
 
-impl_generate_config_from_default!(HecSinkConfig);
+impl GenerateConfig for HecSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
+            endpoint: "endpoint".to_owned(),
+            host_key: default_host_key(),
+            indexed_fields: vec![],
+            index: None,
+            sourcetype: None,
+            source: None,
+            encoding: Encoding::Text.into(),
+            compression: Compression::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            tls: None,
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec")]
@@ -135,7 +144,8 @@ impl HttpSink for HecSinkConfig {
             sourcetype
                 .render_string(&event)
                 .map_err(|missing_keys| {
-                    emit!(SplunkSourceTypeMissingKeys {
+                    emit!(SplunkMissingKeys {
+                        field: "sourcetype",
                         keys: &missing_keys
                     });
                 })
@@ -146,7 +156,20 @@ impl HttpSink for HecSinkConfig {
             source
                 .render_string(&event)
                 .map_err(|missing_keys| {
-                    emit!(SplunkSourceMissingKeys {
+                    emit!(SplunkMissingKeys {
+                        field: "source",
+                        keys: &missing_keys
+                    });
+                })
+                .ok()
+        });
+
+        let index = self.index.as_ref().and_then(|index| {
+            index
+                .render_string(&event)
+                .map_err(|missing_keys| {
+                    emit!(SplunkMissingKeys {
+                        field: "index",
                         keys: &missing_keys
                     });
                 })
@@ -192,7 +215,7 @@ impl HttpSink for HecSinkConfig {
             body["host"] = json!(host);
         }
 
-        if let Some(index) = &self.index {
+        if let Some(index) = index {
             body["index"] = json!(index);
         }
 
@@ -211,8 +234,8 @@ impl HttpSink for HecSinkConfig {
                 });
                 Some(value)
             }
-            Err(e) => {
-                emit!(SplunkEventEncodeError { error: e });
+            Err(error) => {
+                emit!(SplunkEventEncodeError { error });
                 None
             }
         }
@@ -489,7 +512,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let mut config = config(Encoding::Text, vec![]).await;
-        config.index = Some("custom_index".to_string());
+        config.index = Template::try_from("custom_index".to_string()).ok();
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
@@ -499,6 +522,27 @@ mod integration_tests {
         let entry = find_entry(message.as_str()).await;
 
         assert_eq!(entry["index"].as_str().unwrap(), "custom_index");
+    }
+
+    #[tokio::test]
+    async fn splunk_index_is_interpolated() {
+        let cx = SinkContext::new_test();
+
+        let indexed_fields = vec!["asdf".to_string()];
+        let mut config = config(Encoding::Json, indexed_fields).await;
+        config.index = Template::try_from("{{ index_name }}".to_string()).ok();
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        let message = random_string(100);
+        let mut event = Event::from(message.clone());
+        event.as_mut_log().insert("index_name", "custom_index");
+        sink.run(stream::once(ready(event))).await.unwrap();
+
+        let entry = find_entry(message.as_str()).await;
+
+        let index = entry["index"].as_str().unwrap();
+        assert_eq!("custom_index", index);
     }
 
     #[tokio::test]
@@ -714,21 +758,25 @@ mod integration_tests {
     }
 
     async fn config(
-        encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
+        encoding: impl Into<EncodingConfig<Encoding>>,
         indexed_fields: Vec<String>,
     ) -> HecSinkConfig {
         HecSinkConfig {
-            endpoint: "http://localhost:8088/".into(),
             token: get_token().await,
+            endpoint: "http://localhost:8088/".into(),
             host_key: "host".into(),
-            compression: Compression::None,
+            indexed_fields,
+            index: None,
+            sourcetype: None,
+            source: None,
             encoding: encoding.into(),
+            compression: Compression::None,
             batch: BatchConfig {
                 max_events: Some(1),
                 ..Default::default()
             },
-            indexed_fields,
-            ..Default::default()
+            request: TowerRequestConfig::default(),
+            tls: None,
         }
     }
 

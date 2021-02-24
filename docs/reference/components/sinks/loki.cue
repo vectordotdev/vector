@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: loki: {
-	title:       "Loki"
-	description: "[Loki][urls.loki] is a horizontally-scalable, highly-available, multi-tenant log aggregation system inspired by [Prometheus][urls.prometheus]. It is designed to be very cost effective and easy to operate. It does not index the contents of the logs, but rather a set of labels for each log stream."
+	title: "Loki"
 
 	classes: {
 		commonly_used: true
@@ -10,6 +9,7 @@ components: sinks: loki: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Grafana"]
+		stateful: false
 	}
 
 	features: {
@@ -34,12 +34,13 @@ components: sinks: loki: {
 			}
 			request: {
 				enabled:                    true
-				concurrency:                5
+				concurrency:                1
 				rate_limit_duration_secs:   1
 				rate_limit_num:             5
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
 			tls: {
 				enabled:                true
@@ -48,25 +49,45 @@ components: sinks: loki: {
 				can_verify_hostname:    true
 				enabled_default:        false
 			}
+			to: {
+				service: services.loki
+
+				interface: {
+					socket: {
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "optional"
+					}
+				}
+			}
 		}
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
 	}
 
 	configuration: {
+		endpoint: {
+			description: "The base URL of the Loki instance."
+			required:    true
+			type: string: {
+				examples: ["http://localhost:3100"]
+				syntax: "literal"
+			}
+		}
 		auth: configuration._http_auth & {_args: {
 			password_example: "${LOKI_PASSWORD}"
 			username_example: "${LOKI_USERNAME}"
@@ -91,9 +112,30 @@ components: sinks: loki: {
 						type: string: {
 							default: null
 							examples: ["vector", "{{ event_field }}"]
-							templateable: true
+							syntax: "template"
 						}
 					}
+				}
+			}
+		}
+		out_of_order_action: {
+			common: false
+			description: """
+				Some sources may generate events with timestamps that are
+				not strictly in chronological order. The Loki service cannot
+				accept a stream of such events. Vector will sort events before
+				sending it to Loki. However, some late events might arrive after
+				a batch has been sent. This option specifies what Vector should do
+				with those events.
+				"""
+			required: false
+			warnings: []
+			type: string: {
+				syntax:  "literal"
+				default: "drop"
+				enum: {
+					"drop":              "Drop the event, with a warning."
+					"rewrite_timestamp": "Rewrite timestamp of the event to the latest timestamp that was pushed."
 				}
 			}
 		}
@@ -118,7 +160,8 @@ components: sinks: loki: {
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["some_tenant_id"]
+				examples: ["some_tenant_id", "{{ event_field }}"]
+				syntax: "template"
 			}
 		}
 	}
@@ -139,6 +182,15 @@ components: sinks: loki: {
 				either assigning each Vector instance with a unique label
 				or deploying a centralized Vector which will ensure no logs
 				will get sent out-of-order.
+				"""
+		}
+
+		concurrency: {
+			title: "Concurrency"
+			body: """
+				To make sure logs arrive at Loki in a correct order,
+				the `loki` sink only sends one request at a time.
+				Setting `request.concurrency` will not have any effects.
 				"""
 		}
 

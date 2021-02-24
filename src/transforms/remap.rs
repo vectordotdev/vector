@@ -1,12 +1,13 @@
 use crate::{
-    config::{DataType, TransformConfig, TransformDescription},
+    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{RemapEventProcessed, RemapFailedMapping},
+    internal_events::RemapMappingError,
     transforms::{FunctionTransform, Transform},
     Result,
 };
-use remap::{value, Program, Runtime, TypeConstraint, TypeDef};
 use serde::{Deserialize, Serialize};
+use vrl::diagnostic::Formatter;
+use vrl::{Program, Runtime};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -25,16 +26,16 @@ impl_generate_config_from_default!(RemapConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
-    async fn build(&self) -> Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform> {
         Remap::new(self.clone()).map(Transform::function)
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn output_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn transform_type(&self) -> &'static str {
@@ -49,16 +50,22 @@ pub struct Remap {
 }
 
 impl Remap {
-    pub fn new(config: RemapConfig) -> crate::Result<Remap> {
-        let accepts = TypeConstraint {
-            allow_any: true,
-            type_def: TypeDef {
-                fallible: true,
-                kind: value::Kind::all(),
-            },
-        };
+    pub fn new(config: RemapConfig) -> crate::Result<Self> {
+        // TODO(jean): re-add this to VRL
+        // let accepts = TypeConstraint {
+        //     allow_any: true,
+        //     type_def: TypeDef {
+        //         fallible: true,
+        //         kind: value::Kind::all(),
+        //         ..Default::default()
+        //     },
+        // };
 
-        let program = Program::new(&config.source, &crate::remap::FUNCTIONS_MUT, Some(accepts))?;
+        let program = vrl::compile(&config.source, &vrl_stdlib::all()).map_err(|diagnostics| {
+            Formatter::new(&config.source, diagnostics)
+                .colored()
+                .to_string()
+        })?;
 
         Ok(Remap {
             program,
@@ -69,14 +76,16 @@ impl Remap {
 
 impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        emit!(RemapEventProcessed);
-
         let mut runtime = Runtime::default();
+        let result = match event {
+            Event::Log(ref mut event) => runtime.resolve(event, &self.program),
+            Event::Metric(ref mut event) => runtime.resolve(event, &self.program),
+        };
 
-        if let Err(error) = runtime.execute(&mut event, &self.program) {
-            emit!(RemapFailedMapping {
-                event_dropped: self.drop_on_err,
+        if let Err(error) = result {
+            emit!(RemapMappingError {
                 error: error.to_string(),
+                event_dropped: self.drop_on_err,
             });
 
             if self.drop_on_err {
@@ -91,6 +100,11 @@ impl FunctionTransform for Remap {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::{
+        metric::{MetricKind, MetricValue},
+        Metric,
+    };
+    use std::collections::BTreeMap;
 
     #[test]
     fn generate_config() {
@@ -125,5 +139,42 @@ mod tests {
         assert_eq!(get_field_string(&result, "foo"), "bar");
         assert_eq!(get_field_string(&result, "bar"), "baz");
         assert_eq!(get_field_string(&result, "copy"), "buz");
+    }
+
+    #[test]
+    fn check_remap_metric() {
+        let metric = Event::Metric(Metric::new(
+            "counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        ));
+
+        let conf = RemapConfig {
+            source: r#".tags.host = "zoobub"
+                       .name = "zork"
+                       .namespace = "zerk"
+                       .kind = "incremental""#
+                .to_string(),
+            drop_on_err: true,
+        };
+        let mut tform = Remap::new(conf).unwrap();
+
+        let result = tform.transform_one(metric).unwrap();
+        assert_eq!(
+            result,
+            Event::Metric(
+                Metric::new(
+                    "zork",
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_namespace(Some("zerk"))
+                .with_tags(Some({
+                    let mut tags = BTreeMap::new();
+                    tags.insert("host".into(), "zoobub".into());
+                    tags
+                }))
+            )
+        );
     }
 }

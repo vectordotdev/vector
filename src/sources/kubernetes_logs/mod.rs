@@ -19,7 +19,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter};
+use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, ReadFrom};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
@@ -35,14 +35,7 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
-use futures::{
-    compat::{Sink01CompatExt, Stream01CompatExt},
-    future::FutureExt,
-    sink::Sink,
-    stream::StreamExt,
-    TryStreamExt,
-};
-use futures01::Stream as Stream01;
+use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
 use pod_metadata_annotator::PodMetadataAnnotator;
@@ -132,13 +125,11 @@ impl SourceConfig for Config {
         out: Pipeline,
     ) -> crate::Result<sources::Source> {
         let source = Source::new(self, globals, name)?;
-        Ok(Box::pin(source.run(out.sink_compat(), shutdown).map(
-            |result| {
-                result.map_err(|error| {
-                    error!(message = "Source future failed.", %error);
-                })
-            },
-        )))
+        Ok(Box::pin(source.run(out, shutdown).map(|result| {
+            result.map_err(|error| {
+                error!(message = "Source future failed.", %error);
+            })
+        })))
     }
 
     fn output_type(&self) -> DataType {
@@ -261,16 +252,20 @@ impl Source {
             max_read_bytes,
             // We want to use checkpoining mechanism, and resume from where we
             // left off.
-            start_at_beginning: false,
+            ignore_checkpoints: false,
+            // Match the default behavior
+            read_from: ReadFrom::Beginning,
             // We're now aware of the use cases that would require specifying
             // the starting point in time since when we should collect the logs,
             // so we just disable it. If users ask, we can expose it. There may
             // be other, more sound ways for users considering the use of this
-            // option to solvce their use case, so take consideration.
+            // option to solve their use case, so take consideration.
             ignore_before: None,
             // Max line length to expect during regular log reads, see the
             // explanation above.
             max_line_bytes,
+            // Delimiter bytes that is used to read the file line-by-line
+            line_delimiter: Bytes::from("\n"),
             // The directory where to keep the checkpoints.
             data_dir,
             // This value specifies not exactly the globbing, but interval
@@ -283,9 +278,9 @@ impl Source {
                 strategy: FingerprintStrategy::FirstLineChecksum {
                     // Max line length to expect during fingerprinting, see the
                     // explanation above.
-                    max_line_length: max_line_bytes,
                     ignored_header_bytes: 0,
                 },
+                max_line_length: max_line_bytes,
                 ignore_not_found: true,
             },
             // We expect the files distribution to not be a concern because of
@@ -328,9 +323,10 @@ impl Source {
             futures::stream::iter(buf)
         });
 
-        let event_processing_loop = partial_events_merger.transform(
-            Box::new(events.map(Ok).compat())
-        ).map_err(|_| unreachable!("These errors should only happen if our futures compat layer is wrong. If you meet this, please report it.")).compat().forward(out);
+        let event_processing_loop = partial_events_merger
+            .transform(Box::pin(events))
+            .map(Ok)
+            .forward(out);
 
         let mut lifecycle = Lifecycle::new();
         {

@@ -1,5 +1,7 @@
 use crate::Event;
+use futures::Stream;
 use snafu::Snafu;
+use std::pin::Pin;
 
 pub mod util;
 
@@ -53,12 +55,12 @@ pub mod remove_fields;
 pub mod remove_tags;
 #[cfg(feature = "transforms-rename_fields")]
 pub mod rename_fields;
-#[cfg(feature = "transforms-sampler")]
-pub mod sampler;
+#[cfg(feature = "transforms-route")]
+pub mod route;
+#[cfg(feature = "transforms-sample")]
+pub mod sample;
 #[cfg(feature = "transforms-split")]
 pub mod split;
-#[cfg(feature = "transforms-swimlanes")]
-pub mod swimlanes;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-tokenizer")]
@@ -182,8 +184,8 @@ dyn_clone::clone_trait_object!(FunctionTransform);
 pub trait TaskTransform: Send {
     fn transform(
         self: Box<Self>,
-        task: Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>,
-    ) -> Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>
+        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
         Self: 'static;
 }

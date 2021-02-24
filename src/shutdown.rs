@@ -1,6 +1,5 @@
-use crate::stream::tripwire_handler;
-use futures::{future, ready, FutureExt, TryFutureExt};
-use futures01::Future as Future01;
+use crate::{stream::tripwire_handler, trigger::DisabledTrigger};
+use futures::{future, ready, FutureExt};
 use std::{
     collections::HashMap,
     future::Future,
@@ -186,7 +185,7 @@ impl SourceShutdownCoordinator {
     /// resolves once all sources have either shut down completely, or have been sent the
     /// force shutdown signal.  The force shutdown signal will be sent to any sources that
     /// don't cleanly shut down before the given `deadline`.
-    pub fn shutdown_all(self, deadline: Instant) -> impl Future01<Item = (), Error = ()> {
+    pub fn shutdown_all(self, deadline: Instant) -> impl Future<Output = ()> {
         let mut complete_futures = Vec::new();
 
         let shutdown_begun_triggers = self.shutdown_begun_triggers;
@@ -222,9 +221,7 @@ impl SourceShutdownCoordinator {
             complete_futures.push(source_complete);
         }
 
-        futures01::future::join_all(complete_futures)
-            .map(|_| ())
-            .map_err(|_| ())
+        futures::future::join_all(complete_futures).map(|_| ())
     }
 
     /// Sends the signal to the given source to begin shutting down. Returns a future that resolves
@@ -232,11 +229,7 @@ impl SourceShutdownCoordinator {
     /// The returned future resolves to a bool that indicates if the source shut down cleanly before
     /// the given `deadline`. If the result is false then that means the source failed to shut down
     /// before `deadline` and had to be force-shutdown.
-    pub fn shutdown_source(
-        &mut self,
-        name: &str,
-        deadline: Instant,
-    ) -> impl Future01<Item = bool, Error = ()> {
+    pub fn shutdown_source(&mut self, name: &str, deadline: Instant) -> impl Future<Output = bool> {
         let begin_shutdown_trigger =
             self.shutdown_begun_triggers
                 .remove(name)
@@ -293,12 +286,10 @@ impl SourceShutdownCoordinator {
         shutdown_force_trigger: Trigger,
         name: String,
         deadline: Instant,
-    ) -> impl Future01<Item = bool, Error = ()> {
+    ) -> impl Future<Output = bool> {
         async move {
             // Call `shutdown_force_trigger.disable()` on drop.
-            let shutdown_force_trigger = ShutdownForceTriggerStorage {
-                trigger: Some(shutdown_force_trigger),
-            };
+            let shutdown_force_trigger = DisabledTrigger::new(shutdown_force_trigger);
 
             let fut = shutdown_complete_tripwire.then(tripwire_handler);
             if timeout_at(deadline, fut).await.is_ok() {
@@ -313,27 +304,7 @@ impl SourceShutdownCoordinator {
                 false
             }
         }
-        .map(Ok)
         .boxed()
-        .compat()
-    }
-}
-
-struct ShutdownForceTriggerStorage {
-    trigger: Option<Trigger>,
-}
-
-impl ShutdownForceTriggerStorage {
-    fn into_inner(mut self) -> Trigger {
-        self.trigger.take().unwrap()
-    }
-}
-
-impl Drop for ShutdownForceTriggerStorage {
-    fn drop(&mut self) {
-        if let Some(trigger) = self.trigger.take() {
-            trigger.disable();
-        }
     }
 }
 
@@ -341,7 +312,6 @@ impl Drop for ShutdownForceTriggerStorage {
 mod test {
     use super::*;
     use crate::shutdown::SourceShutdownCoordinator;
-    use futures::compat::Future01CompatExt;
     use tokio::time::{Duration, Instant};
 
     #[tokio::test]
@@ -356,7 +326,7 @@ mod test {
 
         drop(shutdown_signal);
 
-        let success = shutdown_complete.compat().await.unwrap();
+        let success = shutdown_complete.await;
         assert_eq!(true, success);
     }
 
@@ -372,7 +342,7 @@ mod test {
 
         // Since we never drop the ShutdownSignal the ShutdownCoordinator assumes the Source is
         // still running and must force shutdown.
-        let success = shutdown_complete.compat().await.unwrap();
+        let success = shutdown_complete.await;
         assert_eq!(false, success);
 
         let finished = futures::poll!(force_shutdown_tripwire.boxed());

@@ -1,8 +1,7 @@
 package metadata
 
 components: sources: prometheus_remote_write: {
-	title:       "Prometheus remote_write"
-	description: "The [Prometheus](\(urls.prometheus)) remote_write protocol is a protobuf based encoding for sending metrics efficiently between agents."
+	title: "Prometheus Remote Write"
 
 	classes: {
 		commonly_used: false
@@ -10,22 +9,18 @@ components: sources: prometheus_remote_write: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "Prometheus remote_write client"
-					thing:    "a \(name)"
-					url:      urls.prometheus_remote_integrations
-					versions: null
-				}
+				service: services.prometheus
 
 				interface: socket: {
 					api: {
-						title: "Prometheus"
+						title: "Prometheus Remote Write"
 						url:   urls.prometheus_remote_write
 					}
 					direction: "incoming"
@@ -44,25 +39,33 @@ components: sources: prometheus_remote_write: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
 		address: {
 			description: "The address to accept connections on. The address _must_ include a port."
 			required:    true
-			type: string: examples: ["0.0.0.0:9090"]
+			type: string: {
+				examples: ["0.0.0.0:9090"]
+				syntax: "literal"
+			}
 		}
 		auth: configuration._http_basic_auth
 	}
@@ -79,7 +82,7 @@ components: sources: prometheus_remote_write: {
 				The remote_write protocol used by this source transmits
 				only the metric tags, timestamp, and numerical value. No
 				explicit information about the original type of the
-				metric (ie counter, histogram, etc) is included. As
+				metric (i.e. counter, histogram, etc) is included. As
 				such, this source makes a guess as to what the original
 				metric type was.
 
@@ -88,5 +91,16 @@ components: sources: prometheus_remote_write: {
 				are emitted as gauges.
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		http_error_response_total:    components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total:    components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total
+		requests_completed_total:     components.sources.internal_metrics.output.metrics.requests_completed_total
+		requests_received_total:      components.sources.internal_metrics.output.metrics.requests_received_total
+		request_duration_nanoseconds: components.sources.internal_metrics.output.metrics.request_duration_nanoseconds
 	}
 }

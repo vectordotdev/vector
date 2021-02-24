@@ -5,4 +5,6 @@ services: aws_cloudwatch_metrics: {
 	thing:    "an \(name) namespace"
 	url:      urls.aws_cloudwatch_metrics
 	versions: null
+
+	description: services._aws_cloudwatch.description
 }

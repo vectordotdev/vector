@@ -1,8 +1,12 @@
 package metadata
 
 components: sources: internal_metrics: {
-	title:       "Internal Metrics"
-	description: "The internal metrics source exposes metrics emitted by the running Vector instance (as opposed to components in its topology)."
+	title: "Internal Metrics"
+
+	description: """
+		Exposes Vector's own internal metrics, allowing you to collect, process,
+		and route Vector's internal metrics just like other metrics.
+		"""
 
 	classes: {
 		commonly_used: true
@@ -10,34 +14,35 @@ components: sources: internal_metrics: {
 		deployment_roles: ["aggregator", "daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
 		collect: {
 			checkpoint: enabled: false
-			from: service: {
-				name:     "Vector instance"
-				thing:    "a \(name)"
-				url:      urls.vector_docs
-				versions: ">= 0.11.0"
-			}
+			from: service:       services.vector
 		}
 		multiline: enabled: false
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		notices: []
 		requirements: []
 		warnings: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	output: metrics: {
@@ -70,6 +75,30 @@ components: sources: internal_metrics: {
 		}
 		connection_errors_total: {
 			description:       "The total number of connection errors for this Vector instance."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		connection_established_total: {
+			description:       "The total number of times a connection has been established."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		connection_failed_total: {
+			description:       "The total number of times a connection has failed."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		connection_send_errors_total: {
+			description:       "The total number of errors sending data via the connection."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		connection_shutdown_total: {
+			description:       "The total number of times the connection has been shut down."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -158,13 +187,13 @@ components: sources: internal_metrics: {
 			}
 		}
 		collect_completed_total: {
-			description:       "The total number of MongoDB metrics collections completed."
+			description:       "The total number of metrics collections completed for this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
 		collect_duration_nanoseconds: {
-			description:       "The duration spent collecting MongoDB metrics."
+			description:       "The duration spent collecting of metrics for this component."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -183,7 +212,7 @@ components: sources: internal_metrics: {
 				mode: {
 					description: ""
 					required:    true
-					options: {
+					enum: {
 						udp: "User Datagram Protocol"
 					}
 				}
@@ -237,6 +266,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		encode_errors_total: {
+			description:       "The total number of errors encountered when encoding an event."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
 		events_discarded_total: {
 			description:       "The total number of events discarded by this component."
 			type:              "counter"
@@ -245,6 +280,18 @@ components: sources: internal_metrics: {
 		}
 		events_failed_total: {
 			description:       "The total number of failures to read a Kafka message."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		events_in_total: {
+			description:       "The total number of events accepted by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		events_out_total: {
+			description:       "The total number of events emitted by this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -313,6 +360,14 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
+		glob_errors_total: {
+			description:       "The total number of errors encountered when globbing paths."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags & {
+				path: _path
+			}
+		}
 		http_bad_requests_total: {
 			description:       "The total number of HTTP `400 Bad Request` errors encountered."
 			type:              "counter"
@@ -377,7 +432,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		missing_keys_total: {
-			description:       "The total number of events dropped due to keys missing from the event."
+			description:       "The total number of failed template renders due to missed keys from the event."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -389,7 +444,7 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		parse_errors_total: {
-			description:       "The total number of errors parsing Prometheus metrics."
+			description:       "The total number of errors parsing metrics for this component."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -414,15 +469,15 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		request_duration_nanoseconds: {
-			description:       "The request duration for this component (in nanoseconds)."
-			type:              "histogram"
-			default_namespace: "vector"
-			tags:              _component_tags
-		}
-		request_error_total: {
-			description:       "The total number of MongoDB request errors."
+		request_errors_total: {
+			description:       "The total number of requests errors for this component."
 			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		request_duration_nanoseconds: {
+			description:       "The total request duration in nanoseconds."
+			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
@@ -440,6 +495,12 @@ components: sources: internal_metrics: {
 		}
 		requests_received_total: {
 			description:       "The total number of requests received by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		send_errors_total: {
+			description:       "The total number of errors sending messages."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -495,9 +556,9 @@ components: sources: internal_metrics: {
 				ignore_type: {
 					description: "The reason for ignoring the S3 record"
 					required:    true
-					options: [
-						"invalid_event_kind",
-					]
+					enum: {
+						"invalid_event_kind": "The kind of invalid event."
+					}
 				}
 			}
 		}
@@ -523,7 +584,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		timestamp_parse_errors_total: {
-			description:       "The total number of errors encountered parsing [RFC3339](\(urls.rfc_3339)) timestamps."
+			description:       "The total number of errors encountered parsing [RFC 3339](\(urls.rfc_3339)) timestamps."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -542,7 +603,7 @@ components: sources: internal_metrics: {
 				mode: {
 					description: "The connection mode used by the component."
 					required:    true
-					options: {
+					enum: {
 						udp: "User Datagram Protocol"
 					}
 				}
@@ -627,17 +688,21 @@ components: sources: internal_metrics: {
 			required:    true
 		}
 		_component_kind: {
-			description: "The component's kind (options are `source`, `sink`, or `transform`)."
+			description: "The Vector component kind."
 			required:    true
-			options: ["sink", "source", "transform"]
+			enum: {
+				"sink":      "Vector sink components"
+				"source":    "Vector source components"
+				"transform": "Vector transform components"
+			}
 		}
 		_component_name: {
-			description: "The name of the component as specified in the Vector configuration."
+			description: "The Vector component ID."
 			required:    true
 			examples: ["file_source", "splunk_sink"]
 		}
 		_component_type: {
-			description: "The type of component (source, transform, or sink)."
+			description: "The Vector component type."
 			required:    true
 			examples: ["file", "http", "honeycomb", "splunk_hec"]
 		}
@@ -649,18 +714,18 @@ components: sources: internal_metrics: {
 		_error_type: {
 			description: "The type of the error"
 			required:    true
-			options: [
-				"field_missing",
-				"invalid_metric",
-				"mapping_failed",
-				"match_failed",
-				"parse_failed",
-				"render_error",
-				"type_conversion_failed",
-				"type_field_does_not_exist",
-				"type_ip_address_parse_error",
-				"value_invalid",
-			]
+			enum: {
+				"field_missing":               "The event field was missing."
+				"invalid_metric":              "The metric was invalid."
+				"mapping_failed":              "The mapping failed."
+				"match_failed":                "The match operation failed."
+				"parse_failed":                "The parsing operation failed."
+				"render_error":                "The rendering operation failed."
+				"type_conversion_failed":      "The type conversion operating failed."
+				"type_field_does_not_exist":   "The type field does not exist."
+				"type_ip_address_parse_error": "The IP address did not parse."
+				"value_invalid":               "The value was invalid."
+			}
 		}
 		_file: {
 			description: "The file that produced the error"
@@ -680,6 +745,10 @@ components: sources: internal_metrics: {
 			description: "The name of the job producing Vector metrics."
 			required:    true
 			default:     "vector"
+		}
+		_path: {
+			description: "The path that produced the error."
+			required:    true
 		}
 	}
 }

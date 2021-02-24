@@ -28,7 +28,9 @@ use std::{
 };
 use tower::{Service, ServiceExt};
 
+pub mod auth;
 pub mod region;
+pub use auth::AWSAuthentication;
 pub use region::{region_from_endpoint, RegionOrEndpoint};
 
 pub type Client = HttpClient<super::http::HttpClient<RusotoBody>>;
@@ -77,15 +79,16 @@ impl Default for CustomChainProvider {
 #[async_trait]
 impl ProvideAwsCredentials for CustomChainProvider {
     async fn credentials(&self) -> Result<AwsCredentials, CredentialsError> {
-        if let Ok(creds) = self.web_provider.credentials().await {
-            return Ok(creds);
+        match self.web_provider.credentials().await {
+            Ok(creds) => Ok(creds),
+            Err(error_1) => match self.chain_provider.credentials().await {
+                Ok(creds) => Ok(creds),
+                Err(error_2) => Err(CredentialsError::new(format!(
+                    "Failed creating AWS credentials. Errors: {:?}",
+                    [error_1, error_2]
+                ))),
+            },
         }
-        if let Ok(creds) = self.chain_provider.credentials().await {
-            return Ok(creds);
-        }
-        Err(CredentialsError::new(
-            "Couldn't find AWS credentials in environment, credentials file, or IAM role.",
-        ))
     }
 }
 
@@ -223,9 +226,9 @@ where
                     Ok(name) => name,
                     Err(err) => {
                         return Err(HttpDispatchError::new(format!(
-                            "error parsing header name: {}",
+                            "Error parsing header name: {}",
                             err
-                        )))
+                        )));
                     }
                 };
                 for v in h.1.iter() {
@@ -233,9 +236,9 @@ where
                         Ok(value) => value,
                         Err(err) => {
                             return Err(HttpDispatchError::new(format!(
-                                "error parsing header value: {}",
-                                err
-                            )))
+                                "Value of header {:?} contains invalid header byte. Error: {}",
+                                h.0, err
+                            )));
                         }
                     };
                     headers.append(&header_name, header_value);
@@ -257,7 +260,7 @@ where
                 .method(method)
                 .uri(uri)
                 .body(RusotoBody::from(request.payload))
-                .map_err(|error| format!("error building request: {}", error))
+                .map_err(|error| format!("Error building request: {}", error))
                 .map_err(HttpDispatchError::new)?;
 
             *request.headers_mut() = headers;

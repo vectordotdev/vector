@@ -1,13 +1,17 @@
 package metadata
 
 components: transforms: tokenizer: {
-	title:       "Tokenizer"
-	description: "Tokenizes a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names."
+	title: "Tokenizer"
+	description: """
+		Tokenizes a field's value by splitting on white space, ignoring special
+		wrapping characters, and zip the tokens into ordered field names.
+		"""
 
 	classes: {
 		commonly_used: true
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -21,17 +25,26 @@ components: transforms: tokenizer: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(tokenizer._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_tokens(.message)
+			```
+			""",
+		]
 		notices: []
 	}
 
@@ -51,13 +64,17 @@ components: transforms: tokenizer: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child"]
+				syntax: "literal"
 			}
 		}
 		field_names: {
 			description: "The log field names assigned to the resulting tokens, in order."
 			required:    true
 			warnings: []
-			type: array: items: type: string: examples: ["timestamp", "level", "message", "parent.child"]
+			type: array: items: type: string: {
+				examples: ["timestamp", "level", "message", "parent.child"]
+				syntax: "literal"
+			}
 		}
 		types: configuration._types
 	}

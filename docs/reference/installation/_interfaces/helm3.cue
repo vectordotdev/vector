@@ -17,9 +17,9 @@ installation: _interfaces: "helm3": {
 	}
 
 	package_manager_name: installation.package_managers.helm.name
-	platform_name:        installation.platforms.kubernetes.name
+	platform_name:        "kubernetes"
 
-	roles: [Name=string]: {
+	role_implementations: [Name=string]: {
 		commands: {
 			_repo_name:                string | *"timberio"
 			_chart_name:               string
@@ -28,21 +28,21 @@ installation: _interfaces: "helm3": {
 			_controller_resource_type: string
 			_controller_resource_name: string | *_chart_name
 			add_repo:                  #"helm repo add \#(_repo_name) https://packages.timber.io/helm/latest"#
+			helm_values_show:          #"helm show values \#(_repo_name)/\#(_chart_name)"#
 			configure: #"""
 				cat <<-'VALUES' > values.yaml
-				// The Vector Kubernetes integration automatically defines a
-				// kubernetes_logs source that is made available to you.
-				// You do not need to define a log source.
+				# The Vector Kubernetes integration automatically defines a
+				# kubernetes_logs source that is made available to you.
+				# You do not need to define a log source.
 				sinks:
-				  // Adjust as necessary. By default we use the console sink
-				  // to print all data. This allows you to see Vector working.
-				  // https://vector.dev/docs/reference/sinks/
+				  # Adjust as necessary. By default we use the console sink
+				  # to print all data. This allows you to see Vector working.
+				  # https://vector.dev/docs/reference/sinks/
 				  stdout:
 				    type: console
 				    inputs: ["kubernetes_logs"]
-				    rawConfig: |
-				    target = "stdout"
-				    encoding = "json"
+				    target: "stdout"
+				    encoding: "json"
 				VALUES
 				"""#
 			install:   #"helm install --namespace \#(_namespace) --create-namespace \#(_release_name) \#(_repo_name)/\#(_chart_name) --values values.yaml"#
@@ -57,7 +57,7 @@ installation: _interfaces: "helm3": {
 		}
 	}
 
-	roles: {
+	role_implementations: {
 		agent: {
 			title:       "Agent"
 			description: #"""
@@ -84,6 +84,10 @@ installation: _interfaces: "helm3": {
 					command: commands.add_repo
 				},
 				{
+					title:   "Check available Helm chart configuration options"
+					command: commands.helm_values_show
+				},
+				{
 					title:   "Configure Vector"
 					command: commands.configure
 				},
@@ -92,6 +96,7 @@ installation: _interfaces: "helm3": {
 					command: commands.install
 				},
 			]
+			variables: config: sinks: out: inputs: ["kubernetes_logs"]
 		}
 
 		// aggregator: {

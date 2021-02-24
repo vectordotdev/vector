@@ -12,6 +12,7 @@ set -u
 
 # If PACKAGE_ROOT is unset or empty, default it.
 PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
+VECTOR_VERSION="0.11.1"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -147,12 +148,12 @@ install_from_archive() {
             ;;
     esac
 
-    local _url="${PACKAGE_ROOT}/latest/vector-${_archive_arch}.tar.gz"
+    local _url="${PACKAGE_ROOT}/latest/vector-${VECTOR_VERSION}-${_archive_arch}.tar.gz"
 
     local _dir
     _dir="$(mktemp -d 2>/dev/null || ensure mktemp -d -t vector-install)"
 
-    local _file="${_dir}/vector-${_archive_arch}.tar.gz"
+    local _file="${_dir}/vector-${VECTOR_VERSION}-${_archive_arch}.tar.gz"
 
     ensure mkdir -p "$_dir"
 
@@ -205,6 +206,30 @@ add_to_path() {
 # All code below here was copied from https://sh.rustup.rs and can safely
 # be updated if necessary.
 # ------------------------------------------------------------------------------
+
+get_gnu_musl_glibc() {
+  need_cmd ldd
+  need_cmd bc
+  need_cmd awk
+  # Detect both gnu and musl
+  # Also detect glibc versions older than 2.18 and return musl for these
+  # Required until we address https://github.com/timberio/vector/issues/5412.
+  local _ldd_version
+  local _glibc_version
+  _ldd_version=$(ldd --version)
+  if [[ $_ldd_version =~ "GNU" ]]; then
+    _glibc_version=$(echo "$_ldd_version" | awk '/ldd/{print $NF}')
+    if [ 1 -eq "$(echo "${_glibc_version} < 2.18" | bc)" ]; then
+      echo "musl"
+    else
+      echo "gnu"
+    fi
+elif [[ $_ldd_version =~ "musl" ]]; then
+  echo "musl"
+else
+  err "Unknown architecture from ldd: ${_ldd_version}"
+fi
+}
 
 get_bitness() {
     need_cmd head
@@ -270,11 +295,11 @@ get_architecture() {
             ;;
 
         Linux)
-            case $(ldd --version 2>&1 | grep -Fq 'musl' >/dev/null; echo $?) in
-              0)
+            case $(get_gnu_musl_glibc) in
+              "musl")
                 _ostype=unknown-linux-musl
                 ;;
-              1)
+              "gnu")
                 _ostype=unknown-linux-gnu
                 ;;
               # Fallback

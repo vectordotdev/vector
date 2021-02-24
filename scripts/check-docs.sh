@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2016
 set -euo pipefail
-shopt -s globstar
 
 # check-docs.sh
 #
@@ -10,38 +8,40 @@ shopt -s globstar
 #   Checks that the contents of /docs folder are valid. This includes:
 #
 #     1. Ensuring the the .cue files can compile.
-#     2. Link validation.
+#     2. In CI, ensuring the the .cue files are properly formatted.
 
-DOCS_PATH="docs"
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-if ! [ -x "$(command -v cue)" ]; then
-  echo 'Error: cue is not installed.' >&2
+read-all-docs() {
+  scripts/cue.sh list | sort | xargs cat -A
+}
+
+if ! cue version >/dev/null; then
+  echo 'Error: cue is not installed'
   exit 1
 fi
 
-if [[ -z "${CI:-}" ]]; then
-  echo "Skipping local formatting - reserved for CI"
+if [[ "${CI:-"false"}" != "true" ]]; then
+  echo "Skipping cue files format validation - reserved for CI"
 else
-  echo "Validating ${DOCS_PATH}/**/*.cue formatting."
+  echo "Validating cue files formatting..."
 
-  cue fmt ${DOCS_PATH}/**/*.cue
-  status="$(git status --porcelain ${DOCS_PATH})"
+  STATE_BEFORE="$(read-all-docs)"
+  scripts/cue.sh fmt
+  STATE_AFTER="$(read-all-docs)"
 
-  [[ -z "$status" ]] || {
-    echo >&2 "Incorrectly formatted Cue files"
-    echo >&2 "$status"
-    git diff ${DOCS_PATH}
+  if [[ "$STATE_BEFORE" != "$STATE_AFTER" ]]; then
+    printf "Incorrectly formatted CUE files\n\n"
+    diff --unified <(echo "$STATE_BEFORE") <(echo "$STATE_AFTER")
     exit 1
-  }
+  fi
 fi
 
-echo "Validating ${DOCS_PATH}/**/*.cue..."
+echo "Validating cue files correctness..."
 
-errors=$(cue vet --concrete --all-errors ${DOCS_PATH}/**/*.cue)
-
-if [ -n "$errors" ]; then
-  printf "Failed!\n\n%s\n" "${errors}"
-  exit 1
+if ERRORS="$(scripts/cue.sh vet 2>&1)"; then
+  echo "Success! The contents of the \"docs/\" directory are valid"
 else
-  echo "Success! The contents of the ${DOCS_PATH} directory are valid."
+  printf "Failed!\n\n%s\n" "$ERRORS"
+  exit 1
 fi

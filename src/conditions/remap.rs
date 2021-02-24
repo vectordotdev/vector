@@ -1,15 +1,16 @@
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
     emit,
-    internal_events::RemapConditionExecutionFailed,
+    internal_events::RemapConditionExecutionError,
     Event,
 };
-use remap::{value, Program, RemapError, Runtime, TypeConstraint, TypeDef, Value};
 use serde::{Deserialize, Serialize};
+use vrl::diagnostic::Formatter;
+use vrl::{Program, Runtime, Value};
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq)]
 pub struct RemapConfig {
-    source: String,
+    pub source: String,
 }
 
 inventory::submit! {
@@ -21,16 +22,31 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl ConditionConfig for RemapConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
-        let constraint = TypeConstraint {
-            allow_any: false,
-            type_def: TypeDef {
-                fallible: true,
-                kind: value::Kind::Boolean,
-            },
-        };
+        // TODO(jean): re-add this to VRL
+        // let constraint = TypeConstraint {
+        //     allow_any: false,
+        //     type_def: TypeDef {
+        //         fallible: true,
+        //         kind: value::Kind::Boolean,
+        //         ..Default::default()
+        //     },
+        // };
 
-        let program = Program::new(&self.source, &crate::remap::FUNCTIONS, Some(constraint))
-            .map_err(|e| e.to_string())?;
+        // Filter out functions that directly mutate the event.
+        //
+        // TODO(jean): expose this as a method on the `Function` trait, so we
+        // don't need to do this manually.
+        let functions = vrl_stdlib::all()
+            .into_iter()
+            .filter(|f| f.identifier() != "del")
+            .filter(|f| f.identifier() != "only_fields")
+            .collect::<Vec<_>>();
+
+        let program = vrl::compile(&self.source, &functions).map_err(|diagnostics| {
+            Formatter::new(&self.source, diagnostics)
+                .colored()
+                .to_string()
+        })?;
 
         Ok(Box::new(Remap { program }))
     }
@@ -44,11 +60,11 @@ pub struct Remap {
 }
 
 impl Remap {
-    fn execute(&self, event: &Event) -> Result<remap::Value, RemapError> {
-        // TODO(jean): This clone exists until remap-lang has an "immutable"
+    fn run(&self, event: &Event) -> vrl::RuntimeResult {
+        // TODO(jean): This clone exists until vrl-lang has an "immutable"
         // mode.
         //
-        // For now, mutability in reduce "remap ends-when conditions" is
+        // For now, mutability in reduce "vrl ends-when conditions" is
         // allowed, but it won't mutate the original event, since we cloned it
         // here.
         //
@@ -57,40 +73,45 @@ impl Remap {
         // program wants to mutate its events.
         //
         // see: https://github.com/timberio/vector/issues/4744
-        Runtime::default().execute(&mut event.clone(), &self.program)
+        match event {
+            Event::Log(event) => Runtime::default().resolve(&mut event.clone(), &self.program),
+            Event::Metric(event) => Runtime::default().resolve(&mut event.clone(), &self.program),
+        }
     }
 }
 
 impl Condition for Remap {
     fn check(&self, event: &Event) -> bool {
-        self.execute(&event)
+        self.run(&event)
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
-                _ => unreachable!("boolean type constraint set"),
+                _ => false,
             })
             .unwrap_or_else(|_| {
-                emit!(RemapConditionExecutionFailed);
+                emit!(RemapConditionExecutionError);
                 false
             })
     }
 
     fn check_with_context(&self, event: &Event) -> Result<(), String> {
         let value = self
-            .execute(event)
+            .run(event)
             .map_err(|err| format!("source execution failed: {:#}", err))?;
 
         match value {
             Value::Boolean(v) if v => Ok(()),
             Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
-            _ => unreachable!("boolean type constraint set"),
+            _ => Err("source execution resolved to a non-boolean value".into()),
         }
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::collections::BTreeMap;
+
     use super::*;
-    use crate::log_event;
+    use crate::{event::Metric, event::MetricKind, event::MetricValue, log_event};
 
     #[test]
     fn generate_config() {
@@ -108,7 +129,7 @@ mod test {
             ),
             (
                 log_event!["foo" => true, "bar" => false],
-                "to_bool(.bar || .foo)",
+                "to_bool(.bar || .foo) ?? false",
                 Ok(()),
                 Ok(()),
             ),
@@ -118,24 +139,41 @@ mod test {
                 Ok(()),
                 Err("source execution resolved to false"),
             ),
+            // TODO: enable once we don't emit large diagnostics with colors when no tty is present.
+            // (
+            //     log_event![],
+            //     "null",
+            //     Err("\n\u{1b}[0m\u{1b}[1m\u{1b}[38;5;9merror\u{1b}[0m\u{1b}[1m: unexpected return value\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m┌─\u{1b}[0m :1:1\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m\n\u{1b}[0m\u{1b}[34m1\u{1b}[0m \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31mnull\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m^^^^\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m│\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31mgot: null\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[34mexpected: boolean\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m=\u{1b}[0m see language documentation at: https://vector.dev/docs/reference/vrl/\n\n"),
+            //     Ok(()),
+            // ),
+            // (
+            //     log_event!["foo" => "string"],
+            //     ".foo",
+            //     Err("\n\u{1b}[0m\u{1b}[1m\u{1b}[38;5;9merror\u{1b}[0m\u{1b}[1m: unexpected return value\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m┌─\u{1b}[0m :1:1\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m\n\u{1b}[0m\u{1b}[34m1\u{1b}[0m \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m.foo\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m^^^^\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m│\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31mgot: any\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[34mexpected: boolean\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m=\u{1b}[0m see language documentation at: https://vector.dev/docs/reference/vrl/\n\n"),
+            //     Ok(()),
+            // ),
+            // (
+            //     log_event![],
+            //     ".",
+            //     Err("n\u{1b}[0m\u{1b}[1m\u{1b}[38;5;9merror\u{1b}[0m\u{1b}[1m: unexpected return value\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m┌─\u{1b}[0m :1:1\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m\n\u{1b}[0m\u{1b}[34m1\u{1b}[0m \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m.\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m^\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31m│\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[31mgot: any\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m \u{1b}[0m\u{1b}[34mexpected: boolean\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m│\u{1b}[0m\n  \u{1b}[0m\u{1b}[34m=\u{1b}[0m see language documentation at: https://vector.dev/docs/reference/vrl/\n\n"),
+            //     Ok(()),
+            // ),
             (
-                log_event![],
-                "",
-                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to null value"),
-                Ok(()),
-            ),
-            (
-                log_event!["foo" => "string"],
-                ".foo",
-                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
-                Ok(()),
-            ),
-            (
-                log_event![],
-                ".",
-                Err(
-                    "remap error: parser error:  --> 1:2\n  |\n1 | .\n  |  ^---\n  |\n  = expected path_segment",
+                Event::Metric(
+                    Metric::new(
+                        "zork",
+                        MetricKind::Incremental,
+                        MetricValue::Counter { value: 1.0 },
+                    )
+                    .with_namespace(Some("zerk"))
+                    .with_tags(Some({
+                        let mut tags = BTreeMap::new();
+                        tags.insert("host".into(), "zoobub".into());
+                        tags
+                    })),
                 ),
+                r#".name == "zork" && .tags.host == "zoobub" && .kind == "incremental""#,
+                Ok(()),
                 Ok(()),
             ),
         ];
@@ -144,10 +182,7 @@ mod test {
             let source = source.to_owned();
             let config = RemapConfig { source };
 
-            assert_eq!(
-                config.build().map(|_| ()).map_err(|e| e.to_string()),
-                build.map_err(|e| e.to_string())
-            );
+            assert_eq!(config.build().map(|_| ()).map_err(|e| e.to_string()), build);
 
             if let Ok(cond) = config.build() {
                 assert_eq!(

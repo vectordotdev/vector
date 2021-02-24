@@ -3,12 +3,17 @@ package metadata
 components: sinks: vector: {
 	title: "Vector"
 
+	description: """
+		Sends data to another downstream Vector instance via the Vector source.
+		"""
+
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
 		development:   "beta"
 		egress_method: "stream"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {
@@ -20,7 +25,9 @@ components: sinks: vector: {
 				enabled: true
 				codec: enabled: false
 			}
-			request: enabled: false
+			send_buffer_bytes: enabled: true
+			keepalive: enabled:         true
+			request: enabled:           false
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -29,12 +36,7 @@ components: sinks: vector: {
 				enabled_default:        false
 			}
 			to: {
-				service: {
-					name:     "Vector source"
-					thing:    "a \(name)"
-					url:      urls.vector_source
-					versions: null
-				}
+				service: services.vector
 
 				interface: {
 					socket: {
@@ -48,15 +50,16 @@ components: sinks: vector: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -81,6 +84,7 @@ components: sinks: vector: {
 			warnings: []
 			type: string: {
 				examples: ["92.12.333.224:5000"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -88,6 +92,8 @@ components: sinks: vector: {
 	how_it_works: components.sources.vector.how_it_works
 
 	telemetry: metrics: {
+		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total
 		protobuf_decode_errors_total: components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
 	}
 }

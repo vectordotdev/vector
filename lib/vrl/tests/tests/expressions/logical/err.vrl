@@ -1,0 +1,7 @@
+# result: [2.5, "yes", false]
+
+[
+    5 / 2 ?? 0,
+    parse_json(s'"yes"') ?? false,
+    parse_json("nope") ?? false,
+]

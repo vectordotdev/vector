@@ -3,10 +3,15 @@ package metadata
 components: transforms: grok_parser: {
 	title: "Grok Parser"
 
+	description: """
+		Parses a log field value with [Grok](\(urls.grok)).
+		"""
+
 	classes: {
 		commonly_used: false
-		development:   "stable"
+		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -20,23 +25,25 @@ components: transforms: grok_parser: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: [
 			"""
-				Grok is approximately 50% slower than the [`regex_parser` transform][docs.transforms.regex_parser].
-				While this is still plenty fast for most use cases we recommend using the
-				[`regex_parser` transform][docs.transforms.regex_parser] if you are experiencing
-				performance issues.
-				""",
+			\(grok_parser._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
+			```
+			""",
 		]
 		notices: [
 			"""
@@ -64,6 +71,7 @@ components: transforms: grok_parser: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
+				syntax: "literal"
 			}
 		}
 		pattern: {
@@ -72,6 +80,7 @@ components: transforms: grok_parser: {
 			warnings: []
 			type: string: {
 				examples: ["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]
+				syntax: "literal"
 			}
 		}
 		types: configuration._types

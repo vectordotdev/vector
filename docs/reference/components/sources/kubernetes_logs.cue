@@ -5,24 +5,25 @@ components: sources: kubernetes_logs: {
 
 	title: "Kubernetes Logs"
 
+	description: """
+		Collects all log data for Kubernetes Nodes, automatically enriching data
+		with Kubernetes metadata via the Kubernetes API.
+		"""
+
 	classes: {
 		commonly_used: true
 		delivery:      "best_effort"
 		deployment_roles: ["daemon"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
 		collect: {
 			checkpoint: enabled: true
 			from: {
-				service: {
-					name:     "Kubernetes"
-					thing:    "a \(name) cluster"
-					url:      urls.kubernetes
-					versions: ">= 1.14"
-				}
+				service: services.kubernetes
 
 				interface: {
 					file_system: {
@@ -35,18 +36,23 @@ components: sources: kubernetes_logs: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: "kubernetes"
 	}
 
 	configuration: {
@@ -63,6 +69,7 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.container_image"
+							syntax:  "literal"
 						}
 					}
 					container_name: {
@@ -71,6 +78,25 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.container_name"
+							syntax:  "literal"
+						}
+					}
+					pod_ip: {
+						common:      false
+						description: "Event field for Pod IPv4 Address."
+						required:    false
+						type: string: {
+							default: "kubernetes.pod_ip"
+							syntax:  "literal"
+						}
+					}
+					pod_ips: {
+						common:      false
+						description: "Event field for Pod IPv4 and IPv6 Addresses."
+						required:    false
+						type: string: {
+							default: "kubernetes.pod_ips"
+							syntax:  "literal"
 						}
 					}
 					pod_labels: {
@@ -79,6 +105,7 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_labels"
+							syntax:  "literal"
 						}
 					}
 					pod_name: {
@@ -87,6 +114,7 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_name"
+							syntax:  "literal"
 						}
 					}
 					pod_namespace: {
@@ -95,6 +123,7 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_namespace"
+							syntax:  "literal"
 						}
 					}
 					pod_node_name: {
@@ -103,6 +132,7 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_node_name"
+							syntax:  "literal"
 						}
 					}
 					pod_uid: {
@@ -111,6 +141,7 @@ components: sources: kubernetes_logs: {
 						required:    false
 						type: string: {
 							default: "kubernetes.pod_uid"
+							syntax:  "literal"
 						}
 					}
 				}
@@ -128,6 +159,7 @@ components: sources: kubernetes_logs: {
 			required:    false
 			type: string: {
 				default: "${VECTOR_SELF_NODE_NAME}"
+				syntax:  "literal"
 			}
 		}
 		exclude_paths_glob_patterns: {
@@ -138,7 +170,10 @@ components: sources: kubernetes_logs: {
 			required: false
 			type: array: {
 				default: []
-				items: type: string: examples: ["**/exclude/**"]
+				items: type: string: {
+					examples: ["**/exclude/**"]
+					syntax: "literal"
+				}
 			}
 		}
 		extra_field_selector: {
@@ -148,9 +183,10 @@ components: sources: kubernetes_logs: {
 				The name of the Kubernetes `Node` this Vector instance runs at. Configured to use an env var by default, to be evaluated to a value provided by Kubernetes at Pod deploy time.
 				"""
 			required: false
-			type: array: {
-				default: []
-				items: type: string: examples: ["metadata.name!=pod-name-to-exclude"]
+			type: string: {
+				default: ""
+				examples: ["metadata.name!=pod-name-to-exclude", "metadata.name!=pod-name-to-exclude,metadata.name=mypod"]
+				syntax: "literal"
 			}
 		}
 		extra_label_selector: {
@@ -160,9 +196,10 @@ components: sources: kubernetes_logs: {
 				addition to the built-in `vector.dev/exclude` filter.
 				"""
 			required: false
-			type: array: {
-				default: []
-				items: type: string: examples: ["my_custom_label!=my_value"]
+			type: string: {
+				default: ""
+				examples: ["my_custom_label!=my_value", "my_custom_label!=my_value,my_other_custom_label=my_value"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -173,7 +210,10 @@ components: sources: kubernetes_logs: {
 			file: {
 				description: "The absolute path of originating file."
 				required:    true
-				type: string: examples: ["\(_directory)/pods/pod-namespace_pod-name_pod-uid/container/1.log"]
+				type: string: {
+					examples: ["\(_directory)/pods/pod-namespace_pod-name_pod-uid/container/1.log"]
+					syntax: "literal"
+				}
 			}
 			"kubernetes.container_image": {
 				description: "Container image."
@@ -182,6 +222,7 @@ components: sources: kubernetes_logs: {
 				type: string: {
 					examples: ["busybox:1.30"]
 					default: null
+					syntax:  "literal"
 				}
 			}
 			"kubernetes.container_name": {
@@ -191,6 +232,27 @@ components: sources: kubernetes_logs: {
 				type: string: {
 					examples: ["coredns"]
 					default: null
+					syntax:  "literal"
+				}
+			}
+			"kubernetes.pod_ip": {
+				description: "Pod IPv4 address."
+				required:    false
+				common:      true
+				type: string: {
+					examples: ["192.168.1.1"]
+					default: null
+					syntax:  "literal"
+				}
+			}
+			"kubernetes.pod_ips": {
+				description: "Pod IPv4 and IPv6 addresses."
+				required:    false
+				common:      true
+				type: string: {
+					examples: ["192.168.1.1", "::1"]
+					default: null
+					syntax:  "literal"
 				}
 			}
 			"kubernetes.pod_labels": {
@@ -209,6 +271,7 @@ components: sources: kubernetes_logs: {
 				type: string: {
 					examples: ["coredns-qwertyuiop-qwert"]
 					default: null
+					syntax:  "literal"
 				}
 			}
 			"kubernetes.pod_namespace": {
@@ -218,6 +281,7 @@ components: sources: kubernetes_logs: {
 				type: string: {
 					examples: ["kube-system"]
 					default: null
+					syntax:  "literal"
 				}
 			}
 			"kubernetes.pod_node_name": {
@@ -227,6 +291,7 @@ components: sources: kubernetes_logs: {
 				type: string: {
 					examples: ["minikube"]
 					default: null
+					syntax:  "literal"
 				}
 			}
 			"kubernetes.pod_uid": {
@@ -236,22 +301,32 @@ components: sources: kubernetes_logs: {
 				type: string: {
 					examples: ["ba46d8c9-9541-4f6b-bbf9-d23b36f2f136"]
 					default: null
+					syntax:  "literal"
 				}
 			}
 			message: {
 				description: "The raw line from the Pod log file."
 				required:    true
-				type: string: examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+				type: string: {
+					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+					syntax: "literal"
+				}
 			}
 			source_type: {
 				description: "The name of the source type."
 				required:    true
-				type: string: examples: ["kubernetes_logs"]
+				type: string: {
+					examples: ["kubernetes_logs"]
+					syntax: "literal"
+				}
 			}
 			stream: {
 				description: "The name of the stream the log line was sumbitted to."
 				required:    true
-				type: string: examples: ["stdout", "stderr"]
+				type: string: {
+					examples: ["stdout", "stderr"]
+					syntax: "literal"
+				}
 			}
 			timestamp: fields._current_timestamp
 		}
@@ -270,6 +345,8 @@ components: sources: kubernetes_logs: {
 				"file":                       "/var/log/pods/kube-system_storage-provisioner_93bde4d0-9731-4785-a80e-cd27ba8ad7c2/storage-provisioner/1.log"
 				"kubernetes.container_image": "gcr.io/k8s-minikube/storage-provisioner:v3"
 				"kubernetes.container_name":  "storage-provisioner"
+				"kubernetes.pod_ip":          "192.168.1.1"
+				"kubernetes.pod_ips": ["192.168.1.1", "::1"]
 				"kubernetes.pod_labels": {
 					"addonmanager.kubernetes.io/mode": "Reconcile"
 					"gcp-auth-skip-secret":            "true"
@@ -297,43 +374,54 @@ components: sources: kubernetes_logs: {
 			body:  """
 					Vector will enrich data with Kubernetes context. A comprehensive
 					list of fields can be found in the
-					[`kubernetes_logs` source output docs](\(urls.vector_kubernetes_logs_source)#output)
-					for a comprehensive list of fields.
+					[`kubernetes_logs` source output docs](\(urls.vector_kubernetes_logs_source)#output).
 					"""
 		}
 
 		filtering: {
 			title: "Filtering"
-			body:  """
-					Please refer to the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source)#output)
-					docs for filtering options.
-					"""
+			body: """
+				Vector provides rich filtering options for Kubernetes log collection:
+
+				* Built-in [`Pod`](#pod-exclusion) and [`container`](#container-exclusion)
+				  exclusion rules.
+				* The `exclude_paths_glob_patterns` option allows you to exclude
+				  Kuberenetes log files by the file name and path.
+				* The `extra_field_selector` option specifies the field selector to
+				  filter Pods with, to be used in addition to the built-in `Node` filter.
+				* The `extra_label_selector` option specifies the label selector to
+				  filter `Pod`s with, to be used in addition to the [built-in
+				  `vector.dev/exclude` filter](#pod-exclusion).
+				"""
 		}
 
 		pod_exclusion: {
 			title: "Pod exclusion"
 			body:  """
-					By default, [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
-					will skip logs from the `Pod`s that have
-					a `vector.dev/exclude: "true"` *label*.
+					By default, the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+					will skip logs from the `Pod`s that have a `vector.dev/exclude: "true"` *label*.
 					You can configure additional exclusion rules via label or field selectors,
-					see [the available options](urls.vector_kubernetes_logs_source)#configuration).
+					see [the available options](\(urls.vector_kubernetes_logs_source)#configuration).
 					"""
 		}
 
 		container_exclusion: {
 			title: "Container exclusion"
 			body:  """
-					[`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
-					can skip the logs from the individual `container`s of a particular `Pod`.
-					Add an *annotation* `vector.dev/exclude-containers` to
-					the `Pod`, and enumerate the `name`s of all the `container`s
-					to exclude in the value of the annotation like so:
-					`vector.dev/exclude-containers: "container1,container2"`.
-					This annotation will make Vector skip logs originating from
-					the `container1` and `container2` of the `Pod` marked with
-					the annotation, while logs from other `container`s in
-					the `Pod` will still be collected.
+					The [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+					can skip the logs from the individual `container`s of a particular
+					`Pod`. Add an *annotation* `vector.dev/exclude-containers` to the
+					`Pod`, and enumerate the `name`s of all the `container`s to exclude in
+					the value of the annotation like so:
+
+					```
+					vector.dev/exclude-containers: "container1,container2"
+					```
+
+					This annotation will make Vector skip logs originating from the
+					`container1` and `container2` of the `Pod` marked with the annotation,
+					while logs from other `container`s in the `Pod` will still be
+					collected.
 					"""
 		}
 
@@ -355,10 +443,12 @@ components: sources: kubernetes_logs: {
 		partial_message_merging: {
 			title: "Partial message merging"
 			body:  """
-					Vector, by default, will merge partial messages that are split due to the Docker
-					size limit. For everything else, the
-					[`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source)) offers `multiline`
-					options to configure custom merging to handle merging things like stacktraces.
+					Vector, by default, will merge partial messages that are
+					split due to the Docker size limit. For everything else, it
+					is recommended to use the [`reduce`
+					transform](\(urls.vector_reduce_transform)) which offers
+					the ability to handle custom merging of things like
+					stacktraces.
 					"""
 		}
 
@@ -371,22 +461,59 @@ components: sources: kubernetes_logs: {
 				"""
 		}
 
+		resource_limits: {
+			title: "Resource limits"
+			body: """
+				Vector recommends the following resource limits.
+				"""
+			sub_sections: [
+				{
+					title: "Agent resource limits"
+					body: """
+						If deploy Vector as an agent (collecting data for each of your
+						Nodes), then we recommend the following limits:
+
+						```yaml
+						resources:
+						  requests:
+						    memory: "64Mi"
+						    cpu: "500m"
+						  limits:
+						    memory: "1024Mi"
+						    cpu: "6000m"
+						```
+
+						**As with all Kubernetes resource limit recommendations, use these
+						as a reference point and adjust as ncessary. If your configured
+						Vector pipeline is complex, you may need more resources. If you
+						have a pipeline you may need less.**
+						"""
+				},
+			]
+		}
+
 		state_management: {
 			title: "State management"
-			body: """
-				For the agent role, Vector stores its state at the host-mapped dir with a static
-				path, so if it's redeployed it'll continue from where it was interrupted.
-				"""
+			body:  null
+			sub_sections: [
+				{
+					title: "Agent state management"
+					body: """
+						For the agent role, Vector stores its state at the host-mapped dir with a static
+						path, so if it's redeployed it'll continue from where it was interrupted.
+						"""
+				},
+			]
 		}
 
 		testing_and_reliability: {
 			title: "Testing & reliability"
-			body:  """
-					Vector is tested extensively against Kubernetes. In addition to Kubernetes
-					being Vector's most popular installation method, Vector implements a
-					comprehensive end-to-end test suite for all minor Kubernetes versions starting
-					with `\(installation.platforms.kubernetes.minimum_supported_version)`.
-					"""
+			body: """
+				Vector is tested extensively against Kubernetes. In addition to Kubernetes
+				being Vector's most popular installation method, Vector implements a
+				comprehensive end-to-end test suite for all minor Kubernetes versions starting
+				with `1.14.
+				"""
 		}
 
 		kubernetes_api_access_control: {
@@ -397,25 +524,22 @@ components: sources: kubernetes_logs: {
 				uses the `/api/v1/pods` endpoint to "watch" the pods from
 				all namespaces.
 
-				Modern Kubernetes clusters run with RBAC
-				(role-based access control) scheme.
-				RBAC-enabled clusters require some configuration to grant Vector
-				the authorization to access the Kubernetes API endpoints.
-				As RBAC is currently the standard way of controlling access to
-				the Kubernetes API, we ship the necessary configuration
-				out of the box: see `ClusterRole`, `ClusterRoleBinding` and
-				a `ServiceAccount` in our `kubectl` YAML config,
-				and the `rbac` configuration at the Helm chart.
+				Modern Kubernetes clusters run with RBAC (role-based access control)
+				scheme. RBAC-enabled clusters require some configuration to grant Vector
+				the authorization to access the Kubernetes API endpoints.	As RBAC is
+				currently the standard way of controlling access to the Kubernetes API,
+				we ship the necessary configuration out of the box: see `ClusterRole`,
+				`ClusterRoleBinding` and a `ServiceAccount` in our `kubectl` YAML
+				config, and the `rbac` configuration at the Helm chart.
 
-				If your cluster doesn't use any access control scheme
-				and doesn't restrict access to the Kubernetes API,
-				you don't need to do any extra configuration - Vector will
-				just work.
+				If your cluster doesn't use any access control scheme	and doesn't
+				restrict access to the Kubernetes API, you don't need to do any extra
+				configuration - Vector willjust work.
+
 				Clusters using legacy ABAC scheme are not officially supported
 				(although Vector might work if you configure access properly) -
-				we encourage switching to RBAC.
-				If you use a custom access control scheme -
-				make sure Vector `Pod`/`ServiceAccount` is granted access to
+				we encourage switching to RBAC. If you use a custom access control
+				scheme - make sure Vector `Pod`/`ServiceAccount` is granted access to
 				the `/api/v1/pods` resource.
 				"""
 		}
@@ -425,5 +549,7 @@ components: sources: kubernetes_logs: {
 		k8s_format_picker_edge_cases_total:     components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
 		k8s_docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
 		k8s_event_annotation_failures_total:    components.sources.internal_metrics.output.metrics.k8s_event_annotation_failures_total
+		processed_bytes_total:                  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:                 components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

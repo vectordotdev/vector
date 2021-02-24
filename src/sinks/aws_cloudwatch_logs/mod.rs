@@ -3,7 +3,7 @@ mod request;
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
-    rusoto::{self, RegionOrEndpoint},
+    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
@@ -72,7 +72,10 @@ pub struct CloudwatchLogsSinkConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig<Option<usize>>,
-    pub assume_role: Option<String>,
+    // Deprecated name. Moved to auth.
+    assume_role: Option<String>,
+    #[serde(default)]
+    pub auth: AWSAuthentication,
 }
 
 inventory::submit! {
@@ -97,6 +100,7 @@ fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
         batch: Default::default(),
         request: Default::default(),
         assume_role: Default::default(),
+        auth: Default::default(),
     }
 }
 
@@ -158,7 +162,7 @@ impl CloudwatchLogsSinkConfig {
         let region = (&self.region).try_into()?;
 
         let client = rusoto::client()?;
-        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+        let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
         Ok(CloudWatchLogsClient::new_with_client(client, region))
@@ -442,7 +446,7 @@ fn partition_encode(
             warn!(
                 message = "Keys in group template do not exist on the event; dropping event.",
                 ?missing_keys,
-                rate_limit_secs = 30
+                internal_log_rate_secs = 30
             );
             return None;
         }
@@ -454,7 +458,7 @@ fn partition_encode(
             warn!(
                 message = "Keys in stream template do not exist on the event; dropping event.",
                 ?missing_keys,
-                rate_limit_secs = 30
+                internal_log_rate_secs = 30
             );
             return None;
         }
@@ -464,7 +468,9 @@ fn partition_encode(
 
     encoding.apply_rules(&mut event);
     let event = encode_log(event.into_log(), encoding)
-        .map_err(|error| error!(message = "Could not encode event.", %error, rate_limit_secs = 5))
+        .map_err(
+            |error| error!(message = "Could not encode event.", %error, internal_log_rate_secs = 5),
+        )
         .ok()?;
 
     Some(PartitionInnerBuffer::new(event, key))
@@ -472,8 +478,8 @@ fn partition_encode(
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
-    #[snafu(display("DescribeLogStreams failed: {}", source))]
-    DescribeLogStreamsFailed {
+    #[snafu(display("DescribeLogGroups failed: {}", source))]
+    DescribeLogGroupsFailed {
         source: RusotoError<rusoto_logs::DescribeLogGroupsError>,
     },
     #[snafu(display("No log group found"))]
@@ -523,7 +529,7 @@ async fn healthcheck(
             }
             None => Err(HealthcheckError::NoLogGroup.into()),
         },
-        Err(source) => Err(HealthcheckError::DescribeLogStreamsFailed { source }.into()),
+        Err(source) => Err(HealthcheckError::DescribeLogGroupsFailed { source }.into()),
     }
 }
 
@@ -882,6 +888,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -891,10 +898,12 @@ mod integration_tests {
         let (input_lines, events) = random_lines_with_stream(100, 11);
         sink.run(events).await.unwrap();
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name;
-        request.log_group_name = GROUP_NAME.into();
-        request.start_time = Some(timestamp.timestamp_millis());
+        let request = GetLogEventsRequest {
+            log_stream_name: stream_name,
+            log_group_name: GROUP_NAME.into(),
+            start_time: Some(timestamp.timestamp_millis()),
+            ..Default::default()
+        };
 
         let response = create_client_test().get_log_events(request).await.unwrap();
 
@@ -926,6 +935,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -951,10 +961,12 @@ mod integration_tests {
         });
         let _ = sink.run(events).await.unwrap();
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name;
-        request.log_group_name = GROUP_NAME.into();
-        request.start_time = Some(timestamp.timestamp_millis());
+        let request = GetLogEventsRequest {
+            log_stream_name: stream_name,
+            log_group_name: GROUP_NAME.into(),
+            start_time: Some(timestamp.timestamp_millis()),
+            ..Default::default()
+        };
 
         let response = create_client_test().get_log_events(request).await.unwrap();
 
@@ -989,6 +1001,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1023,10 +1036,12 @@ mod integration_tests {
 
         sink.run(stream::iter(events)).await.unwrap();
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name;
-        request.log_group_name = GROUP_NAME.into();
-        request.start_time = Some((now - Duration::days(30)).timestamp_millis());
+        let request = GetLogEventsRequest {
+            log_stream_name: stream_name,
+            log_group_name: GROUP_NAME.into(),
+            start_time: Some((now - Duration::days(30)).timestamp_millis()),
+            ..Default::default()
+        };
 
         let response = create_client_test().get_log_events(request).await.unwrap();
 
@@ -1058,6 +1073,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1067,10 +1083,12 @@ mod integration_tests {
         let (input_lines, events) = random_lines_with_stream(100, 11);
         sink.run(events).await.unwrap();
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name;
-        request.log_group_name = group_name;
-        request.start_time = Some(timestamp.timestamp_millis());
+        let request = GetLogEventsRequest {
+            log_stream_name: stream_name,
+            log_group_name: group_name,
+            start_time: Some(timestamp.timestamp_millis()),
+            ..Default::default()
+        };
 
         let response = create_client_test().get_log_events(request).await.unwrap();
 
@@ -1107,6 +1125,7 @@ mod integration_tests {
             },
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1117,10 +1136,12 @@ mod integration_tests {
         let mut events = events.map(Ok);
         let _ = sink.into_sink().send_all(&mut events).await.unwrap();
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name;
-        request.log_group_name = group_name;
-        request.start_time = Some(timestamp.timestamp_millis());
+        let request = GetLogEventsRequest {
+            log_stream_name: stream_name,
+            log_group_name: group_name,
+            start_time: Some(timestamp.timestamp_millis()),
+            ..Default::default()
+        };
 
         let response = create_client_test().get_log_events(request).await.unwrap();
 
@@ -1152,6 +1173,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1173,10 +1195,12 @@ mod integration_tests {
             .collect::<Vec<_>>();
         sink.run(stream::iter(events)).await.unwrap();
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = format!("{}-0", stream_name);
-        request.log_group_name = GROUP_NAME.into();
-        request.start_time = Some(timestamp.timestamp_millis());
+        let request = GetLogEventsRequest {
+            log_stream_name: format!("{}-0", stream_name),
+            log_group_name: GROUP_NAME.into(),
+            start_time: Some(timestamp.timestamp_millis()),
+            ..Default::default()
+        };
 
         let response = create_client_test().get_log_events(request).await.unwrap();
         let events = response.events.unwrap();
@@ -1194,10 +1218,12 @@ mod integration_tests {
 
         assert_eq!(output_lines, expected_output);
 
-        let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = format!("{}-1", stream_name);
-        request.log_group_name = GROUP_NAME.into();
-        request.start_time = Some(timestamp.timestamp_millis());
+        let request = GetLogEventsRequest {
+            log_stream_name: format!("{}-1", stream_name),
+            log_group_name: GROUP_NAME.into(),
+            start_time: Some(timestamp.timestamp_millis()),
+            ..Default::default()
+        };
 
         let response = create_client_test().get_log_events(request).await.unwrap();
         let events = response.events.unwrap();
@@ -1233,6 +1259,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let client = config.create_client().unwrap();

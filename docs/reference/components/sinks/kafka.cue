@@ -1,21 +1,28 @@
 package metadata
 
 components: sinks: kafka: {
-	title:       "Kafka"
-	description: components._kafka.description
+	title: "Kafka"
 
 	classes: {
 		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "stable"
-		egress_method: "stream"
+		egress_method: "dynamic"
 		service_providers: ["AWS", "Confluent"]
+		stateful: false
 	}
 
 	features: {
 		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
+			batch: {
+				enabled:      true
+				common:       true
+				max_bytes:    null
+				max_events:   null
+				timeout_secs: null
+			}
 			compression: {
 				enabled: true
 				default: "none"
@@ -47,11 +54,12 @@ components: sinks: kafka: {
 	configuration: {
 		bootstrap_servers: components._kafka.configuration.bootstrap_servers
 		key_field: {
-			description: "The log field name to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the log, a blank value will be used."
+			description: "The log field name or tags key to use for the topic key. If unspecified, the key will be randomly generated. If the field does not exist on the log or in tags, a blank value will be used."
 			required:    true
 			warnings: []
 			type: string: {
 				examples: ["user_id"]
+				syntax: "literal"
 			}
 		}
 		librdkafka_options: components._kafka.configuration.librdkafka_options
@@ -89,6 +97,7 @@ components: sinks: kafka: {
 						type: string: {
 							default: null
 							examples: ["SCRAM-SHA-256", "SCRAM-SHA-512"]
+							syntax: "literal"
 						}
 					}
 					password: {
@@ -99,6 +108,7 @@ components: sinks: kafka: {
 						type: string: {
 							default: null
 							examples: ["password"]
+							syntax: "literal"
 						}
 					}
 					username: {
@@ -109,6 +119,7 @@ components: sinks: kafka: {
 						type: string: {
 							default: null
 							examples: ["username"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -121,13 +132,21 @@ components: sinks: kafka: {
 			warnings: []
 			type: string: {
 				examples: ["topic-1234", "logs-{{unit}}-%Y-%m-%d"]
+				syntax: "literal"
 			}
 		}
 	}
 
 	input: {
-		logs:    true
-		metrics: null
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
 	}
 
 	how_it_works: components._kafka.how_it_works

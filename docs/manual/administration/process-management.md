@@ -75,7 +75,7 @@ vector --config /etc/vector/vector.toml
 <CodeExplanation>
 
 - `vector` is placed in your `$PATH`.
-- You must create a [Vector configuration file][docs.configuration] to
+- You must create a [Vector configuration file][docs.setup.configuration] to
   successfully start Vector.
 
 </CodeExplanation>
@@ -109,7 +109,7 @@ sudo systemctl start vector
 | Flag                    | Description                                                                                                         |     |
 | :---------------------- | :------------------------------------------------------------------------------------------------------------------ | :-- |
 | **Required**            |                                                                                                                     |     |
-| `-c, --config <path>`   | Path the Vector [configuration file][docs.configuration].                                                           |     |
+| `-c, --config <path>`   | Path the Vector [configuration file][docs.setup.configuration].                                                           |     |
 | **Optional**            |                                                                                                                     |     |
 | `-q, --quiet`           | Raises the log level to `warn`.                                                                                     |     |
 | `-qq`                   | Raises the log level to `error`.                                                                                    |     |
@@ -118,7 +118,7 @@ sudo systemctl start vector
 | `-t, --threads`         | Limits the number of internal threads Vector can spawn.                                                             |     |
 | `-v, --verbose`         | Drops the log level to `debug`.                                                                                     |     |
 | `-vv`                   | Drops the log level to `trace`, the lowest level possible.                                                          |     |
-| `-w, --watch-config`    | Vector will watch for changes in [configuration file][docs.configuration], and reload accordingly. (Mac/Linux only) |     |
+| `-w, --watch-config`    | Vector will watch for changes in [configuration file][docs.setup.configuration], and reload accordingly. (Mac/Linux only) |     |
 
 ### Daemonizing
 
@@ -233,7 +233,7 @@ are:
 | Code | Description                              |
 | :--- | :--------------------------------------- |
 | `0`  | No error.                                |
-| `78` | Bad [configuration][docs.configuration]. |
+| `78` | Bad [configuration][docs.setup.configuration]. |
 
 ## Reloading
 
@@ -337,7 +337,7 @@ Vector will perform a diff between the new and old configuration, determining
 which sinks and sources should be started and shutdown and ensures the
 transition from the old to new pipeline is graceful.
 
-[docs.configuration]: /docs/setup/configuration/
+[docs.setup.configuration]: /docs/setup/configuration/
 [docs.platforms.docker#variants]: /docs/setup/installation/platforms/docker/#variants
 [docs.sources]: /docs/reference/sources/
 [urls.exit_codes]: https://docs.rs/exitcode/1.1.2/exitcode/#constants

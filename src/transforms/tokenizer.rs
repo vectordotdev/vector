@@ -1,12 +1,13 @@
-use super::util::tokenize::parse;
 use crate::{
-    config::{DataType, TransformConfig, TransformDescription},
+    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
-    internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
+    internal_events::{TokenizerConvertFailed, TokenizerFieldMissing},
     transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+use shared::tokenize::parse;
 use std::collections::HashMap;
 use std::str;
 
@@ -28,7 +29,7 @@ impl_generate_config_from_default!(TokenizerConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "tokenizer")]
 impl TransformConfig for TokenizerConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
@@ -99,7 +100,7 @@ impl FunctionTransform for Tokenizer {
             for ((name, path, conversion), value) in
                 self.field_names.iter().zip(parse(value).into_iter())
             {
-                match conversion.convert(Value::from(value.to_owned())) {
+                match conversion.convert::<Value>(Bytes::copy_from_slice(value.as_bytes())) {
                     Ok(value) => {
                         event.as_mut_log().insert_path(path.clone(), value);
                     }
@@ -115,8 +116,6 @@ impl FunctionTransform for Tokenizer {
             emit!(TokenizerFieldMissing { field: &self.field });
         };
 
-        emit!(TokenizerEventProcessed);
-
         output.push(event)
     }
 }
@@ -124,8 +123,11 @@ impl FunctionTransform for Tokenizer {
 #[cfg(test)]
 mod tests {
     use super::TokenizerConfig;
-    use crate::event::{LogEvent, Value};
-    use crate::{config::TransformConfig, Event};
+    use crate::{
+        config::{GlobalOptions, TransformConfig},
+        event::{LogEvent, Value},
+        Event,
+    };
 
     #[test]
     fn generate_config() {
@@ -148,7 +150,7 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build()
+        .build(&GlobalOptions::default())
         .await
         .unwrap();
         let parser = parser.as_function();

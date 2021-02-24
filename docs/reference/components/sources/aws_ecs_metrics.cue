@@ -1,8 +1,12 @@
 package metadata
 
 components: sources: aws_ecs_metrics: {
-	title:       "AWS ECS Metrics"
-	description: "The ECS metrics source collects the docker container stats for tasks running in Amazon ECS or Fargate."
+	title: "AWS ECS Metrics"
+
+	description: """
+		Collects the docker container stats for tasks running in AWS ECS or AWS
+		Fargate.
+		"""
 
 	classes: {
 		commonly_used: false
@@ -10,18 +14,14 @@ components: sources: aws_ecs_metrics: {
 		deployment_roles: ["sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				service: {
-					name:     "Amazon ECS"
-					thing:    "an \(name) container"
-					url:      urls.aws_ecs
-					versions: null
-				}
+				service: services.aws_ecs
 
 				interface: {
 					socket: {
@@ -40,33 +40,39 @@ components: sources: aws_ecs_metrics: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
 	}
 
+	installation: {
+		platform_name: null
+	}
+
 	configuration: {
 		endpoint: {
 			description: """
-					Base URI of the task metadata endpoint.
-					If empty, the URI will be automatically discovered based on the latest version detected.
-					The version 2 endpoint base URI is `169.254.170.2/v2/`.
-					The version 3 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI`.
-					The version 4 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI_V4`.
+				Base URI of the task metadata endpoint.
+				If empty, the URI will be automatically discovered based on the latest version detected.
+				The version 2 endpoint base URI is `169.254.170.2/v2/`.
+				The version 3 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI`.
+				The version 4 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI_V4`.
 				"""
 			common:   false
 			required: false
 			type: string: {
 				default: "${ECS_CONTAINER_METADATA_URI_V4}"
+				syntax:  "literal"
 			}
 		}
 		namespace: {
@@ -75,6 +81,7 @@ components: sources: aws_ecs_metrics: {
 			required:    false
 			type: string: {
 				default: "awsecs"
+				syntax:  "literal"
 			}
 		}
 		scrape_interval_secs: {
@@ -100,6 +107,7 @@ components: sources: aws_ecs_metrics: {
 					v3: "When fails the v4 check, but the environment variable `ECS_CONTAINER_METADATA_URI` is defined."
 					v2: "When fails the v4 and v3 checks."
 				}
+				syntax: "literal"
 			}
 		}
 	}
@@ -233,5 +241,15 @@ components: sources: aws_ecs_metrics: {
 		network_transmit_packets_total:      _awsecs & _network_counter & {description: "Number of packets sent by the container via the network interface."}
 		network_transmit_packets_drop_total: _awsecs & _network_counter & {description: "Number of outbound packets dropped by the container."}
 		network_transmit_errs_total:         _awsecs & _network_counter & {description: "Errors sending packets."}
+	}
+
+	telemetry: metrics: {
+		http_error_response_total:    components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total:    components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total
+		requests_completed_total:     components.sources.internal_metrics.output.metrics.requests_completed_total
+		request_duration_nanoseconds: components.sources.internal_metrics.output.metrics.request_duration_nanoseconds
 	}
 }

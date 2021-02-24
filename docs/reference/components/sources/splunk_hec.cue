@@ -3,27 +3,22 @@ package metadata
 components: sources: splunk_hec: {
 	_port: 8080
 
-	title:       "Splunk HTTP Event Collector (HEC)"
-	description: "The [Splunk HTTP Event Collector (HEC)](\(urls.splunk_hec)) is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application."
+	title: "Splunk HTTP Event Collector (HEC)"
 
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "Splunk HEC"
-					thing:    "a \(name) client"
-					url:      urls.splunk_hec
-					versions: null
-				}
+				service: services.splunk
 
 				interface: socket: {
 					api: {
@@ -47,18 +42,23 @@ components: sources: splunk_hec: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
@@ -69,6 +69,7 @@ components: sources: splunk_hec: {
 			warnings: []
 			type: string: {
 				default: "0.0.0.0:\(_port)"
+				syntax:  "literal"
 			}
 		}
 		token: {
@@ -79,6 +80,7 @@ components: sources: splunk_hec: {
 			type: string: {
 				default: null
 				examples: ["A94A8FE5CCB19BA61C4C08"]
+				syntax: "literal"
 			}
 		}
 	}

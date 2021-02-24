@@ -1,5 +1,4 @@
 use futures::{future::BoxFuture, FutureExt};
-use futures01::Future;
 use hyper::client::connect::dns::Name as Name13;
 use snafu::ResultExt;
 use std::{
@@ -8,8 +7,6 @@ use std::{
 };
 use tokio::task::spawn_blocking;
 use tower::Service;
-
-pub type ResolverFuture = Box<dyn Future<Item = LookupIp, Error = DnsError> + Send + 'static>;
 
 pub struct LookupIp(std::vec::IntoIter<SocketAddr>);
 

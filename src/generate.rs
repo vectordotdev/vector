@@ -1,6 +1,6 @@
 use crate::config::{
-    component::ExampleError, GlobalOptions, SinkDescription, SourceDescription,
-    TransformDescription,
+    component::ExampleError, default_data_dir, GlobalOptions, SinkDescription,
+    SinkHealthcheckOptions, SourceDescription, TransformDescription,
 };
 use colored::*;
 use indexmap::IndexMap;
@@ -58,10 +58,10 @@ pub struct Opts {
 
 #[derive(Serialize)]
 pub struct SinkOuter {
-    pub healthcheck: bool,
     pub inputs: Vec<String>,
     #[serde(flatten)]
     pub inner: Value,
+    pub healthcheck: SinkHealthcheckOptions,
     pub buffer: crate::buffers::BufferConfig,
 }
 
@@ -94,10 +94,9 @@ fn generate_example(
         })
         .collect();
 
-    let globals = {
-        let mut globals = GlobalOptions::default();
-        globals.data_dir = crate::config::default_data_dir();
-        globals
+    let globals = GlobalOptions {
+        data_dir: default_data_dir(),
+        ..Default::default()
     };
     let mut config = Config::default();
 
@@ -264,7 +263,7 @@ fn generate_example(
                         })
                         .unwrap_or_else(|| vec!["component-name".to_owned()]),
                     buffer: crate::buffers::BufferConfig::default(),
-                    healthcheck: true,
+                    healthcheck: SinkHealthcheckOptions::default(),
                     inner: example,
                 },
             );
@@ -292,9 +291,10 @@ fn generate_example(
     };
     if let Some(sources) = config.sources {
         match toml::to_string(&{
-            let mut sub = Config::default();
-            sub.sources = Some(sources);
-            sub
+            Config {
+                sources: Some(sources),
+                ..Default::default()
+            }
         }) {
             Ok(v) => builder = [builder, v].join("\n"),
             Err(e) => errs.push(format!("failed to marshal sources: {}", e)),
@@ -302,9 +302,10 @@ fn generate_example(
     }
     if let Some(transforms) = config.transforms {
         match toml::to_string(&{
-            let mut sub = Config::default();
-            sub.transforms = Some(transforms);
-            sub
+            Config {
+                transforms: Some(transforms),
+                ..Default::default()
+            }
         }) {
             Ok(v) => builder = [builder, v].join("\n"),
             Err(e) => errs.push(format!("failed to marshal transforms: {}", e)),
@@ -312,9 +313,10 @@ fn generate_example(
     }
     if let Some(sinks) = config.sinks {
         match toml::to_string(&{
-            let mut sub = Config::default();
-            sub.sinks = Some(sinks);
-            sub
+            Config {
+                sinks: Some(sinks),
+                ..Default::default()
+            }
         }) {
             Ok(v) => builder = [builder, v].join("\n"),
             Err(e) => errs.push(format!("failed to marshal sinks: {}", e)),
@@ -368,10 +370,8 @@ fn write_config(filepath: &PathBuf, body: &str) -> Result<usize, crate::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-    use std::path::PathBuf;
-
-    use tempfile::tempdir;
+    #[cfg(all(feature = "transforms-json_parser", feature = "sinks-console"))]
+    use indoc::indoc;
 
     #[test]
     fn generate_all() {
@@ -407,8 +407,16 @@ mod tests {
         assert!(errors.is_empty());
     }
 
+    #[cfg(all(
+        feature = "sources-stdin",
+        feature = "transforms-json_parser",
+        feature = "sinks-console"
+    ))]
     #[test]
     fn generate_configfile() {
+        use std::fs;
+        use tempfile::tempdir;
+
         let tempdir = tempdir().expect("Unable to create tempdir for config");
         let filepath = tempdir.path().join("./config.example.toml");
         let cfg = generate_example(true, "stdin/json_parser/console", &Some(filepath.clone()));
@@ -416,12 +424,8 @@ mod tests {
             fs::canonicalize(&filepath).expect("Could not return canonicalized filepath"),
         )
         .expect("Could not read config file");
-        cleanup_configfile(&filepath);
-        assert_eq!(cfg.unwrap(), filecontents)
-    }
-
-    fn cleanup_configfile(filepath: &PathBuf) {
         fs::remove_file(filepath).expect("Could not cleanup config file!");
+        assert_eq!(cfg.unwrap(), filecontents)
     }
 
     #[cfg(all(feature = "transforms-json_parser", feature = "sinks-console"))]
@@ -429,158 +433,167 @@ mod tests {
     fn generate_basic() {
         assert_eq!(
             generate_example(true, "stdin/json_parser/console", &None),
-            Ok(r#"data_dir = "/var/lib/vector/"
+            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
-[sources.source0]
-max_length = 102400
-type = "stdin"
+                [sources.source0]
+                max_length = 102400
+                type = "stdin"
 
-[transforms.transform0]
-inputs = ["source0"]
-drop_field = true
-drop_invalid = false
-type = "json_parser"
+                [transforms.transform0]
+                inputs = ["source0"]
+                drop_field = true
+                drop_invalid = false
+                type = "json_parser"
 
-[sinks.sink0]
-healthcheck = true
-inputs = ["transform0"]
-target = "stdout"
-type = "console"
+                [sinks.sink0]
+                inputs = ["transform0"]
+                target = "stdout"
+                type = "console"
 
-[sinks.sink0.encoding]
-codec = "json"
+                [sinks.sink0.encoding]
+                codec = "json"
 
-[sinks.sink0.buffer]
-type = "memory"
-max_events = 500
-when_full = "block"
-"#
+                [sinks.sink0.healthcheck]
+                enabled = true
+
+                [sinks.sink0.buffer]
+                type = "memory"
+                max_events = 500
+                when_full = "block"
+            "#}
             .to_string())
         );
 
         assert_eq!(
             generate_example(true, "stdin|json_parser|console", &None),
-            Ok(r#"data_dir = "/var/lib/vector/"
+            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
-[sources.source0]
-max_length = 102400
-type = "stdin"
+                [sources.source0]
+                max_length = 102400
+                type = "stdin"
 
-[transforms.transform0]
-inputs = ["source0"]
-drop_field = true
-drop_invalid = false
-type = "json_parser"
+                [transforms.transform0]
+                inputs = ["source0"]
+                drop_field = true
+                drop_invalid = false
+                type = "json_parser"
 
-[sinks.sink0]
-healthcheck = true
-inputs = ["transform0"]
-target = "stdout"
-type = "console"
+                [sinks.sink0]
+                inputs = ["transform0"]
+                target = "stdout"
+                type = "console"
 
-[sinks.sink0.encoding]
-codec = "json"
+                [sinks.sink0.encoding]
+                codec = "json"
 
-[sinks.sink0.buffer]
-type = "memory"
-max_events = 500
-when_full = "block"
-"#
+                [sinks.sink0.healthcheck]
+                enabled = true
+
+                [sinks.sink0.buffer]
+                type = "memory"
+                max_events = 500
+                when_full = "block"
+            "#}
             .to_string())
         );
 
         assert_eq!(
             generate_example(true, "stdin//console", &None),
-            Ok(r#"data_dir = "/var/lib/vector/"
+            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
-[sources.source0]
-max_length = 102400
-type = "stdin"
+                [sources.source0]
+                max_length = 102400
+                type = "stdin"
 
-[sinks.sink0]
-healthcheck = true
-inputs = ["source0"]
-target = "stdout"
-type = "console"
+                [sinks.sink0]
+                inputs = ["source0"]
+                target = "stdout"
+                type = "console"
 
-[sinks.sink0.encoding]
-codec = "json"
+                [sinks.sink0.encoding]
+                codec = "json"
 
-[sinks.sink0.buffer]
-type = "memory"
-max_events = 500
-when_full = "block"
-"#
+                [sinks.sink0.healthcheck]
+                enabled = true
+
+                [sinks.sink0.buffer]
+                type = "memory"
+                max_events = 500
+                when_full = "block"
+            "#}
             .to_string())
         );
 
         assert_eq!(
             generate_example(true, "//console", &None),
-            Ok(r#"data_dir = "/var/lib/vector/"
+            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
-[sinks.sink0]
-healthcheck = true
-inputs = ["component-name"]
-target = "stdout"
-type = "console"
+                [sinks.sink0]
+                inputs = ["component-name"]
+                target = "stdout"
+                type = "console"
 
-[sinks.sink0.encoding]
-codec = "json"
+                [sinks.sink0.encoding]
+                codec = "json"
 
-[sinks.sink0.buffer]
-type = "memory"
-max_events = 500
-when_full = "block"
-"#
+                [sinks.sink0.healthcheck]
+                enabled = true
+
+                [sinks.sink0.buffer]
+                type = "memory"
+                max_events = 500
+                when_full = "block"
+            "#}
             .to_string())
         );
 
         assert_eq!(
             generate_example(true, "/add_fields,json_parser,remove_fields", &None),
-            Ok(r#"data_dir = "/var/lib/vector/"
+            Ok(indoc! {r#"data_dir = "/var/lib/vector/"
 
-[transforms.transform0]
-inputs = []
-type = "add_fields"
+                [transforms.transform0]
+                inputs = []
+                type = "add_fields"
 
-[transforms.transform0.fields]
-name = "field_name"
+                [transforms.transform0.fields]
+                name = "field_name"
 
-[transforms.transform1]
-inputs = ["transform0"]
-drop_field = true
-drop_invalid = false
-type = "json_parser"
+                [transforms.transform1]
+                inputs = ["transform0"]
+                drop_field = true
+                drop_invalid = false
+                type = "json_parser"
 
-[transforms.transform2]
-inputs = ["transform1"]
-fields = []
-type = "remove_fields"
-"#
+                [transforms.transform2]
+                inputs = ["transform1"]
+                fields = []
+                type = "remove_fields"
+            "#}
             .to_string())
         );
 
         assert_eq!(
             generate_example(false, "/add_fields,json_parser,remove_fields", &None),
-            Ok(r#"
-[transforms.transform0]
-inputs = []
-type = "add_fields"
+            Ok(indoc! {r#"
 
-[transforms.transform0.fields]
-name = "field_name"
+                [transforms.transform0]
+                inputs = []
+                type = "add_fields"
 
-[transforms.transform1]
-inputs = ["transform0"]
-drop_field = true
-drop_invalid = false
-type = "json_parser"
+                [transforms.transform0.fields]
+                name = "field_name"
 
-[transforms.transform2]
-inputs = ["transform1"]
-fields = []
-type = "remove_fields"
-"#
+                [transforms.transform1]
+                inputs = ["transform0"]
+                drop_field = true
+                drop_invalid = false
+                type = "json_parser"
+
+                [transforms.transform2]
+                inputs = ["transform1"]
+                fields = []
+                type = "remove_fields"
+            "#}
             .to_string())
         );
     }

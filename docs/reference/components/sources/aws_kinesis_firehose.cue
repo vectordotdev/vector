@@ -1,10 +1,9 @@
 package metadata
 
-components: sources: aws_kinesis_firehose: components._aws & {
+components: sources: aws_kinesis_firehose: {
 	_port: 443
 
-	title:       "AWS Kinesis Firehose"
-	description: "[AWS Kinesis Firehose](\(urls.aws_kinesis_firehose)) is an AWS service that simplifies dealing with streaming data. It allows for ingestion, transformation, and forwarding of events. In addition to publishing events directly to Kinesis Firehose, the service has direct integrations with many AWS services which allow them to directly publish events to a delivery stream."
+	title: "AWS Kinesis Firehose"
 
 	classes: {
 		commonly_used: false
@@ -12,26 +11,14 @@ components: sources: aws_kinesis_firehose: components._aws & {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "AWS Kinesis Firehose"
-					thing:    "a \(name) stream"
-					url:      urls.aws_kinesis_firehose
-					versions: null
-
-					setup: [
-						"""
-							[Setup a Kinesis Firehose delivery stream](\(urls.aws_kinesis_firehose_setup))
-							in your preferred AWS region. Point the endpoint to your
-							Vector instance's address.
-							""",
-					]
-				}
+				service: services.aws_kinesis_firehose
 
 				interface: socket: {
 					api: {
@@ -54,38 +41,54 @@ components: sources: aws_kinesis_firehose: components._aws & {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
+		requirements: [
+			"""
+				AWS Kinesis Firehose can only deliver data over HTTP. You will need
+				to solve TLS termination by fronting Vector with a load balaner or
+				configuring the `tls.*` options.
+				""",
+		]
 
-		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
 		address: {
 			description: "The address to listen for connections on"
 			required:    true
-			type: string: examples: ["0.0.0.0:443", "localhost:443"]
+			type: string: {
+				examples: ["0.0.0.0:443", "localhost:443"]
+				syntax: "literal"
+			}
 		}
 		access_key: {
 			common: true
 			description: """
-					AWS Kinesis Firehose can be configured to pass along an access
-					key to authenticate requests. If configured, `access_key` should
-					be set to the same value. If not specified, vector will treat
-					all requests as authenticated.
+				AWS Kinesis Firehose can be configured to pass along an access
+				key to authenticate requests. If configured, `access_key` should
+				be set to the same value. If not specified, vector will treat
+				all requests as authenticated.
 				"""
 			required: false
 			type: "string": {
 				default: null
 				examples: ["A94A8FE5CCB19BA61C4C08"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -98,17 +101,26 @@ components: sources: aws_kinesis_firehose: components._aws & {
 				message: {
 					description: "The raw record from the incoming payload."
 					required:    true
-					type: string: examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+					type: string: {
+						examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+						syntax: "literal"
+					}
 				}
 				request_id: {
 					description: "The AWS Kinesis Firehose request ID, value of the `X-Amz-Firehose-Request-Id` header."
 					required:    true
-					type: string: examples: ["ed1d787c-b9e2-4631-92dc-8e7c9d26d804"]
+					type: string: {
+						examples: ["ed1d787c-b9e2-4631-92dc-8e7c9d26d804"]
+						syntax: "literal"
+					}
 				}
 				source_arn: {
 					description: "The AWS Kinises Firehose delivery stream that issued the request, value of the `X-Amz-Firehose-Source-Arn` header."
 					required:    true
-					type: string: examples: ["arn:aws:firehose:us-east-1:111111111111:deliverystream/test"]
+					type: string: {
+						examples: ["arn:aws:firehose:us-east-1:111111111111:deliverystream/test"]
+						syntax: "literal"
+					}
 				}
 			}
 		}
@@ -117,6 +129,7 @@ components: sources: aws_kinesis_firehose: components._aws & {
 	examples: [
 		{
 			title: "AWS CloudWatch Subscription message"
+
 			configuration: {
 				address: "0.0.0.0:443"
 			}
@@ -156,7 +169,7 @@ components: sources: aws_kinesis_firehose: components._aws & {
 				1. Deploy vector with a publicly exposed HTTP endpoint using
 				   this source. You will likely also want to use the
 				   [`aws_cloudwatch_logs_subscription_parser`][vector_transform_aws_cloudwatch_logs_subscription_parser]
-				   transform to extract the log events.. Make sure to set
+				   transform to extract the log events. Make sure to set
 				   the `access_key` to secure this endpoint. Your
 				   configuration might look something like:
 

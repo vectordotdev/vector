@@ -1,8 +1,8 @@
 use super::InternalEvent;
-#[cfg(feature = "sources-prometheus")]
-use crate::sources::prometheus::parser::ParserError;
 use hyper::StatusCode;
 use metrics::{counter, histogram};
+#[cfg(feature = "sources-prometheus")]
+use prometheus_parser::ParserError;
 #[cfg(feature = "sources-prometheus")]
 use std::borrow::Cow;
 use std::time::Instant;
@@ -56,7 +56,7 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
         debug!(
             message = %format!("Failed to parse response:\n\n{}\n\n", self.body),
             url = %self.url,
-            rate_limit_secs = 10
+            internal_log_rate_secs = 10
         );
     }
 
@@ -113,34 +113,13 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
 }
 
 #[derive(Debug)]
-pub struct PrometheusRemoteWriteSnapError {
-    pub error: snap::Error,
-}
-
-impl InternalEvent for PrometheusRemoteWriteSnapError {
-    fn emit_logs(&self) {
-        error!(message = "Could not decompress request body.", error = ?self.error);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("parse_errors_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct PrometheusRemoteWriteReceived {
-    pub byte_size: usize,
     pub count: usize,
 }
 
 impl InternalEvent for PrometheusRemoteWriteReceived {
     fn emit_logs(&self) {
         debug!(message = "Received remote_write events.", count = ?self.count);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("events_processed_total", self.count as u64);
-        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -151,7 +130,7 @@ impl InternalEvent for PrometheusNoNameError {
     fn emit_logs(&self) {
         error!(
             message = "Decoded timeseries is missing the __name__ field.",
-            rate_limit_secs = 5
+            internal_log_rate_secs = 5
         );
     }
 
@@ -167,10 +146,34 @@ pub struct PrometheusServerRequestComplete {
 
 impl InternalEvent for PrometheusServerRequestComplete {
     fn emit_logs(&self) {
-        error!(message = "Request to prometheus server complete.", status_code = %self.status_code);
+        let message = "Request to prometheus server complete.";
+        if self.status_code.is_success() {
+            debug!(message, status_code = %self.status_code);
+        } else {
+            error!(message, status_code = %self.status_code);
+        }
     }
 
     fn emit_metrics(&self) {
         counter!("requests_received_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct PrometheusTemplateRenderingError {
+    pub fields: Vec<String>,
+}
+
+impl InternalEvent for PrometheusTemplateRenderingError {
+    fn emit_logs(&self) {
+        error!(
+            message = "Failed to render templated value; discarding value.",
+            fields = ?self.fields,
+            internal_log_rate_secs = 30,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_errors_total", 1);
     }
 }

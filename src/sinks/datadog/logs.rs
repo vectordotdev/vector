@@ -20,6 +20,7 @@ use flate2::write::GzEncoder;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode};
 use hyper::body::Body;
+use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{io::Write, time::Duration};
@@ -59,10 +60,10 @@ inventory::submit! {
 
 impl GenerateConfig for DatadogLogsConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"api_key = "${DATADOG_API_KEY_ENV_VAR}"
-            encoding.codec = "json""#,
-        )
+        toml::from_str(indoc! {r#"
+            api_key = "${DATADOG_API_KEY_ENV_VAR}"
+            encoding.codec = "json"
+        "#})
         .unwrap()
     }
 }
@@ -296,6 +297,8 @@ mod tests {
         test_util::{next_addr, random_lines_with_stream},
     };
     use futures::StreamExt;
+    use indoc::indoc;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn generate_config() {
@@ -304,14 +307,12 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_text() {
-        let (mut config, cx) = load_sink::<DatadogLogsConfig>(
-            r#"
+        let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             api_key = "atoken"
             encoding = "text"
             compression = "none"
             batch.max_events = 1
-            "#,
-        )
+        "#})
         .unwrap();
 
         let addr = next_addr();
@@ -339,14 +340,12 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_json() {
-        let (mut config, cx) = load_sink::<DatadogLogsConfig>(
-            r#"
+        let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             api_key = "atoken"
             encoding = "json"
             compression = "none"
             batch.max_events = 1
-            "#,
-        )
+        "#})
         .unwrap();
 
         let addr = next_addr();

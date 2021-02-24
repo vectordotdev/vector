@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: clickhouse: {
-	title:       "Clickhouse"
-	description: "[ClickHouse](\(urls.clickhouse)) is an open-source column-oriented database management system that manages extremely large volumes of data, including non-aggregated data, in a stable and sustainable manner and allows generating custom data reports in real time. The system is linearly scalable and can be scaled up to store and process trillions of rows and petabytes of data. This makes it an best-in-class storage for logs and metrics data."
+	title: "Clickhouse"
 
 	classes: {
 		commonly_used: true
@@ -10,6 +9,7 @@ components: sinks: clickhouse: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Yandex"]
+		stateful: false
 	}
 
 	features: {
@@ -41,6 +41,7 @@ components: sinks: clickhouse: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               30
+				headers:                    false
 			}
 			tls: {
 				enabled:                true
@@ -68,13 +69,15 @@ components: sinks: clickhouse: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
 
 		requirements: [
@@ -99,6 +102,7 @@ components: sinks: clickhouse: {
 			type: string: {
 				default: null
 				examples: ["mydatabase"]
+				syntax: "literal"
 			}
 		}
 		endpoint: {
@@ -106,6 +110,7 @@ components: sinks: clickhouse: {
 			required:    true
 			type: string: {
 				examples: ["http://localhost:8123"]
+				syntax: "literal"
 			}
 		}
 		table: {
@@ -114,6 +119,7 @@ components: sinks: clickhouse: {
 			warnings: []
 			type: string: {
 				examples: ["mytable"]
+				syntax: "literal"
 			}
 		}
 	}

@@ -1,5 +1,5 @@
 use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
-use futures::{compat::Future01CompatExt, TryFutureExt};
+use futures::TryFutureExt;
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Response, Server,
@@ -37,7 +37,7 @@ fn benchmark_http(c: &mut Criterion) {
                         let mut config = config::Config::builder();
                         config.add_source(
                             "in",
-                            sources::socket::SocketConfig::make_tcp_config(in_addr),
+                            sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
                         );
                         config.add_sink(
                             "out",
@@ -46,7 +46,6 @@ fn benchmark_http(c: &mut Criterion) {
                                 uri: out_addr.to_string().parse::<http::Uri>().unwrap().into(),
                                 compression: *compression,
                                 method: Default::default(),
-                                healthcheck_uri: Default::default(),
                                 auth: Default::default(),
                                 headers: Default::default(),
                                 batch: sinks::util::BatchConfig {
@@ -72,7 +71,7 @@ fn benchmark_http(c: &mut Criterion) {
                         rt.block_on(async move {
                             let lines = random_lines(line_size).take(num_lines);
                             send_lines(in_addr, lines).await.unwrap();
-                            topology.stop().compat().await.unwrap();
+                            topology.stop().await;
                         })
                     },
                     BatchSize::PerIteration,

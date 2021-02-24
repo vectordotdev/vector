@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: nats: {
-	title:       "NATS"
-	description: "[NATS.io](\(urls.nats)) is a simple, secure and high performance open source messaging system for cloud native applications, IoT messaging, and microservices architectures. NATS.io is a Cloud Native Computing Foundation project."
+	title: "NATS"
 
 	classes: {
 		commonly_used: false
@@ -10,6 +9,7 @@ components: sinks: nats: {
 		development:   "beta"
 		egress_method: "stream"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {
@@ -28,12 +28,7 @@ components: sinks: nats: {
 			request: enabled: false
 			tls: enabled:     false
 			to: {
-				service: {
-					name:     "NATS"
-					thing:    "a \(name) server"
-					url:      urls.nats
-					versions: null
-				}
+				service: services.nats
 
 				interface: {
 					socket: {
@@ -47,15 +42,16 @@ components: sinks: nats: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -64,11 +60,11 @@ components: sinks: nats: {
 	configuration: {
 		url: {
 			description: "The NATS URL to connect to. The url _must_ take the form of `nats://server:port`."
-			groups: ["tcp"]
-			required: true
+			required:    true
 			warnings: []
 			type: string: {
 				examples: ["nats://demo.nats.io", "nats://127.0.0.1:4222"]
+				syntax: "literal"
 			}
 		}
 		subject: {
@@ -77,7 +73,7 @@ components: sinks: nats: {
 			warnings: []
 			type: string: {
 				examples: ["{{ host }}", "foo", "time.us.east", "time.*.east", "time.>", ">"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		name: {
@@ -87,6 +83,7 @@ components: sinks: nats: {
 			type: string: {
 				default: "vector"
 				examples: ["foo", "API Name Option Example"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -94,5 +91,12 @@ components: sinks: nats: {
 	input: {
 		logs:    true
 		metrics: null
+	}
+
+	telemetry: metrics: {
+		missing_keys_total:     components.sources.internal_metrics.output.metrics.missing_keys_total
+		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+		send_errors_total:      components.sources.internal_metrics.output.metrics.send_errors_total
 	}
 }

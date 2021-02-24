@@ -15,6 +15,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
+    tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
     Event,
 };
@@ -48,13 +49,34 @@ enum TcpError {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct TcpSinkConfig {
-    pub address: String,
-    pub tls: Option<TlsConfig>,
+    address: String,
+    keepalive: Option<TcpKeepaliveConfig>,
+    tls: Option<TlsConfig>,
+    send_buffer_bytes: Option<usize>,
 }
 
 impl TcpSinkConfig {
-    pub fn new(address: String, tls: Option<TlsConfig>) -> Self {
-        Self { address, tls }
+    pub fn new(
+        address: String,
+        keepalive: Option<TcpKeepaliveConfig>,
+        tls: Option<TlsConfig>,
+        send_buffer_bytes: Option<usize>,
+    ) -> Self {
+        Self {
+            address,
+            keepalive,
+            tls,
+            send_buffer_bytes,
+        }
+    }
+
+    pub fn from_address(address: String) -> Self {
+        Self {
+            address,
+            keepalive: None,
+            tls: None,
+            send_buffer_bytes: None,
+        }
     }
 
     pub fn build(
@@ -66,8 +88,7 @@ impl TcpSinkConfig {
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
-
-        let connector = TcpConnector::new(host, port, tls);
+        let connector = TcpConnector::new(host, port, self.keepalive, tls, self.send_buffer_bytes);
         let sink = TcpSink::new(connector.clone(), cx.acker(), encode_event);
 
         Ok((
@@ -81,12 +102,31 @@ impl TcpSinkConfig {
 struct TcpConnector {
     host: String,
     port: u16,
+    keepalive: Option<TcpKeepaliveConfig>,
     tls: MaybeTlsSettings,
+    send_buffer_bytes: Option<usize>,
 }
 
 impl TcpConnector {
-    fn new(host: String, port: u16, tls: MaybeTlsSettings) -> Self {
-        Self { host, port, tls }
+    fn new(
+        host: String,
+        port: u16,
+        keepalive: Option<TcpKeepaliveConfig>,
+        tls: MaybeTlsSettings,
+        send_buffer_bytes: Option<usize>,
+    ) -> Self {
+        Self {
+            host,
+            port,
+            keepalive,
+            tls,
+            send_buffer_bytes,
+        }
+    }
+
+    #[cfg(test)]
+    fn from_host_port(host: String, port: u16) -> Self {
+        Self::new(host, port, None, None.into(), None)
     }
 
     fn fresh_backoff() -> ExponentialBackoff {
@@ -109,6 +149,21 @@ impl TcpConnector {
             .connect(&self.host, &addr)
             .await
             .context(ConnectError)
+            .map(|mut maybe_tls| {
+                if let Some(keepalive) = self.keepalive {
+                    if let Err(error) = maybe_tls.set_keepalive(keepalive) {
+                        warn!(message = "Failed configuring TCP keepalive.", %error);
+                    }
+                }
+
+                if let Some(send_buffer_bytes) = self.send_buffer_bytes {
+                    if let Err(error) = maybe_tls.set_send_buffer_bytes(send_buffer_bytes) {
+                        warn!(message = "Failed configuring send buffer size on TCP socket.", %error);
+                    }
+                }
+
+                maybe_tls
+            })
     }
 
     async fn connect_backoff(&self) -> MaybeTlsStream<TcpStream> {
@@ -230,11 +285,11 @@ mod test {
 
         let addr = next_addr();
         let _listener = TcpListener::bind(&addr).await.unwrap();
-        let good = TcpConnector::new(addr.ip().to_string(), addr.port(), None.into());
+        let good = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
         assert!(good.healthcheck().await.is_ok());
 
         let addr = next_addr();
-        let bad = TcpConnector::new(addr.ip().to_string(), addr.port(), None.into());
+        let bad = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
         assert!(bad.healthcheck().await.is_err());
     }
 }

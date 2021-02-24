@@ -1,26 +1,26 @@
 package metadata
 
 components: sinks: _datadog: {
-	description: "[Datadog](\(urls.datadog)) is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform."
-
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Datadog"]
+		stateful: false
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -33,6 +33,7 @@ components: sinks: _datadog: {
 			warnings: []
 			type: string: {
 				examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
+				syntax: "literal"
 			}
 		}
 		endpoint: {
@@ -43,6 +44,7 @@ components: sinks: _datadog: {
 			type: string: {
 				default: null
 				examples: ["127.0.0.1:8080", "example.com:12345"]
+				syntax: "literal"
 			}
 		}
 		region: {
@@ -55,6 +57,7 @@ components: sinks: _datadog: {
 					us: "United States"
 					eu: "Europe"
 				}
+				syntax: "literal"
 			}
 		}
 	}

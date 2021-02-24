@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: sematext_metrics: {
-	title:       "Sematext Metrics"
-	description: "[Sematext](\(urls.sematext)) is a hosted monitoring platform for metrics based on InfluxDB. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time."
+	title: "Sematext Metrics"
 
 	classes: {
 		commonly_used: false
@@ -10,6 +9,7 @@ components: sinks: sematext_metrics: {
 		development:   "beta"
 		service_providers: ["Sematext"]
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -35,15 +35,16 @@ components: sinks: sematext_metrics: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: [
 			"""
@@ -63,6 +64,7 @@ components: sinks: sematext_metrics: {
 			warnings: []
 			type: string: {
 				examples: ["service"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -80,6 +82,7 @@ components: sinks: sematext_metrics: {
 	}
 
 	telemetry: metrics: {
+		encode_errors_total:     components.sources.internal_metrics.output.metrics.encode_errors_total
 		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

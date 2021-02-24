@@ -11,10 +11,13 @@
   [[tests.outputs]]
     extract_from = "split_simple"
     [[tests.outputs.conditions]]
-      "timestamp.equals" = "2020-01-01T12:34:56Z"
-      "level.equals" = "INFO"
-      "message.equals" = "\"hello,"
-      "trailer.equals" = "world\""
+      type = "remap"
+      source = '''
+        .timestamp == "2020-01-01T12:34:56Z" &&
+        .level == "INFO" &&
+        .message == "\"hello," &&
+        .trailer == "world\""
+      '''
 
 [transforms.split_nested]
   inputs = []
@@ -29,6 +32,9 @@
   [[tests.outputs]]
     extract_from = "split_nested"
     [[tests.outputs.conditions]]
-      "nested.timestamp.equals" = "2020-01-01T12:34:56Z"
-      "nested.level.equals" = "INFO"
-      "doubly.nested.message.equals" = "hello"
+      type = "remap"
+      source = '''
+        .nested.timestamp == "2020-01-01T12:34:56Z" &&
+        .nested.level == "INFO" &&
+        .doubly.nested.message == "hello"
+      '''

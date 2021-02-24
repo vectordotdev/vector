@@ -1,7 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformDescription},
+    config::{log_schema, DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{JsonParserEventProcessed, JsonParserFailedParse, JsonParserTargetExists},
+    internal_events::{JsonParserFailedParse, JsonParserTargetExists},
     transforms::{FunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
@@ -28,7 +28,7 @@ impl_generate_config_from_default!(JsonParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "json_parser")]
 impl TransformConfig for JsonParserConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         Ok(Transform::function(JsonParser::from(self.clone())))
     }
 
@@ -74,8 +74,6 @@ impl FunctionTransform for JsonParser {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field);
-
-        emit!(JsonParserEventProcessed);
 
         let parsed = value
             .and_then(|value| {

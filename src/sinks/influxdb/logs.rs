@@ -19,6 +19,7 @@ use crate::{
 };
 use futures::SinkExt;
 use http::{Request, Uri};
+use indoc::indoc;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -77,14 +78,14 @@ inventory::submit! {
 
 impl GenerateConfig for InfluxDBLogsConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"endpoint = "http://localhost:8086/"
+        toml::from_str(indoc! {r#"
+            endpoint = "http://localhost:8086/"
             namespace = "my-namespace"
             tags = []
             org = "my-org"
             bucket = "my-bucket"
-            token = "${INFLUXDB_TOKEN}""#,
-        )
+            token = "${INFLUXDB_TOKEN}"
+        "#})
         .unwrap()
     }
 }
@@ -93,7 +94,6 @@ impl GenerateConfig for InfluxDBLogsConfig {
 #[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDBLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        // let mut config = self.clone();
         let mut tags: HashSet<String> = self.tags.clone().into_iter().collect();
         tags.insert(log_schema().host_key().to_string());
         tags.insert(log_schema().source_type_key().to_string());
@@ -158,8 +158,6 @@ impl HttpSink for InfluxDBLogsSink {
     type Output = Vec<u8>;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        let mut output = String::new();
-
         self.encoding.apply_rules(&mut event);
         let mut event = event.into_log();
 
@@ -188,7 +186,8 @@ impl HttpSink for InfluxDBLogsSink {
             }
         });
 
-        influx_line_protocol(
+        let mut output = String::new();
+        if let Err(error) = influx_line_protocol(
             self.protocol_version,
             measurement,
             "logs",
@@ -196,7 +195,10 @@ impl HttpSink for InfluxDBLogsSink {
             Some(fields),
             timestamp,
             &mut output,
-        );
+        ) {
+            warn!(message = "Failed to encode event; dropping event.", %error, internal_log_rate_secs = 30);
+            return None;
+        };
 
         Some(output.into_bytes())
     }
@@ -250,6 +252,7 @@ mod tests {
     };
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
+    use indoc::indoc;
 
     #[test]
     fn generate_config() {
@@ -258,13 +261,13 @@ mod tests {
 
     #[test]
     fn test_config_without_tags() {
-        let config = r#"
+        let config = indoc! {r#"
             namespace = "vector-logs"
             endpoint = "http://localhost:9999"
             bucket = "my-bucket"
             org = "my-org"
             token = "my-token"
-        "#;
+        "#};
 
         toml::from_str::<InfluxDBLogsConfig>(&config).unwrap();
     }
@@ -487,13 +490,11 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_v1() {
-        let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(
-            r#"
+        let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(indoc! {r#"
             namespace = "ns"
             endpoint = "http://localhost:9999"
             database = "my-database"
-        "#,
-        )
+        "#})
         .unwrap();
 
         // Make sure we can build the config
@@ -548,15 +549,13 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_v2() {
-        let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(
-            r#"
+        let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(indoc! {r#"
             namespace = "ns"
             endpoint = "http://localhost:9999"
             bucket = "my-bucket"
             org = "my-org"
             token = "my-token"
-        "#,
-        )
+        "#})
         .unwrap();
 
         // Make sure we can build the config

@@ -6,7 +6,9 @@ on:
 jobs:
   test-harness:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
+
+    needs: version
 
     # Only run if we're invoked with a new command comment on a pull request.
     if: |
@@ -16,7 +18,7 @@ jobs:
 
     steps:
     - name: Indicate that we picked up the command with a comment reaction
-      uses: actions/github-script@0.4.0
+      uses: actions/github-script@v3.1
       with:
         github-token: '${{secrets.GITHUB_TOKEN}}'
         script: |
@@ -36,7 +38,7 @@ jobs:
 
     - name: Get Pull Request info
       id: pr-info
-      uses: actions/github-script@0.9.0
+      uses: actions/github-script@v3.1
       with:
         script: |
           const pr_info_response = await github.pulls.get({
@@ -57,6 +59,10 @@ jobs:
       with:
         lfs: true
         ref: '${{ steps.pr-info.outputs.head_sha }}'
+
+    - name: Set the Vector version
+      run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+
     - name: Complete repo clone and gather info on the cloned code
       id: cloned-repo-info
       run: |
@@ -67,9 +73,9 @@ jobs:
     # Doesn't work yet, see https://github.com/actions/cache/issues/176
     - name: Cache deb
       id: deb-cache
-      uses: actions/cache@v1
+      uses: actions/cache@v2.1.4
       with:
-        path: target/artifacts/vector-amd64.deb
+        path: target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb
         key: vector-test-harness-packaged-deb-${{ steps.pr-info.outputs.head_sha }}
     - name: Make deb
       if: steps.deb-cache.outputs.cache-hit != 'true'
@@ -83,7 +89,7 @@ jobs:
           && bin/test $(echo '${{ github.event.comment.body }}' | head -n 1 | sed 's|^/test ||')"
       env:
         GENERATE_SSH_KEY: true
-        VECTOR_TEST_VECTOR_DEB_PATH: '${{ github.workspace }}/target/artifacts/vector-amd64.deb'
+        VECTOR_TEST_VECTOR_DEB_PATH: '${{ github.workspace }}/target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb'
         VECTOR_TEST_USER_ID: 'gha_${{ github.event.issue.number }}'
         VECTOR_TEST_RESULTS_S3_BUCKET_NAME: test-results.vector.dev
         VECTOR_TEST_SUBJECT: vector
@@ -105,7 +111,7 @@ jobs:
         AWS_DEFAULT_REGION: '${{ secrets.TEST_HARNESS_AWS_DEFAULT_REGION }}'
 
     - name: Post a comment with the results
-      uses: actions/github-script@0.9.0
+      uses: actions/github-script@v3.1
       with:
         github-token: '${{secrets.GITHUB_TOKEN}}'
         script: |

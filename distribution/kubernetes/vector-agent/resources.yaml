@@ -35,17 +35,38 @@ data:
   managed.toml: |
     # Configuration for vector.
     # Docs: https://vector.dev/docs/
-
-    # Data dir is location controlled at the `DaemonSet`.
+    
     data_dir = "/vector-data-dir"
+    
+    [api]
+      enabled = false
+      address = "0.0.0.0:8686"
+      playground = true
+    
     [log_schema]
       host_key = "host"
       message_key = "message"
       source_type_key = "source_type"
       timestamp_key = "timestamp"
+    
     # Ingest logs from Kubernetes.
     [sources.kubernetes_logs]
       type = "kubernetes_logs"
+    
+    # Capture the metrics from the host.
+    [sources.host_metrics]
+      type = "host_metrics"
+    
+    
+    # Emit internal Vector metrics.
+    [sources.internal_metrics]
+      type = "internal_metrics"
+    
+    # Expose metrics for scraping in the Prometheus format.
+    [sinks.prometheus_sink]
+      address = "0.0.0.0:9090"
+      inputs = ["internal_metrics", "host_metrics"]
+      type = "prometheus"
 ---
 # Source: vector-agent/templates/rbac.yaml
 # Permissions to use Kubernetes API.
@@ -104,7 +125,9 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: 3cdf25b37a769fb1b12b40d3efed89539b7cea6f26110ad0b7166b419e9c9254
+        
+        checksum/config: 75958f6034a2d836d57468a572df3af05ea5d4eaf4b8b5cbd6371e6ec319a696
+        
       labels:
         app.kubernetes.io/name: vector-agent
         app.kubernetes.io/instance: vector
@@ -135,10 +158,17 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: PROCFS_ROOT
+              value: /host/proc
+            - name: SYSFS_ROOT
+              value: /host/sys
             
             - name: LOG
               value: info
           ports:
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
           resources:
             {}
           volumeMounts:
@@ -156,6 +186,14 @@ spec:
             # Vector config dir mount.
             - name: config-dir
               mountPath: /etc/vector
+              readOnly: true
+            # Host procsfs mount.
+            - name: procfs
+              mountPath: /host/proc
+              readOnly: true
+            # Host sysfs mount.
+            - name: sysfs
+              mountPath: /host/sys
               readOnly: true
       terminationGracePeriodSeconds: 60
       tolerations:
@@ -186,3 +224,11 @@ spec:
               - secret:
                   name: vector-agent-config
                   optional: true
+        # Host procsfs.
+        - name: procfs
+          hostPath:
+            path: /proc
+        # Host sysfs.
+        - name: sysfs
+          hostPath:
+            path: /sys

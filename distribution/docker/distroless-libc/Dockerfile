@@ -1,7 +1,7 @@
 FROM debian:buster-slim AS builder
 
 COPY vector-*.deb ./
-RUN dpkg -i vector-$(dpkg --print-architecture).deb
+RUN dpkg -i vector-*-$(dpkg --print-architecture).deb
 
 FROM gcr.io/distroless/cc-debian10
 
@@ -14,4 +14,3 @@ VOLUME /var/lib/vector/
 RUN ["vector", "--version"]
 
 ENTRYPOINT ["/usr/bin/vector"]
-

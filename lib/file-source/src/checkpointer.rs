@@ -63,6 +63,26 @@ impl CheckpointsView {
         self.removed_times.insert(fng, Utc::now());
     }
 
+    pub fn update_key(&self, old: FileFingerprint, new: FileFingerprint) {
+        if let Some((_, value)) = self.checkpoints.remove(&old) {
+            self.checkpoints.insert(new, value);
+        }
+
+        if let Some((_, value)) = self.modified_times.remove(&old) {
+            self.modified_times.insert(new, value);
+        }
+
+        if let Some((_, value)) = self.removed_times.remove(&old) {
+            self.removed_times.insert(new, value);
+        }
+    }
+
+    pub fn contains_bytes_checksums(&self) -> bool {
+        self.checkpoints
+            .iter()
+            .any(|entry| matches!(entry.key(), FileFingerprint::BytesChecksum(_)))
+    }
+
     pub fn remove_expired(&self) {
         let now = Utc::now();
 
@@ -172,7 +192,7 @@ impl Checkpointer {
         use FileFingerprint::*;
 
         let path = match fng {
-            Checksum(c) => format!("g{:x}.{}", c, pos),
+            BytesChecksum(c) => format!("g{:x}.{}", c, pos),
             FirstLineChecksum(c) => format!("h{:x}.{}", c, pos),
             DevInode(dev, ino) => format!("i{:x}.{:x}.{}", dev, ino, pos),
             Unknown(x) => format!("{:x}.{}", x, pos),
@@ -193,7 +213,7 @@ impl Checkpointer {
         match file_name.chars().next().expect("empty file name") {
             'g' => {
                 let (c, pos) = scan_fmt!(file_name, "g{x}.{}", [hex u64], FilePosition).unwrap();
-                (Checksum(c), pos)
+                (BytesChecksum(c), pos)
             }
             'h' => {
                 let (c, pos) = scan_fmt!(file_name, "h{x}.{}", [hex u64], FilePosition).unwrap();
@@ -354,7 +374,7 @@ mod test {
     fn test_checkpointer_basics() {
         let fingerprints = vec![
             FileFingerprint::DevInode(1, 2),
-            FileFingerprint::Checksum(3456),
+            FileFingerprint::BytesChecksum(3456),
             FileFingerprint::FirstLineChecksum(78910),
             FileFingerprint::Unknown(1337),
         ];
@@ -378,7 +398,7 @@ mod test {
             Utc::now() - Duration::seconds(5),
         );
         let newish = (
-            FileFingerprint::Checksum(3456),
+            FileFingerprint::BytesChecksum(3456),
             Utc::now() - Duration::seconds(10),
         );
         let oldish = (
@@ -425,7 +445,7 @@ mod test {
     fn test_checkpointer_restart() {
         let fingerprints = vec![
             FileFingerprint::DevInode(1, 2),
-            FileFingerprint::Checksum(3456),
+            FileFingerprint::BytesChecksum(3456),
             FileFingerprint::FirstLineChecksum(78910),
             FileFingerprint::Unknown(1337),
         ];
@@ -519,10 +539,10 @@ mod test {
     fn test_checkpointer_expiration() {
         let cases = vec![
             // (checkpoint, position, seconds since removed)
-            (FileFingerprint::Checksum(123), 0, 30),
-            (FileFingerprint::Checksum(456), 1, 60),
-            (FileFingerprint::Checksum(789), 2, 90),
-            (FileFingerprint::Checksum(101112), 3, 120),
+            (FileFingerprint::BytesChecksum(123), 0, 30),
+            (FileFingerprint::BytesChecksum(456), 1, 60),
+            (FileFingerprint::BytesChecksum(789), 2, 90),
+            (FileFingerprint::BytesChecksum(101112), 3, 120),
         ];
 
         let data_dir = tempdir().unwrap();
@@ -550,5 +570,54 @@ mod test {
         assert_eq!(chkptr.get_checkpoint(cases[1].0), None);
         assert_eq!(chkptr.get_checkpoint(cases[2].0), Some(42));
         assert_eq!(chkptr.get_checkpoint(cases[3].0), None);
+    }
+
+    #[test]
+    fn test_checkpointer_checksum_updates() {
+        let data_dir = tempdir().unwrap();
+
+        let fingerprinter = crate::Fingerprinter {
+            strategy: crate::FingerprintStrategy::Checksum {
+                bytes: 16,
+                ignored_header_bytes: 0,
+            },
+            max_line_length: 1024,
+            ignore_not_found: false,
+        };
+
+        let log_path = data_dir.path().join("test.log");
+        let contents = "hello i am a test log line that is just long enough but not super long\n";
+        std::fs::write(&log_path, contents).expect("writing test data");
+
+        let mut buf = vec![0; 1024];
+        let old = fingerprinter
+            .get_bytes_checksum(&log_path, &mut buf)
+            .expect("getting old checksum")
+            .expect("still getting old checksum");
+
+        let new = fingerprinter
+            .get_fingerprint_of_file(&log_path, &mut buf)
+            .expect("getting new checksum");
+
+        // make sure each is of the expected type and that the inner values are not the same
+        match (old, new) {
+            (FileFingerprint::BytesChecksum(old), FileFingerprint::FirstLineChecksum(new)) => {
+                assert_ne!(old, new)
+            }
+            _ => panic!("unexpected checksum types"),
+        }
+
+        let mut chkptr = Checkpointer::new(&data_dir.path());
+
+        // pretend that we had loaded this old style checksum from disk after an upgrade
+        chkptr.update_checkpoint(old, 1234);
+
+        assert_eq!(true, chkptr.checkpoints.contains_bytes_checksums());
+
+        chkptr.checkpoints.update_key(old, new);
+
+        assert_eq!(false, chkptr.checkpoints.contains_bytes_checksums());
+        assert_eq!(Some(1234), chkptr.get_checkpoint(new));
+        assert_eq!(None, chkptr.get_checkpoint(old));
     }
 }

@@ -1,26 +1,26 @@
 package metadata
 
 components: sinks: _humio: {
-	description: "[Humio][urls.humio] is a time-series logging and aggregation platform for unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With 1TB/day of raw log ingest/node, in-memory stream processing, and live, shareable dashboards and alerts, you can instantly and in real-time explore, monitor, and visualize any system’s data. Metrics are converted to log events via the metric_to_log transform."
-
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["Humio"]
+		stateful: false
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -59,15 +59,17 @@ components: sinks: _humio: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
-			tls: enabled: false
+			tls: {
+				enabled:                true
+				can_enable:             false
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 			to: {
-				service: {
-					name:     "Humio"
-					thing:    "a \(name) database"
-					url:      urls.humio
-					versions: null
-				}
+				service: services.humio
 
 				interface: {
 					socket: {
@@ -85,6 +87,16 @@ components: sinks: _humio: {
 	}
 
 	configuration: {
+		endpoint: {
+			common:      false
+			description: "The base URL of the Humio instance."
+			required:    false
+			type: string: {
+				default: "https://cloud.humio.com"
+				examples: ["http://127.0.0.1", "http://example.com"]
+				syntax: "literal"
+			}
+		}
 		event_type: {
 			common:      false
 			description: "The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.\n\nIf unset, Humio will default it to none.\n"
@@ -93,17 +105,18 @@ components: sinks: _humio: {
 			type: string: {
 				default: null
 				examples: ["json", "none"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		host_key: {
 			common:      true
-			description: "The name of the log field to be used as the hostname sent to Humio. This overrides the [global `host_key` option][docs.reference.global-options#host_key]."
+			description: "The name of the log field to be used as the hostname sent to Humio. This overrides the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
 			required:    false
 			warnings: []
 			type: string: {
 				default: null
 				examples: ["hostname"]
+				syntax: "literal"
 			}
 		}
 		source: {
@@ -114,7 +127,7 @@ components: sinks: _humio: {
 			type: string: {
 				default: null
 				examples: ["{{file}}", "/var/log/syslog", "UDP:514"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		token: {
@@ -123,6 +136,7 @@ components: sinks: _humio: {
 			warnings: []
 			type: string: {
 				examples: ["${HUMIO_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
+				syntax: "literal"
 			}
 		}
 	}

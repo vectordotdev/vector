@@ -15,18 +15,18 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
-    http::{Auth, HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
     sinks::util::{
-        buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        buffer::loki::{GlobalTimestamps, LokiBuffer, LokiEvent, LokiRecord, PartitionKey},
+        encoding::{EncodingConfig, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
+        service::ConcurrencyOption,
         BatchConfig, BatchSettings, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
         UriSerde,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use derivative::Derivative;
 use futures::{FutureExt, SinkExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -35,8 +35,7 @@ use std::collections::HashMap;
 #[serde(deny_unknown_fields)]
 pub struct LokiConfig {
     endpoint: UriSerde,
-    #[serde(default)]
-    encoding: EncodingConfigWithDefault<Encoding>,
+    encoding: EncodingConfig<Encoding>,
 
     tenant_id: Option<Template>,
     labels: HashMap<String, Template>,
@@ -45,6 +44,8 @@ pub struct LokiConfig {
     remove_label_fields: bool,
     #[serde(default = "crate::serde::default_true")]
     remove_timestamp: bool,
+    #[serde(default)]
+    out_of_order_action: OutOfOrderAction,
 
     auth: Option<Auth>,
 
@@ -57,11 +58,18 @@ pub struct LokiConfig {
     tls: Option<TlsOptions>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Derivative)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
-enum Encoding {
+#[serde(rename_all = "snake_case")]
+pub enum OutOfOrderAction {
     #[derivative(Default)]
+    Drop,
+    RewriteTimestamp,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum Encoding {
     Json,
     Text,
 }
@@ -74,6 +82,7 @@ impl GenerateConfig for LokiConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
             r#"endpoint = "http://localhost:3100"
+            encoding = "json"
             labels = {}"#,
         )
         .unwrap()
@@ -91,7 +100,12 @@ impl SinkConfig for LokiConfig {
             return Err("`labels` must include at least one label.".into());
         }
 
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        if self.request.concurrency.is_some() {
+            warn!("Option `request.concurrency` is not supported.");
+        }
+        let mut request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        request_settings.concurrency = Some(1);
+
         let batch_settings = BatchSettings::default()
             .bytes(102_400)
             .events(100_000)
@@ -100,9 +114,20 @@ impl SinkConfig for LokiConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls)?;
 
+        let config = LokiConfig {
+            auth: self.auth.choose_one(&self.endpoint.auth)?,
+            ..self.clone()
+        };
+
+        let sink = LokiSink::new(config.clone());
+
         let sink = PartitionHttpSink::new(
-            self.clone(),
-            PartitionBuffer::new(LokiBuffer::new(batch_settings.size)),
+            sink,
+            PartitionBuffer::new(LokiBuffer::new(
+                batch_settings.size,
+                GlobalTimestamps::default(),
+                config.out_of_order_action.clone(),
+            )),
             request_settings,
             batch_settings.timeout,
             client.clone(),
@@ -110,7 +135,7 @@ impl SinkConfig for LokiConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal loki sink error.", %error));
 
-        let healthcheck = healthcheck(self.clone(), client).boxed();
+        let healthcheck = healthcheck(config, client).boxed();
 
         Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
@@ -124,13 +149,35 @@ impl SinkConfig for LokiConfig {
     }
 }
 
-#[derive(Hash, Eq, PartialEq, Clone)]
-pub struct PartitionKey {
-    tenant_id: Option<String>,
+struct LokiSink {
+    endpoint: UriSerde,
+    encoding: EncodingConfig<Encoding>,
+
+    tenant_id: Option<Template>,
+    labels: HashMap<String, Template>,
+
+    remove_label_fields: bool,
+    remove_timestamp: bool,
+
+    auth: Option<Auth>,
+}
+
+impl LokiSink {
+    fn new(config: LokiConfig) -> Self {
+        Self {
+            endpoint: config.endpoint,
+            encoding: config.encoding,
+            tenant_id: config.tenant_id,
+            labels: config.labels,
+            remove_label_fields: config.remove_label_fields,
+            remove_timestamp: config.remove_timestamp,
+            auth: config.auth,
+        }
+    }
 }
 
 #[async_trait::async_trait]
-impl HttpSink for LokiConfig {
+impl HttpSink for LokiSink {
     type Input = PartitionInnerBuffer<LokiRecord, PartitionKey>;
     type Output = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
 
@@ -141,7 +188,7 @@ impl HttpSink for LokiConfig {
                     error!(
                         message = "Error rendering `tenant_id` template.",
                         ?missing,
-                        rate_limit_secs = 30
+                        internal_log_rate_secs = 30
                     );
                 })
                 .ok()
@@ -154,8 +201,10 @@ impl HttpSink for LokiConfig {
             if let Ok(value) = template.render_string(&event) {
                 labels.push((key.clone(), value));
             }
+        }
 
-            if self.remove_label_fields {
+        if self.remove_label_fields {
+            for template in self.labels.values() {
                 if let Some(fields) = template.get_fields() {
                     for field in fields {
                         event.as_mut_log().remove(&field);
@@ -193,7 +242,14 @@ impl HttpSink for LokiConfig {
         }
 
         let event = LokiEvent { timestamp, event };
-        Some(PartitionInnerBuffer::new(LokiRecord { labels, event }, key))
+        Some(PartitionInnerBuffer::new(
+            LokiRecord {
+                labels,
+                event,
+                partition: key.clone(),
+            },
+            key,
+        ))
     }
 
     async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -202,7 +258,7 @@ impl HttpSink for LokiConfig {
 
         let body = serde_json::to_vec(&json).unwrap();
 
-        let uri = format!("{}loki/api/v1/push", self.endpoint);
+        let uri = format!("{}loki/api/v1/push", self.endpoint.uri);
 
         let mut req = http::Request::post(uri).header("Content-Type", "application/json");
 
@@ -221,7 +277,7 @@ impl HttpSink for LokiConfig {
 }
 
 async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()> {
-    let uri = format!("{}ready", config.endpoint);
+    let uri = format!("{}ready", config.endpoint.uri);
 
     let mut req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
@@ -257,18 +313,19 @@ mod tests {
         let (config, _cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
-            labels = {label1 = "{{ foo }}", label2 = "some-static-label"}
+            labels = {label1 = "{{ foo }}", label2 = "some-static-label", label3 = "{{ foo }}"}
             encoding = "json"
             remove_label_fields = true
         "#,
         )
         .unwrap();
+        let sink = LokiSink::new(config);
 
         let mut e1 = Event::from("hello world");
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let mut record = config.encode_event(e1).unwrap().into_parts().0;
+        let mut record = sink.encode_event(e1).unwrap().into_parts().0;
 
         // HashMap -> Vec doesn't like keeping ordering
         record.labels.sort();
@@ -286,6 +343,8 @@ mod tests {
             record.labels[1],
             ("label2".to_string(), "some-static-label".to_string())
         );
+        // make sure we can reuse fields across labels.
+        assert_eq!(record.labels[2], ("label3".to_string(), "bar".to_string()));
     }
 
     #[test]
@@ -299,12 +358,13 @@ mod tests {
         "#,
         )
         .unwrap();
+        let sink = LokiSink::new(config);
 
         let mut e1 = Event::from("hello world");
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let record = config.encode_event(e1).unwrap().into_parts().0;
+        let record = sink.encode_event(e1).unwrap().into_parts().0;
 
         let expected_line = serde_json::to_string(&serde_json::json!({
             "message": "hello world",
@@ -322,6 +382,7 @@ mod tests {
             r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
+            encoding = "json"
 			auth.strategy = "basic"
 			auth.user = "username"
 			auth.password = "some_password"
@@ -366,6 +427,7 @@ mod integration_tests {
         test_util::random_lines, Event,
     };
     use bytes::Bytes;
+    use chrono::{DateTime, Duration, Utc};
     use futures::{stream, StreamExt};
     use std::convert::TryFrom;
 
@@ -399,7 +461,8 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let outputs = fetch_stream(stream.to_string(), "default").await;
+        let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+        assert_eq!(lines.len(), outputs.len());
         for (i, output) in outputs.iter().enumerate() {
             assert_eq!(output, &lines[i]);
         }
@@ -437,7 +500,8 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let outputs = fetch_stream(stream.to_string(), "default").await;
+        let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
+        assert_eq!(events.len(), outputs.len());
         for (i, output) in outputs.iter().enumerate() {
             let expected_json = serde_json::to_string(&events[i].as_log().all_fields()).unwrap();
             assert_eq!(output, &expected_json);
@@ -485,8 +549,10 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let outputs1 = fetch_stream(stream1.to_string(), "default").await;
-        let outputs2 = fetch_stream(stream2.to_string(), "default").await;
+        let (_, outputs1) = fetch_stream(stream1.to_string(), "default").await;
+        let (_, outputs2) = fetch_stream(stream2.to_string(), "default").await;
+
+        assert_eq!(outputs1.len() + outputs2.len(), lines.len());
 
         for (i, output) in outputs1.iter().enumerate() {
             let index = (i % 5) * 2;
@@ -544,8 +610,10 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let outputs1 = fetch_stream(stream.to_string(), "tenant1").await;
-        let outputs2 = fetch_stream(stream.to_string(), "tenant2").await;
+        let (_, outputs1) = fetch_stream(stream.to_string(), "tenant1").await;
+        let (_, outputs2) = fetch_stream(stream.to_string(), "tenant2").await;
+
+        assert_eq!(outputs1.len() + outputs2.len(), lines.len());
 
         for (i, output) in outputs1.iter().enumerate() {
             let index = (i % 5) * 2;
@@ -558,7 +626,133 @@ mod integration_tests {
         }
     }
 
-    async fn fetch_stream(stream: String, tenant: &str) -> Vec<String> {
+    #[tokio::test]
+    async fn out_of_order_drop() {
+        let batch_size = 5;
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
+        let mut events = lines
+            .clone()
+            .into_iter()
+            .map(Event::from)
+            .collect::<Vec<_>>();
+
+        let base = chrono::Utc::now() - Duration::seconds(20);
+        for (i, event) in events.iter_mut().enumerate() {
+            let log = event.as_mut_log();
+            log.insert(
+                log_schema().timestamp_key(),
+                base + Duration::seconds(i as i64),
+            );
+        }
+        // first event of the second batch is out-of-order.
+        events[batch_size]
+            .as_mut_log()
+            .insert(log_schema().timestamp_key(), base);
+
+        let mut expected = events.clone();
+        expected.remove(batch_size);
+
+        test_out_of_order_events(OutOfOrderAction::Drop, batch_size, events, expected).await;
+    }
+
+    #[tokio::test]
+    async fn out_of_order_rewrite() {
+        let batch_size = 5;
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
+        let mut events = lines
+            .clone()
+            .into_iter()
+            .map(Event::from)
+            .collect::<Vec<_>>();
+
+        let base = chrono::Utc::now() - Duration::seconds(20);
+        for (i, event) in events.iter_mut().enumerate() {
+            let log = event.as_mut_log();
+            log.insert(
+                log_schema().timestamp_key(),
+                base + Duration::seconds(i as i64),
+            );
+        }
+        // first event of the second batch is out-of-order.
+        events[batch_size]
+            .as_mut_log()
+            .insert(log_schema().timestamp_key(), base);
+
+        let mut expected = events.clone();
+        let time = get_timestamp(&expected[batch_size - 1]);
+        // timestamp is rewriten with latest timestamp of the first batch
+        expected[batch_size]
+            .as_mut_log()
+            .insert(log_schema().timestamp_key(), time);
+
+        test_out_of_order_events(
+            OutOfOrderAction::RewriteTimestamp,
+            batch_size,
+            events,
+            expected,
+        )
+        .await;
+    }
+
+    async fn test_out_of_order_events(
+        action: OutOfOrderAction,
+        batch_size: usize,
+        events: Vec<Event>,
+        expected: Vec<Event>,
+    ) {
+        crate::test_util::trace_init();
+        let stream = uuid::Uuid::new_v4();
+
+        let (mut config, cx) = load_sink::<LokiConfig>(
+            r#"
+            endpoint = "http://localhost:3100"
+            labels = {test_name = "placeholder"}
+            encoding = "text"
+            tenant_id = "default"
+        "#,
+        )
+        .unwrap();
+        config.out_of_order_action = action;
+        config.labels.insert(
+            "test_name".to_owned(),
+            Template::try_from(stream.to_string()).unwrap(),
+        );
+        config.batch.max_events = Some(batch_size);
+
+        let (sink, _) = config.build(cx).await.unwrap();
+        sink.into_sink()
+            .send_all(&mut stream::iter(events.clone()).map(Ok))
+            .await
+            .unwrap();
+
+        let (timestamps, outputs) = fetch_stream(stream.to_string(), "default").await;
+        assert_eq!(expected.len(), outputs.len());
+        assert_eq!(expected.len(), timestamps.len());
+        for (i, output) in outputs.iter().enumerate() {
+            assert_eq!(
+                &expected[i]
+                    .as_log()
+                    .get(log_schema().message_key())
+                    .unwrap()
+                    .to_string_lossy(),
+                output,
+            )
+        }
+        for (i, ts) in timestamps.iter().enumerate() {
+            assert_eq!(get_timestamp(&expected[i]).timestamp_nanos(), *ts);
+        }
+    }
+
+    fn get_timestamp(event: &Event) -> DateTime<Utc> {
+        *event
+            .as_log()
+            .get(log_schema().timestamp_key())
+            .unwrap()
+            .as_timestamp()
+            .unwrap()
+    }
+
+    async fn fetch_stream(stream: String, tenant: &str) -> (Vec<i64>, Vec<String>) {
         let query = format!("%7Btest_name%3D\"{}\"%7D", stream);
         let query = format!(
             "http://localhost:3100/loki/api/v1/query_range?query={}&direction=forward",
@@ -589,11 +783,15 @@ mod integration_tests {
 
         let values = results[0].get("values").unwrap().as_array().unwrap();
 
-        values
+        // the array looks like: [ts, line].
+        let timestamps = values
             .iter()
-            // Lets check the message field of the array where
-            // the array looks like: [ts, line].
+            .map(|v| v[0].as_str().unwrap().parse().unwrap())
+            .collect();
+        let lines = values
+            .iter()
             .map(|v| v[1].as_str().unwrap().to_string())
-            .collect::<Vec<_>>()
+            .collect();
+        (timestamps, lines)
     }
 }

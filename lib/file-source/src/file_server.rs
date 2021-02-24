@@ -2,7 +2,7 @@ use crate::{
     checkpointer::{Checkpointer, CheckpointsView},
     file_watcher::FileWatcher,
     fingerprinter::{FileFingerprint, Fingerprinter},
-    FileSourceInternalEvents,
+    FileSourceInternalEvents, ReadFrom,
 };
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
@@ -38,9 +38,11 @@ where
 {
     pub paths_provider: PP,
     pub max_read_bytes: usize,
-    pub start_at_beginning: bool,
+    pub ignore_checkpoints: bool,
+    pub read_from: ReadFrom,
     pub ignore_before: Option<DateTime<Utc>>,
     pub max_line_bytes: usize,
+    pub line_delimiter: Bytes,
     pub data_dir: PathBuf,
     pub glob_minimum_cooldown: Duration,
     pub fingerprinter: Fingerprinter,
@@ -114,14 +116,19 @@ where
 
         let checkpoints = checkpointer.view();
 
+        let needs_checksum_upgrade = checkpoints.contains_bytes_checksums();
+
         for (path, file_id) in existing_files {
-            self.watch_new_file(
-                path,
-                file_id,
-                &mut fp_map,
-                &checkpoints,
-                self.start_at_beginning,
-            );
+            if needs_checksum_upgrade {
+                if let Ok(Some(old_checksum)) = self
+                    .fingerprinter
+                    .get_bytes_checksum(&path, &mut fingerprint_buffer)
+                {
+                    checkpoints.update_key(old_checksum, file_id)
+                }
+            }
+
+            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true);
         }
         self.emitter.emit_files_open(fp_map.len());
 
@@ -335,7 +342,7 @@ where
             match result {
                 Ok(()) => {}
                 Err(error) => {
-                    error!(message = "Output channel closed.", error = ?error);
+                    error!(message = "Output channel closed.", %error);
                     return Err(error);
                 }
             }
@@ -383,24 +390,41 @@ where
         file_id: FileFingerprint,
         fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
         checkpoints: &CheckpointsView,
-        read_from_beginning: bool,
+        startup: bool,
     ) {
-        let file_position = if read_from_beginning {
-            0
+        // Determine the initial _requested_ starting point in the file. This can be overridden
+        // once the file is actually opened and we determine it is compressed, older than we're
+        // configured to read, etc.
+        let read_from = if startup {
+            // If we are starting up, use the stored checkpoint unless the user has opted out. If
+            // they have opted out or there is no checkpoint present, fall back to `read_from`.
+            if self.ignore_checkpoints {
+                self.read_from
+            } else {
+                checkpoints
+                    .get(file_id)
+                    .map(ReadFrom::Checkpoint)
+                    .unwrap_or(self.read_from)
+            }
         } else {
-            checkpoints.get(file_id).unwrap_or(0)
+            // Always read new files that show up while we're running from the beginning. There's
+            // not a good way to determine if they were moved or just created and written very
+            // quickly, so just make sure we're not missing any data.
+            ReadFrom::Beginning
         };
+
         match FileWatcher::new(
             path.clone(),
-            file_position,
+            read_from,
             self.ignore_before,
             self.max_line_bytes,
+            self.line_delimiter.clone(),
         ) {
             Ok(mut watcher) => {
-                if file_position == 0 {
-                    self.emitter.emit_file_added(&path);
-                } else {
+                if let ReadFrom::Checkpoint(file_position) = read_from {
                     self.emitter.emit_file_resumed(&path, file_position);
+                } else {
+                    self.emitter.emit_file_added(&path);
                 }
                 watcher.set_file_findable(true);
                 fp_map.insert(file_id, watcher);

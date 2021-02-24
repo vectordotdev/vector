@@ -1,12 +1,17 @@
 package metadata
 
 components: transforms: key_value_parser: {
-	title: "Key Value Parser"
+	title: "Key-value Parser"
+
+	description: """
+		Loosely parses a log field's value in key-value format.
+		"""
 
 	classes: {
 		commonly_used: false
-		development:   "beta"
+		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -20,25 +25,30 @@ components: transforms: key_value_parser: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: [
 			"""
-					Performance characteristics of the `key_value` transform have not been benchmarked.
-				""",
+			\(key_value_parser._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_key_value(.message)
+			```
+			""",
 		]
 		notices: [
 			"""
-					It is likely that the `key_value` transform will replace the `logfmt` transform in the future since
-					it offers a more flexible super-set of that transform.
+				It is likely that the `key_value` transform will replace the `logfmt_parser` transform
+				in the future since it offers a more flexible superset of that transform.
 				""",
 		]
 	}
@@ -60,6 +70,7 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
+				syntax: "literal"
 			}
 		}
 
@@ -70,14 +81,15 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: "="
 				examples: [":", "="]
+				syntax: "literal"
 			}
 		}
 
 		overwrite_target: {
 			common: false
 			description: """
-					If `target_field` is set and the log contains a field of the same name
-					as the target, it will only be overwritten if this is set to `true`.
+				If `target_field` is set and the log contains a field of the same name
+				as the target, it will only be overwritten if this is set to `true`.
 				"""
 			required: false
 			type: bool: default: false
@@ -90,47 +102,51 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: "[whitespace]"
 				examples: [",", ";", "|"]
+				syntax: "literal"
 			}
 		}
 
 		target_field: {
 			common: false
 			description: """
-					If this setting is present, the parsed JSON will be inserted into the
-					log as a sub-object with this name.
-					If a field with the same name already exists, the parser will fail and
-					produce an error.
+				If this setting is present, the parsed JSON will be inserted into the
+				log as a sub-object with this name.
+				If a field with the same name already exists, the parser will fail and
+				produce an error.
 				"""
 			required: false
 			type: string: {
 				default: null
 				examples: ["root_field", "parent.child"]
+				syntax: "literal"
 			}
 		}
 
 		trim_key: {
 			common: false
 			description: """
-					Removes characters from the beginning and end of a key until a character that is not listed.
-					ex: `<key>=value` would result in `key: value` with this option set to `<>`.
+				Removes characters from the beginning and end of a key until a character that is not listed.
+				ex: `<key>=value` would result in `key: value` with this option set to `<>`.
 				"""
 			required: false
 			type: string: {
 				default: null
 				examples: ["<>", "{}"]
+				syntax: "literal"
 			}
 		}
 
 		trim_value: {
 			common: false
 			description: """
-					Removes characters from the beginning and end of a value until a character that is not listed.
-					ex: `key=<<>value>>` would result in `key: value` with this option set to `<>`.
+				Removes characters from the beginning and end of a value until a character that is not listed.
+				ex: `key=<<>value>>` would result in `key: value` with this option set to `<>`.
 				"""
 			required: false
 			type: string: {
 				default: null
 				examples: ["<>", "{}"]
+				syntax: "literal"
 			}
 		}
 
@@ -146,9 +162,9 @@ components: transforms: key_value_parser: {
 		description: {
 			title: "Description"
 			body: """
-					The Key Value Parser accepts structured data that can be split on a character, or group of characters, and extracts it into a
-					json object (dictionary) of key/value pairs. The `separator` option allows you to define the character(s) to perform the initial
-					splitting of the message into pairs. The `field_split` option allows you to define the character(s) which split the key from the value.
+				The Key Value Parser accepts structured data that can be split on a character, or group of characters, and extracts it into a
+				json object (dictionary) of key/value pairs. The `separator` option allows you to define the character(s) to perform the initial
+				splitting of the message into pairs. The `field_split` option allows you to define the character(s) which split the key from the value.
 				"""
 		}
 	}
@@ -181,4 +197,8 @@ components: transforms: key_value_parser: {
 			}
 		},
 	]
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+	}
 }

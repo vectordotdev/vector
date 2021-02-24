@@ -1,10 +1,9 @@
 use crate::serde::Fields;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{
-        AddFieldsEventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,
-        AddFieldsTemplateRenderingError,
+        AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten, AddFieldsTemplateRenderingError,
     },
     template::Template,
     transforms::{FunctionTransform, Transform},
@@ -59,7 +58,7 @@ impl GenerateConfig for AddFieldsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_fields")]
 impl TransformConfig for AddFieldsConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         let all_fields = self.fields.clone().all_fields().collect::<IndexMap<_, _>>();
         let mut fields = IndexMap::with_capacity(all_fields.len());
         for (key, value) in all_fields {
@@ -104,8 +103,6 @@ impl AddFields {
 
 impl FunctionTransform for AddFields {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        emit!(AddFieldsEventProcessed);
-
         for (key, value_or_template) in self.fields.clone() {
             let key_string = key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
             let value = match value_or_template {

@@ -16,7 +16,7 @@ impl InternalEvent for NginxMetricsCollectCompleted {
 
     fn emit_metrics(&self) {
         counter!("collect_completed_total", 1);
-        histogram!("request_duration_nanoseconds", self.end - self.start);
+        histogram!("collect_duration_nanoseconds", self.end - self.start);
     }
 }
 
@@ -31,7 +31,7 @@ impl<'a> InternalEvent for NginxMetricsRequestError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("request_error_total", 1);
+        counter!("http_request_errors_total", 1);
     }
 }
 

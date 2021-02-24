@@ -4,12 +4,7 @@ components: sinks: _sematext: {
 	features: {
 		send: {
 			to: {
-				service: {
-					name:     "Sematext"
-					thing:    "a \(name) account"
-					url:      urls.sematext
-					versions: null
-				}
+				service: services.sematext
 
 				interface: {
 					socket: {
@@ -30,6 +25,7 @@ components: sinks: _sematext: {
 			type: string: {
 				default: null
 				examples: ["http://127.0.0.1", "http://example.com"]
+				syntax: "literal"
 			}
 		}
 		region: {
@@ -42,6 +38,7 @@ components: sinks: _sematext: {
 					us: "United States"
 					eu: "Europe"
 				}
+				syntax: "literal"
 			}
 		}
 		token: {
@@ -50,6 +47,7 @@ components: sinks: _sematext: {
 			warnings: []
 			type: string: {
 				examples: ["${SEMATEXT_TOKEN}", "some-sematext-token"]
+				syntax: "literal"
 			}
 		}
 	}

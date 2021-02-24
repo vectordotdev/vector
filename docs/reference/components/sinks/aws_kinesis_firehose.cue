@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: aws_kinesis_firehose: components._aws & {
-	title:       "AWS Kinesis Firehose"
-	description: "[Amazon Kinesis Data Firehose](\(urls.aws_kinesis_firehose)) is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk."
+	title: "AWS Kinesis Firehose"
 
 	classes: {
 		commonly_used: false
@@ -10,6 +9,7 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {
@@ -45,6 +45,7 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               30
+				headers:                    false
 			}
 			tls: enabled: false
 			to: {
@@ -66,15 +67,16 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -87,6 +89,7 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 			warnings: []
 			type: string: {
 				examples: ["my-stream"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -95,4 +98,21 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 		logs:    true
 		metrics: null
 	}
+
+	permissions: iam: [
+		{
+			platform: "aws"
+			_service: "firehose"
+
+			policies: [
+				{
+					_action: "DescribeDeliveryStream"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "PutRecordBatch"
+				},
+			]
+		},
+	]
 }

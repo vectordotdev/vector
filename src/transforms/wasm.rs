@@ -1,13 +1,12 @@
 use super::{TaskTransform, Transform};
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
     wasm::WasmModule,
 };
-use futures01::Stream as Stream01;
+use futures::{stream, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::{collections::HashMap, future::ready, path::PathBuf, pin::Pin};
 use vector_wasm::{Role, WasmModuleConfig};
 
 pub mod defaults {
@@ -65,7 +64,7 @@ impl GenerateConfig for WasmConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "wasm")]
 impl TransformConfig for WasmConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         Ok(Transform::task(Wasm::new(self.clone())?))
     }
 
@@ -98,17 +97,19 @@ impl Wasm {
 impl TaskTransform for Wasm {
     fn transform(
         self: Box<Self>,
-        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
-    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send> {
+        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>> {
         let mut inner = self;
 
-        Box::new(
+        Box::pin(
             task.filter_map(move |event| {
-                inner
-                    .module
-                    .process(event)
-                    .map(|events| futures01::stream::iter_ok(events))
-                    .ok()
+                ready({
+                    inner
+                        .module
+                        .process(event)
+                        .map(|events| stream::iter(events))
+                        .ok()
+                })
             })
             .flatten(),
         )
@@ -119,7 +120,7 @@ impl TaskTransform for Wasm {
 mod tests {
     use super::{Wasm, WasmConfig};
     use crate::{event::Event, transforms::TaskTransform};
-    use futures::{compat::Stream01CompatExt, StreamExt};
+    use futures::{stream, StreamExt};
     use serde_json::Value;
     use std::{collections::HashMap, fs, io::Read, path::Path};
 
@@ -162,13 +163,11 @@ mod tests {
                 .collect();
 
         let actual = transform
-            .transform(Box::new(futures01::stream::iter_ok(input)))
-            .compat()
+            .transform(Box::pin(stream::iter(input)))
             .collect::<Vec<_>>()
             .await
             .into_iter()
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+            .collect::<Vec<_>>();
 
         assert_eq!(actual, expected);
     }
@@ -180,7 +179,7 @@ mod tests {
         let _enter = span.enter();
 
         let config = r#"
-            module = "target/wasm32-wasi/release/protobuf.wasm"
+            module = "tests/data/wasm/protobuf/target/wasm32-wasi/release/protobuf.wasm"
             artifact_cache = "target/artifacts"
             "#;
 
@@ -199,7 +198,7 @@ mod tests {
         let _enter = span.enter();
 
         let config = r#"
-            module = "target/wasm32-wasi/release/protobuf.wasm"
+            module = "tests/data/wasm/protobuf/target/wasm32-wasi/release/protobuf.wasm"
             artifact_cache = "target/artifacts"
             "#;
 
@@ -218,7 +217,7 @@ mod tests {
         let _enter = span.enter();
 
         let config = r#"
-    module = "target/wasm32-wasi/release/add_fields.wasm"
+    module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
     artifact_cache = "target/artifacts"
     options.new_field = "new_value"
     options.new_field_2 = "new_value_2"
@@ -239,7 +238,7 @@ mod tests {
         let _enter = span.enter();
 
         let config = r#"
-    module = "target/wasm32-wasi/release/drop.wasm"
+    module = "tests/data/wasm/drop/target/wasm32-wasi/release/drop.wasm"
     artifact_cache = "target/artifacts"
             "#;
 
@@ -258,7 +257,7 @@ mod tests {
         let _enter = span.enter();
 
         let config = r#"
-    module = "target/wasm32-wasi/release/panic.wasm"
+    module = "tests/data/wasm/panic/target/wasm32-wasi/release/panic.wasm"
     artifact_cache = "target/artifacts"
             "#;
 
@@ -277,7 +276,7 @@ mod tests {
         let _enter = span.enter();
 
         let config = r#"
-    module = "target/wasm32-wasi/release/assert_config.wasm"
+    module = "tests/data/wasm/assert_config/target/wasm32-wasi/release/assert_config.wasm"
     artifact_cache = "target/artifacts"
     options.takes_string = "test"
     options.takes_number = 123
@@ -291,6 +290,44 @@ mod tests {
             config,
             "tests/data/wasm/assert_config/fixtures/a/input.json",
             "tests/data/wasm/assert_config/fixtures/a/expected.json",
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn parse_syslog() {
+        crate::test_util::trace_init();
+        let span = span!(tracing::Level::TRACE, "transforms::wasm::parse_syslog");
+        let _enter = span.enter();
+
+        let config = r#"
+            module = "tests/data/wasm/parse_syslog/target/wasm32-wasi/release/parse_syslog.wasm"
+            artifact_cache = "target/artifacts"
+            "#;
+
+        test_config(
+            config,
+            "tests/data/wasm/parse_syslog/fixtures/a/input.json",
+            "tests/data/wasm/parse_syslog/fixtures/a/expected.json",
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn parse_json() {
+        crate::test_util::trace_init();
+        let span = span!(tracing::Level::TRACE, "transforms::wasm::parse_json");
+        let _enter = span.enter();
+
+        let config = r#"
+            module = "tests/data/wasm/parse_json/target/wasm32-wasi/release/parse_json.wasm"
+            artifact_cache = "target/artifacts"
+            "#;
+
+        test_config(
+            config,
+            "tests/data/wasm/parse_json/fixtures/a/input.json",
+            "tests/data/wasm/parse_json/fixtures/a/expected.json",
         )
         .await;
     }

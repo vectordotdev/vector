@@ -5,24 +5,24 @@ components: sources: vector: {
 
 	title: "Vector"
 
+	description: """
+		Receives data from another upstream Vector instance	using the Vector sink.
+		"""
+
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "Vector"
-					thing:    "a \(name) sink"
-					url:      urls.vector_sink
-					versions: null
-				}
+				service: services.vector
 
 				interface: socket: {
 					direction: "incoming"
@@ -31,7 +31,8 @@ components: sources: vector: {
 					ssl: "optional"
 				}
 			}
-
+			receive_buffer_bytes: enabled: true
+			keepalive: enabled:            true
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -42,18 +43,23 @@ components: sources: vector: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
@@ -63,6 +69,7 @@ components: sources: vector: {
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#1"]
+				syntax: "literal"
 			}
 		}
 		shutdown_timeout_secs: {
@@ -77,14 +84,23 @@ components: sources: vector: {
 		}
 	}
 
-	output: logs: event: {
-		description: "A Vector event"
-		fields: {
-			"*": {
-				description: "Vector transparently forwards data from another upstream Vector instance. The `vector` source will not modify or add fields."
-				required:    true
-				type: "*": {}
+	output: {
+		logs: event: {
+			description: "A Vector event"
+			fields: {
+				"*": {
+					description: "Vector transparently forwards data from another upstream Vector instance. The `vector` source will not modify or add fields."
+					required:    true
+					type: "*": {}
+				}
 			}
+		}
+		metrics: {
+			counter:      output._passthrough_counter
+			distribution: output._passthrough_distribution
+			gauge:        output._passthrough_gauge
+			histogram:    output._passthrough_histogram
+			set:          output._passthrough_set
 		}
 	}
 

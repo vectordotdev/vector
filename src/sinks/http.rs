@@ -1,11 +1,12 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    http::{Auth, HttpClient},
+    http::{Auth, HttpClient, MaybeAuth},
+    internal_events::{HTTPEventEncoded, HTTPEventMissingMessage},
     sinks::util::{
         buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink},
+        http::{BatchedHttpSink, HttpSink, RequestConfig},
         BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
@@ -42,8 +43,8 @@ enum BuildError {
 pub struct HttpSinkConfig {
     pub uri: UriSerde,
     pub method: Option<HttpMethod>,
-    pub healthcheck_uri: Option<UriSerde>,
     pub auth: Option<Auth>,
+    // Deprecated, moved to request.
     pub headers: Option<IndexMap<String, String>>,
     #[serde(default)]
     pub compression: Compression,
@@ -51,7 +52,7 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: RequestConfig,
     pub tls: Option<TlsOptions>,
 }
 
@@ -60,7 +61,6 @@ fn default_config(e: Encoding) -> HttpSinkConfig {
     HttpSinkConfig {
         uri: Default::default(),
         method: Default::default(),
-        healthcheck_uri: Default::default(),
         auth: Default::default(),
         headers: Default::default(),
         compression: Default::default(),
@@ -118,38 +118,44 @@ impl SinkConfig for HttpSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        validate_headers(&self.headers, &self.auth)?;
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls)?;
 
-        let mut config = self.clone();
-        config.uri = build_uri(config.uri.clone()).into();
+        let healthcheck = match cx.healthcheck.uri.clone() {
+            Some(healthcheck_uri) => {
+                healthcheck(healthcheck_uri, self.auth.clone(), client.clone()).boxed()
+            }
+            None => future::ok(()).boxed(),
+        };
+
+        let mut config = HttpSinkConfig {
+            auth: self.auth.choose_one(&self.uri.auth)?,
+            uri: self.uri.with_default_parts(),
+            ..self.clone()
+        };
+
+        config.request.add_old_option(config.headers.take());
+        validate_headers(&config.request.headers, &config.auth)?;
 
         let batch = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
             .timeout(1)
             .parse_config(config.batch)?;
-        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.tower.unwrap_with(&REQUEST_DEFAULTS);
 
         let sink = BatchedHttpSink::new(
             config,
             Buffer::new(batch.size, Compression::None),
             request,
             batch.timeout,
-            client.clone(),
+            client,
             cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 
         let sink = super::VectorSink::Sink(Box::new(sink));
 
-        match self.healthcheck_uri.clone() {
-            Some(healthcheck_uri) => {
-                let healthcheck = healthcheck(healthcheck_uri, self.auth.clone(), client).boxed();
-                Ok((sink, healthcheck))
-            }
-            None => Ok((sink, future::ok(()).boxed())),
-        }
+        Ok((sink, healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -177,10 +183,7 @@ impl HttpSink for HttpSinkConfig {
                     b.push(b'\n');
                     b
                 } else {
-                    warn!(
-                        message = "Event missing the message key; dropping event.",
-                        rate_limit_secs = 30,
-                    );
+                    emit!(HTTPEventMissingMessage);
                     return None;
                 }
             }
@@ -202,6 +205,10 @@ impl HttpSink for HttpSinkConfig {
             }
         };
 
+        emit!(HTTPEventEncoded {
+            byte_size: body.len(),
+        });
+
         Some(body)
     }
 
@@ -210,7 +217,7 @@ impl HttpSink for HttpSinkConfig {
             HttpMethod::Post => Method::POST,
             HttpMethod::Put => Method::PUT,
         };
-        let uri: Uri = self.uri.clone().into();
+        let uri: Uri = self.uri.uri.clone();
 
         let ct = match self.encoding.codec() {
             Encoding::Text => "text/plain",
@@ -240,10 +247,8 @@ impl HttpSink for HttpSinkConfig {
             Compression::None => {}
         }
 
-        if let Some(headers) = &self.headers {
-            for (header, value) in headers.iter() {
-                builder = builder.header(header.as_str(), value.as_str());
-            }
+        for (header, value) in self.request.headers.iter() {
+            builder = builder.header(header.as_str(), value.as_str());
         }
 
         let mut request = builder.body(body).unwrap();
@@ -257,8 +262,9 @@ impl HttpSink for HttpSinkConfig {
 }
 
 async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> crate::Result<()> {
-    let uri = build_uri(uri);
-    let mut request = Request::head(&uri).body(Body::empty()).unwrap();
+    let auth = auth.choose_one(&uri.auth)?;
+    let uri = uri.with_default_parts();
+    let mut request = Request::head(&uri.uri).body(Body::empty()).unwrap();
 
     if let Some(auth) = auth {
         auth.apply(&mut request);
@@ -272,34 +278,17 @@ async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> c
     }
 }
 
-fn validate_headers(
-    headers: &Option<IndexMap<String, String>>,
-    auth: &Option<Auth>,
-) -> crate::Result<()> {
-    if let Some(map) = headers {
-        for (name, value) in map {
-            if auth.is_some() && name.eq_ignore_ascii_case("Authorization") {
-                return Err(
-                    "Authorization header can not be used with defined auth options".into(),
-                );
-            }
-
-            HeaderName::from_bytes(name.as_bytes()).with_context(|| InvalidHeaderName { name })?;
-            HeaderValue::from_bytes(value.as_bytes())
-                .with_context(|| InvalidHeaderValue { value })?;
+fn validate_headers(map: &IndexMap<String, String>, auth: &Option<Auth>) -> crate::Result<()> {
+    for (name, value) in map {
+        if auth.is_some() && name.eq_ignore_ascii_case("Authorization") {
+            return Err("Authorization header can not be used with defined auth options".into());
         }
-    }
-    Ok(())
-}
 
-fn build_uri(base: UriSerde) -> Uri {
-    let base: Uri = base.into();
-    Uri::builder()
-        .scheme(base.scheme_str().unwrap_or("http"))
-        .authority(base.authority().map(|a| a.as_str()).unwrap_or("127.0.0.1"))
-        .path_and_query(base.path_and_query().map(|pq| pq.as_str()).unwrap_or(""))
-        .build()
-        .expect("bug building uri")
+        HeaderName::from_bytes(name.as_bytes()).with_context(|| InvalidHeaderName { name })?;
+        HeaderValue::from_bytes(value.as_bytes()).with_context(|| InvalidHeaderValue { value })?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -365,13 +354,13 @@ mod tests {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
         encoding = "text"
-        [headers]
+        [request.headers]
         Auth = "token:thing_and-stuff"
         X-Custom-Nonsense = "_%_{}_-_&_._`_|_~_!_#_&_$_"
         "#;
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        assert!(super::validate_headers(&config.headers, &None).is_ok());
+        assert!(super::validate_headers(&config.request.headers, &None).is_ok());
     }
 
     #[test]
@@ -379,15 +368,15 @@ mod tests {
         let config = r#"
         uri = "http://$IN_ADDR/frames"
         encoding = "text"
-        [headers]
+        [request.headers]
         "\u0001" = "bad"
         "#;
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
         assert_downcast_matches!(
-            super::validate_headers(&config.headers, &None).unwrap_err(),
+            super::validate_headers(&config.request.headers, &None).unwrap_err(),
             BuildError,
-            BuildError::InvalidHeaderName{..}
+            BuildError::InvalidHeaderName { .. }
         );
     }
 
@@ -399,7 +388,7 @@ mod tests {
         let config = r#"
         uri = "http://$IN_ADDR/"
         encoding = "text"
-        [headers]
+        [request.headers]
         Authorization = "Basic base64encodedstring"
         [auth]
         strategy = "basic"
@@ -532,7 +521,7 @@ mod tests {
         uri = "http://$IN_ADDR/frames"
         encoding = "ndjson"
         compression = "gzip"
-        [headers]
+        [request.headers]
         foo = "bar"
         baz = "quux"
     "#

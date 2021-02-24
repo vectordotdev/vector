@@ -1,13 +1,20 @@
 package metadata
 
-installation: roles: {
-	agent: {
-		title: "Agent"
+installation: {
+	#Role: {
+		name:         string
+		title:        string
+		description?: string
+		sub_roles: [SubName=string]: {
+			name:        SubName
+			title:       string
+			description: string
+		}
 	}
-	sidecar: {
-		title: "Sidecar"
+
+	#Roles: [Name=string]: #Role & {
+		name: Name
 	}
-	aggregator: {
-		title: "Aggregator"
-	}
+
+	roles: #Roles
 }

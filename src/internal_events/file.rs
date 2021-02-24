@@ -58,8 +58,8 @@ mod source {
         fn emit_logs(&self) {
             warn!(
                 message = "Currently ignoring file too small to fingerprint.",
-                path = ?self.path,
-            );
+                path = %self.path.display(),
+            )
         }
 
         fn emit_metrics(&self) {
@@ -80,8 +80,8 @@ mod source {
         fn emit_logs(&self) {
             error!(
                 message = "Failed reading file for fingerprinting.",
-                path = ?self.path,
-                error = ?self.error,
+                path = %self.path.display(),
+                error = %self.error,
             );
         }
 
@@ -103,9 +103,9 @@ mod source {
         fn emit_logs(&self) {
             warn!(
                 message = "Failed in deleting file.",
-                path = ?self.path,
-                error = ?self.error,
-                rate_limit_secs = 1
+                path = %self.path.display(),
+                error = %self.error,
+                internal_log_rate_secs = 1
             );
         }
 
@@ -126,7 +126,7 @@ mod source {
         fn emit_logs(&self) {
             info!(
                 message = "File deleted.",
-                path = ?self.path,
+                path = %self.path.display(),
             );
         }
 
@@ -147,7 +147,7 @@ mod source {
         fn emit_logs(&self) {
             info!(
                 message = "Stopped watching file.",
-                path = ?self.path,
+                path = %self.path.display(),
             );
         }
 
@@ -169,8 +169,8 @@ mod source {
         fn emit_logs(&self) {
             error!(
                 message = "Failed to watch file.",
-                path = ?self.path,
-                error = ?self.error
+                path = %self.path.display(),
+                error = %self.error
             );
         }
 
@@ -192,7 +192,7 @@ mod source {
         fn emit_logs(&self) {
             info!(
                 message = "Resuming to watch file.",
-                path = ?self.path,
+                path = %self.path.display(),
                 file_position = %self.file_position
             );
         }
@@ -214,7 +214,7 @@ mod source {
         fn emit_logs(&self) {
             info!(
                 message = "Found new file to watch.",
-                path = ?self.path,
+                path = %self.path.display(),
             );
         }
 
@@ -253,11 +253,34 @@ mod source {
 
     impl InternalEvent for FileCheckpointWriteFailed {
         fn emit_logs(&self) {
-            warn!(message = "Failed writing checkpoints.", error = ?self.error);
+            warn!(message = "Failed writing checkpoints.", error = %self.error);
         }
 
         fn emit_metrics(&self) {
             counter!("checkpoint_write_errors_total", 1);
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct PathGlobbingFailed<'a> {
+        pub path: &'a Path,
+        pub error: &'a Error,
+    }
+
+    impl<'a> InternalEvent for PathGlobbingFailed<'a> {
+        fn emit_logs(&self) {
+            error!(
+                message = "Failed to glob path.",
+                path = %self.path.display(),
+                error = %self.error,
+            );
+        }
+
+        fn emit_metrics(&self) {
+            counter!(
+                "glob_errors_total", 1,
+                "path" => self.path.to_string_lossy().into_owned(),
+            );
         }
     }
 
@@ -310,6 +333,10 @@ mod source {
 
         fn emit_files_open(&self, count: usize) {
             emit!(FileOpen { count });
+        }
+
+        fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
+            emit!(PathGlobbingFailed { path, error });
         }
     }
 }

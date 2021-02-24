@@ -1,0 +1,59 @@
+sources:
+  source1:
+    type: "type1"
+    option1: "value1"
+    option2: "value2"
+    rawConfig: |-
+      option = "value"
+      arbitrary text
+  source2:
+    type: "type2"
+    optionA: "valueA"
+    optionB:
+      suboption: "valueB"
+    rawConfig: |-
+      arbitrary text 2
+  source3:
+    type: "type3"
+
+transforms:
+  transform1:
+    type: "type1"
+    inputs: ["input1", "input2"]
+    option1: "value1"
+    option2: "value2"
+    rawConfig: |-
+      option = "value"
+      arbitrary text
+  transform2:
+    type: "type2"
+    inputs: ["input2", "input1"]
+    optionA: "valueA"
+    optionB:
+      suboption: "valueB"
+    rawConfig: |-
+      arbitrary text 2
+  transform3:
+    type: "type3"
+    inputs: []
+
+sinks:
+  sink1:
+    type: "type1"
+    inputs: ["input1", "input2"]
+    option1: "value1"
+    option2: "value2"
+    rawConfig: |-
+      option = "value"
+      arbitrary text
+  sink2:
+    type: "type2"
+    inputs: ["input2", "input1"]
+    optionA: "valueA"
+    optionB:
+      suboption: "valueB"
+    rawConfig: |-
+      arbitrary text 2
+  sink3:
+    type: "type3"
+    inputs: []

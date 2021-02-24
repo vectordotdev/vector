@@ -3,21 +3,16 @@ package metadata
 components: sources: syslog: {
 	_port: 514
 
-	title:       "Syslog"
-	description: "[Syslog](\(urls.syslog)) stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is used to collect various device logs from different machines and send them to a central location for monitoring and review."
+	title: "Syslog"
 
 	classes: sources.socket.classes
+
 	features: {
 		multiline: sources.socket.features.multiline
 
 		receive: {
 			from: {
-				service: {
-					name:     "Syslog"
-					thing:    "a \(name) client"
-					url:      urls.syslog
-					versions: null
-				}
+				service: services.syslog
 
 				interface: socket: {
 					api: {
@@ -30,20 +25,30 @@ components: sources: syslog: {
 					ssl: "optional"
 				}
 			}
-
+			receive_buffer_bytes: {
+				enabled:       true
+				relevant_when: "mode = `tcp` or mode = `udp` && os = `unix`"
+			}
+			keepalive: enabled: true
 			tls: sources.socket.features.receive.tls
 		}
 	}
 
 	support: {
-		platforms: sources.socket.support.platforms
+		targets: sources.socket.support.targets
 
 		requirements: []
 		warnings: []
 		notices: []
 	}
 
-	configuration: sources.socket.configuration
+	installation: {
+		platform_name: null
+	}
+
+	configuration: sources.socket.configuration & {
+		"type": "type": string: enum: syslog: "The type of this component."
+	}
 
 	output: logs: line: {
 		description: "An individual Syslog event"
@@ -53,6 +58,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["app-name"]
+					syntax: "literal"
 				}
 			}
 			host: fields._local_host
@@ -61,6 +67,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["my.host.com"]
+					syntax: "literal"
 				}
 			}
 			facility: {
@@ -68,6 +75,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["1"]
+					syntax: "literal"
 				}
 			}
 			message: {
@@ -75,6 +83,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["Hello world"]
+					syntax: "literal"
 				}
 			}
 			msgid: {
@@ -82,6 +91,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["ID47"]
+					syntax: "literal"
 				}
 			}
 			procid: {
@@ -89,6 +99,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["8710"]
+					syntax: "literal"
 				}
 			}
 			severity: {
@@ -96,6 +107,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["notice"]
+					syntax: "literal"
 				}
 			}
 			source_ip: {
@@ -103,6 +115,7 @@ components: sources: syslog: {
 				required:    true
 				type: string: {
 					examples: ["127.0.0.1"]
+					syntax: "literal"
 				}
 			}
 			timestamp: fields._current_timestamp
@@ -117,7 +130,10 @@ components: sources: syslog: {
 			"*": {
 				description: "In addition to the defined fields, any Syslog 5424 structured fields are parsed and inserted as root level fields."
 				required:    true
-				type: string: examples: ["hello world"]
+				type: string: {
+					examples: ["hello world"]
+					syntax: "literal"
+				}
 			}
 		}
 	}
@@ -133,7 +149,7 @@ components: sources: syslog: {
 			_msgid:        "ID931"
 			_procid:       "2426"
 			_timestamp:    "2020-03-13T20:45:38.119Z"
-			title:         "Syslog Event"
+			title:         "Syslog Eve"
 			configuration: {}
 			input: """
 				```text
@@ -187,6 +203,8 @@ components: sources: syslog: {
 
 	telemetry: metrics: {
 		connection_read_errors_total: components.sources.internal_metrics.output.metrics.connection_read_errors_total
+		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total
 		utf8_convert_errors_total:    components.sources.internal_metrics.output.metrics.utf8_convert_errors_total
 	}
 }

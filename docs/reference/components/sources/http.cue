@@ -11,18 +11,14 @@ components: sources: http: {
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: {
-					name:     "HTTP"
-					thing:    "an \(name) client"
-					url:      urls.http_client
-					versions: null
-				}
+				service: services.http
 
 				interface: {
 					socket: {
@@ -44,25 +40,33 @@ components: sources: http: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
 		address: {
 			description: "The address to accept connections on. The address _must_ include a port."
 			required:    true
-			type: string: examples: ["0.0.0.0:\(_port)", "localhost:\(_port)"]
+			type: string: {
+				examples: ["0.0.0.0:\(_port)", "localhost:\(_port)"]
+				syntax: "literal"
+			}
 		}
 		encoding: {
 			common:      true
@@ -75,6 +79,7 @@ components: sources: http: {
 					ndjson: "Newline-delimited JSON objects, where each line must contain a JSON object."
 					json:   "Array of JSON objects, which must be a JSON array containing JSON objects."
 				}
+				syntax: "literal"
 			}
 		}
 		headers: {
@@ -83,7 +88,10 @@ components: sources: http: {
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: examples: ["User-Agent", "X-My-Custom-Header"]
+				items: type: string: {
+					examples: ["User-Agent", "X-My-Custom-Header"]
+					syntax: "literal"
+				}
 			}
 		}
 		auth: configuration._http_basic_auth
@@ -93,7 +101,10 @@ components: sources: http: {
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: examples: ["application", "source"]
+				items: type: string: {
+					examples: ["application", "source"]
+					syntax: "literal"
+				}
 			}
 		}
 	}
@@ -106,7 +117,10 @@ components: sources: http: {
 					description:   "The raw line line from the incoming payload."
 					relevant_when: "encoding == \"text\""
 					required:      true
-					type: string: examples: ["Hello world"]
+					type: string: {
+						examples: ["Hello world"]
+						syntax: "literal"
+					}
 				}
 				timestamp: fields._current_timestamp
 				vector_http_path: {
@@ -141,6 +155,7 @@ components: sources: http: {
 			_line:       "Hello world"
 			_user_agent: "my-service/v2.1"
 			title:       "text/plain"
+
 			configuration: {
 				address:  "0.0.0.0:\(_port)"
 				encoding: "text"
@@ -168,6 +183,7 @@ components: sources: http: {
 			_line:       "{\"key\": \"val\"}"
 			_user_agent: "my-service/v2.1"
 			title:       "application/json"
+
 			configuration: {
 				address:  "0.0.0.0:\(_port)"
 				encoding: "json"
@@ -195,5 +211,16 @@ components: sources: http: {
 
 	telemetry: metrics: {
 		http_bad_requests_total: components.sources.internal_metrics.output.metrics.http_bad_requests_total
+		parse_errors_total:      components.sources.internal_metrics.output.metrics.parse_errors_total
+	}
+
+	how_it_works: {
+		decompression: {
+			title: "Decompression"
+			body: """
+				Received body is decompressed according to `Content-Encoding` header.
+				Supported algorithms are `gzip`, `deflate`, and `snappy`.
+				"""
+		}
 	}
 }

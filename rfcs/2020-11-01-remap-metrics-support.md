@@ -6,7 +6,7 @@ data as well as with log data.
 ## Scope
 
 The aim of the Remap language is to remain simple and yet provide the power to
-allow the user to replace most of their tranform configuration with a simple
+allow the user to replace most of their transform configuration with a simple
 Remap script. Any complexity beyond a certain level is possible, but requires
 the `Lua` or `Wasm` transforms.
 

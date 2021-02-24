@@ -1,24 +1,11 @@
-use crate::event::metric::{Metric, MetricKind, MetricValue};
-use indexmap::IndexMap;
+use crate::event::{
+    metric::{Bucket, Metric, MetricKind, MetricValue, Quantile},
+    Event,
+};
+use chrono::{DateTime, TimeZone, Utc};
 use std::collections::BTreeMap;
 
 pub use prometheus_parser::*;
-
-#[derive(Default)]
-struct AggregatedHistogram {
-    buckets: Vec<f64>,
-    counts: Vec<u32>,
-    count: u32,
-    sum: f64,
-}
-
-#[derive(Default)]
-struct AggregatedSummary {
-    quantiles: Vec<f64>,
-    values: Vec<f64>,
-    count: u32,
-    sum: f64,
-}
 
 fn has_values_or_none(tags: BTreeMap<String, String>) -> Option<BTreeMap<String, String>> {
     if tags.is_empty() {
@@ -28,153 +15,132 @@ fn has_values_or_none(tags: BTreeMap<String, String>) -> Option<BTreeMap<String,
     }
 }
 
-pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
+fn utc_timestamp(timestamp: Option<i64>) -> Option<DateTime<Utc>> {
+    timestamp.and_then(|timestamp| {
+        Utc.timestamp_opt(timestamp / 1000, (timestamp % 1000) as u32 * 1000000)
+            .latest()
+    })
+}
+
+pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
+    prometheus_parser::parse_text(packet).map(reparse_groups)
+}
+
+pub(super) fn parse_request(request: proto::WriteRequest) -> Result<Vec<Event>, ParserError> {
+    prometheus_parser::parse_request(request).map(reparse_groups)
+}
+
+fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
     let mut result = Vec::new();
 
-    for group in prometheus_parser::group_metrics(packet)? {
-        // just a header without measurements
-        if group.metrics.is_empty() {
-            continue;
-        }
-
+    for group in groups {
         match group.metrics {
-            GroupKind::Counter(vec) => {
-                for metric in vec {
-                    let counter = Metric {
-                        name: group.name.clone(),
-                        namespace: None,
-                        timestamp: None,
-                        tags: has_values_or_none(metric.labels),
-                        kind: MetricKind::Absolute,
-                        value: MetricValue::Counter {
+            GroupKind::Counter(metrics) => {
+                for (key, metric) in metrics {
+                    let counter = Metric::new(
+                        group.name.clone(),
+                        MetricKind::Absolute,
+                        MetricValue::Counter {
                             value: metric.value,
                         },
-                    };
+                    )
+                    .with_timestamp(utc_timestamp(key.timestamp))
+                    .with_tags(has_values_or_none(key.labels));
 
-                    result.push(counter);
+                    result.push(counter.into());
                 }
             }
-            GroupKind::Gauge(vec) | GroupKind::Untyped(vec) => {
-                for metric in vec {
-                    let gauge = Metric {
-                        name: group.name.clone(),
-                        namespace: None,
-                        timestamp: None,
-                        tags: has_values_or_none(metric.labels),
-                        kind: MetricKind::Absolute,
-                        value: MetricValue::Gauge {
+            GroupKind::Gauge(metrics) | GroupKind::Untyped(metrics) => {
+                for (key, metric) in metrics {
+                    let gauge = Metric::new(
+                        group.name.clone(),
+                        MetricKind::Absolute,
+                        MetricValue::Gauge {
                             value: metric.value,
                         },
-                    };
+                    )
+                    .with_timestamp(utc_timestamp(key.timestamp))
+                    .with_tags(has_values_or_none(key.labels));
 
-                    result.push(gauge);
+                    result.push(gauge.into());
                 }
             }
-            GroupKind::Histogram(vec) => {
-                let mut aggregates = IndexMap::<_, AggregatedHistogram>::new();
-
-                for metric in vec {
-                    let labels = metric.labels;
-                    let aggregate = aggregates.entry(labels).or_default();
-                    match metric.value {
-                        HistogramMetricValue::Count { count } => {
-                            aggregate.count = count;
-                        }
-                        HistogramMetricValue::Sum { sum } => {
-                            aggregate.sum = sum;
-                        }
-                        HistogramMetricValue::Bucket { bucket, count } => {
-                            // last bucket is implicit, because we store its value in 'count'
-                            if bucket != f64::INFINITY {
-                                aggregate.buckets.push(bucket);
-                                aggregate.counts.push(count);
-                            }
-                        }
+            GroupKind::Histogram(metrics) => {
+                for (key, metric) in metrics {
+                    let mut buckets = metric.buckets;
+                    for i in (1..buckets.len()).rev() {
+                        buckets[i].count -= buckets[i - 1].count;
                     }
-                }
-
-                for (tags, mut aggregate) in aggregates {
-                    for i in (1..aggregate.counts.len()).rev() {
-                        aggregate.counts[i] -= aggregate.counts[i - 1];
+                    let drop_last = buckets
+                        .last()
+                        .map_or(false, |bucket| bucket.bucket == f64::INFINITY);
+                    if drop_last {
+                        buckets.pop();
                     }
-                    let hist = Metric {
-                        name: group.name.clone(),
-                        namespace: None,
-                        timestamp: None,
-                        tags: has_values_or_none(tags),
-                        kind: MetricKind::Absolute,
-                        value: MetricValue::AggregatedHistogram {
-                            buckets: aggregate.buckets,
-                            counts: aggregate.counts,
-                            count: aggregate.count,
-                            sum: aggregate.sum,
-                        },
-                    };
 
-                    result.push(hist);
+                    result.push(
+                        Metric::new(
+                            group.name.clone(),
+                            MetricKind::Absolute,
+                            MetricValue::AggregatedHistogram {
+                                buckets: buckets
+                                    .into_iter()
+                                    .map(|b| Bucket {
+                                        upper_limit: b.bucket,
+                                        count: b.count,
+                                    })
+                                    .collect(),
+                                count: metric.count,
+                                sum: metric.sum,
+                            },
+                        )
+                        .with_timestamp(utc_timestamp(key.timestamp))
+                        .with_tags(has_values_or_none(key.labels))
+                        .into(),
+                    );
                 }
             }
-            GroupKind::Summary(vec) => {
-                let mut aggregates = IndexMap::<_, AggregatedSummary>::new();
-
-                for metric in vec {
-                    let tags = metric.labels;
-                    let aggregate = aggregates.entry(tags).or_default();
-
-                    match metric.value {
-                        SummaryMetricValue::Count { count } => {
-                            aggregate.count = count;
-                        }
-                        SummaryMetricValue::Sum { sum } => {
-                            aggregate.sum = sum;
-                        }
-                        SummaryMetricValue::Quantile { quantile, value } => {
-                            aggregate.quantiles.push(quantile);
-                            aggregate.values.push(value);
-                        }
-                    }
-                }
-
-                for (tags, aggregate) in aggregates {
-                    let summary = Metric {
-                        name: group.name.clone(),
-                        namespace: None,
-                        timestamp: None,
-                        tags: has_values_or_none(tags),
-                        kind: MetricKind::Absolute,
-                        value: MetricValue::AggregatedSummary {
-                            quantiles: aggregate.quantiles,
-                            values: aggregate.values,
-                            count: aggregate.count,
-                            sum: aggregate.sum,
-                        },
-                    };
-
-                    result.push(summary);
+            GroupKind::Summary(metrics) => {
+                for (key, metric) in metrics {
+                    result.push(
+                        Metric::new(
+                            group.name.clone(),
+                            MetricKind::Absolute,
+                            MetricValue::AggregatedSummary {
+                                quantiles: metric
+                                    .quantiles
+                                    .into_iter()
+                                    .map(|q| Quantile {
+                                        upper_limit: q.quantile,
+                                        value: q.value,
+                                    })
+                                    .collect(),
+                                count: metric.count,
+                                sum: metric.sum,
+                            },
+                        )
+                        .with_timestamp(utc_timestamp(key.timestamp))
+                        .with_tags(has_values_or_none(key.labels))
+                        .into(),
+                    );
                 }
             }
         }
     }
 
-    Ok(result)
+    result
 }
 
 #[cfg(test)]
 mod test {
-    use super::parse;
+    use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use chrono::{TimeZone, Utc};
     use pretty_assertions::assert_eq;
+    use shared::btreemap;
 
-    macro_rules! map {
-        ($($key:expr => $value:expr),*) => {
-            {
-                let mut m = ::std::collections::BTreeMap::new();
-                $(
-                    m.insert($key.into(), $value.into());
-                )*
-                m
-            }
-        };
+    fn parse_text(text: &str) -> Result<Vec<Metric>, ParserError> {
+        super::parse_text(text).map(|events| events.into_iter().map(Event::into_metric).collect())
     }
 
     #[test]
@@ -186,15 +152,12 @@ mod test {
             "##;
 
         assert_eq!(
-            parse(exp),
-            Ok(vec![Metric {
-                name: "uptime".into(),
-                namespace: None,
-                timestamp: None,
-                tags: None,
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter { value: 123.0 },
-            }]),
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "uptime",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 123.0 },
+            )]),
         );
     }
 
@@ -205,7 +168,7 @@ mod test {
             # TYPE hidden counter
             "##;
 
-        assert_eq!(parse(exp), Ok(vec![]),);
+        assert_eq!(parse_text(exp), Ok(vec![]),);
     }
 
     #[test]
@@ -215,7 +178,7 @@ mod test {
             name{labelname="val1",basename="basevalue"} NaN
             "##;
 
-        match parse(exp).unwrap()[0].value {
+        match parse_text(exp).unwrap()[0].data.value {
             MetricValue::Counter { value } => {
                 assert!(value.is_nan());
             }
@@ -238,54 +201,48 @@ mod test {
             "##;
 
         assert_eq!(
-            parse(exp),
+            parse_text(exp),
             Ok(vec![
-                Metric {
-                    name: "name".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(
-                        vec![
-                            ("labelname".into(), "val2".into()),
-                            ("basename".into(), "base\"v\\al\nue".into())
-                        ]
-                        .into_iter()
-                        .collect()
-                    ),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 0.23 },
-                },
-                Metric {
-                    name: "name2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(
-                        vec![
-                            ("labelname".into(), "val2".into()),
-                            ("basename".into(), "basevalue2".into())
-                        ]
-                        .into_iter()
-                        .collect()
-                    ),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter {
+                Metric::new(
+                    "name",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.23 },
+                )
+                .with_tags(Some(
+                    vec![
+                        ("labelname".into(), "val2".into()),
+                        ("basename".into(), "base\"v\\al\nue".into())
+                    ]
+                    .into_iter()
+                    .collect()
+                )),
+                Metric::new(
+                    "name2",
+                    MetricKind::Absolute,
+                    MetricValue::Counter {
                         value: std::f64::INFINITY
                     },
-                },
-                Metric {
-                    name: "name2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(
-                        vec![("labelname".into(), "val1".into()),]
-                            .into_iter()
-                            .collect()
-                    ),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter {
+                )
+                .with_tags(Some(
+                    vec![
+                        ("labelname".into(), "val2".into()),
+                        ("basename".into(), "basevalue2".into())
+                    ]
+                    .into_iter()
+                    .collect()
+                )),
+                Metric::new(
+                    "name2",
+                    MetricKind::Absolute,
+                    MetricValue::Counter {
                         value: std::f64::NEG_INFINITY
                     },
-                },
+                )
+                .with_tags(Some(
+                    vec![("labelname".into(), "val1".into()),]
+                        .into_iter()
+                        .collect()
+                )),
             ]),
         );
     }
@@ -300,38 +257,36 @@ mod test {
             "##;
 
         assert_eq!(
-            parse(exp),
+            parse_text(exp),
             Ok(vec![
-                Metric {
-                    name: "http_requests_total".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(
-                        vec![
-                            ("method".into(), "post".into()),
-                            ("code".into(), "200".into())
-                        ]
-                        .into_iter()
-                        .collect()
-                    ),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 1027.0 },
-                },
-                Metric {
-                    name: "http_requests_total".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(
-                        vec![
-                            ("method".into(), "post".into()),
-                            ("code".into(), "400".into())
-                        ]
-                        .into_iter()
-                        .collect()
-                    ),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 3.0 },
-                }
+                Metric::new(
+                    "http_requests_total",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 1027.0 },
+                )
+                .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
+                .with_tags(Some(
+                    vec![
+                        ("method".into(), "post".into()),
+                        ("code".into(), "200".into())
+                    ]
+                    .into_iter()
+                    .collect()
+                )),
+                Metric::new(
+                    "http_requests_total",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 3.0 },
+                )
+                .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
+                .with_tags(Some(
+                    vec![
+                        ("method".into(), "post".into()),
+                        ("code".into(), "400".into())
+                    ]
+                    .into_iter()
+                    .collect()
+                ))
             ]),
         );
     }
@@ -345,15 +300,12 @@ mod test {
             "##;
 
         assert_eq!(
-            parse(exp),
-            Ok(vec![Metric {
-                name: "latency".into(),
-                namespace: None,
-                timestamp: None,
-                tags: None,
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value: 123.0 },
-            }]),
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "latency",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 123.0 },
+            )]),
         );
     }
 
@@ -364,15 +316,12 @@ mod test {
             "##;
 
         assert_eq!(
-            parse(exp),
-            Ok(vec![Metric {
-                name: "metric_without_timestamp_and_labels".into(),
-                namespace: None,
-                timestamp: None,
-                tags: None,
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value: 12.47 },
-            }]),
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "metric_without_timestamp_and_labels",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 12.47 },
+            )]),
         );
     }
 
@@ -383,15 +332,12 @@ mod test {
             "##;
 
         assert_eq!(
-            parse(exp),
-            Ok(vec![Metric {
-                name: "no_labels".into(),
-                namespace: None,
-                timestamp: None,
-                tags: None,
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value: 3.0 },
-            }]),
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "no_labels",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 3.0 },
+            )]),
         );
     }
 
@@ -402,24 +348,22 @@ mod test {
             "##;
 
         assert_eq!(
-            parse(exp),
-            Ok(vec![Metric {
-                name: "msdos_file_access_time_seconds".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(
-                    vec![
-                        ("path".into(), "C:\\DIR\\FILE.TXT".into()),
-                        ("error".into(), "Cannot find file:\n\"FILE.TXT\"".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge {
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "msdos_file_access_time_seconds",
+                MetricKind::Absolute,
+                MetricValue::Gauge {
                     value: 1458255915.0
                 },
-            }]),
+            )
+            .with_tags(Some(
+                vec![
+                    ("path".into(), "C:\\DIR\\FILE.TXT".into()),
+                    ("error".into(), "Cannot find file:\n\"FILE.TXT\"".into())
+                ]
+                .into_iter()
+                .collect()
+            )),]),
         );
     }
 
@@ -431,15 +375,13 @@ mod test {
             name{tag="}"} 0
             "##;
         assert_eq!(
-            parse(exp),
-            Ok(vec![Metric {
-                name: "name".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(map! {"tag" => "}"}),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter { value: 0.0 },
-            }]),
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "name",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 0.0 },
+            )
+            .with_tags(Some(btreemap! { "tag" => "}" }))]),
         );
     }
 
@@ -451,15 +393,13 @@ mod test {
             name{tag="a,b"} 0
             "##;
         assert_eq!(
-            parse(exp),
-            Ok(vec![Metric {
-                name: "name".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(map! {"tag" => "a,b"}),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter { value: 0.0 },
-            }]),
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "name",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 0.0 },
+            )
+            .with_tags(Some(btreemap! { "tag" => "a,b" }))]),
         );
     }
 
@@ -471,15 +411,13 @@ mod test {
             name{tag="\\n"} 0
             "##;
         assert_eq!(
-            parse(exp),
-            Ok(vec![Metric {
-                name: "name".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(map! {"tag" => "\\n"}),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter { value: 0.0 },
-            }]),
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "name",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 0.0 },
+            )
+            .with_tags(Some(btreemap! { "tag" => "\\n" }))]),
         );
     }
 
@@ -491,15 +429,13 @@ mod test {
             name{tag=" * "} 0
             "##;
         assert_eq!(
-            parse(exp),
-            Ok(vec![Metric {
-                name: "name".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(map! {"tag" => " * "}),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter { value: 0.0 },
-            }]),
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "name",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 0.0 },
+            )
+            .with_tags(Some(btreemap! { "tag" => " * " }))]),
         );
     }
 
@@ -510,22 +446,20 @@ mod test {
             "##;
 
         assert_eq!(
-            parse(exp),
-            Ok(vec![Metric {
-                name: "telemetry_scrape_size_bytes_count".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(
-                    vec![
-                        ("registry".into(), "default".into()),
-                        ("content_type".into(), "text/plain; version=0.0.4".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value: 1890.0 },
-            }]),
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "telemetry_scrape_size_bytes_count",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1890.0 },
+            )
+            .with_tags(Some(
+                vec![
+                    ("registry".into(), "default".into()),
+                    ("content_type".into(), "text/plain; version=0.0.4".into())
+                ]
+                .into_iter()
+                .collect()
+            ))]),
         );
     }
 
@@ -535,7 +469,7 @@ mod test {
             telemetry_scrape_size_bytes_count{registry="default",content_type} 1890
             "##;
 
-        assert!(parse(exp).is_err());
+        assert!(parse_text(exp).is_err());
     }
 
     #[test]
@@ -544,7 +478,7 @@ mod test {
             telemetry_scrape_size_bytes_count{registry="default",content_type=} 1890
             "##;
 
-        assert!(parse(exp).is_err());
+        assert!(parse_text(exp).is_err());
     }
 
     #[test]
@@ -554,21 +488,20 @@ mod test {
             "##;
 
         assert_eq!(
-            parse(exp),
-            Ok(vec![Metric {
-                name: "something_weird".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(
-                    vec![("problem".into(), "division by zero".into())]
-                        .into_iter()
-                        .collect()
-                ),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge {
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "something_weird",
+                MetricKind::Absolute,
+                MetricValue::Gauge {
                     value: std::f64::INFINITY
                 },
-            }]),
+            )
+            .with_timestamp(Utc.timestamp_opt(-3982045, 0).latest())
+            .with_tags(Some(
+                vec![("problem".into(), "division by zero".into())]
+                    .into_iter()
+                    .collect()
+            ))]),
         );
     }
 
@@ -581,28 +514,28 @@ mod test {
             "##;
 
         assert_eq!(
-            parse(exp),
+            parse_text(exp),
             Ok(vec![
-                Metric {
-                    name: "latency".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(
-                        vec![("env".into(), "production".into())]
-                            .into_iter()
-                            .collect()
-                    ),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "latency".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(vec![("env".into(), "testing".into())].into_iter().collect()),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 2.0 },
-                }
+                Metric::new(
+                    "latency",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 1.0 },
+                )
+                .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
+                .with_tags(Some(
+                    vec![("env".into(), "production".into())]
+                        .into_iter()
+                        .collect()
+                )),
+                Metric::new(
+                    "latency",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 2.0 },
+                )
+                .with_timestamp(Utc.timestamp_opt(1395066363, 0).latest())
+                .with_tags(Some(
+                    vec![("env".into(), "testing".into())].into_iter().collect()
+                ))
             ]),
         );
     }
@@ -619,32 +552,23 @@ mod test {
             "##;
 
         assert_eq!(
-            parse(exp),
+            parse_text(exp),
             Ok(vec![
-                Metric {
-                    name: "uptime".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 123.0 },
-                },
-                Metric {
-                    name: "temperature".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: -1.5 },
-                },
-                Metric {
-                    name: "launch_count".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 10.0 },
-                }
+                Metric::new(
+                    "uptime",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 123.0 },
+                ),
+                Metric::new(
+                    "temperature",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: -1.5 },
+                ),
+                Metric::new(
+                    "launch_count",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 10.0 },
+                )
             ]),
         );
     }
@@ -656,7 +580,7 @@ mod test {
             latency{env="production"}
             "##;
 
-        assert!(parse(exp).is_err());
+        assert!(parse_text(exp).is_err());
     }
 
     #[test]
@@ -666,7 +590,7 @@ mod test {
             123.0
             "##;
 
-        assert!(parse(exp).is_err());
+        assert!(parse_text(exp).is_err());
     }
 
     #[test]
@@ -681,40 +605,28 @@ mod test {
             "##;
 
         assert_eq!(
-            parse(exp),
+            parse_text(exp),
             Ok(vec![
-                Metric {
-                    name: "uptime".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 123.0 },
-                },
-                Metric {
-                    name: "last_downtime".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 4.0 },
-                },
-                Metric {
-                    name: "temperature".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: -1.5 },
-                },
-                Metric {
-                    name: "temperature_7_days_average".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 0.1 },
-                }
+                Metric::new(
+                    "uptime",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 123.0 },
+                ),
+                Metric::new(
+                    "last_downtime",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 4.0 },
+                ),
+                Metric::new(
+                    "temperature",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: -1.5 },
+                ),
+                Metric::new(
+                    "temperature_7_days_average",
+                    MetricKind::Absolute,
+                    MetricValue::Gauge { value: 0.1 },
+                )
             ]),
         );
     }
@@ -735,20 +647,18 @@ mod test {
             "##;
 
         assert_eq!(
-            parse(exp),
-            Ok(vec![Metric {
-                name: "http_request_duration_seconds".into(),
-                namespace: None,
-                timestamp: None,
-                tags: None,
-                kind: MetricKind::Absolute,
-                value: MetricValue::AggregatedHistogram {
-                    buckets: vec![0.05, 0.1, 0.2, 0.5, 1.0],
-                    counts: vec![24054, 9390, 66948, 28997, 4599],
+            parse_text(exp),
+            Ok(vec![Metric::new(
+                "http_request_duration_seconds",
+                MetricKind::Absolute,
+                MetricValue::AggregatedHistogram {
+                    buckets: crate::buckets![
+                        0.05 => 24054, 0.1 => 9390, 0.2 => 66948, 0.5 => 28997, 1.0 => 4599
+                    ],
                     count: 144320,
                     sum: 53423.0,
                 },
-            }]),
+            )]),
         );
     }
 
@@ -799,56 +709,54 @@ mod test {
         "##;
 
         assert_eq!(
-            parse(exp),
+            parse_text(exp),
             Ok(vec![
-                Metric {
-                    name: "gitlab_runner_job_duration_seconds".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(vec![("runner".into(), "z".into())].into_iter().collect()),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedHistogram {
-                        buckets: vec![
-                            30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
-                            36000.0
+                Metric::new(
+                    "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
+                        buckets: crate::buckets![
+                            30.0 => 327,
+                            60.0 => 147,
+                            300.0 => 61,
+                            600.0 => 1,
+                            1800.0 => 0,
+                            3600.0 => 0,
+                            7200.0 => 0,
+                            10800.0 => 0,
+                            18000.0 => 0,
+                            36000.0 => 0
                         ],
-                        counts: vec![327, 147, 61, 1, 0, 0, 0, 0, 0, 0],
                         count: 536,
                         sum: 19690.129384881966,
                     },
-                },
-                Metric {
-                    name: "gitlab_runner_job_duration_seconds".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(vec![("runner".into(), "x".into())].into_iter().collect()),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedHistogram {
-                        buckets: vec![
-                            30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
-                            36000.0
+                ).with_tags(Some(vec![("runner".into(), "z".into())].into_iter().collect())),
+                Metric::new(
+                    "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
+                        buckets: crate::buckets![
+                            30.0 => 1,
+                            60.0 => 0,
+                            300.0 => 0,
+                            600.0 => 0,
+                            1800.0 => 0,
+                            3600.0 => 0,
+                            7200.0 => 0,
+                            10800.0 => 0,
+                            18000.0 => 0,
+                            36000.0 => 0
                         ],
-                        counts: vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                         count: 1,
                         sum: 28.975436316,
                     },
-                },
-                Metric {
-                    name: "gitlab_runner_job_duration_seconds".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(vec![("runner".into(), "y".into())].into_iter().collect()),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedHistogram {
-                        buckets: vec![
-                            30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
-                            36000.0
+                ).with_tags(Some(vec![("runner".into(), "x".into())].into_iter().collect())),
+                Metric::new(
+                    "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
+                        buckets: crate::buckets![
+                            30.0 => 285, 60.0 => 880, 300.0 => 1906, 600.0 => 80, 1800.0 => 101, 3600.0 => 3,
+                            7200.0 => 0, 10800.0 => 0, 18000.0 => 0, 36000.0 => 0
                         ],
-                        counts: vec![285, 880, 1906, 80, 101, 3, 0, 0, 0, 0],
                         count: 3255,
                         sum: 381111.7498891335,
                     },
-                }
+                ).with_tags(Some(vec![("runner".into(), "y".into())].into_iter().collect()))
             ]),
         );
     }
@@ -877,40 +785,41 @@ mod test {
             "##;
 
         assert_eq!(
-            parse(exp),
+            parse_text(exp),
             Ok(vec![
-                Metric {
-                    name: "rpc_duration_seconds".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(vec![("service".into(), "a".into())].into_iter().collect()),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedSummary {
-                        quantiles: vec![0.01, 0.05, 0.5, 0.9, 0.99],
-                        values: vec![3102.0, 3272.0, 4773.0, 9001.0, 76656.0],
+                Metric::new(
+                    "rpc_duration_seconds",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedSummary {
+                        quantiles: crate::quantiles![
+                            0.01 => 3102.0,
+                            0.05 => 3272.0,
+                            0.5 => 4773.0,
+                            0.9 => 9001.0,
+                            0.99 => 76656.0
+                        ],
                         count: 2693,
                         sum: 1.7560473e+07,
                     },
-                },
-                Metric {
-                    name: "go_gc_duration_seconds".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedSummary {
-                        quantiles: vec![0.0, 0.25, 0.5, 0.75, 1.0],
-                        values: vec![
-                            0.009460965,
-                            0.009793382,
-                            0.009870205,
-                            0.01001838,
-                            0.018827136
+                )
+                .with_tags(Some(
+                    vec![("service".into(), "a".into())].into_iter().collect()
+                )),
+                Metric::new(
+                    "go_gc_duration_seconds",
+                    MetricKind::Absolute,
+                    MetricValue::AggregatedSummary {
+                        quantiles: crate::quantiles![
+                            0.0 => 0.009460965,
+                            0.25 => 0.009793382,
+                            0.5 => 0.009870205,
+                            0.75 => 0.01001838,
+                            1.0 => 0.018827136
                         ],
                         count: 602767,
                         sum: 4668.551713715,
                     },
-                },
+                ),
             ]),
         );
     }
@@ -938,104 +847,84 @@ mod test {
             "##;
 
         assert_eq!(
-            parse(exp),
+            parse_text(exp),
             Ok(vec![
-                Metric {
-                    name: "nginx_server_bytes".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(map! {"direction" => "in", "host" => "*"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 263719.0 }
-                },
-                Metric {
-                    name: "nginx_server_bytes".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(map! {"direction" => "in", "host" => "_"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 255061.0 }
-                },
-                Metric {
-                    name: "nginx_server_bytes".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(map! {"direction" => "in", "host" => "nginx-vts-status"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 8658.0 }
-                },
-                Metric {
-                    name: "nginx_server_bytes".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(map! {"direction" => "out", "host" => "*"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 944199.0 }
-                },
-                Metric {
-                    name: "nginx_server_bytes".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(map! {"direction" => "out", "host" => "_"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 360775.0 }
-                },
-                Metric {
-                    name: "nginx_server_bytes".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(map! {"direction" => "out", "host" => "nginx-vts-status"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 583424.0 }
-                },
-                Metric {
-                    name: "nginx_server_cache".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(map! {"host" => "*", "status" => "bypass"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 0.0 }
-                },
-                Metric {
-                    name: "nginx_server_cache".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(map! {"host" => "*", "status" => "expired"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 0.0 }
-                },
-                Metric {
-                    name: "nginx_server_cache".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(map! {"host" => "*", "status" => "hit"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 0.0 }
-                },
-                Metric {
-                    name: "nginx_server_cache".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(map! {"host" => "*", "status" => "miss"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 0.0 }
-                },
-                Metric {
-                    name: "nginx_server_cache".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(map! {"host" => "*", "status" => "revalidated"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 0.0 }
-                },
-                Metric {
-                    name: "nginx_server_cache".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(map! {"host" => "*", "status" => "scarce"}),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Counter { value: 0.0 }
-                }
+                Metric::new(
+                    "nginx_server_bytes",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 263719.0 },
+                )
+                .with_tags(Some(btreemap! { "direction" => "in", "host" => "*" })),
+                Metric::new(
+                    "nginx_server_bytes",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 255061.0 },
+                )
+                .with_tags(Some(btreemap! { "direction" => "in", "host" => "_" })),
+                Metric::new(
+                    "nginx_server_bytes",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 8658.0 },
+                )
+                .with_tags(Some(
+                    btreemap! { "direction" => "in", "host" => "nginx-vts-status" }
+                )),
+                Metric::new(
+                    "nginx_server_bytes",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 944199.0 },
+                )
+                .with_tags(Some(btreemap! { "direction" => "out", "host" => "*" })),
+                Metric::new(
+                    "nginx_server_bytes",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 360775.0 },
+                )
+                .with_tags(Some(btreemap! { "direction" => "out", "host" => "_" })),
+                Metric::new(
+                    "nginx_server_bytes",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 583424.0 },
+                )
+                .with_tags(Some(
+                    btreemap! { "direction" => "out", "host" => "nginx-vts-status" }
+                )),
+                Metric::new(
+                    "nginx_server_cache",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.0 },
+                )
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "bypass" })),
+                Metric::new(
+                    "nginx_server_cache",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.0 },
+                )
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "expired" })),
+                Metric::new(
+                    "nginx_server_cache",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.0 },
+                )
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "hit" })),
+                Metric::new(
+                    "nginx_server_cache",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.0 },
+                )
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "miss" })),
+                Metric::new(
+                    "nginx_server_cache",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.0 },
+                )
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "revalidated" })),
+                Metric::new(
+                    "nginx_server_cache",
+                    MetricKind::Absolute,
+                    MetricValue::Counter { value: 0.0 },
+                )
+                .with_tags(Some(btreemap! { "host" => "*", "status" => "scarce" }))
             ])
         );
     }

@@ -1,15 +1,15 @@
 package metadata
 
 components: sinks: aws_cloudwatch_metrics: components._aws & {
-	title:       "AWS Cloudwatch Metrics"
-	description: sinks._aws_cloudwatch.description
+	title: "AWS Cloudwatch Metrics"
 
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {
@@ -51,15 +51,16 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: [
 			"""
@@ -95,6 +96,7 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 			warnings: []
 			type: string: {
 				examples: ["service"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -110,4 +112,19 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 			summary:      false
 		}
 	}
+
+	permissions: iam: [
+		{
+			platform:  "aws"
+			_service:  "cloudwatch"
+			_docs_tag: "AmazonCloudWatch"
+
+			policies: [
+				{
+					_action: "PutMetricData"
+					required_for: ["healthcheck", "write"]
+				},
+			]
+		},
+	]
 }

@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: pulsar: {
-	title:       "Apache Pulsar"
-	description: "[Pulsar](\(urls.pulsar)) is a multi-tenant, high-performance solution for server-to-server messaging. Pulsar was originally developed by Yahoo, it is under the stewardship of the Apache Software Foundation. It is an excellent tool for streaming logs and metrics data."
+	title: "Apache Pulsar"
 
 	classes: {
 		commonly_used: false
@@ -10,6 +9,7 @@ components: sinks: pulsar: {
 		development:   "beta"
 		egress_method: "stream"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {
@@ -21,19 +21,14 @@ components: sinks: pulsar: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: "text"
+					default: null
 					enum: ["text", "json"]
 				}
 			}
 			request: enabled: false
 			tls: enabled:     false
 			to: {
-				service: {
-					name:     "Apache Pulsar"
-					thing:    "an \(name) cluster"
-					url:      urls.pulsar
-					versions: null
-				}
+				service: services.pulsar
 
 				interface: {
 					socket: {
@@ -51,15 +46,16 @@ components: sinks: pulsar: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -82,6 +78,7 @@ components: sinks: pulsar: {
 						type: string: {
 							default: null
 							examples: ["${PULSAR_NAME}", "name123"]
+							syntax: "literal"
 						}
 					}
 					token: {
@@ -92,6 +89,7 @@ components: sinks: pulsar: {
 						type: string: {
 							default: null
 							examples: ["${PULSAR_TOKEN}", "123456789"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -102,6 +100,7 @@ components: sinks: pulsar: {
 			required:    true
 			type: string: {
 				examples: ["pulsar://127.0.0.1:6650"]
+				syntax: "literal"
 			}
 		}
 		topic: {
@@ -110,6 +109,7 @@ components: sinks: pulsar: {
 			warnings: []
 			type: string: {
 				examples: ["topic-1234"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -117,5 +117,9 @@ components: sinks: pulsar: {
 	input: {
 		logs:    true
 		metrics: null
+	}
+
+	telemetry: metrics: {
+		encode_errors_total: components.sources.internal_metrics.output.metrics.encode_errors_total
 	}
 }

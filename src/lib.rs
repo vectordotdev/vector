@@ -9,6 +9,7 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::unit_arg)]
 #![deny(clippy::clone_on_ref_ptr)]
+#![deny(clippy::trivially_copy_pass_by_ref)]
 
 #[macro_use]
 extern crate tracing;
@@ -16,6 +17,8 @@ extern crate tracing;
 extern crate derivative;
 #[macro_use]
 extern crate pest_derive;
+#[cfg(feature = "vrl-cli")]
+extern crate vrl_cli;
 
 #[cfg(feature = "jemallocator")]
 #[global_allocator]
@@ -23,7 +26,6 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[macro_use]
 pub mod config;
-pub mod buffers;
 pub mod cli;
 pub mod conditions;
 pub mod dns;
@@ -38,6 +40,8 @@ pub mod internal_events;
 pub mod api;
 pub mod app;
 pub mod async_read;
+pub mod buffers;
+pub mod encoding_transcode;
 pub mod heartbeat;
 pub mod http;
 #[cfg(feature = "rdkafka")]
@@ -48,9 +52,6 @@ pub mod list;
 pub mod mapping;
 pub mod metrics;
 pub(crate) mod pipeline;
-#[cfg(any(feature = "sinks-prometheus", feature = "sources-prometheus"))]
-pub(crate) mod prometheus;
-pub mod remap;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod serde;
@@ -61,6 +62,7 @@ pub mod sink;
 pub mod sinks;
 pub mod sources;
 pub mod stream;
+pub mod tcp;
 pub mod template;
 pub mod test_util;
 pub mod tls;
@@ -69,7 +71,10 @@ pub mod top;
 pub mod topology;
 pub mod trace;
 pub mod transforms;
+pub mod trigger;
 pub mod types;
+#[cfg(any(feature = "sources-utils-udp", feature = "sinks-utils-udp"))]
+pub mod udp;
 pub mod unit_test;
 pub mod validate;
 #[cfg(windows)]

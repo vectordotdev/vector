@@ -7,6 +7,7 @@ use super::{
     Batch, BatchSink, Partition, PartitionBatchSink,
 };
 use crate::buffers::Acker;
+use futures::TryFutureExt;
 use serde::{
     de::{self, Unexpected, Visitor},
     Deserialize, Deserializer, Serialize,
@@ -23,7 +24,7 @@ use tower::{
 
 pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AdaptiveConcurrencyLimit<Timeout<S>, L>>>;
 pub type TowerBatchedSink<S, B, L, Request> = BatchSink<Svc<S, L>, B, Request>;
-pub type TowerPartitionSink<S, B, L, K, Request> = PartitionBatchSink<Svc<S, L>, B, K, Request>;
+pub type TowerPartitionSink<S, B, L, K, Request> = PartitionBatchSink<B, Svc<S, L>, K, Request>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -129,6 +130,9 @@ impl<'de> Deserialize<'de> for Concurrency {
 pub trait ConcurrencyOption {
     fn parse_concurrency(&self, default: &Self) -> Option<usize>;
     fn is_none(&self) -> bool;
+    fn is_some(&self) -> bool {
+        !self.is_none()
+    }
 }
 
 impl ConcurrencyOption for Option<usize> {
@@ -163,11 +167,13 @@ impl ConcurrencyOption for Concurrency {
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 pub struct TowerRequestConfig<T: ConcurrencyOption = Concurrency> {
     #[serde(default)]
-    #[serde(
-        alias = "in_flight_limit",
-        skip_serializing_if = "ConcurrencyOption::is_none"
-    )]
+    #[serde(skip_serializing_if = "ConcurrencyOption::is_none")]
     pub concurrency: T, // 5
+    /// The same as concurrency but with old deprecated name.
+    /// Alias couldn't be used because of https://github.com/serde-rs/serde/issues/1504
+    #[serde(default)]
+    #[serde(skip_serializing_if = "ConcurrencyOption::is_none")]
+    pub in_flight_limit: T, // 5
     pub timeout_secs: Option<u64>,             // 60
     pub rate_limit_duration_secs: Option<u64>, // 1
     pub rate_limit_num: Option<u64>,           // 5
@@ -181,7 +187,9 @@ pub struct TowerRequestConfig<T: ConcurrencyOption = Concurrency> {
 impl<T: ConcurrencyOption> TowerRequestConfig<T> {
     pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
         TowerRequestSettings {
-            concurrency: self.concurrency.parse_concurrency(&defaults.concurrency),
+            concurrency: self
+                .concurrency()
+                .parse_concurrency(&defaults.concurrency()),
             timeout: Duration::from_secs(self.timeout_secs.or(defaults.timeout_secs).unwrap_or(60)),
             rate_limit_duration: Duration::from_secs(
                 self.rate_limit_duration_secs
@@ -204,6 +212,17 @@ impl<T: ConcurrencyOption> TowerRequestConfig<T> {
                     .unwrap_or(1),
             ),
             adaptive_concurrency: self.adaptive_concurrency,
+        }
+    }
+
+    pub fn concurrency(&self) -> &T {
+        match (self.concurrency.is_some(), self.in_flight_limit.is_some()) {
+            (_, false) => &self.concurrency,
+            (false, true) => &self.in_flight_limit,
+            (true, true) => {
+                warn!("Option `in_flight_limit` has been renamed to `concurrency`. Ignoring `in_flight_limit` and using `concurrency` option.");
+                &self.concurrency
+            }
         }
     }
 }
@@ -265,6 +284,10 @@ impl TowerRequestSettings {
         batch_timeout: Duration,
         acker: Acker,
     ) -> TowerBatchedSink<S, B, L, Request>
+    // Would like to return `impl Sink + SinkExt<T>` here, but that
+    // doesn't work with later calls to `batched_with_min` etc (via
+    // `trait SinkExt` above), as it is missing a bound on the
+    // associated types that cannot be expressed in stable Rust.
     where
         L: RetryLogic<Response = S::Response>,
         S: Service<Request> + Clone + Send + 'static,
@@ -362,45 +385,36 @@ where
 
 pub struct Map<S, R1, R2> {
     f: Arc<dyn Fn(R1) -> R2 + Send + Sync + 'static>,
-    pub(crate) inner: S,
+    inner: S,
 }
 
 impl<S, R1, R2> Service<R1> for Map<S, R1, R2>
 where
     S: Service<R2>,
+    crate::Error: From<S::Error>,
 {
     type Response = S::Response;
-    type Error = S::Error;
-    type Future = S::Future;
+    type Error = crate::Error;
+    type Future = futures::future::MapErr<S::Future, fn(S::Error) -> crate::Error>;
 
     fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
+        self.inner
+            .poll_ready(cx)
+            .map(|result| result.map_err(|e| e.into()))
     }
 
     fn call(&mut self, req: R1) -> Self::Future {
         let req = (self.f)(req);
-        self.inner.call(req)
+        self.inner.call(req).map_err(Into::into)
     }
 }
 
-impl<S, R1, R2> Clone for Map<S, R1, R2>
-where
-    S: Clone,
-{
+impl<S: Clone, R1, R2> Clone for Map<S, R1, R2> {
     fn clone(&self) -> Self {
         Self {
             f: Arc::clone(&self.f),
             inner: self.inner.clone(),
         }
-    }
-}
-
-impl<S, R1, R2> fmt::Debug for Map<S, R1, R2>
-where
-    S: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Map").field("inner", &self.inner).finish()
     }
 }
 
@@ -443,6 +457,6 @@ mod tests {
 
         let cfg = toml::from_str::<TowerRequestConfigTest>("in_flight_limit = 10")
             .expect("Fixed concurrency failed for in_flight_limit param");
-        assert_eq!(cfg.concurrency, Concurrency::Fixed(10));
+        assert_eq!(cfg.concurrency(), &Concurrency::Fixed(10));
     }
 }

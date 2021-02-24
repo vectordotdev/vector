@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: aws_kinesis_streams: components._aws & {
-	title:       "AWS Kinesis Data Streams"
-	description: "[Amazon Kinesis Data Streams](\(urls.aws_kinesis_streams)) is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data."
+	title: "AWS Kinesis Data Streams"
 
 	classes: {
 		commonly_used: false
@@ -10,6 +9,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {
@@ -45,6 +45,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               30
+				headers:                    false
 			}
 			tls: enabled: false
 			to: {
@@ -66,15 +67,16 @@ components: sinks: aws_kinesis_streams: components._aws & {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -89,6 +91,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 			type: string: {
 				default: null
 				examples: ["user_id"]
+				syntax: "literal"
 			}
 		}
 		stream_name: {
@@ -97,6 +100,7 @@ components: sinks: aws_kinesis_streams: components._aws & {
 			warnings: []
 			type: string: {
 				examples: ["my-stream"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -145,5 +149,27 @@ components: sinks: aws_kinesis_streams: components._aws & {
 				},
 			]
 		}
+	}
+
+	permissions: iam: [
+		{
+			platform: "aws"
+			_service: "kinesis"
+
+			policies: [
+				{
+					_action: "DescribeStream"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "PutRecords"
+				},
+			]
+		},
+	]
+
+	telemetry: metrics: {
+		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

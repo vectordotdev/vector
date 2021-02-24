@@ -1,14 +1,14 @@
 use super::{default_host_key, logs::HumioLogsConfig, Encoding};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig},
-    sinks::util::{
-        encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
-    },
+    sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
     sinks::{Healthcheck, VectorSink},
     template::Template,
+    tls::TlsOptions,
     transforms::metric_to_log::MetricToLogConfig,
 };
 use futures::{stream, SinkExt, StreamExt};
+use indoc::indoc;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -21,11 +21,7 @@ pub struct HumioMetricsConfig {
     #[serde(alias = "host")]
     pub(in crate::sinks::humio) endpoint: Option<String>,
     source: Option<Template>,
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
-    encoding: EncodingConfigWithDefault<Encoding>,
+    encoding: EncodingConfig<Encoding>,
 
     event_type: Option<Template>,
 
@@ -40,6 +36,8 @@ pub struct HumioMetricsConfig {
 
     #[serde(default)]
     batch: BatchConfig,
+
+    tls: Option<TlsOptions>,
     // The obove settings are copied from HumioLogsConfig. In theory we should do below:
     //
     // #[serde(flatten)]
@@ -56,11 +54,11 @@ inventory::submit! {
 
 impl GenerateConfig for HumioMetricsConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"host_key = "hostname"
-            token = "${HUMIO_TOKEN}"
-            encoding.codec = "json""#,
-        )
+        toml::from_str(indoc! {r#"
+                host_key = "hostname"
+                token = "${HUMIO_TOKEN}"
+                encoding.codec = "json"
+            "#})
         .unwrap()
     }
 }
@@ -69,7 +67,7 @@ impl GenerateConfig for HumioMetricsConfig {
 #[typetag::serde(name = "humio_metrics")]
 impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut transform = self.transform.clone().build().await?;
+        let mut transform = self.transform.clone().build(&cx.globals).await?;
         let sink = HumioLogsConfig {
             token: self.token.clone(),
             endpoint: self.endpoint.clone(),
@@ -80,6 +78,7 @@ impl SinkConfig for HumioMetricsConfig {
             compression: self.compression,
             request: self.request,
             batch: self.batch,
+            tls: self.tls.clone(),
         };
 
         let (sink, healthcheck) = sink.clone().build(cx).await?;
@@ -114,6 +113,8 @@ mod tests {
         test_util, Event,
     };
     use chrono::{offset::TimeZone, Utc};
+    use indoc::indoc;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn generate_config() {
@@ -122,23 +123,21 @@ mod tests {
 
     #[test]
     fn test_endpoint_field() {
-        let (config, _) = load_sink::<HumioMetricsConfig>(
-            r#"
+        let (config, _) = load_sink::<HumioMetricsConfig>(indoc! {r#"
             token = "atoken"
             batch.max_events = 1
             endpoint = "https://localhost:9200/"
-            "#,
-        )
+            encoding = "json"
+        "#})
         .unwrap();
 
         assert_eq!(Some("https://localhost:9200/".to_string()), config.endpoint);
-        let (config, _) = load_sink::<HumioMetricsConfig>(
-            r#"
+        let (config, _) = load_sink::<HumioMetricsConfig>(indoc! {r#"
             token = "atoken"
             batch.max_events = 1
             host = "https://localhost:9200/"
-            "#,
-        )
+            encoding = "json"
+        "#})
         .unwrap();
 
         assert_eq!(Some("https://localhost:9200/".to_string()), config.endpoint);
@@ -146,12 +145,11 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_json() {
-        let (mut config, cx) = load_sink::<HumioMetricsConfig>(
-            r#"
+        let (mut config, cx) = load_sink::<HumioMetricsConfig>(indoc! {r#"
             token = "atoken"
             batch.max_events = 1
-            "#,
-        )
+            encoding = "json"
+        "#})
         .unwrap();
 
         let addr = test_util::next_addr();
@@ -167,42 +165,48 @@ mod tests {
 
         // Make our test metrics.
         let metrics = vec![
-            Event::from(Metric {
-                name: "metric1".to_string(),
-                namespace: None,
-                timestamp: Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1)),
-                tags: Some(
+            Event::from(
+                Metric::new(
+                    "metric1",
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 42.0 },
+                )
+                .with_tags(Some(
                     vec![("os.host".to_string(), "somehost".to_string())]
                         .into_iter()
                         .collect(),
-                ),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 42.0 },
-            }),
-            Event::from(Metric {
-                name: "metric2".to_string(),
-                namespace: None,
-                timestamp: Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 2)),
-                tags: Some(
+                ))
+                .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1))),
+            ),
+            Event::from(
+                Metric::new(
+                    "metric2",
+                    MetricKind::Absolute,
+                    MetricValue::Distribution {
+                        samples: crate::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],
+                        statistic: StatisticKind::Histogram,
+                    },
+                )
+                .with_tags(Some(
                     vec![("os.host".to_string(), "somehost".to_string())]
                         .into_iter()
                         .collect(),
-                ),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Distribution {
-                    values: vec![1.0, 2.0, 3.0],
-                    sample_rates: vec![100, 200, 300],
-                    statistic: StatisticKind::Histogram,
-                },
-            }),
+                ))
+                .with_timestamp(Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 2))),
+            ),
         ];
 
         let len = metrics.len();
         let _ = sink.run(stream::iter(metrics)).await.unwrap();
 
         let output = rx.take(len).collect::<Vec<_>>().await;
-        assert_eq!("{\"event\":{\"counter\":{\"value\":42.0},\"kind\":\"incremental\",\"name\":\"metric1\",\"tags\":{\"os.host\":\"somehost\"}},\"fields\":{},\"time\":1597784401.0}", output[0].1);
         assert_eq!(
-            "{\"event\":{\"distribution\":{\"sample_rates\":[100,200,300],\"statistic\":\"histogram\",\"values\":[1.0,2.0,3.0]},\"kind\":\"absolute\",\"name\":\"metric2\",\"tags\":{\"os.host\":\"somehost\"}},\"fields\":{},\"time\":1597784402.0}", output[1].1);
+            r#"{"event":{"counter":{"value":42.0},"kind":"incremental","name":"metric1","tags":{"os.host":"somehost"}},"fields":{},"time":1597784401.0}"#,
+            output[0].1
+        );
+        assert_eq!(
+            r#"{"event":{"distribution":{"samples":[{"rate":100,"value":1.0},{"rate":200,"value":2.0},{"rate":300,"value":3.0}],"statistic":"histogram"},"kind":"absolute","name":"metric2","tags":{"os.host":"somehost"}},"fields":{},"time":1597784402.0}"#,
+            output[1].1
+        );
     }
 }

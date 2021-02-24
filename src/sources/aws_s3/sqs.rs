@@ -13,11 +13,7 @@ use crate::{
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use codec::BytesDelimitedCodec;
-use futures::{
-    compat::{Compat, Future01CompatExt},
-    Stream, StreamExt, TryFutureExt,
-};
-use futures01::Sink;
+use futures::{SinkExt, Stream, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{GetObjectError, GetObjectRequest, S3Client, S3};
@@ -98,7 +94,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to flush all of s3://{}/{}: {}", bucket, key, source))]
     PipelineSend {
-        source: futures01::sync::mpsc::SendError<Event>,
+        source: crate::pipeline::ClosedError,
         bucket: String,
         key: String,
     },
@@ -246,10 +242,10 @@ impl Ingestor {
     async fn handle_s3_event(
         &self,
         s3_event: S3Event,
-        out: Pipeline,
+        mut out: Pipeline,
     ) -> Result<(), ProcessingError> {
         for record in s3_event.records {
-            self.handle_s3_event_record(record, out.clone()).await?
+            self.handle_s3_event_record(record, &mut out).await?
         }
         Ok(())
     }
@@ -257,7 +253,7 @@ impl Ingestor {
     async fn handle_s3_event_record(
         &self,
         s3_event: S3EventRecord,
-        out: Pipeline,
+        out: &mut Pipeline,
     ) -> Result<(), ProcessingError> {
         let event_version: semver::Version = s3_event.event_version.clone().into();
         if !SUPPORTED_S3S_EVENT_VERSION.matches(&event_version) {
@@ -373,9 +369,8 @@ impl Ingestor {
                     ready(Some(Ok(event)))
                 });
 
-                let mut send_error: Option<futures01::sync::mpsc::SendError<Event>> = None;
-                out.send_all(Compat::new(Box::pin(stream)))
-                    .compat()
+                let mut send_error: Option<crate::pipeline::ClosedError> = None;
+                out.send_all(&mut Box::pin(stream))
                     .await
                     .map_err(|err| {
                         send_error = Some(err);

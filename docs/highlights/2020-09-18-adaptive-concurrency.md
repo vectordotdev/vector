@@ -3,7 +3,7 @@ last_modified_on: "2020-09-18"
 $schema: ".schema.json"
 title: "Adaptive Request Concurrency (ARC)"
 description: "Increasing reliability and performance across your entire observability infrastructure."
-author_github: "https://github.com/binarylogic"
+author_github: "https://github.com/lucperkins"
 pr_numbers: [3094]
 release: "0.11.0"
 hide_on_release_notes: false
@@ -14,7 +14,7 @@ Vector 0.11 includes a new Adaptive Request Concurrency (ARC) feature that
 raises the performance and reliability of your entire observability
 infrastructure without any changes on your part. In short, it does away with
 static rate-limits and automatically optimizes HTTP concurrency limits based on
-downstream service responses. The underlying mechanis is a simple feedback loop
+downstream service responses. The underlying mechanism is a simple feedback loop
 inspired by TCP congestion control algorithms.
 
 [**Read the ARC announcement post →**][announcement]

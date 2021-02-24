@@ -25,7 +25,7 @@ The glossary contains common terms and their definitions.
 
 ## Configuration
 
-"Configuration" refers to the settings and options used to control Vector's behavior. You can learn more about Vector's configuration in the [Configuration][docs.configuration] section.
+"Configuration" refers to the settings and options used to control Vector's behavior. You can learn more about Vector's configuration in the [Configuration][docs.setup.configuration] section.
 
 ## Durability
 
@@ -92,9 +92,9 @@ this is commonly used to describe Vector.
 "Rust" refers to the [Rust programming language][urls.rust] that Vector is
 written in.
 
-## Sampler
+## Sample
 
-"Sampler" refers to a [transform][docs.transforms] that samples data.
+"Sample" refers to a [transform][docs.transforms] that samples data.
 
 ## Sink
 
@@ -142,7 +142,7 @@ reducing cost, etc.
 
 "Vector" is the name of this project.
 
-[docs.configuration]: /docs/setup/configuration/
+[docs.setup.configuration]: /docs/setup/configuration/
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [docs.data_model]: /docs/about/data-model/

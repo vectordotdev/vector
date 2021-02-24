@@ -123,7 +123,7 @@ impl SourceConfig for SimpleHttpConfig {
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![self.address.into()]
+        vec![Resource::tcp(self.address)]
     }
 }
 
@@ -259,11 +259,16 @@ mod tests {
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
-    use futures01::sync::mpsc;
+    use flate2::{
+        write::{DeflateEncoder, GzEncoder},
+        Compression,
+    };
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
+    use std::io::Write;
     use std::net::SocketAddr;
+    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {
@@ -346,6 +351,18 @@ mod tests {
             .as_u16()
     }
 
+    async fn send_bytes(address: SocketAddr, body: Vec<u8>, headers: HeaderMap) -> u16 {
+        reqwest::Client::new()
+            .post(&format!("http://{}/", address))
+            .headers(headers)
+            .body(body)
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .as_u16()
+    }
+
     #[tokio::test]
     async fn http_multiline_text() {
         trace_init();
@@ -356,7 +373,7 @@ mod tests {
 
         assert_eq!(200, send(addr, body).await);
 
-        let mut events = collect_n(rx, 2).await.unwrap();
+        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -384,7 +401,7 @@ mod tests {
 
         assert_eq!(200, send(addr, body).await);
 
-        let mut events = collect_n(rx, 2).await.unwrap();
+        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -413,7 +430,7 @@ mod tests {
         assert_eq!(200, send(addr, "{}").await); //can be one object or array of objects
         assert_eq!(200, send(addr, "[{},{},{}]").await);
 
-        let mut events = collect_n(rx, 2).await.unwrap();
+        let mut events = collect_n(rx, 2).await;
         assert!(events
             .remove(1)
             .as_log()
@@ -435,7 +452,7 @@ mod tests {
         assert_eq!(200, send(addr, r#"[{"key":"value"}]"#).await);
         assert_eq!(200, send(addr, r#"{"key2":"value2"}"#).await);
 
-        let mut events = collect_n(rx, 2).await.unwrap();
+        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -464,7 +481,7 @@ mod tests {
             send(addr, r#"{"nested":{"dotted.key2":"value2"}}"#).await
         );
 
-        let mut events = collect_n(rx, 2).await.unwrap();
+        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -492,7 +509,7 @@ mod tests {
             send(addr, "{\"key1\":\"value1\"}\n\n{\"key2\":\"value2\"}").await
         );
 
-        let mut events = collect_n(rx, 2).await.unwrap();
+        let mut events = collect_n(rx, 2).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -533,7 +550,7 @@ mod tests {
             send_with_headers(addr, "{\"key1\":\"value1\"}", headers).await
         );
 
-        let mut events = collect_n(rx, 1).await.unwrap();
+        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -565,7 +582,7 @@ mod tests {
             send_with_query(addr, "{\"key1\":\"value1\"}", "source=staging&region=gb").await
         );
 
-        let mut events = collect_n(rx, 1).await.unwrap();
+        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -588,7 +605,7 @@ mod tests {
             send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path").await
         );
 
-        let mut events = collect_n(rx, 1).await.unwrap();
+        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -606,12 +623,43 @@ mod tests {
 
         assert_eq!(200, send(addr, "{\"key1\":\"value1\"}").await);
 
-        let mut events = collect_n(rx, 1).await.unwrap();
+        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log.get("vector_http_path"), None);
+            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
+        }
+    }
+
+    #[tokio::test]
+    async fn http_gzip_deflate() {
+        trace_init();
+
+        let body = "test body";
+
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(body.as_bytes()).unwrap();
+        let body = encoder.finish().unwrap();
+
+        let mut encoder = DeflateEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(body.as_slice()).unwrap();
+        let body = encoder.finish().unwrap();
+
+        let mut headers = HeaderMap::new();
+        headers.insert("Content-Encoding", "gzip, deflate".parse().unwrap());
+
+        let (rx, addr) = source(Encoding::default(), vec![], vec![]).await;
+
+        assert_eq!(200, send_bytes(addr, body, headers).await);
+
+        let mut events = collect_n(rx, 1).await;
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log[log_schema().message_key()], "test body".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
         }

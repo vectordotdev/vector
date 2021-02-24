@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: aws_cloudwatch_logs: components._aws & {
-	title:       "AWS Cloudwatch Logs"
-	description: sinks._aws_cloudwatch.description
+	title: "AWS Cloudwatch Logs"
 
 	classes: {
 		commonly_used: true
@@ -10,6 +9,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {
@@ -46,10 +46,11 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               30
+				headers:                    false
 			}
 			tls: enabled: false
 			to: {
-				service: services.aws_cloudwatch
+				service: services.aws_cloudwatch_logs
 
 				interface: {
 					socket: {
@@ -67,15 +68,16 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -99,7 +101,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			required:    true
 			type: string: {
 				examples: ["group-name", "{{ file }}"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		stream_name: {
@@ -107,7 +109,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			required:    true
 			type: string: {
 				examples: ["{{ host }}", "%Y-%m-%d", "stream-name"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 	}
@@ -116,6 +118,34 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 		logs:    true
 		metrics: null
 	}
+
+	permissions: iam: [
+		{
+			platform: "aws"
+			_service: "logs"
+
+			policies: [
+				{
+					_action:       "CreateLogGroup"
+					required_when: "[`create_missing_group`](#create_missing_group) is set to `true`"
+				},
+				{
+					_action:       "CreateLogStream"
+					required_when: "[`create_missing_stream`](#create_missing_stream) is set to `true`"
+				},
+				{
+					_action: "DescribeLogGroups"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "DescribeLogStreams"
+				},
+				{
+					_action: "PutLogEvents"
+				},
+			]
+		},
+	]
 
 	telemetry: metrics: {
 		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total

@@ -24,6 +24,7 @@ use hyper::{
     header::{HeaderName, HeaderValue},
     Body, Request, Response,
 };
+use indoc::indoc;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -132,7 +133,7 @@ enum Encoding {
 }
 
 impl Encoding {
-    fn content_type(&self) -> &'static str {
+    fn content_type(self) -> &'static str {
         match self {
             Self::Text => "text/plain",
             Self::Ndjson => "application/x-ndjson",
@@ -146,11 +147,11 @@ inventory::submit! {
 
 impl GenerateConfig for GcsSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"bucket = "my-bucket"
+        toml::from_str(indoc! {r#"
+            bucket = "my-bucket"
             credentials_path = "/path/to/credentials.json"
-            encoding.codec = "ndjson""#,
-        )
+            encoding.codec = "ndjson"
+        "#})
         .unwrap()
     }
 }
@@ -407,7 +408,7 @@ fn encode_event(
             warn!(
                 message = "Keys do not exist on the event; dropping event.",
                 ?missing_keys,
-                rate_limit_secs = 30,
+                internal_log_rate_secs = 30,
             );
         })
         .ok()?;

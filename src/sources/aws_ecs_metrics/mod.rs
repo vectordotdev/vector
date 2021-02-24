@@ -7,8 +7,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Event, Pipeline,
 };
-use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt};
-use futures01::Sink;
+use futures::{stream, SinkExt, StreamExt};
 use hyper::{Body, Client, Request};
 use serde::{Deserialize, Serialize};
 use std::{env, time::Instant};
@@ -126,9 +125,7 @@ async fn aws_ecs_metrics(
     out: Pipeline,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
-    let mut out = out
-        .sink_map_err(|error| error!(message = "Error sending ECS metrics.", %error))
-        .sink_compat();
+    let mut out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
 
     let interval = time::Duration::from_secs(interval);
     let mut interval = time::interval(interval).take_until(shutdown);
@@ -536,20 +533,19 @@ mod test {
 
         let metrics = collect_ready(rx)
             .await
-            .unwrap()
             .into_iter()
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
 
         match metrics
             .iter()
-            .find(|m| m.name == "network_receive_bytes_total")
+            .find(|m| m.name() == "network_receive_bytes_total")
         {
             Some(m) => {
-                assert_eq!(m.value, MetricValue::Counter { value: 329932716.0 });
-                assert_eq!(m.namespace, Some("awsecs".into()));
+                assert_eq!(m.data.value, MetricValue::Counter { value: 329932716.0 });
+                assert_eq!(m.namespace(), Some("awsecs"));
 
-                match &m.tags {
+                match m.tags() {
                     Some(tags) => {
                         assert_eq!(tags.get("device"), Some(&"eth1".to_string()));
                     }
@@ -592,7 +588,7 @@ mod integration_tests {
 
         delay_for(Duration::from_secs(5)).await;
 
-        let metrics = collect_ready(rx).await.unwrap();
+        let metrics = collect_ready(rx).await;
 
         assert!(!metrics.is_empty());
     }

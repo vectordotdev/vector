@@ -14,8 +14,11 @@
   [[tests.outputs]]
     extract_from = "lua_unversioned"
     [[tests.outputs.conditions]]
-      "a.exists" = false
-      "b.equals" = "example value"
+      type = "remap"
+      source = '''
+        !exists(.a) &&
+        .b == "example value"
+      '''
 
 [transforms.lua_v1]
   inputs = []
@@ -34,5 +37,8 @@
   [[tests.outputs]]
     extract_from = "lua_v1"
     [[tests.outputs.conditions]]
-      "a.exists" = false
-      "b.equals" = "example value"
+      type = "remap"
+      source = '''
+        !exists(.a) &&
+        .b == "example value"
+      '''

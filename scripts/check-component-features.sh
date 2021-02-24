@@ -16,6 +16,14 @@ toml-extract() {
   remarshal --if toml --of json | jq -r "$WHAT"
 }
 
+extract-features() {
+  # The main "features.NAME" only lists categories, so extract from the categories
+  for feature in $(toml-extract ".features.\"$1\"|.[]" < Cargo.toml)
+  do
+    toml-extract ".features.\"$feature\"|.[]" < Cargo.toml
+  done | grep "^${1}-" | sort --unique
+}
+
 check-listed-features() {
   xargs -I{} sh -cx "(cargo check --tests --no-default-features --features {}) || exit 255"
 }
@@ -33,7 +41,7 @@ if (echo "$COMPONENTS" | grep -E -v "(Log level|^(Sources:|Transforms:|Sinks:|)$
 fi
 
 echo "Checking that each source feature can be built without other features..."
-toml-extract ".features.sources|.[]" < Cargo.toml | check-listed-features
+extract-features sources | check-listed-features
 
 if (${CI:-false}); then
   echo "Cleaning to save some disk space"
@@ -41,7 +49,7 @@ if (${CI:-false}); then
 fi
 
 echo "Checking that each transform feature can be built without other features..."
-toml-extract ".features.transforms|.[]" < Cargo.toml | check-listed-features
+extract-features transforms | check-listed-features
 
 if (${CI:-false}); then
   echo "Cleaning to save some disk space"
@@ -49,4 +57,4 @@ if (${CI:-false}); then
 fi
 
 echo "Checking that each sink feature can be built without other features..."
-toml-extract ".features.sinks|.[]" < Cargo.toml | check-listed-features
+extract-features sinks | check-listed-features

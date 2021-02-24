@@ -21,18 +21,21 @@
   [[tests.outputs]]
     extract_from = "rename_fields_simple"
     [[tests.outputs.conditions]]
-      # Plain
-      "a.exists" = false
-      "renamed_a.equals" = "a"
-      # Moved via a nested string
-      "b.renamed_c.equals" = "c"
-      "b.c.exists" = false
-      # Didn't change
-      "b.d.equals" = "d"
-      # Moved via a map
-      "b.renamed_e.equals" = "e"
-      # Replaced if conflict
-      "existing.equals" = "replaces"
+      type = "remap"
+      source = '''
+        # Plain
+        !exists(.a) &&
+        .renamed_a == "a" &&
+        # Moved via a nested string
+        .b.renamed_c == "c" &&
+        !exists(.b.c) &&
+        # Didnt change
+        .b.d == "d" &&
+        # Moved via a map
+        .b.renamed_e == "e" &&
+        # Replaced if conflict
+        .existing == "replaces"
+      '''
 
 [transforms.rename_fields_empty_objects]
   inputs = []
@@ -55,11 +58,14 @@
   [[tests.outputs]]
     extract_from = "rename_fields_empty_objects"
     [[tests.outputs.conditions]]
-      "a.b.equals" = 1
-      "a.exists" = true
-      "renamed_c.equals" = 2
-      "renamed_d.equals" = "d"
-      "b.d.exists" = false
-      "renamed_e.equals" = "e"
-      "b.e.exists" = false
-      "b.exists" = false
+      type = "remap"
+      source = '''
+        .a.b == 1 &&
+        exists(.a) &&
+        .renamed_c == 2 &&
+        .renamed_d == "d" &&
+        !exists(.b.d) &&
+        .renamed_e == "e" &&
+        !exists(.b.e) &&
+        !exists(.b)
+      '''

@@ -10,10 +10,9 @@ use crate::{
     shutdown::ShutdownSignal,
     sources,
     tls::{TlsOptions, TlsSettings},
-    Event, Pipeline,
+    Pipeline,
 };
-use futures::{compat::Sink01CompatExt, stream, FutureExt, StreamExt, TryFutureExt};
-use futures01::Sink;
+use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -155,9 +154,8 @@ fn prometheus(
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> sources::Source {
-    let out = out
-        .sink_map_err(|error| error!(message = "Error sending metric.", %error))
-        .sink_compat();
+    let out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
+
     Box::pin(tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown)
         .map(move |_| stream::iter(urls.clone()))
@@ -193,13 +191,13 @@ fn prometheus(
                             let byte_size = body.len();
                             let body = String::from_utf8_lossy(&body);
 
-                            match parser::parse(&body) {
+                            match parser::parse_text(&body) {
                                 Ok(metrics) => {
                                     emit!(PrometheusEventReceived {
                                         byte_size,
                                         count: metrics.len(),
                                     });
-                                    Some(stream::iter(metrics).map(Event::Metric).map(Ok))
+                                    Some(stream::iter(metrics).map(Ok))
                                 }
                                 Err(error) => {
                                     if url.path() == "/" {
@@ -257,7 +255,6 @@ mod test {
         test_util::{next_addr, start_topology},
         Error,
     };
-    use futures::compat::Future01CompatExt;
     use hyper::{
         service::{make_service_fn, service_fn},
         {Body, Client, Response, Server},
@@ -331,6 +328,7 @@ mod test {
             &["in"],
             PrometheusExporterConfig {
                 address: out_addr,
+                tls: None,
                 default_namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 quantiles: vec![],
@@ -354,13 +352,6 @@ mod test {
             .collect::<Vec<_>>();
 
         assert_eq!(lines, vec![
-            "# HELP vector_promhttp_metric_handler_requests_total promhttp_metric_handler_requests_total",
-            "# TYPE vector_promhttp_metric_handler_requests_total counter",
-            "vector_promhttp_metric_handler_requests_total{code=\"200\"} 100",
-            "vector_promhttp_metric_handler_requests_total{code=\"404\"} 7",
-            "# HELP vector_prometheus_remote_storage_samples_in_total prometheus_remote_storage_samples_in_total",
-            "# TYPE vector_prometheus_remote_storage_samples_in_total gauge",
-            "vector_prometheus_remote_storage_samples_in_total 57011636",
             "# HELP vector_http_request_duration_seconds http_request_duration_seconds",
             "# TYPE vector_http_request_duration_seconds histogram",
             "vector_http_request_duration_seconds_bucket{le=\"0.05\"} 24054",
@@ -371,6 +362,13 @@ mod test {
             "vector_http_request_duration_seconds_bucket{le=\"+Inf\"} 144320",
             "vector_http_request_duration_seconds_sum 53423",
             "vector_http_request_duration_seconds_count 144320",
+            "# HELP vector_prometheus_remote_storage_samples_in_total prometheus_remote_storage_samples_in_total",
+            "# TYPE vector_prometheus_remote_storage_samples_in_total gauge",
+            "vector_prometheus_remote_storage_samples_in_total 57011636",
+            "# HELP vector_promhttp_metric_handler_requests_total promhttp_metric_handler_requests_total",
+            "# TYPE vector_promhttp_metric_handler_requests_total counter",
+            "vector_promhttp_metric_handler_requests_total{code=\"200\"} 100",
+            "vector_promhttp_metric_handler_requests_total{code=\"404\"} 7",
             "# HELP vector_rpc_duration_seconds rpc_duration_seconds",
             "# TYPE vector_rpc_duration_seconds summary",
             "vector_rpc_duration_seconds{code=\"200\",quantile=\"0.01\"} 3102",
@@ -383,7 +381,7 @@ mod test {
             ],
         );
 
-        topology.stop().compat().await.unwrap();
+        topology.stop().await;
     }
 }
 
@@ -419,7 +417,7 @@ mod integration_tests {
         tokio::spawn(source);
         tokio::time::delay_for(Duration::from_secs(1)).await;
 
-        let events = test_util::collect_ready(rx).await.unwrap();
+        let events = test_util::collect_ready(rx).await;
         assert!(!events.is_empty());
 
         let metrics: Vec<_> = events
@@ -430,24 +428,24 @@ mod integration_tests {
         let find_metric = |name: &str| {
             metrics
                 .iter()
-                .find(|metric| metric.name == name)
+                .find(|metric| metric.name() == name)
                 .unwrap_or_else(|| panic!("Missing metric {:?}", name))
         };
 
         // Sample some well-known metrics
         let build = find_metric("prometheus_build_info");
-        assert!(matches!(build.kind, MetricKind::Absolute));
-        assert!(matches!(build.value, MetricValue::Gauge { ..}));
-        assert!(build.tags.as_ref().unwrap().contains_key("branch"));
-        assert!(build.tags.as_ref().unwrap().contains_key("version"));
+        assert!(matches!(build.data.kind, MetricKind::Absolute));
+        assert!(matches!(build.data.value, MetricValue::Gauge { .. }));
+        assert!(build.tags().unwrap().contains_key("branch"));
+        assert!(build.tags().unwrap().contains_key("version"));
 
         let queries = find_metric("prometheus_engine_queries");
-        assert!(matches!(queries.kind, MetricKind::Absolute));
-        assert!(matches!(queries.value, MetricValue::Gauge { .. }));
+        assert!(matches!(queries.data.kind, MetricKind::Absolute));
+        assert!(matches!(queries.data.value, MetricValue::Gauge { .. }));
 
         let go_info = find_metric("go_info");
-        assert!(matches!(go_info.kind, MetricKind::Absolute));
-        assert!(matches!(go_info.value, MetricValue::Gauge { .. }));
-        assert!(go_info.tags.as_ref().unwrap().contains_key("version"));
+        assert!(matches!(go_info.data.kind, MetricKind::Absolute));
+        assert!(matches!(go_info.data.value, MetricValue::Gauge { .. }));
+        assert!(go_info.tags().unwrap().contains_key("version"));
     }
 }

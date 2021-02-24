@@ -7,7 +7,7 @@ use tokio::process::Command;
 /// Exec a `tail` command reading the specified `file` within a `Container`
 /// in a `Pod` of a specified `resource` at the specified `namespace` via the
 /// specified `kubectl_command`.
-/// Returns a [`Reader`] that managed the reading process.
+/// Returns a [`Reader`] that manages the reading process.
 pub fn exec_tail(
     kubectl_command: &str,
     namespace: &str,

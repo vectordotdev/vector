@@ -2,12 +2,12 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct ElasticSearchEventReceived {
+pub struct ElasticSearchEventEncoded {
     pub byte_size: usize,
     pub index: String,
 }
 
-impl InternalEvent for ElasticSearchEventReceived {
+impl InternalEvent for ElasticSearchEventEncoded {
     fn emit_logs(&self) {
         trace!(message = "Inserting event.", index = %self.index);
     }
@@ -28,7 +28,7 @@ impl<'a> InternalEvent for ElasticSearchMissingKeys<'a> {
         warn!(
             message = "Keys do not exist on the event; dropping event.",
             missing_keys = ?self.keys,
-            rate_limit_secs = 30,
+            internal_log_rate_secs = 30,
         )
     }
 

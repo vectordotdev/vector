@@ -4,6 +4,7 @@ use crate::{
 };
 use colored::*;
 use exitcode::ExitCode;
+use std::collections::HashMap;
 use std::{fmt, fs::remove_dir_all, path::PathBuf};
 use structopt::StructOpt;
 
@@ -21,9 +22,34 @@ pub struct Opts {
     #[structopt(short, long)]
     deny_warnings: bool,
 
-    /// Any number of Vector config files to validate. If none are specified the
-    /// default config path `/etc/vector/vector.toml` will be targeted.
+    /// Vector config files in TOML format to validate.
+    #[structopt(name = "config-toml", long)]
+    paths_toml: Vec<PathBuf>,
+
+    /// Vector config files in JSON format to validate.
+    #[structopt(name = "config-json", long)]
+    paths_json: Vec<PathBuf>,
+
+    /// Vector config files in YAML format to validate.
+    #[structopt(name = "config-yaml", long)]
+    paths_yaml: Vec<PathBuf>,
+
+    /// Any number of Vector config files to validate.
+    /// Format is detected from the file name.
+    /// If none are specified the default config path `/etc/vector/vector.toml`
+    /// will be targeted.
     paths: Vec<PathBuf>,
+}
+
+impl Opts {
+    fn paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
+        config::merge_path_lists(vec![
+            (&self.paths, None),
+            (&self.paths_toml, Some(config::Format::TOML)),
+            (&self.paths_json, Some(config::Format::JSON)),
+            (&self.paths_yaml, Some(config::Format::YAML)),
+        ])
+    }
 }
 
 /// Performs topology, component, and health checks.
@@ -58,20 +84,22 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
 /// Err Some contains only successfully validated configs.
 fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     // Prepare paths
-    let paths = if let Some(paths) = config::process_paths(&opts.paths) {
+    let paths = opts.paths_with_formats();
+    let paths = if let Some(paths) = config::process_paths(&paths) {
         paths
     } else {
         fmt.error("No config file paths");
         return None;
     };
 
+    let paths_list: Vec<_> = paths.iter().map(|(path, _)| path).collect();
     match config::load_from_paths(&paths, opts.deny_warnings) {
         Ok(config) => {
-            fmt.success(format!("Loaded {:?}", &paths));
+            fmt.success(format!("Loaded {:?}", &paths_list));
             Some(config)
         }
         Err(errors) => {
-            fmt.title(format!("Failed to load {:?}", paths));
+            fmt.title(format!("Failed to load {:?}", &paths_list));
             fmt.sub_error(errors);
             None
         }
@@ -99,7 +127,7 @@ async fn validate_components(
         .set(config.global.log_schema.clone())
         .expect("Couldn't set schema");
 
-    match topology::builder::build_pieces(config, diff).await {
+    match topology::builder::build_pieces(config, diff, HashMap::new()).await {
         Ok(pieces) => {
             fmt.success("Component configuration");
             Some(pieces)
@@ -119,6 +147,11 @@ async fn validate_healthchecks(
     pieces: &mut Pieces,
     fmt: &mut Formatter,
 ) -> bool {
+    if config.healthchecks.enabled {
+        fmt.warning("Health checks are disabled");
+        return !opts.deny_warnings;
+    }
+
     let healthchecks = topology::take_healthchecks(diff, pieces);
     // We are running health checks in serial so it's easier for the users
     // to parse which errors/warnings/etc. belong to which healthcheck.
@@ -130,12 +163,13 @@ async fn validate_healthchecks(
         };
 
         match tokio::spawn(healthcheck).await {
-            Ok(Ok(())) => {
+            Ok(Ok(_)) => {
                 if config
                     .sinks
                     .get(&name)
                     .expect("Sink not present")
-                    .healthcheck
+                    .healthcheck()
+                    .enabled
                 {
                     fmt.success(format!("Health check `{}`", name.as_str()));
                 } else {

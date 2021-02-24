@@ -16,9 +16,9 @@ installation: _interfaces: "docker-cli": {
 		config:      "~/vector.{config_format}"
 	}
 
-	platform_name: installation.platforms.docker.name
+	platform_name: "docker"
 
-	roles: [Name=string]: {
+	role_implementations: [Name=string]: {
 		_api_port:         8383
 		_config_path:      paths.config
 		_docker_sock_path: "/var/run/docker.sock"
@@ -60,7 +60,7 @@ installation: _interfaces: "docker-cli": {
 					file:                 "\n  -v /var/log:/var/log \\"
 					docker:               "\n  -v \(_docker_sock_path):\(_docker_sock_path) \\"
 					http:                 "\n  -p 80:80 \\"
-					logplex:              "\n  -p 80:80 \\"
+					heroku_logs:          "\n  -p 80:80 \\"
 					socket:               "\n  -p 9000:9000 \\"
 					splunk_hec:           "\n  -p 8080:8080 \\"
 					statsd:               "\n  -p 8125:8125 \\"
@@ -73,7 +73,7 @@ installation: _interfaces: "docker-cli": {
 		}
 	}
 
-	roles: {
+	role_implementations: {
 		agent: {
 			title:       "Agent"
 			description: #"""
@@ -90,7 +90,7 @@ installation: _interfaces: "docker-cli": {
 
 			variables: config: sources: logs: type: "docker_logs"
 		}
-		sidecar:    roles._file_sidecar
-		aggregator: roles._vector_aggregator
+		sidecar:    role_implementations._file_sidecar
+		aggregator: role_implementations._vector_aggregator
 	}
 }

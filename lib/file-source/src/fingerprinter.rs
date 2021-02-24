@@ -2,7 +2,7 @@ use crate::{metadata_ext::PortableFileExt, FileSourceInternalEvents};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
-    fs::{self, File},
+    fs::{self, metadata, File},
     io::{self, Read, Seek, SeekFrom, Write},
     path::PathBuf,
 };
@@ -10,6 +10,7 @@ use std::{
 #[derive(Clone)]
 pub struct Fingerprinter {
     pub strategy: FingerprintStrategy,
+    pub max_line_length: usize,
     pub ignore_not_found: bool,
 }
 
@@ -20,7 +21,6 @@ pub enum FingerprintStrategy {
         ignored_header_bytes: usize,
     },
     FirstLineChecksum {
-        max_line_length: usize,
         ignored_header_bytes: usize,
     },
     DevInode,
@@ -29,7 +29,8 @@ pub enum FingerprintStrategy {
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FileFingerprint {
-    Checksum(u64),
+    #[serde(rename = "checksum")]
+    BytesChecksum(u64),
     FirstLineChecksum(u64),
     DevInode(u64, u64),
     Unknown(u64),
@@ -40,7 +41,7 @@ impl FileFingerprint {
         use FileFingerprint::*;
 
         match self {
-            Checksum(c) => *c,
+            BytesChecksum(c) => *c,
             FirstLineChecksum(c) => *c,
             DevInode(dev, ino) => {
                 let mut buf = Vec::with_capacity(std::mem::size_of_val(dev) * 2);
@@ -76,20 +77,12 @@ impl Fingerprinter {
             }
             FingerprintStrategy::Checksum {
                 ignored_header_bytes,
-                bytes,
-            } => {
-                buffer.resize(bytes, 0u8);
-                let mut fp = fs::File::open(path)?;
-                fp.seek(io::SeekFrom::Start(ignored_header_bytes as u64))?;
-                fp.read_exact(&mut buffer[..bytes])?;
-                let fingerprint = crc::crc64::checksum_ecma(&buffer[..]);
-                Ok(Checksum(fingerprint))
+                bytes: _,
             }
-            FingerprintStrategy::FirstLineChecksum {
-                max_line_length,
+            | FingerprintStrategy::FirstLineChecksum {
                 ignored_header_bytes,
             } => {
-                buffer.resize(max_line_length, 0u8);
+                buffer.resize(self.max_line_length, 0u8);
                 let mut fp = fs::File::open(path)?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
                 fingerprinter_read_until(fp, b'\n', buffer)?;
@@ -106,7 +99,14 @@ impl Fingerprinter {
         known_small_files: &mut HashSet<PathBuf>,
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
-        self.get_fingerprint_of_file(path, buffer)
+        metadata(path)
+            .and_then(|metadata| {
+                if metadata.is_dir() {
+                    Ok(None)
+                } else {
+                    self.get_fingerprint_of_file(path, buffer).map(Some)
+                }
+            })
             .map_err(|error| match error.kind() {
                 io::ErrorKind::UnexpectedEof => {
                     if !known_small_files.contains(path) {
@@ -124,6 +124,28 @@ impl Fingerprinter {
                 }
             })
             .ok()
+            .flatten()
+    }
+
+    pub fn get_bytes_checksum(
+        &self,
+        path: &PathBuf,
+        buffer: &mut Vec<u8>,
+    ) -> Result<Option<FileFingerprint>, io::Error> {
+        match self.strategy {
+            FingerprintStrategy::Checksum {
+                bytes,
+                ignored_header_bytes,
+            } => {
+                buffer.resize(bytes, 0u8);
+                let mut fp = fs::File::open(path)?;
+                fp.seek(io::SeekFrom::Start(ignored_header_bytes as u64))?;
+                fp.read_exact(&mut buffer[..bytes])?;
+                let fingerprint = crc::crc64::checksum_ecma(&buffer[..]);
+                Ok(Some(FileFingerprint::BytesChecksum(fingerprint)))
+            }
+            _ => Ok(None),
+        }
     }
 }
 
@@ -150,8 +172,8 @@ fn fingerprinter_read_until(mut r: impl Read, delim: u8, mut buf: &mut [u8]) -> 
 
 #[cfg(test)]
 mod test {
-    use super::{FingerprintStrategy, Fingerprinter};
-    use std::fs;
+    use super::{FileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
+    use std::{collections::HashSet, fs, io::Error, path::Path, time::Duration};
     use tempfile::tempdir;
 
     #[test]
@@ -161,34 +183,36 @@ mod test {
                 bytes: 256,
                 ignored_header_bytes: 0,
             },
+            max_line_length: 1024,
             ignore_not_found: false,
         };
 
         let target_dir = tempdir().unwrap();
-        let enough_data = vec![b'x'; 256];
-        let not_enough_data = vec![b'x'; 199];
+        let mut full_line_data = vec![b'x'; 256];
+        full_line_data.push(b'\n');
+        let not_full_line_data = vec![b'x'; 199];
         let empty_path = target_dir.path().join("empty.log");
-        let big_enough_path = target_dir.path().join("big_enough.log");
+        let full_line_path = target_dir.path().join("full_line.log");
         let duplicate_path = target_dir.path().join("duplicate.log");
-        let not_big_enough_path = target_dir.path().join("not_big_enough.log");
+        let not_full_line_path = target_dir.path().join("not_full_line.log");
         fs::write(&empty_path, &[]).unwrap();
-        fs::write(&big_enough_path, &enough_data).unwrap();
-        fs::write(&duplicate_path, &enough_data).unwrap();
-        fs::write(&not_big_enough_path, &not_enough_data).unwrap();
+        fs::write(&full_line_path, &full_line_data).unwrap();
+        fs::write(&duplicate_path, &full_line_data).unwrap();
+        fs::write(&not_full_line_path, &not_full_line_data).unwrap();
 
         let mut buf = Vec::new();
         assert!(fingerprinter
             .get_fingerprint_of_file(&empty_path, &mut buf)
             .is_err());
         assert!(fingerprinter
-            .get_fingerprint_of_file(&big_enough_path, &mut buf)
+            .get_fingerprint_of_file(&full_line_path, &mut buf)
             .is_ok());
         assert!(fingerprinter
-            .get_fingerprint_of_file(&not_big_enough_path, &mut buf)
+            .get_fingerprint_of_file(&not_full_line_path, &mut buf)
             .is_err());
         assert_eq!(
             fingerprinter
-                .get_fingerprint_of_file(&big_enough_path, &mut buf)
+                .get_fingerprint_of_file(&full_line_path, &mut buf)
                 .unwrap(),
             fingerprinter
                 .get_fingerprint_of_file(&duplicate_path, &mut buf)
@@ -201,9 +225,9 @@ mod test {
         let max_line_length = 64;
         let fingerprinter = Fingerprinter {
             strategy: FingerprintStrategy::FirstLineChecksum {
-                max_line_length,
                 ignored_header_bytes: 0,
             },
+            max_line_length,
             ignore_not_found: false,
         };
 
@@ -273,6 +297,7 @@ mod test {
     fn test_inode_fingerprint() {
         let fingerprinter = Fingerprinter {
             strategy: FingerprintStrategy::DevInode,
+            max_line_length: 42,
             ignore_not_found: false,
         };
 
@@ -303,5 +328,68 @@ mod test {
                 .get_fingerprint_of_file(&duplicate_path, &mut buf)
                 .unwrap()
         );
+    }
+
+    #[test]
+    fn no_error_on_dir() {
+        let target_dir = tempdir().unwrap();
+        let fingerprinter = Fingerprinter {
+            strategy: FingerprintStrategy::Checksum {
+                bytes: 256,
+                ignored_header_bytes: 0,
+            },
+            max_line_length: 1024,
+            ignore_not_found: false,
+        };
+
+        let mut buf = Vec::new();
+        let mut small_files = HashSet::new();
+        assert!(fingerprinter
+            .get_fingerprint_or_log_error(
+                &target_dir.path().to_owned(),
+                &mut buf,
+                &mut small_files,
+                &NoErrors
+            )
+            .is_none());
+    }
+
+    #[derive(Clone)]
+    struct NoErrors;
+
+    impl FileSourceInternalEvents for NoErrors {
+        fn emit_file_added(&self, _: &Path) {}
+
+        fn emit_file_resumed(&self, _: &Path, _: u64) {}
+
+        fn emit_file_watch_failed(&self, _: &Path, _: Error) {
+            panic!();
+        }
+
+        fn emit_file_unwatched(&self, _: &Path) {}
+
+        fn emit_file_deleted(&self, _: &Path) {}
+
+        fn emit_file_delete_failed(&self, _: &Path, _: Error) {
+            panic!();
+        }
+
+        fn emit_file_fingerprint_read_failed(&self, _: &Path, _: Error) {
+            panic!();
+        }
+
+        fn emit_file_checkpointed(&self, _: usize, _: Duration) {}
+
+        fn emit_file_checksum_failed(&self, _: &Path) {
+            panic!();
+        }
+
+        fn emit_file_checkpoint_write_failed(&self, _: Error) {
+            panic!();
+        }
+
+        fn emit_files_open(&self, _: usize) {}
+
+        fn emit_path_globbing_failed(&self, _: &Path, _: &Error) {}
     }
 }

@@ -11,10 +11,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{
-    compat::Sink01CompatExt, future::join_all, stream, SinkExt, StreamExt, TryFutureExt,
-};
-use futures01::Sink;
+use futures::{future::join_all, stream, SinkExt, StreamExt, TryFutureExt};
 use http::{Request, StatusCode};
 use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
 use serde::{Deserialize, Serialize};
@@ -103,9 +100,8 @@ impl SourceConfig for NginxMetricsConfig {
             )?);
         }
 
-        let mut out = out
-            .sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error))
-            .sink_compat();
+        let mut out =
+            out.sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         Ok(Box::pin(async move {
@@ -225,14 +221,10 @@ impl NginxMetrics {
     }
 
     fn create_metric(&self, name: &str, value: MetricValue) -> Metric {
-        Metric {
-            name: name.into(),
-            namespace: self.namespace.clone(),
-            timestamp: Some(Utc::now()),
-            tags: Some(self.tags.clone()),
-            kind: MetricKind::Absolute,
-            value,
-        }
+        Metric::new(name, MetricKind::Absolute, value)
+            .with_namespace(self.namespace.clone())
+            .with_tags(Some(self.tags.clone()))
+            .with_timestamp(Some(Utc::now()))
     }
 }
 
@@ -250,13 +242,11 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
-    use futures::compat::Stream01CompatExt;
 
     async fn test_nginx(endpoint: &'static str, auth: Option<Auth>) {
         trace_init();
 
-        let (sender, recv) = Pipeline::new_test();
-        let mut recv = recv.compat();
+        let (sender, mut recv) = Pipeline::new_test();
 
         tokio::spawn(async move {
             NginxMetricsConfig {

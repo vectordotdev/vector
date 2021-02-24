@@ -257,7 +257,7 @@ config/vector.toml
 ```
 
 Example configurations are located in `config/vector/examples/*`. You can learn more about configuring
-Vector in the [Configuration][docs.configuration] section.
+Vector in the [Configuration][docs.setup.configuration] section.
 
 ### Data Directory
 
@@ -305,7 +305,7 @@ cp -av etc/systemd/vector.service /etc/systemd/system
 
 Simply follow the same [installation instructions above](#installation).
 
-[docs.configuration]: /docs/setup/configuration/
+[docs.setup.configuration]: /docs/setup/configuration/
 [docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
 [docs.package_managers]: /docs/setup/installation/package-managers/
 [docs.platforms]: /docs/setup/installation/platforms/

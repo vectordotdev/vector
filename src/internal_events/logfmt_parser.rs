@@ -2,19 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct LogfmtParserEventProcessed;
-
-impl InternalEvent for LogfmtParserEventProcessed {
-    fn emit_logs(&self) {
-        trace!(message = "Processed one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct LogfmtParserMissingField<'a> {
     pub field: &'a str,
 }
@@ -43,7 +30,7 @@ impl<'a> InternalEvent for LogfmtParserConversionFailed<'a> {
             message = "Could not convert types.",
             name = %self.name,
             error = ?self.error,
-            rate_limit_secs = 30
+            internal_log_rate_secs = 30
         );
     }
 

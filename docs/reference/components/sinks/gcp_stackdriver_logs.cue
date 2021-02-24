@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: gcp_stackdriver_logs: {
-	title:       "GCP Stackdriver Logs"
-	description: "[Stackdriver][urls.gcp_stackdriver] is Google Cloud's embedded observability suite designed to monitor, troubleshoot, and improve cloud infrastructure, software and application performance. Stackdriver enables you to efficiently build and run workloads, keeping applications available and performing well."
+	title: "GCP Operations (formerly Stackdrive) Logs"
 
 	classes: {
 		commonly_used: true
@@ -10,6 +9,7 @@ components: sinks: gcp_stackdriver_logs: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["GCP"]
+		stateful: false
 	}
 
 	features: {
@@ -36,6 +36,7 @@ components: sinks: gcp_stackdriver_logs: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
 			tls: {
 				enabled:                true
@@ -45,12 +46,7 @@ components: sinks: gcp_stackdriver_logs: {
 				enabled_default:        false
 			}
 			to: {
-				service: {
-					name:     "GCP Operations (formerly Stackdriver) logs"
-					thing:    "a \(name) account"
-					url:      urls.gcp_stackdriver_logging
-					versions: null
-				}
+				service: services.gcp_operations_logs
 
 				interface: {
 					socket: {
@@ -68,15 +64,16 @@ components: sinks: gcp_stackdriver_logs: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -91,6 +88,7 @@ components: sinks: gcp_stackdriver_logs: {
 			type: string: {
 				default: null
 				examples: ["012345-6789AB-CDEF01"]
+				syntax: "literal"
 			}
 		}
 		credentials_path: {
@@ -101,6 +99,7 @@ components: sinks: gcp_stackdriver_logs: {
 			type: string: {
 				default: null
 				examples: ["/path/to/credentials.json"]
+				syntax: "literal"
 			}
 		}
 		folder_id: {
@@ -111,6 +110,7 @@ components: sinks: gcp_stackdriver_logs: {
 			type: string: {
 				default: null
 				examples: ["My Folder"]
+				syntax: "literal"
 			}
 		}
 		log_id: {
@@ -119,6 +119,7 @@ components: sinks: gcp_stackdriver_logs: {
 			warnings: []
 			type: string: {
 				examples: ["vector-logs"]
+				syntax: "literal"
 			}
 		}
 		organization_id: {
@@ -129,6 +130,7 @@ components: sinks: gcp_stackdriver_logs: {
 			type: string: {
 				default: null
 				examples: ["622418129737"]
+				syntax: "literal"
 			}
 		}
 		project_id: {
@@ -137,12 +139,12 @@ components: sinks: gcp_stackdriver_logs: {
 			warnings: []
 			type: string: {
 				examples: ["vector-123456"]
+				syntax: "literal"
 			}
 		}
 		resource: {
-			common:      false
 			description: "Options for describing the logging resource."
-			required:    false
+			required:    true
 			warnings: []
 			type: object: {
 				examples: [
@@ -160,6 +162,7 @@ components: sinks: gcp_stackdriver_logs: {
 						warnings: []
 						type: string: {
 							examples: ["global", "gce_instance"]
+							syntax: "literal"
 						}
 					}
 					"*": {
@@ -170,6 +173,7 @@ components: sinks: gcp_stackdriver_logs: {
 						type: string: {
 							default: null
 							examples: ["vector-123456", "Twilight"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -183,6 +187,7 @@ components: sinks: gcp_stackdriver_logs: {
 			type: string: {
 				default: null
 				examples: ["severity"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -220,4 +225,18 @@ components: sinks: gcp_stackdriver_logs: {
 				"""#
 		}
 	}
+
+	permissions: iam: [
+		{
+			platform: "gcp"
+			_service: "logging"
+
+			policies: [
+				{
+					_action: "logEntries.create"
+					required_for: ["healthcheck", "write"]
+				},
+			]
+		},
+	]
 }

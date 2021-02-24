@@ -1,12 +1,15 @@
 use crate::{
-    event::metric::{Metric, MetricKind, MetricValue},
+    event::metric::{Metric, MetricKind, MetricValue, Sample},
     sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
     Event,
 };
 use std::{
     cmp::Ordering,
-    collections::{hash_map::DefaultHasher, HashSet},
+    collections::HashSet,
     hash::{Hash, Hasher},
+    marker::PhantomData,
+    mem::discriminant,
+    ops::{Deref, DerefMut},
 };
 
 #[derive(Clone, Debug)]
@@ -17,27 +20,19 @@ impl Eq for MetricEntry {}
 impl Hash for MetricEntry {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let metric = &self.0;
-        std::mem::discriminant(&metric.value).hash(state);
-        metric.name.hash(state);
-        metric.kind.hash(state);
+        metric.series.hash(state);
+        metric.data.kind.hash(state);
+        discriminant(&metric.data.value).hash(state);
 
-        if let Some(tags) = &metric.tags {
-            let mut tags: Vec<_> = tags.iter().collect();
-            tags.sort();
-            for tag in tags {
-                tag.hash(state);
-            }
-        }
-
-        match &metric.value {
+        match &metric.data.value {
             MetricValue::AggregatedHistogram { buckets, .. } => {
                 for bucket in buckets {
-                    bucket.to_bits().hash(state);
+                    bucket.upper_limit.to_bits().hash(state);
                 }
             }
             MetricValue::AggregatedSummary { quantiles, .. } => {
                 for quantile in quantiles {
-                    quantile.to_bits().hash(state);
+                    quantile.upper_limit.to_bits().hash(state);
                 }
             }
             _ => {}
@@ -47,74 +42,91 @@ impl Hash for MetricEntry {
 
 impl PartialEq for MetricEntry {
     fn eq(&self, other: &Self) -> bool {
-        let mut state = DefaultHasher::new();
-        self.hash(&mut state);
-        let hash1 = state.finish();
-
-        let mut state = DefaultHasher::new();
-        other.hash(&mut state);
-        let hash2 = state.finish();
-
-        hash1 == hash2
+        // This differs from a straightforward implementation of `eq` by
+        // comparing only the "shape" bits (name, tags, and type) while
+        // allowing the contained values to be different.
+        self.series == other.series
+            && self.data.kind == other.data.kind
+            && discriminant(&self.data.value) == discriminant(&other.data.value)
+            && match (&self.data.value, &other.data.value) {
+                (
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets1, ..
+                    },
+                    MetricValue::AggregatedHistogram {
+                        buckets: buckets2, ..
+                    },
+                ) => {
+                    buckets1.len() == buckets2.len()
+                        && buckets1
+                            .iter()
+                            .zip(buckets2.iter())
+                            .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                }
+                (
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles1,
+                        ..
+                    },
+                    MetricValue::AggregatedSummary {
+                        quantiles: quantiles2,
+                        ..
+                    },
+                ) => {
+                    quantiles1.len() == quantiles2.len()
+                        && quantiles1
+                            .iter()
+                            .zip(quantiles2.iter())
+                            .all(|(q1, q2)| q1.upper_limit == q2.upper_limit)
+                }
+                _ => true,
+            }
     }
 }
 
-#[derive(Clone, PartialEq)]
-pub struct MetricBuffer {
-    state: HashSet<MetricEntry>,
-    metrics: HashSet<MetricEntry>,
+impl Deref for MetricEntry {
+    type Target = Metric;
+    fn deref(&self) -> &Metric {
+        &self.0
+    }
+}
+
+impl DerefMut for MetricEntry {
+    fn deref_mut(&mut self) -> &mut Metric {
+        &mut self.0
+    }
+}
+
+/// The metrics buffer is a data structure for collecting a flow of data
+/// points into a batch.
+///
+/// Batching mostly means that we will aggregate away timestamp
+/// information, and apply metric-specific compression to improve the
+/// performance of the pipeline. In particular, only the latest in a
+/// series of metrics are output, and incremental metrics are summed
+/// into the output buffer. Any conversion of metrics is handled by the
+/// normalization type `N: MetricNormalize`. Further, distribution
+/// metrics have their their samples compressed with
+/// `compress_distribution` below.
+pub struct MetricsBuffer {
+    metrics: MetricSet,
     max_events: usize,
 }
 
-impl MetricBuffer {
-    // Metric buffer is a data structure for creating normalised
-    // batched metrics data from the flow of data points.
-    //
-    // Batching mostly means that we will aggregate away timestamp information, and
-    // apply metric-specific compression to improve the performance of the pipeline.
-    // For example, multiple counter observations will be summed up into single observation.
-    //
-    // Normalisation is required to make sure Sources and Sinks are exchanging compatible data
-    // structures. For instance, delta gauges produced by Statsd source cannot be directly
-    // sent to Datadog API. In this case the buffer will keep the state of a gauge value, and
-    // produce absolute values gauges that are well supported by Datadog.
-    //
-    // Another example of normalisation is disaggregation of counters. Most sinks would expect we send
-    // them delta counters (e.g. how many events occurred during the flush period). And most sources are
-    // producing exactly these kind of counters, with Prometheus being a notable exception. If the counter
-    // comes already aggregated inside the source, the buffer will compare it's values with the previous
-    // known and calculate the delta.
-    //
-    // This table will summarise how metrics are transforming inside the buffer:
-    //
-    // Normalised and accumulated metrics
-    //   Counter                      => Counter
-    //   Absolute Counter             => Counter
-    //   Gauge                        => Absolute Gauge
-    //   Distribution                 => Distribution
-    //   Set                          => Set
-    //
-    // Deduplicated metrics
-    //   Absolute Gauge               => Absolute Gauge
-    //   AggregatedHistogram          => AggregatedHistogram
-    //   AggregatedSummary            => AggregatedSummary
-    //   Absolute AggregatedHistogram => Absolute AggregatedHistogram
-    //   Absolute AggregatedSummary   => Absolute AggregatedSummary
-    //
+impl MetricsBuffer {
     pub fn new(settings: BatchSize<Self>) -> Self {
-        Self::new_with_state(settings.events, HashSet::new())
+        Self::with_capacity(settings.events)
     }
 
-    fn new_with_state(max_events: usize, state: HashSet<MetricEntry>) -> Self {
+    fn with_capacity(max_events: usize) -> Self {
         Self {
-            state,
-            metrics: HashSet::with_capacity(max_events),
+            metrics: MetricSet::with_capacity(max_events),
             max_events,
         }
     }
 }
 
-impl Batch for MetricBuffer {
+impl Batch for MetricsBuffer {
     type Input = Event;
     type Output = Vec<Metric>;
 
@@ -133,80 +145,21 @@ impl Batch for MetricBuffer {
             PushResult::Overflow(item)
         } else {
             let item = item.into_metric();
-
-            match &item.value {
-                MetricValue::Counter { value } if item.kind.is_absolute() => {
-                    let new = MetricEntry(item.clone());
-                    if let Some(MetricEntry(Metric {
-                        value: MetricValue::Counter { value: value0, .. },
-                        ..
-                    })) = self.state.get(&new)
-                    {
-                        // Counters are disaggregated. We take the previous value from the state
-                        // and emit the difference between previous and current as a Counter
-                        let delta = MetricEntry(Metric {
-                            name: item.name.to_string(),
-                            namespace: item.namespace.clone(),
-                            timestamp: item.timestamp,
-                            tags: item.tags.clone(),
-                            kind: MetricKind::Incremental,
-                            value: MetricValue::Counter {
-                                value: value - value0,
-                            },
-                        });
-
-                        // The resulting Counters could be added up normally
-                        if let Some(MetricEntry(mut existing)) = self.metrics.take(&delta) {
-                            existing.add(&item);
-                            self.metrics.insert(MetricEntry(existing));
-                        } else {
-                            self.metrics.insert(delta);
-                        }
-                        self.state.replace(new);
-                    } else {
-                        self.state.insert(new);
-                    }
+            let new_entry = match item.data.kind {
+                MetricKind::Absolute => MetricEntry(item),
+                MetricKind::Incremental => {
+                    // Incremental metrics update existing entries, if present
+                    let entry = MetricEntry(item);
+                    self.metrics
+                        .take(&entry)
+                        .map(|mut existing| {
+                            existing.data.update(&entry.data);
+                            existing
+                        })
+                        .unwrap_or(entry)
                 }
-                MetricValue::Gauge { .. } if item.kind.is_incremental() => {
-                    let new = MetricEntry(item.to_absolute());
-                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                        existing.add(&item);
-                        self.metrics.insert(MetricEntry(existing));
-                    } else {
-                        // If the metric is not present in active batch,
-                        // then we look it up in permanent state, where we keep track
-                        // of its values throughout the entire application uptime
-                        let mut initial = if let Some(default) = self.state.get(&new) {
-                            default.0.clone()
-                        } else {
-                            // Otherwise we start from zero value
-                            Metric {
-                                name: item.name.to_string(),
-                                namespace: item.namespace.clone(),
-                                timestamp: item.timestamp,
-                                tags: item.tags.clone(),
-                                kind: MetricKind::Absolute,
-                                value: MetricValue::Gauge { value: 0.0 },
-                            }
-                        };
-                        initial.add(&item);
-                        self.metrics.insert(MetricEntry(initial));
-                    }
-                }
-                _metric if item.kind.is_absolute() => {
-                    let new = MetricEntry(item);
-                    self.metrics.replace(new);
-                }
-                _ => {
-                    let new = MetricEntry(item.clone());
-                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                        existing.add(&item);
-                        self.metrics.insert(MetricEntry(existing));
-                    } else {
-                        self.metrics.insert(new);
-                    }
-                }
-            }
+            };
+            self.metrics.replace(new_entry);
             PushResult::Ok(self.num_items() >= self.max_events)
         }
     }
@@ -216,39 +169,11 @@ impl Batch for MetricBuffer {
     }
 
     fn fresh(&self) -> Self {
-        let mut state = self.state.clone();
-        for entry in self.metrics.iter() {
-            if (entry.0.value.is_gauge() || entry.0.value.is_counter())
-                && entry.0.kind.is_absolute()
-            {
-                state.replace(entry.clone());
-            }
-        }
-
-        Self::new_with_state(self.max_events, state)
+        Self::with_capacity(self.max_events)
     }
 
     fn finish(self) -> Self::Output {
-        self.metrics
-            .into_iter()
-            .map(|e| {
-                let mut metric = e.0;
-                if let MetricValue::Distribution {
-                    values,
-                    sample_rates,
-                    statistic,
-                } = metric.value
-                {
-                    let compressed = compress_distribution(values, sample_rates);
-                    metric.value = MetricValue::Distribution {
-                        values: compressed.0,
-                        sample_rates: compressed.1,
-                        statistic,
-                    };
-                };
-                metric
-            })
-            .collect()
+        self.metrics.0.into_iter().map(finish_metric).collect()
     }
 
     fn num_items(&self) -> usize {
@@ -256,50 +181,188 @@ impl Batch for MetricBuffer {
     }
 }
 
-fn compress_distribution(values: Vec<f64>, sample_rates: Vec<u32>) -> (Vec<f64>, Vec<u32>) {
-    if values.is_empty() || sample_rates.is_empty() {
-        return (Vec::new(), Vec::new());
-    }
+/// This is a simple wrapper for using `MetricNormalize` with a
+/// persistent `MetricSet` state, to be used in sinks in `with_flat_map`
+/// before sending the events to the `MetricsBuffer`
+pub struct MetricNormalizer<N> {
+    state: MetricSet,
+    _norm: PhantomData<N>,
+}
 
-    let mut pairs: Vec<_> = values.into_iter().zip(sample_rates.into_iter()).collect();
-    pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
-
-    let mut prev_value = pairs[0].0;
-    let mut acc = 0;
-    let mut values = vec![];
-    let mut sample_rates = vec![];
-
-    for (v, c) in pairs {
-        if v == prev_value {
-            acc += c;
-        } else {
-            values.push(prev_value);
-            sample_rates.push(acc);
-            prev_value = v;
-            acc = c;
+impl<N: MetricNormalize> MetricNormalizer<N> {
+    pub fn default() -> Self {
+        Self {
+            state: MetricSet::default(),
+            _norm: PhantomData::default(),
         }
     }
-    values.push(prev_value);
-    sample_rates.push(acc);
 
-    (values, sample_rates)
+    /// This wraps `MetricNormalize::apply_state`, converting to/from
+    /// the `Event` type wrapper. See that function for return values.
+    pub fn apply(&mut self, event: Event) -> Option<Event> {
+        N::apply_state(&mut self.state, event.into_metric()).map(Into::into)
+    }
+}
+
+/// The metrics state trait abstracts how data point normalization is
+/// done. Normalisation is required to make sure Sources and Sinks are
+/// exchanging compatible data structures. For instance, delta gauges
+/// produced by Statsd source cannot be directly sent to Datadog API. In
+/// this case the buffer will keep the state of a gauge value, and
+/// produce absolute values gauges that are well supported by Datadog.
+///
+/// Another example of normalisation is disaggregation of counters. Most
+/// sinks would expect we send them delta counters (e.g. how many events
+/// occurred during the flush period). And most sources are producing
+/// exactly these kind of counters, with Prometheus being a notable
+/// exception. If the counter comes already aggregated inside the
+/// source, the buffer will compare it's values with the previous known
+/// and calculate the delta.
+pub trait MetricNormalize {
+    /// Apply normalizes the given `metric` using `state` to save any
+    /// persistent data between calls. The return value is `None` if the
+    /// incoming metric is only used to set a reference state, and
+    /// `Some(metric)` otherwise.
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric>;
+}
+
+/// This is a convenience newtype wrapper for HashSet<MetricEntry> that
+/// provides some extra functionality.
+#[derive(Clone, Default)]
+pub struct MetricSet(HashSet<MetricEntry>);
+
+impl Deref for MetricSet {
+    type Target = HashSet<MetricEntry>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for MetricSet {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl MetricSet {
+    fn with_capacity(capacity: usize) -> Self {
+        Self(HashSet::with_capacity(capacity))
+    }
+
+    /// Either pass the metric through as-is if absolute, or convert it
+    /// to absolute if incremental.
+    pub fn make_absolute(&mut self, metric: Metric) -> Option<Metric> {
+        match metric.data.kind {
+            MetricKind::Absolute => Some(metric),
+            MetricKind::Incremental => Some(self.incremental_to_absolute(metric)),
+        }
+    }
+
+    /// Either convert the metric to incremental if absolute, or
+    /// aggregate it with any previous value if already incremental.
+    pub fn make_incremental(&mut self, metric: Metric) -> Option<Metric> {
+        match metric.data.kind {
+            MetricKind::Absolute => self.absolute_to_incremental(metric),
+            MetricKind::Incremental => Some(metric),
+        }
+    }
+
+    /// Convert the incremental metric into an absolute one, using the
+    /// state buffer to keep track of the value throughout the entire
+    /// application uptime.
+    fn incremental_to_absolute(&mut self, metric: Metric) -> Metric {
+        let mut entry = MetricEntry(metric.into_absolute());
+        let mut existing = self.0.take(&entry).unwrap_or_else(|| {
+            // Start from zero value if the entry is not found.
+            MetricEntry(entry.zero())
+        });
+        existing.data.value.add(&entry.data.value);
+        entry.data.value = existing.data.value.clone();
+        self.0.insert(existing);
+        entry.0
+    }
+
+    /// Convert the absolute metric into an incremental by calculating
+    /// the increment from the last saved absolute state.
+    fn absolute_to_incremental(&mut self, metric: Metric) -> Option<Metric> {
+        let mut entry = MetricEntry(metric);
+        match self.0.take(&entry) {
+            Some(mut reference) => {
+                let new_value = entry.data.value.clone();
+                // From the stored reference value, emit an increment
+                entry.data.value.subtract(&reference.data.value);
+                reference.data.value = new_value;
+                self.0.insert(reference);
+                Some(entry.0.into_incremental())
+            }
+            None => {
+                // No reference so store this and emit nothing
+                self.0.insert(entry);
+                None
+            }
+        }
+    }
+}
+
+fn finish_metric(metric: MetricEntry) -> Metric {
+    let mut metric = metric.0;
+    if let MetricValue::Distribution { samples, statistic } = metric.data.value {
+        let samples = compress_distribution(samples);
+        metric.data.value = MetricValue::Distribution { samples, statistic };
+    }
+    metric
+}
+
+fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {
+    if samples.is_empty() {
+        return Vec::new();
+    }
+
+    samples.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap_or(Ordering::Equal));
+
+    let mut acc = Sample {
+        value: samples[0].value,
+        rate: 0,
+    };
+    let mut result = Vec::new();
+
+    for sample in samples {
+        if acc.value == sample.value {
+            acc.rate += sample.rate;
+        } else {
+            result.push(acc);
+            acc = sample;
+        }
+    }
+    result.push(acc);
+
+    result
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        buffers::Acker,
-        event::metric::{MetricValue, StatisticKind},
-        sinks::util::BatchSink,
-    };
-    use futures::{future, stream, Sink, SinkExt, StreamExt};
+    use crate::event::metric::{MetricKind::*, MetricValue, StatisticKind};
     use pretty_assertions::assert_eq;
-    use std::{
-        collections::BTreeMap,
-        sync::{Arc, Mutex},
-    };
-    use tokio::time::Duration;
+    use std::collections::BTreeMap;
+
+    type Buffer = Vec<Vec<Metric>>;
+
+    struct AbsoluteMetricNormalize;
+
+    impl MetricNormalize for AbsoluteMetricNormalize {
+        fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+            state.make_absolute(metric)
+        }
+    }
+
+    struct IncrementalMetricNormalize;
+
+    impl MetricNormalize for IncrementalMetricNormalize {
+        fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+            state.make_incremental(metric)
+        }
+    }
 
     fn tag(name: &str) -> BTreeMap<String, String> {
         vec![(name.to_owned(), "true".to_owned())]
@@ -307,856 +370,580 @@ mod test {
             .collect()
     }
 
-    fn sorted(buffer: &[Metric]) -> Vec<Metric> {
-        let mut buffer = buffer.to_owned();
-        buffer.sort_by_key(|k| format!("{:?}", k));
-        buffer
-    }
-
-    fn sink() -> (
-        impl Sink<Event, Error = crate::Error>,
-        Arc<Mutex<Vec<Vec<Metric>>>>,
-    ) {
-        let (acker, _) = Acker::new_for_testing();
-        let sent_requests = Arc::new(Mutex::new(Vec::new()));
-        let sent_requests1 = Arc::clone(&sent_requests);
-
-        let svc = tower::service_fn(move |req| {
-            let sent_requests = Arc::clone(&sent_requests1);
-            sent_requests.lock().unwrap().push(req);
-            future::ok::<_, std::io::Error>(())
-        });
+    fn rebuffer<State: MetricNormalize>(metrics: Vec<Metric>) -> Buffer {
         let batch_size = BatchSettings::default().bytes(9999).events(6).size;
-        let buffered = BatchSink::new(
-            svc,
-            MetricBuffer::new(batch_size),
-            Duration::from_secs(0),
-            acker,
-        );
+        let mut normalizer = MetricNormalizer::<State>::default();
+        let mut buffer = MetricsBuffer::new(batch_size);
+        let mut result = vec![];
 
-        (buffered, sent_requests)
-    }
-
-    #[tokio::test]
-    async fn metric_buffer_counters() {
-        let (sink, sent_batches) = sink();
-
-        let mut events = Vec::new();
-        for i in 0..4 {
-            let event = Event::Metric(Metric {
-                name: "counter-0".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: i as f64 },
-            });
-            events.push(event);
-        }
-
-        for i in 0..4 {
-            let event = Event::Metric(Metric {
-                name: format!("counter-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("staging")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: i as f64 },
-            });
-            events.push(event);
-        }
-
-        for i in 0..4 {
-            let event = Event::Metric(Metric {
-                name: format!("counter-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: i as f64 },
-            });
-            events.push(event);
-        }
-
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
-
-        assert_eq!(buffer.len(), 2);
-        assert_eq!(buffer[0].len(), 6);
-        assert_eq!(buffer[1].len(), 2);
-
-        assert_eq!(
-            sorted(&buffer[0].clone()),
-            [
-                Metric {
-                    name: "counter-0".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 6.0 }
-                },
-                Metric {
-                    name: "counter-0".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 0.0 },
-                },
-                Metric {
-                    name: "counter-1".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 1.0 },
-                },
-                Metric {
-                    name: "counter-1".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 1.0 },
-                },
-                Metric {
-                    name: "counter-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 2.0 },
-                },
-                Metric {
-                    name: "counter-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 3.0 },
-                },
-            ]
-        );
-
-        assert_eq!(
-            sorted(&buffer[1].clone()),
-            [
-                Metric {
-                    name: "counter-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 2.0 },
-                },
-                Metric {
-                    name: "counter-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 3.0 },
-                },
-            ]
-        );
-    }
-
-    #[tokio::test]
-    async fn metric_buffer_aggregated_counters() {
-        let (sink, sent_batches) = sink();
-
-        let mut events = Vec::new();
-        for i in 0..4 {
-            let event = Event::Metric(Metric {
-                name: format!("counter-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter { value: i as f64 },
-            });
-            events.push(event);
-        }
-
-        for i in 0..4 {
-            let event = Event::Metric(Metric {
-                name: format!("counter-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Counter {
-                    value: i as f64 * 3.0,
-                },
-            });
-            events.push(event);
-        }
-
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
-
-        assert_eq!(buffer.len(), 1);
-        assert_eq!(buffer[0].len(), 4);
-
-        assert_eq!(
-            sorted(&buffer[0].clone()),
-            [
-                Metric {
-                    name: "counter-0".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 0.0 },
-                },
-                Metric {
-                    name: "counter-1".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 2.0 },
-                },
-                Metric {
-                    name: "counter-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 4.0 },
-                },
-                Metric {
-                    name: "counter-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 6.0 },
-                },
-            ]
-        );
-    }
-
-    #[tokio::test]
-    async fn metric_buffer_gauges() {
-        let (sink, sent_batches) = sink();
-
-        let mut events = Vec::new();
-        for i in 1..5 {
-            let event = Event::Metric(Metric {
-                name: format!("gauge-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("staging")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Gauge { value: i as f64 },
-            });
-            events.push(event);
-        }
-
-        for i in 1..5 {
-            let event = Event::Metric(Metric {
-                name: format!("gauge-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("staging")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Gauge { value: i as f64 },
-            });
-            events.push(event);
-        }
-
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
-
-        assert_eq!(buffer.len(), 1);
-        assert_eq!(buffer[0].len(), 4);
-
-        assert_eq!(
-            sorted(&buffer[0].clone()),
-            [
-                Metric {
-                    name: "gauge-1".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 2.0 },
-                },
-                Metric {
-                    name: "gauge-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 4.0 },
-                },
-                Metric {
-                    name: "gauge-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 6.0 },
-                },
-                Metric {
-                    name: "gauge-4".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 8.0 },
-                },
-            ]
-        );
-    }
-
-    #[tokio::test]
-    async fn metric_buffer_aggregated_gauges() {
-        let (sink, sent_batches) = sink();
-
-        let mut events = Vec::new();
-        for i in 3..6 {
-            let event = Event::Metric(Metric {
-                name: format!("gauge-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("staging")),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge {
-                    value: i as f64 * 10.0,
-                },
-            });
-            events.push(event);
-        }
-
-        for i in 1..4 {
-            let event = Event::Metric(Metric {
-                name: format!("gauge-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("staging")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Gauge { value: i as f64 },
-            });
-            events.push(event);
-        }
-
-        for i in 2..5 {
-            let event = Event::Metric(Metric {
-                name: format!("gauge-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("staging")),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge {
-                    value: i as f64 * 2.0,
-                },
-            });
-            events.push(event);
-        }
-
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
-
-        assert_eq!(buffer.len(), 1);
-        assert_eq!(buffer[0].len(), 5);
-
-        assert_eq!(
-            sorted(&buffer[0].clone()),
-            [
-                Metric {
-                    name: "gauge-1".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 1.0 },
-                },
-                Metric {
-                    name: "gauge-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 4.0 },
-                },
-                Metric {
-                    name: "gauge-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 6.0 },
-                },
-                Metric {
-                    name: "gauge-4".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 8.0 },
-                },
-                Metric {
-                    name: "gauge-5".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("staging")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: 50.0 },
-                },
-            ]
-        );
-    }
-
-    #[tokio::test]
-    async fn metric_buffer_sets() {
-        let (sink, sent_batches) = sink();
-
-        let mut events = Vec::new();
-        for i in 0..4 {
-            let event = Event::Metric(Metric {
-                name: "set-0".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Set {
-                    values: vec![format!("{}", i)].into_iter().collect(),
-                },
-            });
-            events.push(event);
-        }
-
-        for i in 0..4 {
-            let event = Event::Metric(Metric {
-                name: "set-0".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Set {
-                    values: vec![format!("{}", i)].into_iter().collect(),
-                },
-            });
-            events.push(event);
-        }
-
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
-
-        assert_eq!(buffer.len(), 1);
-
-        assert_eq!(
-            sorted(&buffer[0].clone()),
-            [Metric {
-                name: "set-0".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Set {
-                    values: vec!["0".into(), "1".into(), "2".into(), "3".into()]
-                        .into_iter()
-                        .collect(),
-                },
-            },]
-        );
-    }
-
-    #[tokio::test]
-    async fn metric_buffer_distributions() {
-        let (sink, sent_batches) = sink();
-
-        let mut events = Vec::new();
-        for _ in 2..6 {
-            let event = Event::Metric(Metric {
-                name: "dist-2".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
-                    values: vec![2.0],
-                    sample_rates: vec![10],
-                    statistic: StatisticKind::Histogram,
-                },
-            });
-            events.push(event);
-        }
-
-        for i in 2..6 {
-            let event = Event::Metric(Metric {
-                name: format!("dist-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
-                    values: vec![i as f64],
-                    sample_rates: vec![10],
-                    statistic: StatisticKind::Histogram,
-                },
-            });
-            events.push(event);
-        }
-
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
-
-        assert_eq!(buffer.len(), 1);
-
-        assert_eq!(
-            sorted(&buffer[0].clone()),
-            [
-                Metric {
-                    name: "dist-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Distribution {
-                        values: vec![2.0],
-                        sample_rates: vec![50],
-                        statistic: StatisticKind::Histogram
-                    },
-                },
-                Metric {
-                    name: "dist-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Distribution {
-                        values: vec![3.0],
-                        sample_rates: vec![10],
-                        statistic: StatisticKind::Histogram
-                    },
-                },
-                Metric {
-                    name: "dist-4".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Distribution {
-                        values: vec![4.0],
-                        sample_rates: vec![10],
-                        statistic: StatisticKind::Histogram
-                    },
-                },
-                Metric {
-                    name: "dist-5".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Distribution {
-                        values: vec![5.0],
-                        sample_rates: vec![10],
-                        statistic: StatisticKind::Histogram
+        for metric in metrics {
+            if let Some(event) = normalizer.apply(Event::Metric(metric)) {
+                match buffer.push(event) {
+                    PushResult::Overflow(_) => panic!("overflowed too early"),
+                    PushResult::Ok(true) => {
+                        result.push(buffer.fresh_replace().finish());
                     }
-                },
-            ]
-        );
-    }
-
-    #[test]
-    fn metric_buffer_compress_distribution() {
-        let values = vec![2.0, 2.0, 3.0, 1.0, 2.0, 2.0, 3.0];
-        let sample_rates = vec![12, 12, 13, 11, 12, 12, 13];
-
-        assert_eq!(
-            compress_distribution(values, sample_rates),
-            (vec![1.0, 2.0, 3.0], vec![11, 48, 26])
-        );
-    }
-
-    #[tokio::test]
-    async fn metric_buffer_aggregated_histograms_absolute() {
-        let (sink, sent_batches) = sink();
-
-        let mut events = Vec::new();
-        for _ in 2..5 {
-            let event = Event::Metric(Metric {
-                name: "buckets-2".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Absolute,
-                value: MetricValue::AggregatedHistogram {
-                    buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![1, 2, 4],
-                    count: 6,
-                    sum: 10.0,
-                },
-            });
-            events.push(event);
-        }
-
-        for i in 2..5 {
-            let event = Event::Metric(Metric {
-                name: format!("buckets-{}", i),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Absolute,
-                value: MetricValue::AggregatedHistogram {
-                    buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![i, 2 * i, 4 * i],
-                    count: 6 * i,
-                    sum: 10.0,
-                },
-            });
-            events.push(event);
-        }
-
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
-
-        assert_eq!(buffer.len(), 1);
-
-        assert_eq!(
-            sorted(&buffer[0].clone()),
-            [
-                Metric {
-                    name: "buckets-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedHistogram {
-                        buckets: vec![1.0, 2.0, 4.0],
-                        counts: vec![2, 4, 8],
-                        count: 12,
-                        sum: 10.0,
-                    },
-                },
-                Metric {
-                    name: "buckets-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedHistogram {
-                        buckets: vec![1.0, 2.0, 4.0],
-                        counts: vec![3, 6, 12],
-                        count: 6 * 3,
-                        sum: 10.0,
-                    },
-                },
-                Metric {
-                    name: "buckets-4".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedHistogram {
-                        buckets: vec![1.0, 2.0, 4.0],
-                        counts: vec![4, 8, 16],
-                        count: 6 * 4,
-                        sum: 10.0,
-                    },
+                    PushResult::Ok(false) => (),
                 }
-            ]
-        );
-    }
-
-    #[tokio::test]
-    async fn metric_buffer_aggregated_histograms_incremental() {
-        let (sink, sent_batches) = sink();
-
-        let mut events = Vec::new();
-        for _ in 0..3 {
-            let event = Event::Metric(Metric {
-                name: "buckets-2".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::AggregatedHistogram {
-                    buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![1, 2, 4],
-                    count: 6,
-                    sum: 10.0,
-                },
-            });
-            events.push(event);
-        }
-
-        for i in 1..4 {
-            let event = Event::Metric(Metric {
-                name: "buckets-2".into(),
-                namespace: None,
-                timestamp: None,
-                tags: Some(tag("production")),
-                kind: MetricKind::Incremental,
-                value: MetricValue::AggregatedHistogram {
-                    buckets: vec![1.0, 4.0, 16.0],
-                    counts: vec![i, 2 * i, 4 * i],
-                    count: 6 * i,
-                    sum: 10.0,
-                },
-            });
-            events.push(event);
-        }
-
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
-
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
-
-        assert_eq!(buffer.len(), 1);
-
-        assert_eq!(
-            sorted(&buffer[0].clone()),
-            [
-                Metric {
-                    name: "buckets-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::AggregatedHistogram {
-                        buckets: vec![1.0, 2.0, 4.0],
-                        counts: vec![3, 6, 12],
-                        count: 18,
-                        sum: 30.0,
-                    },
-                },
-                Metric {
-                    name: "buckets-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::AggregatedHistogram {
-                        buckets: vec![1.0, 4.0, 16.0],
-                        counts: vec![6, 12, 24],
-                        count: 36,
-                        sum: 30.0,
-                    },
-                },
-            ]
-        );
-    }
-
-    #[tokio::test]
-    async fn metric_buffer_aggregated_summaries() {
-        let (sink, sent_batches) = sink();
-
-        let mut events = Vec::new();
-        for _ in 0..10 {
-            for i in 2..5 {
-                let event = Event::Metric(Metric {
-                    name: format!("quantiles-{}", i),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedSummary {
-                        quantiles: vec![0.0, 0.5, 1.0],
-                        values: vec![i as f64, (2 * i) as f64, (4 * i) as f64],
-                        count: 6 * i,
-                        sum: 10.0,
-                    },
-                });
-                events.push(event);
             }
         }
 
-        let _ = sink
-            .sink_map_err(drop)
-            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
-            .await
-            .unwrap();
+        if !buffer.is_empty() {
+            result.push(buffer.finish())
+        }
 
-        let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
+        // Sort each batch to provide a predictable result ordering
+        result
+            .into_iter()
+            .map(|mut batch| {
+                batch.sort_by_key(|k| format!("{:?}", k));
+                batch
+            })
+            .collect()
+    }
 
-        assert_eq!(buffer.len(), 1);
+    fn rebuffer_incremental_counters<State: MetricNormalize>() -> Buffer {
+        let mut events = Vec::new();
+        for i in 0..4 {
+            // counter-0 is repeated 5 times
+            events.push(sample_counter(0, "production", Incremental, i as f64));
+        }
+
+        for i in 0..4 {
+            // these counters cause a buffer flush
+            events.push(sample_counter(i, "staging", Incremental, i as f64));
+        }
+
+        for i in 0..4 {
+            // counter-0 increments the previous buffer, the rest are new
+            events.push(sample_counter(i, "production", Incremental, i as f64));
+        }
+
+        rebuffer::<State>(events)
+    }
+
+    #[test]
+    fn abs_buffer_incremental_counters() {
+        let buffer = rebuffer_incremental_counters::<AbsoluteMetricNormalize>();
 
         assert_eq!(
-            sorted(&buffer[0].clone()),
+            buffer[0],
             [
-                Metric {
-                    name: "quantiles-2".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedSummary {
-                        quantiles: vec![0.0, 0.5, 1.0],
-                        values: vec![2.0, 4.0, 8.0],
-                        count: 6 * 2,
-                        sum: 10.0,
-                    },
-                },
-                Metric {
-                    name: "quantiles-3".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedSummary {
-                        quantiles: vec![0.0, 0.5, 1.0],
-                        values: vec![3.0, 6.0, 12.0],
-                        count: 6 * 3,
-                        sum: 10.0,
-                    },
-                },
-                Metric {
-                    name: "quantiles-4".into(),
-                    namespace: None,
-                    timestamp: None,
-                    tags: Some(tag("production")),
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::AggregatedSummary {
-                        quantiles: vec![0.0, 0.5, 1.0],
-                        values: vec![4.0, 8.0, 16.0],
-                        count: 6 * 4,
-                        sum: 10.0,
-                    },
-                }
+                sample_counter(0, "production", Absolute, 6.0),
+                sample_counter(0, "staging", Absolute, 0.0),
+                sample_counter(1, "production", Absolute, 1.0),
+                sample_counter(1, "staging", Absolute, 1.0),
+                sample_counter(2, "staging", Absolute, 2.0),
+                sample_counter(3, "staging", Absolute, 3.0),
             ]
         );
+
+        assert_eq!(
+            buffer[1],
+            [
+                sample_counter(2, "production", Absolute, 2.0),
+                sample_counter(3, "production", Absolute, 3.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 2);
+    }
+
+    #[test]
+    fn inc_buffer_incremental_counters() {
+        let buffer = rebuffer_incremental_counters::<IncrementalMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_counter(0, "production", Incremental, 6.0),
+                sample_counter(0, "staging", Incremental, 0.0),
+                sample_counter(1, "production", Incremental, 1.0),
+                sample_counter(1, "staging", Incremental, 1.0),
+                sample_counter(2, "staging", Incremental, 2.0),
+                sample_counter(3, "staging", Incremental, 3.0),
+            ]
+        );
+
+        assert_eq!(
+            buffer[1],
+            [
+                sample_counter(2, "production", Incremental, 2.0),
+                sample_counter(3, "production", Incremental, 3.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 2);
+    }
+
+    fn rebuffer_absolute_counters<State: MetricNormalize>() -> Buffer {
+        let mut events = Vec::new();
+        // counter-0 and -1 only emitted once
+        // counter-2 and -3 emitted twice
+        // counter-4 and -5 emitted once
+        for i in 0..4 {
+            events.push(sample_counter(i, "production", Absolute, i as f64));
+        }
+
+        for i in 2..6 {
+            events.push(sample_counter(i, "production", Absolute, i as f64 * 3.0));
+        }
+
+        rebuffer::<State>(events)
+    }
+
+    #[test]
+    fn abs_buffer_absolute_counters() {
+        let buffer = rebuffer_absolute_counters::<AbsoluteMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_counter(0, "production", Absolute, 0.0),
+                sample_counter(1, "production", Absolute, 1.0),
+                sample_counter(2, "production", Absolute, 6.0),
+                sample_counter(3, "production", Absolute, 9.0),
+                sample_counter(4, "production", Absolute, 12.0),
+                sample_counter(5, "production", Absolute, 15.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn inc_buffer_absolute_counters() {
+        let buffer = rebuffer_absolute_counters::<IncrementalMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_counter(2, "production", Incremental, 4.0),
+                sample_counter(3, "production", Incremental, 6.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    fn rebuffer_incremental_gauges<State: MetricNormalize>() -> Buffer {
+        let mut events = Vec::new();
+        // gauge-1 emitted once
+        // gauge-2 through -4 are emitted twice
+        // gauge-5 emitted once
+        for i in 1..5 {
+            events.push(sample_gauge(i, Incremental, i as f64));
+        }
+
+        for i in 2..6 {
+            events.push(sample_gauge(i, Incremental, i as f64));
+        }
+
+        rebuffer::<State>(events)
+    }
+
+    #[test]
+    fn abs_buffer_incremental_gauges() {
+        let buffer = rebuffer_incremental_gauges::<AbsoluteMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_gauge(1, Absolute, 1.0),
+                sample_gauge(2, Absolute, 4.0),
+                sample_gauge(3, Absolute, 6.0),
+                sample_gauge(4, Absolute, 8.0),
+                sample_gauge(5, Absolute, 5.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn inc_buffer_incremental_gauges() {
+        let buffer = rebuffer_incremental_gauges::<IncrementalMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_gauge(1, Incremental, 1.0),
+                sample_gauge(2, Incremental, 4.0),
+                sample_gauge(3, Incremental, 6.0),
+                sample_gauge(4, Incremental, 8.0),
+                sample_gauge(5, Incremental, 5.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    fn rebuffer_absolute_gauges<State: MetricNormalize>() -> Buffer {
+        let mut events = Vec::new();
+        // gauge-2 emitted once
+        // gauge-3 and -4 emitted twice
+        // gauge-5 emitted once
+        for i in 2..5 {
+            events.push(sample_gauge(i, Absolute, i as f64 * 2.0));
+        }
+
+        for i in 3..6 {
+            events.push(sample_gauge(i, Absolute, i as f64 * 10.0));
+        }
+
+        rebuffer::<State>(events)
+    }
+
+    #[test]
+    fn abs_buffer_absolute_gauges() {
+        let buffer = rebuffer_absolute_gauges::<AbsoluteMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_gauge(2, Absolute, 4.0),
+                sample_gauge(3, Absolute, 30.0),
+                sample_gauge(4, Absolute, 40.0),
+                sample_gauge(5, Absolute, 50.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn inc_buffer_absolute_gauges() {
+        let buffer = rebuffer_absolute_gauges::<IncrementalMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_gauge(3, Incremental, 24.0),
+                sample_gauge(4, Incremental, 32.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    fn rebuffer_incremental_sets<State: MetricNormalize>() -> Buffer {
+        let mut events = Vec::new();
+        // set-0 emitted 8 times with 4 different values
+        // set-1 emitted once with 4 values
+        for i in 0..4 {
+            events.push(sample_set(0, Incremental, &[i]));
+        }
+
+        for i in 0..4 {
+            events.push(sample_set(0, Incremental, &[i]));
+        }
+
+        events.push(sample_set(1, Incremental, &[1, 2, 3, 4]));
+
+        rebuffer::<State>(events)
+    }
+
+    #[test]
+    fn abs_buffer_incremental_sets() {
+        let buffer = rebuffer_incremental_sets::<AbsoluteMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_set(0, Absolute, &[0, 1, 2, 3]),
+                sample_set(1, Absolute, &[1, 2, 3, 4]),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn inc_buffer_incremental_sets() {
+        let buffer = rebuffer_incremental_sets::<IncrementalMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_set(0, Incremental, &[0, 1, 2, 3]),
+                sample_set(1, Incremental, &[1, 2, 3, 4]),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    fn rebuffer_incremental_distributions<State: MetricNormalize>() -> Buffer {
+        let mut events = Vec::new();
+        for _ in 2..6 {
+            events.push(sample_distribution_histogram(2, Incremental, 10));
+        }
+
+        for i in 2..6 {
+            events.push(sample_distribution_histogram(i, Incremental, 10));
+        }
+
+        rebuffer::<State>(events)
+    }
+
+    #[test]
+    fn abs_buffer_incremental_distributions() {
+        let buffer = rebuffer_incremental_distributions::<AbsoluteMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_distribution_histogram(2, Absolute, 50),
+                sample_distribution_histogram(3, Absolute, 10),
+                sample_distribution_histogram(4, Absolute, 10),
+                sample_distribution_histogram(5, Absolute, 10),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn inc_buffer_incremental_distributions() {
+        let buffer = rebuffer_incremental_distributions::<IncrementalMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_distribution_histogram(2, Incremental, 50),
+                sample_distribution_histogram(3, Incremental, 10),
+                sample_distribution_histogram(4, Incremental, 10),
+                sample_distribution_histogram(5, Incremental, 10),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn compress_distributions() {
+        let samples = crate::samples![
+            2.0 => 12,
+            2.0 => 12,
+            3.0 => 13,
+            1.0 => 11,
+            2.0 => 12,
+            2.0 => 12,
+            3.0 => 13
+        ];
+
+        assert_eq!(
+            compress_distribution(samples),
+            crate::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
+        );
+    }
+
+    fn rebuffer_absolute_aggregated_histograms<State: MetricNormalize>() -> Buffer {
+        let mut events = Vec::new();
+        for _ in 2..5 {
+            events.push(sample_aggregated_histogram(2, Absolute, 1.0, 1, 10.0));
+        }
+
+        for i in 2..5 {
+            events.push(sample_aggregated_histogram(
+                i,
+                Absolute,
+                1.0,
+                i as u32,
+                i as f64 * 10.0,
+            ));
+        }
+
+        rebuffer::<State>(events)
+    }
+
+    #[test]
+    fn abs_buffer_absolute_aggregated_histograms() {
+        let buffer = rebuffer_absolute_aggregated_histograms::<AbsoluteMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_aggregated_histogram(2, Absolute, 1.0, 2, 20.0),
+                sample_aggregated_histogram(3, Absolute, 1.0, 3, 30.0),
+                sample_aggregated_histogram(4, Absolute, 1.0, 4, 40.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn inc_buffer_absolute_aggregated_histograms() {
+        let buffer = rebuffer_absolute_aggregated_histograms::<IncrementalMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [sample_aggregated_histogram(2, Incremental, 1.0, 1, 10.0)]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    fn rebuffer_incremental_aggregated_histograms<State: MetricNormalize>() -> Buffer {
+        let mut events = Vec::new();
+        for _ in 0..3 {
+            events.push(sample_aggregated_histogram(2, Incremental, 1.0, 1, 10.0));
+        }
+
+        for i in 1..4 {
+            events.push(sample_aggregated_histogram(2, Incremental, 2.0, i, 10.0));
+        }
+
+        rebuffer::<State>(events)
+    }
+
+    #[test]
+    fn abs_buffer_incremental_aggregated_histograms() {
+        let buffer = rebuffer_incremental_aggregated_histograms::<AbsoluteMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_aggregated_histogram(2, Absolute, 1.0, 3, 30.0),
+                sample_aggregated_histogram(2, Absolute, 2.0, 6, 30.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn inc_buffer_incremental_aggregated_histograms() {
+        let buffer = rebuffer_incremental_aggregated_histograms::<IncrementalMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_aggregated_histogram(2, Incremental, 1.0, 3, 30.0),
+                sample_aggregated_histogram(2, Incremental, 2.0, 6, 30.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    fn rebuffer_aggregated_summaries<State: MetricNormalize>() -> Buffer {
+        let mut events = Vec::new();
+        for factor in 0..10 {
+            for num in 2..5 {
+                events.push(sample_aggregated_summary(
+                    num,
+                    Absolute,
+                    (factor + num) as f64,
+                ));
+            }
+        }
+
+        rebuffer::<State>(events)
+    }
+
+    #[test]
+    fn abs_buffer_aggregated_summaries() {
+        let buffer = rebuffer_aggregated_summaries::<AbsoluteMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_aggregated_summary(2, Absolute, 11.0),
+                sample_aggregated_summary(3, Absolute, 12.0),
+                sample_aggregated_summary(4, Absolute, 13.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn inc_buffer_aggregated_summaries() {
+        let buffer = rebuffer_aggregated_summaries::<IncrementalMetricNormalize>();
+
+        assert_eq!(
+            buffer[0],
+            [
+                sample_aggregated_summary(2, Incremental, 9.0),
+                sample_aggregated_summary(3, Incremental, 9.0),
+                sample_aggregated_summary(4, Incremental, 9.0),
+            ]
+        );
+
+        assert_eq!(buffer.len(), 1);
+    }
+
+    fn sample_counter(num: usize, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
+        Metric::new(
+            format!("counter-{}", num),
+            kind,
+            MetricValue::Counter { value },
+        )
+        .with_tags(Some(tag(tagstr)))
+    }
+
+    fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
+        Metric::new(format!("gauge-{}", num), kind, MetricValue::Gauge { value })
+    }
+
+    fn sample_set<T: ToString>(num: usize, kind: MetricKind, values: &[T]) -> Metric {
+        Metric::new(
+            format!("set-{}", num),
+            kind,
+            MetricValue::Set {
+                values: values.iter().map(|s| s.to_string()).collect(),
+            },
+        )
+    }
+
+    fn sample_distribution_histogram(num: u32, kind: MetricKind, rate: u32) -> Metric {
+        Metric::new(
+            format!("dist-{}", num),
+            kind,
+            MetricValue::Distribution {
+                samples: crate::samples![num as f64 => rate],
+                statistic: StatisticKind::Histogram,
+            },
+        )
+    }
+
+    fn sample_aggregated_histogram(
+        num: usize,
+        kind: MetricKind,
+        bpower: f64,
+        cfactor: u32,
+        sum: f64,
+    ) -> Metric {
+        Metric::new(
+            format!("buckets-{}", num),
+            kind,
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![
+                    1.0 => cfactor,
+                    2.0f64.powf(bpower) => cfactor * 2,
+                    4.0f64.powf(bpower) => cfactor * 4
+                ],
+                count: 7 * cfactor,
+                sum,
+            },
+        )
+    }
+
+    fn sample_aggregated_summary(num: u32, kind: MetricKind, factor: f64) -> Metric {
+        Metric::new(
+            format!("quantiles-{}", num),
+            kind,
+            MetricValue::AggregatedSummary {
+                quantiles: crate::quantiles![
+                    0.0 => factor,
+                    0.5 => factor * 2.0,
+                    1.0 => factor * 4.0
+                ],
+                count: factor as u32 * 10,
+                sum: factor * 7.0,
+            },
+        )
     }
 }

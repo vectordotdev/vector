@@ -60,11 +60,11 @@ section.
 
 A "pipeline" is the end result of connecting [sources](#sources),
 [transforms](#transforms), and [sinks](#sinks). You can see a full example of a
-pipeline in the [configuration section][docs.configuration].
+pipeline in the [configuration section][docs.setup.configuration].
 
 <Jump to="/docs/setup/configuration/">View configuration</Jump>
 
-[docs.configuration]: /docs/setup/configuration/
+[docs.setup.configuration]: /docs/setup/configuration/
 [docs.data-model]: /docs/about/data-model/
 [docs.sinks.aws_s3]: /docs/reference/sinks/aws_s3/
 [docs.sinks.socket]: /docs/reference/sinks/socket/

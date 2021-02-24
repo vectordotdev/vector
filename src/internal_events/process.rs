@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::config;
 use metrics::counter;
 use std::path::PathBuf;
 
@@ -24,7 +25,7 @@ impl InternalEvent for VectorStarted {
 
 #[derive(Debug)]
 pub struct VectorReloaded<'a> {
-    pub config_paths: &'a [PathBuf],
+    pub config_paths: &'a [(PathBuf, config::FormatHint)],
 }
 
 impl InternalEvent for VectorReloaded<'_> {

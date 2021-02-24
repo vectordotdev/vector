@@ -9,6 +9,7 @@ components: sinks: socket: {
 		development:   "stable"
 		egress_method: "stream"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {
@@ -24,7 +25,12 @@ components: sinks: socket: {
 					enum: ["json", "text"]
 				}
 			}
-			request: enabled: false
+			send_buffer_bytes: {
+				enabled:       true
+				relevant_when: "mode = `tcp` or mode = `udp` && os = `unix`"
+			}
+			keepalive: enabled: true
+			request: enabled:   false
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -33,12 +39,7 @@ components: sinks: socket: {
 				enabled_default:        false
 			}
 			to: {
-				service: {
-					name:     "socket receiver"
-					thing:    "a \(name)"
-					url:      urls.socket
-					versions: null
-				}
+				service: services.socket_receiver
 
 				interface: {
 					socket: {
@@ -52,15 +53,16 @@ components: sinks: socket: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -68,18 +70,18 @@ components: sinks: socket: {
 
 	configuration: {
 		address: {
-			description: "The address to connect to. The address _must_ include a port."
-			groups: ["tcp", "udp"]
-			required: true
+			description:   "The address to connect to. The address _must_ include a port."
+			relevant_when: "mode = `tcp` or `udp`"
+			required:      true
 			warnings: []
 			type: string: {
 				examples: ["92.12.333.224:5000"]
+				syntax: "literal"
 			}
 		}
 		mode: {
 			description: "The type of socket to use."
-			groups: ["tcp", "udp", "unix"]
-			required: true
+			required:    true
 			warnings: []
 			type: string: {
 				enum: {
@@ -87,15 +89,17 @@ components: sinks: socket: {
 					udp:  "UDP socket"
 					unix: "Unix domain socket"
 				}
+				syntax: "literal"
 			}
 		}
 		path: {
-			description: "The unix socket path. This should be the absolute path."
-			groups: ["unix"]
-			required: true
+			description:   "The unix socket path. This should be the absolute path."
+			relevant_when: "mode = `tcp` or `udp`"
+			required:      true
 			warnings: []
 			type: string: {
 				examples: ["/path/to/socket"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -103,5 +107,11 @@ components: sinks: socket: {
 	input: {
 		logs:    true
 		metrics: null
+	}
+
+	telemetry: metrics: {
+		connection_errors_total: components.sources.internal_metrics.output.metrics.connection_errors_total
+		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:  components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

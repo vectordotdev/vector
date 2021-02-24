@@ -1,14 +1,4 @@
 use super::InternalEvent;
-use metrics::counter;
-
-#[derive(Debug)]
-pub struct RenameFieldsEventProcessed;
-
-impl InternalEvent for RenameFieldsEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
-    }
-}
 
 #[derive(Debug)]
 pub struct RenameFieldsFieldOverwritten<'a> {
@@ -17,7 +7,7 @@ pub struct RenameFieldsFieldOverwritten<'a> {
 
 impl<'a> InternalEvent for RenameFieldsFieldOverwritten<'a> {
     fn emit_logs(&self) {
-        debug!(message = "Field overwritten.", field = %self.field, rate_limit_secs = 30);
+        debug!(message = "Field overwritten.", field = %self.field, internal_log_rate_secs = 30);
     }
 }
 
@@ -28,6 +18,6 @@ pub struct RenameFieldsFieldDoesNotExist<'a> {
 
 impl<'a> InternalEvent for RenameFieldsFieldDoesNotExist<'a> {
     fn emit_logs(&self) {
-        warn!(message = "Field did not exist.", field = %self.field, rate_limit_secs = 30);
+        warn!(message = "Field did not exist.", field = %self.field, internal_log_rate_secs = 30);
     }
 }

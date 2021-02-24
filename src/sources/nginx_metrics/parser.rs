@@ -63,7 +63,9 @@ impl<'a> TryFrom<&'a str> for NginxStubStatus {
                 })
             }
             Err(error) => match error {
-                nom::Err::Error((_, kind)) => Err(ParseError::NginxStubStatusParseError { kind }),
+                nom::Err::Error(error) => {
+                    Err(ParseError::NginxStubStatusParseError { kind: error.code })
+                }
                 nom::Err::Incomplete(_) | nom::Err::Failure(_) => unreachable!(),
             },
         }

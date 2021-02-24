@@ -3,7 +3,8 @@
   type = "reduce"
   group_by = [ "request_id" ]
   [transforms.reduce.ends_when]
-    "test_end_message.exists" = true
+    type = "remap"
+    source = "exists(.test_end_message)"
 
 [[tests]]
   name = "reduce_basic"
@@ -67,17 +68,23 @@
   [[tests.outputs]]
     extract_from = "reduce"
     [[tests.outputs.conditions]]
-      "message.equals" = "first message value"
-      "host.equals" = "host1"
-      "request_id.equals" = "1"
-      "counter.equals" = 21
-      "timestamp_end.exists" = true
+      type = "remap"
+      source = '''
+        .message == "first message value" &&
+        .host == "host1" &&
+        .request_id == "1" &&
+        .counter == 21 &&
+        exists(.timestamp_end)
+      '''
     [[tests.outputs.conditions]]
-      "message.equals" = "other reduce one"
-      "host.equals" = "host3"
-      "request_id.equals" = "2"
-      "counter.equals" = 20
-      "timestamp_end.exists" = true
+      type = "remap"
+      source = '''
+        .message == "other reduce one" &&
+        .host == "host3" &&
+        .request_id == "2" &&
+        .counter == 20 &&
+        exists(.timestamp_end)
+      '''
 
 ##------------------------------------------------------------------------------
 
@@ -93,7 +100,8 @@
     "concat_array" = "concat"
 
   [transforms.reduce_strats.ends_when]
-    "test_end_message.exists" = true
+    type = "remap"
+    source = 'exists(.test_end_message)'
 
 [[tests]]
   name = "reduce_merge_strategies"
@@ -167,21 +175,25 @@
   [[tests.outputs]]
     extract_from = "reduce_strats"
     [[tests.outputs.conditions]]
-      "message.equals" = "first message value second message value third message value"
-      "another.equals" = "foo\nbar baz\nqux\nquux"
-      "host.equals" = "host1"
-      "request_id.equals" = "1"
-      "counter.equals" = 21
-      "timestamp_end.exists" = true
+      type = "remap"
+      source = '''
+        .message == "first message value second message value third message value" &&
+        .another == "foo\nbar baz\nqux\nquux" &&
+        .host == "host1" &&
+        .request_id == "1" &&
+        .counter == 21 &&
+        exists(.timestamp_end)
+      '''
     [[tests.outputs.conditions]]
-      "message.equals" = "other reduce one other reduce two other reduce three"
-      "concat_array[0].equals" = "foo"
-      "concat_array[1].equals" = "bar"
-      "concat_array[2].equals" = "baz"
-      "host.equals" = "host3"
-      "request_id.equals" = "2"
-      "counter.equals" = 20
-      "timestamp_end.exists" = true
+      type = "remap"
+      source = '''
+        .message == "other reduce one other reduce two other reduce three" &&
+        .concat_array == ["foo", "bar", "baz"] &&
+        .host == "host3" &&
+        .request_id == "2" &&
+        .counter == 20 &&
+        exists(.timestamp_end)
+      '''
 
 ##------------------------------------------------------------------------------
 
@@ -194,7 +206,8 @@
     "maxs" = "max"
 
   [transforms.reduce_numbers.ends_when]
-    "test_end_message.exists" = true
+    type = "remap"
+    source = "exists(.test_end_message)"
 
 [[tests]]
   name = "reduce_number_strategies_1"
@@ -224,9 +237,12 @@
   [[tests.outputs]]
     extract_from = "reduce_numbers"
     [[tests.outputs.conditions]]
-      "mins.equals" = 5.1
-      "maxs.equals" = 7.2
-      "timestamp_end.exists" = true
+      type = "remap"
+      source = '''
+        .mins == 5.1 &&
+        .maxs == 7.2 &&
+        exists(.timestamp_end)
+      '''
 
 [[tests]]
   name = "reduce_number_strategies_2"
@@ -256,9 +272,12 @@
   [[tests.outputs]]
     extract_from = "reduce_numbers"
     [[tests.outputs.conditions]]
-      "mins.equals" = 5
-      "maxs.equals" = 7
-      "timestamp_end.exists" = true
+      type = "remap"
+      source = '''
+        .mins == 5 &&
+        .maxs == 7 &&
+        exists(.timestamp_end)
+      '''
 
 ##------------------------------------------------------------------------------
 
@@ -331,17 +350,26 @@
   [[tests.outputs]]
     extract_from = "ends_when_remap"
     [[tests.outputs.conditions]]
-      "request_id.equals" = "1"
-      "counter.equals" = 6
-      "timestamp_end.exists" = true
+      type = "remap"
+      source = '''
+        .request_id == "1" &&
+        .counter == 6 &&
+        exists(.timestamp_end)
+      '''
     [[tests.outputs.conditions]]
-      "request_id.equals" = "2"
-      "counter.equals" = 7
-      "test_end_message.exists" = true
+      type = "remap"
+      source = '''
+        .request_id == "2" &&
+        .counter == 7 &&
+        exists(.test_end_message)
+      '''
     [[tests.outputs.conditions]]
-      "request_id.equals" = "3"
-      "counter.equals" = 5
-      "test_end_message.exists" = true
+      type = "remap"
+      source = '''
+        .request_id == "3" &&
+        .counter == 5 &&
+        exists(.test_end_message)
+      '''
 
 ##------------------------------------------------------------------------------
 
@@ -350,7 +378,7 @@
     type = "reduce"
     merge_strategies.message = "concat_newline"
     starts_when.type = "remap"
-    starts_when.source = "match(.message, /^\\w.*/)"
+    starts_when.source = "match(string!(.message), r'^\\w.*')"
 
 [[tests]]
   name = "reduce_ruby_exception"
@@ -394,9 +422,13 @@
   [[tests.outputs]]
     extract_from = "ruby_exception"
     [[tests.outputs.conditions]]
-      "message.equals" = "Started GET \"/\" for 127.0.0.1 at 2012-03-10 14:28:14 +0100"
+      type = "remap"
+      source = '.message == "Started GET \"/\" for 127.0.0.1 at 2012-03-10 14:28:14 +0100"'
     [[tests.outputs.conditions]]
-      "message.equals" = "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)\n  from foobar.rb:6:in `bar'\n  from foobar.rb:2:in `foo'\n  from foobar.rb:9:in `<main>'"
+      type = "remap"
+      source = '''
+        .message == "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)\n  from foobar.rb:6:in `bar'\n  from foobar.rb:2:in `foo'\n  from foobar.rb:9:in `<main>'"
+      '''
 
 ##------------------------------------------------------------------------------
 
@@ -405,7 +437,7 @@
     type = "reduce"
     merge_strategies.message = "concat"
     ends_when.type = "remap"
-    ends_when.source = """!ends_with(strip_whitespace(.message), "\\\\")"""
+    ends_when.source = """!ends_with(strip_whitespace(string!(.message)), "\\\\")"""
 
 [[tests]]
   name = "reduce_line_continuation"
@@ -443,20 +475,23 @@
   [[tests.outputs]]
     extract_from = "line_continuation"
     [[tests.outputs.conditions]]
-      "message.equals" = "First-line"
+      type = "remap"
+      source = '.message == "First-line"'
     [[tests.outputs.conditions]]
-      "message.equals" = "Second line\\ more second line\\      end of second line"
+      type = "remap"
+      source = '.message == "Second line\\ more second line\\      end of second line"'
     [[tests.outputs.conditions]]
-      "message.equals" = "third line"
+      type = "remap"
+      source = '.message == "third line"'
 
 ##------------------------------------------------------------------------------
 
 [transforms.line_termination]
-    inputs = []
-    type = "reduce"
-    merge_strategies.message = "concat"
-    ends_when.type = "remap"
-    ends_when.source = """ends_with(strip_whitespace(.message), ";")"""
+  inputs = []
+  type = "reduce"
+  merge_strategies.message = "concat"
+  ends_when.type = "remap"
+  ends_when.source = """ends_with(strip_whitespace(string!(.message)), ";")"""
 
 [[tests]]
   name = "reduce_line_termination"
@@ -494,11 +529,14 @@
   [[tests.outputs]]
     extract_from = "line_termination"
     [[tests.outputs.conditions]]
-      "message.equals" = "first line;"
+      type = "remap"
+      source = '.message == "first line;"'
     [[tests.outputs.conditions]]
-      "message.equals" = "second line more of the second line end of second line;         "
+      type = "remap"
+      source = '.message == "second line more of the second line end of second line;         "'
     [[tests.outputs.conditions]]
-      "message.equals" = "third line;"
+      type = "remap"
+      source = '.message == "third line;"'
 
 ##------------------------------------------------------------------------------
 
@@ -507,7 +545,7 @@
     type = "reduce"
     merge_strategies.message = "concat"
     starts_when.type = "remap"
-    starts_when.source = "match(.message, /^<\\d\\d> /)"
+    starts_when.source = "match(string!(.message), r'^<\\d\\d> ')"
 
 [[tests]]
   name = "reduce_log_stream"
@@ -545,11 +583,14 @@
   [[tests.outputs]]
     extract_from = "log_stream"
     [[tests.outputs.conditions]]
-      "message.equals" = "<12> first line   more of the first line"
+      type = "remap"
+      source = '.message == "<12> first line   more of the first line"'
     [[tests.outputs.conditions]]
-      "message.equals" = "<22> second line"
+      type = "remap"
+      source = '.message == "<22> second line"'
     [[tests.outputs.conditions]]
-      "message.equals" = "<17> third line"
+      type = "remap"
+      source = '.message == "<17> third line"'
 
 ##------------------------------------------------------------------------------
 
@@ -558,7 +599,7 @@
     type = "reduce"
     merge_strategies.message = "concat_newline"
     starts_when.type = "remap"
-    starts_when.source = "match(.message, /^\\d{4}-\\d{2}-\\d{2} .+/)"
+    starts_when.source = "match(string!(.message), r'^\\d{4}-\\d{2}-\\d{2} .+')"
 
 [[tests]]
   name = "reduce_java_exception"
@@ -626,5 +667,9 @@
   [[tests.outputs]]
     extract_from = "java_exception"
     [[tests.outputs.conditions]]
-      "message.starts_with" = "2020-10-19 04:34:15,389"
-      "message.ends_with" = "\nat java.lang.Thread.run(Thread.java:748) ~[?:1.8.0_181]"
+      type = "remap"
+      source = '''
+        message = string!(.message)
+        starts_with(message, "2020-10-19 04:34:15,389") &&
+        ends_with(message, "\nat java.lang.Thread.run(Thread.java:748) ~[?:1.8.0_181]")
+      '''

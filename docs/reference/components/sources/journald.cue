@@ -1,27 +1,22 @@
 package metadata
 
 components: sources: journald: {
-	title:       "Journald"
-	description: "[Journald](\(urls.journald)) is a utility for accessing log data across a variety of system services. It was introduced with [Systemd](\(urls.systemd)) to help system administrators collect, access, and route log data."
+	title: "Journald"
 
 	classes: {
 		commonly_used: true
 		delivery:      "at_least_once"
 		deployment_roles: ["daemon"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
 		collect: {
 			checkpoint: enabled: true
 			from: {
-				service: {
-					name:     "JournalD"
-					thing:    name
-					url:      urls.journald
-					versions: null
-				}
+				service: services.journald
 
 				interface: binary: {
 					name: "journalctl"
@@ -33,18 +28,24 @@ components: sources: journald: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        false
-			"x86_64-pc-windows-msv":      false
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            false
+			"x86_64-pc-windows-msv":          false
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
 
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
@@ -72,7 +73,10 @@ components: sources: journald: {
 			warnings: []
 			type: array: {
 				default: []
-				items: type: string: examples: ["badservice", "sysinit.target"]
+				items: type: string: {
+					examples: ["badservice", "sysinit.target"]
+					syntax: "literal"
+				}
 			}
 		}
 		include_units: {
@@ -82,7 +86,10 @@ components: sources: journald: {
 			warnings: []
 			type: array: {
 				default: []
-				items: type: string: examples: ["ntpd", "sysinit.target"]
+				items: type: string: {
+					examples: ["ntpd", "sysinit.target"]
+					syntax: "literal"
+				}
 			}
 		}
 		journalctl_path: {
@@ -93,14 +100,8 @@ components: sources: journald: {
 			type: string: {
 				default: "journalctl"
 				examples: ["/usr/local/bin/journalctl"]
+				syntax: "literal"
 			}
-		}
-		remap_priority: {
-			common:      false
-			description: "If the record from journald contains a `PRIORITY` field, it will be remapped into the equivalent syslog priority level name using the standard (abbreviated) all-capitals names such as `EMERG` or `ERR`."
-			required:    false
-			warnings: []
-			type: bool: default: false
 		}
 	}
 
@@ -112,7 +113,10 @@ components: sources: journald: {
 				message: {
 					description: "The raw line from the file."
 					required:    true
-					type: string: examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+					type: string: {
+						examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+						syntax: "literal"
+					}
 				}
 				timestamp: fields._current_timestamp
 				"*": {
@@ -122,6 +126,7 @@ components: sources: journald: {
 					type: string: {
 						default: null
 						examples: ["/usr/sbin/ntpd", "c36e9ea52800a19d214cb71b53263a28"]
+						syntax: "literal"
 					}
 				}
 			}
@@ -131,6 +136,7 @@ components: sources: journald: {
 	examples: [
 		{
 			title: "Sample Output"
+
 			configuration: {}
 			input: """
 				```text
@@ -195,5 +201,7 @@ components: sources: journald: {
 	telemetry: metrics: {
 		invalid_record_total:       components.sources.internal_metrics.output.metrics.invalid_record_total
 		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
+		processed_bytes_total:      components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:     components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

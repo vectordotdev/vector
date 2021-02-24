@@ -3,29 +3,31 @@ package metadata
 components: sinks: prometheus_exporter: {
 	_port: 9598
 
-	title:       "Prometheus Exporter"
-	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
-	alias:       "prometheus"
+	title: "Prometheus Exporter"
+	alias: "prometheus"
 
 	classes: {
 		commonly_used: true
 		delivery:      "best_effort"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "expose"
 		service_providers: []
+		stateful: true
 	}
 
 	features: {
 		buffer: enabled:      false
 		healthcheck: enabled: false
 		exposes: {
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				enabled_default:        false
+			}
+
 			for: {
-				service: {
-					name:     "Prometheus"
-					thing:    "a \(name) database"
-					url:      urls.prometheus
-					versions: ">= 1.0"
-				}
+				service: services.prometheus
 
 				interface: {
 					socket: {
@@ -44,15 +46,16 @@ components: sinks: prometheus_exporter: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: [
 			"""
@@ -73,6 +76,7 @@ components: sinks: prometheus_exporter: {
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)"]
+				syntax: "literal"
 			}
 		}
 		buckets: {
@@ -108,6 +112,7 @@ components: sinks: prometheus_exporter: {
 			type: string: {
 				default: null
 				examples: ["service"]
+				syntax: "literal"
 			}
 		}
 		quantiles: {
@@ -194,8 +199,19 @@ components: sinks: prometheus_exporter: {
 				kind: "absolute"
 				name: _name
 				histogram: {
-					buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
-					counts: [0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]
+					buckets: [
+						{upper_limit: 0.005, count: 0},
+						{upper_limit: 0.01, count:  1},
+						{upper_limit: 0.025, count: 0},
+						{upper_limit: 0.05, count:  1},
+						{upper_limit: 0.1, count:   0},
+						{upper_limit: 0.25, count:  0},
+						{upper_limit: 0.5, count:   0},
+						{upper_limit: 1.0, count:   0},
+						{upper_limit: 2.5, count:   0},
+						{upper_limit: 5.0, count:   0},
+						{upper_limit: 10.0, count:  0},
+					]
 					count: 2
 					sum:   0.789
 				}
@@ -231,8 +247,11 @@ components: sinks: prometheus_exporter: {
 				name: _name
 				kind: "incremental"
 				distribution: {
-					values: [0.0, 1.0, 4.0]
-					sample_rates: [4, 2, 1]
+					samples: [
+						{value: 0.0, rate: 4},
+						{value: 1.0, rate: 2},
+						{value: 4.0, rate: 1},
+					]
 					statistic: "histogram"
 				}
 				tags: {
@@ -262,8 +281,11 @@ components: sinks: prometheus_exporter: {
 				name: _name
 				kind: "incremental"
 				distribution: {
-					values: [0.0, 1.0, 4.0]
-					sample_rates: [3, 2, 1]
+					samples: [
+						{value: 0.0, rate: 3},
+						{value: 1.0, rate: 2},
+						{value: 4.0, rate: 1},
+					]
 					statistic: "summary"
 				}
 			}
@@ -289,8 +311,11 @@ components: sinks: prometheus_exporter: {
 				name: _name
 				kind: "absolute"
 				summary: {
-					quantiles: [0.01, 0.5, 0.99]
-					values: [1.5, 2.0, 3.0]
+					quantiles: [
+						{upper_limit: 0.01, value: 1.5},
+						{upper_limit: 0.5, value:  2.0},
+						{upper_limit: 0.99, value: 3.0},
+					]
 					count: 6
 					sum:   12.0
 				}

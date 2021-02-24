@@ -20,7 +20,8 @@ as they see fit.
 ### Kubernetes
 
 YAML is the preferred language in the K8s ecosystem, and to ensure Vector
-does not feel awkward we a
+does not feel awkward in the Kubernetes platform we now support YAML for
+our pipeline definitions.
 
 ### Data templating languages
 

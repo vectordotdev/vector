@@ -1,0 +1,41 @@
+[package]
+name = "shared"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+publish = false
+license = "MPL-2.0"
+
+[dependencies]
+bytes = { version = "0.5.6", optional = true }
+chrono = { version = "0.4", optional = true }
+nom = { version = "6", optional = true }
+serde = { version = "1.0.117", optional = true }
+snafu = { version = "0.6", optional = true }
+tracing = { version = "0.1", optional = true }
+
+[features]
+default = [
+  "aws_cloudwatch_logs_subscription",
+  "btreemap",
+  "conversion",
+  "tokenize",
+]
+
+aws_cloudwatch_logs_subscription = [
+  "chrono/serde",
+  "serde/derive",
+]
+
+btreemap = []
+
+conversion = [
+  "bytes",
+  "chrono",
+  "snafu",
+  "tracing",
+]
+
+tokenize = [
+  "nom",
+]

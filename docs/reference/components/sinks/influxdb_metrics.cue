@@ -1,15 +1,15 @@
 package metadata
 
 components: sinks: influxdb_metrics: {
-	title:       "InfluxDB Metrics"
-	description: "[InfluxDB](\(urls.influxdb)) is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics."
+	title: "InfluxDB Metrics"
 
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["InfluxData"]
+		stateful: false
 	}
 
 	features: {
@@ -36,6 +36,7 @@ components: sinks: influxdb_metrics: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
 			tls: sinks._influxdb.features.send.tls
 			to:  sinks._influxdb.features.send.to
@@ -43,15 +44,16 @@ components: sinks: influxdb_metrics: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -69,6 +71,7 @@ components: sinks: influxdb_metrics: {
 			type: string: {
 				default: null
 				examples: ["service"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -117,8 +120,11 @@ components: sinks: influxdb_metrics: {
 				name:      _name
 				namespace: "app"
 				distribution: {
-					values: [1.0, 5.0, 3.0]
-					sample_rates: [1, 2, 3]
+					samples: [
+						{value: 1.0, rate: 1},
+						{value: 5.0, rate: 2},
+						{value: 3.0, rate: 3},
+					]
 					statistic: "histogram"
 				}
 				tags: {
@@ -157,8 +163,11 @@ components: sinks: influxdb_metrics: {
 				kind: "absolute"
 				name: _name
 				histogram: {
-					buckets: [1.0, 2.1, 3.0]
-					counts: [2, 5, 10]
+					buckets: [
+						{upper_limit: 1.0, count: 2},
+						{upper_limit: 2.1, count: 5},
+						{upper_limit: 3.0, count: 10},
+					]
 					count: 17
 					sum:   46.2
 				}
@@ -195,8 +204,11 @@ components: sinks: influxdb_metrics: {
 				kind: "absolute"
 				name: _name
 				summary: {
-					quantiles: [0.01, 0.5, 0.99]
-					values: [1.5, 2.0, 3.0]
+					quantiles: [
+						{upper_limit: 0.01, value: 1.5},
+						{upper_limit: 0.5, value:  2.0},
+						{upper_limit: 0.99, value: 3.0},
+					]
 					count: 6
 					sum:   12.1
 				}

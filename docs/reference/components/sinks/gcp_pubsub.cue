@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: gcp_pubsub: {
-	title:       "GCP PubSub"
-	description: "[GCP Pub/Sub][urls.gcp_pubsub] is a fully-managed real-time messaging service that allows you to send and receive messages between independent applications on the Google Cloud Platform."
+	title: "GCP PubSub"
 
 	classes: {
 		commonly_used: true
@@ -10,6 +9,7 @@ components: sinks: gcp_pubsub: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["GCP"]
+		stateful: false
 	}
 
 	features: {
@@ -36,6 +36,7 @@ components: sinks: gcp_pubsub: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
 			tls: {
 				enabled:                true
@@ -63,15 +64,16 @@ components: sinks: gcp_pubsub: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -86,6 +88,7 @@ components: sinks: gcp_pubsub: {
 			type: string: {
 				default: null
 				examples: ["${GCP_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
+				syntax: "literal"
 			}
 		}
 		credentials_path: {
@@ -96,6 +99,7 @@ components: sinks: gcp_pubsub: {
 			type: string: {
 				default: null
 				examples: ["/path/to/credentials.json"]
+				syntax: "literal"
 			}
 		}
 		endpoint: {
@@ -106,6 +110,7 @@ components: sinks: gcp_pubsub: {
 			type: string: {
 				default: "https://pubsub.googleapis.com"
 				examples: ["https://us-central1-pubsub.googleapis.com"]
+				syntax: "literal"
 			}
 		}
 		project: {
@@ -114,6 +119,7 @@ components: sinks: gcp_pubsub: {
 			warnings: []
 			type: string: {
 				examples: ["vector-123456"]
+				syntax: "literal"
 			}
 		}
 		topic: {
@@ -122,6 +128,7 @@ components: sinks: gcp_pubsub: {
 			warnings: []
 			type: string: {
 				examples: ["this-is-a-topic"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -130,4 +137,22 @@ components: sinks: gcp_pubsub: {
 		logs:    true
 		metrics: null
 	}
+
+	permissions: iam: [
+		{
+			platform: "gcp"
+			_service: "pubsub"
+
+			policies: [
+				{
+					_action: "topics.get"
+					required_for: ["healthcheck"]
+				},
+				{
+					_action: "topics.publish"
+					required_for: ["write"]
+				},
+			]
+		},
+	]
 }

@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
-use futures::{compat::Future01CompatExt, stream, SinkExt, StreamExt};
+use futures::{stream, SinkExt, StreamExt};
 use std::convert::TryInto;
 use std::path::PathBuf;
 use tempfile::tempdir;
@@ -82,7 +82,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                     });
                     let _ = stream::iter(lines).forward(input).await.unwrap();
 
-                    topology.stop().compat().await.unwrap();
+                    topology.stop().await;
                 });
             },
             BatchSize::LargeInput,
@@ -92,4 +92,10 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, benchmark_files_without_partitions);
+criterion_group!(
+    name = benches;
+    // encapsulates inherent CI noise we saw in
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.05);
+    targets = benchmark_files_without_partitions
+);

@@ -34,12 +34,18 @@ components: {
 			// components.
 			service_providers: [string, ...string] | *[]
 		}
+
+		stateful: bool
 	}
 
 	#Component: {
 		// `kind` specified the component kind. This is set automatically.
 		kind: #ComponentKind
 		let Kind = kind
+
+		installation?: {
+			platform_name: string | null
+		}
 
 		configuration: #Schema
 
@@ -61,10 +67,11 @@ components: {
 
 		// `examples` demonstrates various ways to use the component using an
 		// input, output, and example configuration.
-		#ExampleConfig: close({
+		#ExampleConfig: {
 			title:    string
 			context?: string
 			"configuration": {
+				...
 				for k, v in configuration {
 					"\( k )"?: _ | *null
 				}
@@ -87,7 +94,7 @@ components: {
 			}
 
 			notes?: string
-		})
+		}
 
 		examples?: [#ExampleConfig, ...#ExampleConfig]
 
@@ -122,6 +129,10 @@ components: {
 		// For example, the `http` sink has a `HTTP` title.
 		title: string
 
+		// Platform-specific policies, e.g. AWS IAM policies, that are
+		// required or recommended when using the component.
+		permissions?: iam: [#IAM, ...#IAM]
+
 		// Telemetry produced by the component
 		telemetry: metrics: #MetricOutput
 	}
@@ -136,8 +147,10 @@ components: {
 	// `#EgressMethod` specified how a component outputs events.
 	//
 	// * `batch` - one or more events at a time
+	// * `dynamic` - can switch between batch and stream based on configuration.
+	// * `expose` - exposes data, ex: prometheus_exporter sink
 	// * `stream` - one event at a time
-	#EgressMethod: "batch" | "expose" | "stream"
+	#EgressMethod: "batch" | "dynamic" | "expose" | "stream"
 
 	#EnvVars: #Schema & {[Type=string]: {
 		common:   true
@@ -155,6 +168,7 @@ components: {
 			collect?:  #FeaturesCollect
 			generate?: #FeaturesGenerate
 			multiline: #FeaturesMultiline
+			encoding?: #FeaturesEncoding
 			receive?:  #FeaturesReceive
 		}
 
@@ -172,14 +186,14 @@ components: {
 
 		if Args.kind == "sink" {
 			// `buffer` describes how the component buffers data.
-			buffer: close({
+			buffer: {
 				enabled: bool | string
-			})
+			}
 
 			// `healtcheck` notes if a component offers a healthcheck on boot.
-			healthcheck: close({
+			healthcheck: {
 				enabled: bool
-			})
+			}
 
 			exposes?: #FeaturesExpose
 			send?:    #FeaturesSend & {_args: Args}
@@ -189,9 +203,9 @@ components: {
 	}
 
 	#FeaturesCollect: {
-		checkpoint: close({
+		checkpoint: {
 			enabled: bool
-		})
+		}
 
 		from?: {
 			service:    #Service
@@ -205,14 +219,16 @@ components: {
 	}
 
 	#FeaturesEnrich: {
-		from: service: close({
+		from: service: {
 			name:     string
 			url:      string
 			versions: string | null
-		})
+		}
 	}
 
 	#FeaturesExpose: {
+		tls: #FeaturesTLS & {_args: {mode: "accept"}}
+
 		for: {
 			service:    #Service
 			interface?: #Interface
@@ -225,16 +241,34 @@ components: {
 	#FeaturesGenerate: {
 	}
 
+	#FeaturesSendBufferBytes: {
+		enabled:        bool
+		relevant_when?: string
+	}
+
+	#FeaturesReceiveBufferBytes: {
+		enabled:        bool
+		relevant_when?: string
+	}
+
+	#FeaturesKeepalive: {
+		enabled: bool
+	}
+
 	#FeaturesMultiline: {
 		enabled: bool
 	}
 
+	#FeaturesEncoding: {
+		enabled: bool
+	}
+
 	#FeaturesParse: {
-		format: close({
+		format: {
 			name:     string
 			url:      string | null
 			versions: string | null
-		})
+		}
 	}
 
 	#FeaturesProgram: {
@@ -246,6 +280,10 @@ components: {
 			service:    #Service
 			interface?: #Interface
 		}
+
+		keepalive?: #FeaturesKeepalive
+
+		receive_buffer_bytes?: #FeaturesReceiveBufferBytes
 
 		tls: #FeaturesTLS & {_args: {mode: "accept"}}
 	}
@@ -269,16 +307,16 @@ components: {
 		}
 		let Args = _args
 
-		if Args.egress_method == "batch" {
+		if Args.egress_method == "batch" || Args.egress_method == "dynamic" {
 			// `batch` describes how the component batches data. This is only
 			// relevant if a component has an `egress_method` of "batch".
-			batch: close({
+			batch: {
 				enabled:      bool
 				common:       bool
 				max_bytes:    uint | null
 				max_events:   uint | null
-				timeout_secs: uint16
-			})
+				timeout_secs: uint16 | null
+			}
 		}
 
 		// `compression` describes how the component compresses data.
@@ -308,6 +346,10 @@ components: {
 			}
 		}
 
+		send_buffer_bytes?: #FeaturesSendBufferBytes
+
+		keepalive?: #FeaturesKeepalive
+
 		// `request` describes how the component issues and manages external
 		// requests.
 		request: {
@@ -321,6 +363,7 @@ components: {
 				retry_initial_backoff_secs: uint8
 				retry_max_duration_secs:    uint8
 				timeout_secs:               uint8
+				headers:                    bool
 			}
 		}
 
@@ -356,33 +399,60 @@ components: {
 		metrics: #MetricInput | null
 	}
 
-	#LogOutput: [Name=string]: close({
+	#LogOutput: [Name=string]: {
 		description: string
 		name:        Name
 		fields:      #Schema
-	})
-
-	#MetricInput: {
-		counter:      bool
-		distribution: bool
-		gauge:        bool
-		histogram:    bool
-		summary:      bool
-		set:          bool
 	}
 
-	#MetricOutput: [Name=string]: close({
+	#MetricInput: {
+		counter:      *false | bool
+		distribution: *false | bool
+		gauge:        *false | bool
+		histogram:    *false | bool
+		set:          *false | bool
+		summary:      *false | bool
+	}
+
+	#MetricOutput: [Name=string]: {
 		description:       string
 		relevant_when?:    string
 		tags:              #MetricTags
 		name:              Name
 		type:              #MetricType
 		default_namespace: string
-	})
+	}
 
 	#Output: {
 		logs?:    #LogOutput
 		metrics?: #MetricOutput
+	}
+
+	#IAM: {
+		#Policy: {
+			#RequiredFor: "write" | "healthcheck"
+
+			_action:        !=""
+			required_for:   *["write"] | [#RequiredFor, ...#RequiredFor]
+			docs_url:       !=""
+			required_when?: !=""
+
+			if platform == "aws" {
+				docs_url: "https://docs.aws.amazon.com/\(_docs_tag)/latest/APIReference/API_\(_action).html"
+				action:   "\(_service):\(_action)"
+			}
+			if platform == "gcp" {
+				docs_url: "https://cloud.google.com/iam/docs/permissions-reference"
+				action:   "\(_service).\(_action)"
+			}
+		}
+
+		platform: "aws" | "gcp"
+		policies: [#Policy, ...#Policy]
+		_service: !="" // The slug of the service, e.g. "s3" or "firehose"
+		// _docs_tag is used to ed to construct URLs, e.g. "AmazonCloudWatchLogs" in
+		// https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_DescribeLogStreams.html
+		_docs_tag: *_service | !=""
 	}
 
 	#Runtime: {
@@ -394,18 +464,15 @@ components: {
 	#Support: {
 		_args: kind: string
 
-		// `platforms` describes which platforms this component is available on.
-		//
-		// For example, the `journald` source is only available on Linux
-		// environments.
-		platforms: #TargetTriples
-
 		// `requirements` describes any external requirements that the component
 		// needs to function properly.
 		//
 		// For example, the `journald` source requires the presence of the
 		// `journalctl` binary.
 		requirements: [...string] | null // Allow for empty list
+
+		// `targets` describes which targets this component is available on.
+		targets: #TargetTriples
 
 		// `warnings` describes any warnings the user should know about the
 		// component.
@@ -430,122 +497,9 @@ components: {
 		kind: string
 		let Kind = kind
 
-		configuration: {
-			_conditions: {
-				examples: [
-					{
-						type:                           "check_fields"
-						"message.eq":                   "foo"
-						"message.not_eq":               "foo"
-						"message.exists":               true
-						"message.not_exists":           true
-						"message.contains":             "foo"
-						"message.not_contains":         "foo"
-						"message.ends_with":            "foo"
-						"message.not_ends_with":        "foo"
-						"message.ip_cidr_contains":     "10.0.0.0/8"
-						"message.not_ip_cidr_contains": "10.0.0.0/8"
-						"message.regex":                " (any|of|these|five|words) "
-						"message.not_regex":            " (any|of|these|five|words) "
-						"message.starts_with":          "foo"
-						"message.not_starts_with":      "foo"
-					},
-				]
-				options: {
-					type: {
-						common:      true
-						description: "The type of the condition to execute."
-						required:    false
-						warnings: []
-						type: string: {
-							default: "check_fields"
-							enum: {
-								check_fields: "Allows you to check individual fields against a list of conditions."
-								is_log:       "Returns true if the event is a log."
-								is_metric:    "Returns true if the event is a metric."
-							}
-						}
-					}
-					"*.eq": {
-						common:      true
-						description: "Check whether a field's contents exactly matches the value specified, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: ["foo"]
-						}
-					}
-					"*.exists": {
-						common:      false
-						description: "Check whether a field exists or does not exist, depending on the provided value being `true` or `false` respectively."
-						required:    false
-						warnings: []
-						type: bool: default: null
-					}
-					"*.not_*": {
-						common:      false
-						description: "Allow you to negate any condition listed here."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: []
-						}
-					}
-					"*.contains": {
-						common:      true
-						description: "Checks whether a string field contains a string argument, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: ["foo"]
-						}
-					}
-					"*.ends_with": {
-						common:      true
-						description: "Checks whether a string field ends with a string argument, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: ["suffix"]
-						}
-					}
-					"*.ip_cidr_contains": {
-						common:      false
-						description: "Checks whether an IP field is contained within a given [IP CIDR](\(urls.cidr)) (works with IPv4 and IPv6). This may be a single string or a list of strings, in which case this evaluates to true if the IP field is contained within any of the CIDRs in the list."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: ["10.0.0.0/8", "2000::/10", "192.168.0.0/16"]
-						}
-					}
-					"*.regex": {
-						common:      true
-						description: "Checks whether a string field matches a [regular expression](\(urls.regex)). Vector uses the [documented Rust Regex syntax](\(urls.rust_regex_syntax)). Note that this condition is considerably more expensive than a regular string match (such as `starts_with` or `contains`) so the use of those conditions are preferred where possible."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: [" (any|of|these|five|words) "]
-						}
-					}
-					"*.starts_with": {
-						common:      true
-						description: "Checks whether a string field starts with a string argument, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: ["prefix"]
-						}
-					}
-				}
-			}
+		classes: #Classes & {_args: kind: Kind}
 
+		configuration: {
 			_tls_accept: {
 				_args: {
 					can_enable:             bool
@@ -574,6 +528,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
+							syntax: "literal"
 						}
 					}
 					crt_file: {
@@ -583,6 +538,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.crt"]
+							syntax: "literal"
 						}
 					}
 					key_file: {
@@ -592,6 +548,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.key"]
+							syntax: "literal"
 						}
 					}
 					key_pass: {
@@ -601,6 +558,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+							syntax: "literal"
 						}
 					}
 
@@ -644,6 +602,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
+							syntax: "literal"
 						}
 					}
 					crt_file: {
@@ -653,6 +612,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.crt"]
+							syntax: "literal"
 						}
 					}
 					key_file: {
@@ -662,6 +622,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.key"]
+							syntax: "literal"
 						}
 					}
 					key_pass: {
@@ -671,6 +632,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+							syntax: "literal"
 						}
 					}
 
@@ -711,6 +673,7 @@ components: {
 						warnings: []
 						type: string: {
 							examples: [Args.password_example, "password"]
+							syntax: "literal"
 						}
 					}
 					strategy: {
@@ -722,6 +685,7 @@ components: {
 								basic:  "The [basic authentication strategy](\(urls.basic_auth))."
 								bearer: "The bearer token authentication strategy."
 							}
+							syntax: "literal"
 						}
 					}
 					token: {
@@ -730,6 +694,7 @@ components: {
 						warnings: []
 						type: string: {
 							examples: ["${API_TOKEN}", "xyz123"]
+							syntax: "literal"
 						}
 					}
 					user: {
@@ -738,6 +703,7 @@ components: {
 						warnings: []
 						type: string: {
 							examples: [Args.username_example, "username"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -757,6 +723,7 @@ components: {
 							warnings: []
 							type: string: {
 								examples: ["${HTTP_USERNAME}", "username"]
+								syntax: "literal"
 							}
 						}
 						password: {
@@ -765,6 +732,7 @@ components: {
 							warnings: []
 							type: string: {
 								examples: ["${HTTP_PASSWORD}", "password"]
+								syntax: "literal"
 							}
 						}
 					}
@@ -773,9 +741,51 @@ components: {
 
 			_types: {
 				common:      true
-				description: "Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types."
+				description: """
+					Key/value pairs representing mapped log field names and types. This is used to
+					coerce log fields from strings into their proper types. The available types are
+					listed in the **Types** list below.
+
+					Timestamp coercions need to be prefaced with `timestamp|`, for example
+					`\"timestamp|%F\"`. Timestamp specifiers can use either of the following:
+
+					1. One of the built-in-formats listed in the **Timestamp Formats** table below.
+					2. The [time format specifiers](\(urls.chrono_time_formats)) from Rust's
+					`chrono` library.
+
+					### Types
+
+					* `array`
+					* `bool`
+					* `bytes`
+					* `float`
+					* `int`
+					* `map`
+					* `null`
+					* `timestamp` (see the table below for formats)
+
+					### Timestamp Formats
+
+					Format | Description | Example
+					:------|:------------|:-------
+					`%F %T` | `YYYY-MM-DD HH:MM:SS` | `2020-12-01 02:37:54`
+					`%v %T` | `DD-Mmm-YYYY HH:MM:SS` | `01-Dec-2020 02:37:54`
+					`%FT%T` | [ISO 8601](\(urls.iso_8601))\\[RFC 3339](\(urls.rfc_3339)) format without time zone | `2020-12-01T02:37:54`
+					`%a, %d %b %Y %T` | [RFC 822](\(urls.rfc_822))/[2822](\(urls.rfc_2822)) without time zone | `Tue, 01 Dec 2020 02:37:54`
+					`%a %d %b %T %Y` | [`date`](\(urls.date)) command output without time zone | `Tue 01 Dec 02:37:54 2020`
+					`%a %b %e %T %Y` | [ctime](\(urls.ctime)) format | `Tue Dec  1 02:37:54 2020`
+					`%s` | [UNIX](\(urls.unix_timestamp)) timestamp | `1606790274`
+					`%FT%TZ` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC | `2020-12-01T09:37:54Z`
+					`%+` | [ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC with time zone | `2020-12-01T02:37:54-07:00`
+					`%a %d %b %T %Z %Y` | [`date`](\(urls.date)) command output with time zone | `Tue 01 Dec 02:37:54 PST 2020`
+					`%a %d %b %T %z %Y`| [`date`](\(urls.date)) command output with numeric time zone | `Tue 01 Dec 02:37:54 -0700 2020`
+					`%a %d %b %T %#z %Y` | [`date`](\(urls.date)) command output with numeric time zone (minutes can be missing or present) | `Tue 01 Dec 02:37:54 -07 2020`
+
+					**Note**: the examples in this table are for 54 seconds after 2:37 am on December 1st, 2020 in Pacific Standard Time.
+					"""
 				required:    false
 				warnings: []
+
 				type: object: {
 					examples: [
 						{
@@ -784,6 +794,7 @@ components: {
 							success:           "bool"
 							timestamp_iso8601: "timestamp|%F"
 							timestamp_custom:  "timestamp|%a %b %e %T %Y"
+							timestamp_unix:    "timestamp|%F %T"
 							parent: {"child": "int"}
 						},
 					]
@@ -793,10 +804,21 @@ components: {
 
 			if Kind != "source" {
 				inputs: {
-					description: "A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms)) IDs. See [configuration](\(urls.vector_configuration)) for more info."
+					description: """
+						A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms))
+						IDs. Wildcards (`*`) are supported but _must_ be the last character in the ID.
+
+						See [configuration](\(urls.vector_configuration)) for more info.
+						"""
 					required:    true
 					sort:        -1
-					type: array: items: type: string: examples: ["my-source-or-transform-id"]
+					type: array: items: type: string: {
+						examples: [
+							"my-source-or-transform-id",
+							"prefix-*",
+						]
+						syntax: "literal"
+					}
 				}
 			}
 
@@ -804,8 +826,12 @@ components: {
 				description: "The component type. This is a required field for all components and tells Vector which component to use."
 				required:    true
 				sort:        -2
-				"type": string: enum:
-					"\(Name)": "The type of this component."
+				"type": string: {
+					enum: #Enum | *{
+						"\(Name)": "The type of this component."
+					}
+					syntax: "literal"
+				}
 			}
 		}
 
@@ -842,6 +868,10 @@ components: {
 						receive_context: "Enriches data with useful \(features.receive.from.service.name) context."
 					}
 
+					if features.receive.keepalive.enabled != _|_ {
+						keepalive: "Supports TCP keepalive for efficient resource use and reliability."
+					}
+
 					if features.receive.tls.enabled != _|_ {
 						tls_receive: "Securely receives data via Transport Layer Security (TLS)."
 					}
@@ -856,6 +886,10 @@ components: {
 
 					if features.send.compression.enabled != _|_ {
 						compress: "Compresses data to optimize bandwidth."
+					}
+
+					if features.send.keepalive.enabled != _|_ {
+						keepalive: "Supports TCP keepalive for efficient resource use and reliability."
 					}
 
 					if features.send.request.enabled != _|_ {
@@ -951,10 +985,32 @@ components: {
 			}
 		}
 
-		telemetry: metrics: {
-			// Default metrics for each component
-			processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
-			processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		if Kind == "transform" {
+			telemetry: metrics: {
+				// Default metrics for each transform
+				processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+				processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+			}
+		}
+
+		how_it_works: {
+			state: {
+				title: "State"
+
+				if classes.stateful == true {
+					body: """
+						This component is stateful, meaning its behavior changes based on previous inputs (events).
+						State is not preserved across restarts, therefore state-dependent behavior will reset between
+						restarts and depend on the inputs (events) received since the most recent restart.
+						"""
+				}
+
+				if classes.stateful == false {
+					body: """
+						This component is stateless, meaning its behavior is consistent across each input.
+						"""
+				}
+			}
 		}
 	}}
 }

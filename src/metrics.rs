@@ -1,9 +1,11 @@
 use crate::{event::Metric, Event};
-use metrics::{Key, KeyData, Label, Recorder, Unit};
+use dashmap::DashMap;
+use metrics::{GaugeValue, Key, KeyData, Label, Recorder, SharedString, Unit};
 use metrics_tracing_context::{LabelFilter, TracingContextLayer};
 use metrics_util::layers::Layer;
-use metrics_util::{CompositeKey, Handle, MetricKind, Registry};
+use metrics_util::{CompositeKey, Handle, MetricKind};
 use once_cell::sync::OnceCell;
+use std::hash::Hash;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc,
@@ -15,14 +17,36 @@ static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 // cardinality.
 // Useful for the end users to help understand the characteristics of their
 // environment and how vectors acts in it.
-const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality";
-static CARDINALITY_KEY_DATA: KeyData = KeyData::from_static_name(CARDINALITY_KEY_NAME);
+const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality_total";
+static CARDINALITY_KEY_DATA_NAME: [SharedString; 1] =
+    [SharedString::const_str(&CARDINALITY_KEY_NAME)];
+static CARDINALITY_KEY_DATA: KeyData = KeyData::from_static_name(&CARDINALITY_KEY_DATA_NAME);
 static CARDINALITY_KEY: CompositeKey =
-    CompositeKey::new(MetricKind::Counter, Key::Borrowed(&CARDINALITY_KEY_DATA));
+    CompositeKey::new(MetricKind::COUNTER, Key::Borrowed(&CARDINALITY_KEY_DATA));
+
+fn metrics_enabled() -> bool {
+    !matches!(std::env::var("DISABLE_INTERNAL_METRICS_CORE"), Ok(x) if x == "true")
+}
+
+fn tracing_context_layer_enabled() -> bool {
+    !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
+}
 
 pub fn init() -> crate::Result<()> {
+    // An escape hatch to allow disabing internal metrics core.
+    // May be used for performance reasons.
+    // This is a hidden and undocumented functionality.
+    if !metrics_enabled() {
+        metrics::set_boxed_recorder(Box::new(metrics::NoopRecorder))
+            .map_err(|_| "recorder already initialized")?;
+        info!(message = "Internal metrics core is disabled.");
+        return Ok(());
+    }
+
     // Prepare the registry.
-    let registry = Registry::new();
+    let registry = VectorRegistry {
+        map: DashMap::new(),
+    };
     let registry = Arc::new(registry);
 
     // Init the cardinality counter.
@@ -48,19 +72,68 @@ pub fn init() -> crate::Result<()> {
         registry: Arc::clone(&registry),
         cardinality_counter: Arc::clone(&cardinality_counter),
     };
-    // Apply a layer to capture tracing span fields as labels.
-    let recorder = TracingContextLayer::new(VectorLabelFilter).layer(recorder);
+
+    // If enabled, apply a layer to capture tracing span fields as labels.
+    let recorder: Box<dyn metrics::Recorder> = if tracing_context_layer_enabled() {
+        Box::new(TracingContextLayer::new(VectorLabelFilter).layer(recorder))
+    } else {
+        Box::new(recorder)
+    };
+
     // Register the recorder globally.
-    metrics::set_boxed_recorder(Box::new(recorder)).map_err(|_| "recorder already initialized")?;
+    metrics::set_boxed_recorder(recorder).map_err(|_| "recorder already initialized")?;
 
     // Done.
     Ok(())
 }
 
+/// [`VectorRegistry`] is a vendored version of [`metrics_util::Registry`].
+///
+/// We are removing the generational wrappers that upstream added, as they
+/// might've been the cause of the performance issues on the multi-core systems
+/// under high paralellism.
+///
+/// The suspicion is that the atomics usage in the generational somehow causes
+/// permanent cache invalidation starvation at some scenarios - however, it's
+/// based on the empiric observations, and we currently don't have
+/// a comprehensive mental model to back up this behaviour.
+/// It was decided to just eliminate the generationals - for now.
+/// Maybe in the long term too - we don't need them, so why pay the price?
+/// They're not zero-cost.
+#[derive(Debug)]
+struct VectorRegistry<K, H>
+where
+    K: Eq + Hash + Clone + 'static,
+    H: 'static,
+{
+    pub map: DashMap<K, H>,
+}
+
+impl<K, H> VectorRegistry<K, H>
+where
+    K: Eq + Hash + Clone + 'static,
+    H: 'static,
+{
+    /// Perform an operation on a given key.
+    ///
+    /// The `op` function will be called for the handle under the given `key`.
+    ///
+    /// If the `key` is not already mapped, the `init` function will be
+    /// called, and the resulting handle will be stored in the registry.
+    pub fn op<I, O, V>(&self, key: K, op: O, init: I) -> V
+    where
+        I: FnOnce() -> H,
+        O: FnOnce(&H) -> V,
+    {
+        let valref = self.map.entry(key).or_insert_with(init);
+        op(valref.value())
+    }
+}
+
 /// [`VectorRecorder`] is a [`metrics::Recorder`] implementation that's suitable
 /// for the advanced usage that we have in Vector.
 struct VectorRecorder {
-    registry: Arc<Registry<CompositeKey, Handle>>,
+    registry: Arc<VectorRegistry<CompositeKey, Handle>>,
     cardinality_counter: Arc<AtomicU64>,
 }
 
@@ -76,7 +149,7 @@ impl VectorRecorder {
 
 impl Recorder for VectorRecorder {
     fn register_counter(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
-        let ckey = CompositeKey::new(MetricKind::Counter, key);
+        let ckey = CompositeKey::new(MetricKind::COUNTER, key);
         self.registry.op(
             ckey,
             |_| {},
@@ -84,7 +157,7 @@ impl Recorder for VectorRecorder {
         )
     }
     fn register_gauge(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
-        let ckey = CompositeKey::new(MetricKind::Gauge, key);
+        let ckey = CompositeKey::new(MetricKind::GAUGE, key);
         self.registry.op(
             ckey,
             |_| {},
@@ -97,7 +170,7 @@ impl Recorder for VectorRecorder {
         _unit: Option<Unit>,
         _description: Option<&'static str>,
     ) {
-        let ckey = CompositeKey::new(MetricKind::Histogram, key);
+        let ckey = CompositeKey::new(MetricKind::HISTOGRAM, key);
         self.registry.op(
             ckey,
             |_| {},
@@ -106,23 +179,23 @@ impl Recorder for VectorRecorder {
     }
 
     fn increment_counter(&self, key: Key, value: u64) {
-        let ckey = CompositeKey::new(MetricKind::Counter, key);
+        let ckey = CompositeKey::new(MetricKind::COUNTER, key);
         self.registry.op(
             ckey,
             |handle| handle.increment_counter(value),
             || self.bump_cardinality_counter_and(Handle::counter),
         )
     }
-    fn update_gauge(&self, key: Key, value: f64) {
-        let ckey = CompositeKey::new(MetricKind::Gauge, key);
+    fn update_gauge(&self, key: Key, value: GaugeValue) {
+        let ckey = CompositeKey::new(MetricKind::GAUGE, key);
         self.registry.op(
             ckey,
             |handle| handle.update_gauge(value),
             || self.bump_cardinality_counter_and(Handle::gauge),
         )
     }
-    fn record_histogram(&self, key: Key, value: u64) {
-        let ckey = CompositeKey::new(MetricKind::Histogram, key);
+    fn record_histogram(&self, key: Key, value: f64) {
+        let ckey = CompositeKey::new(MetricKind::HISTOGRAM, key);
         self.registry.op(
             ckey,
             |handle| handle.record_histogram(value),
@@ -143,7 +216,7 @@ impl LabelFilter for VectorLabelFilter {
 
 /// Controller allows capturing metric snapshots.
 pub struct Controller {
-    registry: Arc<Registry<CompositeKey, Handle>>,
+    registry: Arc<VectorRegistry<CompositeKey, Handle>>,
 }
 
 /// Get a handle to the globally registered controller, if it's initialized.
@@ -154,14 +227,17 @@ pub fn get_controller() -> crate::Result<&'static Controller> {
 }
 
 fn snapshot(controller: &Controller) -> Vec<Event> {
-    let handles = controller.registry.get_handles();
-    handles
-        .into_iter()
-        .map(|(ck, m)| {
-            let (_, k) = ck.into_parts();
-            Metric::from_metric_kv(k, m).into()
-        })
+    controller
+        .registry
+        .map
+        .iter()
+        .map(|valref| Metric::from_metric_kv(valref.key().key(), valref.value()).into())
         .collect()
+}
+
+/// Clear all metrics from the registry.
+pub fn reset(controller: &Controller) {
+    controller.registry.map.clear()
 }
 
 /// Take a snapshot of all gathered metrics and expose them as metric
@@ -172,7 +248,7 @@ pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_util::trace_init;
+    use crate::{event::Event, test_util::trace_init};
     use metrics::counter;
     use tracing::{span, Level};
 
@@ -200,7 +276,7 @@ mod tests {
 
         let metric = super::capture_metrics(super::get_controller().unwrap())
             .map(|e| e.into_metric())
-            .find(|metric| metric.name == "labels_injected_total")
+            .find(|metric| metric.name() == "labels_injected_total")
             .unwrap();
 
         let expected_tags = Some(
@@ -213,7 +289,7 @@ mod tests {
             .collect(),
         );
 
-        assert_eq!(metric.tags, expected_tags);
+        assert_eq!(metric.tags(), expected_tags.as_ref());
     }
 
     #[test]
@@ -223,10 +299,10 @@ mod tests {
 
         let capture_value = || {
             let metric = super::capture_metrics(super::get_controller().unwrap())
-                .map(|e| e.into_metric())
-                .find(|metric| metric.name == super::CARDINALITY_KEY_NAME)
+                .map(Event::into_metric)
+                .find(|metric| metric.name() == super::CARDINALITY_KEY_NAME)
                 .unwrap();
-            match metric.value {
+            match metric.data.value {
                 crate::event::MetricValue::Counter { value } => value,
                 _ => panic!("invalid metric value type, expected coutner, got something else"),
             }
@@ -235,18 +311,31 @@ mod tests {
         let intial_value = capture_value();
 
         counter!("cardinality_test_metric_1", 1);
-        assert_eq!(capture_value(), intial_value + 1.0);
+        assert!(capture_value() >= intial_value + 1.0);
 
         counter!("cardinality_test_metric_1", 1);
-        assert_eq!(capture_value(), intial_value + 1.0);
+        assert!(capture_value() >= intial_value + 1.0);
 
         counter!("cardinality_test_metric_2", 1);
         counter!("cardinality_test_metric_3", 1);
-        assert_eq!(capture_value(), intial_value + 3.0);
+        assert!(capture_value() >= intial_value + 3.0);
 
-        counter!("cardinality_test_metric_1", 1);
-        counter!("cardinality_test_metric_2", 1);
-        counter!("cardinality_test_metric_3", 1);
-        assert_eq!(capture_value(), intial_value + 3.0);
+        // Other tests could possibly increase the cardinality, so just
+        // try adding the same test metrics a few times and fail only if
+        // it keeps increasing.
+        for count in 1..=10 {
+            let start_value = capture_value();
+            counter!("cardinality_test_metric_1", 1);
+            counter!("cardinality_test_metric_2", 1);
+            counter!("cardinality_test_metric_3", 1);
+            let end_value = capture_value();
+            assert!(end_value >= start_value);
+            if start_value == end_value {
+                break;
+            }
+            if count == 10 {
+                panic!("Cardinality count still increasing after 10 loops!");
+            }
+        }
     }
 }

@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: gcp_cloud_storage: {
-	title:       "GCP Cloud Storage (GCS)"
-	description: "[Google Cloud Storage][urls.gcp_cloud_storage] is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities. This makes it a prime candidate for log data."
+	title: "GCP Cloud Storage (GCS)"
 
 	classes: {
 		commonly_used: true
@@ -10,6 +9,7 @@ components: sinks: gcp_cloud_storage: {
 		development:   "beta"
 		egress_method: "batch"
 		service_providers: ["GCP"]
+		stateful: false
 	}
 
 	features: {
@@ -45,6 +45,7 @@ components: sinks: gcp_cloud_storage: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
+				headers:                    false
 			}
 			tls: {
 				enabled:                true
@@ -72,15 +73,16 @@ components: sinks: gcp_cloud_storage: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -103,6 +105,7 @@ components: sinks: gcp_cloud_storage: {
 					"project-private":           "Gives permission to the project team based on their roles. Anyone who is part of the team has READER permission. Project owners and project editors have OWNER permission. This the default."
 					"public-read":               "Gives the bucket or object owner OWNER permission, and gives all users, both authenticated and anonymous, READER permission. When you apply this to an object, anyone on the Internet can read the object without authenticating."
 				}
+				syntax: "literal"
 			}
 		}
 		bucket: {
@@ -111,6 +114,7 @@ components: sinks: gcp_cloud_storage: {
 			warnings: []
 			type: string: {
 				examples: ["my-bucket"]
+				syntax: "literal"
 			}
 		}
 		credentials_path: {
@@ -122,6 +126,7 @@ components: sinks: gcp_cloud_storage: {
 			type: string: {
 				default: null
 				examples: ["/path/to/credentials.json"]
+				syntax: "literal"
 			}
 		}
 		filename_append_uuid: {
@@ -140,6 +145,7 @@ components: sinks: gcp_cloud_storage: {
 			warnings: []
 			type: string: {
 				default: "log"
+				syntax:  "literal"
 			}
 		}
 		filename_time_format: {
@@ -150,6 +156,7 @@ components: sinks: gcp_cloud_storage: {
 			warnings: []
 			type: string: {
 				default: "%s"
+				syntax:  "literal"
 			}
 		}
 		key_prefix: {
@@ -161,7 +168,7 @@ components: sinks: gcp_cloud_storage: {
 			type: string: {
 				default: "date=%F/"
 				examples: ["date=%F/", "date=%F/hour=%H/", "year=%Y/month=%m/day=%d/", "application_id={{ application_id }}/date=%F/"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		metadata: {
@@ -172,6 +179,7 @@ components: sinks: gcp_cloud_storage: {
 			type: string: {
 				default: null
 				examples: []
+				syntax: "literal"
 			}
 		}
 		storage_class: {
@@ -188,6 +196,7 @@ components: sinks: gcp_cloud_storage: {
 					COLDLINE: "Coldline Storage is a very-low-cost, highly durable storage service for storing infrequently accessed data."
 					ARCHIVE:  "Archive Storage is the lowest-cost, highly durable storage service for data archiving, online backup, and disaster recovery."
 				}
+				syntax: "literal"
 			}
 		}
 	}
@@ -279,4 +288,22 @@ components: sinks: gcp_cloud_storage: {
 					"""
 		}
 	}
+
+	permissions: iam: [
+		{
+			platform: "gcp"
+			_service: "storage"
+
+			policies: [
+				{
+					_action: "objects.create"
+					required_for: ["write"]
+				},
+				{
+					_action: "objects.get"
+					required_for: ["healthcheck"]
+				},
+			]
+		},
+	]
 }

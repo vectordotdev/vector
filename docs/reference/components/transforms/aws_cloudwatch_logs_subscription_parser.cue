@@ -1,13 +1,18 @@
 package metadata
 
 components: transforms: aws_cloudwatch_logs_subscription_parser: {
-	title:       "AWS CloudWatch Logs Subscription Parser"
-	description: "[AWS CloudWatch Logs Subscription events](\(urls.aws_cloudwatch_logs_subscriptions)) allow you to forward [AWS CloudWatch Logs](\(urls.aws_cloudwatch_logs)) to external systems. Through the subscriiption, you can: call a Lambda, send to AWS Kinesis, or send to AWS Kinesis Firehose (which can then be forwarded to many destinations)."
+	title: "AWS CloudWatch Logs Subscription Parser"
+
+	description: """
+		Parses AWS CloudWatch Logs events (configured through AWS Cloudwatch
+		subscriptions) coming from the `aws_kinesis_firehose` source.
+		"""
 
 	classes: {
 		commonly_used: false
-		development:   "beta"
+		development:   "deprecated"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -21,17 +26,26 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 	}
 
 	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+		targets: {
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+			\(aws_cloudwatch_logs_subscription_parser._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_aws_cloudwatch_log_subscription_message(.message)
+			```
+			""",
+		]
 		notices: []
 	}
 
@@ -41,7 +55,10 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 			description: "The log field to decode as an AWS CloudWatch Logs Subscription JSON event. The field must hold a string value."
 			required:    false
 			warnings: []
-			type: string: default: "message"
+			type: string: {
+				default: "message"
+				syntax:  "literal"
+			}
 		}
 	}
 
@@ -61,32 +78,50 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 			message: {
 				description: "The body of the log event."
 				required:    true
-				type: string: examples: ["hello", "{\"key\": \"value\"}"]
+				type: string: {
+					examples: ["hello", "{\"key\": \"value\"}"]
+					syntax: "literal"
+				}
 			}
 			id: {
 				description: "The CloudWatch Logs event id."
 				required:    true
-				type: string: examples: ["35683658089614582423604394983260738922885519999578275840"]
+				type: string: {
+					examples: ["35683658089614582423604394983260738922885519999578275840"]
+					syntax: "literal"
+				}
 			}
 			log_group: {
 				description: "The log group the event came from."
 				required:    true
-				type: string: examples: ["/lambda/test"]
+				type: string: {
+					examples: ["/lambda/test"]
+					syntax: "literal"
+				}
 			}
 			log_stream: {
 				description: "The log stream the event came from."
 				required:    true
-				type: string: examples: ["2020/03/24/[$LATEST]794dbaf40a7846c4984ad80ebf110544"]
+				type: string: {
+					examples: ["2020/03/24/[$LATEST]794dbaf40a7846c4984ad80ebf110544"]
+					syntax: "literal"
+				}
 			}
 			owner: {
 				description: "The ID of the AWS account the logs came from."
 				required:    true
-				type: string: examples: ["111111111111"]
+				type: string: {
+					examples: ["111111111111"]
+					syntax: "literal"
+				}
 			}
 			subscription_filters: {
 				description: "The list of subscription filter names that the logs were sent by."
 				required:    true
-				type: array: items: type: string: examples: ["Destination"]
+				type: array: items: type: string: {
+					examples: ["Destination"]
+					syntax: "literal"
+				}
 			}
 		}
 	}

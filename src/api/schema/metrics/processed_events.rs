@@ -8,21 +8,29 @@ impl ProcessedEventsTotal {
     pub fn new(m: Metric) -> Self {
         Self(m)
     }
+
+    pub fn get_timestamp(&self) -> Option<DateTime<Utc>> {
+        self.0.data.timestamp
+    }
+
+    pub fn get_processed_events_total(&self) -> f64 {
+        match self.0.data.value {
+            MetricValue::Counter { value } => value,
+            _ => 0.00,
+        }
+    }
 }
 
 #[Object]
 impl ProcessedEventsTotal {
     /// Metric timestamp
     pub async fn timestamp(&self) -> Option<DateTime<Utc>> {
-        self.0.timestamp
+        self.get_timestamp()
     }
 
     /// Total number of events processed
     pub async fn processed_events_total(&self) -> f64 {
-        match self.0.value {
-            MetricValue::Counter { value } => value,
-            _ => 0.00,
-        }
+        self.get_processed_events_total()
     }
 }
 
