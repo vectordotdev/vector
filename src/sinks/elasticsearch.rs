@@ -294,8 +294,11 @@ struct ESResultResponse {
     items: Vec<ESResultItem>,
 }
 #[derive(Deserialize, Debug)]
-struct ESResultItem {
-    index: ESIndexResult,
+enum ESResultItem {
+    #[serde(rename = "index")]
+    Index(ESIndexResult),
+    #[serde(rename = "create")]
+    Create(ESIndexResult),
 }
 #[derive(Deserialize, Debug)]
 struct ESIndexResult {
@@ -306,6 +309,15 @@ struct ESErrorDetails {
     reason: String,
     #[serde(rename = "type")]
     err_type: String,
+}
+
+impl ESResultItem {
+    fn result(self) -> ESIndexResult {
+        match self {
+            ESResultItem::Index(r) => r,
+            ESResultItem::Create(r) => r,
+        }
+    }
 }
 
 impl RetryLogic for ElasticSearchRetryLogic {
@@ -353,7 +365,7 @@ fn get_error_reason(body: &str) -> String {
             "some messages failed, could not parse response, error: {}",
             json_error
         ),
-        Ok(resp) => match resp.items.into_iter().find_map(|item| item.index.error) {
+        Ok(resp) => match resp.items.into_iter().find_map(|item| item.result().error) {
             Some(error) => format!("error type: {}, reason: {}", error.err_type, error.reason),
             None => format!("error response: {}", body),
         },
@@ -616,6 +628,20 @@ mod tests {
             logic.should_retry_response(&response),
             RetryAction::DontRetry(_)
         ));
+    }
+
+    #[test]
+    fn get_index_error_reason() {
+        let json = "{\"took\":185,\"errors\":true,\"items\":[{\"index\":{\"_index\":\"test-hgw28jv10u\",\"_type\":\"log_lines\",\"_id\":\"3GhQLXEBE62DvOOUKdFH\",\"status\":400,\"error\":{\"type\":\"illegal_argument_exception\",\"reason\":\"mapper [message] of different type, current_type [long], merged_type [text]\"}}}]}";
+        let reason = get_error_reason(&json);
+        assert_eq!(reason, "error type: illegal_argument_exception, reason: mapper [message] of different type, current_type [long], merged_type [text]");
+    }
+
+    #[test]
+    fn get_create_error_reason() {
+        let json = "{\"took\":3,\"errors\":true,\"items\":[{\"create\":{\"_index\":\"test-hgw28jv10u\",\"_type\":\"_doc\",\"_id\":\"aBLq1HcBWD7eBWkW2nj4\",\"status\":400,\"error\":{\"type\":\"mapper_parsing_exception\",\"reason\":\"object mapping for [host] tried to parse field [host] as object, but found a concrete value\"}}}]}";
+        let reason = get_error_reason(&json);
+        assert_eq!(reason, "error type: mapper_parsing_exception, reason: object mapping for [host] tried to parse field [host] as object, but found a concrete value");
     }
 
     #[test]
