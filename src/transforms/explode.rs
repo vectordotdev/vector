@@ -78,7 +78,7 @@ impl FunctionTransform for Explode {
         };
         if let Some(value) = event.as_mut_log().remove_prune(&self.field, true) {
             if let Value::Array(array) = value {
-                if let Some(_) = event.as_mut_log().insert(&target_field, Value::Null) {
+                if event.as_mut_log().insert(&target_field, Value::Null).is_some() {
                     emit!(ExplodeFieldOverwritten {
                         field: &target_field
                     });
@@ -245,7 +245,7 @@ mod tests {
                     assert_eq!(event["array[1]"], 2.into());
                 }
                 "table" => assert_eq!(event["table.key"], "value".into()),
-                _ => assert!(false, "unknown find"),
+                _ => unreachable!("unknown find"),
             }
         }
     }
