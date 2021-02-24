@@ -29,7 +29,6 @@ where
     S: Subscriber,
 {
     events: RwLock<HashMap<RateKeyIdentifier, State>>,
-    callsite_store: RwLock<HashMap<Identifier, &'static Metadata<'static>>>,
     inner: L,
 
     // TODO is this right?
@@ -44,7 +43,6 @@ where
     pub fn new(layer: L) -> Self {
         RateLimitedLayer {
             events: RwLock::<HashMap<RateKeyIdentifier, State>>::default(),
-            callsite_store: RwLock::<HashMap<Identifier, &'static Metadata<'static>>>::default(),
             inner: layer,
             _subscriber: std::marker::PhantomData,
         }
@@ -68,12 +66,6 @@ where
             .iter()
             .any(|f| f.name() == RATE_LIMIT_SECS_FIELD)
         {
-            let id = metadata.callsite();
-
-            let mut callsite_store = self.callsite_store.write().unwrap();
-            callsite_store.insert(id, metadata);
-            drop(callsite_store);
-
             Interest::sometimes()
         } else {
             inner
@@ -110,8 +102,7 @@ where
         let mut limit_visitor = LimitVisitor::default();
         event.record(&mut limit_visitor);
 
-        let callsite_id = metadata.callsite();
-        let id = RateKeyIdentifier(callsite_id.clone(), limit_visitor.key.clone());
+        let id = RateKeyIdentifier(metadata.callsite(), limit_visitor.key.clone());
 
         let events = self.events.read().expect("lock poisoned!");
 
@@ -136,7 +127,7 @@ where
                             ),
                         };
 
-                        self.create_event(&callsite_id, &ctx, message, state.limit);
+                        self.create_event(&ctx, metadata, message, state.limit);
                     }
                     // swallow the rest until a log comes in after the internal_log_rate_secs
                     // interval
@@ -158,7 +149,7 @@ where
                             count - 1
                         );
 
-                        self.create_event(&callsite_id, &ctx, message, state.limit);
+                        self.create_event(&ctx, metadata, message, state.limit);
                     }
                 }
             }
@@ -209,10 +200,13 @@ where
     S: Subscriber,
     L: Layer<S>,
 {
-    fn create_event(&self, id: &Identifier, ctx: &Context<S>, message: String, rate_limit: u64) {
-        let store = self.callsite_store.read().unwrap();
-        let metadata = store.get(id).unwrap();
-
+    fn create_event(
+        &self,
+        ctx: &Context<S>,
+        metadata: &'static Metadata<'static>,
+        message: String,
+        rate_limit: u64,
+    ) {
         let fields = metadata.fields();
 
         let message = display(message);
@@ -223,7 +217,6 @@ where
             let valueset = fields.value_set(&values);
             let event = Event::new(metadata, &valueset);
             self.inner.on_event(&event, ctx.clone());
-            drop(store);
         } else {
             let values = [(
                 &fields.field(RATE_LIMIT_SECS_FIELD).unwrap(),
@@ -233,7 +226,6 @@ where
             let valueset = fields.value_set(&values);
             let event = Event::new(metadata, &valueset);
             self.inner.on_event(&event, ctx.clone());
-            drop(store);
         }
     }
 }
