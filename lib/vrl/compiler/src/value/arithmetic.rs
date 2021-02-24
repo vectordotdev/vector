@@ -13,9 +13,7 @@ impl Value {
             Value::Integer(lhv) if rhs.is_float() => (lhv as f64 * rhs.try_float()?).into(),
             Value::Integer(lhv) => (lhv * i64::try_from(&rhs).map_err(|_| err())?).into(),
             Value::Float(lhv) => (lhv * f64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Bytes(lhv) if rhs.is_integer() => {
-                lhv.repeat(rhs.try_integer()? as usize).into()
-            }
+            Value::Bytes(lhv) if rhs.is_integer() => lhv.repeat(rhs.try_integer()? as usize).into(),
             _ => return Err(err()),
         };
 
