@@ -282,9 +282,9 @@ test: ## Run the unit test suite
 
 .PHONY: test-components
 test-components: ## Test with all components enabled
-# TODO(jesse) add `wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
+# TODO(jesse) add `language-benches wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
 # test-components: $(WASM_MODULE_OUTPUTS)
-test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches remap-benches"
+test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches metrics-benches remap-benches"
 test-components: test
 
 .PHONY: test-all
@@ -778,6 +778,12 @@ release-helm: ## Package and release Helm Chart
 .PHONY: sync-install
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
+
+##@ Vector Remap Language
+
+.PHONY: test-vrl
+test-vrl: ## Run the VRL test suite
+	@scripts/test-vrl.sh
 
 ##@ Utility
 
