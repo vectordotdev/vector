@@ -202,6 +202,7 @@ components: sources: kubernetes_logs: {
 				syntax: "literal"
 			}
 		}
+		timezone: configuration._timezone
 	}
 
 	output: logs: line: {
