@@ -57,13 +57,13 @@ These four concerns don't fully enumerate the problem but I think they're a real
 
 It might not be totally clear from the serialization benchmark examples but while protobufs are inherently slow in some respects, they're _still_ more performant than raw JSON implementations and even MessagePack or CBOR. And their maintenance cost has already been paid since we're using them today. Any schema based data format is likely going to have better perf than something schemaless. The schema itself is obviously part of the tooling overhead here but I'd argue that if we cared _more_ about tooling overhead than we did about perfomance and sustainability we'd probably be writing this project in something other than Rust.
 
-With regards to the tansport and the suggested path of implementing gRPC we have to keep both perf and kubernetes issues in mind. [TCP causes us some problems in our K8s integration today](https://github.com/timberio/vector/issues/2070) and unfortunately this problem has quite a bit more context to it than can sanely be shared in this RFC. Suffice to say that any choice we make here has repurcussions on our deployment architecture and ultimately gRPC with Protobufs provides us what we think are the right tradeoffs for our implementation. 
+With regards to the tansport and the suggested path of implementing gRPC we have to keep both perf and kubernetes issues in mind. [TCP causes us some problems in our K8s integration today](https://github.com/timberio/vector/issues/2070) and unfortunately this problem has quite a bit more context to it than can sanely be shared in this RFC. Suffice to say that any choice we make here has repurcussions on our deployment architecture and ultimately gRPC with Protobufs provides us what we think are the right tradeoffs for our implementation.
 
 This brings us to the question of _why_ gRPC instead of HTTP/2 or even HTTP/3 for that matter. There are benefits in HTTP/3 but not _really_ around throughput performance as much as reliability and behavior. HTTP/3 being based on UDP means that in the case of fetching multiple objets simultaneously in the case of a dropped packet only the single interrupted stream is blocked as opposed to all streams being blocked head of line. While this might be useful behavior, the cost of writing and maintaining something in HTTP/3 will (likely) initially be much higher. Available libraries in Rust are fairly low-level and don't provide much in the way of quality abstraction for consumers, which doesn't even cover the major glaring issue that Http/3 as a protocol hasn't fully proliferated or become ubiquitious and novelty at this stage of the project is probably not what we want. That alone makes me feel like it should be avoided initially.
 
 So there are some tangible benefits to using gRPC instead of just HTTP/2 specifically relating to ergonomics and maintenance which ends up being the principle motivator for this decision for me. Most everything that we could want to do with gRPC out of box can be achieved with HTTP/2 in hyper. However using gRPC also gives us access to [tonic](https://github.com/hyperium/tonic) which provides some truly excellent abstractions out-of-box that could pay dividends on our tooling and maintenance overhead the further we go with it, including the maintenance and overhead of protobuf generation. As a specific and shining example, should we want or need to adopt streaming requests, bi-directional stream or mutual TLS authentication. `Tonic` makes this really straightforward and ergonomic. Lets look at an example. First let's start with the protofbuf file specifically:
 
-```
+```protobuf
     syntax = "proto3";
 
     package our_rpc;
@@ -266,10 +266,9 @@ Are there any other side benefits of using HTTP/2 or gRPC for transport?
 
 ## Plan Of Attack
 
-Incremental steps that execute this change. Generally this is in the form of:
+The following steps are generally the incremental steps to execute this change. To summarize first we need to support a v2 config with both the `Vector` source _and_ the `Vector` sink. The v2 config will be backed by a GRPC implementation over Tonic that we will clearly document as an `Internal Only` API. Once fully implemented and tested we will deprecate the `Vector` v1 config in the off-chance a user is leveraging these sources and sinks. At this point it might be good to dive into optimization of our protobufs. Once GRPC has settled in we may wish to remove support for TCP. This last step is optional in the case that we need the source and sink to leverage a different transport or protocol for integrating into other systems.
 
-- [ ] Implement HTTP/1.1 with batching and v2 config (similar to the Lua transform)
-- [ ] Implementent HTTP/2
+- [ ] Implement GRPC via Tonic and v2 config (similar to the Lua transform)
+- [ ] Deprecate TCP
 - [ ] Optimize Protobufs implementation
-- [ ] Deprecate HTTP/1.1 and TCP
-- [ ] Remove HTTP/1.1 and TCP support?
+- [ ] Remove TCP support (optional)
