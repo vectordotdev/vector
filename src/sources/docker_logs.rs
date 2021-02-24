@@ -63,8 +63,7 @@ enum Error {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
-    #[serde(default = "default_host_key")]
-    host_key: String,
+    host_key: Option<String>,
     docker_host: Option<String>,
     tls: Option<DockerTlsConfig>,
     exclude_containers: Option<Vec<String>>, // Starts with actually, not exclude
@@ -88,7 +87,7 @@ pub struct DockerTlsConfig {
 impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
-            host_key: default_host_key(),
+            host_key: None,
             docker_host: None,
             tls: None,
             exclude_containers: None,
@@ -101,10 +100,6 @@ impl Default for DockerLogsConfig {
             retry_backoff_secs: 2,
         }
     }
-}
-
-fn default_host_key() -> String {
-    log_schema().host_key().to_string()
 }
 
 impl DockerLogsConfig {
@@ -333,7 +328,10 @@ impl DockerLogsSource {
     ) -> crate::Result<DockerLogsSource> {
         let backoff_secs = config.retry_backoff_secs;
 
-        let host_key = config.host_key.clone();
+        let host_key = config
+            .host_key
+            .clone()
+            .unwrap_or_else(|| log_schema().host_key().to_string());
         let hostname = crate::get_hostname().ok();
 
         // Only logs created at, or after this moment are logged.
