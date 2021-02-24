@@ -16,15 +16,19 @@ use tracing_core::{
 };
 use tracing_subscriber::layer::{Context, Layer};
 
-const RATE_LIMIT_FIELD: &str = "internal_log_rate_secs";
+const RATE_LIMIT_SECS_FIELD: &str = "internal_log_rate_secs";
+const RATE_LIMIT_KEY_FIELD: &str = "internal_log_rate_key";
 const MESSAGE_FIELD: &str = "message";
+
+#[derive(Eq, PartialEq, Hash)]
+struct RateKeyIdentifier(Identifier, Option<String>);
 
 pub struct RateLimitedLayer<S, L>
 where
     L: Layer<S> + Sized,
     S: Subscriber,
 {
-    events: RwLock<HashMap<Identifier, State>>,
+    events: RwLock<HashMap<RateKeyIdentifier, State>>,
     callsite_store: RwLock<HashMap<Identifier, &'static Metadata<'static>>>,
     inner: L,
 
@@ -39,7 +43,7 @@ where
 {
     pub fn new(layer: L) -> Self {
         RateLimitedLayer {
-            events: RwLock::<HashMap<Identifier, State>>::default(),
+            events: RwLock::<HashMap<RateKeyIdentifier, State>>::default(),
             callsite_store: RwLock::<HashMap<Identifier, &'static Metadata<'static>>>::default(),
             inner: layer,
             _subscriber: std::marker::PhantomData,
@@ -62,7 +66,7 @@ where
         if metadata
             .fields()
             .iter()
-            .any(|f| f.name() == RATE_LIMIT_FIELD)
+            .any(|f| f.name() == RATE_LIMIT_SECS_FIELD)
         {
             let id = metadata.callsite();
 
@@ -106,7 +110,9 @@ where
         let mut limit_visitor = LimitVisitor::default();
         event.record(&mut limit_visitor);
 
-        let id = metadata.callsite();
+        let callsite_id = metadata.callsite();
+        let id = RateKeyIdentifier(callsite_id.clone(), limit_visitor.key.clone());
+
         let events = self.events.read().expect("lock poisoned!");
 
         // check if the event exists within the map, if it does
@@ -120,10 +126,17 @@ where
                 match prev {
                     1 => {
                         // output first rate limited log
-                        let message =
-                            format!("Internal log [{}] is being rate limited.", state.message);
+                        let message = match limit_visitor.key {
+                            None => {
+                                format!("Internal log [{}] is being rate limited.", state.message)
+                            }
+                            Some(key) => format!(
+                                "Internal log [{} internal_log_rate_key={}].",
+                                state.message, key,
+                            ),
+                        };
 
-                        self.create_event(&id, &ctx, message, state.limit);
+                        self.create_event(&callsite_id, &ctx, message, state.limit);
                     }
                     // swallow the rest until a log comes in after the internal_log_rate_secs
                     // interval
@@ -145,21 +158,17 @@ where
                             count - 1
                         );
 
-                        self.create_event(&id, &ctx, message, state.limit);
+                        self.create_event(&callsite_id, &ctx, message, state.limit);
                     }
                 }
             }
         } else {
             drop(events);
             if let Some(limit) = limit_visitor.limit {
-                let start = Instant::now();
-
-                let id = event.metadata().callsite();
-
                 let mut events = self.events.write().expect("lock poisoned!");
 
                 let state = State {
-                    start: Some(start),
+                    start: Some(Instant::now()),
                     count: AtomicUsize::new(1),
                     limit: limit as u64,
                     message: limit_visitor
@@ -217,7 +226,7 @@ where
             drop(store);
         } else {
             let values = [(
-                &fields.field(RATE_LIMIT_FIELD).unwrap(),
+                &fields.field(RATE_LIMIT_SECS_FIELD).unwrap(),
                 Some(&rate_limit as &dyn Value),
             )];
 
@@ -241,31 +250,34 @@ fn is_limited(metadata: &Metadata<'_>) -> bool {
     metadata
         .fields()
         .iter()
-        .any(|f| f.name() == RATE_LIMIT_FIELD)
+        .any(|f| f.name() == RATE_LIMIT_SECS_FIELD)
 }
 
 #[derive(Default)]
 struct LimitVisitor {
     pub limit: Option<usize>,
     pub message: Option<String>,
+    pub key: Option<String>,
 }
 
 impl Visit for LimitVisitor {
     fn record_u64(&mut self, field: &Field, value: u64) {
-        if field.name() == RATE_LIMIT_FIELD {
+        if field.name() == RATE_LIMIT_SECS_FIELD {
             self.limit = Some(value as usize);
         }
     }
 
     fn record_i64(&mut self, field: &Field, value: i64) {
-        if field.name() == RATE_LIMIT_FIELD {
+        if field.name() == RATE_LIMIT_SECS_FIELD {
             self.limit = Some(value as usize);
         }
     }
 
     fn record_str(&mut self, field: &Field, value: &str) {
-        if field.name() == MESSAGE_FIELD {
-            self.message = Some(value.to_string());
+        match field.name() {
+            MESSAGE_FIELD => self.message = Some(value.to_string()),
+            RATE_LIMIT_KEY_FIELD => self.key = Some(value.to_string()),
+            _ => {}
         }
     }
 
