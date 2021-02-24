@@ -406,6 +406,7 @@ transforms-logs = [
   "transforms-coercer",
   "transforms-concat",
   "transforms-dedupe",
+  "transforms-explode",
   "transforms-field_filter",
   "transforms-filter",
   "transforms-geoip",
@@ -446,6 +447,7 @@ transforms-aws_ec2_metadata = ["evmap"]
 transforms-coercer = []
 transforms-concat = []
 transforms-dedupe = ["lru"]
+transforms-explode = []
 transforms-field_filter = []
 transforms-filter = []
 transforms-geoip = ["maxminddb"]

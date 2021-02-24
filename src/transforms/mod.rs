@@ -21,6 +21,8 @@ pub mod coercer;
 pub mod concat;
 #[cfg(feature = "transforms-dedupe")]
 pub mod dedupe;
+#[cfg(feature = "transforms-explode")]
+pub mod explode;
 #[cfg(feature = "transforms-field_filter")]
 pub mod field_filter;
 #[cfg(feature = "transforms-filter")]
