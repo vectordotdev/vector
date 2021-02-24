@@ -18,7 +18,6 @@ use tracing_subscriber::layer::{Context, Layer};
 
 const RATE_LIMIT_FIELD: &str = "internal_log_rate_secs";
 const MESSAGE_FIELD: &str = "message";
-const DEFAULT_LIMIT: u64 = 5;
 
 pub struct RateLimitedLayer<S, L>
 where
@@ -66,17 +65,6 @@ where
             .any(|f| f.name() == RATE_LIMIT_FIELD)
         {
             let id = metadata.callsite();
-            let mut events = self.events.write().expect("lock poisoned!");
-
-            let state = State {
-                start: None,
-                count: AtomicUsize::new(0),
-                limit: DEFAULT_LIMIT,
-                message: String::new(),
-            };
-
-            events.insert(id.clone(), state);
-            drop(events);
 
             let mut callsite_store = self.callsite_store.write().unwrap();
             callsite_store.insert(id, metadata);
@@ -88,61 +76,9 @@ where
         }
     }
 
+    #[inline]
     fn enabled(&self, metadata: &Metadata<'_>, ctx: Context<'_, S>) -> bool {
-        if !self.inner.enabled(metadata, ctx.clone()) {
-            // if wrapped layer doesn't care about the event, don't bother rate limiting
-            return false;
-        }
-
-        if ctx.enabled(metadata) {
-            let events = self.events.read().expect("lock poisoned!");
-            let id = metadata.callsite();
-
-            if events.contains_key(&id) {
-                // check if the event exists within the map, if it does
-                // that means we are currently rate limiting it.
-                if let Some(state) = events.get(&id) {
-                    let start = state.start.unwrap_or_else(Instant::now);
-
-                    if start.elapsed().as_secs() < state.limit {
-                        let prev = state.count.fetch_add(1, Ordering::Relaxed);
-                        match prev {
-                            0 => return true,
-                            1 => {
-                                let message = format!(
-                                    "Internal log [{}] is being rate limited.",
-                                    state.message
-                                );
-
-                                self.create_event(&id, &ctx, message, state.limit);
-                            }
-                            _ => (),
-                        }
-                    } else {
-                        drop(events);
-
-                        let mut events = self.events.write().expect("lock poisoned!");
-
-                        if let Some(state) = events.remove(&id) {
-                            let count = state.count.load(Ordering::Relaxed);
-                            if count > 1 {
-                                let message = format!(
-                                    "Internal log [{}] has been rate limited {} times.",
-                                    state.message,
-                                    count - 1
-                                );
-
-                                self.create_event(&id, &ctx, message, state.limit);
-                            }
-                        }
-                    }
-
-                    return false;
-                }
-            }
-        }
-
-        true
+        self.inner.enabled(metadata, ctx)
     }
 
     #[inline]
@@ -160,12 +96,61 @@ where
         self.inner.on_follows_from(span, follows, ctx);
     }
 
-    #[inline]
     fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
-        if is_limited(event.metadata()) {
-            let mut limit_visitor = LimitVisitor::default();
-            event.record(&mut limit_visitor);
+        let metadata = event.metadata();
+        // if the event is not rate limited, just pass through
+        if !is_limited(metadata) {
+            return self.inner.on_event(event, ctx);
+        }
 
+        let mut limit_visitor = LimitVisitor::default();
+        event.record(&mut limit_visitor);
+
+        let id = metadata.callsite();
+        let events = self.events.read().expect("lock poisoned!");
+
+        // check if the event exists within the map, if it does
+        // that means we are currently rate limiting it.
+        if let Some(state) = events.get(&id) {
+            let start = state.start.unwrap_or_else(Instant::now);
+
+            // check if we are still rate limiting
+            if start.elapsed().as_secs() < state.limit {
+                let prev = state.count.fetch_add(1, Ordering::Relaxed);
+                match prev {
+                    1 => {
+                        // output first rate limited log
+                        let message =
+                            format!("Internal log [{}] is being rate limited.", state.message);
+
+                        self.create_event(&id, &ctx, message, state.limit);
+                    }
+                    // swallow the rest until a log comes in after the internal_log_rate_secs
+                    // interval
+                    _ => (),
+                }
+            } else {
+                // done rate limiting
+                drop(events);
+
+                let mut events = self.events.write().expect("lock poisoned!");
+                if let Some(state) = events.remove(&id) {
+                    let count = state.count.load(Ordering::Relaxed);
+
+                    // avoid outputting a message if the event wasn't rate limited
+                    if count > 1 {
+                        let message = format!(
+                            "Internal log [{}] has been rate limited {} times.",
+                            state.message,
+                            count - 1
+                        );
+
+                        self.create_event(&id, &ctx, message, state.limit);
+                    }
+                }
+            }
+        } else {
+            drop(events);
             if let Some(limit) = limit_visitor.limit {
                 let start = Instant::now();
 
@@ -184,8 +169,9 @@ where
 
                 events.insert(id, state);
             }
+
+            self.inner.on_event(event, ctx);
         }
-        self.inner.on_event(event, ctx);
     }
 
     #[inline]
