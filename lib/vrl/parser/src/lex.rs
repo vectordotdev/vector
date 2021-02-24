@@ -426,7 +426,7 @@ impl<'input> Token<&'input str> {
             | "string" | "traverse" | "timestamp" | "duration" | "unless" | "walk" | "while"
             | "loop" => ReservedIdentifier(s),
 
-            _ if s.contains("@") => PathField(s),
+            _ if s.contains('@') => PathField(s),
 
             _ => Identifier(s),
         }
