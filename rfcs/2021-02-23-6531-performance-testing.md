@@ -2,7 +2,7 @@
 
 This RFC documents the technical details of our existing performance testing
 process and describes avenues for future work to improve over the state of the
-art in this project.
+art in this project, then makes a proposal for where to go next.
 
 * [Summary](#summary)
 * [Motivation](#motivation)
@@ -20,7 +20,8 @@ art in this project.
   * [Lean Further Into Criterion](#lean-further-into-criterion)
   * [Build a `vector diagnostic` Sub-Command](#build-a-vector-diagnostic-sub-command)
   * [Run test-harness Nightly](#run-test-harness-nightly)
-
+  * [Rethink test-harness](#rethink-test-harness)
+  * [Run Vector Continuously](#run-vector-continuously)
 
 ## Summary
 
@@ -115,8 +116,8 @@ quirk of how lua defers GC runs.
 As of this writing there are two broad approaches for performance testing work
 in the Vector project. They are:
 
-  * criterion benchmarks
-  * [vector-test-harness](https://github.com/timberio/vector-test-harness/)
+* criterion benchmarks
+* [vector-test-harness](https://github.com/timberio/vector-test-harness/)
 
 ### Criterion
 
@@ -189,7 +190,7 @@ eBPF traces, nor does the harness run regularly.
 
 We can see from [Motivating Examples](#motivating-examples) that the
 test-harness work has paid dividends. Irregular runs, multiple test purposes --
-correctness, performance, competitor comparison -- noisey results and relatively
+correctness, performance, competitor comparison -- noisy results and relatively
 coarse information collected from the performance tests are all areas for
 improvement. As an example, because of the short run duration the lua
 
@@ -204,26 +205,37 @@ specific alternative.
 
 ### "Do Nothing"
 
-In this alterative we make no substantial changes to our practices. We will
+In this alternative we make no substantial changes to our practices. We will
 continue to invest time in expanding our criterion benchmarks and will
 periodically run the test-harness, expand it as seems desirable. We will also
 not expand on Vector's self-diagnostic tools, except as would happen in the
 normal course of engineering work.
 
+Addresses:
+
+* `metrics` Crate Upgrade Regresses Benchmarks
+
+Does not address:
+
+* Regression from Increased Instrumentation
+* musl libc Release Builds
+* Channel Implementation Regresses Topology Throughput
+* Lua Transform Leaked Memory
+
 #### Upsides
 
-  * We continue to reap the benefits of our criterion work.
-  * We do not have to substantially change our approach to performance work.
+* We continue to reap the benefits of our criterion work.
+* We do not have to substantially change our approach to performance work.
 
 #### Downsides
 
-  * Without improving the reliability of test-harness data we will continue to
-    find its results difficult to act on.
-  * If we do not improve Vector's self-diagnostic capbility we will struggle to
-    understand user's on-prem issues, currently a very high-touch process. As our
-    user base expands this problem will become more accute.
-  * As our criterion tests increase in coverage the build time will balloon. This
-    will steadily drain our productivity as iteration loop time increases.
+* Without improving the reliability of test-harness data we will continue to
+  find its results difficult to act on.
+* If we do not improve Vector's self-diagnostic capability we will struggle to
+  understand user's on-prem issues, currently a very high-touch process. As our
+  user base expands this problem will become more acute.
+* As our criterion tests increase in coverage the build time will balloon. This
+  will steadily drain our productivity as iteration loop time increases.
 
 ### Lean Further Into Criterion
 
@@ -231,33 +243,44 @@ In this alternative we make no substantial changes to the test-harness -- follow
 "do nothing" here -- but place more emphasis on the criterion work. In
 particular, we intend:
 
-  * to increase the amount of compute available to the criterion CI, throwing
-    more hardware at the CI time issue,
-  * to build benchmarks that demonstrate key components' throughput performance,
-    ensuring that these numbers are maintained in documentation for end users,
-  * to substantially improve the coverage of benchmarked Vector code, though as
-    with correctness tests exact thresholds are a matter for team debate,
-  * to run our criterion benchmarks across all supported Vector platforms and
-  * to explore alternatives to improve criterion to derive better, more stable
-    signals on from our benchmarks.
+* to increase the amount of compute available to the criterion CI, throwing
+  more hardware at the CI time issue,
+* to build benchmarks that demonstrate key components' throughput performance,
+  ensuring that these numbers are maintained in documentation for end users,
+* to substantially improve the coverage of benchmarked Vector code, though as
+  with correctness tests exact thresholds are a matter for team debate,
+* to run our criterion benchmarks across all supported Vector platforms and
+* to explore alternatives to improve criterion to derive better, more stable
+  signals on from our benchmarks.
+
+Addresses:
+
+* Regression from Increased Instrumentation
+* `metrics` Crate Upgrade Regresses Benchmarks
+
+Does not address:
+
+* musl libc Release Builds
+* Channel Implementation Regresses Topology Throughput
+* Lua Transform Leaked Memory
 
 #### Upsides
 
-  * We reap the benefits of broader adoption of criterion in our project, which
-    include catching some regressions, offering targetted feedback to engineers
-    (if a test is, itself, targetted) and improve the broader ecosystem by
-    rolling changes into criterion.
-  * We gain a good deal of detailed insight into Vector at a unit level.
-  * We gain documented performance expectations for major components, a boon for
-    our end users when evaluating Vector.
+* We reap the benefits of broader adoption of criterion in our project, which
+  include catching some regressions, offering targeted feedback to engineers
+  (if a test is, itself, targeted) and improve the broader ecosystem by
+  rolling changes into criterion.
+* We gain a good deal of detailed insight into Vector at a unit level.
+* We gain documented performance expectations for major components, a boon for
+  our end users when evaluating Vector.
 
 #### Downsides
 
-  * As we have seen in practice, micro-benchmarks may not be representative of
-    macro-performance.
-  * Wall-clock benchmarks are extremely sensitive to external factors.
-  * We will encounter situations where benchmarks improve in CI and regress on
-    user's machines, especially as benchmarks become more "micro".
+* As we have seen in practice, micro-benchmarks may not be representative of
+  macro-performance.
+* Wall-clock benchmarks are extremely sensitive to external factors.
+* We will encounter situations where benchmarks improve in CI and regress on
+  user's machines, especially as benchmarks become more "micro".
 
 ### Build a `vector diagnostic` sub-command
 
@@ -266,18 +289,18 @@ sub-command. This diagnostic will examine the system to gather information about
 it's running environment and perform, time fundamental actions. Information we
 might want to collect:
 
-  * What operating system is Vector running on?
-  * For the directories present in Vector's config, what filesystems are in use?
-    What mount options are in use?
-  * How many CPUs are available to Vector and of what kind? How much memory?
-    NUMA?
-  * What kernel parameters are set, especially those relating to common
-    bottlenecks like network, descriptor limits etc?
-  * How long does a malloc/dealloc take for a series of block sizes?
-  * How long does spawning a thread take?
-  * How long do 2, 4, 8, 16 threads take to lock and unlock a common mutex?
-  * For filesystems where Vector has R/W privileges, what IO characteristics
-    exist for these filesystems?
+* What operating system is Vector running on?
+* For the directories present in Vector's config, what filesystems are in use?
+  What mount options are in use?
+* How many CPUs are available to Vector and of what kind? How much memory?
+  NUMA?
+* What kernel parameters are set, especially those relating to common
+  bottlenecks like network, descriptor limits etc?
+* How long does a malloc/dealloc take for a series of block sizes?
+* How long does spawning a thread take?
+* How long do 2, 4, 8, 16 threads take to lock and unlock a common mutex?
+* For filesystems where Vector has R/W privileges, what IO characteristics
+  exist for these filesystems?
 
 This list is not exhaustive and hopefully you get the sense that the goal is to
 collect baseline information about the system to inform user issues and guide
@@ -285,19 +308,182 @@ engineering work. An additional `doctor` sub-command could use the diagnostic
 feature to examine a config and make suggestions or point out easily detected
 issues, a disk buffer being configured to use a read-only filesystem, say.
 
+Does not address:
+
+* Regression from Increased Instrumentation
+* `metrics` Crate Upgrade Regresses Benchmarks
+* musl libc Release Builds
+* Channel Implementation Regresses Topology Throughput
+* Lua Transform Leaked Memory
+
 #### Upsides
 
-  * We collect system information from users on a case by case basis. This
-    automates some of that information gathering.
-  * Diagnostics information will help us discover unusual user systems that we
-    might otherwise struggle to reproduce.
+* We collect system information from users on a case by case basis. This
+  automates some of that information gathering.
+* Diagnostics information will help us discover unusual user systems that we
+  might otherwise struggle to reproduce.
 
 #### Downsides
 
-  * The benefits of a `diagnostic` sub-command are not immediate, are focused on
-    the after-release side of regression and some users will not wish to share
-    its output with us.
-  * A `diagnostic` sub-command is not a solution in itself but must be paired
-    with other approaches.
+* The benefits of a `diagnostic` sub-command are not immediate, are focused on
+  the after-release side of regression and some users will not wish to share
+  its output with us.
+* A `diagnostic` sub-command is not a solution in itself but must be paired
+  with other approaches.
 
-###
+### Run test-harness Nightly
+
+In this alternative we take the existing test-harness code base and adjust it to
+run nightly (likely UTC 00:00 for convenience), building from the current head
+of master branch. We will need to actually build a nightly Vector release for
+use by test-harness, but this seems straightforward to achieve.
+
+Addresses:
+
+* Regression from Increased Instrumentation
+* musl libc Release Builds
+* Channel Implementation Regresses Topology Throughput
+
+Does not address:
+
+* `metrics` Crate Upgrade Regresses Benchmarks
+* Lua Transform Leaked Memory
+
+#### Upsides
+
+* By adjusting the test-harness to run nightly we reduce the total number of
+  commits that can potentially introduce regressions, naturally simplifying the
+  debugging process.
+* We need to make very few changes to the test-harness to achieve this, other
+  than rigging up a method for periodic execution.
+
+#### Downside
+
+* Other than reducing the number of commits that must be examined, this
+  approach retains all the defects of the existing test-harness.
+
+### Rethink test-harness
+
+Consider that the test-harness currently serves three purposes: correctness
+testing, performance regression testing and product comparison testing. The
+first two have value with every commit, the third is valuable when we update
+release documentation as a guide for new users and for keeping abreast of the
+progress of our competition. In this alternative we:
+
+* Make a logical, if not structural, split in the project between the
+  different methods of testing.
+* Exploit this split to run correctness and performance tests in a "nightly"
+  fashion, "comparison" tests for pre-releases or otherwise.
+* Exploit this split to run only Vector in performance testing, ensuring that
+  these tests are more straightforward to write and allowing us to write more
+  of them as the cost to introduce each goes down.
+* Run multiple instances of the same test and for significantly longer
+  duration, applying statistical controls after the fact to get cleaner
+  signal.
+* Significantly expand the data collection we do from the subject host
+  machine. We want to collect the same kinds of information that dstat does
+  and then more, ideally with an aim to understanding the internal mechanism
+  of Vector and how it plays against system resource constraints, in the [USE
+  method](http://www.brendangregg.com/usemethod.html) sense.
+
+Fully integrated correctness testing is beyond the scope of this RFC but implied
+in this alternative is a subsequent conversation about our goals here.
+
+Addresses:
+
+* Regression from Increased Instrumentation
+* musl libc Release Builds
+* Channel Implementation Regresses Topology Throughput
+* `metrics` Crate Upgrade Regresses Benchmarks
+
+Does not address:
+
+* Lua Transform Leaked Memory
+
+#### Upsides
+
+* By adjusting the test-harness to run nightly we reduce the total number of
+  commits that can potentially introduce regressions, naturally simplifying the
+  debugging process.
+* Significantly expanded scope for performance testing of Vector.
+* More stable results from the test-harness.
+* Detailed insights about the internal mechanism of Vector in operation. The
+  aim is to not just demonstrate a regression but point at _why_ a regression
+  is.
+
+#### Downsides
+
+* Your author is only passingly familiar with operating systems outside Linux,
+  especially for the kinds of tools we'd want to bring to bear here. Without
+  additional experts we should consider that test-harness will continue to be
+  Linux-only.
+* test-harness will be a first class project in its own right, one that exists
+  in an iterative cycle with Vector.
+
+### Run Vector Continuously
+
+In this alternative we run Vector ourselves in configurations that are
+representative of our end users with conditions that are intended to be as
+extreme as possible. We want to be our own, most difficult user. We will run
+Vector in "bread and butter" setups, those that are likely to be in use by users
+and push Vector above its thresholds. When performance improves we'll up the
+pressure. Likewise, we will invest in continuous monitoring of Vector with
+regard to key customer metrics and continuously monitor the correct operation of
+Vector in its deployments. Vector should be run as close to production here as
+possible, mimicking the kind of environment our users will run Vector in.
+
+Addresses:
+
+* Regression from Increased Instrumentation
+* musl libc Release Builds
+* Channel Implementation Regresses Topology Throughput
+* `metrics` Crate Upgrade Regresses Benchmarks
+* Lua Transform Leaked Memory
+
+#### Upsides
+
+* Gives significant confidence that Vector is fit for purpose for the
+  configurations run.
+* Discovers long-tail issues that other testing methods may not.
+
+#### Downsides
+
+* Detected issues may be very difficult track down to source in this
+  environment. Vector will not be running in an instrumented environment,
+  meaning we will have to rely on its self-diagnostic and self-telemetry
+  capabilities.
+* Detected issues may not be well-isolated in this environment. Long-tail
+  problems are prone to collusion.
+* Initial setup costs will need to be paid and we'll further have to consider
+  how we introduce Vector changes into this system. Nightly? Pre-release?
+
+## Proposal
+
+This RFC proposes that we pursue the following work:
+
+* [Lean Further Into Criterion](#lean-further-into-criterion)
+* [Rethink test-harness](#rethink-test-harness)
+* [Build a `vector diagnostic` Sub-Command](#build-a-vector-diagnostic-sub-command)
+
+The first is a continuation of our existing criterion work, but more. With
+enough compute power backing our CI process we can achieve fast feedback on
+PRs. The results may be a touch artificial but fast feedback is key. The second
+is not a hard break with our current test-harness work so much as it is a
+re-framing of it and a refinement. We can iteratively work test-harness into a
+more reliable, repeatable state without giving up any of the work done
+there. The feedback cycle of test-harness is 24 hours at a minimum, meaning it
+is complementary to the criterion work in this and in that it will, necessarily,
+focus on all-up configurations.  Lastly the `diagnostic` sub-command helps us
+with our existing user base and may be expanded as experience dictates. I
+consider `diagnostic` a soft goal, where the first two are hard.
+
+With regard to the remaining alternatives I do not believe that ["Do
+Nothing"](#do-nothing) is acceptable for Vector. Our current state of the art is
+an excellent foundation but we have already experienced its rough points, as
+have our users. If we pursue "Rethink test-harness" I see [Run test-harness
+Nightly](#run-test-harness-nightly) as a mere stepping stone in that greater
+work, not an end state itself. Lastly, I adamantly believe that we will need to
+pursue [Run Vector Continuously](#run-vector-continuously) in the future but the
+feedback loop here is especially long. The approaches above will pay dividends
+sooner and with more focus, where Run Vector Continuously is meant to search for
+long-tail issues.
