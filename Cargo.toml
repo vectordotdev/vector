@@ -220,7 +220,7 @@ thread_local = "=1.0.1"
 tokio-postgres = { version = "0.5.5", features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = "0.5.8"
 typetag = "0.1.6"
-url = "2.2.0"
+url = "2.2.1"
 uuid = { version = "0.8", features = ["serde", "v4"], optional = true }
 warp = { version = "0.2.5", default-features = false, optional = true }
 
