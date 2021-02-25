@@ -3,7 +3,7 @@ use chrono_tz::Tz;
 use derivative::Derivative;
 use std::fmt::{self, Debug};
 
-#[derive(Clone, Copy, Debug, Derivative)]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
 #[derivative(Default)]
 pub enum TimeZone {
     #[derivative(Default)]

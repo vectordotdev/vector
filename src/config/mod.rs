@@ -60,6 +60,7 @@ pub struct GlobalOptions {
     pub data_dir: Option<PathBuf>,
     #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     pub log_schema: LogSchema,
+    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     pub timezone: TimeZone,
 }
 
