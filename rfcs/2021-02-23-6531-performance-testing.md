@@ -12,6 +12,8 @@ art in this project.
   * [`metrics` Crate Upgrade Regresses Benchmarks](#metrics-crate-upgrade-regresses-benchmarks)
   * [Channel Implementation Regresses Topology Throughput](#channel-implementation-regresses-topology-throughput)
 * [State of the Art](#state-of-the-art)
+  * [Criterion](#criterion)
+  * [test-harness](#test-harness)
 
 
 ## Summary
@@ -131,4 +133,28 @@ The [vector-test-harness](https://github.com/timberio/vector-test-harness/) is a
 feed product documentation. We will focus on the performance aspect of the
 harness, though the correctness tests work similarily. Let's consider the [disk
 buffer](https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_performance)
-performance test. This test is meant to probe the performance characterist of the "disk buffer",
+performance test. This test is meant to probe the performance characteristic of
+the "disk buffer", the disk backed variant of Vector's
+[`buffers`](https://github.com/timberio/vector/blob/2ac861e09f99036145749ee8af7a7e0d7aa945c6/src/buffers/mod.rs). The
+[README](https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_performance)
+for the test describes the high-level approach: generate as much data as
+possible in 60 seconds and observe the results of the test on average IO
+throughput, CPU consumption and so forth. The test-harness uses
+[ansible](https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_performance/ansible)
+to set up and execute every variant to be tested. System operation during the
+execution is recorded with [dstat](http://dag.wiee.rs/home-made/dstat/) and only
+one iteration of each test is made. Tests are made on AWS spot instance c5.large
+variant. The observations made by dstat are shipped to s3 for long-term storage.
+
+The relatively short duration of this test and its singular instance will tend
+to make the results quite noisy. Spot instances suffer no performance penalty
+compared to reserved capacity but the c5.large may not be representative of the
+machines Vector is deployed to. Only a single build of Vector is run here as
+well. Consider that the
+[0.11.1](https://github.com/timberio/vector/releases/tag/v0.11.1) supports
+aarch64, armv7, x86_64, amd64, arm64, armhf, etc plus a cross product on some of
+these platforms with different libc implementations. The test-harness executes
+on Ubuntu, meaning tests are limited to Debian packaged Vector releases. The
+data that dstat collects is relatively black box, especially in comparison to
+tools like [perf](https://perf.wiki.kernel.org/index.php/Main_Page) or custom
+eBPF traces, nor does the harness run regularly.
