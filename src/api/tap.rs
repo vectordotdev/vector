@@ -6,8 +6,23 @@ use crate::{
 use futures::{channel::mpsc, SinkExt, StreamExt};
 use uuid::Uuid;
 
-type EventSender = mpsc::UnboundedSender<Event>;
-type LogEventSender = mpsc::UnboundedSender<LogEvent>;
+type TapSender = mpsc::UnboundedSender<TapResult>;
+
+pub enum TapError {
+    ComponentInvalid,
+    ComponentGoneAway,
+}
+
+pub enum TapResult {
+    LogEvent(LogEvent),
+    Error(TapError),
+}
+
+impl TapResult {
+    pub fn is_error(&self) -> bool {
+        matches!(self, Self::Error(_))
+    }
+}
 
 pub enum TapControl {
     Start(TapSink),
@@ -18,31 +33,32 @@ pub enum TapControl {
 pub struct TapSink {
     id: Uuid,
     input_name: String,
-    event_tx: EventSender,
+    tap_tx: TapSender,
 }
 
 impl TapSink {
     /// Creates a new tap sink, and spawn a listener per sink
-    pub fn new(input_name: &str, mut log_event_tx: LogEventSender) -> Self {
-        let (event_tx, mut event_rx) = mpsc::unbounded();
-
-        tokio::spawn(async move {
-            while let Some(ev) = event_rx.next().await {
-                if let Event::Log(ev) = ev {
-                    let _ = log_event_tx.start_send(ev);
-                }
-            }
-        });
-
+    pub fn new(input_name: &str, tap_tx: TapSender) -> Self {
         Self {
             id: Uuid::new_v4(),
             input_name: input_name.to_string(),
-            event_tx,
+            tap_tx,
         }
     }
 
     pub fn router(&self) -> RouterSink {
-        Box::new(self.event_tx.clone().sink_map_err(|_| ()))
+        let (event_tx, mut event_rx) = mpsc::unbounded();
+        let mut tap_tx = self.tap_tx.clone();
+
+        tokio::spawn(async move {
+            while let Some(ev) = event_rx.next().await {
+                if let Event::Log(ev) = ev {
+                    let _ = tap_tx.start_send(TapResult::LogEvent(ev));
+                }
+            }
+        });
+
+        Box::new(event_tx.sink_map_err(|_| ()))
     }
 
     pub fn name(&self) -> String {
@@ -59,6 +75,18 @@ impl TapSink {
 
     pub fn stop(&self) -> TapControl {
         TapControl::Stop(self.clone())
+    }
+
+    pub fn component_invalid(&mut self) {
+        let _ = self
+            .tap_tx
+            .start_send(TapResult::Error(TapError::ComponentInvalid));
+    }
+
+    pub fn component_gone_away(&mut self) {
+        let _ = self
+            .tap_tx
+            .start_send(TapResult::Error(TapError::ComponentGoneAway));
     }
 }
 

@@ -6,6 +6,7 @@ use crate::{
     topology::RunningTopology,
     trace, unit_test, validate,
 };
+use cfg_if::cfg_if;
 use std::{cmp::max, collections::HashMap, path::PathBuf};
 
 use futures::StreamExt;
@@ -208,7 +209,7 @@ impl Application {
             tokio::spawn(heartbeat::heartbeat());
 
             // Using cfg_if flattens nesting.
-            cfg_if::cfg_if! (
+            cfg_if! (
                 if #[cfg(feature = "api")] {
                     // Controller channel for the API server.
                     let (api_tx, mut api_rx) = api::make_control();
@@ -233,65 +234,110 @@ impl Application {
             let mut sources_finished = topology.sources_finished();
 
             let signal = loop {
-                tokio::select! {
-                    Some(msg) = api_rx.recv(), if api_server.is_some() => {
-                        use api::{ControlMessage, TapControl};
+                // This is wrapped in a `cfg_if!` call to branch two paths-- one where the API
+                // feature is compuled, and one where it isn't. This is distinct from the API
+                // being *enabled*, which is checked by the relevant `select!` branch.
+                cfg_if! (
+                    if #[cfg(feature = "api")] {
+                        tokio::select! {
+                            Some(msg) = api_rx.recv(), if api_server.is_some() => {
+                                use api::{ControlMessage, TapControl};
 
-                        match msg {
-                            ControlMessage::Tap(tap) => match tap {
-                                TapControl::Start(sink) => {
-                                    println!("Started: {}", sink.name());
-                                    topology.attach(&sink.input_name(), &sink.name(), sink.router())
-                                },
-                                TapControl::Stop(sink) => {
-                                    println!("Stopped: {}", sink.name());
-                                    topology.detach(&sink.input_name(), &sink.name());
-                                }
-                            }
-                        }
-                    }
-                    Some(signal) = signals.next() => {
-                        if signal == SignalTo::Reload {
-                            // Reload paths
-                            config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
-                            // Reload config
-                            let new_config = config::load_from_paths(&config_paths, false).map_err(handle_config_errors).ok();
-
-                            if let Some(mut new_config) = new_config {
-                                new_config.healthchecks.set_require_healthy(opts.require_healthy);
-                                match topology
-                                    .reload_config_and_respawn(new_config)
-                                    .await
-                                {
-                                    Ok(true) => {
-                                        #[cfg(feature="api")]
-                                        if let Some(ref api_server) = api_server {
-                                            api_server.update_config(topology.config())
+                                match msg {
+                                    ControlMessage::Tap(tap) => match tap {
+                                        TapControl::Start(mut sink) => {
+                                            if let Err(_) = topology.attach(&sink.input_name(), &sink.name(), sink.router()) {
+                                                sink.component_invalid();
+                                            }
+                                        },
+                                        TapControl::Stop(sink) => {
+                                            let _ = topology.detach(&sink.input_name(), &sink.name());
                                         }
-
-                                        emit!(VectorReloaded { config_paths: &config_paths })
-                                    },
-                                    Ok(false) => emit!(VectorReloadFailed),
-                                    // Trigger graceful shutdown for what remains of the topology
-                                    Err(()) => {
-                                        emit!(VectorReloadFailed);
-                                        emit!(VectorRecoveryFailed);
-                                        break SignalTo::Shutdown;
                                     }
                                 }
-                                sources_finished = topology.sources_finished();
-                            } else {
-                                emit!(VectorConfigLoadFailed);
                             }
-                        } else {
-                            break signal;
+                            Some(signal) = signals.next() => {
+                                if signal == SignalTo::Reload {
+                                    // Reload paths
+                                    config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
+                                    // Reload config
+                                    let new_config = config::load_from_paths(&config_paths, false).map_err(handle_config_errors).ok();
+
+                                    if let Some(mut new_config) = new_config {
+                                        new_config.healthchecks.set_require_healthy(opts.require_healthy);
+                                        match topology
+                                            .reload_config_and_respawn(new_config)
+                                            .await
+                                        {
+                                            Ok(true) => {
+                                                if let Some(ref api_server) = api_server {
+                                                    api_server.update_config(topology.config())
+                                                }
+
+                                                emit!(VectorReloaded { config_paths: &config_paths })
+                                            },
+                                            Ok(false) => emit!(VectorReloadFailed),
+                                            // Trigger graceful shutdown for what remains of the topology
+                                            Err(()) => {
+                                                emit!(VectorReloadFailed);
+                                                emit!(VectorRecoveryFailed);
+                                                break SignalTo::Shutdown;
+                                            }
+                                        }
+                                        sources_finished = topology.sources_finished();
+                                    } else {
+                                        emit!(VectorConfigLoadFailed);
+                                    }
+                                } else {
+                                    break signal;
+                                }
+                            }
+                            // Trigger graceful shutdown if a component crashed, or all sources have ended.
+                            _ = graceful_crash.next() => break SignalTo::Shutdown,
+                            _ = &mut sources_finished => break SignalTo::Shutdown,
+                            else => unreachable!("Signal streams never end"),
+                        }
+                    } else {
+                        tokio::select! {
+                            Some(signal) = signals.next() => {
+                                if signal == SignalTo::Reload {
+                                    // Reload paths
+                                    config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
+                                    // Reload config
+                                    let new_config = config::load_from_paths(&config_paths, false).map_err(handle_config_errors).ok();
+
+                                    if let Some(mut new_config) = new_config {
+                                        new_config.healthchecks.set_require_healthy(opts.require_healthy);
+                                        match topology
+                                            .reload_config_and_respawn(new_config)
+                                            .await
+                                        {
+                                            Ok(true) => {
+                                                emit!(VectorReloaded { config_paths: &config_paths })
+                                            },
+                                            Ok(false) => emit!(VectorReloadFailed),
+                                            // Trigger graceful shutdown for what remains of the topology
+                                            Err(()) => {
+                                                emit!(VectorReloadFailed);
+                                                emit!(VectorRecoveryFailed);
+                                                break SignalTo::Shutdown;
+                                            }
+                                        }
+                                        sources_finished = topology.sources_finished();
+                                    } else {
+                                        emit!(VectorConfigLoadFailed);
+                                    }
+                                } else {
+                                    break signal;
+                                }
+                            }
+                            // Trigger graceful shutdown if a component crashed, or all sources have ended.
+                            _ = graceful_crash.next() => break SignalTo::Shutdown,
+                            _ = &mut sources_finished => break SignalTo::Shutdown,
+                            else => unreachable!("Signal streams never end"),
                         }
                     }
-                    // Trigger graceful shutdown if a component crashed, or all sources have ended.
-                    _ = graceful_crash.next() => break SignalTo::Shutdown,
-                    _ = &mut sources_finished => break SignalTo::Shutdown,
-                    else => unreachable!("Signal streams never end"),
-                }
+                );
             };
 
             match signal {

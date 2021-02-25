@@ -723,16 +723,22 @@ impl RunningTopology {
         &self.config
     }
 
-    pub fn attach(&self, input_name: &str, sink_name: &str, sink: RouterSink) {
-        if let Some(tx) = self.outputs.get(input_name) {
-            let _ = tx.send(fanout::ControlMessage::Add(sink_name.to_string(), sink));
-        }
+    pub fn attach(&self, input_name: &str, sink_name: &str, sink: RouterSink) -> Result<(), ()> {
+        let tx = self.outputs.get(input_name).ok_or(())?;
+
+        debug!(message = "Starting tap", id = sink_name, input = input_name);
+        let _ = tx.send(fanout::ControlMessage::Add(sink_name.to_string(), sink));
+
+        Ok(())
     }
 
-    pub fn detach(&self, input_name: &str, sink_name: &str) {
-        if let Some(tx) = self.outputs.get(input_name) {
-            let _ = tx.send(fanout::ControlMessage::Remove(sink_name.to_string()));
-        }
+    pub fn detach(&self, input_name: &str, sink_name: &str) -> Result<(), ()> {
+        let tx = self.outputs.get(input_name).ok_or(())?;
+
+        debug!(message = "Stopping tap", id = sink_name, input = input_name);
+        let _ = tx.send(fanout::ControlMessage::Remove(sink_name.to_string()));
+
+        Ok(())
     }
 }
 
