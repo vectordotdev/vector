@@ -4,34 +4,44 @@ use chrono::{DateTime, Utc};
 use serde_json::json;
 
 #[derive(Debug)]
-/// A log event
-pub struct LogEvent(event::LogEvent);
+pub struct LogEvent {
+    component_name: String,
+    event: event::LogEvent,
+}
 
 impl LogEvent {
-    pub fn new(event: event::LogEvent) -> Self {
-        Self(event)
+    pub fn new(component_name: &str, event: event::LogEvent) -> Self {
+        Self {
+            component_name: component_name.to_string(),
+            event,
+        }
     }
 }
 
 #[Object]
 impl LogEvent {
+    /// Name of the component associated with the log event
+    async fn component_name(&self) -> &str {
+        &self.component_name
+    }
+
     /// Log message
     async fn message(&self) -> Option<String> {
-        Some(self.0.get("message")?.to_string_lossy())
+        Some(self.event.get("message")?.to_string_lossy())
     }
 
     /// Log timestamp
     async fn timestamp(&self) -> Option<&DateTime<Utc>> {
-        self.0.get("timestamp")?.as_timestamp()
+        self.event.get("timestamp")?.as_timestamp()
     }
 
     /// Log event as a JSON string
     async fn json(&self) -> String {
-        json!(self.0).to_string()
+        json!(self.event).to_string()
     }
 
     /// Log event as a YAML string
     async fn yaml(&self) -> Option<String> {
-        serde_yaml::to_string(&self.0).ok()
+        serde_yaml::to_string(&self.event).ok()
     }
 }

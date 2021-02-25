@@ -14,13 +14,13 @@ pub enum TapError {
 }
 
 pub enum TapResult {
-    LogEvent(LogEvent),
-    Error(TapError),
+    LogEvent(String, LogEvent),
+    Error(String, TapError),
 }
 
 impl TapResult {
     pub fn is_error(&self) -> bool {
-        matches!(self, Self::Error(_))
+        matches!(self, Self::Error(_, _))
     }
 }
 
@@ -48,12 +48,14 @@ impl TapSink {
 
     pub fn router(&self) -> RouterSink {
         let (event_tx, mut event_rx) = mpsc::unbounded();
+
+        let input_name = self.input_name.clone();
         let mut tap_tx = self.tap_tx.clone();
 
         tokio::spawn(async move {
             while let Some(ev) = event_rx.next().await {
                 if let Event::Log(ev) = ev {
-                    let _ = tap_tx.start_send(TapResult::LogEvent(ev));
+                    let _ = tap_tx.start_send(TapResult::LogEvent(input_name.clone(), ev));
                 }
             }
         });
@@ -78,15 +80,17 @@ impl TapSink {
     }
 
     pub fn component_invalid(&mut self) {
-        let _ = self
-            .tap_tx
-            .start_send(TapResult::Error(TapError::ComponentInvalid));
+        let _ = self.tap_tx.start_send(TapResult::Error(
+            self.input_name.clone(),
+            TapError::ComponentInvalid,
+        ));
     }
 
     pub fn component_gone_away(&mut self) {
-        let _ = self
-            .tap_tx
-            .start_send(TapResult::Error(TapError::ComponentGoneAway));
+        let _ = self.tap_tx.start_send(TapResult::Error(
+            self.input_name.clone(),
+            TapError::ComponentGoneAway,
+        ));
     }
 }
 
