@@ -84,8 +84,6 @@ impl Conversion {
     ///  * `"bool"` or `"boolean"` => Boolean
     ///  * `"timestamp"` => Timestamp, guessed using a set of formats
     ///  * `"timestamp|FORMAT"` => Timestamp using the given format
-    ///
-    /// Timestamp parsing does not yet support time zones.
     pub fn parse(s: impl AsRef<str>, tz: TimeZone) -> Result<Self, ConversionError> {
         let s = s.as_ref();
         match s {
