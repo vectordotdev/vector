@@ -17,11 +17,14 @@ fn main() {
     tracing::dispatcher::with_default(&dispatch, || {
         for i in 0..40 {
             trace!("This field is not rate limited!");
-            info!(
-                message = "This message is rate limited",
-                count = &i,
-                internal_log_rate_secs = 5,
-            );
+            for key in &["foo", "bar"] {
+                info!(
+                    message = "This message is rate limited by its key",
+                    count = &i,
+                    internal_log_rate_secs = 5,
+                    internal_log_rate_key = key,
+                );
+            }
             std::thread::sleep(std::time::Duration::from_millis(1000));
         }
     })

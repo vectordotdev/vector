@@ -18,10 +18,15 @@ use tracing_subscriber::layer::{Context, Layer};
 
 const RATE_LIMIT_SECS_FIELD: &str = "internal_log_rate_secs";
 const RATE_LIMIT_KEY_FIELD: &str = "internal_log_rate_key";
+const COMPONENT_NAME_FIELD: &str = "component_name";
 const MESSAGE_FIELD: &str = "message";
 
 #[derive(Eq, PartialEq, Hash)]
-struct RateKeyIdentifier(Identifier, Option<String>);
+struct RateKeyIdentifier {
+    callsite: Identifier,
+    rate_limit_key: Option<String>,
+    component_name: Option<String>,
+}
 
 pub struct RateLimitedLayer<S, L>
 where
@@ -52,7 +57,7 @@ where
 impl<S, L> Layer<S> for RateLimitedLayer<S, L>
 where
     L: Layer<S>,
-    S: Subscriber,
+    S: Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
 {
     fn register_callsite(&self, metadata: &'static Metadata<'static>) -> Interest {
         let inner = self.inner.register_callsite(metadata);
@@ -77,14 +82,39 @@ where
         self.inner.enabled(metadata, ctx)
     }
 
-    #[inline]
+    // keep track of any span fields we use for grouping rate limiting
     fn new_span(&self, attrs: &span::Attributes<'_>, id: &span::Id, ctx: Context<'_, S>) {
+        {
+            let span = ctx.span(id).expect("Span not found, this is a bug");
+            let mut extensions = span.extensions_mut();
+
+            if extensions.get_mut::<RateLimitedSpanKeys>().is_none() {
+                let mut fields = RateLimitedSpanKeys::default();
+                attrs.record(&mut fields);
+                extensions.insert(fields);
+            };
+        }
         self.inner.new_span(attrs, id, ctx);
     }
 
-    #[inline]
-    fn on_record(&self, span: &span::Id, values: &span::Record<'_>, ctx: Context<'_, S>) {
-        self.inner.on_record(span, values, ctx);
+    // keep track of any span fields we use for grouping rate limiting
+    fn on_record(&self, id: &span::Id, values: &span::Record<'_>, ctx: Context<'_, S>) {
+        {
+            let span = ctx.span(id).expect("Span not found, this is a bug");
+            let mut extensions = span.extensions_mut();
+
+            match extensions.get_mut::<RateLimitedSpanKeys>() {
+                Some(fields) => {
+                    values.record(fields);
+                }
+                None => {
+                    let mut fields = RateLimitedSpanKeys::default();
+                    values.record(&mut fields);
+                    extensions.insert(fields);
+                }
+            };
+        }
+        self.inner.on_record(id, values, ctx);
     }
 
     #[inline]
@@ -94,6 +124,7 @@ where
 
     fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
         let metadata = event.metadata();
+
         // if the event is not rate limited, just pass through
         if !is_limited(metadata) {
             return self.inner.on_event(event, ctx);
@@ -102,7 +133,25 @@ where
         let mut limit_visitor = LimitVisitor::default();
         event.record(&mut limit_visitor);
 
-        let id = RateKeyIdentifier(metadata.callsite(), limit_visitor.key.clone());
+        let component_name = {
+            let mut scope = ctx
+                .lookup_current()
+                .into_iter()
+                .flat_map(|span| span.from_root().chain(std::iter::once(span)));
+
+            scope.find_map(|span| {
+                let extensions = span.extensions();
+                extensions
+                    .get::<RateLimitedSpanKeys>()
+                    .and_then(|fields| fields.component_name.clone())
+            })
+        };
+
+        let id = RateKeyIdentifier {
+            callsite: metadata.callsite(),
+            rate_limit_key: limit_visitor.key.clone(),
+            component_name,
+        };
 
         let events = self.events.read().expect("lock poisoned!");
 
@@ -243,6 +292,25 @@ fn is_limited(metadata: &Metadata<'_>) -> bool {
         .fields()
         .iter()
         .any(|f| f.name() == RATE_LIMIT_SECS_FIELD)
+}
+
+/// RateLimitedSpanKeys records span keys that we use to rate limit callsites separately by. For
+/// example, if a given trace callsite is called from two different components, then they will be
+/// rate limited separately.
+#[derive(Default)]
+struct RateLimitedSpanKeys {
+    pub component_name: Option<String>,
+}
+
+impl Visit for RateLimitedSpanKeys {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        match field.name() {
+            COMPONENT_NAME_FIELD => self.component_name = Some(value.to_string()),
+            _ => {}
+        }
+    }
+
+    fn record_debug(&mut self, _field: &Field, _value: &dyn fmt::Debug) {}
 }
 
 #[derive(Default)]
