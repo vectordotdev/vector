@@ -26,16 +26,6 @@ remap: errors: "102": {
 					. |= parse_key_value!(.message)
 				}
 				"""#
-			raises: compiletime: #"""
-				error: \#(title)
-				  ┌─ :1:1
-				  │
-				1 │ 	if .message {
-				  │        ^^^^^^^^
-				  │        │
-				  │        if expression predicates must resolve to a strict boolean
-				  │
-				"""#
 			diff: #"""
 				-if .message {
 				+if exists(.message) {

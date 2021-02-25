@@ -18,16 +18,6 @@ remap: errors: "109": {
 			source: #"""
 				downcase!(.message)
 				"""#
-			raises: compiletime: #"""
-				error: \#(title)
-				  ┌─ :1:1
-				  │
-				1 │ downcase!(.message)
-				  │         ^
-				  │         │
-				  │         This function is not fallible
-				  │
-				"""#
 			diff: #"""
 				-downcase!(.message)
 				+downcase(.message)

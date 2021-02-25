@@ -20,16 +20,6 @@ remap: errors: "104": {
 			source: #"""
 				.message, err = downcase(.message)
 				"""#
-			raises: compiletime: #"""
-				error: \#(title)
-				  ┌─ :1:1
-				  │
-				1 │ .message, err = downcase(.message)
-				  │           ^^^
-				  │           │
-				  │           unneeded error assignment
-				  │
-				"""#
 			diff: #"""
 				-.message, err = downcase(.message)
 				+.message = downcase(.message)

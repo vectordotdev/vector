@@ -17,16 +17,6 @@ remap: errors: "106": {
 			source: #"""
 				parse_json(.message, pretty: true)
 				"""#
-			raises: compiletime: #"""
-				error: \#(title)
-				  ┌─ :1:1
-				  │
-				1 │ parse_json(.message, pretty: true)
-				  │                      ^^^^^^^^^^^^
-				  │                      │
-				  │                      This argument exceeds the function arity
-				  │
-				"""#
 			diff: #"""
 				-parse_json(.message, pretty: true)
 				+parse_json(.message)
