@@ -381,7 +381,8 @@ mod test {
                 match buffer.push(event) {
                     PushResult::Overflow(_) => panic!("overflowed too early"),
                     PushResult::Ok(true) => {
-                        result.push(buffer.fresh_replace().finish());
+                        let batch = std::mem::replace(&mut buffer, MetricsBuffer::new(batch_size));
+                        result.push(batch.finish());
                     }
                     PushResult::Ok(false) => (),
                 }
