@@ -163,24 +163,19 @@ where
             // check if we are still rate limiting
             if start.elapsed().as_secs() < state.limit {
                 let prev = state.count.fetch_add(1, Ordering::Relaxed);
-                match prev {
-                    1 => {
-                        // output first rate limited log
-                        let message = match limit_visitor.key {
-                            None => {
-                                format!("Internal log [{}] is being rate limited.", state.message)
-                            }
-                            Some(key) => format!(
-                                "Internal log [{} internal_log_rate_key={}].",
-                                state.message, key,
-                            ),
-                        };
+                if prev == 1 {
+                    // output first rate limited log
+                    let message = match limit_visitor.key {
+                        None => {
+                            format!("Internal log [{}] is being rate limited.", state.message)
+                        }
+                        Some(key) => format!(
+                            "Internal log [{} internal_log_rate_key={}].",
+                            state.message, key,
+                        ),
+                    };
 
-                        self.create_event(&ctx, metadata, message, state.limit);
-                    }
-                    // swallow the rest until a log comes in after the internal_log_rate_secs
-                    // interval
-                    _ => (),
+                    self.create_event(&ctx, metadata, message, state.limit);
                 }
             } else {
                 // done rate limiting
@@ -304,9 +299,8 @@ struct RateLimitedSpanKeys {
 
 impl Visit for RateLimitedSpanKeys {
     fn record_str(&mut self, field: &Field, value: &str) {
-        match field.name() {
-            COMPONENT_NAME_FIELD => self.component_name = Some(value.to_string()),
-            _ => {}
+        if field.name() == COMPONENT_NAME_FIELD {
+            self.component_name = Some(value.to_string());
         }
     }
 
