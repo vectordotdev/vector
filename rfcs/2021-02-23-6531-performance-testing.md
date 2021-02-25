@@ -11,9 +11,15 @@ art in this project.
   * [musl libc Release Builds](#musl-libc-release-builds)
   * [`metrics` Crate Upgrade Regresses Benchmarks](#metrics-crate-upgrade-regresses-benchmarks)
   * [Channel Implementation Regresses Topology Throughput](#channel-implementation-regresses-topology-throughput)
+  * [Lua Transform Leaked Memory](#lua-transform-leaked-memory)
 * [State of the Art](#state-of-the-art)
   * [Criterion](#criterion)
   * [test-harness](#test-harness)
+* [Alternatives for Future Work](#alternatives-for-future-work)
+  * ["Do Nothing"](#do-nothing)
+  * [Lean Further Into Criterion](#lean-further-into-criterion)
+  * [Build a `vector diagnostic` Sub-Command](#build-a-vector-diagnostic-sub-command)
+  * [Run test-harness Nightly](#run-test-harness-nightly)
 
 
 ## Summary
@@ -94,6 +100,16 @@ regressed test-harness benchmarks and showed mixed results in criterion
 benches. For especially sensitive areas of the project -- like the topology --
 we will absolutely have to rely on a battery of complementary approaches.
 
+### Lua Transform Leaked Memory
+
+Issue: https://github.com/timberio/vector/issues/1496
+PR: https://github.com/timberio/vector/pull/1990
+
+User reports that 0.6.0 steadily consumes memory resources in their deployment,
+indicating a classic leak pattern in their monitoring. Once user provided their
+configuration it became clear that the lua transform was not properly GC'ing, a
+quirk of how lua defers GC runs.
+
 ## State of the Art
 
 As of this writing there are two broad approaches for performance testing work
@@ -126,12 +142,24 @@ the fundamental problem remains. It is possible that criterion will gradually
 incorporate instruction count benchmarking, a reasonable proxy for performance,
 but that is very early days yet.
 
+We can see from [Motivating Examples](#motivating-examples) that this benchmark
+work is paying off and has acted as a backstop, disallowing serious regressions
+from making it into releases. A good deal of work has been done to make results
+stable in our Github Actions based CI. PR build times are, however, increasing
+at a steady clip, a drag on productivity and potentially a barrier to
+open-source contributors whose engagement with a change may not be as high as
+full-time employees on the Vector project.
+
+We are actively expanding our use of criterion in the project, as of this
+writing.
+
 ### test-harness
 
 The [vector-test-harness](https://github.com/timberio/vector-test-harness/) is a
-"black-box" performance and correctness testing approach. The harness is used to
-feed product documentation. We will focus on the performance aspect of the
-harness, though the correctness tests work similarily. Let's consider the [disk
+"black-box" performance and correctness testing approach. Performance tests
+serve two roles: indicating whether Vector has suffered regressions for given
+workloads and comparing Vector to competitor products. The later role feeds our
+product documentation.  Let's consider the [disk
 buffer](https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_performance)
 performance test. This test is meant to probe the performance characteristic of
 the "disk buffer", the disk backed variant of Vector's
@@ -158,3 +186,118 @@ on Ubuntu, meaning tests are limited to Debian packaged Vector releases. The
 data that dstat collects is relatively black box, especially in comparison to
 tools like [perf](https://perf.wiki.kernel.org/index.php/Main_Page) or custom
 eBPF traces, nor does the harness run regularly.
+
+We can see from [Motivating Examples](#motivating-examples) that the
+test-harness work has paid dividends. Irregular runs, multiple test purposes --
+correctness, performance, competitor comparison -- noisey results and relatively
+coarse information collected from the performance tests are all areas for
+improvement. As an example, because of the short run duration the lua
+
+We are not actively expanding the use of test-harness as of this writing, though
+it is maintained and still runs.
+
+## Alternatives for Future Work
+
+In this section we will describe alternatives for future work with regard to our
+performance testing in the Vector project. A later section will argue for a
+specific alternative.
+
+### "Do Nothing"
+
+In this alterative we make no substantial changes to our practices. We will
+continue to invest time in expanding our criterion benchmarks and will
+periodically run the test-harness, expand it as seems desirable. We will also
+not expand on Vector's self-diagnostic tools, except as would happen in the
+normal course of engineering work.
+
+#### Upsides
+
+  * We continue to reap the benefits of our criterion work.
+  * We do not have to substantially change our approach to performance work.
+
+#### Downsides
+
+  * Without improving the reliability of test-harness data we will continue to
+    find its results difficult to act on.
+  * If we do not improve Vector's self-diagnostic capbility we will struggle to
+    understand user's on-prem issues, currently a very high-touch process. As our
+    user base expands this problem will become more accute.
+  * As our criterion tests increase in coverage the build time will balloon. This
+    will steadily drain our productivity as iteration loop time increases.
+
+### Lean Further Into Criterion
+
+In this alternative we make no substantial changes to the test-harness -- follow
+"do nothing" here -- but place more emphasis on the criterion work. In
+particular, we intend:
+
+  * to increase the amount of compute available to the criterion CI, throwing
+    more hardware at the CI time issue,
+  * to build benchmarks that demonstrate key components' throughput performance,
+    ensuring that these numbers are maintained in documentation for end users,
+  * to substantially improve the coverage of benchmarked Vector code, though as
+    with correctness tests exact thresholds are a matter for team debate,
+  * to run our criterion benchmarks across all supported Vector platforms and
+  * to explore alternatives to improve criterion to derive better, more stable
+    signals on from our benchmarks.
+
+#### Upsides
+
+  * We reap the benefits of broader adoption of criterion in our project, which
+    include catching some regressions, offering targetted feedback to engineers
+    (if a test is, itself, targetted) and improve the broader ecosystem by
+    rolling changes into criterion.
+  * We gain a good deal of detailed insight into Vector at a unit level.
+  * We gain documented performance expectations for major components, a boon for
+    our end users when evaluating Vector.
+
+#### Downsides
+
+  * As we have seen in practice, micro-benchmarks may not be representative of
+    macro-performance.
+  * Wall-clock benchmarks are extremely sensitive to external factors.
+  * We will encounter situations where benchmarks improve in CI and regress on
+    user's machines, especially as benchmarks become more "micro".
+
+### Build a `vector diagnostic` sub-command
+
+In this alternative we extend the Vector interface to include a `diagnostic`
+sub-command. This diagnostic will examine the system to gather information about
+it's running environment and perform, time fundamental actions. Information we
+might want to collect:
+
+  * What operating system is Vector running on?
+  * For the directories present in Vector's config, what filesystems are in use?
+    What mount options are in use?
+  * How many CPUs are available to Vector and of what kind? How much memory?
+    NUMA?
+  * What kernel parameters are set, especially those relating to common
+    bottlenecks like network, descriptor limits etc?
+  * How long does a malloc/dealloc take for a series of block sizes?
+  * How long does spawning a thread take?
+  * How long do 2, 4, 8, 16 threads take to lock and unlock a common mutex?
+  * For filesystems where Vector has R/W privileges, what IO characteristics
+    exist for these filesystems?
+
+This list is not exhaustive and hopefully you get the sense that the goal is to
+collect baseline information about the system to inform user issues and guide
+engineering work. An additional `doctor` sub-command could use the diagnostic
+feature to examine a config and make suggestions or point out easily detected
+issues, a disk buffer being configured to use a read-only filesystem, say.
+
+#### Upsides
+
+  * We collect system information from users on a case by case basis. This
+    automates some of that information gathering.
+  * Diagnostics information will help us discover unusual user systems that we
+    might otherwise struggle to reproduce.
+
+#### Downsides
+
+  * The benefits of a `diagnostic` sub-command are not immediate, are focused on
+    the after-release side of regression and some users will not wish to share
+    its output with us.
+  * A `diagnostic` sub-command is not a solution in itself but must be paired
+    with other approaches.
+
+###
