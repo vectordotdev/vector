@@ -23,7 +23,7 @@ where
     T: Metadata<Ty = ObjectMeta> + Send,
 {
     /// Take a [`WriteHandle`], initialize it and return it wrapped with
-    /// [`Self`].
+    /// [`Writer`].
     pub fn new(
         mut inner: WriteHandle<String, Value<T>>,
         flush_debounce_timeout: Option<Duration>,

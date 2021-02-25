@@ -643,6 +643,11 @@ check-kubernetes-yaml: ## Check that the generated Kubernetes YAML configs are u
 check-events: ## Check that events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events.sh
 
+##@ Rustdoc
+build-rustdoc: ## Build a subset of Vector's Rustdocs (as specified by the "docs" feature)
+	# This command is mostly intended for use by the build process in timberio/vector-rustdoc
+	${MAYBE_ENVIRONMENT_EXEC} cargo doc --no-deps --no-default-features --features docs
+
 ##@ Packaging
 
 # archives
