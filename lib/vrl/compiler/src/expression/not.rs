@@ -1,7 +1,7 @@
 use crate::expression::{Expr, Noop, Resolved};
 use crate::parser::Node;
 use crate::{value::Kind, Context, Expression, Span, State, TypeDef};
-use diagnostic::{DiagnosticError, Label, Note};
+use diagnostic::{DiagnosticError, Label, Note, Urls};
 use std::fmt;
 
 pub type Result = std::result::Result<Not, Error>;
@@ -107,7 +107,15 @@ impl DiagnosticError for Error {
         use ErrorVariant::*;
 
         match &self.variant {
-            NonBoolean(..) => vec![Note::CoerceValue],
+            NonBoolean(..) => {
+                vec![
+                    Note::CoerceValue,
+                    Note::SeeDocs(
+                        "type coercion".to_owned(),
+                        Urls::func_docs("#coerce-functions"),
+                    ),
+                ]
+            }
         }
     }
 }

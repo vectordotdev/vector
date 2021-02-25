@@ -10,19 +10,19 @@
 #   │               this expression resolves to one of "string" or "null"
 #   │               but the parameter "value" expects the exact type "string"
 #   │
-#   = try: guard against invalid type at runtime
+#   = try: ensuring an appropriate type at runtime
 #   =
 #   =     .foo = string!(.foo)
-#   =     upcase(.foo))
+#   =     upcase(.foo)
 #   =
-#   = try: coerce with default value
+#   = try: coercing to an appropriate type and specifying a default value as a fallback in case coercion fails
 #   =
 #   =     .foo = to_string(.foo) ?? "default"
-#   =     upcase(.foo))
+#   =     upcase(.foo)
 #   =
-#   = see error handling documentation at: https://vector.dev/docs/reference/vrl/
-#   = learn more at: https://errors.vrl.dev/110
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = learn more about error code 110 at https://errors.vrl.dev/110
+#   = see language documentation at https://vrl.dev
 
 .foo # any
 .foo, err = to_string(.foo) # string or null

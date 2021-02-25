@@ -3,7 +3,7 @@
 #
 # result:
 #
-# error: unneeded error coalescing
+# error: unnecessary error coalescing operation
 #   ┌─ :2:5
 #   │
 # 2 │ "foo" ?? "bar"
@@ -12,7 +12,7 @@
 #   │ │
 #   │ because this expression cannot fail
 #   │
-#   = see error handling documentation at: https://vector.dev/docs/reference/vrl/
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = see error handling documentation at https://errors.vrl.dev/#handling
+#   = see language documentation at https://vrl.dev
 
 "foo" ?? "bar"
