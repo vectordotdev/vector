@@ -9,8 +9,8 @@ name: Publish Vector Rustdoc
 
 on:
   push:
-  branches:
-    - master
+    branches:
+      - master
 
 jobs:
   trigger-site-build:
