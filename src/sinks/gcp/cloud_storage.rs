@@ -225,7 +225,7 @@ impl GcsSink {
             .settings(request, GcsRetryLogic)
             .service(self);
 
-        let buffer = PartitionBuffer::new(Buffer::new(batch.size, config.compression));
+        let buffer = PartitionBuffer::maker(Buffer::maker(batch.size, config.compression));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal gcp_cloud_storage error.", %error))

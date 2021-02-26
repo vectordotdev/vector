@@ -4,7 +4,7 @@ use super::{
     },
     retries::{FixedRetryPolicy, RetryLogic},
     sink::Response,
-    Batch, BatchSink, Partition, PartitionBatchSink,
+    Batch, BatchMaker, BatchSink, Partition, PartitionBatchSink,
 };
 use crate::buffers::Acker;
 use serde::{
@@ -22,8 +22,8 @@ use tower::{
 };
 
 pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AdaptiveConcurrencyLimit<Timeout<S>, L>>>;
-pub type TowerBatchedSink<S, B, L, Request> = BatchSink<Svc<S, L>, B, Request>;
-pub type TowerPartitionSink<S, B, L, K, Request> = PartitionBatchSink<Svc<S, L>, B, K, Request>;
+pub type TowerBatchedSink<S, M, L, Request> = BatchSink<Svc<S, L>, M, Request>;
+pub type TowerPartitionSink<S, M, L, K, Request> = PartitionBatchSink<Svc<S, L>, M, K, Request>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -248,53 +248,55 @@ impl TowerRequestSettings {
         )
     }
 
-    pub fn partition_sink<B, L, S, K, Request>(
+    pub fn partition_sink<M, L, S, K, Request>(
         &self,
         retry_logic: L,
         service: S,
-        batch: B,
+        batch_maker: M,
         batch_timeout: Duration,
         acker: Acker,
-    ) -> TowerPartitionSink<S, B, L, K, Request>
+    ) -> TowerPartitionSink<S, M, L, K, Request>
     where
         L: RetryLogic<Response = S::Response>,
         S: Service<Request> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
         S::Future: Send + 'static,
-        B: Batch<Output = Request>,
-        B::Input: Partition<K>,
+        M: BatchMaker,
+        M::Batch: Batch<Output = Request>,
+        <<M as BatchMaker>::Batch as Batch>::Input: Partition<K>,
         K: Hash + Eq + Clone + Send + 'static,
         Request: Send + Clone + 'static,
     {
         PartitionBatchSink::new(
             self.service(retry_logic, service),
-            batch,
+            batch_maker,
             batch_timeout,
             acker,
         )
     }
 
-    pub fn batch_sink<B, L, S, Request>(
+    pub fn batch_sink<M, L, S, Request>(
         &self,
         retry_logic: L,
         service: S,
-        batch: B,
+        batch_maker: M,
         batch_timeout: Duration,
         acker: Acker,
-    ) -> TowerBatchedSink<S, B, L, Request>
+    ) -> TowerBatchedSink<S, M, L, Request>
     where
         L: RetryLogic<Response = S::Response>,
         S: Service<Request> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
         S::Future: Send + 'static,
-        B: Batch<Output = Request>,
+        M: BatchMaker,
+        M::Batch: Batch<Output = Request>,
         Request: Send + Clone + 'static,
     {
         BatchSink::new(
             self.service(retry_logic, service),
-            batch,
+            batch_maker,
             batch_timeout,
             acker,
         )

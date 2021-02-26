@@ -32,8 +32,8 @@
 //! it to notify the consumer that the request has succeeded.
 
 use super::{
-    batch::{Batch, PushResult, StatefulBatch},
-    buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
+    batch::{Batch, BatchMaker, PushResult, StatefulBatch},
+    buffer::{Partition, PartitionBuffer, PartitionBufferMaker, PartitionInnerBuffer},
     service::{Map, ServiceBuilderExt},
 };
 use crate::{buffers::Acker, Event};
@@ -85,54 +85,58 @@ pub trait StreamSink {
 /// in all requests will not be acked until r1 has completed.
 #[pin_project]
 #[derive(Debug)]
-pub struct BatchSink<S, B, Request>
+pub struct BatchSink<S, M, Request>
 where
-    B: Batch<Output = Request>,
+    M: BatchMaker,
+    M::Batch: Batch<Output = Request>,
 {
     #[pin]
     inner: PartitionBatchSink<
         Map<S, PartitionInnerBuffer<Request, ()>, Request>,
-        PartitionBuffer<B, ()>,
+        PartitionBufferMaker<M, ()>,
         (),
         PartitionInnerBuffer<Request, ()>,
     >,
 }
 
-impl<S, B, Request> BatchSink<S, B, Request>
+impl<S, M, Request> BatchSink<S, M, Request>
 where
     S: Service<Request>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response,
-    B: Batch<Output = Request>,
+    M: BatchMaker,
+    M::Batch: Batch<Output = Request>,
 {
-    pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
+    pub fn new(service: S, batch_maker: M, timeout: Duration, acker: Acker) -> Self {
         let service = ServiceBuilder::new()
             .map(|req: PartitionInnerBuffer<Request, ()>| req.into_parts().0)
             .service(service);
-        let batch = PartitionBuffer::new(batch);
+        let batch = PartitionBuffer::maker(batch_maker);
         let inner = PartitionBatchSink::new(service, batch, timeout, acker);
         Self { inner }
     }
 }
 
 #[cfg(test)]
-impl<S, B, Request> BatchSink<S, B, Request>
+impl<S, M, Request> BatchSink<S, M, Request>
 where
-    B: Batch<Output = Request>,
+    M: BatchMaker,
+    M::Batch: Batch<Output = Request>,
 {
     pub fn get_ref(&self) -> &S {
         &self.inner.service.service.inner
     }
 }
 
-impl<S, B, Request> Sink<B::Input> for BatchSink<S, B, Request>
+impl<S, M, Request> Sink<<<M as BatchMaker>::Batch as Batch>::Input> for BatchSink<S, M, Request>
 where
     S: Service<Request>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response,
-    B: Batch<Output = Request>,
+    M: BatchMaker,
+    M::Batch: Batch<Output = Request>,
 {
     type Error = crate::Error;
 
@@ -140,7 +144,10 @@ where
         self.project().inner.poll_ready(cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: B::Input) -> Result<(), Self::Error> {
+    fn start_send(
+        self: Pin<&mut Self>,
+        item: <<M as BatchMaker>::Batch as Batch>::Input,
+    ) -> Result<(), Self::Error> {
         let item = PartitionInnerBuffer::new(item, ());
         self.project().inner.start_send(item)
     }
@@ -175,36 +182,38 @@ where
 /// and r3 are dispatched and r2 and r3 complete, all events contained
 /// in all requests will not be acked until r1 has completed.
 #[pin_project]
-pub struct PartitionBatchSink<S, B, K, Request>
+pub struct PartitionBatchSink<S, M, K, Request>
 where
-    B: Batch<Output = Request>,
+    M: BatchMaker,
+    M::Batch: Batch<Output = Request>,
 {
     service: ServiceSink<S, Request>,
-    buffer: Option<(K, B::Input)>,
-    batch: StatefulBatch<B>,
-    partitions: HashMap<K, StatefulBatch<B>>,
+    buffer: Option<(K, <<M as BatchMaker>::Batch as Batch>::Input)>,
+    batch_maker: M,
+    partitions: HashMap<K, StatefulBatch<M::Batch>>,
     timeout: Duration,
     lingers: HashMap<K, Delay>,
     closing: bool,
 }
 
-impl<S, B, K, Request> PartitionBatchSink<S, B, K, Request>
+impl<S, M, K, Request> PartitionBatchSink<S, M, K, Request>
 where
-    B: Batch<Output = Request>,
-    B::Input: Partition<K>,
+    M: BatchMaker,
+    M::Batch: Batch<Output = Request>,
+    <<M as BatchMaker>::Batch as Batch>::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     S: Service<Request>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response,
 {
-    pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
+    pub fn new(service: S, batch_maker: M, timeout: Duration, acker: Acker) -> Self {
         let service = ServiceSink::new(service, acker);
 
         Self {
             service,
             buffer: None,
-            batch: batch.into(),
+            batch_maker,
             partitions: HashMap::new(),
             timeout,
             lingers: HashMap::new(),
@@ -213,10 +222,12 @@ where
     }
 }
 
-impl<S, B, K, Request> Sink<B::Input> for PartitionBatchSink<S, B, K, Request>
+impl<S, M, K, Request> Sink<<<M as BatchMaker>::Batch as Batch>::Input>
+    for PartitionBatchSink<S, M, K, Request>
 where
-    B: Batch<Output = Request>,
-    B::Input: Partition<K>,
+    M: BatchMaker,
+    M::Batch: Batch<Output = Request>,
+    <<M as BatchMaker>::Batch as Batch>::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     S: Service<Request>,
     S::Future: Send + 'static,
@@ -241,7 +252,10 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: B::Input) -> Result<(), Self::Error> {
+    fn start_send(
+        mut self: Pin<&mut Self>,
+        item: <<M as BatchMaker>::Batch as Batch>::Input,
+    ) -> Result<(), Self::Error> {
         let partition = item.partition();
 
         let batch = loop {
@@ -249,7 +263,7 @@ where
                 break batch;
             }
 
-            let batch = self.batch.fresh();
+            let batch = StatefulBatch::from(self.batch_maker.new_batch());
             self.partitions.insert(partition.clone(), batch);
 
             let delay = delay_for(self.timeout);
@@ -342,15 +356,15 @@ where
     }
 }
 
-impl<S, B, K, Request> fmt::Debug for PartitionBatchSink<S, B, K, Request>
+impl<S, M, K, Request> fmt::Debug for PartitionBatchSink<S, M, K, Request>
 where
+    M: BatchMaker,
+    M::Batch: Batch<Output = Request>,
     S: fmt::Debug,
-    B: Batch<Output = Request> + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PartitionBatchSink")
             .field("service", &self.service)
-            .field("batch", &self.batch)
             .field("timeout", &self.timeout)
             .finish()
     }
@@ -518,7 +532,7 @@ mod tests {
 
         let svc = tower::service_fn(|_| future::ok::<_, std::io::Error>(()));
         let batch = BatchSettings::default().events(10).bytes(9999);
-        let buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let buffered = BatchSink::new(svc, VecBuffer::maker(batch.size), TIMEOUT, acker);
 
         let _ = buffered
             .sink_map_err(drop)
@@ -557,7 +571,7 @@ mod tests {
 
         let batch = BatchSettings::default().bytes(9999).events(1);
 
-        let mut sink = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let mut sink = BatchSink::new(svc, VecBuffer::maker(batch.size), TIMEOUT, acker);
 
         let mut cx = Context::from_waker(noop_waker_ref());
         assert!(matches!(
@@ -662,7 +676,7 @@ mod tests {
             future::ok::<_, std::io::Error>(())
         });
         let batch = BatchSettings::default().bytes(9999).events(10);
-        let buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let buffered = BatchSink::new(svc, VecBuffer::maker(batch.size), TIMEOUT, acker);
 
         let _ = buffered
             .sink_map_err(drop)
@@ -693,7 +707,7 @@ mod tests {
         });
 
         let batch = BatchSettings::default().bytes(9999).events(10);
-        let mut buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let mut buffered = BatchSink::new(svc, VecBuffer::maker(batch.size), TIMEOUT, acker);
 
         let mut cx = Context::from_waker(noop_waker_ref());
         assert!(matches!(
@@ -725,7 +739,7 @@ mod tests {
         });
 
         let batch = BatchSettings::default().bytes(9999).events(10);
-        let mut buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let mut buffered = BatchSink::new(svc, VecBuffer::maker(batch.size), TIMEOUT, acker);
 
         let mut cx = Context::from_waker(noop_waker_ref());
         assert!(matches!(
@@ -764,7 +778,7 @@ mod tests {
         });
 
         let batch = BatchSettings::default().bytes(9999).events(10);
-        let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let sink = PartitionBatchSink::new(svc, VecBuffer::maker(batch.size), TIMEOUT, acker);
 
         sink.sink_map_err(drop)
             .send_all(&mut stream::iter(0..22).map(Ok))
@@ -794,7 +808,7 @@ mod tests {
         });
 
         let batch = BatchSettings::default().bytes(9999).events(1);
-        let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let sink = PartitionBatchSink::new(svc, VecBuffer::maker(batch.size), TIMEOUT, acker);
 
         let input = vec![Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
@@ -819,7 +833,7 @@ mod tests {
         });
 
         let batch = BatchSettings::default().bytes(9999).events(2);
-        let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let sink = PartitionBatchSink::new(svc, VecBuffer::maker(batch.size), TIMEOUT, acker);
 
         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
@@ -850,7 +864,7 @@ mod tests {
         });
 
         let batch = BatchSettings::default().bytes(9999).events(10);
-        let mut sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let mut sink = PartitionBatchSink::new(svc, VecBuffer::maker(batch.size), TIMEOUT, acker);
 
         let mut cx = Context::from_waker(noop_waker_ref());
         assert!(matches!(

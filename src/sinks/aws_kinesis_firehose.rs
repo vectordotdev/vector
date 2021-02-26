@@ -157,7 +157,7 @@ impl KinesisFirehoseService {
             .batch_sink(
                 KinesisFirehoseRetryLogic,
                 kinesis,
-                VecBuffer::new(batch.size),
+                VecBuffer::maker(batch.size),
                 batch.timeout,
                 cx.acker(),
             )

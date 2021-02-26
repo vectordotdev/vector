@@ -88,7 +88,7 @@ impl SinkConfig for LogdnaConfig {
 
         let sink = PartitionHttpSink::new(
             self.clone(),
-            PartitionBuffer::new(JsonArrayBuffer::new(batch_settings.size)),
+            PartitionBuffer::maker(JsonArrayBuffer::maker(batch_settings.size)),
             request_settings,
             batch_settings.timeout,
             client.clone(),

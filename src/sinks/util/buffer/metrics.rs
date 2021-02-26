@@ -1,6 +1,8 @@
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue, Sample},
-    sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
+    sinks::util::batch::{
+        Batch, BatchConfig, BatchError, BatchMaker, BatchSettings, BatchSize, PushResult,
+    },
     Event,
 };
 use std::{
@@ -113,9 +115,24 @@ pub struct MetricsBuffer {
     max_events: usize,
 }
 
+pub struct MetricsBufferMaker {
+    settings: BatchSize<MetricsBuffer>,
+}
+
+impl BatchMaker for MetricsBufferMaker {
+    type Batch = MetricsBuffer;
+    fn new_batch(&self) -> Self::Batch {
+        Self::Batch::new(self.settings)
+    }
+}
+
 impl MetricsBuffer {
     pub fn new(settings: BatchSize<Self>) -> Self {
         Self::with_capacity(settings.events)
+    }
+
+    pub fn maker(settings: BatchSize<Self>) -> MetricsBufferMaker {
+        MetricsBufferMaker { settings }
     }
 
     fn with_capacity(max_events: usize) -> Self {

@@ -119,7 +119,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
 
         let sink = BatchedHttpSink::new(
             sink,
-            JsonArrayBuffer::new(batch_settings.size),
+            JsonArrayBuffer::maker(batch_settings.size),
             request_settings,
             batch_settings.timeout,
             client,

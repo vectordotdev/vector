@@ -123,7 +123,7 @@ impl SinkConfig for LokiConfig {
 
         let sink = PartitionHttpSink::new(
             sink,
-            PartitionBuffer::new(LokiBuffer::new(
+            PartitionBuffer::maker(LokiBuffer::maker(
                 batch_settings.size,
                 GlobalTimestamps::default(),
                 config.out_of_order_action.clone(),

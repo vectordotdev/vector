@@ -4,7 +4,7 @@ use crate::{
     http::HttpClient,
     sinks::{
         util::{
-            batch::{Batch, BatchError},
+            batch::{Batch, BatchError, BatchMaker},
             encode_event,
             encoding::{EncodingConfig, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
@@ -89,19 +89,23 @@ impl DatadogLogsConfig {
     /// Builds the required BatchedHttpSink.
     /// Since the DataDog sink can create one of two different sinks, this
     /// extracts most of the shared functionality required to create either sink.
-    fn build_sink<T, B, O>(
+    fn build_sink<T, M, O>(
         &self,
         cx: SinkContext,
         service: T,
-        batch: B,
+        batch_maker: M,
         timeout: Duration,
     ) -> crate::Result<(VectorSink, Healthcheck)>
     where
         O: 'static,
-        B: Batch<Output = Vec<O>> + std::marker::Send + 'static,
-        B::Output: std::marker::Send + Clone,
-        B::Input: std::marker::Send,
-        T: HttpSink<Input = B::Input, Output = B::Output> + Clone,
+        M: BatchMaker + std::marker::Send + 'static,
+        M::Batch: Batch<Output = Vec<O>> + std::marker::Send + 'static,
+        <<M as BatchMaker>::Batch as Batch>::Output: std::marker::Send + Clone,
+        <<M as BatchMaker>::Batch as Batch>::Input: std::marker::Send,
+        T: HttpSink<
+                Input = <<M as BatchMaker>::Batch as Batch>::Input,
+                Output = <<M as BatchMaker>::Batch as Batch>::Output,
+            > + Clone,
     {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
 
@@ -114,7 +118,7 @@ impl DatadogLogsConfig {
         let healthcheck = healthcheck(service.clone(), client.clone()).boxed();
         let sink = BatchedHttpSink::new(
             service,
-            batch,
+            batch_maker,
             request_settings,
             timeout,
             client,
@@ -177,7 +181,7 @@ impl SinkConfig for DatadogLogsConfig {
                     DatadogLogsJsonService {
                         config: self.clone(),
                     },
-                    JsonArrayBuffer::new(batch_settings.size),
+                    JsonArrayBuffer::maker(batch_settings.size),
                     batch_settings.timeout,
                 )
             }
@@ -188,7 +192,7 @@ impl SinkConfig for DatadogLogsConfig {
                     DatadogLogsTextService {
                         config: self.clone(),
                     },
-                    VecBuffer::new(batch_settings.size),
+                    VecBuffer::maker(batch_settings.size),
                     batch_settings.timeout,
                 )
             }

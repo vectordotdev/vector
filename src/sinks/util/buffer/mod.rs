@@ -1,5 +1,6 @@
 use super::batch::{
-    err_event_too_large, Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
+    err_event_too_large, Batch, BatchConfig, BatchError, BatchMaker, BatchSettings, BatchSize,
+    PushResult,
 };
 use flate2::write::GzEncoder;
 use std::io::Write;
@@ -13,7 +14,7 @@ pub mod partition;
 pub mod vec;
 
 pub use compression::{Compression, GZIP_FAST};
-pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
+pub use partition::{Partition, PartitionBuffer, PartitionBufferMaker, PartitionInnerBuffer};
 
 #[derive(Debug)]
 pub struct Buffer {
@@ -22,6 +23,18 @@ pub struct Buffer {
     num_bytes: usize,
     settings: BatchSize<Self>,
     compression: Compression,
+}
+
+pub struct BufferMaker {
+    settings: BatchSize<Buffer>,
+    compression: Compression,
+}
+
+impl BatchMaker for BufferMaker {
+    type Batch = Buffer;
+    fn new_batch(&self) -> Self::Batch {
+        Self::Batch::new(self.settings, self.compression)
+    }
 }
 
 #[derive(Debug)]
@@ -47,6 +60,13 @@ impl Buffer {
             inner,
             num_items: 0,
             num_bytes: 0,
+            settings,
+            compression,
+        }
+    }
+
+    pub fn maker(settings: BatchSize<Self>, compression: Compression) -> BufferMaker {
+        BufferMaker {
             settings,
             compression,
         }
@@ -156,7 +176,7 @@ mod test {
 
         let buffered = BatchSink::new(
             svc,
-            Buffer::new(batch_size, Compression::gzip_default()),
+            Buffer::maker(batch_size, Compression::gzip_default()),
             timeout,
             acker,
         );

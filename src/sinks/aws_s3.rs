@@ -228,7 +228,7 @@ impl S3SinkConfig {
             .settings(request, S3RetryLogic)
             .service(s3);
 
-        let buffer = PartitionBuffer::new(Buffer::new(batch.size, self.compression));
+        let buffer = PartitionBuffer::maker(Buffer::maker(batch.size, self.compression));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .with_flat_map(move |e| stream::iter(encode_event(e, &key_prefix, &encoding)).map(Ok))

@@ -100,7 +100,7 @@ impl SinkConfig for RemoteWriteConfig {
         let sink = {
             let service = request.service(HttpRetryLogic, service);
             let service = ServiceBuilder::new().service(service);
-            let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
+            let buffer = PartitionBuffer::maker(MetricsBuffer::maker(batch.size));
             let mut normalizer = MetricNormalizer::<PrometheusMetricNormalize>::default();
 
             PartitionBatchSink::new(service, buffer, batch.timeout, cx.acker())

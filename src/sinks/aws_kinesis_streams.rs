@@ -161,7 +161,7 @@ impl KinesisService {
             .batch_sink(
                 KinesisRetryLogic,
                 kinesis,
-                VecBuffer::new(batch.size),
+                VecBuffer::maker(batch.size),
                 batch.timeout,
                 cx.acker(),
             )

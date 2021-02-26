@@ -152,7 +152,7 @@ impl SinkConfig for TestConfig {
             .batch_sink(
                 TestRetryLogic,
                 TestSink::new(self),
-                VecBuffer::new(batch.size),
+                VecBuffer::maker(batch.size),
                 batch.timeout,
                 cx.acker(),
             )

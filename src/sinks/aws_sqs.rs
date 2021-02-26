@@ -171,7 +171,7 @@ impl SqsSink {
             .batch_sink(
                 SqsRetryLogic,
                 sqs,
-                VecBuffer::new(batch.size),
+                VecBuffer::maker(batch.size),
                 batch.timeout,
                 cx.acker(),
             )

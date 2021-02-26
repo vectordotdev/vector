@@ -170,6 +170,11 @@ pub enum PushResult<T> {
     Overflow(T),
 }
 
+pub trait BatchMaker {
+    type Batch: Batch;
+    fn new_batch(&self) -> Self::Batch;
+}
+
 pub trait Batch: Sized {
     type Input;
     type Output;

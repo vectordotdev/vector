@@ -152,7 +152,7 @@ impl SematextMetricsService {
             .batch_sink(
                 HttpRetryLogic,
                 sematext_service,
-                MetricsBuffer::new(batch.size),
+                MetricsBuffer::maker(batch.size),
                 batch.timeout,
                 cx.acker(),
             )

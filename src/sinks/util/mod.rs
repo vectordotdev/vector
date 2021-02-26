@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::borrow::Cow;
 
-pub use batch::{Batch, BatchConfig, BatchSettings, BatchSize, PushResult};
+pub use batch::{Batch, BatchConfig, BatchMaker, BatchSettings, BatchSize, PushResult};
 pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
 pub use buffer::metrics::MetricEntry;
 pub use buffer::partition::Partition;

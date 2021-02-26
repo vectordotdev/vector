@@ -144,7 +144,7 @@ impl InfluxDBSvc {
             .batch_sink(
                 HttpRetryLogic,
                 influxdb_http_service,
-                MetricsBuffer::new(batch.size),
+                MetricsBuffer::maker(batch.size),
                 batch.timeout,
                 cx.acker(),
             )

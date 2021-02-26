@@ -143,7 +143,7 @@ impl CloudWatchMetricsSvc {
 
         let svc = request.service(CloudWatchMetricsRetryLogic, cloudwatch_metrics);
 
-        let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
+        let buffer = PartitionBuffer::maker(MetricsBuffer::maker(batch.size));
         let mut normalizer = MetricNormalizer::<AwsCloudwatchMetricNormalize>::default();
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())

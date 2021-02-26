@@ -187,10 +187,10 @@ impl SinkConfig for DatadogConfig {
             HttpBatchService::new(client, move |request| ready(sink.build_request(request))),
         );
 
-        let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
+        let maker = PartitionBuffer::maker(MetricsBuffer::maker(batch.size));
         let mut normalizer = MetricNormalizer::<DatadogMetricNormalize>::default();
 
-        let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+        let svc_sink = PartitionBatchSink::new(svc, maker, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal datadog metric sink error.", %error))
             .with_flat_map(move |event: Event| {
                 stream::iter(normalizer.apply(event).map(|event| {

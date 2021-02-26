@@ -1,5 +1,6 @@
 use super::{
-    err_event_too_large, Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
+    err_event_too_large, Batch, BatchConfig, BatchError, BatchMaker, BatchSettings, BatchSize,
+    PushResult,
 };
 use bytes::Bytes;
 
@@ -14,6 +15,17 @@ pub struct VecBuffer<T> {
     settings: BatchSize<Self>,
 }
 
+pub struct VecBufferMaker<T> {
+    settings: BatchSize<VecBuffer<T>>,
+}
+
+impl<T: EncodedLength> BatchMaker for VecBufferMaker<T> {
+    type Batch = VecBuffer<T>;
+    fn new_batch(&self) -> Self::Batch {
+        Self::Batch::new(self.settings)
+    }
+}
+
 impl<T> VecBuffer<T> {
     pub fn new(settings: BatchSize<Self>) -> Self {
         Self::new_with_settings(settings)
@@ -25,6 +37,10 @@ impl<T> VecBuffer<T> {
             bytes: 0,
             settings,
         }
+    }
+
+    pub fn maker(settings: BatchSize<Self>) -> VecBufferMaker<T> {
+        VecBufferMaker { settings }
     }
 }
 

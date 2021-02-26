@@ -5,8 +5,8 @@
 //! together for more efficient output.
 
 use super::{
-    err_event_too_large, json::BoxedRawValue, Batch, BatchConfig, BatchError, BatchSettings,
-    BatchSize, PushResult,
+    err_event_too_large, json::BoxedRawValue, Batch, BatchConfig, BatchError, BatchMaker,
+    BatchSettings, BatchSize, PushResult,
 };
 use crate::sinks::loki::OutOfOrderAction;
 use dashmap::DashMap;
@@ -87,6 +87,23 @@ pub struct LokiBuffer {
     out_of_order_action: OutOfOrderAction,
 }
 
+pub struct LokiBufferMaker {
+    settings: BatchSize<LokiBuffer>,
+    global_timestamps: GlobalTimestamps,
+    out_of_order_action: OutOfOrderAction,
+}
+
+impl BatchMaker for LokiBufferMaker {
+    type Batch = LokiBuffer;
+    fn new_batch(&self) -> Self::Batch {
+        Self::Batch::new(
+            self.settings,
+            self.global_timestamps.clone(),
+            self.out_of_order_action.clone(),
+        )
+    }
+}
+
 impl LokiBuffer {
     pub fn new(
         settings: BatchSize<Self>,
@@ -100,6 +117,18 @@ impl LokiBuffer {
             settings,
             partition: None,
             latest_timestamps: None,
+            global_timestamps,
+            out_of_order_action,
+        }
+    }
+
+    pub fn maker(
+        settings: BatchSize<Self>,
+        global_timestamps: GlobalTimestamps,
+        out_of_order_action: OutOfOrderAction,
+    ) -> LokiBufferMaker {
+        LokiBufferMaker {
+            settings,
             global_timestamps,
             out_of_order_action,
         }

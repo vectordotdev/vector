@@ -145,7 +145,7 @@ impl SinkConfig for HttpSinkConfig {
 
         let sink = BatchedHttpSink::new(
             config,
-            Buffer::new(batch.size, Compression::None),
+            Buffer::maker(batch.size, Compression::None),
             request,
             batch.timeout,
             client,

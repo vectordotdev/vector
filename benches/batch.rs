@@ -78,7 +78,7 @@ fn benchmark_batching(c: &mut Criterion) {
                         .size;
                     let batch_sink = BatchSink::new(
                         tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                        Buffer::new(batch, *compression),
+                        Buffer::maker(batch, *compression),
                         Duration::from_secs(1),
                         acker,
                     )
@@ -121,7 +121,7 @@ impl Partition<Bytes> for InnerBuffer {
 impl PartitionedBuffer {
     pub fn new(batch: BatchSize<Buffer>, compression: Compression) -> Self {
         Self {
-            inner: Buffer::new(batch, compression),
+            inner: Buffer::maker(batch, compression),
             key: None,
         }
     }

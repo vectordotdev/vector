@@ -1,5 +1,6 @@
 use super::super::batch::{
-    err_event_too_large, Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
+    err_event_too_large, Batch, BatchConfig, BatchError, BatchMaker, BatchSettings, BatchSize,
+    PushResult,
 };
 use serde_json::value::{to_raw_value, RawValue, Value};
 
@@ -14,6 +15,17 @@ pub struct JsonArrayBuffer {
     settings: BatchSize<Self>,
 }
 
+pub struct JsonArrayBufferMaker {
+    settings: BatchSize<JsonArrayBuffer>,
+}
+
+impl BatchMaker for JsonArrayBufferMaker {
+    type Batch = JsonArrayBuffer;
+    fn new_batch(&self) -> Self::Batch {
+        JsonArrayBuffer::new(self.settings)
+    }
+}
+
 impl JsonArrayBuffer {
     pub fn new(settings: BatchSize<Self>) -> Self {
         Self {
@@ -21,6 +33,10 @@ impl JsonArrayBuffer {
             total_bytes: 0,
             settings,
         }
+    }
+
+    pub fn maker(settings: BatchSize<Self>) -> JsonArrayBufferMaker {
+        JsonArrayBufferMaker { settings }
     }
 }
 

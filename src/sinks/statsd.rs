@@ -103,7 +103,7 @@ impl SinkConfig for StatsdSinkConfig {
                 let service = StatsdSvc { inner: service };
                 let sink = BatchSink::new(
                     ServiceBuilder::new().service(service),
-                    Buffer::new(batch.size, Compression::None),
+                    Buffer::maker(batch.size, Compression::None),
                     batch.timeout,
                     cx.acker(),
                 )

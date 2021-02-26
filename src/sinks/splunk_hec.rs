@@ -112,7 +112,7 @@ impl SinkConfig for HecSinkConfig {
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            Buffer::new(batch.size, self.compression),
+            Buffer::maker(batch.size, self.compression),
             request,
             batch.timeout,
             client.clone(),

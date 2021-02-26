@@ -1,6 +1,6 @@
 use super::{
     retries::{RetryAction, RetryLogic},
-    sink, Batch, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
+    sink, Batch, BatchMaker, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestSettings,
 };
 use crate::{
@@ -49,35 +49,41 @@ pub trait HttpSink: Send + Sync + 'static {
 /// this we must provide a single buffer slot. To ensure the buffer is
 /// fully flushed make sure `poll_flush` returns ready.
 #[pin_project]
-pub struct BatchedHttpSink<T, B, L = HttpRetryLogic>
+pub struct BatchedHttpSink<T, M, L = HttpRetryLogic>
 where
-    B: Batch,
-    B::Output: Clone + Send + 'static,
+    M: BatchMaker,
+    <<M as BatchMaker>::Batch as Batch>::Output: Clone + Send + 'static,
     L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     sink: Arc<T>,
     #[pin]
     inner: TowerBatchedSink<
-        HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>, B::Output>,
-        B,
+        HttpBatchService<
+            BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>,
+            <<M as BatchMaker>::Batch as Batch>::Output,
+        >,
+        M,
         L,
-        B::Output,
+        <<M as BatchMaker>::Batch as Batch>::Output,
     >,
     // An empty slot is needed to buffer an item where we encoded it but
     // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
     // sink combinator. https://docs.rs/futures/0.1.29/src/futures/sink/with_flat_map.rs.html#20
-    slot: Option<B::Input>,
+    slot: Option<<<M as BatchMaker>::Batch as Batch>::Input>,
 }
 
-impl<T, B> BatchedHttpSink<T, B, HttpRetryLogic>
+impl<T, M> BatchedHttpSink<T, M, HttpRetryLogic>
 where
-    B: Batch,
-    B::Output: Clone + Send + 'static,
-    T: HttpSink<Input = B::Input, Output = B::Output>,
+    M: BatchMaker,
+    <<M as BatchMaker>::Batch as Batch>::Output: Clone + Send + 'static,
+    T: HttpSink<
+        Input = <<M as BatchMaker>::Batch as Batch>::Input,
+        Output = <<M as BatchMaker>::Batch as Batch>::Output,
+    >,
 {
     pub fn new(
         sink: T,
-        batch: B,
+        batch_maker: M,
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
@@ -85,7 +91,7 @@ where
     ) -> Self {
         Self::with_retry_logic(
             sink,
-            batch,
+            batch_maker,
             HttpRetryLogic,
             request_settings,
             batch_timeout,
@@ -95,16 +101,19 @@ where
     }
 }
 
-impl<T, B, L> BatchedHttpSink<T, B, L>
+impl<T, M, L> BatchedHttpSink<T, M, L>
 where
-    B: Batch,
-    B::Output: Clone + Send + 'static,
+    M: BatchMaker,
+    <<M as BatchMaker>::Batch as Batch>::Output: Clone + Send + 'static,
     L: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
-    T: HttpSink<Input = B::Input, Output = B::Output>,
+    T: HttpSink<
+        Input = <<M as BatchMaker>::Batch as Batch>::Input,
+        Output = <<M as BatchMaker>::Batch as Batch>::Output,
+    >,
 {
     pub fn with_retry_logic(
         sink: T,
-        batch: B,
+        batch_maker: M,
         logic: L,
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
@@ -121,7 +130,7 @@ where
             };
 
         let svc = HttpBatchService::new(client, request_builder);
-        let inner = request_settings.batch_sink(logic, svc, batch, batch_timeout, acker);
+        let inner = request_settings.batch_sink(logic, svc, batch_maker, batch_timeout, acker);
 
         Self {
             sink,
@@ -131,11 +140,14 @@ where
     }
 }
 
-impl<T, B, L> Sink<Event> for BatchedHttpSink<T, B, L>
+impl<T, M, L> Sink<Event> for BatchedHttpSink<T, M, L>
 where
-    B: Batch,
-    B::Output: Clone + Send + 'static,
-    T: HttpSink<Input = B::Input, Output = B::Output>,
+    M: BatchMaker,
+    <<M as BatchMaker>::Batch as Batch>::Output: Clone + Send + 'static,
+    T: HttpSink<
+        Input = <<M as BatchMaker>::Batch as Batch>::Input,
+        Output = <<M as BatchMaker>::Batch as Batch>::Output,
+    >,
     L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     type Error = crate::Error;
@@ -181,38 +193,47 @@ where
 }
 
 #[pin_project]
-pub struct PartitionHttpSink<T, B, K, L = HttpRetryLogic>
+pub struct PartitionHttpSink<T, M, K, L = HttpRetryLogic>
 where
-    B: Batch,
-    B::Output: Clone + Send + 'static,
-    B::Input: Partition<K>,
+    M: BatchMaker,
+    <<M as BatchMaker>::Batch as Batch>::Output: Clone + Send + 'static,
+    <<M as BatchMaker>::Batch as Batch>::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
-    T: HttpSink<Input = B::Input, Output = B::Output>,
+    T: HttpSink<
+        Input = <<M as BatchMaker>::Batch as Batch>::Input,
+        Output = <<M as BatchMaker>::Batch as Batch>::Output,
+    >,
 {
     sink: Arc<T>,
     #[pin]
     inner: TowerPartitionSink<
-        HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>, B::Output>,
-        B,
+        HttpBatchService<
+            BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>,
+            <<M as BatchMaker>::Batch as Batch>::Output,
+        >,
+        M,
         L,
         K,
-        B::Output,
+        <<M as BatchMaker>::Batch as Batch>::Output,
     >,
-    slot: Option<B::Input>,
+    slot: Option<<<M as BatchMaker>::Batch as Batch>::Input>,
 }
 
-impl<T, B, K> PartitionHttpSink<T, B, K, HttpRetryLogic>
+impl<T, M, K> PartitionHttpSink<T, M, K, HttpRetryLogic>
 where
-    B: Batch,
-    B::Output: Clone + Send + 'static,
-    B::Input: Partition<K>,
+    M: BatchMaker,
+    <<M as BatchMaker>::Batch as Batch>::Output: Clone + Send + 'static,
+    <<M as BatchMaker>::Batch as Batch>::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
-    T: HttpSink<Input = B::Input, Output = B::Output>,
+    T: HttpSink<
+        Input = <<M as BatchMaker>::Batch as Batch>::Input,
+        Output = <<M as BatchMaker>::Batch as Batch>::Output,
+    >,
 {
     pub fn new(
         sink: T,
-        batch: B,
+        batch_maker: M,
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
@@ -220,7 +241,7 @@ where
     ) -> Self {
         Self::with_retry_logic(
             sink,
-            batch,
+            batch_maker,
             HttpRetryLogic,
             request_settings,
             batch_timeout,
@@ -230,18 +251,21 @@ where
     }
 }
 
-impl<T, B, K, L> PartitionHttpSink<T, B, K, L>
+impl<T, M, K, L> PartitionHttpSink<T, M, K, L>
 where
-    B: Batch,
-    B::Output: Clone + Send + 'static,
-    B::Input: Partition<K>,
+    M: BatchMaker,
+    <<M as BatchMaker>::Batch as Batch>::Output: Clone + Send + 'static,
+    <<M as BatchMaker>::Batch as Batch>::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
     L: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
-    T: HttpSink<Input = B::Input, Output = B::Output>,
+    T: HttpSink<
+        Input = <<M as BatchMaker>::Batch as Batch>::Input,
+        Output = <<M as BatchMaker>::Batch as Batch>::Output,
+    >,
 {
     pub fn with_retry_logic(
         sink: T,
-        batch: B,
+        batch_maker: M,
         logic: L,
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
@@ -258,7 +282,7 @@ where
             };
 
         let svc = HttpBatchService::new(client, request_builder);
-        let inner = request_settings.partition_sink(logic, svc, batch, batch_timeout, acker);
+        let inner = request_settings.partition_sink(logic, svc, batch_maker, batch_timeout, acker);
 
         Self {
             sink,
@@ -268,13 +292,16 @@ where
     }
 }
 
-impl<T, B, K, L> Sink<Event> for PartitionHttpSink<T, B, K, L>
+impl<T, M, K, L> Sink<Event> for PartitionHttpSink<T, M, K, L>
 where
-    B: Batch,
-    B::Output: Clone + Send + 'static,
-    B::Input: Partition<K>,
+    M: BatchMaker,
+    <<M as BatchMaker>::Batch as Batch>::Output: Clone + Send + 'static,
+    <<M as BatchMaker>::Batch as Batch>::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
-    T: HttpSink<Input = B::Input, Output = B::Output>,
+    T: HttpSink<
+        Input = <<M as BatchMaker>::Batch as Batch>::Input,
+        Output = <<M as BatchMaker>::Batch as Batch>::Output,
+    >,
     L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     type Error = crate::Error;

@@ -1,12 +1,30 @@
-use super::super::batch::{Batch, BatchConfig, BatchError, BatchSettings, PushResult};
+use super::super::batch::{Batch, BatchConfig, BatchError, BatchMaker, BatchSettings, PushResult};
+use std::marker::PhantomData;
 
 pub trait Partition<K> {
     fn partition(&self) -> K;
 }
+
 #[derive(Debug)]
 pub struct PartitionBuffer<T, K> {
     inner: T,
     key: Option<K>,
+}
+
+pub struct PartitionBufferMaker<M, K> {
+    batch_maker: M,
+    _phantom: PhantomData<K>,
+}
+
+impl<M, K> BatchMaker for PartitionBufferMaker<M, K>
+where
+    M: BatchMaker,
+    K: Clone,
+{
+    type Batch = PartitionBuffer<M::Batch, K>;
+    fn new_batch(&self) -> Self::Batch {
+        Self::Batch::new(self.batch_maker.new_batch())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -18,6 +36,16 @@ pub struct PartitionInnerBuffer<T, K> {
 impl<T, K> PartitionBuffer<T, K> {
     pub fn new(inner: T) -> Self {
         Self { inner, key: None }
+    }
+
+    pub fn maker<M>(batch_maker: M) -> PartitionBufferMaker<M, K>
+    where
+        M: BatchMaker<Batch = T>,
+    {
+        PartitionBufferMaker {
+            batch_maker,
+            _phantom: PhantomData::default(),
+        }
     }
 }
 

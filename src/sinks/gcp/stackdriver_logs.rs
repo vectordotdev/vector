@@ -132,7 +132,7 @@ impl SinkConfig for StackdriverConfig {
 
         let sink = BatchedHttpSink::new(
             sink,
-            JsonArrayBuffer::new(batch.size),
+            JsonArrayBuffer::maker(batch.size),
             request,
             batch.timeout,
             client,
