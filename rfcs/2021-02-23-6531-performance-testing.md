@@ -22,6 +22,7 @@ art in this project, then makes a proposal for where to go next.
   * [Run test-harness Nightly](#run-test-harness-nightly)
   * [Rethink test-harness](#rethink-test-harness)
   * [Run Vector Continuously](#run-vector-continuously)
+* [Proposal](#proposal)
 
 ## Summary
 
