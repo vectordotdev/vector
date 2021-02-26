@@ -260,7 +260,7 @@ reqwest = { version = "0.10.9", features = ["json"] }
 rusty-fork = "0.3.0"
 tempfile = "3.0.6"
 tokio = { version = "0.2", features = ["test-util"] }
-tokio-test = "0.2"
+tokio-test = "0.4"
 tokio01-test = "0.1.1"
 tower-test = "0.3.0"
 walkdir = "2.2.7"
