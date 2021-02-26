@@ -399,6 +399,7 @@ urls: {
 	toml_types:                                               "\(github)/toml-lang/toml#table-of-contents"
 	twelve_factor_app:                                        "https://12factor.net/"
 	type_safety:                                              "https://en.wikipedia.org/wiki/Type_safety"
+	tz_time_zones:                                            "https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
 	ubuntu:                                                   "https://ubuntu.com/"
 	udp:                                                      "\(wikipedia)/wiki/User_Datagram_Protocol"
 	uds:                                                      "\(wikipedia)/wiki/Unix_domain_socket"

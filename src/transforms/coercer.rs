@@ -6,15 +6,16 @@ use crate::{
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use std::collections::HashMap;
 use std::str;
 
-#[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields, default)]
-#[derivative(Default)]
 pub struct CoercerConfig {
     types: HashMap<String, String>,
     drop_unspecified: bool,
+    timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -26,8 +27,9 @@ impl_generate_config_from_default!(CoercerConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
-        let types = parse_conversion_map(&self.types)?;
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+        let timezone = self.timezone.unwrap_or(globals.timezone);
+        let types = parse_conversion_map(&self.types, timezone)?;
         Ok(Transform::function(Coercer {
             types,
             drop_unspecified: self.drop_unspecified,

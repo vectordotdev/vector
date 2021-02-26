@@ -1,5 +1,5 @@
-use chrono::{TimeZone, Utc};
-use shared::conversion::Conversion;
+use chrono::{TimeZone as _, Utc};
+use shared::{conversion::Conversion, TimeZone};
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -117,7 +117,7 @@ impl Expression for ToTimestampFn {
                     (v.fract() * 1_000_000_000.0).round() as u32,
                 )
                 .into(),
-            Bytes(v) => Conversion::Timestamp
+            Bytes(v) => Conversion::Timestamp(TimeZone::Local)
                 .convert::<Value>(v)
                 .map_err(|err| err.to_string())?,
             v => return Err(format!(r#"unable to coerce {} into "timestamp""#, v.kind()).into()),
