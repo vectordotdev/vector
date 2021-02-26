@@ -79,10 +79,6 @@ where
         self.inner.is_empty()
     }
 
-    fn fresh(&self) -> Self {
-        Self::new(self.inner.fresh())
-    }
-
     fn finish(mut self) -> Self::Output {
         let key = self.key.take().unwrap();
         let inner = self.inner.finish();

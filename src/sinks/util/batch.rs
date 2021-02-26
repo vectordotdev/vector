@@ -190,7 +190,6 @@ pub trait Batch: Sized {
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input>;
     fn is_empty(&self) -> bool;
-    fn fresh(&self) -> Self;
     fn finish(self) -> Self::Output;
     fn num_items(&self) -> usize;
 }
@@ -247,13 +246,6 @@ where
 
     fn is_empty(&self) -> bool {
         !self.was_full && self.inner.is_empty()
-    }
-
-    fn fresh(&self) -> Self {
-        Self {
-            inner: self.inner.fresh(),
-            was_full: false,
-        }
     }
 
     fn finish(self) -> Self::Output {

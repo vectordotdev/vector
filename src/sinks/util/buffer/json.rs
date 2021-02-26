@@ -73,10 +73,6 @@ impl Batch for JsonArrayBuffer {
         self.buffer.is_empty()
     }
 
-    fn fresh(&self) -> Self {
-        Self::new(self.settings)
-    }
-
     fn finish(self) -> Self::Output {
         self.buffer
     }

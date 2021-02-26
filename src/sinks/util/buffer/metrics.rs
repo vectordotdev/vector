@@ -185,10 +185,6 @@ impl Batch for MetricsBuffer {
         self.num_items() == 0
     }
 
-    fn fresh(&self) -> Self {
-        Self::with_capacity(self.max_events)
-    }
-
     fn finish(self) -> Self::Output {
         self.metrics.0.into_iter().map(finish_metric).collect()
     }

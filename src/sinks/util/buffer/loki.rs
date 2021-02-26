@@ -232,14 +232,6 @@ impl Batch for LokiBuffer {
         self.streams.is_empty()
     }
 
-    fn fresh(&self) -> Self {
-        Self::new(
-            self.settings,
-            self.global_timestamps.clone(),
-            self.out_of_order_action.clone(),
-        )
-    }
-
     fn finish(self) -> Self::Output {
         let mut latest_timestamps = self.latest_timestamps.expect("Batch is empty");
         let streams_json = self

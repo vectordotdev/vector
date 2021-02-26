@@ -76,10 +76,6 @@ impl<T: EncodedLength> Batch for VecBuffer<T> {
         self.batch.is_empty()
     }
 
-    fn fresh(&self) -> Self {
-        Self::new_with_settings(self.settings)
-    }
-
     fn finish(self) -> Self::Output {
         self.batch
     }

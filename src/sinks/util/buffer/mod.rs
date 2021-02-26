@@ -127,10 +127,6 @@ impl Batch for Buffer {
         self.is_empty()
     }
 
-    fn fresh(&self) -> Self {
-        Self::new(self.settings, self.compression)
-    }
-
     fn finish(self) -> Self::Output {
         match self.inner {
             InnerBuffer::Plain(inner) => inner,
