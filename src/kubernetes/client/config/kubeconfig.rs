@@ -56,11 +56,10 @@ fn kubeconfig_reader(config: &str) -> Result<Config, Error> {
 
     let base = cluster.server.parse().context(InvalidUrl)?;
 
-    // use inline token if defined, otherwise fallback to token_file
     let token = match &user.token {
         Some(t) => Some(t.clone()),
         None => match &user.token_file {
-            Some(file) => Some(std::fs::read_to_string(PathBuf::from(&file)).context(Token)?),
+            Some(file) => Some(std::fs::read_to_string(&file).context(Token)?),
             None => None,
         },
     };
