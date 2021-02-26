@@ -11,7 +11,7 @@ remap: {
 		resolution:  string
 		title:       string
 
-		examples: [remap.#Example, ...remap.#Example]
+		examples?: [remap.#Example, ...remap.#Example]
 	}
 
 	errors: [Code=string]: #Error & {
