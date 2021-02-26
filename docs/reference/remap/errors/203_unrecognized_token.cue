@@ -1,12 +1,12 @@
 package metadata
 
 remap: errors: "203": {
-	title:       "Unrecognized token"
+	title: "Unrecognized token"
 	description: """
-		Your VRL program contains a token (character) that the VRL parses doesn't recognize as valid.
+		Your VRL program contains a token (character) that the VRL parser doesn't recognize as valid.
 		"""
 	rationale: null
-	resolution:  """
+	resolution: """
 		Use a valid token.
 		"""
 
@@ -16,19 +16,9 @@ remap: errors: "203": {
 			source: #"""
 				😂
 				"""#
-			raises: compiletime: #"""
-				error: \#(title)
-				  ┌─ :1:1
-				  │
-				1 │ 😂
-				  │ ^^
-				  │ │
-				  │ unexpected syntax token: "InvalidToken"
-				  │ expected one of: "\n", "!", "(", "[", "_", "false", "float literal", "function call", "identifier", "if", "integer literal", "null", "regex literal", "string literal", "timestamp literal", "true", "{", "path literal"
-				  │
-				"""#
 			diff: #"""
 				-😂
+				+"some valid value"
 				"""#
 		},
 	]
