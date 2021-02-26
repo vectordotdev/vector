@@ -1,5 +1,6 @@
 use super::{Error, Value};
 use crate::ExpressionError;
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
 impl Value {
@@ -185,6 +186,22 @@ impl Value {
             Value::Float(lhv) => {
                 (lhv.into_inner() <= f64::try_from(&rhs).map_err(|_| err())?).into()
             }
+            _ => return Err(err()),
+        };
+
+        Ok(value)
+    }
+
+    pub fn try_merge(self, rhs: Self) -> Result<Self, Error> {
+        let err = || Error::Merge(self.kind(), rhs.kind());
+
+        let value = match (&self, &rhs) {
+            (Value::Object(lhv), Value::Object(rhv)) => lhv
+                .iter()
+                .chain(rhv.iter())
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<BTreeMap<String, Value>>()
+                .into(),
             _ => return Err(err()),
         };
 

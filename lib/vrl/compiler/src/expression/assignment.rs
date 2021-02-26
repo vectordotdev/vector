@@ -405,7 +405,7 @@ pub struct Error {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ErrorVariant {
-    #[error("useless no-op assignment")]
+    #[error("unnecessary no-op assignment")]
     UnnecessaryNoop(Span),
 
     #[error("unhandled fallible assignment")]
@@ -447,7 +447,7 @@ impl DiagnosticError for Error {
 
         match &self.variant {
             UnnecessaryNoop(target_span) => vec![
-                Label::primary("this no-op assignment is useless", self.expr_span),
+                Label::primary("this no-op assignment has no effect", self.expr_span),
                 Label::context("either assign to a path or variable here", *target_span),
                 Label::context("or remove the assignment", self.assignment_span),
             ],
@@ -462,7 +462,7 @@ impl DiagnosticError for Error {
             ],
             InfallibleAssignment(target, expr, ok_span, err_span) => vec![
                 Label::primary("this error assignment is unnecessary", err_span),
-                Label::context("because this expression cannot fail", self.expr_span),
+                Label::context("because this expression can't fail", self.expr_span),
                 Label::context(format!("use: {} = {}", target, expr), ok_span),
             ],
             InvalidTarget(span) => vec![

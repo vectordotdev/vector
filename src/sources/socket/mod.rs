@@ -851,7 +851,7 @@ mod test {
     #[test]
     fn parses_unix_datagram_config() {
         let config = parses_unix_config("unix_datagram");
-        assert!(matches!(config.mode,Mode::UnixDatagram { .. }));
+        assert!(matches!(config.mode, Mode::UnixDatagram { .. }));
     }
 
     ////////////// UNIX STREAM TESTS //////////////
@@ -890,13 +890,13 @@ mod test {
     #[test]
     fn parses_new_unix_stream_config() {
         let config = parses_unix_config("unix_stream");
-        assert!(matches!(config.mode,Mode::UnixStream { .. }));
+        assert!(matches!(config.mode, Mode::UnixStream { .. }));
     }
 
     #[cfg(unix)]
     #[test]
     fn parses_old_unix_stream_config() {
         let config = parses_unix_config("unix");
-        assert!(matches!(config.mode,Mode::UnixStream { .. }));
+        assert!(matches!(config.mode, Mode::UnixStream { .. }));
     }
 }

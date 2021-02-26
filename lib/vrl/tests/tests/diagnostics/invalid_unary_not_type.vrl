@@ -8,7 +8,8 @@
 #   │  │
 #   │  negation only works on boolean values
 #   │
-#   = hint: coerce the value using one of the coercion functions
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = hint: coerce the value to the required type using a coercion function
+#   = see documentation about type coercion at https://functions.vrl.dev/#coerce-functions
+#   = see language documentation at https://vrl.dev
 
 !!"true"

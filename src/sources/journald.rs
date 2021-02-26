@@ -391,18 +391,16 @@ fn create_event(record: Record) -> Event {
         log.insert(log_schema().host_key(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
-    if let Some(timestamp) = log
+    if let Some(Value::Bytes(timestamp)) = log
         .get(&*SOURCE_TIMESTAMP)
         .or_else(|| log.get(RECEIVED_TIMESTAMP))
     {
-        if let Value::Bytes(timestamp) = timestamp {
-            if let Ok(timestamp) = String::from_utf8_lossy(&timestamp).parse::<u64>() {
-                let timestamp = chrono::Utc.timestamp(
-                    (timestamp / 1_000_000) as i64,
-                    (timestamp % 1_000_000) as u32 * 1_000,
-                );
-                log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
-            }
+        if let Ok(timestamp) = String::from_utf8_lossy(&timestamp).parse::<u64>() {
+            let timestamp = chrono::Utc.timestamp(
+                (timestamp / 1_000_000) as i64,
+                (timestamp % 1_000_000) as u32 * 1_000,
+            );
+            log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
         }
     }
     // Add source type
@@ -629,7 +627,7 @@ mod tests {
     impl FakeJournal {
         fn new(
             checkpoint: &Option<String>,
-        ) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {
+        ) -> (BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn) {
             let cursor = Cursor::new(FAKE_JOURNAL);
             let reader = BufReader::new(cursor);
             let mut journal = FakeJournal { reader };
@@ -642,7 +640,7 @@ mod tests {
                 }
             }
 
-            Ok((Box::pin(journal), Box::new(|| ())))
+            (Box::pin(journal), Box::new(|| ()))
         }
     }
 
@@ -676,7 +674,10 @@ mod tests {
             remap_priority: true,
             out: tx,
         }
-        .run_shutdown(shutdown, Box::new(FakeJournal::new));
+        .run_shutdown(
+            shutdown,
+            Box::new(|checkpoint| Ok(FakeJournal::new(checkpoint))),
+        );
         tokio::spawn(source);
 
         delay_for(Duration::from_millis(100)).await;

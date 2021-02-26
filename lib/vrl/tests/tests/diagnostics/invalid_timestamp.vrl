@@ -6,6 +6,7 @@
 # 2 │ t'foobar'
 #   │ ^^^^^^^^^ invalid timestamp format: input contains invalid characters
 #   │
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = see documentation about timestamps at https://vrl.dev/expressions/#timestamp
+#   = see language documentation at https://vrl.dev
 
 t'foobar'

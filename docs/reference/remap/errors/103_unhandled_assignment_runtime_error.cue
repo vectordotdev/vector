@@ -19,16 +19,6 @@ remap: errors: "103": {
 		source: #"""
 			. |= parse_key_value(.message)
 			"""#
-		raises: compiletime: #"""
-			error: \#(title)
-			  ┌─ :1:1
-			  │
-			1 │ . |= parse_key_value(.message)
-			  │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-			  │ │
-			  │ This assingment does not handle errors
-			  │
-			"""#
 	}]
 
 	examples: [

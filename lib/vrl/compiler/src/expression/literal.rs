@@ -2,7 +2,7 @@ use crate::expression::Resolved;
 use crate::{value::Regex, Context, Expression, Span, State, TypeDef, Value};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use diagnostic::{DiagnosticError, Label};
+use diagnostic::{DiagnosticError, Label, Note, Urls};
 use ordered_float::NotNan;
 use parser::ast::{self, Node};
 use std::borrow::Cow;
@@ -263,13 +263,13 @@ pub struct Error {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ErrorVariant {
-    #[error("invalid regex")]
+    #[error("invalid regular expression")]
     InvalidRegex(#[from] regex::Error),
 
     #[error("invalid timestamp")]
     InvalidTimestamp(#[from] chrono::ParseError),
 
-    #[error("float literal cannot be nan")]
+    #[error("float literal can't be NaN")]
     NanFloat,
 }
 
@@ -326,6 +326,25 @@ impl DiagnosticError for Error {
             )],
 
             NanFloat => vec![],
+        }
+    }
+
+    fn notes(&self) -> Vec<Note> {
+        use ErrorVariant::*;
+
+        match &self.variant {
+            InvalidRegex(_) => vec![Note::SeeDocs(
+                "regular expressions".to_owned(),
+                Urls::expression_docs_url("#regular-expression"),
+            )],
+            InvalidTimestamp(_) => vec![Note::SeeDocs(
+                "timestamps".to_owned(),
+                Urls::expression_docs_url("#timestamp"),
+            )],
+            NanFloat => vec![Note::SeeDocs(
+                "floats".to_owned(),
+                Urls::expression_docs_url("#float"),
+            )],
         }
     }
 }

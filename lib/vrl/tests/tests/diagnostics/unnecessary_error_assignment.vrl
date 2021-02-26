@@ -4,13 +4,13 @@
 #   ┌─ :2:5
 #   │
 # 2 │ ok, err = 5;
-#   │ --  ^^^   - because this expression cannot fail
+#   │ --  ^^^   - because this expression can't fail
 #   │ │   │
 #   │ │   this error assignment is unnecessary
 #   │ use: ok = 5
 #   │
-#   = see error handling documentation at: https://vector.dev/docs/reference/vrl/
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
-#   = learn more at: https://errors.vrl.dev/104
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = learn more about error code 104 at https://errors.vrl.dev/104
+#   = see language documentation at https://vrl.dev
 
 ok, err = 5;

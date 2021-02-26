@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::Event,
-    http::{Auth, HttpClient, MaybeAuth},
+    http::{Auth, HttpClient, HttpError, MaybeAuth},
     internal_events::{ElasticSearchEventEncoded, ElasticSearchMissingKeys},
     rusoto::{self, region_from_endpoint, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
@@ -309,7 +309,7 @@ struct ESErrorDetails {
 }
 
 impl RetryLogic for ElasticSearchRetryLogic {
-    type Error = hyper::Error;
+    type Error = HttpError;
     type Response = hyper::Response<Bytes>;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {

@@ -1,4 +1,3 @@
-use crate::Error;
 use indoc::indoc;
 use lazy_static::lazy_static;
 use prettytable::{format, Cell, Row, Table};
@@ -23,8 +22,19 @@ lazy_static! {
 
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
 const ERRORS_URL_ROOT: &str = "https://errors.vrl.dev";
+const RESERVED_TERMS: &[&str] = &[
+    "next",
+    "prev",
+    "exit",
+    "quit",
+    "help",
+    "help functions",
+    "help funcs",
+    "help fs",
+    "help docs",
+];
 
-pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
+pub(crate) fn run(mut objects: Vec<Value>) {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
     let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
@@ -96,8 +106,6 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
             }
         }
     }
-
-    Ok(())
 }
 
 fn resolve(
@@ -125,19 +133,29 @@ fn resolve(
 struct Repl {
     highlighter: MatchingBracketHighlighter,
     validator: MatchingBracketValidator,
-    hinter: HistoryHinter,
+    history_hinter: HistoryHinter,
     colored_prompt: String,
+    hints: Vec<&'static str>,
 }
 
 impl Repl {
     fn new() -> Self {
         Self {
             highlighter: MatchingBracketHighlighter::new(),
-            hinter: HistoryHinter {},
+            history_hinter: HistoryHinter {},
             colored_prompt: "$ ".to_owned(),
             validator: MatchingBracketValidator::new(),
+            hints: initial_hints(),
         }
     }
+}
+
+fn initial_hints() -> Vec<&'static str> {
+    stdlib::all()
+        .into_iter()
+        .map(|f| f.identifier())
+        .chain(RESERVED_TERMS.iter().copied())
+        .collect()
 }
 
 impl Helper for Repl {}
@@ -149,7 +167,33 @@ impl Hinter for Repl {
     type Hint = String;
 
     fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
-        self.hinter.hint(line, pos, ctx)
+        if pos < line.len() {
+            return None;
+        }
+
+        let mut hints: Vec<String> = Vec::new();
+
+        // Add all function names to the hints
+        let mut func_names = stdlib::all()
+            .iter()
+            .map(|f| f.identifier().into())
+            .collect::<Vec<String>>();
+
+        hints.append(&mut func_names);
+
+        // Check history first
+        if let Some(hist) = self.history_hinter.hint(line, pos, ctx) {
+            return Some(hist);
+        }
+
+        // Then check the other built-in hints
+        self.hints.iter().find_map(|hint| {
+            if pos > 0 && hint.starts_with(&line[..pos]) {
+                Some(String::from(&hint[pos..]))
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -204,13 +248,11 @@ impl Validator for Repl {
 
 fn print_function_list() {
     let table_format = *format::consts::FORMAT_NO_LINESEP_WITH_TITLE;
-    let all_funcs = stdlib::all();
-
     let num_columns = 3;
 
     let mut func_table = Table::new();
     func_table.set_format(table_format);
-    all_funcs
+    stdlib::all()
         .chunks(num_columns)
         .map(|funcs| {
             // Because it's possible that some chunks are only partial, e.g. have only two Some(_)
@@ -252,7 +294,7 @@ fn show_func_docs(line: &str, pattern: &Regex) {
     let func_name = matches.get(1).unwrap().as_str();
 
     if stdlib::all().iter().any(|f| f.identifier() == func_name) {
-        let func_url = format!("{}/#{}", DOCS_URL, func_name);
+        let func_url = format!("{}/functions/#{}", DOCS_URL, func_name);
         open_url(&func_url);
     } else {
         println!("function name {} not recognized", func_name);

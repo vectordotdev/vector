@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    http::{Auth, HttpClient, MaybeAuth},
+    http::{Auth, HttpClient, HttpError, MaybeAuth},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
@@ -195,7 +195,7 @@ struct ClickhouseRetryLogic {
 }
 
 impl RetryLogic for ClickhouseRetryLogic {
-    type Error = hyper::Error;
+    type Error = HttpError;
     type Response = http::Response<Bytes>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Display, Formatter};
@@ -52,15 +53,15 @@ pub struct Config {
     expansions: IndexMap<String, Vec<String>>,
 }
 
-#[derive(Default, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default)]
 pub struct GlobalOptions {
     #[serde(default = "default_data_dir")]
     pub data_dir: Option<PathBuf>,
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
+    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
     pub log_schema: LogSchema,
+    #[serde(skip_serializing_if = "crate::serde::skip_serializing_if_default")]
+    pub timezone: TimeZone,
 }
 
 pub fn default_data_dir() -> Option<PathBuf> {
@@ -316,6 +317,7 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
 pub struct SinkContext {
     pub(super) acker: Acker,
     pub(super) healthcheck: SinkHealthcheckOptions,
+    pub(super) globals: GlobalOptions,
 }
 
 impl SinkContext {
@@ -324,11 +326,16 @@ impl SinkContext {
         Self {
             acker: Acker::Null,
             healthcheck: SinkHealthcheckOptions::default(),
+            globals: GlobalOptions::default(),
         }
     }
 
     pub fn acker(&self) -> Acker {
         self.acker.clone()
+    }
+
+    pub fn globals(&self) -> &GlobalOptions {
+        &self.globals
     }
 }
 
@@ -346,7 +353,7 @@ pub struct TransformOuter {
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    async fn build(&self) -> crate::Result<transforms::Transform>;
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<transforms::Transform>;
 
     fn input_type(&self) -> DataType;
 

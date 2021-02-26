@@ -22,6 +22,7 @@ use bytes::Bytes;
 use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, ReadFrom};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use std::convert::TryInto;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -95,6 +96,9 @@ pub struct Config {
     /// stages, i.e. the time delta between log line was written and when it was
     /// processed by the `kubernetes_logs` source.
     ingestion_timestamp_field: Option<String>,
+
+    /// The default time zone for timestamps without an explicit zone.
+    timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -153,6 +157,7 @@ struct Source {
     max_read_bytes: usize,
     glob_minimum_cooldown: Duration,
     ingestion_timestamp_field: Option<String>,
+    timezone: TimeZone,
 }
 
 impl Source {
@@ -164,6 +169,7 @@ impl Source {
         let client = k8s::client::Client::new(k8s_config)?;
 
         let data_dir = globals.resolve_and_make_data_subdir(None, name)?;
+        let timezone = config.timezone.unwrap_or(globals.timezone);
 
         let exclude_paths = config
             .exclude_paths_glob_patterns
@@ -192,6 +198,7 @@ impl Source {
             max_read_bytes: config.max_read_bytes,
             glob_minimum_cooldown,
             ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
+            timezone,
         })
     }
 
@@ -211,6 +218,7 @@ impl Source {
             max_read_bytes,
             glob_minimum_cooldown,
             ingestion_timestamp_field,
+            timezone,
         } = self;
 
         let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
@@ -301,7 +309,7 @@ impl Source {
         let (file_source_tx, file_source_rx) =
             futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
 
-        let mut parser = parser::build();
+        let mut parser = parser::build(timezone);
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
         let events = file_source_rx.map(futures::stream::iter);

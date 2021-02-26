@@ -1,4 +1,4 @@
-use crate::{config::Resource, Event};
+use crate::{config::Resource, internal_events::EventOut, Event};
 #[cfg(feature = "leveldb")]
 use futures::compat::{Sink01CompatExt, Stream01CompatExt};
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
@@ -181,6 +181,7 @@ impl Acker {
                     notifier.notify();
                 }
             }
+            emit!(EventOut { count: num });
         }
     }
 
