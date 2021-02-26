@@ -38,16 +38,16 @@ representative workloads.
 More fundamentally, this RFC proposes that we continue/adopt three high-level
 processes in our work on Vector:
 
-  1. Performance is a first-class testing concern for Vector. We will drive our
-     process to identify regressions or opportunities for optimization as close
-     to introduction as possible.
-  1. Identifying _that_ a regression has happened is often easier than _why_. We
-     will continuously improve Vector’s diagnosis tooling to reduce the time to
-     debug and repair detected issues.
-  1. Performance regressions will inevitably, unintentionally make their way
-     into a release. When this happens we will treat this just like we would a
-     correctness regression, relying on our diagnostic tools and rolling the
-     experiences of repair back into the tooling.
+1. Performance is a first-class testing concern for Vector. We will drive our
+   process to identify regressions or opportunities for optimization as close
+   to introduction as possible.
+1. Identifying _that_ a regression has happened is often easier than _why_. We
+   will continuously improve Vector’s diagnosis tooling to reduce the time to
+   debug and repair detected issues.
+1. Performance regressions will inevitably, unintentionally make their way
+   into a release. When this happens we will treat this just like we would a
+   correctness regression, relying on our diagnostic tools and rolling the
+   experiences of repair back into the tooling.
 
 Vector's primary optimization target is **throughput**. All other concerns being
 equal, Vector will choose to optimize toward this goal. However, unlike with
