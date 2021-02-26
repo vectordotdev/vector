@@ -74,6 +74,8 @@ mod now;
 mod object;
 #[cfg(feature = "only_fields")]
 mod only_fields;
+#[cfg(feature = "parse_apache_log")]
+mod parse_apache_log;
 #[cfg(feature = "parse_aws_alb_log")]
 mod parse_aws_alb_log;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
@@ -233,6 +235,8 @@ pub use now::Now;
 pub use object::Object;
 #[cfg(feature = "only_fields")]
 pub use only_fields::OnlyFields;
+#[cfg(feature = "parse_apache_log")]
+pub use parse_apache_log::ParseApacheLog;
 #[cfg(feature = "parse_aws_alb_log")]
 pub use parse_aws_alb_log::ParseAwsAlbLog;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
@@ -408,6 +412,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseGrok),
         #[cfg(feature = "parse_json")]
         Box::new(ParseJson),
+        #[cfg(feature = "parse_apache_log")]
+        Box::new(ParseApacheLog),
         #[cfg(feature = "parse_common_log")]
         Box::new(ParseCommonLog),
         #[cfg(feature = "parse_key_value")]
