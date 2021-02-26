@@ -22,16 +22,12 @@ pub struct VecBufferMaker<T> {
 impl<T: EncodedLength> BatchMaker for VecBufferMaker<T> {
     type Batch = VecBuffer<T>;
     fn new_batch(&self) -> Self::Batch {
-        Self::Batch::new(self.settings)
+        Self::Batch::with_settings(self.settings)
     }
 }
 
 impl<T> VecBuffer<T> {
-    pub fn new(settings: BatchSize<Self>) -> Self {
-        Self::new_with_settings(settings)
-    }
-
-    fn new_with_settings(settings: BatchSize<Self>) -> Self {
+    fn with_settings(settings: BatchSize<Self>) -> Self {
         Self {
             batch: Vec::with_capacity(settings.events),
             bytes: 0,
@@ -105,7 +101,7 @@ mod tests {
     #[test]
     fn obeys_max_events() {
         let settings = BatchSettings::default().events(2).size;
-        let mut buffer = VecBuffer::new(settings);
+        let mut buffer = VecBuffer::maker(settings).new_batch();
         let data = "dummy".to_string();
 
         assert_eq!(buffer.is_empty(), true);
@@ -129,7 +125,7 @@ mod tests {
     #[test]
     fn obeys_max_bytes() {
         let settings = BatchSettings::default().events(99).bytes(22).size;
-        let mut buffer = VecBuffer::new(settings);
+        let mut buffer = VecBuffer::maker(settings).new_batch();
         let data = "some bytes".to_string();
 
         assert_eq!(buffer.is_empty(), true);

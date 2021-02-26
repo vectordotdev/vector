@@ -96,7 +96,7 @@ pub struct LokiBufferMaker {
 impl BatchMaker for LokiBufferMaker {
     type Batch = LokiBuffer;
     fn new_batch(&self) -> Self::Batch {
-        Self::Batch::new(
+        Self::Batch::with_settings(
             self.settings,
             self.global_timestamps.clone(),
             self.out_of_order_action.clone(),
@@ -105,7 +105,7 @@ impl BatchMaker for LokiBufferMaker {
 }
 
 impl LokiBuffer {
-    pub fn new(
+    fn with_settings(
         settings: BatchSize<Self>,
         global_timestamps: GlobalTimestamps,
         out_of_order_action: OutOfOrderAction,
@@ -306,11 +306,12 @@ mod tests {
 
     #[test]
     fn insert_single() {
-        let mut buffer = LokiBuffer::new(
+        let mut buffer = LokiBuffer::maker(
             BatchSettings::default().size,
             Default::default(),
             Default::default(),
-        );
+        )
+        .new_batch();
         assert!(matches!(
             buffer.push(LokiRecord {
                 partition: PartitionKey { tenant_id: None },
@@ -333,11 +334,12 @@ mod tests {
 
     #[test]
     fn insert_multiple_streams() {
-        let mut buffer = LokiBuffer::new(
+        let mut buffer = LokiBuffer::maker(
             BatchSettings::default().size,
             Default::default(),
             Default::default(),
-        );
+        )
+        .new_batch();
         for n in 1..4 {
             assert!(matches!(
                 buffer.push(LokiRecord {
@@ -362,11 +364,12 @@ mod tests {
 
     #[test]
     fn insert_multiple_one_stream() {
-        let mut buffer = LokiBuffer::new(
+        let mut buffer = LokiBuffer::maker(
             BatchSettings::default().size,
             Default::default(),
             Default::default(),
-        );
+        )
+        .new_batch();
         for n in 1..4 {
             assert!(matches!(
                 buffer.push(LokiRecord {

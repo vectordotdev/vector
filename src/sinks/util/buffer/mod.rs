@@ -22,7 +22,6 @@ pub struct Buffer {
     num_items: usize,
     num_bytes: usize,
     settings: BatchSize<Self>,
-    compression: Compression,
 }
 
 pub struct BufferMaker {
@@ -33,7 +32,7 @@ pub struct BufferMaker {
 impl BatchMaker for BufferMaker {
     type Batch = Buffer;
     fn new_batch(&self) -> Self::Batch {
-        Self::Batch::new(self.settings, self.compression)
+        Self::Batch::with_settings(self.settings, self.compression)
     }
 }
 
@@ -44,7 +43,7 @@ pub enum InnerBuffer {
 }
 
 impl Buffer {
-    pub fn new(settings: BatchSize<Self>, compression: Compression) -> Self {
+    fn with_settings(settings: BatchSize<Self>, compression: Compression) -> Self {
         let buffer = Vec::with_capacity(settings.bytes);
         let inner = match compression {
             Compression::None => InnerBuffer::Plain(buffer),
@@ -61,7 +60,6 @@ impl Buffer {
             num_items: 0,
             num_bytes: 0,
             settings,
-            compression,
         }
     }
 

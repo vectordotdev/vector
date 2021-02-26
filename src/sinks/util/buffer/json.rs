@@ -22,12 +22,12 @@ pub struct JsonArrayBufferMaker {
 impl BatchMaker for JsonArrayBufferMaker {
     type Batch = JsonArrayBuffer;
     fn new_batch(&self) -> Self::Batch {
-        JsonArrayBuffer::new(self.settings)
+        JsonArrayBuffer::with_settings(self.settings)
     }
 }
 
 impl JsonArrayBuffer {
-    pub fn new(settings: BatchSize<Self>) -> Self {
+    fn with_settings(settings: BatchSize<Self>) -> Self {
         Self {
             buffer: Vec::new(),
             total_bytes: 0,
@@ -91,7 +91,7 @@ mod tests {
     #[test]
     fn multi_object_array() {
         let batch = BatchSettings::default().bytes(9999).events(2).size;
-        let mut buffer = JsonArrayBuffer::new(batch);
+        let mut buffer = JsonArrayBuffer::maker(batch).new_batch();
 
         assert_eq!(
             buffer.push(json!({

@@ -23,7 +23,7 @@ where
 {
     type Batch = PartitionBuffer<M::Batch, K>;
     fn new_batch(&self) -> Self::Batch {
-        Self::Batch::new(self.batch_maker.new_batch())
+        Self::Batch::with_batch(self.batch_maker.new_batch())
     }
 }
 
@@ -34,7 +34,7 @@ pub struct PartitionInnerBuffer<T, K> {
 }
 
 impl<T, K> PartitionBuffer<T, K> {
-    pub fn new(inner: T) -> Self {
+    fn with_batch(inner: T) -> Self {
         Self { inner, key: None }
     }
 

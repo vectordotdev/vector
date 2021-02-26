@@ -122,12 +122,12 @@ pub struct MetricsBufferMaker {
 impl BatchMaker for MetricsBufferMaker {
     type Batch = MetricsBuffer;
     fn new_batch(&self) -> Self::Batch {
-        Self::Batch::new(self.settings)
+        Self::Batch::with_settings(self.settings)
     }
 }
 
 impl MetricsBuffer {
-    pub fn new(settings: BatchSize<Self>) -> Self {
+    fn with_settings(settings: BatchSize<Self>) -> Self {
         Self::with_capacity(settings.events)
     }
 
@@ -386,7 +386,7 @@ mod test {
     fn rebuffer<State: MetricNormalize>(metrics: Vec<Metric>) -> Buffer {
         let batch_size = BatchSettings::default().bytes(9999).events(6).size;
         let mut normalizer = MetricNormalizer::<State>::default();
-        let mut buffer = MetricsBuffer::new(batch_size);
+        let mut buffer = MetricsBuffer::maker(batch_size).new_batch();
         let mut result = vec![];
 
         for metric in metrics {
@@ -394,7 +394,8 @@ mod test {
                 match buffer.push(event) {
                     PushResult::Overflow(_) => panic!("overflowed too early"),
                     PushResult::Ok(true) => {
-                        let batch = std::mem::replace(&mut buffer, MetricsBuffer::new(batch_size));
+                        let new_buffer = MetricsBuffer::maker(batch_size).new_batch();
+                        let batch = std::mem::replace(&mut buffer, new_buffer);
                         result.push(batch.finish());
                     }
                     PushResult::Ok(false) => (),
