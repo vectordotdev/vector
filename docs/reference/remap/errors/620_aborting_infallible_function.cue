@@ -21,16 +21,6 @@ remap: errors: "620": {
 			source: #"""
 				encode_json!(["one", "two", "three"])
 				"""#
-			raises: compiletime: #"""
-				error: \#(title)
-				┌─ :1:1
-				│
-				1 │ encode_json!(["one", "two", "three"])
-				│ ^^^^^^^^^^^- remove this abort-instruction
-				│ │
-				│ this function cannot fail
-				│
-				"""#
 			diff: #"""
 				- 	encode_json!(["one", "two", "three"])
 				+# 	encode_json(["one", "two", "three"])

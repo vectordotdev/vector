@@ -22,17 +22,6 @@ remap: errors: "630": {
 			source: #"""
 				format_timestamp!(to_timestamp("2021-01-17T23:27:31.891948Z"), format: "%v %R")
 				"""#
-			raises: compiletime: #"""
-				error: \#(title)
-				┌─ :1:19
-				│
-				1 │ format_timestamp!(to_timestamp("2021-01-17T23:27:31.891948Z"), format: "%v %R")
-				│                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-				│                   │
-				│                   this expression can fail
-				│                   handle the error before passing it in as an argument
-				|
-				"""#
 			diff: #"""
 				- 	format_timestamp!(to_timestamp("2021-01-17T23:27:31.891948Z"), format: "%v %R")
 				+# 	format_timestamp!(to_timestamp!("2021-01-17T23:27:31.891948Z"), format: "%v %R")

@@ -22,16 +22,6 @@ remap: errors: "660": {
 			source: #"""
 				!47
 				"""#
-			raises: compiletime: #"""
-				error: \#(title)
-				┌─ :1:1
-				│
-				1 │ !7
-				│ ^- this expression resolves to "integer"
-				│ │
-				│ negation only works on boolean values
-				│
-				"""#
 			diff: #"""
 				- 	!47
 				+# 	!(47 == 48)

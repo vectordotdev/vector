@@ -22,17 +22,6 @@ remap: errors: "640": {
 			source: #"""
 				_ = "the hills are alive"
 				"""#
-			raises: compiletime: #"""
-				error: \#(title)
-				┌─ :1:5
-				│
-				1 │ _ = "the hills are alive"
-				│ --- ^^^^^^^^^^^^^^^^^^^^^ this no-op assignment is useless
-				│ │
-				│ or remove the assignment
-				│ either assign to a path or variable here
-				│
-				"""#
 			diff: #"""
 				- 	_ = "the hills are alive"
 				+# 	.movie_song_quote = "the hills are alive"

@@ -19,9 +19,6 @@ remap: errors: "601": {
 			source: #"""
 				parse_timestamp!("next Tuesday", format: "%v %R")
 				"""#
-			raises: compiletime: #"""
-				function call error for "parse_timestamp" at (0:49): Invalid timestamp "next Tuesday": input contains invalid characters
-				"""#
 			diff: #"""
 				- 	parse_timestamp!("next Tuesday", format: "%v %R")
 				+# 	parse_timestamp!("10-Oct-2020 16:00", format: "%v %R")
