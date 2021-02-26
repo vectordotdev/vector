@@ -36,7 +36,6 @@ where
     events: RwLock<HashMap<RateKeyIdentifier, State>>,
     inner: L,
 
-    // TODO is this right?
     _subscriber: std::marker::PhantomData<S>,
 }
 
