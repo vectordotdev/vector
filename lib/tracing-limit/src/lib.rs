@@ -59,22 +59,9 @@ where
     L: Layer<S>,
     S: Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
 {
+    #[inline]
     fn register_callsite(&self, metadata: &'static Metadata<'static>) -> Interest {
-        let inner = self.inner.register_callsite(metadata);
-        if inner.is_never() {
-            // if wrapped layer doesn't care about the event, don't bother rate limiting
-            return inner;
-        }
-
-        if metadata
-            .fields()
-            .iter()
-            .any(|f| f.name() == RATE_LIMIT_SECS_FIELD)
-        {
-            Interest::sometimes()
-        } else {
-            inner
-        }
+        self.inner.register_callsite(metadata)
     }
 
     #[inline]
@@ -158,10 +145,8 @@ where
         // check if the event exists within the map, if it does
         // that means we are currently rate limiting it.
         if let Some(state) = events.get(&id) {
-            let start = state.start.unwrap_or_else(Instant::now);
-
             // check if we are still rate limiting
-            if start.elapsed().as_secs() < state.limit {
+            if state.start.elapsed().as_secs() < state.limit {
                 let prev = state.count.fetch_add(1, Ordering::Relaxed);
                 if prev == 1 {
                     // output first rate limited log
@@ -194,6 +179,21 @@ where
                         );
 
                         self.create_event(&ctx, metadata, message, state.limit);
+
+                        if let Some(limit) = limit_visitor.limit {
+                            let state = State {
+                                start: Instant::now(),
+                                count: AtomicUsize::new(1),
+                                limit: limit as u64,
+                                message: limit_visitor
+                                    .message
+                                    .unwrap_or_else(|| event.metadata().name().into()),
+                            };
+
+                            events.insert(id, state);
+                        }
+
+                        self.inner.on_event(event, ctx);
                     }
                 }
             }
@@ -203,7 +203,7 @@ where
                 let mut events = self.events.write().expect("lock poisoned!");
 
                 let state = State {
-                    start: Some(Instant::now()),
+                    start: Instant::now(),
                     count: AtomicUsize::new(1),
                     limit: limit as u64,
                     message: limit_visitor
@@ -276,7 +276,7 @@ where
 
 #[derive(Debug)]
 struct State {
-    start: Option<Instant>,
+    start: Instant,
     count: AtomicUsize,
     limit: u64,
     message: String,
