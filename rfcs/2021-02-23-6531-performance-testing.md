@@ -27,7 +27,7 @@ art in this project, then makes a proposal for where to go next.
 ## Summary
 
 This RFC proposes that we continue to improve our criterion benchmarks, both in
-terms mere code coverage and by reducing their time to report in results. As
+terms of more code coverage and by reducing their time to report in results. As
 [iai](https://github.com/bheisler/iai) matures we may consider transition our
 wall-clock benchmarks to instruction count based methods, but this RFC makes no
 comment on that other than to mention it as a future possibility. This RFC also
@@ -287,7 +287,7 @@ Does not address:
 
 In this alternative we extend the Vector interface to include a `diagnostic`
 sub-command. This diagnostic will examine the system to gather information about
-it's running environment and perform, time fundamental actions. Information we
+it's running environment and perform time fundamental actions. Information we
 might want to collect:
 
 * What operating system is Vector running on?
