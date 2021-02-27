@@ -182,7 +182,7 @@ compared to reserved capacity but the c5.large may not be representative of the
 machines Vector is deployed to. Only a single build of Vector is run here as
 well. Consider that the
 [0.11.1](https://github.com/timberio/vector/releases/tag/v0.11.1) supports
-aarch64, armv7, x86_64, amd64, arm64, armhf, etc plus a cross product on some of
+aarch64, armv7, x86_64, arm64, armhf, etc plus a cross product on some of
 these platforms with different libc implementations. The test-harness executes
 on Ubuntu, meaning tests are limited to Debian packaged Vector releases. The
 data that dstat collects is relatively black box, especially in comparison to
@@ -193,7 +193,9 @@ We can see from [Motivating Examples](#motivating-examples) that the
 test-harness work has paid dividends. Irregular runs, multiple test purposes --
 correctness, performance, competitor comparison -- noisy results and relatively
 coarse information collected from the performance tests are all areas for
-improvement. As an example, because of the short run duration the lua
+improvement. As an example, because of the short run duration the lua memory
+leak described in [Lua Transform Leaked Memory](#lua-transform-leaked-memory)
+had to be caught by a user.
 
 We are not actively expanding the use of test-harness as of this writing, though
 it is maintained and still runs.
@@ -309,6 +311,11 @@ engineering work. An additional `doctor` sub-command could use the diagnostic
 feature to examine a config and make suggestions or point out easily detected
 issues, a disk buffer being configured to use a read-only filesystem, say.
 
+Note that the work described here is also reflected in [Issue
+4660](https://github.com/timberio/vector/issues/4660). We should also consider
+that the interface -- a sub-command -- is not the mechanism and leave open the
+possibility for multiple interfaces to the same diagnostic information.
+
 Does not address:
 
 * Regression from Increased Instrumentation
@@ -337,7 +344,11 @@ Does not address:
 In this alternative we take the existing test-harness code base and adjust it to
 run nightly (likely UTC 00:00 for convenience), building from the current head
 of master branch. We will need to actually build a nightly Vector release for
-use by test-harness, but this seems straightforward to achieve.
+use by test-harness, but this seems straightforward to achieve. We intend to
+build this "nightly" process in such a way as to allow for arbitrary commits to
+be run, though we do not intend to expose this behavior as a first step,
+necessarily. Arbitrary commit execution will allow for ad hoc experimentation by
+engineers, bisection of regressions.
 
 Addresses:
 
@@ -373,8 +384,8 @@ progress of our competition. In this alternative we:
 
 * Make a logical, if not structural, split in the project between the
   different methods of testing.
-* Exploit this split to run correctness and performance tests in a "nightly"
-  fashion, "comparison" tests for pre-releases or otherwise.
+* Exploit this split to performance tests in a "nightly" fashion, "comparison"
+  and correctness tests for pre-releases or otherwise.
 * Exploit this split to run only Vector in performance testing, ensuring that
   these tests are more straightforward to write and allowing us to write more
   of them as the cost to introduce each goes down.
