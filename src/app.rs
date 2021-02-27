@@ -245,13 +245,11 @@ impl Application {
 
                                 match msg {
                                     ControlMessage::Tap(tap) => match tap {
-                                        TapControl::Start(mut sink) => {
-                                            if let Err(_) = topology.attach(&sink.input_name(), &sink.name(), sink.router()) {
-                                                sink.component_invalid();
-                                            }
+                                        TapControl::Start(sink) => {
+                                            topology.attach_tap_sink(sink);
                                         },
                                         TapControl::Stop(sink) => {
-                                            let _ = topology.detach(&sink.input_name(), &sink.name());
+                                            // topology.detach_tap(sink);
                                         }
                                     }
                                 }

@@ -10,7 +10,6 @@ pub mod builder;
 pub mod fanout;
 mod task;
 
-use crate::topology::fanout::RouterSink;
 use crate::{
     buffers,
     config::{Config, ConfigDiff, HealthcheckOptions, Resource},
@@ -53,6 +52,8 @@ pub struct RunningTopology {
     detach_triggers: HashMap<String, DisabledTrigger>,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
+    #[cfg(feature = "api")]
+    tap_sinks: weak_table::WeakHashSet<std::sync::Weak<crate::api::tap::TapSink>>,
 }
 
 pub async fn start_validated(
@@ -71,6 +72,8 @@ pub async fn start_validated(
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
         abort_tx,
+        #[cfg(feature = "api")]
+        tap_sinks: weak_table::WeakHashSet::new(),
     };
 
     if !running_topology
@@ -718,27 +721,29 @@ impl RunningTopology {
         }
     }
 
-    /// Borrows the Config
+    /// Borrows the Config.
     pub fn config(&self) -> &Config {
         &self.config
     }
 
-    pub fn attach(&self, input_name: &str, sink_name: &str, sink: RouterSink) -> Result<(), ()> {
-        let tx = self.outputs.get(input_name).ok_or(())?;
-
-        debug!(message = "Starting tap", id = sink_name, input = input_name);
-        let _ = tx.send(fanout::ControlMessage::Add(sink_name.to_string(), sink));
-
-        Ok(())
-    }
-
-    pub fn detach(&self, input_name: &str, sink_name: &str) -> Result<(), ()> {
-        let tx = self.outputs.get(input_name).ok_or(())?;
-
-        debug!(message = "Stopping tap", id = sink_name, input = input_name);
-        let _ = tx.send(fanout::ControlMessage::Remove(sink_name.to_string()));
-
-        Ok(())
+    #[cfg(feature = "api")]
+    /// Attaches a tap sink.
+    pub fn attach_tap_sink(&mut self, tap_sink: Arc<crate::api::tap::TapSink>) {
+        tap_sink.input_names().iter().for_each(|input_name| {
+            if let Some(tx) = self.outputs.get(input_name) {
+                if let Ok((sink_name, sink)) = tap_sink.make_output(input_name) {
+                    debug!(
+                        message = "Starting tap",
+                        id = sink_name.as_str(),
+                        input = input_name.as_str()
+                    );
+                    let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
+                }
+            } else {
+                debug!(message = "Invalid tap", input = input_name.as_str());
+                tap_sink.component_invalid(input_name);
+            }
+        })
     }
 }
 

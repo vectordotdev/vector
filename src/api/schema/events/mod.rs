@@ -74,27 +74,26 @@ impl EventsSubscription {
     pub async fn log_events<'a>(
         &'a self,
         ctx: &'a Context<'a>,
-        component_name: String,
+        component_names: Vec<String>,
     ) -> impl Stream<Item = LogEventResult> + 'a {
         let control_tx = ctx.data_unchecked::<ControlSender>().clone();
 
         let (tx, mut rx) = mpsc::unbounded();
-        let tap_sink = TapSink::new(&component_name, tx);
+        let tap_sink = TapSink::new(&component_names, tx);
 
         stream! {
             // The tap controller is scoped to the stream. When it's dropped, it bubbles a control
             // message up to the signal handler to remove the ad hoc sinks from topology.
-            let _control = TapController::new(control_tx, tap_sink);
+            let control = TapController::new(control_tx, tap_sink);
 
             // Process `TapResults`s. A tap result could contain a `LogEvent` or an error; if
             // we get an error, the subscription is dropped.
             while let Some(tap) = rx.next().await {
-                let is_error = tap.is_error();
                 yield tap.into();
 
-                if is_error {
-                    break;
-                }
+                // if control.sink_is_empty() {
+                //     break;
+                // }
             }
         }
     }

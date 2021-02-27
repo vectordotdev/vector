@@ -8117,6 +8117,7 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-probe",
+ "parking_lot",
  "percent-encoding",
  "pest",
  "pest_derive",
@@ -8193,6 +8194,7 @@ dependencies = [
  "vrl-stdlib",
  "walkdir",
  "warp",
+ "weak-table",
  "windows-service",
 ]
 
