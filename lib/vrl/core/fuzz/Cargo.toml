@@ -1,0 +1,30 @@
+
+[package]
+name = "vrl-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+arbitrary = { version = "1", optional = true, features = ["derive"] }
+libfuzzer-sys = "0.4"
+
+[dependencies.vrl]
+path = ".."
+
+[dependencies.vrl-stdlib]
+path = "../../stdlib"
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "compile"
+path = "fuzz_targets/compile.rs"
+test = false
+doc = false
