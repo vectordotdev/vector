@@ -8,7 +8,7 @@ license = "MIT"
 
 [dependencies]
 bstr = "0.2"
-bytes = "0.5"
+bytes = "1.0"
 chrono = { version = "0.4.19", features = ["serde"] }
 crc = "1.8.1"
 dashmap = "4.0.0"

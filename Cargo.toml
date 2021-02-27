@@ -150,7 +150,7 @@ avro-rs = { version = "0.13.0", optional = true }
 base64 = { version = "0.13.0", optional = true }
 bloom = { version = "0.3.2", optional = true }
 bollard = { version = "0.9.1", features = ["ssl"], optional = true }
-bytes = { version = "0.5.6", features = ["serde"] }
+bytes = { version = "1.0.1", features = ["serde"] }
 bytesize = { version = "1.0.0", optional = true }
 chrono = { version = "0.4.19", features = ["serde"] }
 cidr-utils = "0.5.0"

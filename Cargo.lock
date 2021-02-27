@@ -869,15 +869,15 @@ name = "bytes"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e4cec68f03f32e44924783795810fa50a7035d8c8ebe78580ad7e6c703fba38"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "bytes"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b700ce4376041dcd0a327fd0097c41095743c4c8af8887265942faf1100bd040"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "bytesize"
@@ -1042,7 +1042,7 @@ dependencies = [
 name = "codec"
 version = "0.1.0"
 dependencies = [
- "bytes 0.5.6",
+ "bytes 1.0.1",
  "serde_json",
  "tokio-util",
  "tracing 0.1.23",
@@ -2164,7 +2164,7 @@ name = "file-source"
 version = "0.1.0"
 dependencies = [
  "bstr",
- "bytes 0.5.6",
+ "bytes 1.0.1",
  "chrono",
  "crc",
  "dashmap 4.0.2",
@@ -6590,7 +6590,7 @@ dependencies = [
 name = "shared"
 version = "0.1.0"
 dependencies = [
- "bytes 0.5.6",
+ "bytes 1.0.1",
  "chrono",
  "chrono-tz",
  "derivative 2.2.0",
@@ -8073,7 +8073,7 @@ dependencies = [
  "bloom",
  "bollard",
  "built",
- "bytes 0.5.6",
+ "bytes 1.0.1",
  "bytesize",
  "chrono",
  "cidr-utils",
@@ -8269,7 +8269,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 name = "vrl"
 version = "0.1.0"
 dependencies = [
- "bytes 0.5.6",
+ "bytes 1.0.1",
  "indoc",
  "ordered-float",
  "thiserror",
@@ -8282,7 +8282,7 @@ dependencies = [
 name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
- "bytes 0.5.6",
+ "bytes 1.0.1",
  "exitcode",
  "indoc",
  "lazy_static",
@@ -8302,7 +8302,7 @@ name = "vrl-compiler"
 version = "0.1.0"
 dependencies = [
  "bitflags",
- "bytes 0.5.6",
+ "bytes 1.0.1",
  "chrono",
  "dyn-clone",
  "lalrpop-util",
@@ -8343,7 +8343,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64 0.13.0",
- "bytes 0.5.6",
+ "bytes 1.0.1",
  "chrono",
  "cidr-utils",
  "criterion",
