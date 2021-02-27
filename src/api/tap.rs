@@ -52,7 +52,7 @@ impl TapSink {
             id: Uuid::new_v4(),
             inputs: RwLock::new(inputs),
             tap_tx,
-            empty: AtomicBool::new(input_names.len() > 0),
+            empty: AtomicBool::new(input_names.len() == 0),
         }
     }
 
@@ -88,8 +88,8 @@ impl TapSink {
     fn remove_input(&self, input_name: &str) {
         let mut lock = self.inputs.write();
         let _ = lock.remove(input_name);
-        if lock.len() == 0 {
-            self.empty.store(false, Ordering::Release);
+        if lock.is_empty() {
+            self.empty.store(true, Ordering::Release);
         }
     }
 

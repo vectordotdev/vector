@@ -91,9 +91,9 @@ impl EventsSubscription {
             while let Some(tap) = rx.next().await {
                 yield tap.into();
 
-                // if control.sink_is_empty() {
-                //     break;
-                // }
+                if control.sink_is_empty() {
+                    break;
+                }
             }
         }
     }
