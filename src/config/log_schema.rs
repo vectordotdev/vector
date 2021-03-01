@@ -33,6 +33,9 @@ pub fn init_log_schema(
     Ok(())
 }
 
+/// Components should use global LogShema returned by this function.
+/// The returned value can differ from LogSchema::default()
+/// which is unchanging.
 pub fn log_schema() -> &'static LogSchema {
     LOG_SCHEMA.get().unwrap_or(&LOG_SCHEMA_DEFAULT)
 }
@@ -62,16 +65,16 @@ impl Default for LogSchema {
 }
 
 impl LogSchema {
-    pub fn default_message_key() -> String {
+    fn default_message_key() -> String {
         String::from("message")
     }
-    pub fn default_timestamp_key() -> String {
+    fn default_timestamp_key() -> String {
         String::from("timestamp")
     }
-    pub fn default_host_key() -> String {
+    fn default_host_key() -> String {
         String::from("host")
     }
-    pub fn default_source_type_key() -> String {
+    fn default_source_type_key() -> String {
         String::from("source_type")
     }
 
