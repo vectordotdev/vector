@@ -276,8 +276,6 @@ default-msvc = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sourc
 default-musl = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-all", "vrl-cli"]
 default-no-api-client = ["api", "leveldb", "rdkafka-plain", "sinks", "sources", "transforms", "unix", "vendor-all", "vrl-cli"]
 default-no-vrl-cli = ["api", "leveldb", "rdkafka-plain", "sinks", "sources", "transforms", "unix", "vendor-all"]
-# The docs feature specifies which packages are included in the Rustdoc available at https://rustdoc.vector.dev
-docs = ["api", "sinks", "sources", "transforms"]
 
 all-logs = ["sinks-logs", "sources-logs", "transforms-logs"]
 all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]

@@ -644,9 +644,9 @@ check-events: ## Check that events satisfy patterns set in https://github.com/ti
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events.sh
 
 ##@ Rustdoc
-build-rustdoc: ## Build a subset of Vector's Rustdocs (as specified by the "docs" feature)
+build-rustdoc: ## Build Vector's Rustdocs
 	# This command is mostly intended for use by the build process in timberio/vector-rustdoc
-	${MAYBE_ENVIRONMENT_EXEC} cargo doc --no-deps --no-default-features --features docs
+	${MAYBE_ENVIRONMENT_EXEC} cargo doc --no-deps
 
 ##@ Packaging
 
