@@ -374,4 +374,18 @@ mod tests {
         }
         assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
+
+    #[tokio::test]
+    async fn metrics_format_generates_output() {
+        let mut rx = runit(
+            r#"format = "metrics"
+            namespace = "vector"
+            names = ["cool_points"]"#,
+        ).await;
+
+        for _ in 0..5 {
+            assert!(matches!(rx.try_recv(), Ok(_)));
+        }
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+    }
 }
