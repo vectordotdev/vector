@@ -1,8 +1,14 @@
-extern crate vrl_cli;
-
 use structopt::StructOpt;
-use vrl_cli::{cmd::cmd, Opts};
+use vrl_cli::{run, Opts};
 
 fn main() {
-    std::process::exit(cmd(&Opts::from_args()));
+    let status = match run(Opts::from_args()) {
+        Ok(_) => 0,
+        Err(err) => {
+            eprintln!("{}", err);
+            1
+        }
+    };
+
+    std::process::exit(status);
 }
