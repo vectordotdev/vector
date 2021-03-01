@@ -178,15 +178,6 @@ impl KindInfo {
                 Segment::Index(index) => {
                     let index = *index as usize;
                     let mut map = BTreeMap::default();
-
-                    let mut i = 0;
-                    while i < index {
-                        let mut set = BTreeSet::new();
-                        set.insert(TypeKind::Null);
-                        map.insert(Index::Index(i), Self::Known(set));
-                        i += 1;
-                    }
-
                     map.insert(Index::Index(index), self);
 
                     let mut set = BTreeSet::new();
@@ -282,7 +273,7 @@ impl KindInfo {
         info.at_path(iter.collect())
     }
 
-    fn merge(self, rhs: Self, shallow: bool) -> Self {
+    fn merge(self, rhs: Self, shallow: bool, overwrite: bool) -> Self {
         use KindInfo::*;
 
         match (self, rhs) {
@@ -320,18 +311,20 @@ impl KindInfo {
                 let array = lhs_array
                     .clone()
                     .zip(rhs_array.clone())
-                    .map(|(mut l, r)| {
-                        let r_start = l
-                            .keys()
-                            .filter_map(|i| i.to_inner())
-                            .max()
-                            .map(|i| i + 1)
-                            .unwrap_or_default();
+                    .map(|(mut l, mut r)| {
+                        if !overwrite {
+                            let r_start = l
+                                .keys()
+                                .filter_map(|i| i.to_inner())
+                                .max()
+                                .map(|i| i + 1)
+                                .unwrap_or_default();
 
-                        let mut r = r
-                            .into_iter()
-                            .map(|(i, v)| (i.shift(r_start), v))
-                            .collect::<BTreeMap<_, _>>();
+                            r = r
+                                .into_iter()
+                                .map(|(i, v)| (i.shift(r_start), v))
+                                .collect::<BTreeMap<_, _>>();
+                        };
 
                         l.append(&mut r);
                         l
@@ -375,7 +368,7 @@ impl KindInfo {
                             for (k1, v1) in l.iter_mut() {
                                 for (k2, v2) in r.iter_mut() {
                                     if k1 == k2 {
-                                        *v2 = v1.clone().merge(v2.clone(), false);
+                                        *v2 = v1.clone().merge(v2.clone(), false, false);
                                     }
                                 }
                             }
@@ -636,7 +629,7 @@ impl TypeDef {
     pub fn add_scalar(mut self, kind: Kind) -> Self {
         debug_assert!(kind.is_scalar());
 
-        self.kind = self.kind.merge(kind.into(), false);
+        self.kind = self.kind.merge(kind.into(), false, false);
         self
     }
 
@@ -754,7 +747,7 @@ impl TypeDef {
         let mut set = BTreeSet::default();
         set.insert(kind);
 
-        self.kind = self.kind.merge(KindInfo::Known(set), false);
+        self.kind = self.kind.merge(KindInfo::Known(set), false, false);
         self
     }
 
@@ -887,7 +880,7 @@ impl TypeDef {
     pub fn merge(self, rhs: Self) -> Self {
         Self {
             fallible: self.fallible | rhs.fallible,
-            kind: self.kind.merge(rhs.kind, false),
+            kind: self.kind.merge(rhs.kind, false, false),
         }
     }
 
@@ -896,7 +889,16 @@ impl TypeDef {
     pub fn merge_shallow(self, rhs: Self) -> Self {
         Self {
             fallible: self.fallible | rhs.fallible,
-            kind: self.kind.merge(rhs.kind, true),
+            kind: self.kind.merge(rhs.kind, true, false),
+        }
+    }
+
+    /// Merge two type definitions, where the rhs type definition should
+    /// overwrite any conflicting values in the lhs type definition.
+    pub fn merge_overwrite(self, rhs: Self) -> Self {
+        Self {
+            fallible: self.fallible | rhs.fallible,
+            kind: self.kind.merge(rhs.kind, false, true),
         }
     }
 }
