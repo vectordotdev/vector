@@ -6,7 +6,10 @@ use crate::{
     Pipeline,
 };
 use chrono::Utc;
-use fakedata::logs::*;
+use fakedata::{
+    logs::*,
+    random_counter,
+};
 use futures::{stream::StreamExt, SinkExt};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -104,7 +107,9 @@ impl OutputFormat {
         names
             .iter()
             .map(|name| {
-                Metric::new(name, MetricKind::Incremental, MetricValue::Counter { value: 1.0 })
+                let value = random_counter(1, 100);
+
+                Metric::new(name, MetricKind::Incremental, MetricValue::Counter { value })
                     .with_namespace(Some(namespace))
                     .with_timestamp(Some(Utc::now()))
             })
