@@ -3,7 +3,7 @@ use std::{
     collections::HashMap,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        RwLock,
+        Mutex,
     },
     time::Instant,
 };
@@ -21,7 +21,7 @@ const RATE_LIMIT_KEY_FIELD: &str = "internal_log_rate_key";
 const COMPONENT_NAME_FIELD: &str = "component_name";
 const MESSAGE_FIELD: &str = "message";
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq, Hash, Clone)]
 struct RateKeyIdentifier {
     callsite: Identifier,
     rate_limit_key: Option<String>,
@@ -33,7 +33,7 @@ where
     L: Layer<S> + Sized,
     S: Subscriber,
 {
-    events: RwLock<HashMap<RateKeyIdentifier, State>>,
+    events: Mutex<HashMap<RateKeyIdentifier, State>>,
     inner: L,
 
     _subscriber: std::marker::PhantomData<S>,
@@ -46,7 +46,7 @@ where
 {
     pub fn new(layer: L) -> Self {
         RateLimitedLayer {
-            events: RwLock::<HashMap<RateKeyIdentifier, State>>::default(),
+            events: Mutex::<HashMap<RateKeyIdentifier, State>>::default(),
             inner: layer,
             _subscriber: std::marker::PhantomData,
         }
@@ -139,15 +139,29 @@ where
             component_name,
         };
 
-        let events = self.events.read().expect("lock poisoned!");
+        // TODO benchmark with multiple threads
+        // TODO can we drop the lock before create_event/on_event
 
-        // check if the event exists within the map, if it does
-        // that means we are currently rate limiting it.
-        if let Some(state) = events.get(&id) {
-            // check if we are still rate limiting
-            if state.start.elapsed().as_secs() < state.limit {
-                let prev = state.count.fetch_add(1, Ordering::Relaxed);
-                if prev == 1 {
+        let mut events = self.events.lock().expect("lock poisoned!");
+
+        let state = events.entry(id.clone()).or_insert(State {
+            start: Instant::now(),
+            count: AtomicUsize::new(0),
+            // if this is None, then a non-integer was passed as the rate limit
+            limit: limit_visitor
+                .limit
+                .expect("unreachable; if you see this, there is a bug"),
+            message: limit_visitor
+                .message
+                .unwrap_or_else(|| event.metadata().name().into()),
+        });
+
+        //check if we are still rate limiting
+        if state.start.elapsed().as_secs() < state.limit.get() {
+            // TODO document
+            match state.count.fetch_add(1, Ordering::Relaxed) {
+                0 => self.inner.on_event(event, ctx),
+                1 => {
                     // output first rate limited log
                     let message = match limit_visitor.key {
                         None => {
@@ -161,59 +175,27 @@ where
 
                     self.create_event(&ctx, metadata, message, state.limit);
                 }
-            } else {
-                // done rate limiting
-                drop(events);
-
-                let mut events = self.events.write().expect("lock poisoned!");
-                if let Some(state) = events.remove(&id) {
-                    let count = state.count.load(Ordering::Relaxed);
-
-                    // avoid outputting a message if the event wasn't rate limited
-                    if count > 1 {
-                        let message = format!(
-                            "Internal log [{}] has been rate limited {} times.",
-                            state.message,
-                            count - 1
-                        );
-
-                        self.create_event(&ctx, metadata, message, state.limit);
-
-                        if let Some(limit) = limit_visitor.limit {
-                            let state = State {
-                                start: Instant::now(),
-                                count: AtomicUsize::new(1),
-                                limit: limit as u64,
-                                message: limit_visitor
-                                    .message
-                                    .unwrap_or_else(|| event.metadata().name().into()),
-                            };
-
-                            events.insert(id, state);
-                        }
-
-                        self.inner.on_event(event, ctx);
-                    }
-                }
+                _ => {}
             }
         } else {
-            drop(events);
-            if let Some(limit) = limit_visitor.limit {
-                let mut events = self.events.write().expect("lock poisoned!");
+            // done rate limiting
+            {
+                let count = state.count.load(Ordering::Relaxed);
 
-                let state = State {
-                    start: Instant::now(),
-                    count: AtomicUsize::new(1),
-                    limit: limit as u64,
-                    message: limit_visitor
-                        .message
-                        .unwrap_or_else(|| event.metadata().name().into()),
-                };
+                // avoid outputting a message if the event wasn't rate limited
+                if count > 1 {
+                    let message = format!(
+                        "Internal log [{}] has been rate limited {} times.",
+                        state.message,
+                        count - 1
+                    );
 
-                events.insert(id, state);
+                    self.create_event(&ctx, metadata, message, state.limit);
+                }
+                self.inner.on_event(event, ctx);
             }
-
-            self.inner.on_event(event, ctx);
+            drop(state);
+            events.remove(&id);
         }
     }
 
@@ -248,7 +230,7 @@ where
         ctx: &Context<S>,
         metadata: &'static Metadata<'static>,
         message: String,
-        rate_limit: u64,
+        rate_limit: std::num::NonZeroU64,
     ) {
         let fields = metadata.fields();
 
@@ -277,7 +259,7 @@ where
 struct State {
     start: Instant,
     count: AtomicUsize,
-    limit: u64,
+    limit: std::num::NonZeroU64,
     message: String,
 }
 
@@ -308,7 +290,7 @@ impl Visit for RateLimitedSpanKeys {
 
 #[derive(Default)]
 struct LimitVisitor {
-    pub limit: Option<usize>,
+    pub limit: Option<std::num::NonZeroU64>,
     pub message: Option<String>,
     pub key: Option<String>,
 }
@@ -316,13 +298,16 @@ struct LimitVisitor {
 impl Visit for LimitVisitor {
     fn record_u64(&mut self, field: &Field, value: u64) {
         if field.name() == RATE_LIMIT_SECS_FIELD {
-            self.limit = Some(value as usize);
+            self.limit = std::num::NonZeroU64::new(value);
         }
     }
 
+    // TODO maybe switch limit to an i64
     fn record_i64(&mut self, field: &Field, value: i64) {
         if field.name() == RATE_LIMIT_SECS_FIELD {
-            self.limit = Some(value as usize);
+            use std::convert::TryFrom;
+            self.limit =
+                std::num::NonZeroU64::new(u64::try_from(value).expect("non-negative values"));
         }
     }
 
