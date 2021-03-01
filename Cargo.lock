@@ -2559,9 +2559,9 @@ dependencies = [
 
 [[package]]
 name = "goauth"
-version = "0.10.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a1d5b4e896797c19dff490f9706817b42e9b7aa4adfe844464d3bbc9aabb035"
+checksum = "d94101e84ede813c04773b0a43396c01b5a3a9376537dbce1125858ae090ae60"
 dependencies = [
  "arc-swap",
  "futures 0.3.13",
@@ -2571,7 +2571,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "simpl",
- "smpl_jwt 0.6.1",
+ "smpl_jwt",
  "time 0.2.25",
  "tokio 1.2.0",
 ]
@@ -6793,22 +6793,6 @@ dependencies = [
 
 [[package]]
 name = "smpl_jwt"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "547e9c1059500ce0fe6cfa325f868b5621214957922be60a49d86e3e844ee9dc"
-dependencies = [
- "base64 0.12.3",
- "log",
- "openssl",
- "serde",
- "serde_derive",
- "serde_json",
- "simpl",
- "time 0.2.25",
-]
-
-[[package]]
-name = "smpl_jwt"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4370044f8b20f944e05c35d77edd3518e6f21fc4de77e593919f287c6a3f428a"
@@ -8287,7 +8271,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "shared",
- "smpl_jwt 0.5.0",
+ "smpl_jwt",
  "snafu",
  "snap",
  "socket2",
