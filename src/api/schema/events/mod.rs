@@ -61,6 +61,7 @@ impl From<TapResult> for LogEventResult {
                     LogEventErrorType::ComponentGoneAway,
                 )),
             },
+            TapResult::Stop => unreachable!(),
         }
     }
 }
@@ -84,16 +85,15 @@ impl EventsSubscription {
         stream! {
             // The tap controller is scoped to the stream. When it's dropped, it bubbles a control
             // message up to the signal handler to remove the ad hoc sinks from topology.
-            let control = TapController::new(control_tx, tap_sink);
+            let _control = TapController::new(control_tx, tap_sink);
 
             // Process `TapResults`s. A tap result could contain a `LogEvent` or an error; if
             // we get an error, the subscription is dropped.
             while let Some(tap) = rx.next().await {
-                yield tap.into();
-
-                if control.sink_is_empty() {
+                if let TapResult::Stop = tap {
                     break;
                 }
+                yield tap.into();
             }
         }
     }

@@ -249,7 +249,7 @@ impl Application {
                                             topology.attach_tap_sink(sink);
                                         },
                                         TapControl::Stop(sink) => {
-                                            // topology.detach_tap(sink);
+                                            topology.detach_tap_sink(sink);
                                         }
                                     }
                                 }

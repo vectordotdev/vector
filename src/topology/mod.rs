@@ -239,6 +239,9 @@ impl RunningTopology {
                 self.connect_diff(&diff, &mut new_pieces).await;
                 self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
+                #[cfg(feature = "api")]
+                // self.reattach_tap_sinks();
+
                 // We have successfully changed to new config.
                 return Ok(true);
             }
@@ -254,6 +257,8 @@ impl RunningTopology {
             {
                 self.connect_diff(&diff, &mut new_pieces).await;
                 self.spawn_diff(&diff, new_pieces);
+                #[cfg(feature = "api")]
+                // self.reattach_tap_sinks();
                 // We have successfully returned to old config.
                 return Ok(false);
             }
@@ -594,6 +599,10 @@ impl RunningTopology {
 
     fn remove_outputs(&mut self, name: &str) {
         self.outputs.remove(name);
+        #[cfg(feature = "api")]
+        for tap_sink in self.tap_sinks.iter() {
+            let _ = tap_sink.component_gone_away(name);
+        }
     }
 
     fn remove_inputs(&mut self, name: &str) {
@@ -729,6 +738,14 @@ impl RunningTopology {
     #[cfg(feature = "api")]
     /// Attaches a tap sink.
     pub fn attach_tap_sink(&mut self, tap_sink: Arc<crate::api::tap::TapSink>) {
+        // Keep a weak ref around in running topology. This will allow subsequent config
+        // changes to re-attach the tap within explicit control messages. If there are no
+        // valid inputs, this ref will drop.
+        self.tap_sinks.insert(Arc::clone(&tap_sink));
+
+        // Tap names are user-supplied, and could therefore be invalid. Loop over each and
+        // wire up valid sinks. If the input is invalid, a control message will be sent to the
+        // sink which will bubble up to the client.
         tap_sink.input_names().iter().for_each(|input_name| {
             if let Some(tx) = self.outputs.get(input_name) {
                 if let Ok((sink_name, sink)) = tap_sink.make_output(input_name) {
@@ -744,6 +761,30 @@ impl RunningTopology {
                 tap_sink.component_invalid(input_name);
             }
         })
+    }
+
+    #[cfg(feature = "api")]
+    /// Detaches a tap sink.
+    pub fn detach_tap_sink(&mut self, tap_sink: Arc<crate::api::tap::TapSink>) {
+        // Explicitly removing isn't strictly necessary, as the weak ref will drop when the
+        // tap sink falls out of scope. However, since the intention of this ref is for when
+        // re-attaching sinks, we'll defensively drop here to make that intent clearer.
+        self.tap_sinks.remove(&tap_sink);
+
+        tap_sink
+            .inputs()
+            .iter()
+            .for_each(|(input_name, sink_name)| {
+                if let Some(tx) = self.outputs.get(input_name) {
+                    let sink_name = sink_name.to_string();
+                    debug!(
+                        message = "Removing tap",
+                        id = sink_name.as_str(),
+                        input = input_name.as_str()
+                    );
+                    let _ = tx.send(fanout::ControlMessage::Remove(sink_name));
+                }
+            })
     }
 }
 

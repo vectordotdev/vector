@@ -8,10 +8,7 @@ use parking_lot::RwLock;
 use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::Arc,
 };
 use uuid::Uuid;
 
@@ -25,6 +22,7 @@ pub enum TapError {
 pub enum TapResult {
     LogEvent(String, LogEvent),
     Error(String, TapError),
+    Stop,
 }
 
 pub enum TapControl {
@@ -36,7 +34,6 @@ pub struct TapSink {
     id: Uuid,
     inputs: RwLock<HashMap<String, Uuid>>,
     tap_tx: TapSender,
-    empty: AtomicBool,
 }
 
 impl TapSink {
@@ -52,12 +49,19 @@ impl TapSink {
             id: Uuid::new_v4(),
             inputs: RwLock::new(inputs),
             tap_tx,
-            empty: AtomicBool::new(input_names.len() == 0),
         }
     }
 
     pub fn input_names(&self) -> Vec<String> {
         self.inputs.read().keys().cloned().collect()
+    }
+
+    pub fn inputs(&self) -> HashMap<String, Uuid> {
+        self.inputs
+            .read()
+            .iter()
+            .map(|(name, uuid)| (name.to_string(), *uuid))
+            .collect()
     }
 
     /// Internal function to build a `RouterSink` from an input name. This will spawn an async
@@ -85,34 +89,30 @@ impl TapSink {
         Ok((id.to_string(), self.make_router(input_name)))
     }
 
-    fn remove_input(&self, input_name: &str) {
+    fn remove_input_result(&self, input_name: &str, result: TapResult) -> Option<Uuid> {
         let mut lock = self.inputs.write();
-        let _ = lock.remove(input_name);
+        let id = lock.remove(input_name)?;
+        let _ = self.tap_tx.clone().start_send(result);
+
         if lock.is_empty() {
-            self.empty.store(true, Ordering::Release);
+            let _ = self.tap_tx.clone().start_send(TapResult::Stop);
         }
+
+        Some(id)
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.empty.load(Ordering::Acquire)
+    pub fn component_invalid(&self, input_name: &str) -> Option<Uuid> {
+        self.remove_input_result(
+            input_name,
+            TapResult::Error(input_name.to_string(), TapError::ComponentInvalid),
+        )
     }
 
-    pub fn component_invalid(&self, input_name: &str) {
-        self.remove_input(input_name);
-
-        let _ = self.tap_tx.clone().start_send(TapResult::Error(
-            input_name.to_string(),
-            TapError::ComponentInvalid,
-        ));
-    }
-
-    pub fn component_gone_away(&self, input_name: &str) {
-        self.remove_input(input_name);
-
-        let _ = self.tap_tx.clone().start_send(TapResult::Error(
-            input_name.to_string(),
-            TapError::ComponentGoneAway,
-        ));
+    pub fn component_gone_away(&self, input_name: &str) -> Option<Uuid> {
+        self.remove_input_result(
+            input_name,
+            TapResult::Error(input_name.to_string(), TapError::ComponentGoneAway),
+        )
     }
 }
 
@@ -141,10 +141,6 @@ impl TapController {
 
         let _ = control_tx.send(ControlMessage::Tap(TapControl::Start(Arc::clone(&sink))));
         Self { control_tx, sink }
-    }
-
-    pub fn sink_is_empty(&self) -> bool {
-        self.sink.is_empty()
     }
 }
 
