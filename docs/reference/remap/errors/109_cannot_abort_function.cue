@@ -4,10 +4,9 @@ remap: errors: "109": {
 	title:       "Cannot abort function"
 	description: """
 		A [function call expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor)) can't end with
-		`!` unless it's _fallible_. If a function can't produce a runtime error, it doesn't have an abort variant
-		that ends with `!`.
+		`!` unless the function is fallible, that is, if it can produce a runtime error. If the function is infallible,
+		it doesn't have an abort variant that ends with `!`.
 		"""
-	rationale:   null
 	resolution: """
 		Remove the `!` from the end of the function name.
 		"""

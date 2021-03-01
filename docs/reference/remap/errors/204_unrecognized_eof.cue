@@ -5,7 +5,6 @@ remap: errors: "204": {
 	description: """
 		Your VRL program contains an [EOF](\(urls.eof)) character that unexpectedly ends the program.
 		"""
-	rationale:   null
 	resolution: """
 		Remove the EOF character.
 		"""

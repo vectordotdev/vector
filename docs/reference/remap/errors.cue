@@ -6,10 +6,10 @@ remap: {
 	#Error: {
 		anchor:      "\(code)"
 		code:        >=100 & <1000 & int
-		description: string
-		rationale:   string | null
-		resolution:  string
 		title:       string
+		description: string
+		rationale:   string | *null
+		resolution?: string
 
 		examples?: [remap.#Example, ...remap.#Example]
 	}

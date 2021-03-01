@@ -5,7 +5,6 @@ remap: errors: "205": {
 	description: """
 		You've used a name for a variable that serves another purpose in VRL or is reserved for potential future use.
 		"""
-	rationale: null
 	resolution: """
 		Use a different variable name.
 		"""
