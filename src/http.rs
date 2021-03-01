@@ -26,11 +26,11 @@ use tracing_futures::Instrument;
 
 #[derive(Debug, Snafu)]
 pub enum HttpError {
-    #[snafu(display("Failed to build TLS connector"))]
+    #[snafu(display("Failed to build TLS connector: {}", source))]
     BuildTlsConnector { source: TlsError },
-    #[snafu(display("Failed to build HTTPS connector"))]
+    #[snafu(display("Failed to build HTTPS connector: {}", source))]
     MakeHttpsConnector { source: openssl::error::ErrorStack },
-    #[snafu(display("Failed to make HTTP(S) request"))]
+    #[snafu(display("Failed to make HTTP(S) request: {}", source))]
     CallRequest { source: hyper::Error },
 }
 

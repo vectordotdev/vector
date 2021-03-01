@@ -25,7 +25,7 @@ fn benchmark_add_fields(c: &mut Criterion) {
                   inputs = ["in"]
                   source = """
                   .four = 4
-                  .five = 4
+                  .five = 5
                   """
             "#},
         ),
@@ -64,16 +64,16 @@ fn benchmark_add_fields(c: &mut Criterion) {
                   inputs = ["in"]
                   module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
                   artifact_cache = "target/artifacts/"
+                  options.four = 4
+                  options.five = 5
             "#},
         ),
     ];
 
-    let input = r#"{"one":1,"two":2,"three":3}"#;
-    let output =
-        serde_json::from_str(r#"{ "one": 1, "two": 2, "three": 3, "four": 4, "five": 5 }"#)
-            .unwrap();
+    let input = "";
+    let output = serde_json::from_str(r#"{"four": 4, "five": 5 }"#).unwrap();
 
-    benchmark_configs(c, "add_fields", configs, "in", "last", input, output);
+    benchmark_configs(c, "add_fields", configs, "in", "last", input, &output);
 }
 
 fn benchmark_parse_json(c: &mut Criterion) {
@@ -133,7 +133,7 @@ fn benchmark_parse_json(c: &mut Criterion) {
         r#"{"string":"bar","array":[1,2,3],"boolean":true,"number":47.5,"object":{"key":"value"}}"#;
     let output = serde_json::from_str(r#"{ "array": [1, 2, 3], "boolean": true, "number": 47.5, "object": { "key": "value" }, "string": "bar" }"#).unwrap();
 
-    benchmark_configs(c, "parse_json", configs, "in", "last", input, output);
+    benchmark_configs(c, "parse_json", configs, "in", "last", input, &output);
 }
 
 fn benchmark_parse_syslog(c: &mut Criterion) {
@@ -156,15 +156,14 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                   type = "regex_parser"
                   inputs = ["in"]
                   field = "message"
-                  patterns = ['^<(?P<priority>\d+)>(?P<version>\d+) (?P<timestamp>%S+) (?P<hostname>%S+) (?P<appname>%S+) (?P<procid>\S+) (?P<msgid>\S+) (?P<sdata>%S+) (?P<message>.+)$']
+                  patterns = ['^<(?P<priority>\d+)>(?P<version>\d+) (?P<timestamp>\S+) (?P<hostname>\S+) (?P<appname>\S+) (?P<procid>\S+) (?P<msgid>\S+) (?P<sdata>\S+) (?P<message>.+)$']
                   types.appname = "string"
-                  types.facility = "string"
                   types.hostname = "string"
                   types.level = "string"
                   types.message = "string"
                   types.msgid = "string"
                   types.procid = "int"
-                  types.timestamp = "timestamp|%F"
+                  types.timestamp = "timestamp|%Y-%m-%dT%H:%M:%S%.fZ"
             "#},
         ),
         (
@@ -177,9 +176,9 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
                   source = """
                   local function parse_syslog(message)
                     local pattern = "^<(%d+)>(%d+) (%S+) (%S+) (%S+) (%S+) (%S+) (%S+) (.+)$"
-                    local priority, version, timestamp, host, appname, procid, msgid, sdata, message = string.match(message, pattern)
+                    local priority, version, timestamp, hostname, appname, procid, msgid, sdata, message = string.match(message, pattern)
 
-                    return {priority = priority, version = version, timestamp = timestamp, host = host, appname = appname, procid = procid, msgid = msgid, sdata = sdata, message = message}
+                    return {priority = priority, version = version, timestamp = timestamp, hostname = hostname, appname = appname, procid = tonumber(procid), msgid = msgid, sdata = sdata, message = message}
                   end
 
                   function process(event, emit)
@@ -203,9 +202,11 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
     ];
 
     let input = r#"<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet"#;
-    let output = serde_json::from_str(r#"{ "appname": "su", "facility": "user", "hostname": "initech.io", "severity": "warning", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "2020-12-19 21:48:09.004 +00:00", "version": 3 }"#).unwrap();
+    // intentionally leaves out facility and severity as the native implementation, using
+    // `regex_parser`, is not able to capture this
+    let output = serde_json::from_str(r#"{ "appname": "su", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "2020-12-19T21:48:09.004Z" }"#).unwrap();
 
-    benchmark_configs(c, "parse_syslog", configs, "in", "last", input, output);
+    benchmark_configs(c, "parse_syslog", configs, "in", "last", input, &output);
 }
 
 /// Benches a set of transform configs for comparison
@@ -226,7 +227,7 @@ fn benchmark_configs(
     input_name: &str,
     output_name: &str,
     input: &str,
-    output: serde_json::Value,
+    output: &serde_json::map::Map<String, serde_json::Value>,
 ) {
     vector::test_util::trace_init();
 
@@ -297,9 +298,14 @@ fn benchmark_configs(
                         #[cfg(debug_assertions)]
                         {
                             assert_eq!(num_lines, output_lines.len());
-                            for output_line in output_lines {
-                                let actual = serde_json::from_str(output_line);
-                                assert_eq!(output, actual);
+                            for output_line in &output_lines {
+                                let actual: serde_json::map::Map<String, serde_json::Value> =
+                                    serde_json::from_str(output_line).unwrap();
+                                // avoids asserting the actual == expected as the socket trasform
+                                // adds dynamic keys like timestamp
+                                for (key, value) in output.iter() {
+                                    assert_eq!(Some(value), actual.get(key), "for key {}", key,);
+                                }
                             }
                         }
 

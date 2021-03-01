@@ -3,7 +3,12 @@ use criterion::{criterion_group, BatchSize, Criterion, Throughput};
 use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 use rand_distr::{Alphanumeric, Distribution, Uniform};
 
-use vector::{config::TransformConfig, event::Event, test_util::runtime, transforms};
+use vector::{
+    config::{GlobalOptions, TransformConfig},
+    event::Event,
+    test_util::runtime,
+    transforms,
+};
 
 fn benchmark_regex(c: &mut Criterion) {
     let lines: Vec<String> = http_access_log_lines().take(10).collect();
@@ -26,7 +31,7 @@ fn benchmark_regex(c: &mut Criterion) {
                 drop_failed: true,
                 ..Default::default()
             }
-            .build()
+            .build(&GlobalOptions::default())
             .await
             .unwrap().into_function()
         });

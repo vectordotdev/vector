@@ -4,7 +4,7 @@ components: transforms: lua: {
 	title: "Lua"
 
 	description: """
-		Transform events with a full embedded [Lua](\(urls.lua)) engine.
+		Transform events with a full embedded [Lua](\(urls.lua)) 5.3.5 engine.
 		"""
 
 	classes: {

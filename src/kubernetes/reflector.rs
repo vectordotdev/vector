@@ -40,7 +40,7 @@ where
     <W as Watcher>::Object: Metadata<Ty = ObjectMeta> + Send,
     S: state::MaintainedWrite<Item = <W as Watcher>::Object>,
 {
-    /// Create a new [`Cache`].
+    /// Create a new [`Reflector`].
     pub fn new(
         watcher: W,
         state_writer: S,

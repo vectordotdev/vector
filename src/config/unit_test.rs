@@ -1,5 +1,5 @@
 use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
-use crate::config::{self, TransformConfig};
+use crate::config::{self, GlobalOptions, TransformConfig};
 use crate::{
     conditions::Condition,
     event::{Event, Value},
@@ -66,6 +66,7 @@ pub struct UnitTest {
     transforms: IndexMap<String, UnitTestTransform>,
     checks: Vec<UnitTestCheck>,
     no_outputs_from: Vec<String>,
+    globals: GlobalOptions,
 }
 
 struct UnitTestTransform {
@@ -110,6 +111,7 @@ fn walk(
     mut inputs: Vec<Event>,
     transforms: &mut IndexMap<String, UnitTestTransform>,
     aggregated_results: &mut HashMap<String, (Vec<Event>, Vec<Event>)>,
+    globals: &GlobalOptions,
 ) {
     let mut results = Vec::new();
     let mut targets = Vec::new();
@@ -135,7 +137,7 @@ fn walk(
                 // TODO: This is a hack.
                 // Our tasktransforms must consume the transform to attach it to an input stream, so we rebuild it between input streams.
                 transforms.insert(key, UnitTestTransform {
-                    transform:  futures::executor::block_on(target.config.clone().build())
+                    transform:  futures::executor::block_on(target.config.clone().build(globals))
                         .expect("Failed to build a known valid transform config. Things may have changed during runtime."),
                     config: target.config,
                     next: target.next
@@ -145,7 +147,13 @@ fn walk(
     }
 
     for child in targets {
-        walk(&child, results.clone(), transforms, aggregated_results);
+        walk(
+            &child,
+            results.clone(),
+            transforms,
+            aggregated_results,
+            globals,
+        );
     }
 
     if let Some((mut e_inputs, mut e_results)) = aggregated_results.remove(node) {
@@ -173,7 +181,13 @@ impl UnitTest {
         }
 
         for (target, inputs) in inputs_by_target {
-            walk(&target, inputs, &mut self.transforms, &mut results);
+            walk(
+                &target,
+                inputs,
+                &mut self.transforms,
+                &mut results,
+                &self.globals,
+            );
         }
 
         for check in &self.checks {
@@ -446,7 +460,7 @@ async fn build_unit_test(
     let mut transforms: IndexMap<String, UnitTestTransform> = IndexMap::new();
     for (name, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(name) {
-            match transform_config.inner.build().await {
+            match transform_config.inner.build(&config.global).await {
                 Ok(transform) => {
                     transforms.insert(
                         name.clone(),
@@ -533,6 +547,7 @@ async fn build_unit_test(
             transforms,
             checks,
             no_outputs_from: definition.no_outputs_from.clone(),
+            globals: config.global.clone(),
         })
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, TransformConfig, TransformDescription},
+    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful},
@@ -110,7 +110,7 @@ impl_generate_config_from_default!(Ec2Metadata);
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         let (read, write) = evmap::new();
 
         // Check if the namespace is set to `""` which should mean that we do
@@ -511,7 +511,7 @@ enum Ec2MetadataError {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::{event::Event, test_util::trace_init};
+    use crate::{config::GlobalOptions, event::Event, test_util::trace_init};
     use futures::{SinkExt, StreamExt};
 
     const HOST: &str = "http://localhost:8111";
@@ -529,7 +529,11 @@ mod integration_tests {
             endpoint: Some(HOST.to_string()),
             ..Default::default()
         };
-        let transform = config.build().await.unwrap().into_task();
+        let transform = config
+            .build(&GlobalOptions::default())
+            .await
+            .unwrap()
+            .into_task();
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
         let mut rx = transform.transform(Box::pin(rx));
@@ -567,7 +571,11 @@ mod integration_tests {
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
-        let transform = config.build().await.unwrap().into_task();
+        let transform = config
+            .build(&GlobalOptions::default())
+            .await
+            .unwrap()
+            .into_task();
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
         let mut rx = transform.transform(Box::pin(rx));
@@ -600,7 +608,11 @@ mod integration_tests {
                 namespace: Some("ec2.metadata".into()),
                 ..Default::default()
             };
-            let transform = config.build().await.unwrap().into_task();
+            let transform = config
+                .build(&GlobalOptions::default())
+                .await
+                .unwrap()
+                .into_task();
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
             let mut rx = transform.transform(Box::pin(rx));
@@ -631,7 +643,11 @@ mod integration_tests {
                 namespace: Some("".into()),
                 ..Default::default()
             };
-            let transform = config.build().await.unwrap().into_task();
+            let transform = config
+                .build(&GlobalOptions::default())
+                .await
+                .unwrap()
+                .into_task();
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
             let mut rx = transform.transform(Box::pin(rx));

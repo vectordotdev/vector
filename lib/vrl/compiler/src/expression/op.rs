@@ -1,7 +1,7 @@
 use crate::expression::{self, Expr, Noop, Resolved};
 use crate::parser::{ast, Node};
 use crate::{value, Context, Expression, State, TypeDef, Value};
-use diagnostic::{DiagnosticError, Label, Note, Span};
+use diagnostic::{DiagnosticError, Label, Note, Span, Urls};
 use std::fmt;
 
 #[derive(Clone, PartialEq)]
@@ -235,17 +235,17 @@ impl fmt::Debug for Op {
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("comparison operators cannot be chained")]
+    #[error("comparison operators can't be chained together")]
     ChainedComparison { span: Span },
 
-    #[error("unneeded error-coalesce operation")]
+    #[error("unnecessary error coalescing operation")]
     ErrInfallible {
         lhs_span: Span,
         rhs_span: Span,
         op_span: Span,
     },
 
-    #[error("can only merge objects")]
+    #[error("only objects can be merged")]
     MergeNonObjects {
         lhs_span: Option<Span>,
         rhs_span: Option<Span>,
@@ -286,9 +286,9 @@ impl DiagnosticError for Error {
                 rhs_span,
                 op_span,
             } => vec![
-                Label::primary("this expression cannot fail", lhs_span),
+                Label::primary("this expression can't fail", lhs_span),
                 Label::context("this expression never resolves", rhs_span),
-                Label::context("remove this error coalesce operation", op_span),
+                Label::context("remove this error coalescing operation", op_span),
             ],
             MergeNonObjects { lhs_span, rhs_span } => {
                 let mut labels = Vec::new();
@@ -315,6 +315,10 @@ impl DiagnosticError for Error {
         use Error::*;
 
         match self {
+            ChainedComparison { .. } => vec![Note::SeeDocs(
+                "comparisons".to_owned(),
+                Urls::expression_docs_url("#comparison"),
+            )],
             Expr(err) => err.notes(),
             _ => vec![],
         }

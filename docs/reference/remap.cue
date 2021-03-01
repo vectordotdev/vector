@@ -14,22 +14,12 @@ package metadata
 	}
 
 	#Example: {
-		title:  string
-		input?: #Event
-		source: string
-		raises?: {
-			compiletime?: string
-			runtime?:     string
-		}
-
-		if raises == _|_ {
-			return?: _
-			output?: #Event
-		}
-
-		if raises != _|_ {
-			diff?: string
-		}
+		title:   string
+		input?:  #Event
+		source:  string
+		diff?:   string
+		return?: _
+		output?: #Event
 
 		notes?: [string, ...string]
 		warnings?: [string, ...string]

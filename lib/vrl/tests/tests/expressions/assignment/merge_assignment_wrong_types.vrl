@@ -1,9 +1,9 @@
 # result: ~
-# can only merge objects
-# can only merge objects
-# can only merge objects
-# can only merge objects
-# can only merge objects
+# only objects can be merged
+# only objects can be merged
+# only objects can be merged
+# only objects can be merged
+# only objects can be merged
 
 . = { "ook": 23 }
 

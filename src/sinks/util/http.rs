@@ -3,7 +3,11 @@ use super::{
     sink, Batch, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestSettings,
 };
-use crate::{buffers::Acker, http::HttpClient, Event};
+use crate::{
+    buffers::Acker,
+    http::{HttpClient, HttpError},
+    Event,
+};
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
 use http::StatusCode;
@@ -95,7 +99,7 @@ impl<T, B, L> BatchedHttpSink<T, B, L>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
-    L: RetryLogic<Response = http::Response<Bytes>, Error = hyper::Error> + Send + 'static,
+    L: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn with_retry_logic(
@@ -232,7 +236,7 @@ where
     B::Output: Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
-    L: RetryLogic<Response = http::Response<Bytes>, Error = hyper::Error> + Send + 'static,
+    L: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn with_retry_logic(
@@ -378,7 +382,7 @@ impl<T: fmt::Debug> sink::Response for http::Response<T> {
 pub struct HttpRetryLogic;
 
 impl RetryLogic for HttpRetryLogic {
-    type Error = hyper::Error;
+    type Error = HttpError;
     type Response = hyper::Response<Bytes>;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {

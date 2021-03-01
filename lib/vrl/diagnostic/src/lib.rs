@@ -12,6 +12,10 @@ pub use note::Note;
 pub use severity::Severity;
 pub use span::{span, Span};
 
+const VRL_DOCS_ROOT_URL: &str = "https://vrl.dev";
+const VRL_ERROR_DOCS_ROOT_URL: &str = "https://errors.vrl.dev";
+const VRL_FUNCS_ROOT_URL: &str = "https://functions.vrl.dev";
+
 /// A trait that can be implemented by error types to provide diagnostic
 /// information about the given error.
 pub trait DiagnosticError: std::error::Error {
@@ -36,5 +40,29 @@ pub trait DiagnosticError: std::error::Error {
     /// Defaults to no notes.
     fn notes(&self) -> Vec<Note> {
         vec![]
+    }
+}
+
+pub struct Urls;
+
+impl Urls {
+    fn vrl_root_url() -> String {
+        VRL_DOCS_ROOT_URL.into()
+    }
+
+    pub fn func_docs(ident: &str) -> String {
+        format!("{}/{}", VRL_FUNCS_ROOT_URL, ident)
+    }
+
+    fn error_handling_url() -> String {
+        format!("{}/#handling", VRL_ERROR_DOCS_ROOT_URL)
+    }
+
+    fn error_code_url(code: &usize) -> String {
+        format!("{}/{}", VRL_ERROR_DOCS_ROOT_URL, code)
+    }
+
+    pub fn expression_docs_url(expr: &str) -> String {
+        format!("{}/expressions/{}", VRL_DOCS_ROOT_URL, expr)
     }
 }
