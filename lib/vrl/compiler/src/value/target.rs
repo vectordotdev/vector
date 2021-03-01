@@ -302,7 +302,7 @@ impl Value {
 
             let map = match self {
                 Value::Object(map) => map,
-                _ => unreachable!(),
+                _ => unreachable!("see invariant above"),
             };
 
             match rest.first() {
