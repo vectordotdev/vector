@@ -1,6 +1,6 @@
+use crate::{random_from_array, random_in_range};
 use chrono::{prelude::Local, SecondsFormat};
 use fakedata_generator::{gen_domain, gen_http_method, gen_ipv4, gen_username};
-use rand::{thread_rng, Rng};
 
 const APPLICATION_NAMES: [&str; 10] = [
     "auth", "data", "deploy", "etl", "scraper", "cron", "ingress", "egress", "alerter", "fwd",
@@ -210,11 +210,3 @@ fn syslog_version() -> String {
     random_in_range(1, 3)
 }
 
-// Helper functions
-fn random_in_range(min: usize, max: usize) -> String {
-    thread_rng().gen_range(min..max).to_string()
-}
-
-fn random_from_array<T: Copy>(v: &[T]) -> T {
-    v[thread_rng().gen_range(0..v.len())]
-}
