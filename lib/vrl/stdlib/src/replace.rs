@@ -109,7 +109,11 @@ impl Expression for ReplaceFn {
 
                 Ok(replaced)
             }
-            _ => unreachable!("argument-type invariant"),
+            value => Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::Regex | Kind::Bytes,
+            }
+            .into()),
         })
     }
 

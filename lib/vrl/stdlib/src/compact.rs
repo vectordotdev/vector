@@ -174,7 +174,11 @@ impl Expression for CompactFn {
         match self.value.resolve(ctx)? {
             Value::Object(map) => Ok(Value::from(compact_map(map, &options))),
             Value::Array(arr) => Ok(Value::from(compact_array(arr, &options))),
-            _ => unreachable!(),
+            value => Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::Array | Kind::Object,
+            }
+            .into()),
         }
     }
 

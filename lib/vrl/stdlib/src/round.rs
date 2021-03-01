@@ -64,8 +64,12 @@ impl Expression for RoundFn {
 
         match self.value.resolve(ctx)? {
             Value::Float(f) => Ok(round_to_precision(f.into_inner(), precision, f64::round).into()),
-            v @ Value::Integer(_) => Ok(v),
-            _ => unreachable!(),
+            value @ Value::Integer(_) => Ok(value),
+            value => Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::Float | Kind::Integer,
+            }
+            .into()),
         }
     }
 

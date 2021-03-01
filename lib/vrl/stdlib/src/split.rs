@@ -87,7 +87,11 @@ impl Expression for SplitFn {
                     .collect::<Vec<_>>()
                     .into())
             }
-            _ => unreachable!(),
+            value => Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::Regex | Kind::Bytes,
+            }
+            .into()),
         })
     }
 
