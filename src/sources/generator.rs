@@ -1,10 +1,11 @@
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::Event,
+    event::{metric::{Metric, MetricKind, MetricValue}, Event},
     internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
     Pipeline,
 };
+use chrono::Utc;
 use fakedata::logs::*;
 use futures::{stream::StreamExt, SinkExt};
 use rand::seq::SliceRandom;
@@ -46,27 +47,45 @@ pub enum OutputFormat {
     #[serde(alias = "rfc3164")]
     BsdSyslog,
     Json,
+    Metrics {
+        namespace: String,
+        names: Vec<String>,
+    }
 }
 
 impl OutputFormat {
-    fn generate_event(&self, n: usize) -> Event {
+    fn generate_events(&self, n: usize) -> Vec<Event> {
         emit!(GeneratorEventProcessed);
 
-        let line = match self {
+        match self {
             Self::Shuffle {
                 sequence,
                 ref lines,
-            } => Self::shuffle_generate(*sequence, lines, n),
-            Self::ApacheCommon => apache_common_log_line(),
-            Self::ApacheError => apache_error_log_line(),
-            Self::Syslog => syslog_5424_log_line(),
-            Self::BsdSyslog => syslog_3164_log_line(),
-            Self::Json => json_log_line(),
-        };
-        Event::from(line)
+            } => Self::line_to_events(Self::shuffle_generate(*sequence, lines, n)),
+            Self::ApacheCommon => Self::line_to_events(apache_common_log_line()),
+            Self::ApacheError => Self::line_to_events(apache_error_log_line()),
+            Self::Syslog => Self::line_to_events(syslog_5424_log_line()),
+            Self::BsdSyslog => Self::line_to_events(syslog_3164_log_line()),
+            Self::Json => Self::line_to_events(json_log_line()),
+            Self::Metrics { namespace, names } => Self::generate_fake_metrics(namespace, names),
+        }
     }
 
-    fn shuffle_generate(sequence: bool, lines: &[String], n: usize) -> String {
+    pub(self) fn validate(&self) -> Result<(), GeneratorConfigError> {
+        match self {
+            // Ensures that the `lines` list is non-empty if `Shuffle` is chosen
+            Self::Shuffle { lines, .. } => {
+                if lines.is_empty() {
+                    Err(GeneratorConfigError::ShuffleGeneratorItemsEmpty)
+                } else {
+                    Ok(())
+                }
+            }
+            _ => Ok(()),
+        }
+    }
+
+    pub(self) fn shuffle_generate(sequence: bool, lines: &[String], n: usize) -> String {
         // unwrap can be called here because `lines` can't be empty
         let line = lines.choose(&mut rand::thread_rng()).unwrap();
 
@@ -77,18 +96,20 @@ impl OutputFormat {
         }
     }
 
-    // Ensures that the `lines` list is non-empty if `Shuffle` is chosen
-    pub(self) fn validate(&self) -> Result<(), GeneratorConfigError> {
-        match self {
-            Self::Shuffle { lines, .. } => {
-                if lines.is_empty() {
-                    Err(GeneratorConfigError::ShuffleGeneratorItemsEmpty)
-                } else {
-                    Ok(())
-                }
-            }
-            _ => Ok(()),
-        }
+    pub(self) fn line_to_events(line: String) -> Vec<Event> {
+        vec![Event::from(line)]
+    }
+
+    pub(self) fn generate_fake_metrics(namespace: &str, names: &[String]) -> Vec<Event> {
+        names
+            .iter()
+            .map(|name| {
+                Metric::new(name, MetricKind::Incremental, MetricValue::Counter { value: 1.0 })
+                    .with_namespace(Some(namespace))
+                    .with_timestamp(Some(Utc::now()))
+            })
+            .map(Event::from)
+            .collect()
     }
 }
 
@@ -121,13 +142,15 @@ impl GeneratorConfig {
                 interval.next().await;
             }
 
-            let event = self.format.generate_event(n);
+            let events = self.format.generate_events(n);
 
-            out.send(event)
-                .await
-                .map_err(|_: crate::pipeline::ClosedError| {
-                    error!(message = "Failed to forward events; downstream is closed.");
-                })?;
+            for event in events {
+                out.send(event)
+                    .await
+                    .map_err(|_: crate::pipeline::ClosedError| {
+                        error!(message = "Failed to forward events; downstream is closed.");
+                    })?;
+            }
         }
 
         Ok(())

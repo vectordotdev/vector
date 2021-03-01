@@ -1,7 +1,10 @@
 use crate::random_n;
 
-pub fn counter(namespace: String, name: String) -> String {
-    let n = random_n(1.0, 25.0);
+pub fn metric_lines(namespace: &str, names: &[String]) -> Vec<String> {
+    names.iter().map(|name| metric_line(namespace, name)).collect()
+}
 
-    format!("{}_{}_{}", namespace, name, n)
+fn metric_line(namespace: &str, name: &str) -> String {
+    let n = random_n(0.0, 10.0);
+    format!("{}_{} {}", namespace, name, n)
 }
