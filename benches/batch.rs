@@ -5,7 +5,7 @@ use std::{convert::Infallible, time::Duration};
 use vector::{
     buffers::Acker,
     sinks::util::{
-        batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
+        batch::{Batch, BatchConfig, BatchError, BatchMaker, BatchSettings, BatchSize, PushResult},
         BatchSink, Buffer, Compression, Partition, PartitionBatchSink,
     },
     test_util::{random_lines, runtime},
@@ -45,7 +45,7 @@ fn benchmark_batching(c: &mut Criterion) {
                             .size;
                         let batch_sink = PartitionBatchSink::new(
                             tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                            PartitionedBuffer::new(batch, *compression),
+                            PartitionedBuffer::maker(batch, *compression),
                             Duration::from_secs(1),
                             acker,
                         )
@@ -106,6 +106,18 @@ pub struct PartitionedBuffer {
     key: Option<Bytes>,
 }
 
+pub struct PartitionedBufferMaker {
+    batch: BatchSize<Buffer>,
+    compression: Compression,
+}
+
+impl BatchMaker for PartitionedBufferMaker {
+    type Batch = PartitionedBuffer;
+    fn new_batch(&self) -> Self::Batch {
+        Self::Batch::new(self.batch, self.compression)
+    }
+}
+
 #[derive(Clone)]
 pub struct InnerBuffer {
     pub(self) inner: Vec<u8>,
@@ -119,11 +131,15 @@ impl Partition<Bytes> for InnerBuffer {
 }
 
 impl PartitionedBuffer {
-    pub fn new(batch: BatchSize<Buffer>, compression: Compression) -> Self {
+    fn new(batch: BatchSize<Buffer>, compression: Compression) -> Self {
         Self {
-            inner: Buffer::maker(batch, compression),
+            inner: Buffer::with_settings(batch, compression),
             key: None,
         }
+    }
+
+    pub fn maker(batch: BatchSize<Buffer>, compression: Compression) -> PartitionedBufferMaker {
+        PartitionedBufferMaker { batch, compression }
     }
 }
 
@@ -151,13 +167,6 @@ impl Batch for PartitionedBuffer {
 
     fn is_empty(&self) -> bool {
         self.inner.is_empty()
-    }
-
-    fn fresh(&self) -> Self {
-        Self {
-            inner: self.inner.fresh(),
-            key: None,
-        }
     }
 
     fn finish(mut self) -> Self::Output {

@@ -43,7 +43,7 @@ pub enum InnerBuffer {
 }
 
 impl Buffer {
-    fn with_settings(settings: BatchSize<Self>, compression: Compression) -> Self {
+    pub fn with_settings(settings: BatchSize<Self>, compression: Compression) -> Self {
         let buffer = Vec::with_capacity(settings.bytes);
         let inner = match compression {
             Compression::None => InnerBuffer::Plain(buffer),
