@@ -1056,7 +1056,6 @@ impl<'input> Lexer<'input> {
             Some((_, '\'')) => Ok('\''),
             Some((_, '"')) => Ok('"'),
             Some((_, '\\')) => Ok('\\'),
-            Some((_, '/')) => Ok('/'),
             Some((_, 'n')) => Ok('\n'),
             Some((_, 'r')) => Ok('\r'),
             Some((_, 't')) => Ok('\t'),
