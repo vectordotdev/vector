@@ -364,6 +364,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-nats"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1368b1e781af424c247edee8d29eb967439da4ebb2d676a6e67411880d4c9d92"
+dependencies = [
+ "blocking",
+ "nats",
+]
+
+[[package]]
 name = "async-net"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8078,6 +8088,7 @@ dependencies = [
  "async-compression",
  "async-graphql",
  "async-graphql-warp",
+ "async-nats",
  "async-stream",
  "async-trait",
  "atty",
