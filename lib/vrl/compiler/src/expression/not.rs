@@ -38,7 +38,7 @@ impl Not {
 
 impl Expression for Not {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        Ok((!self.inner.resolve(ctx)?.unwrap_boolean()).into())
+        Ok((!self.inner.resolve(ctx)?.try_boolean()?).into())
     }
 
     fn type_def(&self, state: &State) -> TypeDef {

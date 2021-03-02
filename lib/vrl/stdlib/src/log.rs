@@ -52,7 +52,8 @@ impl Function for Log {
         let level = arguments
             .optional_enum("level", &levels)?
             .unwrap_or_else(|| "info".into())
-            .unwrap_bytes();
+            .try_bytes()
+            .expect("log level not bytes");
 
         Ok(Box::new(LogFn { value, level }))
     }

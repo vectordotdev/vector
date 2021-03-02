@@ -104,6 +104,8 @@ fn main() {
 
                 match result {
                     Ok(got) => {
+                        let mut failed = false;
+
                         if !test.skip {
                             let want = if want.starts_with("r'") && want.ends_with('\'') {
                                 match regex::Regex::new(
@@ -138,18 +140,20 @@ fn main() {
                                 let diff = prettydiff::diff_chars(&want, &got)
                                     .set_highlight_whitespace(true);
                                 println!("  {}", diff);
-
-                                if cmd.fail_early {
-                                    std::process::exit(1)
-                                }
+                                failed = true;
                             }
                         }
 
                         if cmd.verbose {
                             println!("{:#}", got);
                         }
+
+                        if failed && cmd.fail_early {
+                            std::process::exit(1)
+                        }
                     }
                     Err(err) => {
+                        let mut failed = false;
                         if !test.skip {
                             let got = err.to_string().trim().to_owned();
                             let want = want.trim().to_owned();
@@ -164,20 +168,22 @@ fn main() {
 
                                 let diff = prettydiff::diff_lines(&want, &got);
                                 println!("{}", diff);
-
-                                if cmd.fail_early {
-                                    std::process::exit(1)
-                                }
+                                failed = true;
                             }
                         }
 
                         if cmd.verbose {
                             println!("{:#}", err);
                         }
+
+                        if failed && cmd.fail_early {
+                            std::process::exit(1)
+                        }
                     }
                 }
             }
             Err(diagnostics) => {
+                let mut failed = false;
                 let mut formatter = Formatter::new(&test.source, diagnostics);
                 if !test.skip {
                     let got = formatter.to_string().trim().to_owned();
@@ -193,16 +199,17 @@ fn main() {
 
                         let diff = prettydiff::diff_lines(&want, &got);
                         println!("{}", diff);
-
-                        if cmd.fail_early {
-                            std::process::exit(1)
-                        }
+                        failed = true;
                     }
                 }
 
                 if cmd.verbose {
                     formatter.enable_colors(true);
                     println!("{:#}", formatter);
+                }
+
+                if failed && cmd.fail_early {
+                    std::process::exit(1)
                 }
             }
         }

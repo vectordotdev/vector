@@ -188,6 +188,26 @@ impl Target {
     fn insert_type_def(&self, state: &mut State, type_def: TypeDef, value: Option<Value>) {
         use Target::*;
 
+        fn set_type_def(
+            current_type_def: &TypeDef,
+            new_type_def: TypeDef,
+            path: &Option<Path>,
+        ) -> TypeDef {
+            // If the assignment is into a specific index, we want to keep the
+            // existing type def, and only update the type def at the provided
+            // index.
+            let is_index_assignment = path
+                .as_ref()
+                .and_then(|p| p.segments().last().map(|s| s.is_index()))
+                .unwrap_or_default();
+
+            if is_index_assignment {
+                current_type_def.clone().merge_overwrite(new_type_def)
+            } else {
+                new_type_def
+            }
+        }
+
         match self {
             Noop => {}
             Internal(ident, path) => {
@@ -198,7 +218,7 @@ impl Target {
 
                 let type_def = match state.variable(ident) {
                     None => td,
-                    Some(&Details { ref type_def, .. }) => type_def.clone().merge(td),
+                    Some(&Details { ref type_def, .. }) => set_type_def(type_def, td, path),
                 };
 
                 let details = Details { type_def, value };
@@ -214,7 +234,7 @@ impl Target {
 
                 let type_def = match state.target() {
                     None => td,
-                    Some(&Details { ref type_def, .. }) => type_def.clone().merge(td),
+                    Some(&Details { ref type_def, .. }) => set_type_def(type_def, td, path),
                 };
 
                 let details = Details { type_def, value };

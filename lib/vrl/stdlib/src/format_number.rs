@@ -93,7 +93,13 @@ impl Expression for FormatNumberFn {
         let value: Decimal = match self.value.resolve(ctx)? {
             Value::Integer(v) => v.into(),
             Value::Float(v) => Decimal::from_f64(*v).expect("not NaN"),
-            _ => unreachable!(),
+            value => {
+                return Err(value::Error::Expected {
+                    got: value.kind(),
+                    expected: Kind::Integer | Kind::Float,
+                }
+                .into())
+            }
         };
 
         let scale = match &self.scale {

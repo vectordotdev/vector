@@ -47,7 +47,7 @@ impl DowncaseFn {
 
 impl Expression for DowncaseFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.unwrap_bytes();
+        let bytes = self.value.resolve(ctx)?.try_bytes()?;
 
         Ok(String::from_utf8_lossy(&bytes).to_lowercase().into())
     }
