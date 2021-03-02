@@ -162,7 +162,9 @@ impl Component for App {
 impl App {
     fn initial_object() -> Value {
         let mut m: BTreeMap<String, Value> = BTreeMap::new();
-        m.insert("message".into(), "<17>1 2021-03-02T11:03:23.201Z omnicorp.org mcnulty 6432 ID130 - Welp, this is not looking good".into());
+        let mut msg: BTreeMap<String, Value> = BTreeMap::new();
+        msg.insert("foo".into(), "bar".into());
+        m.insert("message".into(), Value::Object(msg));
         m.insert("timestamp".into(), "2021-03-02T19:25:05.205732Z".into());
         Value::Object(m)
     }
