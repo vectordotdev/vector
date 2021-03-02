@@ -21,11 +21,15 @@ impl Component for App {
     fn view(&self) -> Html {
         html! {
             <>
-                <main>
-                    <h1>
-                        { "Hello from VRL!" }
-                    </h1>
-                </main>
+                <nav class="navbar is-black" role="navigation">
+                    <div class="container">
+                        <div class="navbar-brand">
+                            <a class="navbar-item has-text-primary has-text-weight-bold" href="https://vrl.dev">
+                                { "Vector Remap Language" }
+                            </a>
+                        </div>
+                    </div>
+                </nav>
             </>
         }
     }
