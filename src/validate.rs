@@ -104,7 +104,10 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         .ok()?;
 
     // Build
-    let (config, build_warnings) = builder.build().map_err(&mut report_error).ok()?;
+    let (config, build_warnings) = builder
+        .build_with_warnings()
+        .map_err(&mut report_error)
+        .ok()?;
 
     // Warnings
     let warnings = load_warnings

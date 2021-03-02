@@ -55,7 +55,17 @@ impl From<Config> for ConfigBuilder {
 }
 
 impl ConfigBuilder {
-    pub fn build(self) -> Result<(Config, Vec<String>), Vec<String>> {
+    pub fn build(self) -> Result<Config, Vec<String>> {
+        let (config, warnings) = self.build_with_warnings()?;
+
+        for warning in warnings {
+            warn!("{}", warning);
+        }
+
+        Ok(config)
+    }
+
+    pub fn build_with_warnings(self) -> Result<(Config, Vec<String>), Vec<String>> {
         compiler::compile(self)
     }
 

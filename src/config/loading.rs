@@ -78,7 +78,7 @@ pub fn process_paths(config_paths: &[(PathBuf, FormatHint)]) -> Option<Vec<(Path
 
 pub fn load_from_paths(config_paths: &[(PathBuf, FormatHint)]) -> Result<Config, Vec<String>> {
     let (builder, load_warnings) = load_builder_from_paths(config_paths)?;
-    let (config, build_warnings) = builder.build()?;
+    let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in load_warnings.into_iter().chain(build_warnings) {
         warn!("{}", warning);
@@ -110,7 +110,7 @@ pub fn load_builder_from_paths(
 
 pub fn load_from_str(input: &str, format: FormatHint) -> Result<Config, Vec<String>> {
     let (builder, load_warnings) = load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
-    let (config, build_warnings) = builder.build()?;
+    let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in load_warnings.into_iter().chain(build_warnings) {
         warn!("{}", warning);

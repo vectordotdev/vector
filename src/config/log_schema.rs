@@ -24,9 +24,9 @@ pub fn init_log_schema(
     deny_seted: bool,
 ) -> Result<(), Vec<String>> {
     let (builder, _) = load_builder_from_paths(config_paths)?;
-    let (config, _) = builder.build()?;
+    let (config, _) = builder.build_with_warnings()?;
 
-    if LOG_SCHEMA.set(config.global.log_schema.clone()).is_err() && deny_seted {
+    if LOG_SCHEMA.set(config.global.log_schema).is_err() && deny_seted {
         panic!("Couldn't set schema");
     }
 
