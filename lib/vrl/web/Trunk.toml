@@ -1,0 +1,16 @@
+[build]
+target = "index.html"
+release = false
+dist = "dist"
+public_url = "/"
+
+[watch]
+path = ["src"]
+
+[serve]
+port = 8080
+open = true
+
+[clean]
+dist = "dist"
+cargo = false
