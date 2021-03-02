@@ -163,10 +163,10 @@ fn log_schema() {
             r#"
         data_dir = "${VECTOR_DATA_DIR}"
         log_schema.message_key = "test_msg"
-    
+
         [sources.in_console]
             type = "stdin"
-    
+
         [sinks.out_console]
             inputs = ["in_console"]
             type = "console"
