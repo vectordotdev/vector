@@ -508,13 +508,14 @@ long-tail issues.
 ## Plan of Action
 
 In this section we break down the plan of action for the proposed future work,
-given in the previous section. There are three complementary efforts. They will
-be pursued in a roughly a concurrent manner, depending on how many people are
-available for the work. As an example, the `diagnostic` task "Report on Vector's
-Environment" will improve the test-harness work with regard to increasing
-reliability but is not a blocking task. The criterion "Discover Tolerances" will
-help establish a baseline for test-harness tests introduced in "Expand Test
-Coverage" but we might also take some arbitrary commit as "base" for new tests.
+given in the previous section. There are three complementary, long-term efforts
+here. They will be pursued in a roughly a concurrent manner, depending on how
+many people are available for the work. As an example, the `diagnostic` task
+"Report on Vector's Environment" will improve the test-harness work with regard
+to increasing reliability but is not a blocking task. The criterion "Discover
+Tolerances" will help establish a baseline for test-harness tests introduced in
+"Expand Test Coverage" but we might also take some arbitrary commit as "base"
+for new tests.
 
 ### Ad Hoc Sprint
 
