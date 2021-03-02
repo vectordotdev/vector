@@ -6,5 +6,9 @@ edition = "2018"
 publish = false
 
 [dependencies]
-yew = "0.17.4"
+stdlib = { package = "vrl-stdlib", path = "../stdlib" }
+vrl = { path = "../core" }
 wasm-logger = "0.2.0"
+yew = "0.17.4"
+serde_json = "1.0.64"
+thiserror = "1.0.24"

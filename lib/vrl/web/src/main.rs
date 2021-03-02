@@ -1,11 +1,25 @@
 #![recursion_limit="1024"]
 
+use vrl::{diagnostic::Formatter, state, Runtime, Value};
 use yew::events::KeyboardEvent;
 use yew::prelude::*;
 use yew::services::console::ConsoleService;
 
+#[derive(Debug, thiserror::Error)]
+enum Error {
+    #[error("json parsing error")]
+    Json(#[from] serde_json::Error),
+
+    #[error("program parsing error")]
+    Parse(String),
+
+    #[error("runtime error {0}")]
+    Runtime(String),
+}
+
 struct State {
     program: String,
+    output: String,
 }
 
 struct App {
@@ -22,13 +36,19 @@ fn log(msg: &str) {
     ConsoleService::info(msg)
 }
 
+fn log_s(s: String) {
+    ConsoleService::info(&s)
+}
+
 impl Component for App {
     type Message = Action;
     type Properties = ();
 
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         let program = String::new();
-        let state = State { program };
+        let output = String::new();
+
+        let state = State { program, output };
 
         Self { link, state }
     }
@@ -44,6 +64,15 @@ impl Component for App {
             }
             Compile => {
                 log(&format!("Current program: {}", self.state.program));
+
+                match parse_input(&self.state.program) {
+                    Ok(res) => {
+                        log_s(format!("OK: {}", res));
+                    }
+                    Err(err) => {
+                        log_s(format!("Error: {}", err));
+                    }
+                }
             }
         }
 
@@ -85,7 +114,7 @@ impl Component for App {
                                     { "Output" }
                                 </p>
 
-                                <br />
+                                {self.compiled_output()}
                             </div>
                         </div>
                     </div>
@@ -113,6 +142,28 @@ impl App {
             </div>
         }
     }
+
+    fn compiled_output(&self) -> Html {
+        html! {
+            <p>
+                {&self.state.output}
+            </p>
+        }
+    }
+}
+
+fn parse_input(source: &str) -> Result<Value, Error> {
+    let object = &mut Value::Null;
+
+    let state = state::Runtime::default();
+    let mut runtime = Runtime::new(state);
+    let program = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
+        Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+    })?;
+
+    runtime
+        .resolve(object, &program)
+        .map_err(|err| Error::Runtime(err.to_string()))
 }
 
 fn main() {
