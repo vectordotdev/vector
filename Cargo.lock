@@ -7621,6 +7621,7 @@ version = "0.1.0"
 dependencies = [
  "ansi_term 0.12.1",
  "criterion",
+ "dashmap 4.0.2",
  "tracing 0.1.23",
  "tracing-core 0.1.17",
  "tracing-subscriber",

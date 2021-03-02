@@ -1,10 +1,7 @@
+use dashmap::DashMap;
 use std::fmt;
 use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Mutex,
-    },
+    sync::atomic::{AtomicUsize, Ordering},
     time::Instant,
 };
 use tracing_core::{
@@ -31,7 +28,7 @@ where
     L: Layer<S> + Sized,
     S: Subscriber,
 {
-    events: Mutex<HashMap<RateKeyIdentifier, State>>,
+    events: DashMap<RateKeyIdentifier, State>,
     inner: L,
 
     _subscriber: std::marker::PhantomData<S>,
@@ -44,7 +41,7 @@ where
 {
     pub fn new(layer: L) -> Self {
         RateLimitedLayer {
-            events: Mutex::<HashMap<RateKeyIdentifier, State>>::default(),
+            events: DashMap::new(),
             inner: layer,
             _subscriber: std::marker::PhantomData,
         }
@@ -136,9 +133,9 @@ where
             component_name,
         };
 
-        let mut events = self.events.lock().expect("lock poisoned!");
+        //let mut events = self.events.lock().expect("lock poisoned!");
 
-        let state = events.entry(id.clone()).or_insert(State {
+        let state = self.events.entry(id.clone()).or_insert(State {
             start: Instant::now(),
             count: AtomicUsize::new(0),
             // if this is None, then a non-integer was passed as the rate limit
@@ -181,7 +178,7 @@ where
                 self.create_event(&ctx, metadata, message, state.limit);
             }
             self.inner.on_event(event, ctx);
-            events.remove(&id);
+            self.events.remove(&id);
         }
     }
 
