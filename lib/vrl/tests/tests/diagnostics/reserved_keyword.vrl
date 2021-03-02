@@ -9,6 +9,6 @@
 #   │ this identifier name is reserved for future use in the language
 #   │ use a different name instead
 #   │
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = see language documentation at https://vrl.dev
 
 array = []

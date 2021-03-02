@@ -1,7 +1,7 @@
 use crate::expression::{Block, Expr, Resolved};
 use crate::parser::Node;
 use crate::{value::Kind, Context, Expression, Span, State, TypeDef, Value};
-use diagnostic::{DiagnosticError, Label, Note};
+use diagnostic::{DiagnosticError, Label, Note, Urls};
 use std::fmt;
 
 pub type Result = std::result::Result<Predicate, Error>;
@@ -143,7 +143,7 @@ impl DiagnosticError for Error {
 
         match &self.variant {
             NonBoolean(kind) => vec![
-                Label::primary("this predicate must resolve to a boolean ", self.span),
+                Label::primary("this predicate must resolve to a boolean", self.span),
                 Label::context(format!("instead it resolves to {}", kind), self.span),
             ],
         }
@@ -153,7 +153,13 @@ impl DiagnosticError for Error {
         use ErrorVariant::*;
 
         match &self.variant {
-            NonBoolean(..) => vec![Note::CoerceValue],
+            NonBoolean(..) => vec![
+                Note::CoerceValue,
+                Note::SeeDocs(
+                    "if expressions".to_owned(),
+                    Urls::expression_docs_url("#if"),
+                ),
+            ],
         }
     }
 }

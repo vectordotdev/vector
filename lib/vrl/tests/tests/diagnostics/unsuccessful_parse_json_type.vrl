@@ -10,19 +10,19 @@
 #   │      this expression resolves to "unknown type"
 #   │      but the parameter "value" expects the exact type "string"
 #   │
-#   = try: guard against invalid type at runtime
+#   = try: ensuring an appropriate type at runtime
 #   =
 #   =     result.message = string!(result.message)
-#   =     sha3(result.message))
+#   =     sha3(result.message)
 #   =
-#   = try: coerce with default value
+#   = try: coercing to an appropriate type and specifying a default value as a fallback in case coercion fails
 #   =
 #   =     result.message = to_string(result.message) ?? "default"
-#   =     sha3(result.message))
+#   =     sha3(result.message)
 #   =
-#   = see error handling documentation at: https://vector.dev/docs/reference/vrl/
-#   = learn more at: https://errors.vrl.dev/110
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = learn more about error code 110 at https://errors.vrl.dev/110
+#   = see language documentation at https://vrl.dev
 
 .message = to_string!(.message)
 result = parse_json!(.message)

@@ -17,16 +17,6 @@ remap: errors: "105": {
 			source: #"""
 				parse_keyvalue(.message)
 				"""#
-			raises: compiletime: #"""
-				error: \#(title)
-				  ┌─ :1:1
-				  │
-				1 │ parse_keyvalue(.message)
-				  │ ^^^^^^^^^^^^^^
-				  │ │
-				  │ Undefined function
-				  │
-				"""#
 			diff: #"""
 				-parse_keyvalue(.message)
 				+parse_key_value(.message)

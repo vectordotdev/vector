@@ -1,20 +1,22 @@
 # result:
 #
-# error[E650]: comparison operators cannot be chained
+# error[E650]: comparison operators can't be chained together
 #   ┌─ :2:7
 #   │
 # 2 │ 2 < 3 < 4
 #   │       ^
 #   │
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = see documentation about comparisons at https://vrl.dev/expressions/#comparison
+#   = see language documentation at https://vrl.dev
 #
-# error[E650]: comparison operators cannot be chained
+# error[E650]: comparison operators can't be chained together
 #   ┌─ :3:15
 #   │
 # 3 │ true == false == true
 #   │               ^^
 #   │
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = see documentation about comparisons at https://vrl.dev/expressions/#comparison
+#   = see language documentation at https://vrl.dev
 
 2 < 3 < 4
 true == false == true

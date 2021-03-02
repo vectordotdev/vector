@@ -739,6 +739,18 @@ components: {
 				}
 			}
 
+			_timezone: {
+				common:      false
+				description: "The name of the time zone to apply to timestamp conversions that do not contain an explicit time zone. This overrides the global [`timezone` option][docs.reference.configuration.global-options#timezone]. The time zone name may be any name in the [TZ database][urls.tz_time_zones], or `local` to indicate system local time."
+				required:    false
+				warnings: []
+				type: string: {
+					default: "local"
+					examples: ["local", "America/NewYork", "EST5EDT"]
+					syntax: "literal"
+				}
+			}
+
 			_types: {
 				common:      true
 				description: """

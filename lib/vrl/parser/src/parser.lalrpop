@@ -14,6 +14,7 @@ extern {
 
     enum Tok<'input> {
         "identifier" => Token::Identifier(<&'input str>),
+        "path field" => Token::PathField(<&'input str>),
         "string literal" => Token::StringLiteral(<StringLiteral<&'input str>>),
         "integer literal" => Token::IntegerLiteral(<i64>),
         "float literal" => Token::FloatLiteral(<NotNan<f64>>),
@@ -219,6 +220,8 @@ NonterminalNewline: () = "\n";
 
 Ident: Ident = "identifier" => Ident(<>.to_owned());
 
+PathField: Ident = "path field" => Ident(<>.to_owned());
+
 // An identifier that is allowed to include reserved keywords.
 AnyIdent: Ident = {
     "identifier" => Ident(<>.to_owned()),
@@ -377,6 +380,7 @@ PathSegment: PathSegment = {
 
 pub Field: Field = {
     AnyIdent => Field::Regular(<>),
+    PathField => Field::Regular(<>),
     String => Field::Quoted(<>),
 };
 

@@ -101,7 +101,8 @@ components: transforms: regex_parser: {
 				syntax: "literal"
 			}
 		}
-		types: configuration._types
+		timezone: configuration._timezone
+		types:    configuration._types
 	}
 
 	input: {
