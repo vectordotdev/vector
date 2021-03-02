@@ -1724,9 +1724,6 @@ mod test {
 
     #[test]
     fn queries_negative_index() {
-        use StringLiteral as S;
-        use Token::StringLiteral as L;
-
         test(
             data("v[-1] = 2"),
             vec![
