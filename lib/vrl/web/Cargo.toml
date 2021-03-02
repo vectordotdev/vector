@@ -7,3 +7,4 @@ publish = false
 
 [dependencies]
 yew = "0.17.4"
+wasm-logger = "0.2.0"
