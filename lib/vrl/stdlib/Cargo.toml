@@ -30,7 +30,7 @@ strip-ansi-escapes = { version = "0.1", optional = true }
 syslog_loose = { version = "0.10", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
-uuid = { version = "0.8", features = ["v4"], optional = true }
+uuid = { version = "0.8", features = ["v4", "wasm-bindgen"], optional = true }
 
 [dev-dependencies]
 anyhow = "1"
@@ -270,6 +270,7 @@ wasm = [
   "timestamp",
   "truncate",
   "upcase",
+  "uuid_v4",
 ]
 
 [lib]
