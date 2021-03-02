@@ -204,7 +204,7 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
     let input = r#"<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet"#;
     // intentionally leaves out facility and severity as the native implementation, using
     // `regex_parser`, is not able to capture this
-    let output = serde_json::from_str(r#"{ "appname": "su", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "2020-12-19T21:48:09.004Z" }"#).unwrap();
+    let output = serde_json::from_str(r#"{ "appname": "su", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "2020-12-19T21:48:09.004Z", "version": 3 }"#).unwrap();
 
     benchmark_configs(c, "parse_syslog", configs, "in", "last", input, &output);
 }
@@ -218,10 +218,10 @@ fn benchmark_multifaceted(c: &mut Criterion) {
                   type = "remap"
                   inputs = ["in"]
                   source = """
-                  . = parse_syslog!(.message)
-                  .timestamp = format_timestamp!(.timestamp, format: "%c")
+                  . = parse_syslog!(string!(.message))
+                  .timestamp = format_timestamp!(to_timestamp!(.timestamp), format: "%c")
                   del(.hostname)
-                  .message = downcase(string!(.message))
+                  .message = downcase(.message)
                   """
             "#},
         ),
