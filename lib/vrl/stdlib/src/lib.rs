@@ -154,7 +154,8 @@ mod to_unix_timestamp;
 mod truncate;
 #[cfg(feature = "upcase")]
 mod upcase;
-#[cfg(feature = "uuid_v4")]
+// uuid_v4 has two versions
+#[cfg(any(feature = "uuid_v4_wasm", feature = "uuid_v4_no_wasm"))]
 mod uuid_v4;
 
 // -----------------------------------------------------------------------------
@@ -313,7 +314,7 @@ pub use to_unix_timestamp::ToUnixTimestamp;
 pub use truncate::Truncate;
 #[cfg(feature = "upcase")]
 pub use upcase::Upcase;
-#[cfg(feature = "uuid_v4")]
+#[cfg(any(feature = "uuid_v4_wasm", feature = "uuid_v4_no_wasm"))]
 pub use uuid_v4::UuidV4;
 
 pub fn all() -> Vec<Box<dyn vrl::Function>> {
@@ -476,7 +477,7 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Truncate),
         #[cfg(feature = "upcase")]
         Box::new(Upcase),
-        #[cfg(feature = "uuid_v4")]
+        #[cfg(any(feature = "uuid_v4_wasm", feature = "uuid_v4_no_wasm"))]
         Box::new(UuidV4),
     ]
 }
