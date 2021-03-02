@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::convert::Into;
-use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
+use vrl::{diagnostic::Formatter, state::{Compiler as CompilerState, Runtime as StateRuntime}, Runtime, Target, Value};
 use yew::events::KeyboardEvent;
 use yew::prelude::*;
 use yew::services::console::ConsoleService;
@@ -26,6 +26,7 @@ struct App {
     link: ComponentLink<Self>,
     app_state: AppState,
     processor: Processor,
+    compiler_state: CompilerState,
 }
 
 
@@ -35,18 +36,21 @@ struct Processor {
 
 impl Processor {
     fn new() -> Self {
-        let state = state::Runtime::default();
+        let state = StateRuntime::default();
         let runtime = Runtime::new(state);
 
         Self { runtime }
     }
 
-    fn parse_input(&mut self, object: &mut impl Target, source: &str) -> String {
-        let program = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
-            Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
-        }).unwrap();
+    fn parse_input(&mut self, object: &mut impl Target, program: &str, state: &mut CompilerState) -> String {
+        let program = match vrl::compile_with_state(program, &stdlib::all(), state) {
+            Ok(program) => program,
+            Err(diagnostics) => return Formatter::new(program, diagnostics).colored().to_string(),
+        };
 
-        match (&mut self.runtime).resolve(object, &program) {
+        let runtime = &mut self.runtime;
+
+        match runtime.resolve(object, &program) {
             Ok(obj) => obj.to_string(),
             Err(err) => err.to_string()
         }
@@ -69,6 +73,7 @@ impl Component for App {
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
         let initial_program = "".to_owned();
         let output = "".to_owned();
+        let compiler_state = CompilerState::default();
 
         let mut m: BTreeMap<String, Value> = BTreeMap::new();
         m.insert("foo".into(), "bar".into());
@@ -82,7 +87,7 @@ impl Component for App {
 
         let processor = Processor::new();
 
-        Self { link, app_state, processor }
+        Self { link, app_state, processor, compiler_state }
     }
 
     fn update(&mut self, action: Self::Message) -> ShouldRender {
@@ -95,7 +100,7 @@ impl Component for App {
             Compile => {
                 log(&format!("Current program: {}", self.app_state.vrl_program));
 
-                let result = self.processor.parse_input(&mut self.app_state.current_value, &self.app_state.vrl_program);
+                let result = self.processor.parse_input(&mut self.app_state.current_value, &self.app_state.vrl_program, &mut self.compiler_state);
 
                 self.app_state.output = result;
             }
