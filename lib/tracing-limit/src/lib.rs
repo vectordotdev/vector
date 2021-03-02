@@ -136,9 +136,6 @@ where
             component_name,
         };
 
-        // TODO benchmark with multiple threads
-        // TODO can we drop the lock before create_event/on_event
-
         let mut events = self.events.lock().expect("lock poisoned!");
 
         let state = events.entry(id.clone()).or_insert(State {
@@ -155,7 +152,10 @@ where
 
         //check if we are still rate limiting
         if state.start.elapsed().as_secs() < state.limit.get() {
-            // TODO document
+            // check and increment the current count
+            // if 0: this is the first message, just pass it through
+            // if 1: this is the first rate limited message
+            // otherwise supress it until the rate limit expires
             match state.count.fetch_add(1, Ordering::Relaxed) {
                 0 => self.inner.on_event(event, ctx),
                 1 => {
@@ -168,22 +168,19 @@ where
             }
         } else {
             // done rate limiting
-            {
-                let count = state.count.load(Ordering::Relaxed);
+            let count = state.count.load(Ordering::Relaxed);
 
-                // avoid outputting a message if the event wasn't rate limited
-                if count > 1 {
-                    let message = format!(
-                        "Internal log [{}] has been rate limited {} times.",
-                        state.message,
-                        count - 1
-                    );
+            // avoid outputting a message if the event wasn't rate limited
+            if count > 1 {
+                let message = format!(
+                    "Internal log [{}] has been rate limited {} times.",
+                    state.message,
+                    count - 1
+                );
 
-                    self.create_event(&ctx, metadata, message, state.limit);
-                }
-                self.inner.on_event(event, ctx);
+                self.create_event(&ctx, metadata, message, state.limit);
             }
-            drop(state);
+            self.inner.on_event(event, ctx);
             events.remove(&id);
         }
     }
@@ -290,12 +287,12 @@ impl Visit for LimitVisitor {
         }
     }
 
-    // TODO maybe switch limit to an i64
     fn record_i64(&mut self, field: &Field, value: i64) {
         if field.name() == RATE_LIMIT_SECS_FIELD {
             use std::convert::TryFrom;
-            self.limit =
-                std::num::NonZeroU64::new(u64::try_from(value).expect("non-negative values"));
+            self.limit = std::num::NonZeroU64::new(
+                u64::try_from(value).expect("rate-limit must not be negative"),
+            );
         }
     }
 
