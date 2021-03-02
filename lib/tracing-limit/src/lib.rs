@@ -180,6 +180,7 @@ where
             }
             self.inner.on_event(event, ctx);
             state.start = Instant::now();
+            // we emitted the event, so the next one within `limit` should be rate limited
             state.count = 1;
         }
     }
