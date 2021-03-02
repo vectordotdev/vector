@@ -134,7 +134,7 @@ where
             component_name,
         };
 
-        let mut state = self.events.entry(id.clone()).or_insert(State {
+        let mut state = self.events.entry(id).or_insert(State {
             start: Instant::now(),
             count: 0,
             // if this is None, then a non-integer was passed as the rate limit
@@ -147,7 +147,7 @@ where
         });
 
         let prev = state.count;
-        state.count = state.count + 1;
+        state.count += 1;
 
         //check if we are still rate limiting
         if state.start.elapsed().as_secs() < state.limit.get() {
