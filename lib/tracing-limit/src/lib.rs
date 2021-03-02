@@ -17,14 +17,12 @@ use tracing_core::{
 use tracing_subscriber::layer::{Context, Layer};
 
 const RATE_LIMIT_SECS_FIELD: &str = "internal_log_rate_secs";
-const RATE_LIMIT_KEY_FIELD: &str = "internal_log_rate_key";
 const COMPONENT_NAME_FIELD: &str = "component_name";
 const MESSAGE_FIELD: &str = "message";
 
 #[derive(Eq, PartialEq, Hash, Clone)]
 struct RateKeyIdentifier {
     callsite: Identifier,
-    rate_limit_key: Option<String>,
     component_name: Option<String>,
 }
 
@@ -135,7 +133,6 @@ where
 
         let id = RateKeyIdentifier {
             callsite: metadata.callsite(),
-            rate_limit_key: limit_visitor.key.clone(),
             component_name,
         };
 
@@ -163,16 +160,8 @@ where
                 0 => self.inner.on_event(event, ctx),
                 1 => {
                     // output first rate limited log
-                    let message = match limit_visitor.key {
-                        None => {
-                            format!("Internal log [{}] is being rate limited.", state.message)
-                        }
-                        Some(key) => format!(
-                            "Internal log [{} internal_log_rate_key={}].",
-                            state.message, key,
-                        ),
-                    };
-
+                    let message =
+                        format!("Internal log [{}] is being rate limited.", state.message);
                     self.create_event(&ctx, metadata, message, state.limit);
                 }
                 _ => {}
@@ -292,7 +281,6 @@ impl Visit for RateLimitedSpanKeys {
 struct LimitVisitor {
     pub limit: Option<std::num::NonZeroU64>,
     pub message: Option<String>,
-    pub key: Option<String>,
 }
 
 impl Visit for LimitVisitor {
@@ -312,10 +300,8 @@ impl Visit for LimitVisitor {
     }
 
     fn record_str(&mut self, field: &Field, value: &str) {
-        match field.name() {
-            MESSAGE_FIELD => self.message = Some(value.to_string()),
-            RATE_LIMIT_KEY_FIELD => self.key = Some(value.to_string()),
-            _ => {}
+        if field.name() == MESSAGE_FIELD {
+            self.message = Some(value.to_string());
         }
     }
 
