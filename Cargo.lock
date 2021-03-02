@@ -8503,6 +8503,7 @@ dependencies = [
  "glob 0.3.0",
  "prettydiff",
  "regex",
+ "serde",
  "serde_json",
  "structopt 0.3.21",
  "vrl",
