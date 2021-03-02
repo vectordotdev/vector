@@ -303,7 +303,7 @@ impl StreamSink for PrometheusExporter {
                     .drain(..)
                     .map(|(MetricEntry(mut metric), is_incremental_set)| {
                         if is_incremental_set {
-                            metric.data.reset();
+                            metric.data.value = metric.data.value.zero();
                         }
                         (MetricEntry(metric), is_incremental_set)
                     })
@@ -312,12 +312,13 @@ impl StreamSink for PrometheusExporter {
 
             match item.data.kind {
                 MetricKind::Incremental => {
-                    let mut new = MetricEntry(item.to_absolute());
-                    if let Some((MetricEntry(mut existing), _)) = metrics.map.remove_entry(&new) {
-                        existing.data.add(&item.data);
-                        new = MetricEntry(existing);
+                    let mut entry = MetricEntry(item.into_absolute());
+                    if let Some((MetricEntry(mut existing), _)) = metrics.map.remove_entry(&entry) {
+                        existing.data.update(&entry.data);
+                        entry = MetricEntry(existing);
                     }
-                    metrics.map.insert(new, item.data.value.is_set());
+                    let is_set = entry.data.value.is_set();
+                    metrics.map.insert(entry, is_set);
                 }
                 MetricKind::Absolute => {
                     let new = MetricEntry(item);
@@ -423,7 +424,7 @@ mod tests {
         let mut sink = PrometheusExporter::new(config, cx.acker());
 
         let m1 = Metric::new(
-            "absolute".to_string(),
+            "absolute",
             MetricKind::Absolute,
             MetricValue::Counter { value: 32. },
         )
@@ -476,12 +477,12 @@ mod tests {
         let map = &sink.metrics.read().unwrap().map;
 
         assert_eq!(
-            map.get_full(&MetricEntry(m1)).unwrap().1 .0.data.value,
+            map.get_full(&MetricEntry(m1)).unwrap().1.data.value,
             MetricValue::Counter { value: 40. }
         );
 
         assert_eq!(
-            map.get_full(&MetricEntry(m2)).unwrap().1 .0.data.value,
+            map.get_full(&MetricEntry(m2)).unwrap().1.data.value,
             MetricValue::Counter { value: 33. }
         );
     }

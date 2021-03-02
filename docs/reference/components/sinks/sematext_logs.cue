@@ -9,6 +9,7 @@ components: sinks: sematext_logs: {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Sematext"]
+		stateful: false
 	}
 
 	features: {

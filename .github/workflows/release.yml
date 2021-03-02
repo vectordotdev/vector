@@ -15,7 +15,7 @@ env:
 
 jobs:
   build-x86_64-unknown-linux-musl-packages:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v1
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -29,7 +29,7 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz"
 
   build-x86_64-unknown-linux-gnu-packages:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v1
       - run: make ci-sweep
@@ -51,7 +51,7 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm"
 
   build-aarch64-unknown-linux-musl-packages:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v1
       - run: make ci-sweep
@@ -74,7 +74,7 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
 
   build-aarch64-unknown-linux-gnu-packages:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v1
       - run: make ci-sweep
@@ -89,7 +89,7 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz"
 
   build-armv7-unknown-linux-gnueabihf-packages:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v1
       - run: make ci-sweep
@@ -111,7 +111,7 @@ jobs:
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
 
   build-armv7-unknown-linux-musleabihf-packages:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v1
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
@@ -213,7 +213,7 @@ jobs:
   deb-verify:
     needs:
       - build-x86_64-unknown-linux-gnu-packages
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
         container: ["ubuntu:14.04","ubuntu:16.04","ubuntu:18.04","ubuntu:20.04","debian:8","debian:9","debian:10"]
@@ -245,7 +245,7 @@ jobs:
   rpm-verify:
     needs:
       - build-x86_64-unknown-linux-gnu-packages
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
         container: ["centos:7","centos:8","amazonlinux:1","amazonlinux:2","fedora:33"]
@@ -291,7 +291,7 @@ jobs:
           tar -xvf target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-apple-darwin.tar.gz && vector-x86_64-apple-darwin/bin/vector --version
 
   release-docker:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs:
       - build-aarch64-unknown-linux-musl-packages
       - build-x86_64-unknown-linux-gnu-packages
@@ -347,7 +347,7 @@ jobs:
           make release-docker
 
   release-s3:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     needs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
@@ -530,7 +530,7 @@ jobs:
           make release-homebrew
 
   release-cloudsmith:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-aarch64-unknown-linux-musl-packages
@@ -644,7 +644,7 @@ jobs:
           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.armv7.rpm"
 
   release-helm:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     needs:
       # This is not strictly required, but ensures that Helm Chart doesn't
       # appear before the image it refers to.
@@ -679,7 +679,7 @@ jobs:
       - release-cloudsmith
       - release-github
       - release-helm
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - name: Discord notification
       env:

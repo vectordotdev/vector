@@ -11,6 +11,7 @@ components: transforms: split: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -31,9 +32,11 @@ components: transforms: split: {
 		requirements: []
 		warnings: [
 			"""
-			This component has been deprecated in favor of the new [`remap` transform's `split`
-			function](\(urls.vector_remap_transform)#split). The `remap` transform provides a simple
-			syntax for robust data transformation. Let us know what you think!
+			\(split._remap_deprecation_notice)
+
+			```vrl
+			.message = split(.message)
+			```
 			""",
 		]
 		notices: []
@@ -55,13 +58,17 @@ components: transforms: split: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child"]
+				syntax: "literal"
 			}
 		}
 		field_names: {
 			description: "The field names assigned to the resulting tokens, in order."
 			required:    true
 			warnings: []
-			type: array: items: type: string: examples: ["timestamp", "level", "message", "parent.child"]
+			type: array: items: type: string: {
+				examples: ["timestamp", "level", "message", "parent.child"]
+				syntax: "literal"
+			}
 		}
 		separator: {
 			common:      true
@@ -71,9 +78,11 @@ components: transforms: split: {
 			type: string: {
 				default: "[whitespace]"
 				examples: [","]
+				syntax: "literal"
 			}
 		}
-		types: configuration._types
+		timezone: configuration._timezone
+		types:    configuration._types
 	}
 
 	input: {

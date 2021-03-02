@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: encode_json: {
+	category: "Codec"
+	description: """
+		Encodes the `value` to JSON.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -11,10 +16,7 @@ remap: functions: encode_json: {
 	]
 	internal_failure_reasons: []
 	return: types: ["string"]
-	category: "Codec"
-	description: """
-		Encodes the provided `value` into JSON.
-		"""
+
 	examples: [
 		{
 			title: "Encode to JSON"

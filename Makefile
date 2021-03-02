@@ -1,6 +1,9 @@
 # .PHONY: $(MAKECMDGOALS) all
 .DEFAULT_GOAL := help
 
+mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+mkfile_dir := $(dir $(mkfile_path))
+
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
@@ -16,6 +19,8 @@ endif
 export SCOPE ?= ""
 # Override this with any extra flags for cargo bench
 export CARGO_BENCH_FLAGS ?= ""
+# override this to put criterion output elsewhere
+export CRITERION_HOME ?= "$(mkfile_dir)target/criterion"
 # Override to false to disable autospawning services on integration tests.
 export AUTOSPAWN ?= true
 # Override to control if services are turned off after integration tests.
@@ -163,6 +168,7 @@ environment-push: environment-prepare ## Publish a new version of the container 
 
 ##@ Building
 .PHONY: build
+build: export CFLAGS += -g0 -O3
 build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
@@ -214,7 +220,7 @@ cross-%: export PAIR =$(subst -, ,$($(strip @):cross-%=%))
 cross-%: export COMMAND ?=$(word 1,${PAIR})
 cross-%: export TRIPLE ?=$(subst ${SPACE},-,$(wordlist 2,99,${PAIR}))
 cross-%: export PROFILE ?= release
-cross-%: export RUSTFLAGS += -C link-arg=-s
+cross-%: export CFLAGS += -g0 -O3
 cross-%: cargo-install-cross
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross ${COMMAND} \
@@ -226,7 +232,7 @@ cross-%: cargo-install-cross
 target/%/vector: export PAIR =$(subst /, ,$(@:target/%/vector=%))
 target/%/vector: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector: export PROFILE ?=$(word 2,${PAIR})
-target/%/vector: export RUSTFLAGS += -C link-arg=-s
+target/%/vector: export CFLAGS += -g0 -O3
 target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
 	$(MAKE) -k cross-image-${TRIPLE}
 	cross build \
@@ -276,9 +282,9 @@ test: ## Run the unit test suite
 
 .PHONY: test-components
 test-components: ## Test with all components enabled
-# TODO(jesse) add `wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
+# TODO(jesse) add `language-benches wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
 # test-components: $(WASM_MODULE_OUTPUTS)
-test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches remap-benches"
+test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches metrics-benches remap-benches"
 test-components: test
 
 .PHONY: test-all
@@ -515,6 +521,7 @@ test-cli: ## Runs cli tests
 test-wasm-build-modules: $(WASM_MODULE_OUTPUTS) ### Build all WASM test modules
 
 $(WASM_MODULE_OUTPUTS): MODULE = $(notdir $@)
+$(WASM_MODULE_OUTPUTS): export CFLAGS += -g0 -O3
 $(WASM_MODULE_OUTPUTS): ### Build a specific WASM module
 	@echo "# Building WASM module ${MODULE}, requires Rustc for wasm32-wasi."
 	${MAYBE_ENVIRONMENT_EXEC} cargo build \
@@ -536,6 +543,11 @@ bench: ## Run benchmarks in /benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
+.PHONY: bench-remap-functions
+bench-remap-functions: ## Run remap-functions benches
+	${MAYBE_ENVIRONMENT_EXEC} CRITERION_HOME="$(CRITERION_HOME)" cargo bench --manifest-path lib/vrl/stdlib/Cargo.toml ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
 .PHONY: bench-remap
 bench-remap: ## Run remap benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "remap-benches" --bench remap ${CARGO_BENCH_FLAGS}
@@ -548,7 +560,7 @@ bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
 
 .PHONY: bench-languages
 bench-languages: $(WASM_MODULE_OUTPUTS)  ### Run language comparison benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "language-benches" --bench language ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "language-benches" --bench languages ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: bench-metrics
@@ -563,7 +575,7 @@ bench-standalone: ## Run standalone benches
 
 .PHONY: bench-all
 bench-all: ### Run all benches
-bench-all: bench-standalone $(WASM_MODULE_OUTPUTS)
+bench-all: $(WASM_MODULE_OUTPUTS) bench-standalone bench-remap-functions
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches metrics-benches language-benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
@@ -611,7 +623,7 @@ check-version: ## Check that Vector's version is correct accounting for recent c
 
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
-	${MAYBE_ENVIRONMENT_EXEC} cargo run -- validate --topology --deny-warnings ./config/examples/*.toml
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-examples.sh
 
 .PHONY: check-scripts
 check-scripts: ## Check that scipts do not have common mistakes
@@ -635,6 +647,11 @@ check-kubernetes-yaml: ## Check that the generated Kubernetes YAML configs are u
 
 check-events: ## Check that events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events.sh
+
+##@ Rustdoc
+build-rustdoc: ## Build Vector's Rustdocs
+	# This command is mostly intended for use by the build process in timberio/vector-rustdoc
+	${MAYBE_ENVIRONMENT_EXEC} cargo doc --no-deps
 
 ##@ Packaging
 
@@ -771,6 +788,12 @@ release-helm: ## Package and release Helm Chart
 .PHONY: sync-install
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
+
+##@ Vector Remap Language
+
+.PHONY: test-vrl
+test-vrl: ## Run the VRL test suite
+	@scripts/test-vrl.sh
 
 ##@ Utility
 

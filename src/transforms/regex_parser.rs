@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, TransformConfig, TransformDescription},
+    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserFailedMatch, RegexParserMissingField,
@@ -11,6 +11,7 @@ use crate::{
 use bytes::Bytes;
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use snafu::ResultExt;
 use std::collections::HashMap;
 use std::str;
@@ -32,6 +33,8 @@ pub struct RegexParserConfig {
     #[derivative(Default(value = "true"))]
     pub overwrite_target: bool,
     pub types: HashMap<String, String>,
+    #[serde(default)]
+    pub timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -43,8 +46,8 @@ impl_generate_config_from_default!(RegexParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    async fn build(&self) -> crate::Result<Transform> {
-        RegexParser::build(&self)
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+        RegexParser::build(&self, globals.timezone)
     }
 
     fn input_type(&self) -> DataType {
@@ -137,7 +140,7 @@ impl CompiledRegex {
 }
 
 impl RegexParser {
-    pub fn build(config: &RegexParserConfig) -> crate::Result<Transform> {
+    pub fn build(config: &RegexParserConfig, timezone: TimeZone) -> crate::Result<Transform> {
         let field = config
             .field
             .clone()
@@ -184,7 +187,8 @@ impl RegexParser {
             .flatten()
             .collect::<Vec<_>>();
 
-        let types = parse_check_conversion_map(&config.types, names)?;
+        let types =
+            parse_check_conversion_map(&config.types, names, config.timezone.unwrap_or(timezone))?;
 
         Ok(Transform::function(RegexParser::new(
             regexset,
@@ -301,8 +305,11 @@ impl FunctionTransform for RegexParser {
 #[cfg(test)]
 mod tests {
     use super::RegexParserConfig;
-    use crate::event::{LogEvent, Value};
-    use crate::{config::TransformConfig, Event};
+    use crate::{
+        config::{GlobalOptions, TransformConfig},
+        event::{LogEvent, Value},
+        Event,
+    };
 
     #[test]
     fn generate_config() {
@@ -319,7 +326,7 @@ mod tests {
             patterns, config
         ))
         .unwrap()
-        .build()
+        .build(&GlobalOptions::default())
         .await
         .unwrap();
         let parser = parser.as_function();

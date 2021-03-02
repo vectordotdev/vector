@@ -1,0 +1,4 @@
+# result: [{ "ok": { "foo": [null, null, 1.0] } }, { "bar": { "baz": null } }]
+
+.ok.foo[2], err.bar.baz = 1 / 1
+[., err]

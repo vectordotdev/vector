@@ -6,7 +6,7 @@ components: transforms: "remap": {
 	description: """
 		Is the recommended transform for parsing, shaping, and transforming data in Vector. It implements the
 		[Vector Remap Language](\(urls.vrl_reference)) (VRL), an expression-oriented language designed for processing
-		obervability data (logs and metrics) in safe and performant manner.
+		observability data (logs and metrics) in a safe and performant manner.
 
 		Please refer to the [VRL reference](\(urls.vrl_reference)) when writing VRL scripts.
 		"""
@@ -15,6 +15,7 @@ components: transforms: "remap": {
 		commonly_used: true
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -47,9 +48,6 @@ components: transforms: "remap": {
 		source: {
 			description: """
 				The [Vector Remap Language](\(urls.vrl_reference)) (VRL) program to execute for each event.
-
-				Please refer to the [Vector Remap Language reference](\(urls.vrl_reference)) for a list of expressions
-				and functions.
 				"""
 			required:    true
 			type: string: {
@@ -63,6 +61,7 @@ components: transforms: "remap": {
 						del(.old_name)
 						""",
 				]
+				syntax: "remap_program"
 			}
 		}
 	}
@@ -80,7 +79,7 @@ components: transforms: "remap": {
 	}
 
 	examples: [
-		for k, v in remap.real_world_examples if v.raises == _|_ {
+		for k, v in remap.examples if v.raises == _|_ {
 			{
 				title: v.title
 				configuration: source: v.source
@@ -93,7 +92,7 @@ components: transforms: "remap": {
 	how_it_works: {
 		remap_language: {
 			title: "Vector Remap Language"
-			body: #"""
+			body:  #"""
 				The Vector Remap Language (VRL) is a restrictive, fast, and safe language we
 				designed specifically for mapping observability data. It avoids the need to
 				chain together many fundamental Vector transforms to accomplish rudimentary
@@ -103,7 +102,7 @@ components: transforms: "remap": {
 				without paying the performance or safety penalty.
 
 				Learn more about Vector's Remap Language in the
-				[Vector Remap Language reference](\(urls.vector_remap_language_reference)).
+				[Vector Remap Language reference](\#(urls.vrl_reference)).
 				"""#
 		}
 	}

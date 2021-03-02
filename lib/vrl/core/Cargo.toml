@@ -1,0 +1,16 @@
+[package]
+name = "vrl"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+compiler = { package = "vrl-compiler", path = "../compiler" }
+diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
+parser = { package = "vrl-parser", path = "../parser" }
+
+bytes = "0.5.6"
+indoc = "1"
+ordered-float = "2"
+thiserror = "1"

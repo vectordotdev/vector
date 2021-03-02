@@ -54,9 +54,12 @@ message Metric {
     Counter counter = 5;
     Gauge gauge = 6;
     Set set = 7;
-    Distribution distribution = 8;
-    AggregatedHistogram aggregated_histogram = 9;
-    AggregatedSummary aggregated_summary = 10;
+    Distribution1 distribution1 = 8;
+    AggregatedHistogram1 aggregated_histogram1 = 9;
+    AggregatedSummary1 aggregated_summary1 = 10;
+    Distribution2 distribution2 = 12;
+    AggregatedHistogram2 aggregated_histogram2 = 13;
+    AggregatedSummary2 aggregated_summary2 = 14;
   }
   string namespace = 11;
 }
@@ -73,26 +76,59 @@ message Set {
   repeated string values = 1;
 }
 
-message Distribution {
+enum StatisticKind {
+  Histogram = 0;
+  Summary = 1;
+}
+
+message Distribution1 {
   repeated double values = 1;
   repeated uint32 sample_rates = 2;
-  enum StatisticKind {
-    Histogram = 0;
-    Summary = 1;
-  }
   StatisticKind statistic = 3;
 }
 
-message AggregatedHistogram {
+message Distribution2 {
+  repeated DistributionSample samples = 1;
+  StatisticKind statistic = 2;
+}
+
+message DistributionSample {
+  double value = 1;
+  uint32 rate = 2;
+}
+
+message AggregatedHistogram1 {
   repeated double buckets = 1;
   repeated uint32 counts = 2;
   uint32 count = 3;
   double sum = 4;
 }
 
-message AggregatedSummary {
+message AggregatedHistogram2 {
+  repeated HistogramBucket buckets = 1;
+  uint32 count = 2;
+  double sum = 3;
+}
+
+message HistogramBucket {
+  double upper_limit = 1;
+  uint32 count = 2;
+}
+
+message AggregatedSummary1 {
   repeated double quantiles = 1;
   repeated double values = 2;
   uint32 count = 3;
   double sum = 4;
+}
+
+message AggregatedSummary2 {
+  repeated SummaryQuantile quantiles = 1;
+  uint32 count = 2;
+  double sum = 3;
+}
+
+message SummaryQuantile {
+  double upper_limit = 1;
+  double value = 2;
 }

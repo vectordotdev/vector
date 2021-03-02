@@ -1,6 +1,6 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, LogSchema, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
     internal_events::{
@@ -63,7 +63,7 @@ enum Error {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
-    #[serde(default = "LogSchema::default_host_key")]
+    #[serde(default = "default_host_key")]
     host_key: String,
     docker_host: Option<String>,
     tls: Option<DockerTlsConfig>,
@@ -88,7 +88,7 @@ pub struct DockerTlsConfig {
 impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
-            host_key: LogSchema::default_host_key(),
+            host_key: default_host_key(),
             docker_host: None,
             tls: None,
             exclude_containers: None,
@@ -101,6 +101,10 @@ impl Default for DockerLogsConfig {
             retry_backoff_secs: 2,
         }
     }
+}
+
+fn default_host_key() -> String {
+    log_schema().host_key().to_string()
 }
 
 impl DockerLogsConfig {

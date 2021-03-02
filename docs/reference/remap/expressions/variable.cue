@@ -37,6 +37,13 @@ remap: expressions: variable: {
 				"""#
 			return: 1
 		},
-
+		{
+			title: "Variable with path"
+			source: #"""
+				my_object = { "one": 1 }
+				my_object.one
+				"""#
+			return: 1
+		},
 	]
 }

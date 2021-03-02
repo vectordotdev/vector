@@ -1,12 +1,17 @@
 package metadata
 
 remap: functions: length: {
+	category: "Enumerate"
+	description: """
+		Returns the length of the `value`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
-			description: "The array or map"
+			description: "The array or object"
 			required:    true
-			type: ["array", "map", "string"]
+			type: ["array", "object", "string"]
 		},
 	]
 	internal_failure_reasons: []
@@ -18,13 +23,10 @@ remap: functions: length: {
 			"If `value` is a map, the number of map keys is returned (nested keys are ignored)",
 		]
 	}
-	category: "Enumerate"
-	description: """
-		Returns the length of the input.
-		"""
+
 	examples: [
 		{
-			title: "Length (map)"
+			title: "Length (object)"
 			source: """
 				length({
 					"portland": "Trail Blazers"
@@ -34,7 +36,7 @@ remap: functions: length: {
 			return: 2
 		},
 		{
-			title: "Length (nested map)"
+			title: "Length (nested object)"
 			source: """
 				length({
 					"home": {

@@ -11,6 +11,7 @@ components: transforms: ansi_stripper: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -31,9 +32,11 @@ components: transforms: ansi_stripper: {
 		requirements: []
 		warnings: [
 			"""
-			This component has been deprecated in favor of the new [`remap` transform's `strip_ansi_escape_codes`
-			function](\(urls.vector_remap_transform)#strip_ansi_escape_codes). The `remap` transform provides a
-			simple syntax for robust data transformation. Let us know what you think!
+			\(ansi_stripper._remap_deprecation_notice)
+
+			```vrl
+			.message = strip_ansi_escape_codes(.message)
+			```
 			""",
 		]
 		notices: []
@@ -48,6 +51,7 @@ components: transforms: ansi_stripper: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
+				syntax: "literal"
 			}
 		}
 	}

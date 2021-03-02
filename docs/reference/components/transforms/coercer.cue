@@ -11,6 +11,7 @@ components: transforms: coercer: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -29,7 +30,19 @@ components: transforms: coercer: {
 			"x86_64-unknown-linux-musl":      true
 		}
 		requirements: []
-		warnings: [transforms.add_fields.support.warnings[0]]
+		warnings: [
+			"""
+			\(coercer._remap_deprecation_notice)
+
+			```vrl
+			.bool = to_bool("false")
+			.float = to_float("1.0")
+			.int = to_int("1")
+			.string = to_string(1)
+			.timestamp = to_timestamp("2021-01-15T12:33:22.213221Z")
+			```
+			""",
+		]
 		notices: []
 	}
 
@@ -46,7 +59,8 @@ components: transforms: coercer: {
 			warnings: []
 			type: bool: default: false
 		}
-		types: configuration._types
+		timezone: configuration._timezone
+		types:    configuration._types
 	}
 
 	examples: [

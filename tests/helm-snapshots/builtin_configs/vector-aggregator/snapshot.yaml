@@ -36,6 +36,11 @@ data:
     
     data_dir = "/vector-data-dir"
     
+    [api]
+      enabled = false
+      address = "0.0.0.0:8686"
+      playground = true
+    
     [log_schema]
       host_key = "host"
       message_key = "message"
@@ -81,11 +86,9 @@ metadata:
 spec:
   clusterIP: None
   ports:
-    
-    - name: vector
-      port: 9000
-      protocol: TCP
-      targetPort: 9000
+  - port: 9000
+    name: vector
+    protocol: TCP
   selector:
     app.kubernetes.io/name: vector-aggregator
     app.kubernetes.io/instance: vector
@@ -102,12 +105,12 @@ metadata:
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
 spec:
+  type: ClusterIP
   ports:
-    
-    - name: vector
-      port: 9000
-      protocol: TCP
-      targetPort: 9000
+  - port: 9000
+    targetPort: 9000
+    name: vector
+    protocol: TCP
   selector:
     app.kubernetes.io/name: vector-aggregator
     app.kubernetes.io/instance: vector

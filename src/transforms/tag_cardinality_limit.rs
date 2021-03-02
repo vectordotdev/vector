@@ -1,6 +1,6 @@
 use crate::transforms::TaskTransform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     internal_events::{
         TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
         TagCardinalityValueLimitReached,
@@ -89,7 +89,7 @@ impl GenerateConfig for TagCardinalityLimitConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         Ok(Transform::task(TagCardinalityLimit::new(self.clone())))
     }
 
@@ -282,7 +282,7 @@ mod tests {
     fn make_metric(tags: BTreeMap<String, String>) -> Event {
         Event::Metric(
             Metric::new(
-                "event".into(),
+                "event",
                 metric::MetricKind::Incremental,
                 metric::MetricValue::Counter { value: 1.0 },
             )

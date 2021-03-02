@@ -1,6 +1,13 @@
 package metadata
 
 remap: functions: is_nullish: {
+	category: "Type"
+	description: """
+		Determines whether the `value` is "nullish".
+
+		Nullish indicates the absence of a meaningful value.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -18,10 +25,7 @@ remap: functions: is_nullish: {
 			#"If `value` is whitespace, as defined by [Unicode `White_Space` property](\#(urls.unicode_whitespace)), then `true` is returned."#,
 		]
 	}
-	category: "Type"
-	description: #"""
-		Determines whether the provided `value` is "nullish,". Nullish indicates the absence of a meaningful value.
-		"""#
+
 	examples: [
 		{
 			title: "Null detection (blank string)"

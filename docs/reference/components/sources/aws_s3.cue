@@ -18,6 +18,7 @@ components: sources: aws_s3: components._aws & {
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	support: {
@@ -55,6 +56,7 @@ components: sources: aws_s3: components._aws & {
 				enum: {
 					sqs: "Consume S3 objects by polling for bucket notifications sent to an [AWS SQS queue](\(urls.aws_sqs))."
 				}
+				syntax: "literal"
 			}
 		}
 		compression: {
@@ -69,6 +71,7 @@ components: sources: aws_s3: components._aws & {
 					zstd: "ZSTD format."
 					none: "Uncompressed."
 				}
+				syntax: "literal"
 			}
 		}
 		sqs: {
@@ -112,6 +115,7 @@ components: sources: aws_s3: components._aws & {
 						warnings: []
 						type: string: {
 							examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -125,7 +129,10 @@ components: sources: aws_s3: components._aws & {
 			message: {
 				description: "A line from the S3 object."
 				required:    true
-				type: string: examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+				type: string: {
+					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+					syntax: "literal"
+				}
 			}
 			timestamp: fields._current_timestamp & {
 				description: "The Last-Modified time of the object. Defaults the current timestamp if this information is missing."
@@ -133,17 +140,26 @@ components: sources: aws_s3: components._aws & {
 			bucket: {
 				description: "The bucket of the object the line came from."
 				required:    true
-				type: string: examples: ["my-bucket"]
+				type: string: {
+					examples: ["my-bucket"]
+					syntax: "literal"
+				}
 			}
 			object: {
 				description: "The object the line came from."
 				required:    true
-				type: string: examples: ["AWSLogs/111111111111/vpcflowlogs/us-east-1/2020/10/26/111111111111_vpcflowlogs_us-east-1_fl-0c5605d9f1baf680d_20201026T1950Z_b1ea4a7a.log.gz"]
+				type: string: {
+					examples: ["AWSLogs/111111111111/vpcflowlogs/us-east-1/2020/10/26/111111111111_vpcflowlogs_us-east-1_fl-0c5605d9f1baf680d_20201026T1950Z_b1ea4a7a.log.gz"]
+					syntax: "literal"
+				}
 			}
 			region: {
 				description: "The AWS region bucket is in."
 				required:    true
-				type: string: examples: ["us-east-1"]
+				type: string: {
+					examples: ["us-east-1"]
+					syntax: "literal"
+				}
 			}
 		}
 	}

@@ -11,7 +11,7 @@ pub struct Writer<T> {
 }
 
 impl<T> Writer<T> {
-    /// Take a [`super::Write`] and return it wrapped with [`Self`].
+    /// Take a [`super::Write`] and return it wrapped with [`Writer`].
     pub fn new(inner: T) -> Self {
         Self { inner }
     }

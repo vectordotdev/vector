@@ -9,6 +9,7 @@ components: sinks: influxdb_logs: {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["InfluxData"]
+		stateful: false
 	}
 
 	features: {
@@ -66,6 +67,7 @@ components: sinks: influxdb_logs: {
 			warnings: []
 			type: string: {
 				examples: ["service"]
+				syntax: "literal"
 			}
 		}
 	}

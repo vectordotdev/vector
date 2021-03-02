@@ -7,7 +7,7 @@ author_github: "https://github.com/lucperkins"
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false
-tags: ["type: enhancement", "source: internal_logs"]
+tags: ["type: new feature", "source: internal_logs"]
 ---
 
 Vector has a new [`internal_logs`][internal_logs] source that you can use to

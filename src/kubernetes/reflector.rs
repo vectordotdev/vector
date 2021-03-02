@@ -5,13 +5,10 @@ use super::{
     watcher::{self, Watcher},
 };
 use crate::internal_events::kubernetes::reflector as internal_events;
-use futures::{
-    pin_mut,
-    stream::{Stream, StreamExt},
-};
+use futures::{pin_mut, stream::StreamExt};
 use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
-    Metadata, WatchOptional, WatchResponse,
+    Metadata, WatchOptional,
 };
 use snafu::Snafu;
 use std::convert::Infallible;
@@ -43,7 +40,7 @@ where
     <W as Watcher>::Object: Metadata<Ty = ObjectMeta> + Send,
     S: state::MaintainedWrite<Item = <W as Watcher>::Object>,
 {
-    /// Create a new [`Cache`].
+    /// Create a new [`Reflector`].
     pub fn new(
         watcher: W,
         state_writer: S,
@@ -77,12 +74,16 @@ where
     ) -> Result<Infallible, Error<<W as Watcher>::InvocationError, <W as Watcher>::StreamError>>
     {
         // Start the watch loop.
-        loop {
+        'outer: loop {
+            // For the next pause duration we won't get any updates.
+            // This is better than flooding k8s api server with requests.
+            delay_for(self.pause_between_requests).await;
+
             let invocation_result = self.issue_request().await;
             let stream = match invocation_result {
                 Ok(val) => val,
                 Err(watcher::invocation::Error::Desync { source }) => {
-                    emit!(internal_events::DesyncReceived { error: source });
+                    emit!(internal_events::InvocationDesyncReceived { error: source });
                     // We got desynced, reset the state and retry fetching.
                     self.resource_version.reset();
                     self.state_writer.resync().await;
@@ -97,7 +98,7 @@ where
 
             pin_mut!(stream);
             loop {
-                // Obtain an value from the watch stream.
+                // Obtain a value from the watch stream.
                 // If maintenance is requested, we perform it concurrently
                 // to reading items from the watch stream.
                 let maintenance_request = self.state_writer.maintenance_request();
@@ -115,9 +116,27 @@ where
                 trace!(message = "Got an item from watch stream.");
 
                 if let Some(item) = val {
-                    // A new item arrived from the watch response stream
-                    // first - process it.
-                    self.process_stream_item(item).await?;
+                    let response = match item {
+                        // We got a stream-level desync error, abort the stream
+                        // and handle the desync.
+                        Err(watcher::stream::Error::Desync { source }) => {
+                            emit!(internal_events::StreamDesyncReceived { error: source });
+                            // We got desynced, reset the state and retry fetching.
+                            self.resource_version.reset();
+                            self.state_writer.resync().await;
+                            continue 'outer;
+                        }
+                        // Any other streaming error means the protocol is in
+                        // an unxpected state.
+                        // This is considered a fatal error, do not attempt
+                        // to retry and just quit.
+                        Err(watcher::stream::Error::Other { source }) => {
+                            return Err(Error::Streaming { source });
+                        }
+                        // A fine watch respose arrived, we just pass it down.
+                        Ok(val) => val,
+                    };
+                    self.process_watch_event(response).await;
                 } else {
                     // Response stream has ended.
                     // Break the watch reading loop so the flow can
@@ -125,10 +144,6 @@ where
                     break;
                 }
             }
-
-            // For the next pause duration we won't get any updates.
-            // This is better than flooding k8s api server with requests.
-            delay_for(self.pause_between_requests).await;
         }
     }
 
@@ -150,31 +165,7 @@ where
     }
 
     /// Process an item from the watch response stream.
-    async fn process_stream_item(
-        &mut self,
-        item: <<W as Watcher>::Stream as Stream>::Item,
-    ) -> Result<(), Error<<W as Watcher>::InvocationError, <W as Watcher>::StreamError>> {
-        // Any streaming error means the protocol is in an unxpected
-        // state. This is considered a fatal error, do not attempt
-        // to retry and just quit.
-        let response = item.map_err(|source| Error::Streaming { source })?;
-
-        // Unpack the event.
-        let event = match response {
-            WatchResponse::Ok(event) => event,
-            WatchResponse::Other(_) => {
-                // Even though we could parse the response, we didn't
-                // get the data we expected on the wire.
-                // According to the rules, we just ignore the unknown
-                // responses. This may be a newly added piece of data
-                // our code doesn't know of.
-                // TODO: add more details on the data here if we
-                // encounter these messages in practice.
-                warn!(message = "Got unexpected data in the watch response.");
-                return Ok(());
-            }
-        };
-
+    async fn process_watch_event(&mut self, event: WatchEvent<<W as Watcher>::Object>) {
         // Prepare a resource version candidate so we can update (aka commit) it
         // later.
         let resource_version_candidate = match resource_version::Candidate::from_watch_event(&event)
@@ -183,7 +174,7 @@ where
             None => {
                 // This event doesn't have a resource version, this means
                 // it's not something we care about.
-                return Ok(());
+                return;
             }
         };
 
@@ -193,8 +184,6 @@ where
         // Record the resourse version for this event, so when we resume
         // it won't be redelivered.
         self.resource_version.update(resource_version_candidate);
-
-        Ok(())
     }
 
     /// Translate received watch event to the state update.
@@ -258,7 +247,7 @@ mod tests {
     use k8s_openapi::{
         api::core::v1::Pod,
         apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
-        Metadata, WatchResponse,
+        Metadata,
     };
     use std::time::Duration;
 
@@ -302,7 +291,13 @@ mod tests {
 
     // A helper enum to encode expected mock watcher invocation.
     enum ExpInvRes {
-        Stream(Vec<WatchEvent<Pod>>),
+        Stream(Vec<ExpStmRes>),
+        Desync,
+    }
+
+    // A helper enum to encode expected mock watcher stream.
+    enum ExpStmRes {
+        Item(WatchEvent<Pod>),
         Desync,
     }
 
@@ -368,16 +363,16 @@ mod tests {
                 vec![],
                 None,
                 ExpInvRes::Stream(vec![
-                    WatchEvent::Added(make_pod("uid0", "10")),
-                    WatchEvent::Added(make_pod("uid1", "15")),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
                 ]),
             ),
             (
                 vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
                 Some("15".to_owned()),
                 ExpInvRes::Stream(vec![
-                    WatchEvent::Modified(make_pod("uid0", "20")),
-                    WatchEvent::Added(make_pod("uid2", "25")),
+                    ExpStmRes::Item(WatchEvent::Modified(make_pod("uid0", "20"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid2", "25"))),
                 ]),
             ),
             (
@@ -387,9 +382,9 @@ mod tests {
                     make_pod("uid2", "25"),
                 ],
                 Some("25".to_owned()),
-                ExpInvRes::Stream(vec![WatchEvent::Bookmark {
+                ExpInvRes::Stream(vec![ExpStmRes::Item(WatchEvent::Bookmark {
                     resource_version: "50".into(),
-                }]),
+                })]),
             ),
             (
                 vec![
@@ -399,8 +394,8 @@ mod tests {
                 ],
                 Some("50".to_owned()),
                 ExpInvRes::Stream(vec![
-                    WatchEvent::Deleted(make_pod("uid2", "55")),
-                    WatchEvent::Modified(make_pod("uid0", "60")),
+                    ExpStmRes::Item(WatchEvent::Deleted(make_pod("uid2", "55"))),
+                    ExpStmRes::Item(WatchEvent::Modified(make_pod("uid0", "60"))),
                 ]),
             ),
         ];
@@ -410,9 +405,9 @@ mod tests {
         run_flow_test(invocations, expected_resulting_state).await;
     }
 
-    // Test the properies of the flow with desync.
+    // Test the properies of the flow with desync during invocation.
     #[tokio::test]
-    async fn desync_test() {
+    async fn invocation_desync_test() {
         trace_init();
 
         let invocations = vec![
@@ -420,8 +415,8 @@ mod tests {
                 vec![],
                 None,
                 ExpInvRes::Stream(vec![
-                    WatchEvent::Added(make_pod("uid0", "10")),
-                    WatchEvent::Added(make_pod("uid1", "15")),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
                 ]),
             ),
             (
@@ -433,14 +428,105 @@ mod tests {
                 vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
                 None,
                 ExpInvRes::Stream(vec![
-                    WatchEvent::Added(make_pod("uid20", "1000")),
-                    WatchEvent::Added(make_pod("uid21", "1005")),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid20", "1000"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid21", "1005"))),
                 ]),
             ),
             (
                 vec![make_pod("uid20", "1000"), make_pod("uid21", "1005")],
                 Some("1005".to_owned()),
-                ExpInvRes::Stream(vec![WatchEvent::Modified(make_pod("uid21", "1010"))]),
+                ExpInvRes::Stream(vec![ExpStmRes::Item(WatchEvent::Modified(make_pod(
+                    "uid21", "1010",
+                )))]),
+            ),
+        ];
+        let expected_resulting_state = vec![make_pod("uid20", "1000"), make_pod("uid21", "1010")];
+
+        // Use standard flow test logic.
+        run_flow_test(invocations, expected_resulting_state).await;
+    }
+
+    // Test the properies of the flow with desync during stream when bare desync arrives.
+    #[tokio::test]
+    async fn stream_desync_test_bare() {
+        trace_init();
+
+        let invocations = vec![
+            (
+                vec![],
+                None,
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
+                ]),
+            ),
+            (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
+                Some("15".to_owned()),
+                ExpInvRes::Stream(vec![ExpStmRes::Desync]),
+            ),
+            (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
+                None,
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid20", "1000"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid21", "1005"))),
+                ]),
+            ),
+            (
+                vec![make_pod("uid20", "1000"), make_pod("uid21", "1005")],
+                Some("1005".to_owned()),
+                ExpInvRes::Stream(vec![ExpStmRes::Item(WatchEvent::Modified(make_pod(
+                    "uid21", "1010",
+                )))]),
+            ),
+        ];
+        let expected_resulting_state = vec![make_pod("uid20", "1000"), make_pod("uid21", "1010")];
+
+        // Use standard flow test logic.
+        run_flow_test(invocations, expected_resulting_state).await;
+    }
+
+    // Test the properies of the flow with desync during stream when desync arrives after an item.
+    #[tokio::test]
+    async fn stream_desync_test_with_item() {
+        trace_init();
+
+        let invocations = vec![
+            (
+                vec![],
+                None,
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
+                ]),
+            ),
+            (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
+                Some("15".to_owned()),
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid2", "20"))),
+                    ExpStmRes::Desync,
+                ]),
+            ),
+            (
+                vec![
+                    make_pod("uid0", "10"),
+                    make_pod("uid1", "15"),
+                    make_pod("uid2", "20"),
+                ],
+                None,
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid20", "1000"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid21", "1005"))),
+                ]),
+            ),
+            (
+                vec![make_pod("uid20", "1000"), make_pod("uid21", "1005")],
+                Some("1005".to_owned()),
+                ExpInvRes::Stream(vec![ExpStmRes::Item(WatchEvent::Modified(make_pod(
+                    "uid21", "1010",
+                )))]),
             ),
         ];
         let expected_resulting_state = vec![make_pod("uid20", "1000"), make_pod("uid21", "1010")];
@@ -557,11 +643,16 @@ mod tests {
         let watcher = InstrumentingWatcher::new(watcher);
 
         // Prepare reflector.
+        let pause_between_requests = Duration::from_secs(1);
         let mut reflector =
-            Reflector::new(watcher, state_writer, None, None, Duration::from_secs(1));
+            Reflector::new(watcher, state_writer, None, None, pause_between_requests);
 
         // Run test logic.
         let logic = tokio::spawn(async move {
+            // Advance the time to scroll pass the delay between
+            // the invocations.
+            tokio::time::advance(pause_between_requests * 2).await;
+
             // Wait for watcher to request next invocation.
             assert!(matches!(
                 watcher_events_rx.next().await.unwrap(),
@@ -583,8 +674,8 @@ mod tests {
 
             // Send pod addition to a stream.
             watch_stream_tx
-                .send(mock_watcher::ScenarioActionStream::Ok(WatchResponse::Ok(
-                    WatchEvent::Added(make_pod("uid0", "10")),
+                .send(mock_watcher::ScenarioActionStream::Ok(WatchEvent::Added(
+                    make_pod("uid0", "10"),
                 )))
                 .await
                 .unwrap();
@@ -608,8 +699,8 @@ mod tests {
 
             // Send pod deletion to a stream.
             watch_stream_tx
-                .send(mock_watcher::ScenarioActionStream::Ok(WatchResponse::Ok(
-                    WatchEvent::Deleted(make_pod("uid0", "15")),
+                .send(mock_watcher::ScenarioActionStream::Ok(WatchEvent::Deleted(
+                    make_pod("uid0", "15"),
                 )))
                 .await
                 .unwrap();
@@ -663,6 +754,9 @@ mod tests {
                 .await
                 .unwrap();
 
+            // Advance the time to scroll pass the delay between
+            // the invocations.
+            tokio::time::advance(pause_between_requests * 2).await;
             // Wait for next invocation and send an error to terminate the
             // flow.
             assert!(matches!(
@@ -737,7 +831,7 @@ mod tests {
 
             // Send an error to the stream.
             watch_stream_tx
-                .send(mock_watcher::ScenarioActionStream::Err)
+                .send(mock_watcher::ScenarioActionStream::ErrOther)
                 .await
                 .unwrap();
         });
@@ -898,12 +992,28 @@ mod tests {
         // Run test logic.
         let logic = tokio::spawn(async move {
             // Process the invocations.
-            for (
+            'invocation: for (
                 expected_state_before_op,
                 expected_resource_version,
                 expected_invocation_response,
             ) in invocations
             {
+                // Validate that there's a delay before the invocation, and
+                // that some time has to pass before the actual invocation is
+                // issued.
+                // Wait for a quater of the expected delay, and assert that the
+                // invocation is still not yet requested.
+                tokio::time::advance(pause_between_requests / 4).await;
+                tokio::task::yield_now().await;
+                assert!(
+                    watcher_events_rx.try_next().is_err(),
+                    "expected a delay before the invocation, but it was called without a delay"
+                );
+
+                // Advance the time to scroll pass the delay between
+                // the invocations.
+                tokio::time::advance(pause_between_requests * 2).await;
+
                 // Wait for watcher to request next invocation.
                 let invocation_event = watcher_events_rx.next().await.unwrap();
 
@@ -922,9 +1032,9 @@ mod tests {
                 assert_eq!(watch_optional.resource_version, expected_resource_version);
 
                 // Determine the requested action from the test scenario.
-                let responses = match expected_invocation_response {
+                let actions = match expected_invocation_response {
                     // Stream is requested, continue with the current flow.
-                    ExpInvRes::Stream(responses) => responses,
+                    ExpInvRes::Stream(actions) => actions,
                     // Desync is requested, complete the invocation with the desync.
                     ExpInvRes::Desync => {
                         // Send the desync action to mock watcher.
@@ -945,20 +1055,37 @@ mod tests {
                     .await
                     .unwrap();
 
-                for response in responses {
+                for action in actions {
                     // Wait for watcher to request next item from the stream.
                     assert_eq!(
                         watcher_events_rx.next().await.unwrap(),
                         mock_watcher::ScenarioEvent::Stream
                     );
 
-                    // Send the requested action to the stream.
-                    watch_stream_tx
-                        .send(mock_watcher::ScenarioActionStream::Ok(WatchResponse::Ok(
-                            response,
-                        )))
-                        .await
-                        .unwrap();
+                    // Determine the requested action from the test scenario.
+                    match action {
+                        // Watch response is requested, send it to the stream.
+                        ExpStmRes::Item(response) => {
+                            // Send the requested action to the stream.
+                            watch_stream_tx
+                                .send(mock_watcher::ScenarioActionStream::Ok(response))
+                                .await
+                                .unwrap();
+                        }
+                        // Desync is requested, send it to the stream.
+                        ExpStmRes::Desync => {
+                            // Send the desync action to mock watcher.
+                            watch_stream_tx
+                                .send(mock_watcher::ScenarioActionStream::ErrDesync)
+                                .await
+                                .unwrap();
+                            // After the desync, expect the reflector to go
+                            // immediately to the next invocation, skipping the
+                            // rest of the stream content, and not polling it
+                            // anymore.
+                            continue 'invocation;
+                        }
+                    };
                 }
 
                 // Wait for watcher to request next item from the stream.
@@ -972,10 +1099,6 @@ mod tests {
                     .send(mock_watcher::ScenarioActionStream::Done)
                     .await
                     .unwrap();
-
-                // Advance the time to scroll pass the delay till next
-                // invocation.
-                tokio::time::advance(pause_between_requests * 2).await;
             }
 
             // We're done with the test! Shutdown the stream and force an

@@ -1,4 +1,4 @@
-mod file;
+pub mod file;
 mod generic;
 
 use super::{ProcessedBytesTotal, ProcessedEventsTotal};
@@ -16,11 +16,11 @@ pub enum SourceMetrics {
 }
 
 pub trait IntoSourceMetrics {
-    fn to_source_metrics(self, component_type: &str) -> SourceMetrics;
+    fn into_source_metrics(self, component_type: &str) -> SourceMetrics;
 }
 
 impl IntoSourceMetrics for Vec<Metric> {
-    fn to_source_metrics(self, component_type: &str) -> SourceMetrics {
+    fn into_source_metrics(self, component_type: &str) -> SourceMetrics {
         match component_type {
             "file" => SourceMetrics::FileSourceMetrics(file::FileSourceMetrics::new(self)),
             _ => SourceMetrics::GenericSourceMetrics(generic::GenericSourceMetrics::new(self)),

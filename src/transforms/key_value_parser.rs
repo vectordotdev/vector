@@ -1,11 +1,12 @@
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformDescription},
+    config::{log_schema, DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{KeyValueFieldDoesNotExist, KeyValueParseFailed, KeyValueTargetExists},
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use std::collections::HashMap;
 use std::str;
 
@@ -24,6 +25,7 @@ pub struct KeyValueConfig {
     pub trim_key: Option<String>,
     pub trim_value: Option<String>,
     pub types: HashMap<String, String>,
+    pub timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -35,8 +37,9 @@ impl_generate_config_from_default!(KeyValueConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "key_value_parser")]
 impl TransformConfig for KeyValueConfig {
-    async fn build(&self) -> crate::Result<Transform> {
-        let conversions = parse_conversion_map(&self.types)?;
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+        let timezone = self.timezone.unwrap_or(globals.timezone);
+        let conversions = parse_conversion_map(&self.types, timezone)?;
         let field = self
             .field
             .clone()
@@ -183,7 +186,7 @@ impl FunctionTransform for KeyValue {
 mod tests {
     use super::KeyValueConfig;
     use crate::{
-        config::TransformConfig,
+        config::{GlobalOptions, TransformConfig},
         event::{LogEvent, Value},
         Event,
     };
@@ -210,8 +213,9 @@ mod tests {
             overwrite_target: false,
             trim_key,
             trim_value,
+            timezone: Default::default(),
         }
-        .build()
+        .build(&GlobalOptions::default())
         .await
         .unwrap();
 
