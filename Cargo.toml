@@ -93,7 +93,7 @@ tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "f470db1b03
 
 # Metrics
 metrics = "=0.13.0-alpha.13"
-metrics-tracing-context = "=0.1.0-alpha.7"
+metrics-tracing-context = "=0.3.0"
 metrics-util = "=0.4.0-alpha.10"
 # Indirect dependency; benchmark regression detected; pinning until
 # https://github.com/timberio/vector/issues/6412 is resolved
