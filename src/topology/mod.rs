@@ -239,9 +239,6 @@ impl RunningTopology {
                 self.connect_diff(&diff, &mut new_pieces).await;
                 self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
-                #[cfg(feature = "api")]
-                // self.reattach_tap_sinks();
-
                 // We have successfully changed to new config.
                 return Ok(true);
             }
@@ -257,8 +254,6 @@ impl RunningTopology {
             {
                 self.connect_diff(&diff, &mut new_pieces).await;
                 self.spawn_diff(&diff, new_pieces);
-                #[cfg(feature = "api")]
-                // self.reattach_tap_sinks();
                 // We have successfully returned to old config.
                 return Ok(false);
             }
@@ -601,12 +596,9 @@ impl RunningTopology {
         self.outputs.remove(name);
 
         #[cfg(feature = "api")]
-        // If the API feature is enabled, loop through each tap sink and inform that the
-        // component has gone away. This will only affect components that the sink is
-        // actively observing; it will be ignored in all other instances.
         self.tap_sinks.iter().for_each(|tap_sink| {
-            let _ = tap_sink.component_gone_away(name);
-        });
+            tap_sink.component_went_away(name);
+        })
     }
 
     fn remove_inputs(&mut self, name: &str) {
@@ -656,6 +648,9 @@ impl RunningTopology {
         }
 
         self.outputs.insert(name.to_string(), output);
+
+        #[cfg(feature = "api")]
+        self.reattach_tap_sinks(name);
     }
 
     fn setup_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
@@ -740,6 +735,27 @@ impl RunningTopology {
     }
 
     #[cfg(feature = "api")]
+    fn reattach_tap_sinks(&mut self, input_name: &str) {
+        let input_name = input_name.to_string();
+
+        for tap_sink in self.tap_sinks.iter() {
+            if tap_sink.input_names().contains(&input_name) {
+                if let Some(tx) = self.outputs.get(&input_name) {
+                    if let Some((sink_name, sink)) = tap_sink.make_output(&input_name) {
+                        debug!(
+                            message = "Restarting tap",
+                            id = sink_name.as_str(),
+                            input = input_name.as_str()
+                        );
+                        tap_sink.component_came_back(&input_name);
+                        let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "api")]
     /// Attaches a tap sink.
     pub fn attach_tap_sink(&mut self, tap_sink: Arc<crate::api::tap::TapSink>) {
         // Keep a weak ref around in running topology. This will allow subsequent config
@@ -752,7 +768,7 @@ impl RunningTopology {
         // sink which will bubble up to the client.
         tap_sink.input_names().iter().for_each(|input_name| {
             if let Some(tx) = self.outputs.get(input_name) {
-                if let Ok((sink_name, sink)) = tap_sink.make_output(input_name) {
+                if let Some((sink_name, sink)) = tap_sink.make_output(input_name) {
                     debug!(
                         message = "Starting tap",
                         id = sink_name.as_str(),
@@ -761,8 +777,11 @@ impl RunningTopology {
                     let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
                 }
             } else {
-                debug!(message = "Invalid tap", input = input_name.as_str());
-                let _ = tap_sink.component_invalid(input_name);
+                debug!(
+                    message = "Waiting for tap component",
+                    input = input_name.as_str()
+                );
+                let _ = tap_sink.component_not_ready(input_name);
             }
         })
     }

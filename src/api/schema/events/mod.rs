@@ -1,66 +1,43 @@
 mod log;
+mod notification;
 
 use log::LogEvent;
 
 use crate::api::{
-    tap::{TapController, TapError, TapResult, TapSink},
+    tap::{TapController, TapNotification, TapResult, TapSink},
     ControlSender,
 };
-use async_graphql::{Context, Enum, SimpleObject, Subscription, Union};
+use async_graphql::{Context, Subscription, Union};
 use futures::{channel::mpsc, StreamExt};
 use tokio::{select, stream::Stream, time};
 
-#[derive(Enum, Copy, Clone, PartialEq, Eq)]
-/// Type of log event error
-pub enum LogEventErrorType {
-    /// Component name doesn't match a currently configured component
-    ComponentInvalid,
-    /// Component has been removed from topology
-    ComponentGoneAway,
-}
-
-#[derive(SimpleObject)]
-/// An error that occurred attempting to observe log events against a component
-pub struct LogEventError {
-    /// Name of the component associated with the error
-    component_name: String,
-
-    /// Type of log event error
-    error_type: LogEventErrorType,
-}
-
-impl LogEventError {
-    fn new(component_name: &str, error_type: LogEventErrorType) -> Self {
-        Self {
-            component_name: component_name.to_string(),
-            error_type,
-        }
-    }
-}
-
 #[derive(Union)]
-/// Log event result which can be a payload for log events, or an error.
+/// Log event result which can be a payload for log events, or an error
 pub enum LogEventResult {
+    /// Log event payload
     LogEvent(log::LogEvent),
-    Error(LogEventError),
+    /// Log notification
+    Notification(notification::LogEventNotification),
 }
 
 /// Convert an `api::TapResult` to the equivalent GraphQL type.
 impl From<TapResult> for LogEventResult {
     fn from(t: TapResult) -> Self {
+        use notification::{LogEventNotification, LogEventNotificationType};
+
         match t {
             TapResult::LogEvent(name, ev) => Self::LogEvent(LogEvent::new(&name, ev)),
-            TapResult::Error(name, err) => match err {
-                TapError::ComponentInvalid => Self::Error(LogEventError::new(
-                    &name,
-                    LogEventErrorType::ComponentInvalid,
-                )),
-                TapError::ComponentGoneAway => Self::Error(LogEventError::new(
-                    &name,
-                    LogEventErrorType::ComponentGoneAway,
-                )),
+            TapResult::Notification(name, n) => match n {
+                TapNotification::ComponentNotReady => Self::Notification(
+                    LogEventNotification::new(&name, LogEventNotificationType::ComponentNotReady),
+                ),
+                TapNotification::ComponentWentAway => Self::Notification(
+                    LogEventNotification::new(&name, LogEventNotificationType::ComponentWentAway),
+                ),
+                TapNotification::ComponentCameBack => Self::Notification(
+                    LogEventNotification::new(&name, LogEventNotificationType::ComponentCameBack),
+                ),
             },
-            TapResult::Stop => unreachable!(),
         }
     }
 }
@@ -70,8 +47,8 @@ pub struct EventsSubscription;
 
 #[Subscription]
 impl EventsSubscription {
-    /// A stream of component(s) log events
-    pub async fn log_events<'a>(
+    /// A stream of log events emitted from component(s)
+    pub async fn output_log_events<'a>(
         &'a self,
         ctx: &'a Context<'a>,
         component_names: Vec<String>,
@@ -82,6 +59,9 @@ impl EventsSubscription {
     }
 }
 
+/// Creates a log events stream based on component names, and a provided interval. Will emit
+/// control messages that bubble up the application if the sink goes away. The stream contains
+/// all matching events; filtering should be done at the caller level.
 fn create_log_events_stream(
     control_tx: ControlSender,
     component_names: &[String],
@@ -105,13 +85,10 @@ fn create_log_events_stream(
                 // Process `TapResults`s. A tap result could contain a `LogEvent` or an error; if
                 // we get an error, the subscription is dropped.
                 Some(tap) = rx.next() => {
-                    if let TapResult::Stop = tap {
-                        let _ = log_tx.start_send(results.drain(..).collect());
-                        break;
-                    }
                     results.push(tap.into());
                 }
                 _ = interval.tick() => {
+                    // If there are any existing results after the interval tick, emit.
                     if !results.is_empty() {
                         let _ = log_tx.start_send(results.drain(..).collect());
                     }

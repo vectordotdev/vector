@@ -4,7 +4,6 @@ use crate::{
     topology::fanout::RouterSink,
 };
 use futures::{channel::mpsc, SinkExt, StreamExt};
-use parking_lot::RwLock;
 use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
@@ -14,15 +13,29 @@ use uuid::Uuid;
 
 type TapSender = mpsc::UnboundedSender<TapResult>;
 
-pub enum TapError {
-    ComponentInvalid,
-    ComponentGoneAway,
+pub enum TapNotification {
+    ComponentNotReady,
+    ComponentWentAway,
+    ComponentCameBack,
 }
 
 pub enum TapResult {
     LogEvent(String, LogEvent),
-    Error(String, TapError),
-    Stop,
+    Notification(String, TapNotification),
+}
+
+impl TapResult {
+    pub fn component_not_ready(input_name: &str) -> Self {
+        Self::Notification(input_name.to_string(), TapNotification::ComponentNotReady)
+    }
+
+    pub fn component_went_away(input_name: &str) -> Self {
+        Self::Notification(input_name.to_string(), TapNotification::ComponentWentAway)
+    }
+
+    pub fn component_came_back(input_name: &str) -> Self {
+        Self::Notification(input_name.to_string(), TapNotification::ComponentCameBack)
+    }
 }
 
 pub enum TapControl {
@@ -32,7 +45,7 @@ pub enum TapControl {
 
 pub struct TapSink {
     id: Uuid,
-    inputs: RwLock<HashMap<String, Uuid>>,
+    inputs: HashMap<String, Uuid>,
     tap_tx: TapSender,
 }
 
@@ -47,21 +60,9 @@ impl TapSink {
 
         Self {
             id: Uuid::new_v4(),
-            inputs: RwLock::new(inputs),
+            inputs,
             tap_tx,
         }
-    }
-
-    pub fn input_names(&self) -> Vec<String> {
-        self.inputs.read().keys().cloned().collect()
-    }
-
-    pub fn inputs(&self) -> HashMap<String, Uuid> {
-        self.inputs
-            .read()
-            .iter()
-            .map(|(name, uuid)| (name.to_string(), *uuid))
-            .collect()
     }
 
     /// Internal function to build a `RouterSink` from an input name. This will spawn an async
@@ -82,39 +83,43 @@ impl TapSink {
         Box::new(event_tx.sink_map_err(|_| ()))
     }
 
-    pub fn make_output(&self, input_name: &str) -> Result<(String, RouterSink), ()> {
-        let lock = self.inputs.read();
-        let id = lock.get(input_name).ok_or(())?;
-
-        Ok((id.to_string(), self.make_router(input_name)))
+    fn send(&self, msg: TapResult) {
+        let _ = self.tap_tx.clone().start_send(msg);
     }
 
-    fn remove_input_result(&self, input_name: &str, result: TapResult) -> Option<Uuid> {
-        let mut lock = self.inputs.write();
-        let id = lock.remove(input_name)?;
-        let mut tx = self.tap_tx.clone();
+    pub fn input_names(&self) -> Vec<String> {
+        self.inputs.keys().cloned().collect()
+    }
 
-        let _ = tx.start_send(result);
+    pub fn inputs(&self) -> HashMap<String, Uuid> {
+        self.inputs
+            .iter()
+            .map(|(name, uuid)| (name.to_string(), *uuid))
+            .collect()
+    }
 
-        if lock.is_empty() {
-            let _ = tx.start_send(TapResult::Stop);
+    pub fn make_output(&self, input_name: &str) -> Option<(String, RouterSink)> {
+        let id = self.inputs.get(input_name)?;
+
+        Some((id.to_string(), self.make_router(input_name)))
+    }
+
+    pub fn component_not_ready(&self, input_name: &str) {
+        if self.inputs.contains_key(input_name) {
+            self.send(TapResult::component_not_ready(input_name))
         }
-
-        Some(id)
     }
 
-    pub fn component_invalid(&self, input_name: &str) -> Option<Uuid> {
-        self.remove_input_result(
-            input_name,
-            TapResult::Error(input_name.to_string(), TapError::ComponentInvalid),
-        )
+    pub fn component_went_away(&self, input_name: &str) {
+        if self.inputs.contains_key(input_name) {
+            self.send(TapResult::component_went_away(input_name))
+        }
     }
 
-    pub fn component_gone_away(&self, input_name: &str) -> Option<Uuid> {
-        self.remove_input_result(
-            input_name,
-            TapResult::Error(input_name.to_string(), TapError::ComponentGoneAway),
-        )
+    pub fn component_came_back(&self, input_name: &str) {
+        if self.inputs.contains_key(input_name) {
+            self.send(TapResult::component_came_back(input_name))
+        }
     }
 }
 
