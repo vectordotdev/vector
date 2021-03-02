@@ -1044,7 +1044,7 @@ version = "0.1.0"
 dependencies = [
  "bytes 0.5.6",
  "serde_json",
- "tokio-util",
+ "tokio-util 0.3.1",
  "tracing 0.1.25",
 ]
 
@@ -2662,7 +2662,7 @@ dependencies = [
  "indexmap",
  "slab",
  "tokio 0.2.25",
- "tokio-util",
+ "tokio-util 0.3.1",
  "tracing 0.1.25",
  "tracing-futures 0.2.5",
 ]
@@ -2683,7 +2683,7 @@ dependencies = [
  "slab",
  "tokio 1.2.0",
  "tokio-util 0.6.3",
- "tracing 0.1.23",
+ "tracing 0.1.25",
 ]
 
 [[package]]
