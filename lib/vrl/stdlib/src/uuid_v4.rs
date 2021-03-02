@@ -1,4 +1,8 @@
 use bytes::Bytes;
+#[cfg(feature = "wasm")]
+use uuid_wasm as uuid;
+#[cfg(not(feature = "wasm"))]
+use uuid_no_wasm as uuid;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
