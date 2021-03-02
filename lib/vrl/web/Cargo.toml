@@ -7,8 +7,7 @@ publish = false
 
 [dependencies]
 stdlib = { package = "vrl-stdlib", path = "../stdlib", default-features = false, features = ["wasm"] }
+thiserror = "1.0.24"
 vrl = { path = "../core" }
 wasm-logger = "0.2.0"
 yew = "0.17.4"
-serde_json = "1.0.64"
-thiserror = "1.0.24"

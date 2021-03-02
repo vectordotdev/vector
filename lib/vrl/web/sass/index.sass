@@ -1,15 +1,25 @@
 @import url(https://fonts.googleapis.com/css2?family=Roboto)
 
 $primary: rgb(0, 214, 243)
+$link: $primary
+$family-sans-serif: "Roboto", BlinkMacSystemFont, -apple-system, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", "Helvetica", "Arial", sans-serif
+$footer-background-color: black
+$footer-color: white
 
 @import ../node_modules/bulma/bulma
 
-body
-  font-family: "Roboto"
-
 .console-output
   background-color: black
-  color: $primary
+  color: lighten($primary, 10%)
+  font-weight: bold
   padding: 0.75rem
   font-size: 1rem
   border-radius: 0.5rem
+
+.page
+  display: flex
+  flex-direction: column
+  min-height: 100vh
+
+  .main
+    flex: 1

@@ -8,13 +8,7 @@ use yew::prelude::*;
 use yew::services::console::ConsoleService;
 
 #[derive(Debug, thiserror::Error)]
-enum Error {
-    #[error("json parsing error: {0}")]
-    Json(#[from] serde_json::Error),
-
-    #[error("program parsing error: {0}")]
-    Parse(String),
-}
+enum Error {}
 
 struct AppState {
     vrl_program: String,
@@ -74,10 +68,7 @@ impl Component for App {
         let initial_program = "".to_owned();
         let output = "".to_owned();
         let compiler_state = CompilerState::default();
-
-        let mut m: BTreeMap<String, Value> = BTreeMap::new();
-        m.insert("foo".into(), "bar".into());
-        let initial_value = Value::Object(m);
+        let initial_value = Self::initial_object();
 
         let app_state = AppState {
             vrl_program: initial_program,
@@ -116,56 +107,66 @@ impl Component for App {
     fn view(&self) -> Html {
         html! {
             <>
-                <nav class="navbar is-black" role="navigation">
-                    <div class="container">
-                        <div class="navbar-brand">
-                            <a class="navbar-item has-text-primary has-text-weight-bold" href="https://vrl.dev">
-                                { "Vector Remap Language" }
-                            </a>
-                        </div>
-                    </div>
-                </nav>
-
-                <section class="section">
-                    <div class="container">
-                        <div class="columns is-multiline is-8">
-                            <div class="column">
-                                <p class="is-size-2">
-                                    { "Program" }
-                                </p>
-
-                                <br />
-
-                                {self.view_input()}
+                <div class="page">
+                    <main class="main">
+                        <nav class="navbar is-black" role="navigation">
+                            <div class="container">
+                                <div class="navbar-brand">
+                                    <a class="navbar-item has-text-primary has-text-weight-bold" href="https://vrl.dev">
+                                        { "Vector Remap Language" }
+                                    </a>
+                                </div>
                             </div>
+                        </nav>
 
-                            <div class="column">
-                                <p class="is-size-2">
-                                    { "Object state" }
-                                </p>
+                        <section class="section">
+                            <div class="container">
+                                <div class="card">
+                                    <div class="card-content">
+                                        <div class="columns is-multiline is-8">
+                                            <div class="column">
+                                                <p class="title">
+                                                    { "Program" }
+                                                </p>
 
-                                <br />
+                                                {self.view_input()}
 
-                                <strong>
-                                    {self.current_object()}
-                                </strong>
+                                                {self.vrl_output()}
+                                            </div>
+
+                                            <div class="column">
+                                                {self.current_object()}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
+                        </section>
+                    </main>
+
+                    <footer class="footer">
+                        <div class="container">
+                            <p>
+                                { "Brought to you by the " }
+                                <a href="https://vector.dev" target="_blank">{ "Vector" }</a>
+                                { " team" }
+                            </p>
                         </div>
-                    </div>
-
-                    <br />
-                    <br />
-
-                    <div class="container">
-                        {self.vrl_output()}
-                    </div>
-                </section>
+                    </footer>
+                </div>
             </>
         }
     }
 }
 
 impl App {
+    fn initial_object() -> Value {
+        let mut m: BTreeMap<String, Value> = BTreeMap::new();
+        m.insert("message".into(), "<17>1 2021-03-02T11:03:23.201Z omnicorp.org mcnulty 6432 ID130 - Welp, this is not looking good".into());
+        m.insert("timestamp".into(), "2021-03-02T19:25:05.205732Z".into());
+        Value::Object(m)
+    }
+
     fn view_input(&self) -> Html {
         html! {
             <div class="control">
@@ -187,9 +188,23 @@ impl App {
     fn vrl_output(&self) -> Html {
         if &self.app_state.output != "" {
             html! {
-                <span class="console-output">
-                    {&self.app_state.output}
-                </span>
+                <>
+                    <br /><br />
+
+                    <div class="card">
+                        <div class="card-content">
+                            <p class="is-size-4">
+                                { "Output" }
+                            </p>
+
+
+
+                            <p class="console-output">
+                                {&self.app_state.output}
+                            </p>
+                        </div>
+                    </div>
+                </>
             }
         } else {
             html! {}
@@ -197,10 +212,18 @@ impl App {
     }
 
     fn current_object(&self) -> Html {
+        let value_as_string = self.app_state.current_value.to_string();
+
         html! {
-            <span>
-                {&self.app_state.current_value}
-            </span>
+            <>
+                <p class="title">
+                    { "Current event value" }
+                </p>
+
+                <p class="console-output">
+                    {value_as_string}
+                </p>
+            </>
         }
     }
 }
