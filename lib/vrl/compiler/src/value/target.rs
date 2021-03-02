@@ -165,7 +165,7 @@ impl Value {
                 .and_then(|map| fields.iter().find_map(|field| map.get(field.as_str()))),
             Index(index) => self.as_array().and_then(|array| {
                 let len = array.len() as i64;
-                if *index >= len || index.abs() - 1 >= len {
+                if *index >= len || index.abs() > len {
                     return None;
                 }
 
@@ -199,7 +199,7 @@ impl Value {
             }),
             Index(index) => self.as_array_mut().and_then(|array| {
                 let len = array.len() as i64;
-                if *index >= len || index.abs() - 1 >= len {
+                if *index >= len || index.abs() > len {
                     return None;
                 }
 
@@ -257,7 +257,7 @@ impl Value {
 
             Index(index) => self.as_array_mut().and_then(|array| {
                 let len = array.len() as i64;
-                if *index >= len || index.abs() - 1 >= len {
+                if *index >= len || index.abs() > len {
                     return None;
                 }
 
