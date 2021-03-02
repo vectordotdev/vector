@@ -282,9 +282,9 @@ test: ## Run the unit test suite
 
 .PHONY: test-components
 test-components: ## Test with all components enabled
-# TODO(jesse) add `wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
+# TODO(jesse) add `language-benches wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
 # test-components: $(WASM_MODULE_OUTPUTS)
-test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches remap-benches"
+test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches metrics-benches remap-benches"
 test-components: test
 
 .PHONY: test-all
@@ -643,6 +643,11 @@ check-kubernetes-yaml: ## Check that the generated Kubernetes YAML configs are u
 check-events: ## Check that events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events.sh
 
+##@ Rustdoc
+build-rustdoc: ## Build a subset of Vector's Rustdocs (as specified by the "docs" feature)
+	# This command is mostly intended for use by the build process in timberio/vector-rustdoc
+	${MAYBE_ENVIRONMENT_EXEC} cargo doc --no-deps --no-default-features --features docs
+
 ##@ Packaging
 
 # archives
@@ -778,6 +783,12 @@ release-helm: ## Package and release Helm Chart
 .PHONY: sync-install
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
+
+##@ Vector Remap Language
+
+.PHONY: test-vrl
+test-vrl: ## Run the VRL test suite
+	@scripts/test-vrl.sh
 
 ##@ Utility
 

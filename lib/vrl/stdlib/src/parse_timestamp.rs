@@ -1,4 +1,4 @@
-use shared::conversion::Conversion;
+use shared::{conversion::Conversion, TimeZone};
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -61,12 +61,14 @@ impl Expression for ParseTimestampFn {
         let format = self.format.resolve(ctx);
 
         match value {
-            Value::Bytes(v) => format
-                .map(|v| format!("timestamp|{}", String::from_utf8_lossy(&v.unwrap_bytes())))?
-                .parse::<Conversion>()
-                .map_err(|e| format!("{}", e))?
-                .convert(v)
-                .map_err(|e| e.to_string().into()),
+            Value::Bytes(v) => Conversion::parse(
+                format
+                    .map(|v| format!("timestamp|{}", String::from_utf8_lossy(&v.unwrap_bytes())))?,
+                TimeZone::Local,
+            )
+            .map_err(|e| format!("{}", e))?
+            .convert(v)
+            .map_err(|e| e.to_string().into()),
             Value::Timestamp(_) => Ok(value),
             _ => Err("unable to convert value to timestamp".into()),
         }

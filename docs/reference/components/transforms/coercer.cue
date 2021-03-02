@@ -59,7 +59,8 @@ components: transforms: coercer: {
 			warnings: []
 			type: bool: default: false
 		}
-		types: configuration._types
+		timezone: configuration._timezone
+		types:    configuration._types
 	}
 
 	examples: [

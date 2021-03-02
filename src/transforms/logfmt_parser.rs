@@ -6,6 +6,7 @@ use crate::{
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use std::collections::HashMap;
 use std::str;
 
@@ -15,6 +16,7 @@ pub struct LogfmtConfig {
     pub field: Option<String>,
     pub drop_field: bool,
     pub types: HashMap<String, String>,
+    pub timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -26,12 +28,13 @@ impl_generate_config_from_default!(LogfmtConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
-    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().into());
-        let conversions = parse_conversion_map(&self.types)?;
+        let timezone = self.timezone.unwrap_or(globals.timezone);
+        let conversions = parse_conversion_map(&self.types, timezone)?;
 
         Ok(Transform::function(Logfmt {
             field,
@@ -125,6 +128,7 @@ mod tests {
             field: None,
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
+            timezone: Default::default(),
         }
         .build(&GlobalOptions::default())
         .await

@@ -81,7 +81,8 @@ components: transforms: split: {
 				syntax: "literal"
 			}
 		}
-		types: configuration._types
+		timezone: configuration._timezone
+		types:    configuration._types
 	}
 
 	input: {

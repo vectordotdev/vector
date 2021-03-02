@@ -10,21 +10,21 @@
 #   │           this expression resolves to one of "string" or "null"
 #   │           but the parameter "value" expects the exact type "string"
 #   │
-#   = try: guard against invalid type at runtime
+#   = try: ensuring an appropriate type at runtime
 #   =
 #   =     .result[0].an = string!(.result[0].an)
-#   =     sha3(.result[0].an))
+#   =     sha3(.result[0].an)
 #   =
-#   = try: coerce with default value
+#   = try: coercing to an appropriate type and specifying a default value as a fallback in case coercion fails
 #   =
 #   =     .result[0].an = to_string(.result[0].an) ?? "default"
-#   =     sha3(.result[0].an))
+#   =     sha3(.result[0].an)
 #   =
-#   = see error handling documentation at: https://vector.dev/docs/reference/vrl/
-#   = learn more at: https://errors.vrl.dev/110
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = learn more about error code 110 at https://errors.vrl.dev/110
+#   = see language documentation at https://vrl.dev
 
 .result = parse_regex_all!(.message, r'(?P<an>an.)')
 .a = sha3(.result[0].an)
 
-"cant work since all array access is error prone"
+"can't work since all array access is error prone"

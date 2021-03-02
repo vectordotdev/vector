@@ -32,15 +32,21 @@ pub extern "C" fn process(data: u32, length: u32) -> u32 {
 
     // Perform the initial JSON parsing required to access the event, i.e.:
     // {"message": "...", "timestamp": "..."}
-    let initial_event: HashMap<String, Value> = serde_json::from_slice(data).unwrap();
+    let mut event: HashMap<String, Value> = serde_json::from_slice(data).unwrap();
 
-    let log_message = initial_event.get("message").unwrap().to_string();
+    let log_message = event
+        .get("message")
+        .expect("message field should exist")
+        .as_str()
+        .expect("message field should be a string");
 
     // This parses the extracted log message, which is assumed to be a valid JSON string, into JSON
-    let parsed_json: serde_json::Value = serde_json::from_str(&log_message).unwrap();
+    let parsed_json: HashMap<String, Value> = serde_json::from_str(&log_message).unwrap();
+
+    event.extend(parsed_json);
 
     // Covert the output into bytes
-    let output = serde_json::to_vec(&parsed_json).unwrap();
+    let output = serde_json::to_vec(&event).unwrap();
 
     hostcall::emit(output).unwrap();
 
