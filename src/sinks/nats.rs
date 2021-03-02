@@ -237,7 +237,6 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
-    use futures::stream::StreamExt;
     use std::{thread, time::Duration};
 
     #[tokio::test]
@@ -274,10 +273,10 @@ mod integration_tests {
         thread::sleep(Duration::from_secs(3));
         let _ = sub.drain().await.unwrap();
 
-        let output: Vec<String> = sub
-            .map(|msg| String::from_utf8_lossy(&msg.data).to_string())
-            .collect()
-            .await;
+        let mut output: Vec<String> = Vec::new();
+        while let Some(msg) = sub.next().await {
+            output.push(String::from_utf8_lossy(&msg.data).to_string())
+        }
 
         assert_eq!(output.len(), input.len());
         assert_eq!(output, input);
