@@ -7,9 +7,8 @@ use crate::api::{
     ControlSender,
 };
 use async_graphql::{Context, Enum, SimpleObject, Subscription, Union};
-use async_stream::stream;
 use futures::{channel::mpsc, StreamExt};
-use tokio::stream::Stream;
+use tokio::{select, stream::Stream, time};
 
 #[derive(Enum, Copy, Clone, PartialEq, Eq)]
 /// Type of log event error
@@ -76,25 +75,50 @@ impl EventsSubscription {
         &'a self,
         ctx: &'a Context<'a>,
         component_names: Vec<String>,
-    ) -> impl Stream<Item = LogEventResult> + 'a {
+        #[graphql(default = 500)] interval: i32,
+    ) -> impl Stream<Item = Vec<LogEventResult>> + 'a {
         let control_tx = ctx.data_unchecked::<ControlSender>().clone();
+        create_log_events_stream(control_tx, &component_names, interval)
+    }
+}
 
-        let (tx, mut rx) = mpsc::unbounded();
-        let tap_sink = TapSink::new(&component_names, tx);
+fn create_log_events_stream(
+    control_tx: ControlSender,
+    component_names: &[String],
+    interval: i32,
+) -> impl Stream<Item = Vec<LogEventResult>> {
+    let (tx, mut rx) = mpsc::unbounded();
+    let (mut log_tx, log_rx) = mpsc::unbounded::<Vec<LogEventResult>>();
 
-        stream! {
-            // The tap controller is scoped to the stream. When it's dropped, it bubbles a control
-            // message up to the signal handler to remove the ad hoc sinks from topology.
-            let _control = TapController::new(control_tx, tap_sink);
+    let tap_sink = TapSink::new(&component_names, tx);
 
-            // Process `TapResults`s. A tap result could contain a `LogEvent` or an error; if
-            // we get an error, the subscription is dropped.
-            while let Some(tap) = rx.next().await {
-                if let TapResult::Stop = tap {
-                    break;
+    tokio::spawn(async move {
+        // The tap controller is scoped to the stream. When it's dropped, it bubbles a control
+        // message up to the signal handler to remove the ad hoc sinks from topology.
+        let _control = TapController::new(control_tx, tap_sink);
+
+        let mut interval = time::interval(time::Duration::from_millis(interval as u64));
+        let mut results: Vec<LogEventResult> = vec![];
+
+        loop {
+            select! {
+                // Process `TapResults`s. A tap result could contain a `LogEvent` or an error; if
+                // we get an error, the subscription is dropped.
+                Some(tap) = rx.next() => {
+                    if let TapResult::Stop = tap {
+                        let _ = log_tx.start_send(results.drain(..).collect());
+                        break;
+                    }
+                    results.push(tap.into());
                 }
-                yield tap.into();
+                _ = interval.tick() => {
+                    if !results.is_empty() {
+                        let _ = log_tx.start_send(results.drain(..).collect());
+                    }
+                }
             }
         }
-    }
+    });
+
+    log_rx
 }

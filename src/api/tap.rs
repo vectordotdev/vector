@@ -92,10 +92,12 @@ impl TapSink {
     fn remove_input_result(&self, input_name: &str, result: TapResult) -> Option<Uuid> {
         let mut lock = self.inputs.write();
         let id = lock.remove(input_name)?;
-        let _ = self.tap_tx.clone().start_send(result);
+        let mut tx = self.tap_tx.clone();
+
+        let _ = tx.start_send(result);
 
         if lock.is_empty() {
-            let _ = self.tap_tx.clone().start_send(TapResult::Stop);
+            let _ = tx.start_send(TapResult::Stop);
         }
 
         Some(id)

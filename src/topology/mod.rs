@@ -599,10 +599,14 @@ impl RunningTopology {
 
     fn remove_outputs(&mut self, name: &str) {
         self.outputs.remove(name);
+
         #[cfg(feature = "api")]
-        for tap_sink in self.tap_sinks.iter() {
+        // If the API feature is enabled, loop through each tap sink and inform that the
+        // component has gone away. This will only affect components that the sink is
+        // actively observing; it will be ignored in all other instances.
+        self.tap_sinks.iter().for_each(|tap_sink| {
             let _ = tap_sink.component_gone_away(name);
-        }
+        });
     }
 
     fn remove_inputs(&mut self, name: &str) {
@@ -758,7 +762,7 @@ impl RunningTopology {
                 }
             } else {
                 debug!(message = "Invalid tap", input = input_name.as_str());
-                tap_sink.component_invalid(input_name);
+                let _ = tap_sink.component_invalid(input_name);
             }
         })
     }
