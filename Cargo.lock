@@ -8153,7 +8153,6 @@ dependencies = [
  "metrics-tracing-context",
  "metrics-util",
  "mongodb",
- "nats",
  "nix 0.19.1",
  "nom 6.1.2",
  "notify",
