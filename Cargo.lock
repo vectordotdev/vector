@@ -8479,6 +8479,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "vrl-web"
+version = "0.1.0"
+
+[[package]]
 name = "vte"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
