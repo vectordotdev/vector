@@ -7,6 +7,14 @@ This directory houses the assets used to build the VRL web app.
 * [npm]
 * [Trunk]
 
+## Setup
+
+Install npm assets:
+
+```bash
+npm i
+```
+
 ## Build
 
 ```bash
