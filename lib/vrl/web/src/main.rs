@@ -1,25 +1,27 @@
 #![recursion_limit="1024"]
 
-use vrl::{diagnostic::Formatter, state, Runtime, Value};
+use std::collections::BTreeMap;
+use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 use yew::events::KeyboardEvent;
 use yew::prelude::*;
 use yew::services::console::ConsoleService;
 
 #[derive(Debug, thiserror::Error)]
 enum Error {
-    #[error("json parsing error")]
+    #[error("json parsing error: {0}")]
     Json(#[from] serde_json::Error),
 
-    #[error("program parsing error")]
+    #[error("program parsing error: {0}")]
     Parse(String),
 
-    #[error("runtime error {0}")]
+    #[error("runtime error: {0}")]
     Runtime(String),
 }
 
 struct State {
     program: String,
     output: String,
+    value: Value,
 }
 
 struct App {
@@ -48,7 +50,11 @@ impl Component for App {
         let program = String::new();
         let output = String::new();
 
-        let state = State { program, output };
+        let mut m: BTreeMap<String, Value> = BTreeMap::new();
+        m.insert("foo".into(), "bar".into());
+        let value = Value::Object(m);
+
+        let state = State { program, output, value };
 
         Self { link, state }
     }
@@ -65,7 +71,7 @@ impl Component for App {
             Compile => {
                 log(&format!("Current program: {}", self.state.program));
 
-                match parse_input(&self.state.program) {
+                match parse_input(&mut self.state.value, &self.state.program) {
                     Ok(res) => {
                         log_s(format!("OK: {}", res));
                     }
@@ -118,6 +124,15 @@ impl Component for App {
                             </div>
                         </div>
                     </div>
+
+                    <br />
+                    <br />
+
+                    <div class="container">
+                        <p>
+                            {self.state.value.clone()}
+                        </p>
+                    </div>
                 </section>
             </>
         }
@@ -152,9 +167,7 @@ impl App {
     }
 }
 
-fn parse_input(source: &str) -> Result<Value, Error> {
-    let object = &mut Value::Null;
-
+fn parse_input(object: &mut impl Target, source: &str) -> Result<Value, Error> {
     let state = state::Runtime::default();
     let mut runtime = Runtime::new(state);
     let program = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
