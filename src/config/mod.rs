@@ -56,7 +56,7 @@ pub struct Config {
     expansions: IndexMap<String, Vec<String>>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(default)]
 pub struct GlobalOptions {
     #[serde(default = "default_data_dir")]
