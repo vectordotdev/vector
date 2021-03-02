@@ -6,7 +6,7 @@ edition = "2018"
 publish = false
 
 [dependencies]
-stdlib = { package = "vrl-stdlib", path = "../stdlib", default-features = false, features = ["append", "decode_base64", "encode_base64"] }
+stdlib = { package = "vrl-stdlib", path = "../stdlib", default-features = false, features = ["wasm"] }
 vrl = { path = "../core" }
 wasm-logger = "0.2.0"
 yew = "0.17.4"
