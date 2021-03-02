@@ -1,9 +1,6 @@
 use dashmap::DashMap;
 use std::fmt;
-use std::{
-    sync::atomic::{AtomicUsize, Ordering},
-    time::Instant,
-};
+use std::time::Instant;
 use tracing_core::{
     callsite::Identifier,
     field::{display, Field, Value, Visit},
@@ -12,6 +9,10 @@ use tracing_core::{
     Event, Metadata, Subscriber,
 };
 use tracing_subscriber::layer::{Context, Layer};
+
+#[cfg(test)]
+#[macro_use]
+extern crate tracing;
 
 const RATE_LIMIT_SECS_FIELD: &str = "internal_log_rate_secs";
 const COMPONENT_NAME_FIELD: &str = "component_name";
@@ -41,7 +42,7 @@ where
 {
     pub fn new(layer: L) -> Self {
         RateLimitedLayer {
-            events: DashMap::new(),
+            events: Default::default(),
             inner: layer,
             _subscriber: std::marker::PhantomData,
         }
@@ -133,11 +134,9 @@ where
             component_name,
         };
 
-        //let mut events = self.events.lock().expect("lock poisoned!");
-
-        let state = self.events.entry(id.clone()).or_insert(State {
+        let mut state = self.events.entry(id.clone()).or_insert(State {
             start: Instant::now(),
-            count: AtomicUsize::new(0),
+            count: 0,
             // if this is None, then a non-integer was passed as the rate limit
             limit: limit_visitor
                 .limit
@@ -147,13 +146,16 @@ where
                 .unwrap_or_else(|| event.metadata().name().into()),
         });
 
+        let prev = state.count;
+        state.count = state.count + 1;
+
         //check if we are still rate limiting
         if state.start.elapsed().as_secs() < state.limit.get() {
             // check and increment the current count
             // if 0: this is the first message, just pass it through
             // if 1: this is the first rate limited message
             // otherwise supress it until the rate limit expires
-            match state.count.fetch_add(1, Ordering::Relaxed) {
+            match prev {
                 0 => self.inner.on_event(event, ctx),
                 1 => {
                     // output first rate limited log
@@ -165,20 +167,20 @@ where
             }
         } else {
             // done rate limiting
-            let count = state.count.load(Ordering::Relaxed);
 
-            // avoid outputting a message if the event wasn't rate limited
-            if count > 1 {
+            // output a message if any events were rate limited
+            if prev > 1 {
                 let message = format!(
                     "Internal log [{}] has been rate limited {} times.",
                     state.message,
-                    count - 1
+                    prev - 1
                 );
 
                 self.create_event(&ctx, metadata, message, state.limit);
             }
             self.inner.on_event(event, ctx);
-            self.events.remove(&id);
+            state.start = Instant::now();
+            state.count = 1;
         }
     }
 
@@ -241,7 +243,7 @@ where
 #[derive(Debug)]
 struct State {
     start: Instant,
-    count: AtomicUsize,
+    count: u64,
     limit: std::num::NonZeroU64,
     message: String,
 }
@@ -299,5 +301,136 @@ impl Visit for LimitVisitor {
         }
     }
 
-    fn record_debug(&mut self, _field: &Field, _value: &dyn fmt::Debug) {}
+    fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
+        if field.name() == MESSAGE_FIELD {
+            self.message = Some(format!("{:?}", value));
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+    use tracing_subscriber::layer::SubscriberExt;
+
+    #[derive(Default)]
+    struct RecordingLayer<S> {
+        events: Arc<Mutex<Vec<String>>>,
+
+        _subscriber: std::marker::PhantomData<S>,
+    }
+
+    impl<S> RecordingLayer<S> {
+        fn new(events: Arc<Mutex<Vec<String>>>) -> Self {
+            RecordingLayer {
+                events,
+
+                _subscriber: std::marker::PhantomData,
+            }
+        }
+    }
+
+    impl<S> Layer<S> for RecordingLayer<S>
+    where
+        S: Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+    {
+        fn register_callsite(&self, _metadata: &'static Metadata<'static>) -> Interest {
+            Interest::always()
+        }
+
+        fn enabled(&self, _metadata: &Metadata<'_>, _ctx: Context<'_, S>) -> bool {
+            true
+        }
+
+        fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+            let mut visitor = LimitVisitor::default();
+            event.record(&mut visitor);
+
+            let mut events = self.events.lock().unwrap();
+            events.push(visitor.message.unwrap_or("".to_string()));
+        }
+    }
+
+    #[test]
+    fn rate_limits() {
+        let events: Arc<Mutex<Vec<String>>> = Default::default();
+
+        let recorder = RecordingLayer::new(Arc::clone(&events));
+        let sub =
+            tracing_subscriber::registry::Registry::default().with(RateLimitedLayer::new(recorder));
+        tracing::subscriber::with_default(sub, || {
+            for _ in 0..21 {
+                info!(message = "Hello world!", internal_log_rate_secs = 1);
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        });
+
+        let events = events.lock().unwrap();
+
+        assert_eq!(
+            *events,
+            vec![
+                "Hello world!",
+                "Internal log [Hello world!] is being rate limited.",
+                "Internal log [Hello world!] has been rate limited 9 times.",
+                "Hello world!",
+                "Internal log [Hello world!] is being rate limited.",
+                "Internal log [Hello world!] has been rate limited 9 times.",
+                "Hello world!",
+            ]
+            .into_iter()
+            .map(std::borrow::ToOwned::to_owned)
+            .collect::<Vec<String>>()
+        );
+    }
+
+    #[test]
+    fn rate_limit_by_component_name() {
+        let events: Arc<Mutex<Vec<String>>> = Default::default();
+
+        let recorder = RecordingLayer::new(Arc::clone(&events));
+        let sub =
+            tracing_subscriber::registry::Registry::default().with(RateLimitedLayer::new(recorder));
+        tracing::subscriber::with_default(sub, || {
+            for _ in 0..21 {
+                for key in &["foo", "bar"] {
+                    let span = info_span!("span", component_name = &key);
+                    let _enter = span.enter();
+                    info!(
+                        message = format!("Hello {}!", key).as_str(),
+                        internal_log_rate_secs = 1
+                    );
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        });
+
+        let events = events.lock().unwrap();
+
+        dbg!(&events);
+
+        assert_eq!(
+            *events,
+            vec![
+                "Hello foo!",
+                "Hello bar!",
+                "Internal log [Hello foo!] is being rate limited.",
+                "Internal log [Hello bar!] is being rate limited.",
+                "Internal log [Hello foo!] has been rate limited 9 times.",
+                "Hello foo!",
+                "Internal log [Hello bar!] has been rate limited 9 times.",
+                "Hello bar!",
+                "Internal log [Hello foo!] is being rate limited.",
+                "Internal log [Hello bar!] is being rate limited.",
+                "Internal log [Hello foo!] has been rate limited 9 times.",
+                "Hello foo!",
+                "Internal log [Hello bar!] has been rate limited 9 times.",
+                "Hello bar!",
+            ]
+            .into_iter()
+            .map(std::borrow::ToOwned::to_owned)
+            .collect::<Vec<String>>()
+        );
+    }
 }
