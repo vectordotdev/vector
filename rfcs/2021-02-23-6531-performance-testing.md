@@ -57,7 +57,7 @@ processes in our work on Vector:
 
 Vector's primary optimization target is **throughput**. All other concerns being
 equal, Vector will choose to optimize toward this goal. However, unlike with
-pcorrectness testing, other concerns are not always equal and we may decide to
+correctness testing, other concerns are not always equal and we may decide to
 intentionally regress performance to achieve other aims.
 
 ## Motivation
@@ -524,7 +524,7 @@ working on Vector performance as a full-time concern to have an initial ramp
 sprint.
 
 Completion criteria: My aim in my own ramp sprint will be to deepen my
-understanding of the codebase by pursuing low-hanging fruit present in
+understanding of the code base by pursuing low-hanging fruit present in
 flamegraph traces of the project for representative workload, see test-harness
 section below, pair with people on their PRs and stub out documentation notes on
 performance work in Vector.
@@ -594,7 +594,7 @@ http sink will be our **primary sources of measure**. The source will record its
 **per second** throughput (lines, bytes) in a manner that DOES avoid coordinated
 omission. Files will be rotated by the generator after +100Mb have been written
 to them. Rotated files will be rotated for five iterations, then deleted. The
-HTTP sink will record the **per second** throughtput (lines, bytes) received
+HTTP sink will record the **per second** throughput (lines, bytes) received
 from Vector. No attempt will be made to verify the correctness of
 transmission. Each peer will run in the same VM but isolated into different
 cgroups with isolated resources.
@@ -630,12 +630,12 @@ total runtime and etc.
 
 #### Backfill Performance Tests
 
-The value of our performance tests comes in their comparisson with previous
+The value of our performance tests comes in their comparison with previous
 results. We must have the ability to "backfill" results for new benchmarks or
 for when we substantially change our benchmark approach.
 
 Completion criteria: We will backfill our performance tests far back enough to
-give a reasonable trendline. In cases where compatibility has been broken
+give a reasonable trend-line. In cases where compatibility has been broken
 between vector releases we'll support alternate configuration where reasonable.
 
 #### Expand Side-Channel Data
@@ -651,7 +651,7 @@ into a comparable state. We may also explore eBPF tracing to track syscall
 counts.
 
 Completion criteria: Our aim with collecting side-channel data is to provide
-comparisson between versions. If, for instance, the test is sensitive to context
+comparison between versions. If, for instance, the test is sensitive to context
 switches how have context switches changed between versions and to what degree
 can we inject new telemetry into Vector to measure (and reduce) this behavior?
 While collecting information is useful the main result here will be tooling to
