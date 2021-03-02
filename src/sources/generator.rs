@@ -1,15 +1,15 @@
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::{metric::{Metric, MetricKind, MetricValue}, Event},
+    event::{
+        metric::{Metric, MetricKind, MetricValue},
+        Event,
+    },
     internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
     Pipeline,
 };
 use chrono::Utc;
-use fakedata::{
-    logs::*,
-    random_counter,
-};
+use fakedata::{logs::*, random_counter};
 use futures::{stream::StreamExt, SinkExt};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -53,7 +53,7 @@ pub enum OutputFormat {
     Metrics {
         namespace: String,
         names: Vec<String>,
-    }
+    },
 }
 
 impl OutputFormat {
@@ -109,9 +109,13 @@ impl OutputFormat {
             .map(|name| {
                 let value = random_counter(1, 100);
 
-                Metric::new(name, MetricKind::Incremental, MetricValue::Counter { value })
-                    .with_namespace(Some(namespace))
-                    .with_timestamp(Some(Utc::now()))
+                Metric::new(
+                    name,
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value },
+                )
+                .with_namespace(Some(namespace))
+                .with_timestamp(Some(Utc::now()))
             })
             .map(Event::from)
             .collect()
@@ -386,7 +390,8 @@ mod tests {
             r#"format = "metrics"
             namespace = "vector"
             names = ["cool_points"]"#,
-        ).await;
+        )
+        .await;
 
         for _ in 0..5 {
             assert!(matches!(rx.try_recv(), Ok(_)));

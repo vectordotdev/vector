@@ -209,4 +209,3 @@ fn username() -> String {
 fn syslog_version() -> String {
     random_in_range(1, 3)
 }
-
