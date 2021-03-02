@@ -1,27 +1,19 @@
 # object: { "message": "bananas and another ant" }
 # result:
 #
-# error[E110]: invalid argument type
-#   ┌─ :3:11
+# error[E103]: unhandled fallible assignment
+#   ┌─ :3:6
 #   │
 # 3 │ .a = sha3(.result[0].an)
-#   │           ^^^^^^^^^^^^^
-#   │           │
-#   │           this expression resolves to one of "string" or "null"
-#   │           but the parameter "value" expects the exact type "string"
+#   │ ---- ^^^^^^^^^^^^^^^^^^^
+#   │ │    │
+#   │ │    this expression is fallible
+#   │ │    update the expression to be infallible
+#   │ or change this to an infallible assignment:
+#   │ .a, err = sha3(.result[0].an)
 #   │
-#   = try: ensuring an appropriate type at runtime
-#   =
-#   =     .result[0].an = string!(.result[0].an)
-#   =     sha3(.result[0].an)
-#   =
-#   = try: coercing to an appropriate type and specifying a default value as a fallback in case coercion fails
-#   =
-#   =     .result[0].an = to_string(.result[0].an) ?? "default"
-#   =     sha3(.result[0].an)
-#   =
 #   = see documentation about error handling at https://errors.vrl.dev/#handling
-#   = learn more about error code 110 at https://errors.vrl.dev/110
+#   = learn more about error code 103 at https://errors.vrl.dev/103
 #   = see language documentation at https://vrl.dev
 
 .result = parse_regex_all!(.message, r'(?P<an>an.)')

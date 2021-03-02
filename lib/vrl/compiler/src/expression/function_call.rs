@@ -9,6 +9,7 @@ use std::fmt;
 pub struct FunctionCall {
     abort_on_error: bool,
     expr: Box<dyn Expression>,
+    maybe_fallible_arguments: bool,
 
     // used for enhancing runtime error messages (using abort-instruction).
     //
@@ -86,6 +87,7 @@ impl FunctionCall {
             .map(|arg| format!("{:?}", arg))
             .collect::<Vec<_>>();
 
+        let mut maybe_fallible_arguments = false;
         for node in arguments {
             let (argument_span, argument) = node.take();
 
@@ -118,7 +120,9 @@ impl FunctionCall {
 
             // Check if the argument is of the expected type.
             let expr_kind = argument.type_def(state).kind();
-            if !parameter.kind().contains(expr_kind) {
+            let param_kind = parameter.kind();
+
+            if !param_kind.intersects(expr_kind) {
                 return Err(Error::InvalidArgumentKind {
                     function_ident: function.identifier(),
                     abort_on_error,
@@ -128,6 +132,8 @@ impl FunctionCall {
                     argument,
                     argument_span,
                 });
+            } else if !param_kind.contains(expr_kind) {
+                maybe_fallible_arguments = true;
             }
 
             // Check if the argument is infallible.
@@ -159,11 +165,15 @@ impl FunctionCall {
             .compile(list)
             .map_err(|error| Error::Compilation { call_span, error })?;
 
+        let mut type_def = expr.type_def(state);
+
+        if maybe_fallible_arguments {
+            type_def.fallible = true;
+        }
+
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the
         // resulting program incorrectly convey this function call might fail.
-        let type_def = expr.type_def(state);
-
         if abort_on_error && !type_def.is_fallible() {
             return Err(Error::AbortInfallible {
                 ident_span,
@@ -172,9 +182,10 @@ impl FunctionCall {
         }
 
         Ok(Self {
-            span: call_span,
             abort_on_error,
             expr,
+            maybe_fallible_arguments,
+            span: call_span,
             arguments_fmt,
             arguments_dbg,
             ident: function.identifier(),
@@ -185,9 +196,10 @@ impl FunctionCall {
         let expr = Box::new(Noop) as _;
 
         Self {
-            span: Span::default(),
             abort_on_error: false,
             expr,
+            maybe_fallible_arguments: false,
+            span: Span::default(),
             arguments_fmt: vec![],
             arguments_dbg: vec![],
             ident: "noop",
@@ -212,6 +224,66 @@ impl Expression for FunctionCall {
 
     fn type_def(&self, state: &State) -> TypeDef {
         let mut type_def = self.expr.type_def(state);
+
+        // If one of the arguments only partially matches the function type
+        // definition, then we mark the entire function as fallible.
+        //
+        // This allows for progressive type-checking, by handling any potential
+        // type error the function throws, instead of having to enforce
+        // exact-type invariants for individual arguments.
+        //
+        // That is, this program triggers the `InvalidArgumentKind` error:
+        //
+        //     slice(10, 1)
+        //
+        // This is because `slice` expects either a string or an array, but it
+        // receives an integer. The concept of "progressive type checking" does
+        // not apply in this case, because this call can never succeed.
+        //
+        // However, given these example events:
+        //
+        //     { "foo": "bar" }
+        //     { "foo": 10.5 }
+        //
+        // If we were to run the same program, but against the `foo` field:
+        //
+        //     slice(.foo, 1)
+        //
+        // In this situation, progressive type checking _does_ make sense,
+        // because we can't know at compile-time what the eventual value of
+        // `.foo` will be. We mark `.foo` as "any", which includes the "array"
+        // and "string" types, so the program can now be made infallible by
+        // handling any potential type error the function returns:
+        //
+        //     slice(.foo, 1) ?? []
+        //
+        // Note that this rule doesn't just apply to "any" kind (in fact, "any"
+        // isn't a kind, it's simply a term meaning "all possible VRL values"),
+        // but it applies whenever there's an _intersection_ but not an exact
+        // _match_ between two types.
+        //
+        // Here's another example to demonstrate this:
+        //
+        //     { "foo": "foobar" }
+        //     { "foo": ["foo", "bar"] }
+        //     { "foo": 10.5 }
+        //
+        //     foo = slice(.foo, 1) ?? .foo
+        //     .foo = upcase(foo) ?? foo
+        //
+        // This would result in the following outcomes:
+        //
+        //     { "foo": "OOBAR" }
+        //     { "foo": ["bar", "baz"] }
+        //     { "foo": 10.5 }
+        //
+        // For the first event, both the `slice` and `upcase` functions succeed.
+        // For the second event, only the `slice` function succeeds.
+        // For the third event, both functions fail.
+        //
+        if self.maybe_fallible_arguments {
+            type_def.fallible = true;
+        }
 
         if self.abort_on_error {
             type_def.fallible = false;

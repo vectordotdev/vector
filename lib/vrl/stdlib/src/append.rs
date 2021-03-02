@@ -47,8 +47,8 @@ struct AppendFn {
 
 impl Expression for AppendFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let mut value = self.value.resolve(ctx)?.unwrap_array();
-        let mut items = self.items.resolve(ctx)?.unwrap_array();
+        let mut value = self.value.resolve(ctx)?.try_array()?;
+        let mut items = self.items.resolve(ctx)?.try_array()?;
 
         value.append(&mut items);
 
