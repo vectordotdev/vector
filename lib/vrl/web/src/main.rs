@@ -1,6 +1,7 @@
 #![recursion_limit = "1024"]
 
 use std::collections::BTreeMap;
+use std::convert::Into;
 use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 use yew::events::KeyboardEvent;
 use yew::prelude::*;
@@ -13,20 +14,43 @@ enum Error {
 
     #[error("program parsing error: {0}")]
     Parse(String),
-
-    #[error("runtime error: {0}")]
-    Runtime(String),
 }
 
-struct State {
-    program: String,
+struct AppState {
+    vrl_program: String,
     output: String,
-    value: Value,
+    current_value: Value,
 }
 
 struct App {
     link: ComponentLink<Self>,
-    state: State,
+    app_state: AppState,
+    processor: Processor,
+}
+
+
+struct Processor {
+    runtime: Runtime,
+}
+
+impl Processor {
+    fn new() -> Self {
+        let state = state::Runtime::default();
+        let runtime = Runtime::new(state);
+
+        Self { runtime }
+    }
+
+    fn parse_input(&mut self, object: &mut impl Target, source: &str) -> String {
+        let program = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
+            Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+        }).unwrap();
+
+        match (&mut self.runtime).resolve(object, &program) {
+            Ok(obj) => obj.to_string(),
+            Err(err) => err.to_string()
+        }
+    }
 }
 
 enum Action {
@@ -38,51 +62,42 @@ fn log(msg: &str) {
     ConsoleService::info(msg)
 }
 
-fn log_s(s: String) {
-    ConsoleService::info(&s)
-}
-
 impl Component for App {
     type Message = Action;
     type Properties = ();
 
     fn create(_: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let program = String::new();
-        let output = String::new();
+        let initial_program = "".to_owned();
+        let output = "".to_owned();
 
         let mut m: BTreeMap<String, Value> = BTreeMap::new();
         m.insert("foo".into(), "bar".into());
-        let value = Value::Object(m);
+        let initial_value = Value::Object(m);
 
-        let state = State {
-            program,
+        let app_state = AppState {
+            vrl_program: initial_program,
             output,
-            value,
+            current_value: initial_value,
         };
 
-        Self { link, state }
+        let processor = Processor::new();
+
+        Self { link, app_state, processor }
     }
 
     fn update(&mut self, action: Self::Message) -> ShouldRender {
         use Action::*;
 
-        log("Updated...");
-
         match action {
             Update(program) => {
-                self.state.program = program;
+                self.app_state.vrl_program = program;
             }
             Compile => {
-                log(&format!("Current program: {}", self.state.program));
+                log(&format!("Current program: {}", self.app_state.vrl_program));
 
-                match parse_input(&mut self.state.value, &self.state.program) {
-                    Ok(res) => {
-                        log_s(format!("OK: {}", res));
-                    }
-                    Err(err) => {
-                        log_s(format!("Error: {}", err));
-                    }
-                }
+                let result = self.processor.parse_input(&mut self.app_state.current_value, &self.app_state.vrl_program);
+
+                self.app_state.output = result;
             }
         }
 
@@ -121,10 +136,14 @@ impl Component for App {
 
                             <div class="column">
                                 <p class="is-size-2">
-                                    { "Output" }
+                                    { "Object state" }
                                 </p>
 
-                                {self.compiled_output()}
+                                <br />
+
+                                <strong>
+                                    {self.current_object()}
+                                </strong>
                             </div>
                         </div>
                     </div>
@@ -133,9 +152,7 @@ impl Component for App {
                     <br />
 
                     <div class="container">
-                        <p>
-                            {self.state.value.clone()}
-                        </p>
+                        {self.vrl_output()}
                     </div>
                 </section>
             </>
@@ -150,7 +167,7 @@ impl App {
                 <input
                     type="text"
                     class="input"
-                    value=&self.state.program
+                    value=&self.app_state.vrl_program
                     oninput=self.link.callback(|input: InputData| {
                         Action::Update(input.value)
                     })
@@ -162,25 +179,25 @@ impl App {
         }
     }
 
-    fn compiled_output(&self) -> Html {
-        html! {
-            <p>
-                {&self.state.output}
-            </p>
+    fn vrl_output(&self) -> Html {
+        if &self.app_state.output != "" {
+            html! {
+                <span class="console-output">
+                    {&self.app_state.output}
+                </span>
+            }
+        } else {
+            html! {}
         }
     }
-}
 
-fn parse_input(object: &mut impl Target, source: &str) -> Result<Value, Error> {
-    let state = state::Runtime::default();
-    let mut runtime = Runtime::new(state);
-    let program = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
-        Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
-    })?;
-
-    runtime
-        .resolve(object, &program)
-        .map_err(|err| Error::Runtime(err.to_string()))
+    fn current_object(&self) -> Html {
+        html! {
+            <span>
+                {&self.app_state.current_value}
+            </span>
+        }
+    }
 }
 
 fn main() {

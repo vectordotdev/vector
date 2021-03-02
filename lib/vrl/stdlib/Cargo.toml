@@ -195,7 +195,7 @@ upcase = []
 uuid_v4 = ["bytes", "uuid"]
 
 # The set of functions that are WebAssembly compatible (used by vrl-web in ../web)
-# Currently incompatible functions: get_hostname, parse_grok, uuid_v4
+# Currently incompatible functions: get_hostname, parse_grok
 wasm = [
   "append",
   "array",
