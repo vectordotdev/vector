@@ -185,7 +185,7 @@ logfmt = { version = "0.0.2", optional = true }
 lru = { version = "0.6.3", optional = true }
 maxminddb = { version = "0.17.0", optional = true }
 mongodb = { version = "1.1.1", optional = true }
-nats = { version = "0.8.6", optional = true }
+async-nats = { version = "0.9.4", optional = true }
 nom = { version = "6.0.1", optional = true }
 notify = "4.0.14"
 num_cpus = "1.10.0"
@@ -536,7 +536,7 @@ sinks-influxdb = ["bytesize"]
 sinks-kafka = []
 sinks-logdna = ["bytesize"]
 sinks-loki = ["bytesize", "uuid"]
-sinks-nats = ["nats"]
+sinks-nats = ["async-nats"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-papertrail = ["syslog"]
 sinks-prometheus = ["prometheus-parser", "snap", "sources-utils-tls"]

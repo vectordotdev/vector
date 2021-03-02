@@ -364,6 +364,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-nats"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1368b1e781af424c247edee8d29eb967439da4ebb2d676a6e67411880d4c9d92"
+dependencies = [
+ "blocking",
+ "nats",
+]
+
+[[package]]
 name = "async-net"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -398,17 +408,6 @@ dependencies = [
  "once_cell",
  "signal-hook 0.3.4",
  "winapi 0.3.9",
-]
-
-[[package]]
-name = "async-rustls"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f38092e8f467f47aadaff680903c7cbfeee7926b058d7f40af2dd4c878fbdee"
-dependencies = [
- "futures-lite",
- "rustls 0.18.1",
- "webpki",
 ]
 
 [[package]]
@@ -766,7 +765,7 @@ dependencies = [
  "mio-named-pipes",
  "pin-project 0.4.27",
  "rustls 0.18.1",
- "rustls-native-certs",
+ "rustls-native-certs 0.4.0",
  "serde",
  "serde_derive",
  "serde_json",
@@ -3152,7 +3151,7 @@ dependencies = [
  "hyper 0.13.10",
  "log",
  "rustls 0.18.1",
- "rustls-native-certs",
+ "rustls-native-certs 0.4.0",
  "tokio 0.2.25",
  "tokio-rustls 0.14.1",
  "webpki",
@@ -4302,28 +4301,27 @@ dependencies = [
 
 [[package]]
 name = "nats"
-version = "0.8.6"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14b716f15b711daea70d5da9195f5c10063d2a14d74b8dba256f8eb6d45d8b29"
+checksum = "3845d2bb3e0e01a6074589b5789ec1079253418356275ae437235683085a8848"
 dependencies = [
- "async-channel",
- "async-executor",
- "async-io",
- "async-lock",
- "async-net",
- "async-rustls",
  "base64 0.13.0",
  "base64-url",
+ "crossbeam-channel 0.5.0",
  "fastrand",
- "futures-lite",
  "itoa",
  "json",
+ "libc",
  "log",
  "nkeys",
  "nuid",
  "once_cell",
+ "parking_lot",
  "regex",
- "rustls-native-certs",
+ "rustls 0.19.0",
+ "rustls-native-certs 0.5.0",
+ "webpki",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -6212,6 +6210,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "064fd21ff87c6e87ed4506e68beb42459caa4a0e2eb144932e6776768556980b"
+dependencies = [
+ "base64 0.13.0",
+ "log",
+ "ring",
+ "sct",
+ "webpki",
+]
+
+[[package]]
 name = "rustls-native-certs"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6221,6 +6232,18 @@ dependencies = [
  "rustls 0.18.1",
  "schannel",
  "security-framework 1.0.0",
+]
+
+[[package]]
+name = "rustls-native-certs"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a07b7c1885bd8ed3831c289b7870b13ef46fe0e856d288c30d9cc17d75a2092"
+dependencies = [
+ "openssl-probe",
+ "rustls 0.19.0",
+ "schannel",
+ "security-framework 2.0.0",
 ]
 
 [[package]]
@@ -8159,6 +8182,7 @@ dependencies = [
  "async-compression",
  "async-graphql",
  "async-graphql-warp",
+ "async-nats",
  "async-stream",
  "async-trait",
  "atty",
@@ -8223,7 +8247,6 @@ dependencies = [
  "metrics-tracing-context",
  "metrics-util",
  "mongodb",
- "nats",
  "nix 0.19.1",
  "nom 6.1.2",
  "notify",
