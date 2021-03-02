@@ -1,4 +1,4 @@
-#![recursion_limit="1024"]
+#![recursion_limit = "1024"]
 
 use std::collections::BTreeMap;
 use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
@@ -54,7 +54,11 @@ impl Component for App {
         m.insert("foo".into(), "bar".into());
         let value = Value::Object(m);
 
-        let state = State { program, output, value };
+        let state = State {
+            program,
+            output,
+            value,
+        };
 
         Self { link, state }
     }
