@@ -17,15 +17,15 @@ lazy_static::lazy_static! {
 
 /// Loads Log Schema from configurations and sets global schema.
 /// Once this is done, configurations can be correctly loaded using
-/// seted log schema.
-/// If deny seted, will panic if schema has already been seted.
+/// configured log schema defaults.
+/// If deny is set, will panic if schema has already been set.
 pub fn init_log_schema(
     config_paths: &[(PathBuf, FormatHint)],
-    deny_seted: bool,
+    deny_if_set: bool,
 ) -> Result<(), Vec<String>> {
     let (builder, _) = load_builder_from_paths(config_paths)?;
 
-    if LOG_SCHEMA.set(builder.global.log_schema).is_err() && deny_seted {
+    if LOG_SCHEMA.set(builder.global.log_schema).is_err() && deny_if_set {
         panic!("Couldn't set schema");
     }
 
