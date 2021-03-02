@@ -30,14 +30,29 @@ strip-ansi-escapes = { version = "0.1", optional = true }
 syslog_loose = { version = "0.10", optional = true }
 tracing = { version = "0.1", optional = true }
 url = { version = "2", optional = true }
-uuid = { version = "0.8", features = ["v4"], optional = true }
+uuid-no-wasm =  { package = "uuid", version = "0.8", features = ["v4"], optional = true }
+uuid-wasm = { package = "uuid", version = "0.8", features = ["v4", "wasm-bindgen"], optional = true }
 
 [dev-dependencies]
 anyhow = "1"
 criterion = "0.3"
 
 [features]
-default = [
+# The standard default build (for use in Vector and vrl-cli) isn't Wasm compatible
+default = ["wasm_neutral", "wasm_incompatible"]
+wasm_incompatible = ["get_hostname", "parse_grok", "uuid_v4_no_wasm"]
+
+# The Wasm-compatible build removes the parse_grok and get_hostname functions
+# and uses a Wasm-compatible version of the uuid_v4 function
+wasm = ["wasm_neutral", "wasm_compatible"]
+wasm_compatible = ["uuid_v4_wasm"]
+
+# uuid_v4 has a Wasm-compatible and -incompatible variant
+uuid_v4_no_wasm = ["bytes", "uuid-no-wasm"]
+uuid_v4_wasm = ["bytes", "uuid-wasm"]
+
+# Most VRL functions are "Wasm neutral"
+wasm_neutral = [
     "append",
     "array",
     "assert",
@@ -57,7 +72,6 @@ default = [
     "format_number",
     "format_timestamp",
     "get_env_var",
-    "get_hostname",
     "includes",
     "integer",
     "ip_cidr_contains",
@@ -79,7 +93,6 @@ default = [
     "parse_common_log",
     "parse_duration",
     "parse_glog",
-    "parse_grok",
     "parse_json",
     "parse_key_value",
     "parse_regex_all",
@@ -113,7 +126,6 @@ default = [
     "timestamp",
     "truncate",
     "upcase",
-    "uuid_v4",
 ]
 
 array = []
@@ -192,7 +204,7 @@ to_unix_timestamp = ["chrono"]
 timestamp = []
 truncate = []
 upcase = []
-uuid_v4 = ["bytes", "uuid"]
+# See above for the uuid_v4 function, which has two versions
 
 [lib]
 bench = false
