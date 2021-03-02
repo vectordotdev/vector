@@ -2,7 +2,7 @@ use super::util::MultilineConfig;
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     line_agg,
-    rusoto::{self, RegionOrEndpoint},
+    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -46,7 +46,10 @@ struct AwsS3Config {
 
     sqs: Option<sqs::Config>,
 
+    // Deprecated name. Moved to auth.
     assume_role: Option<String>,
+    #[serde(default)]
+    auth: AWSAuthentication,
 
     multiline: Option<MultilineConfig>,
 }
@@ -101,10 +104,11 @@ impl AwsS3Config {
         let region: Region = (&self.region).try_into().context(RegionParse {})?;
 
         let client = rusoto::client().with_context(|| Client {})?;
-        let creds: Arc<rusoto::AwsCredentialsProvider> =
-            rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())
-                .context(Credentials {})?
-                .into();
+        let creds: Arc<rusoto::AwsCredentialsProvider> = self
+            .auth
+            .build(&region, self.assume_role.clone())
+            .context(Credentials {})?
+            .into();
         let s3_client = S3Client::new_with(
             client.clone(),
             Arc::<rusoto::AwsCredentialsProvider>::clone(&creds),

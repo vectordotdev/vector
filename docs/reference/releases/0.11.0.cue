@@ -17,8 +17,8 @@ releases: "0.11.0": {
 		{
 			title: "Vector's own observability"
 			description: """
-				The next Vector release (0.12.0) will focus on Vector's own	internal
-				observability. We've got some _very_ exciting features planned for this.
+				We will be working to improve Vector's own observability with high-quality internal metrics, logs,
+				CLI tools, and dashboards. This will likely be the focus of 0.13.
 				"""
 		},
 		{
@@ -36,13 +36,13 @@ releases: "0.11.0": {
 		{
 			title:       "Vector Remap Language (VRL)"
 			description: """
-				Finally, 0.13 will introduce the new Vector Remap Language.	This is a
+				Finally, 0.12 will introduce the new Vector Remap Language.	This is a
 				Rust-native syntax designed for safe and efficient data mapping. It's an
 				ultra-performant middle ground between fundamental transforms like
 				`add_fields` and a full blown runtime like `lua`.
 
 				If interested, you can beta test via the [`remap` transform](\(urls.vector_remap_transform))
-				and use the [Vector Remap Language reference](\(urls.vector_remap_language_reference))
+				and use the [Vector Remap Language reference](\(urls.vrl_reference))
 				to write scripts.
 				"""
 		},

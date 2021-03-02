@@ -1,7 +1,0 @@
-status = [
-    "ci",
-]
-delete_merged_branches = true
-use_squash_merge = true
-cut_body_after = "---"
-timeout_sec = 43200

@@ -23,7 +23,7 @@ where
     T: super::Write + Send,
     <T as super::Write>::Item: Send + Sync,
 {
-    /// Take a [`super::Write`] and return it wrapped with [`Self`].
+    /// Take a [`super::Write`] and return it wrapped with [`Writer`].
     pub fn new(inner: T, sleep: Duration) -> Self {
         let queue = VecDeque::new();
         Self {

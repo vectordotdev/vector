@@ -1,4 +1,8 @@
-use crate::{config::log_schema, event::Value, Event};
+use crate::{
+    config::log_schema,
+    event::{Metric, Value},
+    Event,
+};
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
@@ -149,12 +153,14 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
                 .get(1)
                 .map(|s| s.as_str().trim())
                 .expect("src should match regex");
-            if let Some(val) = event.as_log().get(&key) {
-                val.to_string_lossy()
-            } else {
+            match event {
+                Event::Log(log) => log.get(&key).map(|val| val.to_string_lossy()),
+                Event::Metric(metric) => render_metric_field(key, metric),
+            }
+            .unwrap_or_else(|| {
                 missing_fields.push(key.to_owned());
                 String::new()
-            }
+            })
         })
         .into_owned();
     if missing_fields.is_empty() {
@@ -164,12 +170,25 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
     }
 }
 
+fn render_metric_field(key: &str, metric: &Metric) -> Option<String> {
+    match key {
+        "name" => Some(metric.name().into()),
+        "namespace" => metric.namespace().map(Into::into),
+        _ if key.starts_with("tags.") => metric
+            .series
+            .tags
+            .as_ref()
+            .and_then(|tags| tags.get(&key[5..]).cloned()),
+        _ => None,
+    }
+}
+
 fn render_timestamp(src: &str, event: &Event) -> String {
     let timestamp = match event {
         Event::Log(log) => log
             .get(log_schema().timestamp_key())
             .and_then(Value::as_timestamp),
-        _ => None,
+        Event::Metric(metric) => metric.data.timestamp.as_ref(),
     };
     if let Some(ts) = timestamp {
         ts.format(src).to_string()
@@ -218,7 +237,9 @@ impl Serialize for Template {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::{MetricKind, MetricValue};
     use chrono::TimeZone;
+    use shared::btreemap;
 
     #[test]
     fn get_fields() {
@@ -264,7 +285,7 @@ mod tests {
     }
 
     #[test]
-    fn render_static() {
+    fn render_log_static() {
         let event = Event::from("hello world");
         let template = Template::try_from("foo").unwrap();
 
@@ -272,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic() {
+    fn render_log_dynamic() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("log_stream", "stream");
         let template = Template::try_from("{{log_stream}}").unwrap();
@@ -281,7 +302,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_with_prefix() {
+    fn render_log_dynamic_with_prefix() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("log_stream", "stream");
         let template = Template::try_from("abcd-{{log_stream}}").unwrap();
@@ -290,7 +311,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_with_postfix() {
+    fn render_log_dynamic_with_postfix() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("log_stream", "stream");
         let template = Template::try_from("{{log_stream}}-abcd").unwrap();
@@ -299,7 +320,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_missing_key() {
+    fn render_log_dynamic_missing_key() {
         let event = Event::from("hello world");
         let template = Template::try_from("{{log_stream}}-{{foo}}").unwrap();
 
@@ -310,7 +331,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_multiple_keys() {
+    fn render_log_dynamic_multiple_keys() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("baz", "quux");
@@ -323,7 +344,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_weird_junk() {
+    fn render_log_dynamic_weird_junk() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("baz", "quux");
@@ -336,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    fn render_timestamp_strftime_style() {
+    fn render_log_timestamp_strftime_style() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
@@ -348,7 +369,7 @@ mod tests {
     }
 
     #[test]
-    fn render_timestamp_multiple_strftime_style() {
+    fn render_log_timestamp_multiple_strftime_style() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
@@ -363,7 +384,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_with_strftime() {
+    fn render_log_dynamic_with_strftime() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
@@ -379,7 +400,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_with_nested_strftime() {
+    fn render_log_dynamic_with_nested_strftime() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
@@ -395,7 +416,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_with_reverse_nested_strftime() {
+    fn render_log_dynamic_with_reverse_nested_strftime() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
@@ -408,6 +429,66 @@ mod tests {
             Ok(Bytes::from("nested foo 04:05:06")),
             template.render(&event)
         )
+    }
+
+    #[test]
+    fn render_metric_timestamp() {
+        let template = Template::try_from("timestamp %F %T").unwrap();
+
+        assert_eq!(
+            Ok(Bytes::from("timestamp 2002-03-04 05:06:07")),
+            template.render(&sample_metric().into())
+        );
+    }
+
+    #[test]
+    fn render_metric_with_tags() {
+        let template = Template::try_from("name={{name}} component={{tags.component}}").unwrap();
+        let metric = sample_metric().with_tags(Some(
+            btreemap! { "test" => "true", "component" => "template" },
+        ));
+        assert_eq!(
+            Ok(Bytes::from("name=a-counter component=template")),
+            template.render(&metric.into())
+        );
+    }
+
+    #[test]
+    fn render_metric_without_tags() {
+        let template = Template::try_from("name={{name}} component={{tags.component}}").unwrap();
+        assert_eq!(
+            Err(vec!["tags.component".into()]),
+            template.render(&sample_metric().into())
+        );
+    }
+
+    #[test]
+    fn render_metric_with_namespace() {
+        let template = Template::try_from("namespace={{namespace}} name={{name}}").unwrap();
+        let metric = sample_metric().with_namespace(Some("vector-test"));
+        assert_eq!(
+            Ok(Bytes::from("namespace=vector-test name=a-counter")),
+            template.render(&metric.into())
+        );
+    }
+
+    #[test]
+    fn render_metric_without_namespace() {
+        let template = Template::try_from("namespace={{namespace}} name={{name}}").unwrap();
+        let metric = sample_metric();
+        assert_eq!(
+            Err(vec!["namespace".into()]),
+            template.render(&metric.into())
+        );
+    }
+
+    fn sample_metric() -> Metric {
+        Metric::new(
+            "a-counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.1 },
+        )
+        .with_timestamp(Some(Utc.ymd(2002, 3, 4).and_hms(5, 6, 7)))
     }
 
     #[test]

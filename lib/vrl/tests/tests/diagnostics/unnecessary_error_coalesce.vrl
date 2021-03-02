@@ -1,0 +1,14 @@
+# result:
+#
+# error[E651]: unnecessary error coalescing operation
+#   ┌─ :2:1
+#   │
+# 2 │ "foo" ?? "bar"
+#   │ ^^^^^ -- ----- this expression never resolves
+#   │ │     │
+#   │ │     remove this error coalescing operation
+#   │ this expression can't fail
+#   │
+#   = see language documentation at https://vrl.dev
+
+"foo" ?? "bar"

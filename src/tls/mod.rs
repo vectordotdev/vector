@@ -1,10 +1,10 @@
-use crate::tcp::TcpKeepaliveConfig;
+use crate::tcp::{self, TcpKeepaliveConfig};
 use openssl::{
     error::ErrorStack,
     ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
 };
 use snafu::{ResultExt, Snafu};
-use std::{fmt::Debug, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{fmt::Debug, net::SocketAddr, path::PathBuf};
 use tokio::net::TcpStream;
 use tokio_openssl::SslStream;
 
@@ -135,6 +135,30 @@ impl MaybeTlsStream<TcpStream> {
         };
 
         // stream.set_keepalive(keepalive.time_secs.map(Duration::from_secs))?;
+
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    pub fn set_send_buffer_bytes(&mut self, bytes: usize) -> std::io::Result<()> {
+        let stream = match self {
+            Self::Raw(raw) => raw,
+            Self::Tls(tls) => tls.get_ref(),
+        };
+
+        tcp::set_send_buffer_size(stream, bytes);
+
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    pub fn set_receive_buffer_bytes(&mut self, bytes: usize) -> std::io::Result<()> {
+        let stream = match self {
+            Self::Raw(raw) => raw,
+            Self::Tls(tls) => tls.get_ref(),
+        };
+
+        tcp::set_receive_buffer_size(stream, bytes);
 
         Ok(())
     }

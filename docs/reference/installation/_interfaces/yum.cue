@@ -6,6 +6,11 @@ installation: _interfaces: yum: {
 		The [Yellowdog Updater](\(urls.yum)), Modified (YUM) is a free and
 		open-source command-line package-manager for Linux operating system
 		using the RPM Package Manager.
+
+		Our Yum repositories are provided by
+		[Cloudsmith](\(urls.cloudsmith)) and you
+		can find [instructions for manually adding
+		the repositories](\(urls.cloudsmith_yum)).
 		"""
 
 	archs: ["x86_64", "ARM64", "ARMv7"]
@@ -16,8 +21,8 @@ installation: _interfaces: yum: {
 		config:      "/etc/vector/vector.{config_format}"
 	}
 
-	roles: [Name=string]: {
-		commands: roles._systemd_commands & {
+	role_implementations: [Name=string]: {
+		commands: role_implementations._systemd_commands & {
 			_config_path: paths.config
 			add_repo: #"""
 				curl -1sLf \
@@ -51,8 +56,8 @@ installation: _interfaces: yum: {
 		}
 	}
 
-	roles: {
-		agent:      roles._journald_agent
-		aggregator: roles._vector_aggregator
+	role_implementations: {
+		agent:      role_implementations._journald_agent
+		aggregator: role_implementations._vector_aggregator
 	}
 }

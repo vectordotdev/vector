@@ -1,7 +1,7 @@
 mod support;
 
 use crate::support::{sink, sink_failing_healthcheck, source, transform, MockSourceConfig};
-use futures::{compat::Future01CompatExt, future, stream, FutureExt, SinkExt, StreamExt};
+use futures::{future, stream, FutureExt, SinkExt, StreamExt};
 use std::{
     collections::HashMap,
     iter,
@@ -68,7 +68,7 @@ async fn topology_shutdown_while_active() {
     }
 
     // Now shut down the RunningTopology while Events are still being processed.
-    let stop_complete = tokio::spawn(async move { topology.stop().compat().await });
+    let stop_complete = tokio::spawn(async move { topology.stop().await });
 
     // Now that shutdown has begun we should be able to drain the Sink without blocking forever,
     // as the source should shut down and close its output channel.
@@ -84,7 +84,7 @@ async fn topology_shutdown_while_active() {
         );
     }
 
-    stop_complete.await.unwrap().unwrap();
+    stop_complete.await.unwrap();
 
     // We expect the pump to fail with an error since we shut down the source it was sending to
     // while it was running.
@@ -105,7 +105,7 @@ async fn topology_source_and_sink() {
     let event = Event::from("this");
     in1.send(event.clone()).await.unwrap();
 
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let res = out1.collect::<Vec<_>>().await;
 
@@ -136,7 +136,7 @@ async fn topology_multiple_sources() {
 
     let (out_event2, _out1) = out1.into_future().await;
 
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     assert_eq!(out_event1, Some(event1));
     assert_eq!(out_event2, Some(event2));
@@ -159,7 +159,7 @@ async fn topology_multiple_sinks() {
 
     in1.send(event.clone()).await.unwrap();
 
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let res1 = out1.collect::<Vec<_>>().await;
     let res2 = out2.collect::<Vec<_>>().await;
@@ -187,7 +187,7 @@ async fn topology_transform_chain() {
 
     in1.send(event).await.unwrap();
 
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let res = out1.map(into_message).collect::<Vec<_>>().await;
 
@@ -223,7 +223,7 @@ async fn topology_remove_one_source() {
     let h_out1 = tokio::spawn(out1.collect::<Vec<_>>());
     in1.send(event1.clone()).await.unwrap();
     in2.send(event2.clone()).await.unwrap_err();
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let res = h_out1.await.unwrap();
     assert_eq!(vec![event1], res);
@@ -255,7 +255,7 @@ async fn topology_remove_one_sink() {
 
     in1.send(event.clone()).await.unwrap();
 
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let res1 = out1.collect::<Vec<_>>().await;
     let res2 = out2.collect::<Vec<_>>().await;
@@ -294,7 +294,7 @@ async fn topology_remove_one_transform() {
     let event = Event::from("this");
     let h_out1 = tokio::spawn(out1.map(into_message).collect::<Vec<_>>());
     in1.send(event.clone()).await.unwrap();
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
     let res = h_out1.await.unwrap();
     assert_eq!(vec!["this transformed"], res);
 }
@@ -329,7 +329,7 @@ async fn topology_swap_source() {
     let h_out1v2 = tokio::spawn(out1v2.collect::<Vec<_>>());
     in1.send(event1.clone()).await.unwrap_err();
     in2.send(event2.clone()).await.unwrap();
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
     let res1v1 = h_out1v1.await.unwrap();
     let res1v2 = h_out1v2.await.unwrap();
 
@@ -363,7 +363,7 @@ async fn topology_swap_sink() {
     let h_out1 = tokio::spawn(out1.collect::<Vec<_>>());
     let h_out2 = tokio::spawn(out2.collect::<Vec<_>>());
     in1.send(event.clone()).await.unwrap();
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let res1 = h_out1.await.unwrap();
     let res2 = h_out2.await.unwrap();
@@ -402,7 +402,7 @@ async fn topology_swap_transform() {
     let h_out1v1 = tokio::spawn(out1v1.map(into_message).collect::<Vec<_>>());
     let h_out1v2 = tokio::spawn(out1v2.map(into_message).collect::<Vec<_>>());
     in1.send(event.clone()).await.unwrap();
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
     let res1v1 = h_out1v1.await.unwrap();
     let res1v2 = h_out1v2.await.unwrap();
 
@@ -469,7 +469,7 @@ async fn topology_swap_transform_is_atomic() {
 
     run_control.store(false, Ordering::Release);
     h_in.await.unwrap();
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
     h_out.await.unwrap();
 
     assert_eq!(

@@ -11,6 +11,7 @@ components: transforms: key_value_parser: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -25,21 +26,24 @@ components: transforms: key_value_parser: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: [
 			"""
-				This component has been deprecated in favor of the new [`remap` transform's `parse_key_value`
-				function](\(urls.vector_remap_transform)#parse_key_value). The `remap` transform provides a
-				simple syntax for robust data transformation. Let us know what you think!
-				""",
+			\(key_value_parser._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_key_value(.message)
+			```
+			""",
 		]
 		notices: [
 			"""
@@ -66,6 +70,7 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
+				syntax: "literal"
 			}
 		}
 
@@ -76,6 +81,7 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: "="
 				examples: [":", "="]
+				syntax: "literal"
 			}
 		}
 
@@ -96,6 +102,7 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: "[whitespace]"
 				examples: [",", ";", "|"]
+				syntax: "literal"
 			}
 		}
 
@@ -111,6 +118,7 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: null
 				examples: ["root_field", "parent.child"]
+				syntax: "literal"
 			}
 		}
 
@@ -124,6 +132,7 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: null
 				examples: ["<>", "{}"]
+				syntax: "literal"
 			}
 		}
 
@@ -137,10 +146,12 @@ components: transforms: key_value_parser: {
 			type: string: {
 				default: null
 				examples: ["<>", "{}"]
+				syntax: "literal"
 			}
 		}
 
-		types: configuration._types
+		timezone: configuration._timezone
+		types:    configuration._types
 	}
 
 	input: {
@@ -187,4 +198,8 @@ components: transforms: key_value_parser: {
 			}
 		},
 	]
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+	}
 }

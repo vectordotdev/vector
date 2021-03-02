@@ -6,7 +6,7 @@ use super::watcher::{self, Watcher};
 use async_stream::try_stream;
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::{future::BoxFuture, stream::BoxStream, SinkExt, StreamExt};
-use k8s_openapi::{Resource, WatchOptional, WatchResponse};
+use k8s_openapi::{apimachinery::pkg::apis::meta::v1::WatchEvent, Resource, WatchOptional};
 use serde::de::DeserializeOwned;
 use std::fmt;
 
@@ -39,9 +39,11 @@ where
     T: DeserializeOwned + Resource,
 {
     /// Return a watch response.
-    Ok(WatchResponse<T>),
-    /// Return an error.
-    Err,
+    Ok(WatchEvent<T>),
+    /// Return a desync error.
+    ErrDesync,
+    /// Return an "other" (i.e. non-desync) error.
+    ErrOther,
     /// Complete the stream (return `None`).
     Done,
 }
@@ -78,7 +80,10 @@ where
     type Object = T;
 
     type StreamError = StreamError;
-    type Stream = BoxStream<'static, Result<WatchResponse<Self::Object>, Self::StreamError>>;
+    type Stream = BoxStream<
+        'static,
+        Result<WatchEvent<Self::Object>, watcher::stream::Error<Self::StreamError>>,
+    >;
 
     type InvocationError = InvocationError;
 
@@ -93,7 +98,6 @@ where
                 .send(ScenarioEvent::Invocation(watch_optional.into()))
                 .await
                 .unwrap();
-
             let action = self.invocation_rx.next().await.unwrap();
             match action {
                 ScenarioActionInvocation::Ok(mut stream_rx) => {
@@ -108,17 +112,21 @@ where
                                 ScenarioActionStream::Ok(val) => {
                                     yield val
                                 },
-                                ScenarioActionStream::Err => {
-                                    Err(StreamError)?;
+                                ScenarioActionStream::ErrDesync => {
+                                    Err(watcher::stream::Error::desync(StreamError))?;
                                     break;
                                 },
+                                ScenarioActionStream::ErrOther => {
+                                    Err(watcher::stream::Error::other(StreamError))?;
+                                    break;
+                                }
                                 ScenarioActionStream::Done => break,
                             }
                         }
                     })
                         as BoxStream<
                             'static,
-                            Result<WatchResponse<Self::Object>, Self::StreamError>,
+                            Result<WatchEvent<Self::Object>, watcher::error::Error<StreamError>>,
                         >;
                     Ok(stream)
                 }

@@ -1,12 +1,9 @@
 use criterion::criterion_main;
 use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion};
-use futures::{
-    compat::{Future01CompatExt, Stream01CompatExt},
-    Stream, StreamExt,
-};
-use futures01::{Sink, Stream as Stream01};
+use futures::{stream, SinkExt, Stream, StreamExt};
+use indoc::indoc;
 use serde_json::Value;
-use std::{collections::HashMap, fs, io::Read, path::Path};
+use std::{collections::HashMap, fs, io::Read, path::Path, pin::Pin};
 use vector::{
     transforms::{wasm::Wasm, TaskTransform, Transform},
     Event,
@@ -32,24 +29,22 @@ pub fn protobuf(c: &mut Criterion) {
     c.bench_function("wasm/protobuf", |b| {
         let transform = Box::new(
             Wasm::new(
-                toml::from_str(
-                    r#"
-                module = "target/wasm32-wasi/release/protobuf.wasm"
-                artifact_cache = "target/artifacts/"
-                "#,
-                )
+                toml::from_str(indoc! {r#"
+                    module = "tests/data/wasm/protobuf/target/wasm32-wasi/release/protobuf.wasm"
+                    artifact_cache = "target/artifacts/"
+                "#})
                 .unwrap(),
             )
             .unwrap(),
         );
 
-        let (tx, rx) = futures01::sync::mpsc::channel::<Event>(1);
-        let mut rx = transform.transform(Box::new(rx)).compat();
+        let (tx, rx) = futures::channel::mpsc::channel::<Event>(1);
+        let mut rx = transform.transform(Box::pin(rx));
 
         b.iter_batched(
             || (tx.clone(), input.clone()),
-            |(tx, input)| {
-                futures::executor::block_on(tx.send(input).compat()).unwrap();
+            |(mut tx, input)| {
+                futures::executor::block_on(tx.send(input)).unwrap();
                 futures::executor::block_on(rx.next())
             },
             BatchSize::SmallInput,
@@ -64,18 +59,32 @@ pub fn add_fields(criterion: &mut Criterion) {
             Transform::task(
                 vector::transforms::lua::v2::Lua::new(
                     &toml::from_str(
-                        r#"
-hooks.process = """
-function (event, emit)
-event.log.test_key = "test_value"
-event.log.test_key2 = "test_value2"
-emit(event)
-end
-"""
-"#,
+                        indoc! {r#"
+                            hooks.process = """
+                            function (event, emit)
+                              event.log.test_key = "test_value"
+                              event.log.test_key2 = "test_value2"
+                              emit(event)
+                            end
+                            """
+                        "#},
                     )
                     .unwrap(),
                 )
+                .unwrap(),
+            ),
+        ),
+        (
+            "remap",
+            Transform::function(
+                vector::transforms::remap::Remap::new(vector::transforms::remap::RemapConfig {
+                    source: indoc! {r#"
+                        .test_key = "test_value"
+                        .test_key2 = "test_value2"
+                    "#}
+                    .to_string(),
+                    drop_on_err: false,
+                })
                 .unwrap(),
             ),
         ),
@@ -84,10 +93,10 @@ end
             Transform::task(
                 Wasm::new(
                     toml::from_str(
-                        r#"
-module = "target/wasm32-wasi/release/add_fields.wasm"
-artifact_cache = "target/artifacts/"
-"#,
+                        indoc! {r#"
+                            module = "tests/data/wasm/add_fields/target/wasm32-wasi/release/add_fields.wasm"
+                            artifact_cache = "target/artifacts/"
+                        "#},
                     )
                     .unwrap(),
                 )
@@ -125,22 +134,18 @@ fn bench_group_transforms_over_parameterized_event_sizes(
     let mut group = criterion.benchmark_group(group);
 
     for (name, transform) in transforms {
-        let (tx, rx) = futures01::sync::mpsc::channel::<Event>(1);
+        let (tx, rx) = futures::channel::mpsc::channel::<Event>(1);
 
-        let mut rx: Box<dyn Stream<Item = Result<Event, ()>> + Send + Unpin> = match transform {
+        let mut rx: Pin<Box<dyn Stream<Item = Event> + Send>> = match transform {
             Transform::Function(t) => {
                 let mut t = t.clone();
-                Box::new(
-                    rx.map(move |v| {
-                        let mut buf = Vec::with_capacity(1);
-                        t.transform(&mut buf, v);
-                        futures01::stream::iter_ok(buf.into_iter())
-                    })
-                    .flatten()
-                    .compat(),
-                )
+                Box::pin(rx.flat_map(move |v| {
+                    let mut buf = Vec::with_capacity(1);
+                    t.transform(&mut buf, v);
+                    stream::iter(buf.into_iter())
+                }))
             }
-            Transform::Task(t) => Box::new(t.transform(Box::new(rx)).compat()),
+            Transform::Task(t) => t.transform(Box::pin(rx)),
         };
 
         for &parameter in &parameters {
@@ -156,8 +161,8 @@ fn bench_group_transforms_over_parameterized_event_sizes(
             group.bench_with_input(id, &input, |bencher, input| {
                 bencher.iter_batched(
                     || (tx.clone(), input.clone()),
-                    |(tx, input)| {
-                        futures::executor::block_on(tx.send(input).compat()).unwrap();
+                    |(mut tx, input)| {
+                        futures::executor::block_on(tx.send(input)).unwrap();
                         futures::executor::block_on(rx.next())
                     },
                     BatchSize::SmallInput,
@@ -168,7 +173,13 @@ fn bench_group_transforms_over_parameterized_event_sizes(
     group.finish();
 }
 
-criterion_group!(benches, protobuf, add_fields);
+criterion_group!(
+    name = benches;
+    // We've seen CI noise commonly be 5% so configure here
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.05);
+    targets = protobuf, add_fields
+);
 criterion_main! {
     benches,
 }

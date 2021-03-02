@@ -23,7 +23,7 @@ where
     T: Metadata<Ty = ObjectMeta> + Send,
 {
     /// Take a [`WriteHandle`], initialize it and return it wrapped with
-    /// [`Self`].
+    /// [`Writer`].
     pub fn new(
         mut inner: WriteHandle<String, Value<T>>,
         flush_debounce_timeout: Option<Duration>,
@@ -146,6 +146,28 @@ mod tests {
         let pod = make_pod("uid");
         let (key, val) = kv(pod.clone()).unwrap();
         assert_eq!(key, "uid");
+        assert_eq!(val, Box::new(HashValue::new(pod)));
+    }
+
+    #[test]
+    fn test_kv_static_pod() {
+        let pod = Pod {
+            metadata: ObjectMeta {
+                uid: Some("uid".to_owned()),
+                annotations: Some(
+                    vec![(
+                        "kubernetes.io/config.mirror".to_owned(),
+                        "config-hashsum".to_owned(),
+                    )]
+                    .into_iter()
+                    .collect(),
+                ),
+                ..ObjectMeta::default()
+            },
+            ..Pod::default()
+        };
+        let (key, val) = kv(pod.clone()).unwrap();
+        assert_eq!(key, "config-hashsum");
         assert_eq!(val, Box::new(HashValue::new(pod)));
     }
 

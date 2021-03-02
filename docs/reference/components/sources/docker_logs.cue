@@ -10,6 +10,7 @@ components: sources: docker_logs: {
 		deployment_roles: ["daemon"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	env_vars: {
@@ -18,6 +19,7 @@ components: sources: docker_logs: {
 			type: string: {
 				default: null
 				examples: ["unix:///var/run/docker.sock"]
+				syntax: "literal"
 			}
 		}
 
@@ -32,6 +34,7 @@ components: sources: docker_logs: {
 			type: string: {
 				default: null
 				examples: ["certs/"]
+				syntax: "literal"
 			}
 		}
 
@@ -40,6 +43,7 @@ components: sources: docker_logs: {
 			type: string: {
 				default: null
 				examples: ["certs/"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -68,12 +72,14 @@ components: sources: docker_logs: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
-			"x86_64-apple-darwin":        true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
+			"x86_64-apple-darwin":            true
 		}
 
 		requirements: []
@@ -85,6 +91,14 @@ components: sources: docker_logs: {
 				Docker [`syslog`](\(urls.docker_logging_driver_syslog)) or
 				[Docker `journald` driver](\(urls.docker_logging_driver_journald))
 				drivers.
+				""",
+			"""
+				To avoid collecting logs from itself when deployed as a container,
+				the Docker source uses current hostname to find out which container
+				it is inside. If a container's ID matches the hostname, that container
+				will be excluded.
+				If you change container's hostname, consider manually excluding Vector
+				container using [`exclude_containers`](#exclude_containers).
 				""",
 		]
 		notices: []
@@ -101,12 +115,20 @@ components: sources: docker_logs: {
 				The Docker host to connect to. Use an HTTPS URL to enable TLS encryption.
 				If absent, Vector will try to use `DOCKER_HOST` enviroment variable.
 				If `DOCKER_HOST` is also absent, Vector will use default Docker local socket
-				(`/var/run/docker.sock` on Unix flatforms, `\\\\.\\pipe\\docker_engine` on Windows).
+				(`/var/run/docker.sock` on Unix flatforms, `//./pipe/docker_engine` on Windows).
 				"""
 			required: false
 			type: string: {
 				default: null
-				examples: ["http://localhost:2375", "https://localhost:2376", "/var/run/docker.sock", "\\\\.\\pipe\\docker_engine"]
+				examples: [
+					"http://localhost:2375",
+					"https://localhost:2376",
+					"unix:///var/run/docker.sock",
+					"npipe:////./pipe/docker_engine",
+					"/var/run/docker.sock",
+					"//./pipe/docker_engine",
+				]
+				syntax: "literal"
 			}
 		}
 		tls: {
@@ -126,6 +148,7 @@ components: sources: docker_logs: {
 						warnings: []
 						type: string: {
 							examples: ["certs/ca.pem"]
+							syntax: "literal"
 						}
 					}
 					crt_file: {
@@ -134,6 +157,7 @@ components: sources: docker_logs: {
 						warnings: []
 						type: string: {
 							examples: ["certs/cert.pem"]
+							syntax: "literal"
 						}
 					}
 					key_file: {
@@ -142,6 +166,7 @@ components: sources: docker_logs: {
 						warnings: []
 						type: string: {
 							examples: ["certs/key.pem"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -169,7 +194,10 @@ components: sources: docker_logs: {
 			required: false
 			type: array: {
 				default: null
-				items: type: string: examples: ["exclude_", "exclude_me_0", "ad08cc418cf9"]
+				items: type: string: {
+					examples: ["exclude_", "exclude_me_0", "ad08cc418cf9"]
+					syntax: "literal"
+				}
 			}
 		}
 		include_containers: {
@@ -185,7 +213,10 @@ components: sources: docker_logs: {
 			required: false
 			type: array: {
 				default: null
-				items: type: string: examples: ["include_", "include_me_0", "ad08cc418cf9"]
+				items: type: string: {
+					examples: ["include_", "include_me_0", "ad08cc418cf9"]
+					syntax: "literal"
+				}
 			}
 		}
 		include_labels: {
@@ -193,12 +224,15 @@ components: sources: docker_logs: {
 			description: """
 				A list of container object labels to match against when
 				filtering running containers. This should follow the
-				described label's synatx in [docker object labels docs](\(urls.docker_object_labels)).
+				described label's syntax in [docker object labels docs](\(urls.docker_object_labels)).
 				"""
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: examples: ["com.example.vendor=Timber Inc.", "com.example.name=Vector"]
+				items: type: string: {
+					examples: ["com.example.vendor=Timber Inc.", "com.example.name=Vector"]
+					syntax: "literal"
+				}
 			}
 		}
 		include_images: {
@@ -210,7 +244,10 @@ components: sources: docker_logs: {
 			required: false
 			type: array: {
 				default: null
-				items: type: string: examples: ["httpd", "redis"]
+				items: type: string: {
+					examples: ["httpd", "redis"]
+					syntax: "literal"
+				}
 			}
 		}
 		retry_backoff_secs: {
@@ -227,10 +264,13 @@ components: sources: docker_logs: {
 		host_key: {
 			category:    "Context"
 			common:      false
-			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.global-options#host_key]."
+			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
 			required:    false
 			warnings: []
-			type: string: default: "host"
+			type: string: {
+				default: "host"
+				syntax:  "literal"
+			}
 		}
 	}
 
@@ -246,29 +286,44 @@ components: sources: docker_logs: {
 				container_id: {
 					description: "The Docker container ID that the log was collected from."
 					required:    true
-					type: string: examples: ["9b6247364a03", "715ebfcee040"]
+					type: string: {
+						examples: ["9b6247364a03", "715ebfcee040"]
+						syntax: "literal"
+					}
 				}
 				container_name: {
 					description: "The Docker container name that the log was collected from."
 					required:    true
-					type: string: examples: ["evil_ptolemy", "nostalgic_stallman"]
+					type: string: {
+						examples: ["evil_ptolemy", "nostalgic_stallman"]
+						syntax: "literal"
+					}
 				}
 				image: {
 					description: "The image name that the container is based on."
 					required:    true
-					type: string: examples: ["ubuntu:latest", "busybox", "timberio/vector:latest-alpine"]
+					type: string: {
+						examples: ["ubuntu:latest", "busybox", "timberio/vector:latest-alpine"]
+						syntax: "literal"
+					}
 				}
 				message: {
 					description: "The raw log message."
 					required:    true
-					type: string: examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+					type: string: {
+						examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+						syntax: "literal"
+					}
 				}
 				stream: {
 					description: "The [standard stream](\(urls.standard_streams)) that the log was collected from."
 					required:    true
-					type: string: enum: {
-						stdout: "The STDOUT stream"
-						stderr: "The STDERR stream"
+					type: string: {
+						enum: {
+							stdout: "The STDOUT stream"
+							stderr: "The STDERR stream"
+						}
+						syntax: "literal"
 					}
 				}
 				timestamp: {
@@ -280,7 +335,10 @@ components: sources: docker_logs: {
 				"*": {
 					description: "Each container label is inserted with it's exact key/value pair."
 					required:    true
-					type: string: examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+					type: string: {
+						examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+						syntax: "literal"
+					}
 				}
 			}
 		}
@@ -333,10 +391,12 @@ components: sources: docker_logs: {
 
 	telemetry: metrics: {
 		communication_errors_total:            components.sources.internal_metrics.output.metrics.communication_errors_total
-		container_processed_events_total:      components.sources.internal_metrics.output.metrics.container_processed_events_total
 		container_metadata_fetch_errors_total: components.sources.internal_metrics.output.metrics.container_metadata_fetch_errors_total
+		container_processed_events_total:      components.sources.internal_metrics.output.metrics.container_processed_events_total
 		containers_unwatched_total:            components.sources.internal_metrics.output.metrics.containers_unwatched_total
 		containers_watched_total:              components.sources.internal_metrics.output.metrics.containers_watched_total
 		logging_driver_errors_total:           components.sources.internal_metrics.output.metrics.logging_driver_errors_total
+		processed_bytes_total:                 components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:                components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

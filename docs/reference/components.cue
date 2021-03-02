@@ -34,6 +34,8 @@ components: {
 			// components.
 			service_providers: [string, ...string] | *[]
 		}
+
+		stateful: bool
 	}
 
 	#Component: {
@@ -65,10 +67,11 @@ components: {
 
 		// `examples` demonstrates various ways to use the component using an
 		// input, output, and example configuration.
-		#ExampleConfig: close({
+		#ExampleConfig: {
 			title:    string
 			context?: string
 			"configuration": {
+				...
 				for k, v in configuration {
 					"\( k )"?: _ | *null
 				}
@@ -91,7 +94,7 @@ components: {
 			}
 
 			notes?: string
-		})
+		}
 
 		examples?: [#ExampleConfig, ...#ExampleConfig]
 
@@ -165,6 +168,7 @@ components: {
 			collect?:  #FeaturesCollect
 			generate?: #FeaturesGenerate
 			multiline: #FeaturesMultiline
+			encoding?: #FeaturesEncoding
 			receive?:  #FeaturesReceive
 		}
 
@@ -182,14 +186,14 @@ components: {
 
 		if Args.kind == "sink" {
 			// `buffer` describes how the component buffers data.
-			buffer: close({
+			buffer: {
 				enabled: bool | string
-			})
+			}
 
 			// `healtcheck` notes if a component offers a healthcheck on boot.
-			healthcheck: close({
+			healthcheck: {
 				enabled: bool
-			})
+			}
 
 			exposes?: #FeaturesExpose
 			send?:    #FeaturesSend & {_args: Args}
@@ -199,9 +203,9 @@ components: {
 	}
 
 	#FeaturesCollect: {
-		checkpoint: close({
+		checkpoint: {
 			enabled: bool
-		})
+		}
 
 		from?: {
 			service:    #Service
@@ -215,14 +219,16 @@ components: {
 	}
 
 	#FeaturesEnrich: {
-		from: service: close({
+		from: service: {
 			name:     string
 			url:      string
 			versions: string | null
-		})
+		}
 	}
 
 	#FeaturesExpose: {
+		tls: #FeaturesTLS & {_args: {mode: "accept"}}
+
 		for: {
 			service:    #Service
 			interface?: #Interface
@@ -235,6 +241,16 @@ components: {
 	#FeaturesGenerate: {
 	}
 
+	#FeaturesSendBufferBytes: {
+		enabled:        bool
+		relevant_when?: string
+	}
+
+	#FeaturesReceiveBufferBytes: {
+		enabled:        bool
+		relevant_when?: string
+	}
+
 	#FeaturesKeepalive: {
 		enabled: bool
 	}
@@ -243,12 +259,16 @@ components: {
 		enabled: bool
 	}
 
+	#FeaturesEncoding: {
+		enabled: bool
+	}
+
 	#FeaturesParse: {
-		format: close({
+		format: {
 			name:     string
 			url:      string | null
 			versions: string | null
-		})
+		}
 	}
 
 	#FeaturesProgram: {
@@ -262,6 +282,8 @@ components: {
 		}
 
 		keepalive?: #FeaturesKeepalive
+
+		receive_buffer_bytes?: #FeaturesReceiveBufferBytes
 
 		tls: #FeaturesTLS & {_args: {mode: "accept"}}
 	}
@@ -288,13 +310,13 @@ components: {
 		if Args.egress_method == "batch" || Args.egress_method == "dynamic" {
 			// `batch` describes how the component batches data. This is only
 			// relevant if a component has an `egress_method` of "batch".
-			batch: close({
+			batch: {
 				enabled:      bool
 				common:       bool
 				max_bytes:    uint | null
 				max_events:   uint | null
 				timeout_secs: uint16 | null
-			})
+			}
 		}
 
 		// `compression` describes how the component compresses data.
@@ -323,6 +345,8 @@ components: {
 				}
 			}
 		}
+
+		send_buffer_bytes?: #FeaturesSendBufferBytes
 
 		keepalive?: #FeaturesKeepalive
 
@@ -375,11 +399,11 @@ components: {
 		metrics: #MetricInput | null
 	}
 
-	#LogOutput: [Name=string]: close({
+	#LogOutput: [Name=string]: {
 		description: string
 		name:        Name
 		fields:      #Schema
-	})
+	}
 
 	#MetricInput: {
 		counter:      *false | bool
@@ -390,14 +414,14 @@ components: {
 		summary:      *false | bool
 	}
 
-	#MetricOutput: [Name=string]: close({
+	#MetricOutput: [Name=string]: {
 		description:       string
 		relevant_when?:    string
 		tags:              #MetricTags
 		name:              Name
 		type:              #MetricType
 		default_namespace: string
-	})
+	}
 
 	#Output: {
 		logs?:    #LogOutput
@@ -473,122 +497,9 @@ components: {
 		kind: string
 		let Kind = kind
 
-		configuration: {
-			_conditions: {
-				examples: [
-					{
-						type:                           "check_fields"
-						"message.eq":                   "foo"
-						"message.not_eq":               "foo"
-						"message.exists":               true
-						"message.not_exists":           true
-						"message.contains":             "foo"
-						"message.not_contains":         "foo"
-						"message.ends_with":            "foo"
-						"message.not_ends_with":        "foo"
-						"message.ip_cidr_contains":     "10.0.0.0/8"
-						"message.not_ip_cidr_contains": "10.0.0.0/8"
-						"message.regex":                " (any|of|these|five|words) "
-						"message.not_regex":            " (any|of|these|five|words) "
-						"message.starts_with":          "foo"
-						"message.not_starts_with":      "foo"
-					},
-				]
-				options: {
-					type: {
-						common:      true
-						description: "The type of the condition to execute."
-						required:    false
-						warnings: []
-						type: string: {
-							default: "check_fields"
-							enum: {
-								check_fields: "Allows you to check individual fields against a list of conditions."
-								is_log:       "Returns true if the event is a log."
-								is_metric:    "Returns true if the event is a metric."
-							}
-						}
-					}
-					"*.eq": {
-						common:      true
-						description: "Check whether a field's contents exactly matches the value specified, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: ["foo"]
-						}
-					}
-					"*.exists": {
-						common:      false
-						description: "Check whether a field exists or does not exist, depending on the provided value being `true` or `false` respectively."
-						required:    false
-						warnings: []
-						type: bool: default: null
-					}
-					"*.not_*": {
-						common:      false
-						description: "Allow you to negate any condition listed here."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: []
-						}
-					}
-					"*.contains": {
-						common:      true
-						description: "Checks whether a string field contains a string argument, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: ["foo"]
-						}
-					}
-					"*.ends_with": {
-						common:      true
-						description: "Checks whether a string field ends with a string argument, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: ["suffix"]
-						}
-					}
-					"*.ip_cidr_contains": {
-						common:      false
-						description: "Checks whether an IP field is contained within a given [IP CIDR](\(urls.cidr)) (works with IPv4 and IPv6). This may be a single string or a list of strings, in which case this evaluates to true if the IP field is contained within any of the CIDRs in the list."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: ["10.0.0.0/8", "2000::/10", "192.168.0.0/16"]
-						}
-					}
-					"*.regex": {
-						common:      true
-						description: "Checks whether a string field matches a [regular expression](\(urls.regex)). Vector uses the [documented Rust Regex syntax](\(urls.rust_regex_syntax)). Note that this condition is considerably more expensive than a regular string match (such as `starts_with` or `contains`) so the use of those conditions are preferred where possible."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: [" (any|of|these|five|words) "]
-						}
-					}
-					"*.starts_with": {
-						common:      true
-						description: "Checks whether a string field starts with a string argument, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: ["prefix"]
-						}
-					}
-				}
-			}
+		classes: #Classes & {_args: kind: Kind}
 
+		configuration: {
 			_tls_accept: {
 				_args: {
 					can_enable:             bool
@@ -617,6 +528,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
+							syntax: "literal"
 						}
 					}
 					crt_file: {
@@ -626,6 +538,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.crt"]
+							syntax: "literal"
 						}
 					}
 					key_file: {
@@ -635,6 +548,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.key"]
+							syntax: "literal"
 						}
 					}
 					key_pass: {
@@ -644,6 +558,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+							syntax: "literal"
 						}
 					}
 
@@ -687,6 +602,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/certificate_authority.crt"]
+							syntax: "literal"
 						}
 					}
 					crt_file: {
@@ -696,6 +612,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.crt"]
+							syntax: "literal"
 						}
 					}
 					key_file: {
@@ -705,6 +622,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["/path/to/host_certificate.key"]
+							syntax: "literal"
 						}
 					}
 					key_pass: {
@@ -714,6 +632,7 @@ components: {
 						type: string: {
 							default: null
 							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+							syntax: "literal"
 						}
 					}
 
@@ -754,6 +673,7 @@ components: {
 						warnings: []
 						type: string: {
 							examples: [Args.password_example, "password"]
+							syntax: "literal"
 						}
 					}
 					strategy: {
@@ -765,6 +685,7 @@ components: {
 								basic:  "The [basic authentication strategy](\(urls.basic_auth))."
 								bearer: "The bearer token authentication strategy."
 							}
+							syntax: "literal"
 						}
 					}
 					token: {
@@ -773,6 +694,7 @@ components: {
 						warnings: []
 						type: string: {
 							examples: ["${API_TOKEN}", "xyz123"]
+							syntax: "literal"
 						}
 					}
 					user: {
@@ -781,6 +703,7 @@ components: {
 						warnings: []
 						type: string: {
 							examples: [Args.username_example, "username"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -800,6 +723,7 @@ components: {
 							warnings: []
 							type: string: {
 								examples: ["${HTTP_USERNAME}", "username"]
+								syntax: "literal"
 							}
 						}
 						password: {
@@ -808,9 +732,22 @@ components: {
 							warnings: []
 							type: string: {
 								examples: ["${HTTP_PASSWORD}", "password"]
+								syntax: "literal"
 							}
 						}
 					}
+				}
+			}
+
+			_timezone: {
+				common:      false
+				description: "The name of the time zone to apply to timestamp conversions that do not contain an explicit time zone. This overrides the global [`timezone` option][docs.reference.configuration.global-options#timezone]. The time zone name may be any name in the [TZ database][urls.tz_time_zones], or `local` to indicate system local time."
+				required:    false
+				warnings: []
+				type: string: {
+					default: "local"
+					examples: ["local", "America/NewYork", "EST5EDT"]
+					syntax: "literal"
 				}
 			}
 
@@ -879,10 +816,21 @@ components: {
 
 			if Kind != "source" {
 				inputs: {
-					description: "A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms)) IDs. See [configuration](\(urls.vector_configuration)) for more info."
+					description: """
+						A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms))
+						IDs. Wildcards (`*`) are supported but _must_ be the last character in the ID.
+
+						See [configuration](\(urls.vector_configuration)) for more info.
+						"""
 					required:    true
 					sort:        -1
-					type: array: items: type: string: examples: ["my-source-or-transform-id"]
+					type: array: items: type: string: {
+						examples: [
+							"my-source-or-transform-id",
+							"prefix-*",
+						]
+						syntax: "literal"
+					}
 				}
 			}
 
@@ -890,8 +838,11 @@ components: {
 				description: "The component type. This is a required field for all components and tells Vector which component to use."
 				required:    true
 				sort:        -2
-				"type": string: enum: #Enum | *{
-					"\(Name)": "The type of this component."
+				"type": string: {
+					enum: #Enum | *{
+						"\(Name)": "The type of this component."
+					}
+					syntax: "literal"
 				}
 			}
 		}
@@ -1046,10 +997,32 @@ components: {
 			}
 		}
 
-		telemetry: metrics: {
-			// Default metrics for each component
-			processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
-			processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		if Kind == "transform" {
+			telemetry: metrics: {
+				// Default metrics for each transform
+				processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+				processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+			}
+		}
+
+		how_it_works: {
+			state: {
+				title: "State"
+
+				if classes.stateful == true {
+					body: """
+						This component is stateful, meaning its behavior changes based on previous inputs (events).
+						State is not preserved across restarts, therefore state-dependent behavior will reset between
+						restarts and depend on the inputs (events) received since the most recent restart.
+						"""
+				}
+
+				if classes.stateful == false {
+					body: """
+						This component is stateless, meaning its behavior is consistent across each input.
+						"""
+				}
+			}
 		}
 	}}
 }

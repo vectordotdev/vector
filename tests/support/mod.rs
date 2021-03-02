@@ -29,7 +29,10 @@ use tracing::{error, info};
 use vector::{
     buffers::Acker,
     config::{DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig},
-    event::{metric::MetricValue, Value},
+    event::{
+        metric::{self, MetricValue},
+        Value,
+    },
     shutdown::ShutdownSignal,
     sinks::{util::StreamSink, Healthcheck, VectorSink},
     sources::Source,
@@ -171,11 +174,7 @@ impl SourceConfig for MockSourceConfig {
                 }
             })
             .map(Ok)
-            .forward(
-                out.sink_map_err(
-                    |error| error!(message = "Error sending in sink..", error = ?error),
-                ),
-            )
+            .forward(out.sink_map_err(|error| error!(message = "Error sending in sink..", %error)))
             .inspect(|_| info!("Finished sending."))
             .await
         }))
@@ -207,17 +206,18 @@ impl FunctionTransform for MockTransform {
                 v.push_str(&self.suffix);
                 log.insert(vector::config::log_schema().message_key(), Value::from(v));
             }
-            Event::Metric(metric) => match metric.value {
+            Event::Metric(metric) => match metric.data.value {
                 MetricValue::Counter { ref mut value } => {
                     *value += self.increase;
                 }
                 MetricValue::Distribution {
-                    ref mut values,
-                    ref mut sample_rates,
+                    ref mut samples,
                     statistic: _,
                 } => {
-                    values.push(self.increase);
-                    sample_rates.push(1);
+                    samples.push(metric::Sample {
+                        value: self.increase,
+                        rate: 1,
+                    });
                 }
                 MetricValue::AggregatedHistogram {
                     ref mut count,
@@ -262,7 +262,7 @@ impl MockTransformConfig {
 #[async_trait]
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    async fn build(&self) -> Result<Transform, vector::Error> {
+    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform, vector::Error> {
         Ok(Transform::function(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,
@@ -286,7 +286,7 @@ impl TransformConfig for MockTransformConfig {
 pub struct MockSinkConfig<T>
 where
     T: Sink<Event> + Unpin + std::fmt::Debug + Clone + Send + Sync + 'static,
-    <T as Sink<Event>>::Error: std::fmt::Debug,
+    <T as Sink<Event>>::Error: std::fmt::Display,
 {
     #[serde(skip)]
     sink: Option<T>,
@@ -297,7 +297,7 @@ where
 impl<T> MockSinkConfig<T>
 where
     T: Sink<Event> + Unpin + std::fmt::Debug + Clone + Send + Sync + 'static,
-    <T as Sink<Event>>::Error: std::fmt::Debug,
+    <T as Sink<Event>>::Error: std::fmt::Display,
 {
     pub fn new(sink: T, healthy: bool) -> Self {
         Self {
@@ -318,7 +318,7 @@ enum HealthcheckError {
 impl<T> SinkConfig for MockSinkConfig<T>
 where
     T: Sink<Event> + Unpin + std::fmt::Debug + Clone + Send + Sync + 'static,
-    <T as Sink<Event>>::Error: std::fmt::Debug,
+    <T as Sink<Event>>::Error: std::fmt::Display,
 {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         let sink = MockSink {
@@ -357,12 +357,12 @@ struct MockSink<S> {
 impl<S> StreamSink for MockSink<S>
 where
     S: Sink<Event> + Send + std::marker::Unpin,
-    <S as Sink<Event>>::Error: std::fmt::Debug,
+    <S as Sink<Event>>::Error: std::fmt::Display,
 {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
             if let Err(error) = self.sink.send(event).await {
-                error!(message = "Ingesting an event failed at mock sink.", ?error);
+                error!(message = "Ingesting an event failed at mock sink.", %error);
             }
 
             self.acker.ack(1);

@@ -9,15 +9,15 @@ lazy_static! {
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum PathComponent {
-    /// For example, in "a.b[0].c[2]" the keys are "a", "b", and "c".
+    /// For example, in `a.b[0].c[2]` the keys are "a", "b", and "c".
     Key(String),
-    /// For example, in "a.b[0].c[2]" the indexes are 0 and 2.
+    /// For example, in `a.b[0].c[2]` the indexes are 0 and 2.
     Index(usize),
     /// Indicates that a parsing error occurred.
     Invalid,
 }
 
-/// Iterator over components of paths specified in form "a.b[0].c[2]".
+/// Iterator over components of paths specified in form `a.b[0].c[2]`.
 pub struct PathIter<'a> {
     path: &'a str,
     chars: Chars<'a>,

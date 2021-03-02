@@ -118,6 +118,16 @@ logSchema:
   sourceTypeKey: "source_type"
   timestampKey: "timestamp"
 
+# The Vector API.
+# Will be disabled by default.
+vectorApi:
+  # Turn the Vector API on or off.
+  enabled: false
+  # The address to listen at.
+  address: "0.0.0.0:8686"
+  # Enable or disable the built-in GraphQL Playground (a web IDE for working on GraphQL queries).
+  playground: true
+
 # The "built-in" kubernetes logs source to collect logs from the `Pod`s running
 # on the `Node`.
 # Will be added by default, unless explicitly disabled.
@@ -126,7 +136,10 @@ kubernetesLogsSource:
   enabled: true
   # The name to use for the "built-in" kubernetes logs source.
   sourceId: kubernetes_logs
-  # Raw TOML config to embed at the kubernetes logs source.
+  # Additional config to embed at the kubernetes logs source.
+  config: {}
+    # option: "value"
+  # Raw TOML config to embed at the kubernetes logs source (deprecated).
   rawConfig: null
 
 # The "built-in" vector sink, to send the logs to the vector aggregator.
@@ -138,12 +151,15 @@ vectorSink:
   # The name to use for the "built-in" vector sink.
   sinkId: vector_sink
   # Inputs of the built-in vector sink.
-  inputs: null # ["my_input_1", "my_input_2"]
+  inputs: null  # ["my_input_1", "my_input_2"]
   # The host of the Vector to send the data to.
-  host: null # "vector.internal"
+  host: null  # "vector.internal"
   # The port of the Vector to send the data to.
-  port: null # 9000
-  # Raw TOML config to embed at the vector sink.
+  port: null  # 9000
+  # Additional config to embed at the vector sink.
+  config: {}
+    # option: "value"
+  # Raw TOML config to embed at the vector sink (deprecated).
   rawConfig: null
 
 # The "built-in" internal metrics source emitting Vector's internal opertaional
@@ -153,7 +169,10 @@ internalMetricsSource:
   enabled: true
   # The name to use for the "built-in" internal metrics source.
   sourceId: internal_metrics
-  # Raw TOML config to embed at the internal metrics source.
+  # Additional config to embed at the internal metrics source.
+  config: {}
+    # option: "value"
+  # Raw TOML config to embed at the internal metrics source (deprecated).
   rawConfig: null
 
 # The "built-in" host metrics source emitting the metrics gathered from the node
@@ -163,7 +182,10 @@ hostMetricsSource:
   enabled: true
   # The name to use for the "built-in" host metrics source.
   sourceId: host_metrics
-  # Raw TOML config to embed at the host metrics source.
+  # Additional config to embed at the host metrics source.
+  config: {}
+    # option: "value"
+  # Raw TOML config to embed at the host metrics source (deprecated).
   rawConfig: null
 
 # The "built-in" prometheus sink exposing metrics in the Prometheus scraping
@@ -189,7 +211,10 @@ prometheusSink:
   listenAddress: "0.0.0.0"
   # The port to listen at.
   listenPort: "9090"
-  # Raw TOML config to embed at the vector source.
+  # Additional config to embed at the prometheus sink.
+  config: {}
+    # option: "value"
+  # Raw TOML config to embed at the prometheus sink (deprecated).
   rawConfig: null
   # Add Prometheus annotations to Pod to opt-in for Prometheus scraping.
   # To be used in clusters that rely on Pod annotations in the form of
@@ -212,6 +237,7 @@ prometheusSink:
 sources: {}
   # source_name:
   #   type: "source_type"
+  #   option: "value"
   #   rawConfig: |
   #     option = "value"
 
@@ -220,6 +246,7 @@ transforms: {}
   # transform_name:
   #   type: "transform_type"
   #   inputs: ["input1", "input2"]
+  #   option: "value"
   #   rawConfig: |
   #     option = "value"
 
@@ -228,5 +255,6 @@ sinks: {}
   # sink_name:
   #   type: "sink_type"
   #   inputs: ["input1", "input2"]
+  #   option: "value"
   #   rawConfig: |
   #     option = "value"

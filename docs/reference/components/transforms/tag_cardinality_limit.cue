@@ -13,6 +13,7 @@ components: transforms: tag_cardinality_limit: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      true
 	}
 
 	features: {
@@ -21,14 +22,15 @@ components: transforms: tag_cardinality_limit: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -57,6 +59,7 @@ components: transforms: tag_cardinality_limit: {
 					drop_tag:   "Remove tags that would exceed the configured limit from the incoming metric"
 					drop_event: "Drop any metric events that contain tags that would exceed the configured limit"
 				}
+				syntax: "literal"
 			}
 		}
 		mode: {
@@ -68,6 +71,7 @@ components: transforms: tag_cardinality_limit: {
 					exact:         "Has higher memory requirements than `probabilistic`, but never falsely outputs metrics with new tags after the limit has been hit."
 					probabilistic: "Has lower memory requirements than `exact`, but may occasionally allow metric events to pass through the transform even when they contain new tags that exceed the configured limit.  The rate at which this happens can be controlled by changing the value of `cache_size_per_tag`."
 				}
+				syntax: "literal"
 			}
 		}
 		value_limit: {

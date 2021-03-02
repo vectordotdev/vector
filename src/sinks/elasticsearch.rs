@@ -2,9 +2,9 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::Event,
-    http::{Auth, HttpClient, MaybeAuth},
+    http::{Auth, HttpClient, HttpError, MaybeAuth},
     internal_events::{ElasticSearchEventEncoded, ElasticSearchMissingKeys},
-    rusoto::{self, region_from_endpoint, RegionOrEndpoint},
+    rusoto::{self, region_from_endpoint, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
@@ -85,7 +85,7 @@ pub enum Encoding {
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum ElasticSearchAuth {
     Basic { user: String, password: String },
-    Aws { assume_role: Option<String> },
+    Aws(AWSAuthentication),
 }
 
 #[derive(Derivative, Deserialize, Serialize, Clone, Debug)]
@@ -294,8 +294,11 @@ struct ESResultResponse {
     items: Vec<ESResultItem>,
 }
 #[derive(Deserialize, Debug)]
-struct ESResultItem {
-    index: ESIndexResult,
+enum ESResultItem {
+    #[serde(rename = "index")]
+    Index(ESIndexResult),
+    #[serde(rename = "create")]
+    Create(ESIndexResult),
 }
 #[derive(Deserialize, Debug)]
 struct ESIndexResult {
@@ -308,8 +311,17 @@ struct ESErrorDetails {
     err_type: String,
 }
 
+impl ESResultItem {
+    fn result(self) -> ESIndexResult {
+        match self {
+            ESResultItem::Index(r) => r,
+            ESResultItem::Create(r) => r,
+        }
+    }
+}
+
 impl RetryLogic for ElasticSearchRetryLogic {
-    type Error = hyper::Error;
+    type Error = HttpError;
     type Response = hyper::Response<Bytes>;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
@@ -353,7 +365,7 @@ fn get_error_reason(body: &str) -> String {
             "some messages failed, could not parse response, error: {}",
             json_error
         ),
-        Ok(resp) => match resp.items.into_iter().find_map(|item| item.index.error) {
+        Ok(resp) => match resp.items.into_iter().find_map(|item| item.result().error) {
             Some(error) => format!("error type: {}, reason: {}", error.err_type, error.reason),
             None => format!("error response: {}", body),
         },
@@ -392,9 +404,7 @@ impl ElasticSearchCommon {
 
         let credentials = match &config.auth {
             Some(ElasticSearchAuth::Basic { .. }) | None => None,
-            Some(ElasticSearchAuth::Aws { assume_role }) => Some(
-                rusoto::AwsCredentialsProvider::new(&region, assume_role.clone())?,
-            ),
+            Some(ElasticSearchAuth::Aws(aws)) => Some(aws.build(&region, None)?),
         };
 
         let compression = config.compression;
@@ -525,6 +535,26 @@ mod tests {
     }
 
     #[test]
+    fn parse_aws_auth() {
+        toml::from_str::<ElasticSearchConfig>(
+            r#"
+            endpoint = ""
+            auth.strategy = "aws"
+            auth.assume_role = "role"
+        "#,
+        )
+        .unwrap();
+
+        toml::from_str::<ElasticSearchConfig>(
+            r#"
+            endpoint = ""
+            auth.strategy = "aws"
+        "#,
+        )
+        .unwrap();
+    }
+
+    #[test]
     fn removes_and_sets_id_from_custom_field() {
         let id_key = Some("foo");
         let mut event = Event::from("butts");
@@ -601,6 +631,20 @@ mod tests {
     }
 
     #[test]
+    fn get_index_error_reason() {
+        let json = "{\"took\":185,\"errors\":true,\"items\":[{\"index\":{\"_index\":\"test-hgw28jv10u\",\"_type\":\"log_lines\",\"_id\":\"3GhQLXEBE62DvOOUKdFH\",\"status\":400,\"error\":{\"type\":\"illegal_argument_exception\",\"reason\":\"mapper [message] of different type, current_type [long], merged_type [text]\"}}}]}";
+        let reason = get_error_reason(&json);
+        assert_eq!(reason, "error type: illegal_argument_exception, reason: mapper [message] of different type, current_type [long], merged_type [text]");
+    }
+
+    #[test]
+    fn get_create_error_reason() {
+        let json = "{\"took\":3,\"errors\":true,\"items\":[{\"create\":{\"_index\":\"test-hgw28jv10u\",\"_type\":\"_doc\",\"_id\":\"aBLq1HcBWD7eBWkW2nj4\",\"status\":400,\"error\":{\"type\":\"mapper_parsing_exception\",\"reason\":\"object mapping for [host] tried to parse field [host] as object, but found a concrete value\"}}}]}";
+        let reason = get_error_reason(&json);
+        assert_eq!(reason, "error type: mapper_parsing_exception, reason: object mapping for [host] tried to parse field [host] as object, but found a concrete value");
+    }
+
+    #[test]
     fn allows_using_excepted_fields() {
         let config = ElasticSearchConfig {
             index: Some(String::from("{{ idx }}")),
@@ -633,7 +677,7 @@ mod integration_tests {
         config::{SinkConfig, SinkContext},
         http::HttpClient,
         test_util::{random_events_with_stream, random_string, trace_init},
-        tls::TlsOptions,
+        tls::{self, TlsOptions},
         Event,
     };
     use futures::{stream, StreamExt};
@@ -749,7 +793,7 @@ mod integration_tests {
                 doc_type: Some("log_lines".into()),
                 compression: Compression::None,
                 tls: Some(TlsOptions {
-                    ca_file: Some("tests/data/Vector_CA.crt".into()),
+                    ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                     ..Default::default()
                 }),
                 ..config()
@@ -765,7 +809,7 @@ mod integration_tests {
 
         run_insert_tests(
             ElasticSearchConfig {
-                auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
+                auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default {})),
                 endpoint: "http://localhost:4571".into(),
                 ..config()
             },
@@ -780,7 +824,7 @@ mod integration_tests {
 
         run_insert_tests(
             ElasticSearchConfig {
-                auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
+                auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default {})),
                 endpoint: "http://localhost:4571".into(),
                 compression: Compression::gzip_default(),
                 ..config()
@@ -841,7 +885,7 @@ mod integration_tests {
         flush(common).await.expect("Flushing writes failed");
 
         let mut test_ca = Vec::<u8>::new();
-        File::open("tests/data/Vector_CA.crt")
+        File::open(tls::TEST_PEM_CA_PATH)
             .unwrap()
             .read_to_end(&mut test_ca)
             .unwrap();

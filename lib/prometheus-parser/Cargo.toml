@@ -1,12 +1,23 @@
 [package]
 name = "prometheus-parser"
 version = "0.1.0"
-authors = ["Duy Do <juchiast@gmail.com>"]
+authors = ["Vector Contributors <vector@timber.io>", "Duy Do <juchiast@gmail.com>"]
 edition = "2018"
 publish = false
+license = "MPL-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+indexmap = "1.6.1"
 nom = "6.0.1"
+num_enum = "0.5.1"
+prost = "0.6.1"
+prost-types = "0.6.1"
 snafu = { version = "0.6" }
+
+[build-dependencies]
+prost-build = "0.6.1"
+
+[dev-dependencies]
+shared = { path = "../shared", features = ["btreemap"] }

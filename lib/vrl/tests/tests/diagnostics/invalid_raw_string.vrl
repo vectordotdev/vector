@@ -1,0 +1,13 @@
+# result:
+#
+# error[E202]: syntax error
+#   ┌─ :1:1
+#   │
+# 1 │ ╭
+# 2 │ │ s'foobar
+# 3 │ │
+#   │ ╰^ unexpected error: invalid literal
+#   │
+#   = see language documentation at https://vrl.dev
+
+s'foobar

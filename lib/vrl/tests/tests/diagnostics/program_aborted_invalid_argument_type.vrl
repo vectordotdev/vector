@@ -1,0 +1,5 @@
+# result:
+#
+# function call error for "to_string" at (1:15): unable to coerce "array" into "string"
+
+to_string!([])

@@ -15,7 +15,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
     time::sleep,
 };
-use tokio_util::codec::{Decoder, FramedRead};
+use tokio_util::codec::{Decoder, FramedRead, LinesCodecError};
 use tracing_futures::Instrument;
 
 async fn make_listener(
@@ -50,12 +50,30 @@ async fn make_listener(
         },
     }
 }
+pub trait IsErrorFatal {
+    fn is_error_fatal() -> bool;
+}
 
-pub trait TcpSource: Clone + Send + Sync + 'static {
+impl IsErrorFatal for LinesCodecError {
+    fn is_error_fatal() -> bool {
+        false
+    }
+}
+
+impl IsErrorFatal for std::io::Error {
+    fn is_error_fatal() -> bool {
+        true
+    }
+}
+
+pub trait TcpSource: Clone + Send + Sync + 'static
+where
+    <<Self as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
+{
     // Should be default: `std::io::Error`.
     // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
-    type Error: From<io::Error> + std::fmt::Debug + std::fmt::Display;
-    type Decoder: Decoder<Error = Self::Error> + Send + 'static;
+    type Error: From<io::Error> + IsErrorFatal + std::fmt::Debug + std::fmt::Display + Send;
+    type Decoder: Decoder<Error = Self::Error> + Send + 'static + Send;
 
     fn decoder(&self) -> Self::Decoder;
 
@@ -67,6 +85,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
         keepalive: Option<TcpKeepaliveConfig>,
         shutdown_timeout_secs: u64,
         tls: MaybeTlsSettings,
+        receive_buffer_bytes: Option<usize>,
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
@@ -138,8 +157,16 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
                                 connection_gauge.open(|count| emit!(ConnectionOpen { count }));
 
                             let fut = handle_stream(
-                                shutdown, socket, keepalive, source, tripwire, host, out,
+                                shutdown,
+                                socket,
+                                keepalive,
+                                receive_buffer_bytes,
+                                source,
+                                tripwire,
+                                host,
+                                out,
                             );
+
                             tokio::spawn(
                                 fut.map(move |()| drop(open_token)).instrument(span.clone()),
                             );
@@ -152,15 +179,19 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
     }
 }
 
-async fn handle_stream(
+async fn handle_stream<T>(
     mut shutdown: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,
     keepalive: Option<TcpKeepaliveConfig>,
-    source: impl TcpSource,
+    receive_buffer_bytes: Option<usize>,
+    source: T,
     tripwire: BoxFuture<'static, ()>,
     host: Bytes,
     mut out: Pipeline,
-) {
+) where
+    <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
+    T: TcpSource,
+{
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
@@ -179,6 +210,13 @@ async fn handle_stream(
         }
     }
 
+    #[cfg(unix)]
+    if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+        if let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes) {
+            warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
+        }
+    }
+
     let mut _token = None;
     let mut shutdown = Some(shutdown);
     let mut reader = FramedRead::new(socket, source.decoder());
@@ -192,7 +230,7 @@ async fn handle_stream(
                     let socket: Option<&TcpStream> = reader.get_ref().get_ref();
                     if let Some(socket) = socket {
                         // if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
-                        // warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
+                        //     warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
                         // }
                     } else {
                         // Connection hasn't yet been established so we are done here.
@@ -210,6 +248,12 @@ async fn handle_stream(
         reader.poll_next_unpin(cx)
     })
     .take_until(tripwire)
+    .take_while(move |frame| {
+        ready(match frame {
+            Ok(_) => true,
+            Err(_) => !<<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal(),
+        })
+    })
     .filter_map(move |frame| {
         ready(match frame {
             Ok(frame) => {

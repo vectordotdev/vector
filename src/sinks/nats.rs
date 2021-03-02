@@ -85,18 +85,16 @@ impl SinkConfig for NatsSinkConfig {
 }
 
 impl NatsSinkConfig {
-    fn to_nats_options(&self) -> crate::Result<nats::Options> {
+    fn to_nats_options(&self) -> nats::Options {
         // Set reconnect_buffer_size on the nats client to 0 bytes so that the
         // client doesn't buffer internally (to avoid message loss).
-        let options = nats::Options::new()
+        nats::Options::new()
             .with_name(&self.name)
-            .reconnect_buffer_size(0);
-
-        Ok(options)
+            .reconnect_buffer_size(0)
     }
 
     async fn connect(&self) -> crate::Result<nats::asynk::Connection> {
-        self.to_nats_options()?
+        self.to_nats_options()
             .connect_async(&self.url)
             .map_err(|e| e.into())
             .await
@@ -177,12 +175,13 @@ impl StreamSink for NatsSink {
                     emit!(NatsEventSendSuccess {
                         byte_size: message_len,
                     });
-                    self.acker.ack(1);
                 }
                 Err(error) => {
                     emit!(NatsEventSendFail { error });
                 }
             }
+
+            self.acker.ack(1);
         }
 
         Ok(())

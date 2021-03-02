@@ -9,6 +9,7 @@ components: sinks: aws_sqs: components._aws & {
 		development:   "beta"
 		egress_method: "stream"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {
@@ -55,14 +56,15 @@ components: sinks: aws_sqs: components._aws & {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -75,6 +77,7 @@ components: sinks: aws_sqs: components._aws & {
 			warnings: []
 			type: string: {
 				examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
+				syntax: "literal"
 			}
 		}
 		message_group_id: {
@@ -85,6 +88,7 @@ components: sinks: aws_sqs: components._aws & {
 			type: string: {
 				default: null
 				examples: ["vector", "vector-%Y-%m-%d"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -111,4 +115,10 @@ components: sinks: aws_sqs: components._aws & {
 			]
 		},
 	]
+
+	telemetry: metrics: {
+		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
+		missing_keys_total:     components.sources.internal_metrics.output.metrics.missing_keys_total
+	}
 }

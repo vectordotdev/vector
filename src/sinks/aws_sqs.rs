@@ -1,7 +1,7 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     internal_events::{AwsSqsEventSent, AwsSqsMessageGroupIdMissingKeys},
-    rusoto,
+    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
@@ -56,12 +56,15 @@ pub struct SqsSink {
 pub struct SqsSinkConfig {
     pub queue_url: String,
     #[serde(flatten)]
-    pub region: rusoto::RegionOrEndpoint,
+    pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
     pub message_group_id: Option<String>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub assume_role: Option<String>,
+    // Deprecated name. Moved to auth.
+    assume_role: Option<String>,
+    #[serde(default)]
+    pub auth: AWSAuthentication,
 }
 
 lazy_static! {
@@ -132,7 +135,7 @@ impl SqsSinkConfig {
         let region = (&self.region).try_into()?;
         let client = rusoto::client()?;
 
-        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+        let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         Ok(SqsClient::new_with(client, creds, region))
     }
@@ -334,11 +337,12 @@ mod integration_tests {
 
         let config = SqsSinkConfig {
             queue_url: queue_url.clone(),
-            region: rusoto::RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
             encoding: Encoding::Text.into(),
             message_group_id: None,
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         config.clone().healthcheck(client.clone()).await.unwrap();

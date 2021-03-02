@@ -164,6 +164,10 @@ where
 /// more fine grained partitioning ability. It will hold many different batches
 /// of events and contain linger timeouts for each.
 ///
+/// Note that, unlike `BatchSink`, the `batch` given to this sink is
+/// *only* used to create new batches (via `Batch::fresh`) for each new
+/// partition.
+///
 /// # Acking
 ///
 /// Service based acking will only ack events when all prior request

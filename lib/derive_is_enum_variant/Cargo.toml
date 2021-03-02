@@ -1,0 +1,17 @@
+[package]
+name = "derive_is_enum_variant"
+version = "1.0.0"
+authors = ["Vector Contributors <vector@timber.io>", "Nick Fitzgerald <fitzgen@gmail.com>"]
+edition = "2018"
+description = "Automatically derives `is_dog` and `is_cat` methods for `enum Pet { Dog, Cat }`."
+publish = false
+license = "Apache-2.0/MIT"
+
+[dependencies]
+heck = "0.3.0"
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "1", features = ["extra-traits"] }
+
+[lib]
+proc_macro = true

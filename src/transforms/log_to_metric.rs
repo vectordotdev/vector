@@ -1,5 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+    },
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::LogEvent,
     event::Value,
@@ -106,7 +108,7 @@ impl GenerateConfig for LogToMetricConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         Ok(Transform::function(LogToMetric::new(self.clone())))
     }
 
@@ -229,14 +231,14 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&counter.tags, &event)?;
 
-            Ok(Metric {
+            Ok(Metric::new(
                 name,
-                namespace,
-                timestamp,
-                tags,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value },
-            })
+                MetricKind::Incremental,
+                MetricValue::Counter { value },
+            )
+            .with_namespace(namespace)
+            .with_tags(tags)
+            .with_timestamp(timestamp))
         }
         MetricConfig::Histogram(hist) => {
             let value = parse_field(&log, &hist.field)?;
@@ -251,18 +253,17 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&hist.tags, &event)?;
 
-            Ok(Metric {
+            Ok(Metric::new(
                 name,
-                namespace,
-                timestamp,
-                tags,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
-                    values: vec![value],
-                    sample_rates: vec![1],
+                MetricKind::Incremental,
+                MetricValue::Distribution {
+                    samples: crate::samples![value => 1],
                     statistic: StatisticKind::Histogram,
                 },
-            })
+            )
+            .with_namespace(namespace)
+            .with_tags(tags)
+            .with_timestamp(timestamp))
         }
         MetricConfig::Summary(summary) => {
             let value = parse_field(&log, &summary.field)?;
@@ -277,18 +278,17 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&summary.tags, &event)?;
 
-            Ok(Metric {
+            Ok(Metric::new(
                 name,
-                namespace,
-                timestamp,
-                tags,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
-                    values: vec![value],
-                    sample_rates: vec![1],
+                MetricKind::Incremental,
+                MetricValue::Distribution {
+                    samples: crate::samples![value => 1],
                     statistic: StatisticKind::Summary,
                 },
-            })
+            )
+            .with_namespace(namespace)
+            .with_tags(tags)
+            .with_timestamp(timestamp))
         }
         MetricConfig::Gauge(gauge) => {
             let value = parse_field(&log, &gauge.field)?;
@@ -303,14 +303,12 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&gauge.tags, &event)?;
 
-            Ok(Metric {
-                name,
-                namespace,
-                timestamp,
-                tags,
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value },
-            })
+            Ok(
+                Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
+                    .with_namespace(namespace)
+                    .with_tags(tags)
+                    .with_timestamp(timestamp),
+            )
         }
         MetricConfig::Set(set) => {
             let value = log
@@ -330,16 +328,16 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&set.tags, &event)?;
 
-            Ok(Metric {
+            Ok(Metric::new(
                 name,
-                namespace,
-                timestamp,
-                tags,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Set {
+                MetricKind::Incremental,
+                MetricValue::Set {
                     values: std::iter::once(value).collect(),
                 },
-            })
+            )
+            .with_namespace(namespace)
+            .with_tags(tags)
+            .with_timestamp(timestamp))
         }
     }
 }
@@ -417,14 +415,12 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric {
-                name: "status".into(),
-                namespace: None,
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.0 },
-            }
+            Metric::new(
+                "status",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -450,22 +446,22 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric {
-                name: "http_requests_total".into(),
-                namespace: Some("app".into()),
-                timestamp: Some(ts()),
-                tags: Some(
-                    vec![
-                        ("method".to_owned(), "post".to_owned()),
-                        ("code".to_owned(), "200".to_owned()),
-                        ("host".to_owned(), "localhost".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.0 },
-            }
+            Metric::new(
+                "http_requests_total",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_namespace(Some("app"))
+            .with_tags(Some(
+                vec![
+                    ("method".to_owned(), "post".to_owned()),
+                    ("code".to_owned(), "200".to_owned()),
+                    ("host".to_owned(), "localhost".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
+            ))
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -486,14 +482,12 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric {
-                name: "exception_total".into(),
-                namespace: None,
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.0 },
-            }
+            Metric::new(
+                "exception_total",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -532,14 +526,12 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric {
-                name: "amount_total".into(),
-                namespace: None,
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 33.99 },
-            }
+            Metric::new(
+                "amount_total",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 33.99 },
+            )
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -560,14 +552,12 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric {
-                name: "memory_rss_bytes".into(),
-                namespace: None,
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value: 123.0 },
-            }
+            Metric::new(
+                "memory_rss_bytes",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 123.0 },
+            )
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -635,25 +625,21 @@ mod tests {
         assert_eq!(2, output.len());
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric {
-                name: "exception_total".into(),
-                namespace: None,
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.0 },
-            }
+            Metric::new(
+                "exception_total",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_timestamp(Some(ts()))
         );
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric {
-                name: "status".into(),
-                namespace: None,
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.0 },
-            }
+            Metric::new(
+                "status",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -691,27 +677,24 @@ mod tests {
         assert_eq!(2, output.len());
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric {
-                name: "xyz_exception_total".into(),
-                namespace: Some("local".into()),
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.0 },
-            }
+            Metric::new(
+                "xyz_exception_total",
+                MetricKind::Incremental,
+                MetricValue::Counter { value: 1.0 },
+            )
+            .with_namespace(Some("local"))
+            .with_timestamp(Some(ts()))
         );
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric {
-                name: "local_abc_status_set".into(),
-                namespace: None,
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Set {
+            Metric::new(
+                "local_abc_status_set",
+                MetricKind::Incremental,
+                MetricValue::Set {
                     values: vec!["42".into()].into_iter().collect()
                 },
-            }
+            )
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -732,16 +715,14 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric {
-                name: "unique_user_ip".into(),
-                namespace: None,
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Set {
+            Metric::new(
+                "unique_user_ip",
+                MetricKind::Incremental,
+                MetricValue::Set {
                     values: vec!["1.2.3.4".into()].into_iter().collect()
                 },
-            }
+            )
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -761,18 +742,15 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric {
-                name: "response_time".into(),
-                namespace: None,
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
-                    values: vec![2.5],
-                    sample_rates: vec![1],
+            Metric::new(
+                "response_time",
+                MetricKind::Incremental,
+                MetricValue::Distribution {
+                    samples: crate::samples![2.5 => 1],
                     statistic: StatisticKind::Histogram
                 },
-            }
+            )
+            .with_timestamp(Some(ts()))
         );
     }
 
@@ -792,18 +770,15 @@ mod tests {
 
         assert_eq!(
             metric.into_metric(),
-            Metric {
-                name: "response_time".into(),
-                namespace: None,
-                timestamp: Some(ts()),
-                tags: None,
-                kind: MetricKind::Incremental,
-                value: MetricValue::Distribution {
-                    values: vec![2.5],
-                    sample_rates: vec![1],
+            Metric::new(
+                "response_time",
+                MetricKind::Incremental,
+                MetricValue::Distribution {
+                    samples: crate::samples![2.5 => 1],
                     statistic: StatisticKind::Summary
                 },
-            }
+            )
+            .with_timestamp(Some(ts()))
         );
     }
 }

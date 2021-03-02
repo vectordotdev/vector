@@ -54,7 +54,7 @@ scopes:
   - releasing # Anything related to releasing Vector
   - reliability # Anything related to Vector's reliability
   - reload # Anything related to reloading Vector (updating configuration)
-  - remap # Anything related to the Timber Remap Language
+  - remap # Anything related to the Vector Remap Language
   - schemas # Anything related to internal Vector event schemas
   - security # Anything related to security
   - setup # Anything related to setting up or installing Vector
@@ -128,6 +128,7 @@ scopes:
   - kubernetes_logs source # Anything `kubernetes_logs` source related
   - mongodb_metrics source # Anything `mongodb_metrics` source related
   - nginx_metrics source # Anything `nginx_metrics` source related
+  - postgresql_metrics source # Anything `postgresql_metrics` source related
   - prometheus_remote_write source # Anything `prometheus_remote_write` source related
   - prometheus_scrape source # Anything `prometheus_scrape` source related
   - socket source # Anything `socket` source related
@@ -160,9 +161,9 @@ scopes:
   - remove_fields transform # Anything `remove_fields` transform related
   - remove_tags transform # Anything `remove_tags` transform related
   - rename_fields transform # Anything `rename_fields` transform related
-  - sampler transform # Anything `sampler` transform related
+  - sample transform # Anything `sample` transform related
   - split transform # Anything `split` transform related
-  - swimlanes transform # Anything `swimlanes` transform related
+  - route transform # Anything `route` transform related
   - tag_cardinality_limit transform # Anything `tag_cardinality_limit` transform related
   - tokenizer transform # Anything `tokenizer` transform related
   - wasm transform # Anything `wasm` transform related

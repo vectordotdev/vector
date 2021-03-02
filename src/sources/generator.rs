@@ -3,12 +3,9 @@ use crate::{
     event::Event,
     internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
-    sources::util::fake::{
-        apache_common_log_line, apache_error_log_line, json_log_line, syslog_3164_log_line,
-        syslog_5424_log_line,
-    },
     Pipeline,
 };
+use fakedata::logs::*;
 use futures::{stream::StreamExt, SinkExt};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -70,7 +67,7 @@ impl OutputFormat {
     }
 
     fn shuffle_generate(sequence: bool, lines: &[String], n: usize) -> String {
-        // unwrap can be called here because lines cannot be empty
+        // unwrap can be called here because `lines` can't be empty
         let line = lines.choose(&mut rand::thread_rng()).unwrap();
 
         if sequence {
@@ -80,7 +77,7 @@ impl OutputFormat {
         }
     }
 
-    // Ensures that the lines list is non-empty if Shuffle is chosen
+    // Ensures that the `lines` list is non-empty if `Shuffle` is chosen
     pub(self) fn validate(&self) -> Result<(), GeneratorConfigError> {
         match self {
             Self::Shuffle { lines, .. } => {

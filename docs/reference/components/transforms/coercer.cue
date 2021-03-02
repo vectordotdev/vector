@@ -11,6 +11,7 @@ components: transforms: coercer: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -19,16 +20,29 @@ components: transforms: coercer: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
-		warnings: [transforms.add_fields.support.warnings[0]]
+		warnings: [
+			"""
+			\(coercer._remap_deprecation_notice)
+
+			```vrl
+			.bool = to_bool("false")
+			.float = to_float("1.0")
+			.int = to_int("1")
+			.string = to_string(1)
+			.timestamp = to_timestamp("2021-01-15T12:33:22.213221Z")
+			```
+			""",
+		]
 		notices: []
 	}
 
@@ -45,7 +59,8 @@ components: transforms: coercer: {
 			warnings: []
 			type: bool: default: false
 		}
-		types: configuration._types
+		timezone: configuration._timezone
+		types:    configuration._types
 	}
 
 	examples: [
@@ -79,4 +94,8 @@ components: transforms: coercer: {
 			}
 		},
 	]
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+	}
 }

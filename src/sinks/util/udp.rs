@@ -1,4 +1,6 @@
 use super::SinkBuildError;
+#[cfg(unix)]
+use crate::udp;
 use crate::{
     buffers::Acker,
     config::SinkContext,
@@ -45,19 +47,23 @@ pub enum UdpError {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct UdpSinkConfig {
-    pub address: String,
+    address: String,
+    send_buffer_bytes: Option<usize>,
 }
 
 impl UdpSinkConfig {
-    pub fn new(address: String) -> Self {
-        Self { address }
+    pub fn from_address(address: String) -> Self {
+        Self {
+            address,
+            send_buffer_bytes: None,
+        }
     }
 
     fn build_connector(&self, _cx: SinkContext) -> crate::Result<UdpConnector> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
-        Ok(UdpConnector::new(host, port))
+        Ok(UdpConnector::new(host, port, self.send_buffer_bytes))
     }
 
     pub fn build_service(&self, cx: SinkContext) -> crate::Result<(UdpService, Healthcheck)> {
@@ -86,11 +92,16 @@ impl UdpSinkConfig {
 struct UdpConnector {
     host: String,
     port: u16,
+    send_buffer_bytes: Option<usize>,
 }
 
 impl UdpConnector {
-    fn new(host: String, port: u16) -> Self {
-        Self { host, port }
+    fn new(host: String, port: u16, send_buffer_bytes: Option<usize>) -> Self {
+        Self {
+            host,
+            port,
+            send_buffer_bytes,
+        }
     }
 
     fn fresh_backoff() -> ExponentialBackoff {
@@ -112,6 +123,12 @@ impl UdpConnector {
         let bind_address = find_bind_address(&addr);
 
         let socket = UdpSocket::bind(bind_address).await.context(BindError)?;
+
+        #[cfg(unix)]
+        if let Some(send_buffer_bytes) = self.send_buffer_bytes {
+            udp::set_send_buffer_size(&socket, send_buffer_bytes);
+        }
+
         socket.connect(addr).await.context(ConnectError)?;
 
         Ok(socket)

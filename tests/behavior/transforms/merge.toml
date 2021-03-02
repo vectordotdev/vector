@@ -17,8 +17,11 @@
   [[tests.outputs]]
     extract_from = "merge"
     [[tests.outputs.conditions]]
-      "message.equals" = "hello world"
-      "_partial.exists" = false
+      type = "remap"
+      source = '''
+        .message == "hello world" &&
+        !exists(."_partial")
+      '''
 
 [transforms.merge_nested]
   inputs = []
@@ -40,8 +43,11 @@
   [[tests.outputs]]
     extract_from = "merge_nested"
     [[tests.outputs.conditions]]
-      "nested.message.equals" = "hello world"
-      "_partial.exists" = false
+      type = "remap"
+      source = '''
+        .nested.message == "hello world" &&
+        !exists(."_partial")
+      '''
 
 [transforms.merge_nested_marker]
   inputs = []
@@ -64,5 +70,8 @@
   [[tests.outputs]]
     extract_from = "merge_nested_marker"
     [[tests.outputs.conditions]]
-      "nested.message.equals" = "hello world"
-      "nested.is_partial.exists" = false
+      type = "remap"
+      source = '''
+        .nested.message == "hello world" &&
+        !exists(.nested.is_partial)
+      '''

@@ -163,8 +163,8 @@ impl WeightedSum {
     pub fn add(&mut self, value: f64, weight: f64) {
         self.total += value * weight;
         self.weights += weight;
-        self.max = opt_max(self.max, value);
-        self.min = opt_min(self.min, value);
+        self.max = Some(opt_max(self.max, value));
+        self.min = Some(opt_min(self.min, value));
     }
 
     pub fn mean(&self) -> Option<f64> {
@@ -197,20 +197,20 @@ impl Display for WeightedSum {
     }
 }
 
-fn opt_max(opt: Option<f64>, value: f64) -> Option<f64> {
-    Some(match opt {
+fn opt_max(opt: Option<f64>, value: f64) -> f64 {
+    match opt {
         None => value,
         Some(s) if s > value => s,
         _ => value,
-    })
+    }
 }
 
-fn opt_min(opt: Option<f64>, value: f64) -> Option<f64> {
-    Some(match opt {
+fn opt_min(opt: Option<f64>, value: f64) -> f64 {
+    match opt {
         None => value,
         Some(s) if s < value => s,
         _ => value,
-    })
+    }
 }
 
 /// A TimeWeightedSum is a wrapper around WeightedSum that keeps track

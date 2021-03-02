@@ -38,10 +38,10 @@ pub trait MaintainedWrite: Write {
     /// A future that resolves when maintenance is required.
     ///
     /// Does not perform the maintenance itself, users must call
-    /// [`perform_maintenance`] to actually perform the maintenance.
+    /// [`Self::perform_maintenance`] to actually perform the maintenance.
     ///
     /// `None` if the state doesn't require maintenance, and
-    /// [`perform_maintenance`] shouldn't be called.
+    /// [`Self::perform_maintenance`] shouldn't be called.
     /// [`futures::future::FusedFuture`] should've been used here, but it's
     /// not not trivially implementable with `async/await` syntax, so [`Option`]
     /// wrapper is used instead for the same purpose.

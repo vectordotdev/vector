@@ -1,5 +1,4 @@
 use crate::event::{lookup::Segment, util, Lookup, PathComponent, Value};
-use remap::{Object, Path};
 use serde::{Serialize, Serializer};
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
@@ -244,8 +243,8 @@ impl Serialize for LogEvent {
     }
 }
 
-impl Object for LogEvent {
-    fn get(&self, path: &remap::Path) -> Result<Option<remap::Value>, String> {
+impl vrl::Target for LogEvent {
+    fn get(&self, path: &vrl::Path) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             let iter = self
                 .as_map()
@@ -253,7 +252,7 @@ impl Object for LogEvent {
                 .into_iter()
                 .map(|(k, v)| (k, v.into()));
 
-            return Ok(Some(remap::Value::from_iter(iter)));
+            return Ok(Some(vrl::Value::from_iter(iter)));
         }
 
         let value = path
@@ -266,14 +265,16 @@ impl Object for LogEvent {
         Ok(value)
     }
 
-    fn remove(&mut self, path: &Path, compact: bool) -> Result<(), String> {
+    fn remove(&mut self, path: &vrl::Path, compact: bool) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
-            for key in self.keys().collect::<Vec<_>>() {
-                self.remove_prune(key, compact);
-            }
-
-            return Ok(());
-        };
+            return Ok(Some(
+                std::mem::take(&mut self.fields)
+                    .into_iter()
+                    .map(|(key, value)| (key, value.into()))
+                    .collect::<BTreeMap<_, _>>()
+                    .into(),
+            ));
+        }
 
         // loop until we find a path that exists.
         for key in path.to_alternative_strings() {
@@ -281,17 +282,16 @@ impl Object for LogEvent {
                 continue;
             }
 
-            self.remove_prune(&key, compact);
-            break;
+            return Ok(self.remove_prune(&key, compact).map(Into::into));
         }
 
-        Ok(())
+        Ok(None)
     }
 
-    fn insert(&mut self, path: &Path, value: remap::Value) -> Result<(), String> {
+    fn insert(&mut self, path: &vrl::Path, value: vrl::Value) -> Result<(), String> {
         if path.is_root() {
             match value {
-                remap::Value::Map(map) => {
+                vrl::Value::Object(map) => {
                     *self = map
                         .into_iter()
                         .map(|(k, v)| (k, v.into()))
@@ -309,16 +309,6 @@ impl Object for LogEvent {
         }
 
         Ok(())
-    }
-
-    fn paths(&self) -> Result<Vec<remap::Path>, String> {
-        if self.is_empty() {
-            return Ok(vec![remap::Path::root()]);
-        }
-
-        self.keys()
-            .map(|key| remap::Path::from_alternative_string(key).map_err(|err| err.to_string()))
-            .collect()
     }
 }
 
@@ -429,28 +419,28 @@ mod test {
 
     #[test]
     fn object_get() {
-        use crate::map;
-        use remap::{Field::*, Object, Path, Segment::*};
+        use shared::btreemap;
+        use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
-            (map![], vec![], Ok(Some(map![].into()))),
+            (btreemap! {}, vec![], Ok(Some(btreemap! {}.into()))),
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![],
-                Ok(Some(map!["foo": "bar"].into())),
+                Ok(Some(btreemap! { "foo" => "bar" }.into())),
             ),
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned()))],
                 Ok(Some("bar".into())),
             ),
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![Field(Regular("bar".to_owned()))],
                 Ok(None),
             ),
             (
-                map!["foo": vec![map!["bar": true]]],
+                btreemap! { "foo" => vec![btreemap! { "bar" => true }] },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Index(0),
@@ -459,7 +449,7 @@ mod test {
                 Ok(Some(true.into())),
             ),
             (
-                map!["foo": map!["bar baz": map!["baz": 2]]],
+                btreemap! { "foo" => btreemap! { "bar baz" => btreemap! { "baz" => 2 } } },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Coalesce(vec![
@@ -475,34 +465,34 @@ mod test {
         for (value, segments, expect) in cases {
             let value: BTreeMap<String, Value> = value;
             let event = LogEvent::from(value);
-            let path = Path::new_unchecked(segments);
+            let path = vrl::Path::new_unchecked(segments);
 
-            assert_eq!(Object::get(&event, &path), expect)
+            assert_eq!(vrl::Target::get(&event, &path), expect)
         }
     }
 
     #[test]
     fn object_insert() {
-        use crate::map;
-        use remap::{Field::*, Object, Path, Segment::*};
+        use shared::btreemap;
+        use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![],
-                map!["baz": "qux"].into(),
-                map!["baz": "qux"],
+                btreemap! { "baz" => "qux" }.into(),
+                btreemap! { "baz" => "qux" },
                 Ok(()),
             ),
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned()))],
                 "baz".into(),
-                map!["foo": "baz"],
+                btreemap! { "foo" => "baz" },
                 Ok(()),
             ),
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Index(2),
@@ -511,66 +501,66 @@ mod test {
                     Field(Regular("b".to_owned())),
                 ],
                 true.into(),
-                map![
-                    "foo":
-                        vec![
-                            Value::Null,
-                            Value::Null,
-                            map!["bar baz": map!["a": map!["b": true]],].into()
-                        ]
-                ],
+                btreemap! {
+                    "foo" => vec![
+                        Value::Null,
+                        Value::Null,
+                        btreemap! {
+                            "bar baz" => btreemap! { "a" => btreemap! { "b" => true } },
+                        }.into()
+                    ]
+                },
                 Ok(()),
             ),
             (
-                map!["foo": vec![0, 1, 2]],
+                btreemap! { "foo" => vec![0, 1, 2] },
                 vec![Field(Regular("foo".to_owned())), Index(5)],
                 "baz".into(),
-                map![
-                    "foo":
-                        vec![
-                            0.into(),
-                            1.into(),
-                            2.into(),
-                            Value::Null,
-                            Value::Null,
-                            Value::from("baz"),
-                        ]
-                ],
+                btreemap! {
+                    "foo" => vec![
+                        0.into(),
+                        1.into(),
+                        2.into(),
+                        Value::Null,
+                        Value::Null,
+                        Value::from("baz"),
+                    ],
+                },
                 Ok(()),
             ),
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                map!["foo": vec!["baz"]],
+                btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                map!["foo": Value::Array(vec![])],
+                btreemap! { "foo" => Value::Array(vec![]) },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                map!["foo": vec!["baz"]],
+                btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                map!["foo": Value::Array(vec![0.into()])],
+                btreemap! { "foo" => Value::Array(vec![0.into()]) },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                map!["foo": vec!["baz"]],
+                btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                map!["foo": Value::Array(vec![0.into(), 1.into()])],
+                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                map!["foo": Value::Array(vec!["baz".into(), 1.into()])],
+                btreemap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
                 Ok(()),
             ),
             (
-                map!["foo": Value::Array(vec![0.into(), 1.into()])],
+                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
                 vec![Field(Regular("foo".to_owned())), Index(1)],
                 "baz".into(),
-                map!["foo": Value::Array(vec![0.into(), "baz".into()])],
+                btreemap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
                 Ok(()),
             ),
         ];
@@ -579,129 +569,104 @@ mod test {
             let object: BTreeMap<String, Value> = object;
             let mut event = LogEvent::from(object);
             let expect = LogEvent::from(expect);
-            let value: remap::Value = value;
-            let path = Path::new_unchecked(segments);
+            let value: vrl::Value = value;
+            let path = vrl::Path::new_unchecked(segments);
 
-            assert_eq!(Object::insert(&mut event, &path, value.clone()), result);
+            assert_eq!(
+                vrl::Target::insert(&mut event, &path, value.clone()),
+                result
+            );
             assert_eq!(event, expect);
-            assert_eq!(remap::Object::get(&event, &path), Ok(Some(value)));
+            assert_eq!(vrl::Target::get(&event, &path), Ok(Some(value)));
         }
     }
 
     #[test]
     fn object_remove() {
-        use crate::map;
-        use remap::{Field::*, Object, Path, Segment::*};
+        use shared::btreemap;
+        use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned()))],
                 false,
-                Some(map![].into()),
+                Some(btreemap! {}.into()),
             ),
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![Coalesce(vec![
                     Quoted("foo bar".to_owned()),
                     Regular("foo".to_owned()),
                 ])],
                 false,
-                Some(map![].into()),
+                Some(btreemap! {}.into()),
             ),
             (
-                map!["foo": "bar", "baz": "qux"],
+                btreemap! { "foo" => "bar", "baz" => "qux" },
                 vec![],
                 false,
-                Some(map![].into()),
+                Some(btreemap! {}.into()),
             ),
             (
-                map!["foo": "bar", "baz": "qux"],
+                btreemap! { "foo" => "bar", "baz" => "qux" },
                 vec![],
                 true,
-                Some(map![].into()),
+                Some(btreemap! {}.into()),
             ),
             (
-                map!["foo": vec![0]],
+                btreemap! { "foo" => vec![0] },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 false,
-                Some(map!["foo": Value::Array(vec![])].into()),
+                Some(btreemap! { "foo" => Value::Array(vec![]) }.into()),
             ),
             (
-                map!["foo": vec![0]],
+                btreemap! { "foo" => vec![0] },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 true,
-                Some(map![].into()),
+                Some(btreemap! {}.into()),
             ),
             (
-                map!["foo": map!["bar baz": vec![0]], "bar": "baz"],
+                btreemap! {
+                    "foo" => btreemap! { "bar baz" => vec![0] },
+                    "bar" => "baz",
+                },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Field(Quoted("bar baz".to_owned())),
                     Index(0),
                 ],
                 false,
-                Some(map!["foo": map!["bar baz": Value::Array(vec![])], "bar": "baz"].into()),
+                Some(
+                    btreemap! {
+                        "foo" => btreemap! { "bar baz" => Value::Array(vec![]) },
+                        "bar" => "baz",
+                    }
+                    .into(),
+                ),
             ),
             (
-                map!["foo": map!["bar baz": vec![0]], "bar": "baz"],
+                btreemap! {
+                    "foo" => btreemap! { "bar baz" => vec![0] },
+                    "bar" => "baz",
+                },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Field(Quoted("bar baz".to_owned())),
                     Index(0),
                 ],
                 true,
-                Some(map!["bar": "baz"].into()),
+                Some(btreemap! { "bar" => "baz" }.into()),
             ),
         ];
 
         for (object, segments, compact, expect) in cases {
             let mut event = LogEvent::from(object);
-            let path = Path::new_unchecked(segments);
+            let path = vrl::Path::new_unchecked(segments);
+            let removed = vrl::Target::get(&event, &path).unwrap();
 
-            assert_eq!(Object::remove(&mut event, &path, compact), Ok(()));
-            assert_eq!(Object::get(&event, &Path::root()), Ok(expect))
-        }
-    }
-
-    #[test]
-    fn object_paths() {
-        use crate::map;
-        use remap::{Object, Path};
-        use std::str::FromStr;
-
-        let cases = vec![
-            (map![], Ok(vec!["."])),
-            (map!["foo bar baz": "bar"], Ok(vec![r#"."foo bar baz""#])),
-            (map!["foo": "bar", "baz": "qux"], Ok(vec![".baz", ".foo"])),
-            (map!["foo": map!["bar": "baz"]], Ok(vec![".foo.bar"])),
-            (map!["a": vec![0, 1]], Ok(vec![".a[0]", ".a[1]"])),
-            (
-                map!["a": map!["b": "c"], "d": 12, "e": vec![
-                    map!["f": 1],
-                    map!["g": 2],
-                    map!["h": 3],
-                ]],
-                Ok(vec![".a.b", ".d", ".e[0].f", ".e[1].g", ".e[2].h"]),
-            ),
-            (
-                map![
-                    "a": vec![map![
-                        "b": vec![map!["c": map!["d": map!["e": vec![vec![0, 1]]]]]]
-                    ]]
-                ],
-                Ok(vec![".a[0].b[0].c.d.e[0][0]", ".a[0].b[0].c.d.e[0][1]"]),
-            ),
-        ];
-
-        for (object, expect) in cases {
-            let object: BTreeMap<String, Value> = object;
-            let event = LogEvent::from(object);
-
-            assert_eq!(
-                event.paths(),
-                expect.map(|vec| vec.iter().map(|s| Path::from_str(s).unwrap()).collect())
-            );
+            assert_eq!(vrl::Target::remove(&mut event, &path, compact), Ok(removed));
+            assert_eq!(vrl::Target::get(&event, &vrl::Path::root()), Ok(expect))
         }
     }
 }

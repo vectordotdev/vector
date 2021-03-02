@@ -14,9 +14,12 @@
   [[tests.outputs]]
     extract_from = "add_fields_nested"
     [[tests.outputs.conditions]]
-      "a.b.equals" = 123
-      "x.y.equals" = 456
-      "x.z.equals" = 789
+        type = "remap"
+        source = '''
+            .a.b == 123
+            .x.y == 456
+            .x.z == 789
+        '''
 
 [transforms.add_fields_array]
   inputs = []
@@ -37,13 +40,11 @@
   [[tests.outputs]]
     extract_from = "add_fields_array"
     [[tests.outputs.conditions]]
-      "a[0].equals" = 0
-      "a[1].equals" = "1"
-      "a[2].equals" = 2.0
-
-      "b[0].equals" = 0
-      "b[1].equals" = "<null>"
-      "b[2].equals" = "two"
+      type = "remap"
+      source = '''
+        .a == [0, "1", 2.0] &&
+        .b == [0, null, "two"]
+      '''
 
 [transforms.add_fields_scalar_then_nested_1]
   inputs = []
@@ -64,7 +65,8 @@
   [[tests.outputs]]
     extract_from = "add_fields_scalar_then_nested_2"
     [[tests.outputs.conditions]]
-      "a.b.equals" = "new value"
+      type = "remap"
+      source = '.a.b == "new value"'
 
 [transforms.add_fields_nested_then_scalar_1]
   inputs = []
@@ -85,7 +87,8 @@
   [[tests.outputs]]
     extract_from = "add_fields_nested_then_scalar_2"
     [[tests.outputs.conditions]]
-      "a.equals" = "new value"
+      type = "remap"
+      source = '.a == "new value"'
 
 [transforms.add_fields_scalar_then_scalar_1]
   inputs = []
@@ -106,7 +109,8 @@
   [[tests.outputs]]
     extract_from = "add_fields_scalar_then_scalar_2"
     [[tests.outputs.conditions]]
-      "a.equals" = "new value"
+      type = "remap"
+      source = '.a == "new value"'
 
 [transforms.add_fields_templated_1]
   inputs = []
@@ -127,7 +131,8 @@
   [[tests.outputs]]
     extract_from = "add_fields_templated_2"
     [[tests.outputs.conditions]]
-      "b.equals" = "a was: initial value"
+      type = "remap"
+      source = '.b == "a was: initial value"'
 
 [transforms.add_fields_templated_nested_1]
   inputs = []
@@ -148,4 +153,5 @@
   [[tests.outputs]]
     extract_from = "add_fields_templated_nested_2"
     [[tests.outputs.conditions]]
-      "b.c.equals" = "a.b was: initial value"
+      type = "remap"
+      source = '.b.c == "a.b was: initial value"'

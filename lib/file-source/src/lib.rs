@@ -17,12 +17,25 @@ pub use self::internal_events::FileSourceInternalEvents;
 
 type FilePosition = u64;
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ReadFrom {
+    Beginning,
+    End,
+    Checkpoint(FilePosition),
+}
+
+impl Default for ReadFrom {
+    fn default() -> Self {
+        ReadFrom::Beginning
+    }
+}
+
 #[cfg(test)]
 mod test {
     use self::file_watcher::FileWatcher;
     use super::*;
+    use bytes::Bytes;
     use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
-    use rand::{distributions::Alphanumeric, Rng};
     use std::fs;
     use std::io::Write;
     #[cfg(unix)]
@@ -166,20 +179,28 @@ mod test {
     }
 
     impl Arbitrary for FWAction {
-        fn arbitrary<G>(g: &mut G) -> FWAction
-        where
-            G: Gen,
-        {
-            let i: usize = g.gen_range(0, 100);
-            let ln_sz = g.gen_range(1, 32);
-            let pause = g.gen_range(1, 3);
+        fn arbitrary(g: &mut Gen) -> FWAction {
+            let i: usize = *g.choose(&(0..100).collect::<Vec<_>>()).unwrap();
             match i {
                 // These weights are more or less arbitrary. 'Pause' maybe
                 // doesn't have a use but we keep it in place to allow for
                 // variations in file-system flushes.
-                0..=50 => FWAction::WriteLine(g.sample_iter(&Alphanumeric).take(ln_sz).collect()),
+                0..=50 => {
+                    const GEN_ASCII_STR_CHARSET: &[u8] =
+                        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+                    let ln_sz = *g.choose(&(1..32).collect::<Vec<_>>()).unwrap();
+                    FWAction::WriteLine(
+                        std::iter::repeat_with(|| *g.choose(&GEN_ASCII_STR_CHARSET).unwrap())
+                            .take(ln_sz)
+                            .map(|v| -> char { v.into() })
+                            .collect(),
+                    )
+                }
                 51..=69 => FWAction::Read,
-                70..=75 => FWAction::Pause(pause),
+                70..=75 => {
+                    let pause = *g.choose(&(1..3).collect::<Vec<_>>()).unwrap();
+                    FWAction::Pause(pause)
+                }
                 76..=85 => FWAction::RotateFile,
                 86..=90 => FWAction::TruncateFile,
                 91..=95 => FWAction::DeleteFile,
@@ -206,8 +227,14 @@ mod test {
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
         let mut rotation_count = 0;
-        let mut fw =
-            FileWatcher::new(path.clone(), 0, None, 100_000).expect("must be able to create");
+        let mut fw = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            100_000,
+            Bytes::from("\n"),
+        )
+        .expect("must be able to create");
 
         let mut writes = 0;
         let mut sut_reads = 0;
@@ -302,8 +329,14 @@ mod test {
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
         let mut rotation_count = 0;
-        let mut fw =
-            FileWatcher::new(path.clone(), 0, None, 100_000).expect("must be able to create");
+        let mut fw = FileWatcher::new(
+            path.clone(),
+            ReadFrom::Beginning,
+            None,
+            100_000,
+            Bytes::from("\n"),
+        )
+        .expect("must be able to create");
 
         let mut fwfiles: Vec<FWFile> = vec![];
         fwfiles.push(FWFile::new());

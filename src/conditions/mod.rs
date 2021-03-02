@@ -9,6 +9,8 @@ pub mod remap;
 
 pub use check_fields::CheckFieldsConfig;
 
+use self::remap::RemapConfig;
+
 pub trait Condition: Send + Sync + dyn_clone::DynClone {
     fn check(&self, e: &Event) -> bool;
 
@@ -39,15 +41,63 @@ inventory::collect!(ConditionDescription);
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(untagged)]
 pub enum AnyCondition {
-    FromType(Box<dyn ConditionConfig>),
-    NoTypeCondition(CheckFieldsConfig),
+    String(String),
+    Map(Box<dyn ConditionConfig>),
 }
 
 impl AnyCondition {
     pub fn build(&self) -> crate::Result<Box<dyn Condition>> {
         match self {
-            Self::FromType(c) => c.build(),
-            Self::NoTypeCondition(c) => c.build(),
+            AnyCondition::String(s) => RemapConfig { source: s.clone() }.build(),
+            AnyCondition::Map(m) => m.build(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use indoc::indoc;
+
+    #[derive(Deserialize, Debug)]
+    struct Test {
+        condition: AnyCondition,
+    }
+
+    #[test]
+    fn deserialize_anycondition_default() {
+        let conf: Test = toml::from_str(r#"condition = ".nork == false""#).unwrap();
+        assert_eq!(
+            r#"String(".nork == false")"#,
+            format!("{:?}", conf.condition)
+        )
+    }
+
+    #[test]
+    fn deserialize_anycondition_check_fields() {
+        let conf: Test = toml::from_str(indoc! {r#"
+            condition.type = "check_fields"
+            condition."norg.equals" = "nork"
+        "#})
+        .unwrap();
+
+        assert_eq!(
+            r#"Map(CheckFieldsConfig { predicates: {"norg.equals": "nork"} })"#,
+            format!("{:?}", conf.condition)
+        )
+    }
+
+    #[test]
+    fn deserialize_anycondition_remap() {
+        let conf: Test = toml::from_str(indoc! {r#"
+            condition.type = "remap"
+            condition.source = '.nork == true'
+        "#})
+        .unwrap();
+
+        assert_eq!(
+            r#"Map(RemapConfig { source: ".nork == true" })"#,
+            format!("{:?}", conf.condition)
+        )
     }
 }

@@ -216,38 +216,42 @@ impl From<proto::EventWrapper> for Event {
                     MetricProto::Set(set) => MetricValue::Set {
                         values: set.values.into_iter().collect(),
                     },
-                    MetricProto::Distribution(dist) => MetricValue::Distribution {
-                        statistic: match dist.statistic() {
-                            proto::distribution::StatisticKind::Histogram => {
-                                StatisticKind::Histogram
-                            }
-                            proto::distribution::StatisticKind::Summary => StatisticKind::Summary,
-                        },
-                        values: dist.values,
-                        sample_rates: dist.sample_rates,
+                    MetricProto::Distribution1(dist) => MetricValue::Distribution {
+                        statistic: dist.statistic().into(),
+                        samples: metric::zip_samples(dist.values, dist.sample_rates),
                     },
-                    MetricProto::AggregatedHistogram(hist) => MetricValue::AggregatedHistogram {
-                        buckets: hist.buckets,
-                        counts: hist.counts,
+                    MetricProto::Distribution2(dist) => MetricValue::Distribution {
+                        statistic: dist.statistic().into(),
+                        samples: dist.samples.into_iter().map(Into::into).collect(),
+                    },
+                    MetricProto::AggregatedHistogram1(hist) => MetricValue::AggregatedHistogram {
+                        buckets: metric::zip_buckets(hist.buckets, hist.counts),
                         count: hist.count,
                         sum: hist.sum,
                     },
-                    MetricProto::AggregatedSummary(summary) => MetricValue::AggregatedSummary {
-                        quantiles: summary.quantiles,
-                        values: summary.values,
+                    MetricProto::AggregatedHistogram2(hist) => MetricValue::AggregatedHistogram {
+                        buckets: hist.buckets.into_iter().map(Into::into).collect(),
+                        count: hist.count,
+                        sum: hist.sum,
+                    },
+                    MetricProto::AggregatedSummary1(summary) => MetricValue::AggregatedSummary {
+                        quantiles: metric::zip_quantiles(summary.quantiles, summary.values),
+                        count: summary.count,
+                        sum: summary.sum,
+                    },
+                    MetricProto::AggregatedSummary2(summary) => MetricValue::AggregatedSummary {
+                        quantiles: summary.quantiles.into_iter().map(Into::into).collect(),
                         count: summary.count,
                         sum: summary.sum,
                     },
                 };
 
-                Event::Metric(Metric {
-                    name,
-                    namespace,
-                    timestamp,
-                    tags,
-                    kind,
-                    value,
-                })
+                Event::Metric(
+                    Metric::new(name, kind, value)
+                        .with_namespace(namespace)
+                        .with_tags(tags)
+                        .with_timestamp(timestamp),
+                )
             }
         }
     }
@@ -299,30 +303,24 @@ impl From<Event> for proto::EventWrapper {
 
                 proto::EventWrapper { event: Some(event) }
             }
-            Event::Metric(Metric {
-                name,
-                namespace,
-                timestamp,
-                tags,
-                kind,
-                value,
-            }) => {
-                let namespace = namespace.unwrap_or_default();
+            Event::Metric(Metric { series, data }) => {
+                let name = series.name.name;
+                let namespace = series.name.namespace.unwrap_or_default();
 
-                let timestamp = timestamp.map(|ts| prost_types::Timestamp {
+                let timestamp = data.timestamp.map(|ts| prost_types::Timestamp {
                     seconds: ts.timestamp(),
                     nanos: ts.timestamp_subsec_nanos() as i32,
                 });
 
-                let tags = tags.unwrap_or_default();
+                let tags = series.tags.unwrap_or_default();
 
-                let kind = match kind {
+                let kind = match data.kind {
                     MetricKind::Incremental => proto::metric::Kind::Incremental,
                     MetricKind::Absolute => proto::metric::Kind::Absolute,
                 }
                 .into();
 
-                let metric = match value {
+                let metric = match data.value {
                     MetricValue::Counter { value } => {
                         MetricProto::Counter(proto::Counter { value })
                     }
@@ -330,40 +328,31 @@ impl From<Event> for proto::EventWrapper {
                     MetricValue::Set { values } => MetricProto::Set(proto::Set {
                         values: values.into_iter().collect(),
                     }),
-                    MetricValue::Distribution {
-                        values,
-                        sample_rates,
-                        statistic,
-                    } => MetricProto::Distribution(proto::Distribution {
-                        values,
-                        sample_rates,
-                        statistic: match statistic {
-                            StatisticKind::Histogram => {
-                                proto::distribution::StatisticKind::Histogram
+                    MetricValue::Distribution { samples, statistic } => {
+                        MetricProto::Distribution2(proto::Distribution2 {
+                            samples: samples.into_iter().map(Into::into).collect(),
+                            statistic: match statistic {
+                                StatisticKind::Histogram => proto::StatisticKind::Histogram,
+                                StatisticKind::Summary => proto::StatisticKind::Summary,
                             }
-                            StatisticKind::Summary => proto::distribution::StatisticKind::Summary,
-                        }
-                        .into(),
-                    }),
+                            .into(),
+                        })
+                    }
                     MetricValue::AggregatedHistogram {
                         buckets,
-                        counts,
                         count,
                         sum,
-                    } => MetricProto::AggregatedHistogram(proto::AggregatedHistogram {
-                        buckets,
-                        counts,
+                    } => MetricProto::AggregatedHistogram2(proto::AggregatedHistogram2 {
+                        buckets: buckets.into_iter().map(Into::into).collect(),
                         count,
                         sum,
                     }),
                     MetricValue::AggregatedSummary {
                         quantiles,
-                        values,
                         count,
                         sum,
-                    } => MetricProto::AggregatedSummary(proto::AggregatedSummary {
-                        quantiles,
-                        values,
+                    } => MetricProto::AggregatedSummary2(proto::AggregatedSummary2 {
+                        quantiles: quantiles.into_iter().map(Into::into).collect(),
                         count,
                         sum,
                     }),
@@ -380,6 +369,69 @@ impl From<Event> for proto::EventWrapper {
 
                 proto::EventWrapper { event: Some(event) }
             }
+        }
+    }
+}
+
+impl From<proto::StatisticKind> for StatisticKind {
+    fn from(kind: proto::StatisticKind) -> Self {
+        match kind {
+            proto::StatisticKind::Histogram => StatisticKind::Histogram,
+            proto::StatisticKind::Summary => StatisticKind::Summary,
+        }
+    }
+}
+
+impl From<metric::Sample> for proto::DistributionSample {
+    fn from(sample: metric::Sample) -> Self {
+        Self {
+            value: sample.value,
+            rate: sample.rate,
+        }
+    }
+}
+
+impl From<proto::DistributionSample> for metric::Sample {
+    fn from(sample: proto::DistributionSample) -> Self {
+        Self {
+            value: sample.value,
+            rate: sample.rate,
+        }
+    }
+}
+
+impl From<metric::Bucket> for proto::HistogramBucket {
+    fn from(bucket: metric::Bucket) -> Self {
+        Self {
+            upper_limit: bucket.upper_limit,
+            count: bucket.count,
+        }
+    }
+}
+
+impl From<proto::HistogramBucket> for metric::Bucket {
+    fn from(bucket: proto::HistogramBucket) -> Self {
+        Self {
+            upper_limit: bucket.upper_limit,
+            count: bucket.count,
+        }
+    }
+}
+
+impl From<metric::Quantile> for proto::SummaryQuantile {
+    fn from(quantile: metric::Quantile) -> Self {
+        Self {
+            upper_limit: quantile.upper_limit,
+            value: quantile.value,
+        }
+    }
+}
+
+impl From<proto::SummaryQuantile> for metric::Quantile {
+    fn from(quantile: proto::SummaryQuantile) -> Self {
+        Self {
+            upper_limit: quantile.upper_limit,
+            value: quantile.value,
         }
     }
 }

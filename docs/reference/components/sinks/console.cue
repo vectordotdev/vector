@@ -9,6 +9,7 @@ components: sinks: console: {
 		development:   "stable"
 		egress_method: "stream"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {
@@ -35,14 +36,15 @@ components: sinks: console: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -60,6 +62,7 @@ components: sinks: console: {
 					stdout: "Output will be written to [STDOUT](\(urls.stdout))"
 					stderr: "Output will be written to [STDERR](\(urls.stderr))"
 				}
+				syntax: "literal"
 			}
 		}
 	}
@@ -77,6 +80,8 @@ components: sinks: console: {
 	}
 
 	telemetry: metrics: {
+		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:  components.sources.internal_metrics.output.metrics.processed_events_total
 		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

@@ -36,14 +36,15 @@ components: _kafka: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -56,6 +57,7 @@ components: _kafka: {
 			warnings: []
 			type: string: {
 				examples: ["10.14.22.123:9092,10.14.23.332:9092"]
+				syntax: "literal"
 			}
 		}
 		librdkafka_options: {
@@ -97,10 +99,5 @@ components: _kafka: {
 				this dependency is packaged with Vector, meaning you do not need to install it.
 				"""
 		}
-	}
-
-	telemetry: metrics: {
-		consumer_offset_updates_failed_total: components.sources.internal_metrics.output.metrics.consumer_offset_updates_failed_total
-		events_failed_total:                  components.sources.internal_metrics.output.metrics.events_failed_total
 	}
 }

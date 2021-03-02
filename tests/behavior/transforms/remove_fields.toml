@@ -13,8 +13,11 @@
   [[tests.outputs]]
     extract_from = "remove_fields_simple"
     [[tests.outputs.conditions]]
-      "a.exists" = false
-      "b.equals" = 4
+      type = "remap"
+      source = '''
+        !exists(.a) &&
+        .b == 4
+      '''
 
 [transforms.remove_fields_nested]
   inputs = []
@@ -31,8 +34,11 @@
   [[tests.outputs]]
     extract_from = "remove_fields_nested"
     [[tests.outputs.conditions]]
-      "a.b.equals" = 3
-      "a.c.exists" = false
+      type = "remap"
+      source = '''
+        .a.b == 3 &&
+        !exists(.a.c)
+      '''
 
 [transforms.remove_fields_empty_objects]
   inputs = []
@@ -52,9 +58,12 @@
   [[tests.outputs]]
     extract_from = "remove_fields_empty_objects"
     [[tests.outputs.conditions]]
-      "a.b.exists" = false
-      "a.c.exists" = false
-      "a.exists" = false
-      "b.a.exists" = false
-      "b.exists" = true
-      "b.b.equals" = 4
+      type = "remap"
+      source = '''
+        !exists(.a.b) &&
+        !exists(.a.c) &&
+        !exists(.a) &&
+        !exists(.b.a) &&
+        exists(.b) &&
+        .b.b == 4
+      '''

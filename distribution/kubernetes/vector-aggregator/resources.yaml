@@ -35,27 +35,35 @@ data:
   managed.toml: |
     # Configuration for vector.
     # Docs: https://vector.dev/docs/
-
-    # Data dir is location controlled at the `StatefulSet`.
+    
     data_dir = "/vector-data-dir"
+    
+    [api]
+      enabled = false
+      address = "0.0.0.0:8686"
+      playground = true
+    
     [log_schema]
       host_key = "host"
       message_key = "message"
       source_type_key = "source_type"
       timestamp_key = "timestamp"
+    
     # Accept logs from Vector agents.
     [sources.vector]
-      type = "vector"
       address = "0.0.0.0:9000"
+      type = "vector"
+    
     
     # Emit internal Vector metrics.
     [sources.internal_metrics]
       type = "internal_metrics"
+    
     # Expose metrics for scraping in the Prometheus format.
     [sinks.prometheus_sink]
-      type = "prometheus"
-      inputs = ["internal_metrics"]
       address = "0.0.0.0:9090"
+      inputs = ["internal_metrics"]
+      type = "prometheus"
 ---
 # Source: vector-aggregator/templates/service-headless.yaml
 apiVersion: v1
@@ -71,11 +79,9 @@ metadata:
 spec:
   clusterIP: None
   ports:
-    
-    - name: vector
-      port: 9000
-      protocol: TCP
-      targetPort: 9000
+  - port: 9000
+    name: vector
+    protocol: TCP
   selector:
     app.kubernetes.io/name: vector-aggregator
     app.kubernetes.io/instance: vector
@@ -92,12 +98,12 @@ metadata:
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
 spec:
+  type: ClusterIP
   ports:
-    
-    - name: vector
-      port: 9000
-      protocol: TCP
-      targetPort: 9000
+  - port: 9000
+    targetPort: 9000
+    name: vector
+    protocol: TCP
   selector:
     app.kubernetes.io/name: vector-aggregator
     app.kubernetes.io/instance: vector

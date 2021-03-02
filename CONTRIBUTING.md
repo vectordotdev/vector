@@ -60,6 +60,9 @@ expanding into more specifics.
       1. [Kubernetes E2E tests](#kubernetes-e2e-tests)
          1. [Requirements](#requirements-1)
          1. [Running the E2E tests](#running-the-e2e-tests)
+      1. [Kubernetes Architecture](#kubernetes-architecture)
+         1. [The operation logic](#the-operation-logic)
+         1. [Where to find things](#where-to-find-things)
 1. [Humans](#humans)
    1. [Documentation](#documentation)
    1. [Changelog](#changelog)
@@ -92,14 +95,14 @@ expanding into more specifics.
    [existing issue][urls.existing_issues] or [open a new issue][urls.new_issue].
    - This is where you can get a feel if the change will be accepted or not.
      Changes that are questionable will have a `needs: approval` label.
-2. One approved, [fork the Vector repository][urls.fork_repo] in your own
+2. Once approved, [fork the Vector repository][urls.fork_repo] in your own
    Github account.
 3. [Create a new Git branch][urls.create_branch].
-4. Review the Vector [workflow](#workflow) and [development](#development).
+4. Review the Vector [change control](#change-control) and [development](#development) workflows.
 5. Make your changes.
 6. [Submit the branch as a pull request][urls.submit_pr] to the main Vector
    repo. A Vector team member should comment and/or review your pull request
-   with a few days. Although, depending on the circumstances, it may take
+   within a few days. Although, depending on the circumstances, it may take
    longer.
 
 ### New sources, sinks, and transforms
@@ -448,7 +451,7 @@ warn!("Failed to merge value: {}.", err);
 Yep!
 
 ```rust
-warn!(message = "Failed to merge value.", error = ?error);
+warn!(message = "Failed to merge value.", %error);
 ```
 
 #### Feature flags
@@ -909,6 +912,42 @@ or
 ```shell
 QUICK_BUILD=true CONTAINER_IMAGE_REPO=<your name>/vector-test make test-e2e-kubernetes
 ```
+
+#### Kubernetes Architecture
+
+Kubernetes integration architecture is largely inspired by
+the [RFC 2221](rfcs/2020-04-04-2221-kubernetes-integration.md), so this
+is a concise outline of the effective design, rather than a deep dive into
+the concepts.
+
+##### The operation logic
+
+With `kubernetes_logs` source, Vector connects to the Kubernetes API doing
+a streaming watch request over the `Pod`s executing on the same `Node` that
+Vector itself runs at. Once Vector gets the list of all the `Pod`s that are
+running on the `Node`, it starts collecting logs for the logs files
+corresponding to each of the `Pod`. Only plaintext (as in non-gzipped) files
+are taken into consideration.
+The log files are then parsed into events, and the said events are annotated
+with the metadata from the corresponding `Pod`s, correlated via the file path
+of the originating log file.
+The events are then passed to the topology.
+
+##### Where to find things
+
+We use custom Kubernetes API client and machinery, that lives
+at `src/kubernetes`.
+The `kubernetes_logs` source lives at `src/sources/kubernetes_logs`.
+There is also an end-to-end (E2E) test framework that resides
+at `lib/k8s-test-framework`, and the actual end-to-end tests using that
+framework are at `lib/k8s-e2e-tests`.
+
+The Kubernetes-related distribution bit that are at `distribution/docker`,
+`distribution/kubernetes` and `distribution/helm`.
+There are also snapshot tests for Helm at `tests/helm-snapshots`.
+
+The development assistance resources are located at `skaffold.yaml`
+and `skaffold` dir.
 
 ## Humans
 

@@ -1,0 +1,15 @@
+# result:
+#
+# error[E105]: call to undefined function
+#   ┌─ :2:1
+#   │
+# 2 │ unknown_function(.foo, .bar)
+#   │ ^^^^^^^^^^^^^^^^
+#   │ │
+#   │ undefined function
+#   │ did you mean "parse_duration"?
+#   │
+#   = learn more about error code 105 at https://errors.vrl.dev/105
+#   = see language documentation at https://vrl.dev
+
+unknown_function(.foo, .bar)

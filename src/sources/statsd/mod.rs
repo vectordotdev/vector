@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use crate::udp;
 use crate::{
     config::{self, GenerateConfig, GlobalOptions, Resource, SourceConfig, SourceDescription},
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
@@ -34,7 +36,19 @@ enum StatsdConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct UdpConfig {
-    pub address: SocketAddr,
+    address: SocketAddr,
+    #[cfg(unix)]
+    receive_buffer_bytes: Option<usize>,
+}
+
+impl UdpConfig {
+    pub fn from_address(address: SocketAddr) -> Self {
+        Self {
+            address,
+            #[cfg(unix)]
+            receive_buffer_bytes: None,
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -44,7 +58,21 @@ struct TcpConfig {
     #[serde(default)]
     tls: Option<TlsConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]
-    pub shutdown_timeout_secs: u64,
+    shutdown_timeout_secs: u64,
+    receive_buffer_bytes: Option<usize>,
+}
+
+impl TcpConfig {
+    #[cfg(all(test, feature = "sinks-prometheus"))]
+    pub fn from_address(address: SocketListenAddr) -> Self {
+        Self {
+            address,
+            keepalive: None,
+            tls: None,
+            shutdown_timeout_secs: default_shutdown_timeout_secs(),
+            receive_buffer_bytes: None,
+        }
+    }
 }
 
 fn default_shutdown_timeout_secs() -> u64 {
@@ -57,9 +85,9 @@ inventory::submit! {
 
 impl GenerateConfig for StatsdConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self::Udp(UdpConfig {
-            address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8125)),
-        }))
+        toml::Value::try_from(Self::Udp(UdpConfig::from_address(SocketAddr::V4(
+            SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8125),
+        ))))
         .unwrap()
     }
 }
@@ -83,6 +111,7 @@ impl SourceConfig for StatsdConfig {
                     config.keepalive,
                     config.shutdown_timeout_secs,
                     tls,
+                    config.receive_buffer_bytes,
                     shutdown,
                     out,
                 )
@@ -133,6 +162,11 @@ async fn statsd_udp(
     let socket = UdpSocket::bind(&config.address)
         .map_err(|error| emit!(StatsdSocketError::bind(error)))
         .await?;
+
+    #[cfg(unix)]
+    if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
+        udp::set_receive_buffer_size(&socket, receive_buffer_bytes);
+    }
 
     info!(
         message = "Listening.",
@@ -190,7 +224,6 @@ mod test {
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{next_addr, start_topology},
     };
-    use futures::compat::Future01CompatExt;
     use hyper::body::to_bytes as body_to_bytes;
     use tokio::io::AsyncWriteExt;
     use tokio::sync::mpsc;
@@ -214,7 +247,7 @@ mod test {
     #[tokio::test]
     async fn test_statsd_udp() {
         let in_addr = next_addr();
-        let config = StatsdConfig::Udp(UdpConfig { address: in_addr });
+        let config = StatsdConfig::Udp(UdpConfig::from_address(in_addr));
         let (sender, mut receiver) = mpsc::channel(200);
         tokio::spawn(async move {
             let bind_addr = next_addr();
@@ -230,12 +263,7 @@ mod test {
     #[tokio::test]
     async fn test_statsd_tcp() {
         let in_addr = next_addr();
-        let config = StatsdConfig::Tcp(TcpConfig {
-            address: in_addr.into(),
-            keepalive: None,
-            tls: None,
-            shutdown_timeout_secs: 30,
-        });
+        let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
         let (sender, mut receiver) = mpsc::channel(200);
         tokio::spawn(async move {
             while let Some(bytes) = receiver.recv().await {
@@ -286,6 +314,7 @@ mod test {
             &["in"],
             PrometheusExporterConfig {
                 address: out_addr,
+                tls: None,
                 default_namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 quantiles: vec![],
@@ -395,6 +424,6 @@ mod test {
         }
 
         // Shut down server
-        topology.stop().compat().await.unwrap();
+        topology.stop().await;
     }
 }

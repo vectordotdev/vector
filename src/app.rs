@@ -8,11 +8,9 @@ use std::cmp::max;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use futures::{
-    compat::{Future01CompatExt, Stream01CompatExt},
-    StreamExt,
-};
-use futures01::sync::mpsc;
+use futures::StreamExt;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "sources-host_metrics")]
 use crate::sources::host_metrics;
@@ -59,6 +57,7 @@ impl Application {
             level => [
                 format!("vector={}", level),
                 format!("codec={}", level),
+                format!("vrl={}", level),
                 format!("file_source={}", level),
                 "tower_limit=trace".to_owned(),
                 format!("rdkafka={}", level),
@@ -120,6 +119,8 @@ impl Application {
                         SubCommand::Top(t) => top::cmd(&t).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
+                        #[cfg(feature = "vrl-cli")]
+                        SubCommand::VRL(s) => vrl_cli::cmd::cmd(&s),
                     };
 
                     return Err(code);
@@ -189,7 +190,7 @@ impl Application {
     pub fn run(self) {
         let mut rt = self.runtime;
 
-        let graceful_crash = self.config.graceful_crash;
+        let mut graceful_crash = UnboundedReceiverStream::new(self.config.graceful_crash);
         let mut topology = self.config.topology;
 
         let mut config_paths = self.config.config_paths;
@@ -198,6 +199,10 @@ impl Application {
 
         #[cfg(feature = "api")]
         let api_config = self.config.api;
+
+        // Any internal_logs sources will have grabbed a copy of the
+        // early buffer by this point and set up a subscriber.
+        crate::trace::stop_buffering();
 
         rt.block_on(async move {
             emit!(VectorStarted);
@@ -220,7 +225,6 @@ impl Application {
             let signals = signal::signals();
             tokio::pin!(signals);
             let mut sources_finished = topology.sources_finished();
-            let mut graceful_crash = graceful_crash.compat();
 
             let signal = loop {
                 tokio::select! {
@@ -272,7 +276,7 @@ impl Application {
                 SignalTo::Shutdown => {
                     emit!(VectorStopped);
                     tokio::select! {
-                    _ = topology.stop().compat() => (), // Graceful shutdown finished
+                    _ = topology.stop() => (), // Graceful shutdown finished
                     _ = signals.next() => {
                         // It is highly unlikely that this event will exit from topology.
                         emit!(VectorQuit);

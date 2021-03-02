@@ -35,29 +35,38 @@ data:
   managed.toml: |
     # Configuration for vector.
     # Docs: https://vector.dev/docs/
-
-    # Data dir is location controlled at the `DaemonSet`.
+    
     data_dir = "/vector-data-dir"
+    
+    [api]
+      enabled = false
+      address = "0.0.0.0:8686"
+      playground = true
+    
     [log_schema]
       host_key = "host"
       message_key = "message"
       source_type_key = "source_type"
       timestamp_key = "timestamp"
+    
     # Ingest logs from Kubernetes.
     [sources.kubernetes_logs]
       type = "kubernetes_logs"
+    
     # Capture the metrics from the host.
     [sources.host_metrics]
       type = "host_metrics"
     
+    
     # Emit internal Vector metrics.
     [sources.internal_metrics]
       type = "internal_metrics"
+    
     # Expose metrics for scraping in the Prometheus format.
     [sinks.prometheus_sink]
-      type = "prometheus"
-      inputs = ["internal_metrics","host_metrics"]
       address = "0.0.0.0:9090"
+      inputs = ["internal_metrics", "host_metrics"]
+      type = "prometheus"
 ---
 # Source: vector-agent/templates/rbac.yaml
 # Permissions to use Kubernetes API.

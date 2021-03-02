@@ -11,6 +11,7 @@ components: transforms: regex_parser: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -25,21 +26,23 @@ components: transforms: regex_parser: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: [
 			"""
-			This component has been deprecated in favor of the new [`remap` transform's
-			`parse_regex` function](\(urls.vector_remap_transform)#parse_regex). The `remap`
-			transform provides a simple syntax for robust data transformation. Let us know what you
-			think!
+			\(regex_parser._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_regex(.message, r'(?P<number>.*?) group')
+			```
 			""",
 		]
 		notices: []
@@ -68,6 +71,7 @@ components: transforms: regex_parser: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child"]
+				syntax: "literal"
 			}
 		}
 		overwrite_target: {
@@ -81,7 +85,10 @@ components: transforms: regex_parser: {
 			description: "The Regular Expressions to apply. Do not include the leading or trailing `/` in any of the expressions."
 			required:    true
 			warnings: []
-			type: array: items: type: string: examples: ["^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$"]
+			type: array: items: type: string: {
+				examples: ["^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$"]
+				syntax: "literal"
+			}
 		}
 		target_field: {
 			common:      false
@@ -91,9 +98,11 @@ components: transforms: regex_parser: {
 			type: string: {
 				default: null
 				examples: ["root_field", "parent.child"]
+				syntax: "literal"
 			}
 		}
-		types: configuration._types
+		timezone: configuration._timezone
+		types:    configuration._types
 	}
 
 	input: {

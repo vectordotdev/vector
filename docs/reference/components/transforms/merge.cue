@@ -11,6 +11,7 @@ components: transforms: merge: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      true
 	}
 
 	features: {
@@ -19,14 +20,15 @@ components: transforms: merge: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: [
 			"""
@@ -53,7 +55,10 @@ components: transforms: merge: {
 			warnings: []
 			type: array: {
 				default: ["message"]
-				items: type: string: examples: ["message", "parent.child"]
+				items: type: string: {
+					examples: ["message", "parent.child"]
+					syntax: "literal"
+				}
 			}
 		}
 		partial_event_marker_field: {
@@ -67,6 +72,7 @@ components: transforms: merge: {
 			type: string: {
 				default: "_partial"
 				examples: ["_partial", "parent.child"]
+				syntax: "literal"
 			}
 		}
 		stream_discriminant_fields: {
@@ -80,7 +86,10 @@ components: transforms: merge: {
 			warnings: []
 			type: array: {
 				default: []
-				items: type: string: examples: ["host", "parent.child"]
+				items: type: string: {
+					examples: ["host", "parent.child"]
+					syntax: "literal"
+				}
 			}
 		}
 	}

@@ -1,6 +1,6 @@
 use crate::transforms::TaskTransform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     internal_events::{
         TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
         TagCardinalityValueLimitReached,
@@ -9,12 +9,14 @@ use crate::{
     Event,
 };
 use bloom::{BloomFilter, ASMS};
-use futures01::Stream as Stream01;
+use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::fmt::Formatter;
 use std::{
     borrow::{Borrow, Cow},
     collections::{HashMap, HashSet},
+    fmt,
+    future::ready,
+    pin::Pin,
 };
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -87,7 +89,7 @@ impl GenerateConfig for TagCardinalityLimitConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         Ok(Transform::task(TagCardinalityLimit::new(self.clone())))
     }
 
@@ -116,8 +118,8 @@ enum TagValueSetStorage {
     Bloom(BloomFilter),
 }
 
-impl std::fmt::Debug for TagValueSetStorage {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+impl fmt::Debug for TagValueSetStorage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TagValueSetStorage::Set(set) => write!(f, "Set({:?})", set),
             TagValueSetStorage::Bloom(_) => write!(f, "Bloom"),
@@ -215,8 +217,8 @@ impl TagCardinalityLimit {
     }
 
     fn transform_one(&mut self, mut event: Event) -> Option<Event> {
-        match event.as_mut_metric().tags {
-            Some(ref mut tags_map) => {
+        match event.as_mut_metric().tags_mut() {
+            Some(tags_map) => {
                 match self.config.limit_exceeded_action {
                     LimitExceededAction::DropEvent => {
                         for (key, value) in tags_map {
@@ -255,13 +257,13 @@ impl TagCardinalityLimit {
 impl TaskTransform for TagCardinalityLimit {
     fn transform(
         self: Box<Self>,
-        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
-    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
     where
         Self: 'static,
     {
         let mut inner = self;
-        Box::new(task.filter_map(move |v| inner.transform_one(v)))
+        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
     }
 }
 
@@ -278,14 +280,14 @@ mod tests {
     }
 
     fn make_metric(tags: BTreeMap<String, String>) -> Event {
-        Event::Metric(Metric {
-            name: "event".into(),
-            namespace: None,
-            timestamp: None,
-            tags: Some(tags),
-            kind: metric::MetricKind::Incremental,
-            value: metric::MetricValue::Counter { value: 1.0 },
-        })
+        Event::Metric(
+            Metric::new(
+                "event",
+                metric::MetricKind::Incremental,
+                metric::MetricValue::Counter { value: 1.0 },
+            )
+            .with_tags(Some(tags)),
+        )
     }
 
     fn make_transform_hashset(
@@ -388,21 +390,10 @@ mod tests {
         assert_eq!(new_event2, event2);
         // The third event should have been modified to remove "tag1"
         assert_ne!(new_event3, event3);
-        assert!(!new_event3
-            .as_metric()
-            .tags
-            .as_ref()
-            .unwrap()
-            .contains_key("tag1"));
+        assert!(!new_event3.as_metric().tags().unwrap().contains_key("tag1"));
         assert_eq!(
             "val1",
-            new_event3
-                .as_metric()
-                .tags
-                .as_ref()
-                .unwrap()
-                .get("tag2")
-                .unwrap()
+            new_event3.as_metric().tags().unwrap().get("tag2").unwrap()
         );
     }
 

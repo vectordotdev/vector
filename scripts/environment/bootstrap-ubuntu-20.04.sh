@@ -2,6 +2,7 @@
 set -e -o verbose
 
 export DEBIAN_FRONTEND=noninteractive
+export ACCEPT_EULA=Y
 
 echo 'APT::Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries
 
@@ -24,42 +25,47 @@ apt-get install --yes grub-efi
 update-grub
 set -e
 
-apt upgrade --yes
+# using force-overwrite due to
+# https://github.com/actions/virtual-environments/issues/2703
+apt upgrade  -o Dpkg::Options::="--force-overwrite" --yes
 
 # Deps
 apt install --yes \
+    awscli \
     build-essential \
-    cmake \
-    pkg-config \
-    libssl-dev \
-    python3-pip \
-    jq \
-    shellcheck \
-    locales \
     ca-certificates \
+    cmake \
+    cmark-gfm \
     curl \
+    gawk \
+    gnupg2 \
     gnupg-agent \
     gnuplot \
+    jq \
+    libclang-dev \
+    libsasl2-dev \
+    libssl-dev \
+    llvm \
+    locales \
     nodejs \
     npm \
-    ruby-bundler \
-    libsasl2-dev \
-    gnupg2 \
-    wget \
-    gawk \
-    yarn \
-    sudo \
-    cmark-gfm \
+    pkg-config \
+    python3-pip \
     rename \
-    rpm
+    rpm \
+    ruby-bundler \
+    shellcheck \
+    sudo \
+    wget \
+    yarn
 
 # Cue
 TEMP=$(mktemp -d)
 curl \
-    -L https://github.com/cuelang/cue/releases/download/v0.3.0-alpha6/cue_0.3.0-alpha6_Linux_x86_64.tar.gz \
-    -o "${TEMP}/cue_0.3.0-alpha6_Linux_x86_64.tar.gz"
+    -L https://github.com/cuelang/cue/releases/download/v0.3.0-beta.5/cue_0.3.0-beta.5_Linux_x86_64.tar.gz \
+    -o "${TEMP}/cue_0.3.0-beta.5_Linux_x86_64.tar.gz"
 tar \
-    -xvf "${TEMP}/cue_0.3.0-alpha6_Linux_x86_64.tar.gz" \
+    -xvf "${TEMP}/cue_0.3.0-beta.5_Linux_x86_64.tar.gz" \
     -C "${TEMP}"
 cp "${TEMP}/cue" /usr/bin/cue
 

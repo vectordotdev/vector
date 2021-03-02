@@ -27,11 +27,11 @@ use heim::{
     units::{information::byte, time::second},
     Error,
 };
-
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
+use shared::btreemap;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
@@ -45,6 +45,7 @@ enum Collector {
     Disk,
     Filesystem,
     Load,
+    Host,
     Memory,
     Network,
 }
@@ -139,15 +140,6 @@ impl SourceConfig for HostMetricsConfig {
     }
 }
 
-macro_rules! tags {
-    ( $( $key:expr => $value:expr ),* ) => {{
-        #[allow(unused_mut)]
-        let mut result = std::collections::BTreeMap::default();
-        $( result.insert($key.to_string(), $value.to_string()); )*
-            result
-    }}
-}
-
 impl HostMetricsConfig {
     async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut out =
@@ -185,6 +177,9 @@ impl HostMetricsConfig {
         if self.has_collector(Collector::Load) {
             metrics.extend(add_collector("load", self.loadavg_metrics().await));
         }
+        if self.has_collector(Collector::Host) {
+            metrics.extend(add_collector("host", self.host_metrics().await));
+        }
         if self.has_collector(Collector::Memory) {
             metrics.extend(add_collector("memory", self.memory_metrics().await));
             metrics.extend(add_collector("memory", self.swap_metrics().await));
@@ -194,7 +189,7 @@ impl HostMetricsConfig {
         }
         if let Ok(hostname) = &hostname {
             for metric in &mut metrics {
-                (metric.tags.as_mut().unwrap()).insert("host".into(), hostname.into());
+                (metric.series.tags.as_mut().unwrap()).insert("host".into(), hostname.into());
             }
         }
         emit!(HostMetricsEventReceived {
@@ -218,26 +213,26 @@ impl HostMetricsConfig {
                                     name,
                                     timestamp,
                                     times.idle().get::<second>(),
-                                    tags!["mode" => "idle", "cpu" => index.to_string()],
+                                    btreemap! { "mode" => "idle", "cpu" => index.to_string() },
                                 ),
                                 #[cfg(target_os = "linux")]
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.nice().get::<second>(),
-                                    tags!["mode" => "nice", "cpu" => index.to_string()],
+                                    btreemap! { "mode" => "nice", "cpu" => index.to_string() },
                                 ),
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.system().get::<second>(),
-                                    tags!["mode" => "system", "cpu" => index.to_string()],
+                                    btreemap! { "mode" => "system", "cpu" => index.to_string() },
                                 ),
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.user().get::<second>(),
-                                    tags!["mode" => "user", "cpu" => index.to_string()],
+                                    btreemap! { "mode" => "user", "cpu" => index.to_string() },
                                 ),
                             ]
                             .into_iter(),
@@ -263,68 +258,68 @@ impl HostMetricsConfig {
                         "memory_total_bytes",
                         timestamp,
                         memory.total().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     self.gauge(
                         "memory_free_bytes",
                         timestamp,
                         memory.free().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     self.gauge(
                         "memory_available_bytes",
                         timestamp,
                         memory.available().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(any(target_os = "linux", target_os = "macos"))]
                     self.gauge(
                         "memory_active_bytes",
                         timestamp,
                         memory.active().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_buffers_bytes",
                         timestamp,
                         memory.buffers().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_cached_bytes",
                         timestamp,
                         memory.cached().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_shared_bytes",
                         timestamp,
                         memory.shared().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_used_bytes",
                         timestamp,
                         memory.used().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "macos")]
                     self.gauge(
                         "memory_inactive_bytes",
                         timestamp,
                         memory.inactive().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "macos")]
                     self.gauge(
                         "memory_wired_bytes",
                         timestamp,
                         memory.wire().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                 ]
             }
@@ -344,33 +339,33 @@ impl HostMetricsConfig {
                         "memory_swap_free_bytes",
                         timestamp,
                         swap.free().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     self.gauge(
                         "memory_swap_total_bytes",
                         timestamp,
                         swap.total().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     self.gauge(
                         "memory_swap_used_bytes",
                         timestamp,
                         swap.used().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(not(target_os = "windows"))]
                     self.counter(
                         "memory_swapped_in_bytes_total",
                         timestamp,
                         swap.sin().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(not(target_os = "windows"))]
                     self.counter(
                         "memory_swapped_out_bytes_total",
                         timestamp,
                         swap.sout().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                 ]
             }
@@ -387,13 +382,23 @@ impl HostMetricsConfig {
             Ok(loadavg) => {
                 let timestamp = Utc::now();
                 vec![
-                    self.gauge("load1", timestamp, loadavg.0.get::<ratio>() as f64, tags![]),
-                    self.gauge("load5", timestamp, loadavg.1.get::<ratio>() as f64, tags![]),
+                    self.gauge(
+                        "load1",
+                        timestamp,
+                        loadavg.0.get::<ratio>() as f64,
+                        btreemap! {},
+                    ),
+                    self.gauge(
+                        "load5",
+                        timestamp,
+                        loadavg.1.get::<ratio>() as f64,
+                        btreemap! {},
+                    ),
                     self.gauge(
                         "load15",
                         timestamp,
                         loadavg.2.get::<ratio>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                 ]
             }
@@ -406,6 +411,41 @@ impl HostMetricsConfig {
         let result = vec![];
 
         result
+    }
+
+    pub async fn host_metrics(&self) -> Vec<Metric> {
+        let mut metrics = Vec::new();
+        match heim::host::uptime().await {
+            Ok(time) => {
+                let timestamp = Utc::now();
+                metrics.push(self.gauge(
+                    "uptime",
+                    timestamp,
+                    time.get::<second>() as f64,
+                    BTreeMap::default(),
+                ));
+            }
+            Err(error) => {
+                error!(message = "Failed to load host uptime info.", %error, internal_log_rate_secs = 60);
+            }
+        }
+
+        match heim::host::boot_time().await {
+            Ok(time) => {
+                let timestamp = Utc::now();
+                metrics.push(self.gauge(
+                    "boot_time",
+                    timestamp,
+                    time.get::<second>() as f64,
+                    BTreeMap::default(),
+                ));
+            }
+            Err(error) => {
+                error!(message = "Failed to load host boot time info.", %error, internal_log_rate_secs = 60);
+            }
+        }
+
+        metrics
     }
 
     pub async fn network_metrics(&self) -> Vec<Metric> {
@@ -434,45 +474,45 @@ impl HostMetricsConfig {
                                     "network_receive_bytes_total",
                                     timestamp,
                                     counter.bytes_recv().get::<byte>() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_receive_errs_total",
                                     timestamp,
                                     counter.errors_recv() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_receive_packets_total",
                                     timestamp,
                                     counter.packets_recv() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_transmit_bytes_total",
                                     timestamp,
                                     counter.bytes_sent().get::<byte>() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_transmit_errs_total",
                                     timestamp,
                                     counter.errors_sent() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 #[cfg(any(target_os = "linux", target_os = "windows"))]
                                 self.counter(
                                     "network_transmit_packets_drop_total",
                                     timestamp,
                                     counter.drop_sent() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 #[cfg(any(target_os = "linux", target_os = "windows"))]
                                 self.counter(
                                     "network_transmit_packets_total",
                                     timestamp,
                                     counter.packets_sent() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                             ]
                             .into_iter(),
@@ -542,10 +582,10 @@ impl HostMetricsConfig {
                     .map(|(partition, usage)| {
                         let timestamp = Utc::now();
                         let fs = partition.file_system();
-                        let mut tags = tags![
+                        let mut tags = btreemap! {
                             "filesystem" => fs.as_str(),
                             "mountpoint" => partition.mount_point().to_string_lossy()
-                        ];
+                        };
                         if let Some(device) = partition.device() {
                             tags.insert("device".into(), device.to_string_lossy().into());
                         }
@@ -600,9 +640,9 @@ impl HostMetricsConfig {
                     .filter_map(|counter| async { counter })
                     .map(|counter| {
                         let timestamp = Utc::now();
-                        let tags = tags![
+                        let tags = btreemap! {
                             "device" => counter.device_name().to_string_lossy()
-                        ];
+                        };
                         stream::iter(
                             vec![
                                 self.counter(
@@ -651,14 +691,10 @@ impl HostMetricsConfig {
         value: f64,
         tags: BTreeMap<String, String>,
     ) -> Metric {
-        Metric {
-            name: name.into(),
-            namespace: self.namespace.0.clone(),
-            timestamp: Some(timestamp),
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value },
-            tags: Some(tags),
-        }
+        Metric::new(name, MetricKind::Absolute, MetricValue::Counter { value })
+            .with_namespace(self.namespace.0.clone())
+            .with_tags(Some(tags))
+            .with_timestamp(Some(timestamp))
     }
 
     fn gauge(
@@ -668,14 +704,10 @@ impl HostMetricsConfig {
         value: f64,
         tags: BTreeMap<String, String>,
     ) -> Metric {
-        Metric {
-            name: name.into(),
-            namespace: self.namespace.0.clone(),
-            timestamp: Some(timestamp),
-            kind: MetricKind::Absolute,
-            value: MetricValue::Gauge { value },
-            tags: Some(tags),
-        }
+        Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
+            .with_namespace(self.namespace.0.clone())
+            .with_tags(Some(tags))
+            .with_timestamp(Some(timestamp))
     }
 }
 
@@ -687,7 +719,7 @@ async fn filter_result<T>(result: Result<T, Error>, message: &'static str) -> Op
 
 fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
     for metric in &mut metrics {
-        (metric.tags.as_mut().unwrap()).insert("collector".into(), collector.into());
+        (metric.series.tags.as_mut().unwrap()).insert("collector".into(), collector.into());
     }
     metrics
 }
@@ -881,6 +913,7 @@ mod tests {
             Collector::Disk,
             Collector::Filesystem,
             Collector::Load,
+            Collector::Host,
             Collector::Memory,
             Collector::Network,
         ] {
@@ -905,7 +938,7 @@ mod tests {
         let hostname = crate::get_hostname().expect("Broken hostname");
         assert!(!metrics.any(|event| event
             .into_metric()
-            .tags
+            .tags()
             .expect("Missing tags")
             .get("host")
             .expect("Missing \"host\" tag")
@@ -921,14 +954,14 @@ mod tests {
         .capture_metrics()
         .await;
 
-        assert!(metrics.all(|event| event.into_metric().namespace.as_deref() == Some("other")));
+        assert!(metrics.all(|event| event.into_metric().namespace() == Some("other")));
     }
 
     #[tokio::test]
     async fn uses_default_namespace() {
         let mut metrics = HostMetricsConfig::default().capture_metrics().await;
 
-        assert!(metrics.all(|event| event.into_metric().namespace.as_deref() == Some("host")));
+        assert!(metrics.all(|event| event.into_metric().namespace() == Some("host")));
     }
 
     #[tokio::test]
@@ -1071,7 +1104,7 @@ mod tests {
         // All metrics are named network_*
         assert!(!metrics
             .iter()
-            .any(|metric| !metric.name.starts_with("network_")));
+            .any(|metric| !metric.name().starts_with("network_")));
 
         // They should all have a "device" tag
         assert_eq!(count_tag(&metrics, "device"), metrics.len());
@@ -1104,26 +1137,32 @@ mod tests {
         // All metrics are named load*
         assert!(!metrics
             .iter()
-            .any(|metric| !metric.name.starts_with("load")));
+            .any(|metric| !metric.name().starts_with("load")));
+    }
+
+    #[tokio::test]
+    async fn generates_host_metrics() {
+        let metrics = HostMetricsConfig::default().host_metrics().await;
+        assert_eq!(metrics.len(), 2);
+        assert!(all_gauges(&metrics));
     }
 
     fn all_counters(metrics: &[Metric]) -> bool {
         !metrics
             .iter()
-            .any(|metric| !matches!(metric.value, MetricValue::Counter { .. }))
+            .any(|metric| !matches!(metric.data.value, MetricValue::Counter { .. }))
     }
 
     fn all_gauges(metrics: &[Metric]) -> bool {
         !metrics
             .iter()
-            .any(|metric| !matches!(metric.value, MetricValue::Gauge { .. }))
+            .any(|metric| !matches!(metric.data.value, MetricValue::Gauge { .. }))
     }
 
     fn all_tags_match(metrics: &[Metric], tag: &str, matches: impl Fn(&str) -> bool) -> bool {
         !metrics.iter().any(|metric| {
             metric
-                .tags
-                .as_ref()
+                .tags()
                 .unwrap()
                 .get(tag)
                 .map(|value| !matches(value))
@@ -1132,7 +1171,10 @@ mod tests {
     }
 
     fn count_name(metrics: &[Metric], name: &str) -> usize {
-        metrics.iter().filter(|metric| metric.name == name).count()
+        metrics
+            .iter()
+            .filter(|metric| metric.name() == name)
+            .count()
     }
 
     fn count_tag(metrics: &[Metric], tag: &str) -> usize {
@@ -1140,8 +1182,7 @@ mod tests {
             .iter()
             .filter(|metric| {
                 metric
-                    .tags
-                    .as_ref()
+                    .tags()
                     .expect("Metric is missing tags")
                     .contains_key(tag)
             })
@@ -1151,7 +1192,7 @@ mod tests {
     fn collect_tag_values(metrics: &[Metric], tag: &str) -> HashSet<String> {
         metrics
             .iter()
-            .filter_map(|metric| metric.tags.as_ref().unwrap().get(tag).cloned())
+            .filter_map(|metric| metric.tags().unwrap().get(tag).cloned())
             .collect::<HashSet<_>>()
     }
 

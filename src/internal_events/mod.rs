@@ -34,6 +34,7 @@ mod dedupe;
 #[cfg(feature = "sources-docker_logs")]
 mod docker_logs;
 mod elasticsearch;
+mod encoding_transcode;
 #[cfg(feature = "transforms-filter")]
 mod filter;
 #[cfg(feature = "sources-generator")]
@@ -73,6 +74,8 @@ mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
 mod open;
+#[cfg(feature = "sources-postgresql_metrics")]
+mod postgresql_metrics;
 mod process;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 mod prometheus;
@@ -86,7 +89,9 @@ mod remap;
 mod remove_fields;
 #[cfg(feature = "transforms-rename_fields")]
 mod rename_fields;
-mod sampler;
+#[cfg(feature = "transforms-route")]
+mod route;
+mod sample;
 #[cfg(feature = "sinks-sematext")]
 mod sematext_metrics;
 mod socket;
@@ -98,8 +103,6 @@ mod statsd_sink;
 #[cfg(feature = "sources-statsd")]
 mod statsd_source;
 mod stdin;
-#[cfg(feature = "transforms-swimlanes")]
-mod swimlanes;
 mod syslog;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 mod tag_cardinality_limit;
@@ -147,6 +150,7 @@ pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-docker_logs")]
 pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
+pub use self::encoding_transcode::*;
 #[cfg(any(
     feature = "sources-file",
     feature = "sources-kubernetes-logs",
@@ -190,6 +194,8 @@ pub use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
 pub use self::open::*;
+#[cfg(feature = "sources-postgresql_metrics")]
+pub(crate) use self::postgresql_metrics::*;
 pub use self::process::*;
 #[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 pub(crate) use self::prometheus::*;
@@ -203,7 +209,9 @@ pub use self::remap::*;
 pub use self::remove_fields::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
-pub use self::sampler::*;
+#[cfg(feature = "transforms-route")]
+pub use self::route::*;
+pub use self::sample::*;
 #[cfg(feature = "sinks-sematext")]
 pub use self::sematext_metrics::*;
 pub(crate) use self::socket::*;
@@ -215,8 +223,6 @@ pub use self::statsd_sink::*;
 #[cfg(feature = "sources-statsd")]
 pub use self::statsd_source::*;
 pub use self::stdin::*;
-#[cfg(feature = "transforms-swimlanes")]
-pub use self::swimlanes::*;
 pub use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub(crate) use self::tag_cardinality_limit::*;

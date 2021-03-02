@@ -128,10 +128,10 @@ mod tests {
     use tokio::signal::unix::{signal, SignalKind};
 
     async fn test(file: &mut File, timeout: Duration) -> bool {
+        let mut signal = signal(SignalKind::hangup()).expect("Signal handlers should not panic.");
+
         file.write_all(&[0]).unwrap();
         file.sync_all().unwrap();
-
-        let mut signal = signal(SignalKind::hangup()).expect("Signal handlers should not panic.");
 
         tokio::time::timeout(timeout, signal.recv()).await.is_ok()
     }

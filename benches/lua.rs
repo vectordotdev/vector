@@ -1,13 +1,11 @@
 use criterion::{criterion_group, BatchSize, Criterion, Throughput};
-use futures::{
-    compat::{Future01CompatExt, Stream01CompatExt},
-    Stream, StreamExt,
-};
-use futures01::{Sink, Stream as Stream01};
+use futures::{stream, SinkExt, Stream, StreamExt};
 use indexmap::IndexMap;
+use indoc::indoc;
+use std::pin::Pin;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    config::TransformConfig,
+    config::{GlobalOptions, TransformConfig},
     test_util::{collect_ready, runtime},
     transforms::{self, Transform},
     Event,
@@ -35,15 +33,15 @@ fn bench_add_fields(c: &mut Criterion) {
         }),
         ("v2", {
             let config = format!(
-                r#"
-hooks.process = """
-function (event, emit)
-event.log['{}'] = '{}'
+                indoc! {r#"
+                    hooks.process = """
+                    function (event, emit)
+                      event.log['{}'] = '{}'
 
-emit(event)
-end
-"""
-"#,
+                      emit(event)
+                    end
+                    """
+                "#},
                 key, value
             );
             Transform::task(
@@ -54,30 +52,26 @@ end
     ];
 
     for (name, transform) in benchmarks {
-        let (tx, rx) = futures01::sync::mpsc::channel::<Event>(1);
+        let (tx, rx) = futures::channel::mpsc::channel::<Event>(1);
 
-        let mut rx: Box<dyn Stream<Item = Result<Event, ()>> + Send + Unpin> = match transform {
+        let mut rx: Pin<Box<dyn Stream<Item = Event> + Send>> = match transform {
             Transform::Function(t) => {
                 let mut t = t.clone();
-                Box::new(
-                    rx.map(move |v| {
-                        let mut buf = Vec::with_capacity(1);
-                        t.transform(&mut buf, v);
-                        futures01::stream::iter_ok(buf.into_iter())
-                    })
-                    .flatten()
-                    .compat(),
-                )
+                Box::pin(rx.flat_map(move |v| {
+                    let mut buf = Vec::with_capacity(1);
+                    t.transform(&mut buf, v);
+                    stream::iter(buf.into_iter())
+                }))
             }
-            Transform::Task(t) => Box::new(t.transform(Box::new(rx)).compat()),
+            Transform::Task(t) => t.transform(Box::pin(rx)),
         };
 
         group.bench_function(name.to_owned(), |b| {
             b.iter_batched(
                 || (tx.clone(), event.clone()),
-                |(tx, event)| {
-                    futures::executor::block_on(tx.send(event).compat()).unwrap();
-                    let transformed = futures::executor::block_on(rx.next()).unwrap().unwrap();
+                |(mut tx, event)| {
+                    futures::executor::block_on(tx.send(event)).unwrap();
+                    let transformed = futures::executor::block_on(rx.next()).unwrap();
 
                     debug_assert_eq!(transformed.as_log()[key], value.to_owned().into());
 
@@ -112,32 +106,30 @@ fn bench_field_filter(c: &mut Criterion) {
                     field: "the_field".to_string(),
                     value: "0".to_string(),
                 }
-                .build()
+                .build(&GlobalOptions::default())
                 .await
                 .unwrap()
             })
         }),
         ("v1", {
-            let source = String::from(
-                r#"
-if event["the_field"] ~= "0" then
-event = nil
-end
-"#,
-            );
+            let source = String::from(indoc! {r#"
+                if event["the_field"] ~= "0" then
+                    event = nil
+                end
+            "#});
             Transform::task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
         }),
         ("v2", {
-            let config = r#"
-hooks.process = """
-function (event, emit)
-if event.log["the_field"] ~= "0" then
-event = nil
-end
-emit(event)
-end
-"""
-"#;
+            let config = indoc! {r#"
+                hooks.process = """
+                function (event, emit)
+                  if event.log["the_field"] ~= "0" then
+                    event = nil
+                  end
+                  emit(event)
+                end
+                """
+            "#};
             Transform::task(
                 transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap(),
             )
@@ -145,32 +137,27 @@ end
     ];
 
     for (name, transform) in benchmarks {
-        let (tx, rx) = futures01::sync::mpsc::channel::<Event>(num_events as usize);
+        let (tx, rx) = futures::channel::mpsc::channel::<Event>(num_events as usize);
 
-        let mut rx: Box<dyn Stream<Item = Result<Event, ()>> + Send + Unpin> = match transform {
+        let mut rx: Pin<Box<dyn Stream<Item = Event> + Send>> = match transform {
             Transform::Function(t) => {
                 let mut t = t.clone();
-                Box::new(
-                    rx.map(move |v| {
-                        let mut buf = Vec::with_capacity(1);
-                        t.transform(&mut buf, v);
-                        futures01::stream::iter_ok(buf.into_iter())
-                    })
-                    .flatten()
-                    .compat(),
-                )
+                Box::pin(rx.flat_map(move |v| {
+                    let mut buf = Vec::with_capacity(1);
+                    t.transform(&mut buf, v);
+                    stream::iter(buf.into_iter())
+                }))
             }
-            Transform::Task(t) => Box::new(t.transform(Box::new(rx)).compat()),
+            Transform::Task(t) => t.transform(Box::pin(rx)),
         };
 
         group.bench_function(name.to_owned(), |b| {
             b.iter_batched(
                 || (tx.clone(), events.clone()),
-                |(tx, events)| {
-                    let _ = futures::executor::block_on(
-                        tx.send_all(futures01::stream::iter_ok(events)).compat(),
-                    )
-                    .unwrap();
+                |(mut tx, events)| {
+                    let _ =
+                        futures::executor::block_on(tx.send_all(&mut stream::iter(events).map(Ok)))
+                            .unwrap();
 
                     let output = futures::executor::block_on(collect_ready(&mut rx));
 
@@ -188,4 +175,10 @@ end
     group.finish();
 }
 
-criterion_group!(benches, bench_add_fields, bench_field_filter);
+criterion_group!(
+    name = benches;
+    // encapsulates CI noise we saw in
+    // https://github.com/timberio/vector/issues/5394
+    config = Criterion::default().noise_threshold(0.05);
+    targets = bench_add_fields, bench_field_filter
+);

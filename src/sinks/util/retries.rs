@@ -123,7 +123,7 @@ where
 
                 if let Some(expected) = error.downcast_ref::<L::Error>() {
                     if self.logic.is_retriable_error(expected) {
-                        warn!(message = "Retrying after error.", error = ?expected);
+                        warn!(message = "Retrying after error.", error = %expected);
                         Some(self.build_retry())
                     } else {
                         error!(

@@ -45,8 +45,8 @@ impl Debounce {
     }
 
     /// This function exposes the state of the debounce logic.
-    /// If this returns `false`, you shouldn't `poll` on [`debounced`], as it's
-    /// pending indefinitely.
+    /// If this returns `false`, you shouldn't `poll` on [`Self::debounced`], as
+    /// it's pending indefinitely.
     pub fn is_debouncing(&self) -> bool {
         self.sequence_start.is_some()
     }

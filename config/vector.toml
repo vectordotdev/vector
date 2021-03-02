@@ -9,19 +9,40 @@
 # ------------------------------------------------------------------------------
 # Website: https://vector.dev
 # Docs: https://vector.dev/docs/
+# Chat: https://chat.vector.dev
 # ------------------------------------------------------------------------------
 
-# Note: A full configuration reference is located at https://vector.dev/docs/ and examples
-#       in the ./examples folder.
+# data_dir = "/var/lib/vector"
 
-data_dir = "/var/lib/vector"
+# Vector's API (disabled by default)
+# Enable and try it out with the `vector top` command
+[api]
+enabled = false
+# address = "127.0.0.1:8686"
 
-# Input data. Change me to a valid input source.
-[sources.in]
-  type = "stdin"
+# Dummy Apache formatted logs
+[sources.dummy_logs]
+type = "generator"
+format = "syslog"
+interval = 1
 
-# Output data
-[sinks.out]
-  inputs   = ["in"]
-  type     = "console"
-  encoding = "text"
+# Parse Apache formatted logs
+# See the Remap reference: https://vector.dev/docs/reference/vrl/
+[transforms.parse_logs]
+type = "remap"
+source = '''
+. = parse_syslog(.message)
+'''
+
+# Host-level metrics (cpu, memory, disk, etc)
+[sources.host_metrics]
+type = "host_metrics"
+
+# Vector's own internal metrics
+[sources.internal_metrics]
+type = "internal_metrics"
+
+# Print it all out for inspection
+[sinks.print]
+type = "console"
+inputs = ["parse_logs", "host_metrics", "internal_metrics"]

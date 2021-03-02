@@ -1,11 +1,10 @@
 #![cfg(all(
     feature = "sinks-socket",
-    feature = "transforms-sampler",
+    feature = "transforms-sample",
     feature = "sources-socket",
 ))]
 
 use approx::assert_relative_eq;
-use futures::compat::Future01CompatExt;
 use vector::{
     config, sinks, sources,
     test_util::{
@@ -46,7 +45,7 @@ async fn pipe() {
     send_lines(in_addr, input_lines.clone()).await.unwrap();
 
     // Shut down server
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines = output_lines.await;
     assert_eq!(num_lines, output_lines.len());
@@ -66,9 +65,9 @@ async fn sample() {
         sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
     );
     config.add_transform(
-        "sampler",
+        "sample",
         &["in"],
-        transforms::sampler::SamplerConfig {
+        transforms::sample::SampleConfig {
             rate: 10,
             key_field: Some(config::log_schema().message_key().into()),
             exclude: None,
@@ -76,7 +75,7 @@ async fn sample() {
     );
     config.add_sink(
         "out",
-        &["sampler"],
+        &["sample"],
         sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
 
@@ -93,7 +92,7 @@ async fn sample() {
     send_lines(in_addr, input_lines.clone()).await.unwrap();
 
     // Shut down server
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines = output_lines.await;
     let num_output_lines = output_lines.len();
@@ -148,7 +147,7 @@ async fn fork() {
     send_lines(in_addr, input_lines.clone()).await.unwrap();
 
     // Shut down server
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines1 = output_lines1.await;
     let output_lines2 = output_lines2.await;
@@ -158,7 +157,11 @@ async fn fork() {
     assert_eq!(input_lines, output_lines2);
 }
 
-#[tokio::test]
+// In cpu constrained environments at least two threads
+// are needed to finish processing all the events before
+// sources are forcefully shutted down.
+// Although that's still not a guarantee.
+#[tokio::test(core_threads = 2)]
 async fn merge_and_fork() {
     trace_init();
 
@@ -212,7 +215,7 @@ async fn merge_and_fork() {
     tokio::task::yield_now().await;
 
     // Shut down server
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines1 = output_lines1.await;
     let output_lines2 = output_lines2.await;
@@ -265,7 +268,7 @@ async fn reconnect() {
     send_lines(in_addr, input_lines.clone()).await.unwrap();
 
     // Shut down server and wait for it to fully flush
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let output_lines = output_lines.await;
     assert!(num_lines >= 2);

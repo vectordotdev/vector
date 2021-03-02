@@ -23,12 +23,15 @@
   [[tests.outputs]]
     extract_from = "coercer_simple"
     [[tests.outputs.conditions]]
-      "integer_field.equals" = 123
-      "boolean_field.equals" = true
-      "float_field.equals" = 3.1415926535
-      "string_field.equals" = "-1"
-      "timestamp_field.equals" = "2020-02-20T12:34:56.123456789Z"
-      "timestamp_field_formatted.equals" = "2020-02-20T12:34:56Z"
+      type = "remap"
+      source = '''
+        .integer_field == 123 &&
+        .boolean_field == true &&
+        .float_field == 3.1415926535 &&
+        .string_field == "-1" &&
+        .timestamp_field == to_timestamp!("2020-02-20T12:34:56.123456789Z") &&
+        .timestamp_field_formatted == to_timestamp!("2020-02-20T12:34:56Z")
+      '''
 
 [transforms.coercer_nested]
   inputs = []
@@ -45,4 +48,5 @@
   [[tests.outputs]]
     extract_from = "coercer_nested"
     [[tests.outputs.conditions]]
-      "nested.field.equals" = 1234
+      type = "remap"
+      source = ".nested.field == 1234"

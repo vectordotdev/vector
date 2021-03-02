@@ -14,6 +14,7 @@ components: sources: internal_metrics: {
 		deployment_roles: ["aggregator", "daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -26,14 +27,15 @@ components: sources: internal_metrics: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		notices: []
 		requirements: []
 		warnings: []
@@ -73,6 +75,30 @@ components: sources: internal_metrics: {
 		}
 		connection_errors_total: {
 			description:       "The total number of connection errors for this Vector instance."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		connection_established_total: {
+			description:       "The total number of times a connection has been established."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		connection_failed_total: {
+			description:       "The total number of times a connection has failed."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		connection_send_errors_total: {
+			description:       "The total number of errors sending data via the connection."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		connection_shutdown_total: {
+			description:       "The total number of times the connection has been shut down."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
@@ -258,6 +284,18 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		events_in_total: {
+			description:       "The total number of events accepted by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		events_out_total: {
+			description:       "The total number of events emitted by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		processed_events_total: {
 			description:       "The total number of events processed by this component."
 			type:              "counter"
@@ -320,6 +358,14 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags & {
 				file: _file
+			}
+		}
+		glob_errors_total: {
+			description:       "The total number of errors encountered when globbing paths."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags & {
+				path: _path
 			}
 		}
 		http_bad_requests_total: {
@@ -429,6 +475,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
+		request_duration_nanoseconds: {
+			description:       "The total request duration in nanoseconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
 		request_read_errors_total: {
 			description:       "The total number of request read errors for this component."
 			type:              "counter"
@@ -443,6 +495,12 @@ components: sources: internal_metrics: {
 		}
 		requests_received_total: {
 			description:       "The total number of requests received by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		send_errors_total: {
+			description:       "The total number of errors sending messages."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -687,6 +745,10 @@ components: sources: internal_metrics: {
 			description: "The name of the job producing Vector metrics."
 			required:    true
 			default:     "vector"
+		}
+		_path: {
+			description: "The path that produced the error."
+			required:    true
 		}
 	}
 }

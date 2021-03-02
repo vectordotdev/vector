@@ -1,23 +1,29 @@
 use super::collector::{self, MetricCollector as _};
 use crate::{
     config::{self, SinkConfig, SinkDescription},
-    event::Metric,
-    http::HttpClient,
+    event::{Event, Metric},
+    http::{Auth, HttpClient},
+    internal_events::PrometheusTemplateRenderingError,
     sinks::{
         self,
         util::{
-            http::HttpRetryLogic, BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
+            buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
+            http::HttpRetryLogic,
+            BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+            TowerRequestConfig,
         },
     },
+    template::Template,
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::{Bytes, BytesMut};
-use futures::{future::BoxFuture, FutureExt, SinkExt};
+use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use http::Uri;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::task;
+use tower::ServiceBuilder;
 
 #[derive(Debug, Snafu)]
 enum Errors {
@@ -26,6 +32,7 @@ enum Errors {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RemoteWriteConfig {
     pub endpoint: String,
 
@@ -41,7 +48,12 @@ pub(crate) struct RemoteWriteConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
 
+    #[serde(default)]
+    pub tenant_id: Option<Template>,
+
     pub tls: Option<TlsOptions>,
+
+    pub auth: Option<Auth>,
 }
 
 inventory::submit! {
@@ -72,6 +84,9 @@ impl SinkConfig for RemoteWriteConfig {
         let quantiles = self.quantiles.clone();
 
         let client = HttpClient::new(tls_settings)?;
+        let tenant_id = self.tenant_id.clone();
+        let auth = self.auth.clone();
+
         let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
         let service = RemoteWriteService {
             endpoint,
@@ -79,16 +94,34 @@ impl SinkConfig for RemoteWriteConfig {
             client,
             buckets,
             quantiles,
+            auth,
         };
-        let sink = request
-            .batch_sink(
-                HttpRetryLogic,
-                service,
-                MetricBuffer::new(batch.size),
-                batch.timeout,
-                cx.acker(),
-            )
-            .sink_map_err(|error| error!(message = "Prometheus remote_write sink error.", %error));
+
+        let sink = {
+            let service = request.service(HttpRetryLogic, service);
+            let service = ServiceBuilder::new().service(service);
+            let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
+            let mut normalizer = MetricNormalizer::<PrometheusMetricNormalize>::default();
+
+            PartitionBatchSink::new(service, buffer, batch.timeout, cx.acker())
+                .with_flat_map(move |event: Event| {
+                    stream::iter(normalizer.apply(event).map(|event| {
+                        let tenant_id = tenant_id.as_ref().and_then(|template| {
+                            template
+                                .render_string(&event)
+                                .map_err(|fields| {
+                                    emit!(PrometheusTemplateRenderingError { fields })
+                                })
+                                .ok()
+                        });
+                        let key = PartitionKey { tenant_id };
+                        Ok(PartitionInnerBuffer::new(event, key))
+                    }))
+                })
+                .sink_map_err(
+                    |error| error!(message = "Prometheus remote_write sink error.", %error),
+                )
+        };
 
         Ok((sinks::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
@@ -100,6 +133,11 @@ impl SinkConfig for RemoteWriteConfig {
     fn sink_type(&self) -> &'static str {
         "prometheus_remote_write"
     }
+}
+
+#[derive(Clone, Eq, Hash, PartialEq)]
+struct PartitionKey {
+    tenant_id: Option<String>,
 }
 
 async fn healthcheck(endpoint: Uri, client: HttpClient) -> crate::Result<()> {
@@ -114,6 +152,13 @@ async fn healthcheck(endpoint: Uri, client: HttpClient) -> crate::Result<()> {
         other => Err(sinks::HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
 }
+pub struct PrometheusMetricNormalize;
+
+impl MetricNormalize for PrometheusMetricNormalize {
+    fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
+        state.make_absolute(metric)
+    }
+}
 
 #[derive(Clone)]
 struct RemoteWriteService {
@@ -122,6 +167,7 @@ struct RemoteWriteService {
     client: HttpClient,
     buckets: Vec<f64>,
     quantiles: Vec<f64>,
+    auth: Option<Auth>,
 }
 
 impl RemoteWriteService {
@@ -144,7 +190,7 @@ impl RemoteWriteService {
     }
 }
 
-impl tower::Service<Vec<Metric>> for RemoteWriteService {
+impl tower::Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteWriteService {
     type Response = http::Response<Bytes>;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -153,16 +199,23 @@ impl tower::Service<Vec<Metric>> for RemoteWriteService {
         task::Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, events: Vec<Metric>) -> Self::Future {
+    fn call(&mut self, buffer: PartitionInnerBuffer<Vec<Metric>, PartitionKey>) -> Self::Future {
+        let (events, key) = buffer.into_parts();
         let body = self.encode_events(events);
         let body = snap_block(body);
 
-        let request = http::Request::post(self.endpoint.clone())
+        let mut builder = http::Request::post(self.endpoint.clone())
             .header("X-Prometheus-Remote-Write-Version", "0.1.0")
             .header("Content-Encoding", "snappy")
-            .header("Content-Type", "application/x-protobuf")
-            .body(body.into())
-            .unwrap();
+            .header("Content-Type", "application/x-protobuf");
+        if let Some(tenant_id) = key.tenant_id {
+            builder = builder.header("X-Scope-OrgID", tenant_id);
+        }
+
+        let mut request = builder.body(body.into()).unwrap();
+        if let Some(auth) = &self.auth {
+            auth.apply(&mut request);
+        }
         let client = self.client.clone();
 
         Box::pin(async move {
@@ -183,21 +236,212 @@ fn snap_block(data: Bytes) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        config::SinkContext,
+        event::{MetricKind, MetricValue},
+        sinks::util::test::build_test_server,
+        test_util,
+    };
+    use futures::StreamExt;
+    use http::HeaderMap;
+    use indoc::indoc;
+    use prometheus_parser::proto;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<RemoteWriteConfig>();
     }
+
+    macro_rules! labels {
+        ( $( $name:expr => $value:expr ),* ) => {
+            vec![ $( proto::Label {
+                name: $name.to_string(),
+                value: $value.to_string()
+            }, )* ]
+        }
+    }
+
+    #[tokio::test]
+    async fn sends_request() {
+        let outputs = send_request("", vec![create_event("gauge-2".into(), 32.0)]).await;
+        assert_eq!(outputs.len(), 1);
+        let (headers, req) = &outputs[0];
+
+        assert!(!headers.contains_key("x-scope-orgid"));
+
+        assert_eq!(req.timeseries.len(), 1);
+        assert_eq!(
+            req.timeseries[0].labels,
+            labels!("__name__" => "gauge-2", "production" => "true", "region" => "us-west-1")
+        );
+        assert_eq!(req.timeseries[0].samples.len(), 1);
+        assert_eq!(req.timeseries[0].samples[0].value, 32.0);
+        assert_eq!(req.metadata.len(), 1);
+        assert_eq!(req.metadata[0].r#type, proto::MetricType::Gauge as i32);
+        assert_eq!(req.metadata[0].metric_family_name, "gauge-2");
+    }
+
+    #[tokio::test]
+    async fn sends_authenticated_request() {
+        let outputs = send_request(
+            indoc! {r#"
+                tenant_id = "tenant-%Y"
+                [auth]
+                strategy = "basic"
+                user = "user"
+                password = "password"
+            "#},
+            vec![create_event("gauge-2".into(), 32.0)],
+        )
+        .await;
+
+        assert_eq!(outputs.len(), 1);
+        let (_headers, req) = &outputs[0];
+
+        assert_eq!(req.timeseries.len(), 1);
+        assert_eq!(
+            req.timeseries[0].labels,
+            labels!("__name__" => "gauge-2", "production" => "true", "region" => "us-west-1")
+        );
+        assert_eq!(req.timeseries[0].samples.len(), 1);
+        assert_eq!(req.timeseries[0].samples[0].value, 32.0);
+        assert_eq!(req.metadata.len(), 1);
+        assert_eq!(req.metadata[0].r#type, proto::MetricType::Gauge as i32);
+        assert_eq!(req.metadata[0].metric_family_name, "gauge-2");
+    }
+
+    #[tokio::test]
+    async fn sends_x_scope_orgid_header() {
+        let outputs = send_request(
+            r#"tenant_id = "tenant""#,
+            vec![create_event("gauge-3".into(), 12.0)],
+        )
+        .await;
+
+        assert_eq!(outputs.len(), 1);
+        let (headers, _) = &outputs[0];
+        assert_eq!(headers["x-scope-orgid"], "tenant");
+    }
+
+    #[tokio::test]
+    async fn sends_templated_x_scope_orgid_header() {
+        let outputs = send_request(
+            r#"tenant_id = "tenant-%Y""#,
+            vec![create_event("gauge-3".into(), 12.0)],
+        )
+        .await;
+
+        assert_eq!(outputs.len(), 1);
+        let (headers, _) = &outputs[0];
+        let orgid = headers["x-scope-orgid"]
+            .to_str()
+            .expect("Missing x-scope-orgid header");
+        assert!(orgid.starts_with("tenant-20"));
+        assert_eq!(orgid.len(), 11);
+    }
+
+    #[tokio::test]
+    async fn retains_state_between_requests() {
+        // This sink converts all incremental events to absolute, and
+        // should accumulate their totals between batches.
+        let outputs = send_request(
+            r#"batch.max_events = 1"#,
+            vec![
+                create_inc_event("counter-1".into(), 12.0),
+                create_inc_event("counter-2".into(), 13.0),
+                create_inc_event("counter-1".into(), 14.0),
+            ],
+        )
+        .await;
+
+        assert_eq!(outputs.len(), 3);
+
+        let check_output = |index: usize, name: &str, value: f64| {
+            let (_, req) = &outputs[index];
+            assert_eq!(req.timeseries.len(), 1);
+            assert_eq!(req.timeseries[0].labels, labels!("__name__" => name));
+            assert_eq!(req.timeseries[0].samples.len(), 1);
+            assert_eq!(req.timeseries[0].samples[0].value, value);
+        };
+        check_output(0, "counter-1", 12.0);
+        check_output(1, "counter-2", 13.0);
+        check_output(2, "counter-1", 26.0);
+    }
+
+    async fn send_request(
+        config: &str,
+        events: Vec<Event>,
+    ) -> Vec<(HeaderMap, proto::WriteRequest)> {
+        let addr = test_util::next_addr();
+        let (rx, trigger, server) = build_test_server(addr);
+        tokio::spawn(server);
+
+        let config = format!("endpoint = \"http://{}/write\"\n{}", addr, config);
+        let config: RemoteWriteConfig = toml::from_str(&config).unwrap();
+        let cx = SinkContext::new_test();
+
+        let (sink, _) = config.build(cx).await.unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
+
+        drop(trigger);
+
+        rx.map(|(parts, body)| {
+            assert_eq!(parts.method, "POST");
+            assert_eq!(parts.uri.path(), "/write");
+            let headers = parts.headers;
+            assert_eq!(headers["x-prometheus-remote-write-version"], "0.1.0");
+            assert_eq!(headers["content-encoding"], "snappy");
+            assert_eq!(headers["content-type"], "application/x-protobuf");
+
+            if config.auth.is_some() {
+                assert!(headers.contains_key("authorization"));
+            }
+
+            let decoded = snap::raw::Decoder::new()
+                .decompress_vec(&body)
+                .expect("Invalid snappy compressed data");
+            let request =
+                proto::WriteRequest::decode(Bytes::from(decoded)).expect("Invalid protobuf");
+            (headers, request)
+        })
+        .collect::<Vec<_>>()
+        .await
+    }
+
+    pub(super) fn create_event(name: String, value: f64) -> Event {
+        Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
+            .with_tags(Some(
+                vec![
+                    ("region".to_owned(), "us-west-1".to_owned()),
+                    ("production".to_owned(), "true".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
+            ))
+            .with_timestamp(Some(chrono::Utc::now()))
+            .into()
+    }
+
+    fn create_inc_event(name: String, value: f64) -> Event {
+        Metric::new(
+            name,
+            MetricKind::Incremental,
+            MetricValue::Counter { value },
+        )
+        .with_timestamp(Some(chrono::Utc::now()))
+        .into()
+    }
 }
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
+    use super::tests::*;
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::metric::{Metric, MetricKind, MetricValue},
+        event::metric::MetricValue,
         sinks::influxdb::test_util::{cleanup_v1, onboarding_v1, query_v1},
-        tls::TlsOptions,
+        tls::{self, TlsOptions},
         Event,
     };
     use futures::stream;
@@ -218,6 +462,8 @@ mod integration_tests {
     }
 
     async fn insert_metrics(url: &str) {
+        crate::test_util::trace_init();
+
         let database = onboarding_v1(url).await;
 
         let cx = SinkContext::new_test();
@@ -225,7 +471,7 @@ mod integration_tests {
         let config = RemoteWriteConfig {
             endpoint: format!("{}/api/v1/prom/write?db={}", url, database),
             tls: Some(TlsOptions {
-                ca_file: Some("tests/data/Vector_CA.crt".into()),
+                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
             ..Default::default()
@@ -244,7 +490,7 @@ mod integration_tests {
             let metric = event.into_metric();
             let result = query(
                 url,
-                &format!(r#"SELECT * FROM "{}".."{}""#, database, &metric.name),
+                &format!(r#"SELECT * FROM "{}".."{}""#, database, metric.name()),
             )
             .await;
 
@@ -252,17 +498,18 @@ mod integration_tests {
             assert_eq!(metrics.len(), 1);
             let output = &metrics[0];
 
-            match metric.value {
+            match metric.data.value {
                 MetricValue::Gauge { value } => {
                     assert_eq!(output["value"], Value::Number((value as u32).into()))
                 }
                 _ => panic!("Unhandled metric value, fix the test"),
             }
-            for (tag, value) in metric.tags.unwrap() {
-                assert_eq!(output[&tag], Value::String(value));
+            for (tag, value) in metric.tags().unwrap() {
+                assert_eq!(output[&tag[..]], Value::String(value.to_string()));
             }
             let timestamp = strip_timestamp(
                 metric
+                    .data
                     .timestamp
                     .unwrap()
                     .format("%Y-%m-%dT%H:%M:%S%.3fZ")
@@ -311,23 +558,5 @@ mod integration_tests {
         name_range
             .map(move |num| create_event(format!("metric_{}", num), value(num as f64)))
             .collect()
-    }
-
-    fn create_event(name: String, value: f64) -> Event {
-        Event::Metric(Metric {
-            name,
-            namespace: None,
-            timestamp: Some(chrono::Utc::now()),
-            tags: Some(
-                vec![
-                    ("region".to_owned(), "us-west-1".to_owned()),
-                    ("production".to_owned(), "true".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            ),
-            kind: MetricKind::Absolute,
-            value: MetricValue::Gauge { value },
-        })
     }
 }
