@@ -1723,6 +1723,23 @@ mod test {
     }
 
     #[test]
+    fn queries_negative_index() {
+        test(
+            data("v[-1] = 2"),
+            vec![
+                ("~        ", LQuery),
+                ("~        ", Identifier("v")),
+                (" ~       ", LBracket),
+                ("  ~~     ", IntegerLiteral(-1)),
+                ("    ~    ", RBracket),
+                ("    ~    ", RQuery),
+                ("      ~  ", Equals),
+                ("        ~", IntegerLiteral(2)),
+            ],
+        );
+    }
+
+    #[test]
     fn multi_byte_character_1() {
         use StringLiteral as S;
         use Token::StringLiteral as L;
