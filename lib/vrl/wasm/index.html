@@ -47,8 +47,7 @@
       import { default as wasm, resolve } from "./pkg/vrl_wasm.js";
 
       wasm().then((module) => {
-        const program = `
-          . |= parse_key_value!(string!(.message))
+        const program = `. |= parse_key_value!(string!(.message))
           del(.message)
           .timestamp = format_timestamp!(to_timestamp!(.timestamp), format: "%+")
           .id = uuid_v4()
@@ -65,7 +64,7 @@
         $(() => {
           let result = resolve(input);
 
-          $('#program').text(program);
+          $('#program').html(program.replaceAll('\n', '<br>'));
           $('#output').html(result.output);
           $('#result').html(JSON.stringify(result.result));
         });
