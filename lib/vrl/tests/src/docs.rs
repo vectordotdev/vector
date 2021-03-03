@@ -26,6 +26,8 @@ pub fn tests() -> Vec<Test> {
         .output()
         .expect("failed to execute process");
 
+    dbg!(&output);
+
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
 
     let examples: Vec<_> = json
