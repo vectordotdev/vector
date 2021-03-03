@@ -1,3 +1,4 @@
+use super::EventMetadata;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::{Deserialize, Serialize};
@@ -16,6 +17,8 @@ pub struct Metric {
     pub series: MetricSeries,
     #[serde(flatten)]
     pub data: MetricData,
+    #[serde(skip)]
+    pub metadata: EventMetadata,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -239,6 +242,7 @@ impl Metric {
                 kind,
                 value,
             },
+            metadata: EventMetadata,
         }
     }
 
@@ -257,11 +261,17 @@ impl Metric {
         self
     }
 
+    pub fn with_value(mut self, value: MetricValue) -> Self {
+        self.data.value = value;
+        self
+    }
+
     /// Rewrite this into a Metric with the data marked as absolute.
     pub fn into_absolute(self) -> Self {
         Self {
             series: self.series,
             data: self.data.into_absolute(),
+            metadata: EventMetadata,
         }
     }
 
@@ -270,6 +280,7 @@ impl Metric {
         Self {
             series: self.series,
             data: self.data.into_incremental(),
+            metadata: EventMetadata,
         }
     }
 
@@ -361,6 +372,7 @@ impl Metric {
         Self {
             series: self.series.clone(),
             data: self.data.zero(),
+            metadata: EventMetadata,
         }
     }
 }

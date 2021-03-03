@@ -2,6 +2,7 @@ use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricPro
 use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 
 pub mod discriminant;
@@ -27,6 +28,9 @@ pub mod proto {
 }
 
 pub const PARTIAL: &str = "_partial";
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct EventMetadata;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Event {
@@ -303,7 +307,11 @@ impl From<Event> for proto::EventWrapper {
 
                 proto::EventWrapper { event: Some(event) }
             }
-            Event::Metric(Metric { series, data }) => {
+            Event::Metric(Metric {
+                series,
+                data,
+                metadata: _metadata,
+            }) => {
                 let name = series.name.name;
                 let namespace = series.name.namespace.unwrap_or_default();
 

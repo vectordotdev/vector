@@ -337,7 +337,7 @@ impl StreamSink for PrometheusExporter {
 mod tests {
     use super::*;
     use crate::{
-        event::metric::{Metric, MetricData, MetricSeries, MetricValue},
+        event::metric::{Metric, MetricValue},
         http::HttpClient,
         test_util::{next_addr, random_string, trace_init},
         tls::MaybeTlsSettings,
@@ -505,40 +505,16 @@ mod tests {
                 .collect(),
         ));
 
-        let m2 = Metric {
-            series: MetricSeries {
-                tags: Some(
-                    vec![("tag1".to_owned(), "value2".to_owned())]
-                        .into_iter()
-                        .collect(),
-                ),
-                ..m1.series.clone()
-            },
-            data: m1.data.clone(),
-        };
+        let m2 = m1.clone().with_tags(Some(
+            vec![("tag1".to_owned(), "value2".to_owned())]
+                .into_iter()
+                .collect(),
+        ));
 
         let metrics = vec![
-            Event::Metric(Metric {
-                series: m1.series.clone(),
-                data: MetricData {
-                    value: MetricValue::Counter { value: 32. },
-                    ..m1.data.clone()
-                },
-            }),
-            Event::Metric(Metric {
-                series: m2.series.clone(),
-                data: MetricData {
-                    value: MetricValue::Counter { value: 33. },
-                    ..m2.data.clone()
-                },
-            }),
-            Event::Metric(Metric {
-                series: m1.series.clone(),
-                data: MetricData {
-                    value: MetricValue::Counter { value: 40. },
-                    ..m1.data.clone()
-                },
-            }),
+            Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 32. })),
+            Event::Metric(m2.clone().with_value(MetricValue::Counter { value: 33. })),
+            Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 40. })),
         ];
 
         sink.run(Box::pin(futures::stream::iter(metrics)))
