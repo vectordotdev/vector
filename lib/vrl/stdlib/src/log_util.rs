@@ -108,7 +108,7 @@ fn capture_value(
     value: &str,
     timestamp_format: &str,
 ) -> std::result::Result<Value, String> {
-    Ok(match name.as_ref() {
+    Ok(match name {
         "timestamp" => Value::Timestamp(parse_time(&value, &timestamp_format)?),
         "status" | "size" | "pid" | "port" => Value::Integer(
             value
