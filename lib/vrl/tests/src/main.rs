@@ -1,5 +1,5 @@
 use ansi_term::Colour;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use glob::glob;
 use std::str::FromStr;
 use structopt::StructOpt;

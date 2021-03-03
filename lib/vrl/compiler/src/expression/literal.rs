@@ -1,7 +1,7 @@
 use crate::expression::Resolved;
 use crate::{value::Regex, Context, Expression, Span, State, TypeDef, Value};
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use ordered_float::NotNan;
 use parser::ast::{self, Node};
@@ -93,7 +93,7 @@ impl fmt::Display for Literal {
             Float(v) => v.fmt(f),
             Boolean(v) => v.fmt(f),
             Regex(v) => v.fmt(f),
-            Timestamp(v) => write!(f, "t'{}'", v.to_rfc3339()),
+            Timestamp(v) => write!(f, "t'{}'", v.to_rfc3339_opts(SecondsFormat::AutoSi, true)),
             Null => f.write_str("null"),
         }
     }
