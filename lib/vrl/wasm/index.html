@@ -5,12 +5,19 @@
     <title>vrl-wasm</title>
   </head>
   <body>
+    <h1>
+      Result:
+    </h1>
+
+    <div id="result"></div>
+
     <script type="module">
       import { default as wasm, resolve } from "./pkg/vrl_wasm.js";
 
       wasm().then((module) => {
         const program = `
           . |= parse_key_value!(string!(.message))
+          del(.message)
           .timestamp = format_timestamp!(to_timestamp!(.timestamp), format: "%+")
           .id = uuid_v4()
         `;
@@ -24,10 +31,9 @@
         };
 
         let result = resolve(input);
+        let json = JSON.stringify(result, null, '\t');
 
-        let json = JSON.stringify(result);
-
-        window.alert(json);
+        document.getElementById('result').innerHTML = `<p>${json}</p>`;
       });
     </script>
   </body>
