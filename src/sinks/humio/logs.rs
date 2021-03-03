@@ -1,4 +1,4 @@
-use super::{default_host_key, Encoding};
+use super::{host_key, Encoding};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::splunk_hec::HecSinkConfig,
@@ -22,7 +22,7 @@ pub struct HumioLogsConfig {
 
     pub(in crate::sinks::humio) event_type: Option<Template>,
 
-    #[serde(default = "default_host_key")]
+    #[serde(default = "host_key")]
     pub(in crate::sinks::humio) host_key: String,
 
     #[serde(default)]
@@ -49,7 +49,7 @@ impl GenerateConfig for HumioLogsConfig {
             source: None,
             encoding: Encoding::Json.into(),
             event_type: None,
-            host_key: default_host_key(),
+            host_key: host_key(),
             compression: Compression::default(),
             request: TowerRequestConfig::default(),
             batch: BatchConfig::default(),
