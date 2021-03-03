@@ -3,9 +3,9 @@ package metadata
 remap: functions: parse_apache_log: {
 	category: "Parse"
 	description: """
-		Parses apache access and error log lines. Lines can be either in [`common`](https://httpd.apache.org/docs/1.3/logs.html#common) format,
-		[`combined`](https://httpd.apache.org/docs/1.3/logs.html#combined) format, or default
-		[`error`](https://httpd.apache.org/docs/1.3/logs.html#errorlog) format.
+		Parses apache access and error log lines. Lines can be either in [`common`](\(urls.apache_common)) format,
+		[`combined`](\(urls.apache_combined)) format, or default
+		[`error`](\(urls.apache_error)) format.
 		"""
 	notices: [
 		"""
@@ -49,7 +49,7 @@ remap: functions: parse_apache_log: {
 
 	examples: [
 		{
-			title: "Parse via Common Log Format (with default timestamp format)"
+			title: "Parse via Apache log format (common)"
 			source: #"""
 				parse_apache_log("127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] \"GET /apache_pb.gif HTTP/1.0\" 200 2326", format: "common")
 				"""#
@@ -67,12 +67,11 @@ remap: functions: parse_apache_log: {
 			}
 		},
 		{
-			title: "Parse via Combined Log Format (with custom timestamp format)"
+			title: "Parse via Apache log format (combined)"
 			source: #"""
 				parse_apache_log(
-					s'127.0.0.1 bob frank [2000-10-10T20:55:36Z] \"GET /apache_pb.gif HTTP/1.0\" 200 2326 "http://www.seniorinfomediaries.com/vertical/channels/front-end/bandwidth" "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0"',
+					s'127.0.0.1 bob frank [10/Oct/2000:20:55:36 +0000] \"GET /apache_pb.gif HTTP/1.0\" 200 2326 "http://www.seniorinfomediaries.com/vertical/channels/front-end/bandwidth" "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0"',
 					"combined",
-					"%+"
 				)
 				"""#
 			return: {
@@ -91,7 +90,7 @@ remap: functions: parse_apache_log: {
 			}
 		},
 		{
-			title: "Parse Error Format"
+			title: "Parse via Apache log format (error)"
 			source: #"""
 				parse_apache_log(
 					s'[01/Mar/2021:12:00:19 +0000] [ab:alert] [pid 4803:tid 3814] [client 147.159.108.175:24259] I will bypass the haptic COM bandwidth, that should matrix the CSS driver!',
