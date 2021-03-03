@@ -33,7 +33,7 @@ import { default as wasm, resolve } from "./pkg/vrl_wasm.js";
 wasm().then((module) => {
   // An example VRL program
   const program = `
-    . |= parse_key_value!(string!(del(.message)))
+    . |= parse_key_value!(string!(.message))
     del(.message)
     .timestamp = format_timestamp!(to_timestamp!(.timestamp), format: "%+")
     .id = uuid_v4()
