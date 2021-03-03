@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: parse_apache_log: {
-	category: "Parse"
+	category:    "Parse"
 	description: """
 		Parses apache access and error log lines. Lines can be either in [`common`](\(urls.apache_common)) format,
 		[`combined`](\(urls.apache_combined)) format, or default
