@@ -597,7 +597,7 @@ impl RunningTopology {
 
         #[cfg(feature = "api")]
         self.tap_sinks.iter().for_each(|tap_sink| {
-            tap_sink.component_went_away(name);
+            tap_sink.component_not_matched(name);
         })
     }
 
@@ -747,7 +747,7 @@ impl RunningTopology {
                             id = sink_name.as_str(),
                             input = input_name.as_str()
                         );
-                        tap_sink.component_came_back(&input_name);
+                        tap_sink.component_matched(&input_name);
                         let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
                     }
                 }
@@ -781,7 +781,7 @@ impl RunningTopology {
                     message = "Waiting for tap component",
                     input = input_name.as_str()
                 );
-                let _ = tap_sink.component_not_ready(input_name);
+                let _ = tap_sink.component_not_matched(input_name);
             }
         })
     }

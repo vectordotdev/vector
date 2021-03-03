@@ -28,14 +28,12 @@ impl From<TapResult> for LogEventResult {
         match t {
             TapResult::LogEvent(name, ev) => Self::LogEvent(LogEvent::new(&name, ev)),
             TapResult::Notification(name, n) => match n {
-                TapNotification::ComponentNotReady => Self::Notification(
-                    LogEventNotification::new(&name, LogEventNotificationType::ComponentNotReady),
-                ),
-                TapNotification::ComponentWentAway => Self::Notification(
-                    LogEventNotification::new(&name, LogEventNotificationType::ComponentWentAway),
-                ),
-                TapNotification::ComponentCameBack => Self::Notification(
-                    LogEventNotification::new(&name, LogEventNotificationType::ComponentCameBack),
+                TapNotification::ComponentMatched => Self::Notification(LogEventNotification::new(
+                    &name,
+                    LogEventNotificationType::ComponentMatched,
+                )),
+                TapNotification::ComponentNotMatched => Self::Notification(
+                    LogEventNotification::new(&name, LogEventNotificationType::ComponentNotMatched),
                 ),
             },
         }

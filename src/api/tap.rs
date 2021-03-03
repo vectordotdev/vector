@@ -14,9 +14,8 @@ use uuid::Uuid;
 type TapSender = mpsc::UnboundedSender<TapResult>;
 
 pub enum TapNotification {
-    ComponentNotReady,
-    ComponentWentAway,
-    ComponentCameBack,
+    ComponentMatched,
+    ComponentNotMatched,
 }
 
 pub enum TapResult {
@@ -25,16 +24,12 @@ pub enum TapResult {
 }
 
 impl TapResult {
-    pub fn component_not_ready(input_name: &str) -> Self {
-        Self::Notification(input_name.to_string(), TapNotification::ComponentNotReady)
+    pub fn component_matched(input_name: &str) -> Self {
+        Self::Notification(input_name.to_string(), TapNotification::ComponentMatched)
     }
 
-    pub fn component_went_away(input_name: &str) -> Self {
-        Self::Notification(input_name.to_string(), TapNotification::ComponentWentAway)
-    }
-
-    pub fn component_came_back(input_name: &str) -> Self {
-        Self::Notification(input_name.to_string(), TapNotification::ComponentCameBack)
+    pub fn component_not_matched(input_name: &str) -> Self {
+        Self::Notification(input_name.to_string(), TapNotification::ComponentNotMatched)
     }
 }
 
@@ -104,21 +99,15 @@ impl TapSink {
         Some((id.to_string(), self.make_router(input_name)))
     }
 
-    pub fn component_not_ready(&self, input_name: &str) {
+    pub fn component_matched(&self, input_name: &str) {
         if self.inputs.contains_key(input_name) {
-            self.send(TapResult::component_not_ready(input_name))
+            self.send(TapResult::component_matched(input_name))
         }
     }
 
-    pub fn component_went_away(&self, input_name: &str) {
+    pub fn component_not_matched(&self, input_name: &str) {
         if self.inputs.contains_key(input_name) {
-            self.send(TapResult::component_went_away(input_name))
-        }
-    }
-
-    pub fn component_came_back(&self, input_name: &str) {
-        if self.inputs.contains_key(input_name) {
-            self.send(TapResult::component_came_back(input_name))
+            self.send(TapResult::component_not_matched(input_name))
         }
     }
 }
