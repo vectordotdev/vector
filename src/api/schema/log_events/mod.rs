@@ -7,29 +7,35 @@ use crate::api::{
     tap::{TapController, TapNotification, TapResult, TapSink},
     ControlSender,
 };
-use async_graphql::{Context, Enum, InputObject, Subscription, Union};
+use async_graphql::{validators::IntRange, Context, Enum, InputObject, Subscription, Union};
 use futures::{channel::mpsc, StreamExt};
 use itertools::Itertools;
 use tokio::{select, stream::Stream, time};
 
 #[derive(Enum, Copy, Clone, PartialEq, Eq)]
-pub enum LogEventSampleType {
-    First,
-    Last,
+/// Where to sample log events from
+pub enum LogEventSampleWhere {
+    /// Start of this interval's log events
+    Head,
+    /// End of this interval's log events
+    Tail,
+    /// Even distribution of this interval's log events
     Range,
 }
 
 #[derive(InputObject)]
 pub struct LogEventSample {
-    #[graphql(name = "type")]
-    sample_type: LogEventSampleType,
+    #[graphql(name = "where")]
+    sample_where: LogEventSampleWhere,
+
+    #[graphql(validator(IntRange(min = "1", max = "1_000")))]
     value: usize,
 }
 
 impl Default for LogEventSample {
     fn default() -> Self {
         LogEventSample {
-            sample_type: LogEventSampleType::First,
+            sample_where: LogEventSampleWhere::Head,
             value: 100,
         }
     }
@@ -115,16 +121,15 @@ fn create_log_events_stream(
                     // If there are any existing results after the interval tick, emit.
                     if !results.is_empty() {
                         let results = results.drain(..).into_iter();
-                        let number_of_results = results.len();
+                        let results_len = results.len();
 
-                        let results = match sample.sample_type {
-                            LogEventSampleType::First => results.take(sample.value).collect(),
-                            LogEventSampleType::Last => results.rev().take(sample.value).collect(),
-                            LogEventSampleType::Range => {
+                        let results = match sample.sample_where {
+                            LogEventSampleWhere::Head => results.take(sample.value).collect(),
+                            LogEventSampleWhere::Tail => results.rev().take(sample.value).collect(),
+                            LogEventSampleWhere::Range => {
                                 results
-                                    .into_iter()
                                     .chunks(
-                                        number_of_results
+                                        results_len
                                             .checked_div(sample.value)
                                             .unwrap_or(1)
                                             .max(1),
@@ -133,7 +138,7 @@ fn create_log_events_stream(
                                     .enumerate()
                                     .flat_map(|(i, chunk)| {
                                         let mut chunk = chunk.collect_vec();
-                                        if matches!(i.checked_sub(1), Some(i) if i > 0 && i == number_of_results - 1) {
+                                        if matches!(i.checked_sub(1), Some(i) if i > 0 && i == results_len - 1) {
                                             chunk = chunk.into_iter().rev().collect_vec();
                                         }
                                         chunk.into_iter().take(1)
