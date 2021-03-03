@@ -20,7 +20,7 @@ mod support;
 use crate::support::{create_directory, create_file, overwrite_file};
 
 const STARTUP_TIME: Duration = Duration::from_secs(2);
-const SHUTDOWN_TIME: Duration = Duration::from_secs(3);
+const SHUTDOWN_TIME: Duration = Duration::from_secs(4);
 const RELOAD_TIME: Duration = Duration::from_secs(5);
 
 const STDIO_CONFIG: &'static str = r#"
