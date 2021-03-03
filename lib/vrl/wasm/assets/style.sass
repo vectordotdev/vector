@@ -1,0 +1,48 @@
+// Site variables
+$vector-blue: rgb(41, 209, 238)
+$vector-pink: rgb(238, 31, 242)
+$vector-black: rgb(19, 19, 29)
+
+// Bulma theme overrides
+$primary: $vector-blue
+$link: $primary
+$dark: $vector-black
+$footer-background-color: $dark
+$footer-color: white
+$column-gap: 1.5rem
+
+@import 'bulma/bulma'
+
+.page
+  display: flex
+  flex-direction: column
+  min-height: 100vh
+
+  .main
+    flex: 1
+
+.footer a:hover
+  color: $vector-pink
+
+.code
+  padding: 0.5rem 1rem
+  border-radius: 0.5rem
+  font-size: 1.2rem
+  font-weight: bold
+  font-family: monospace
+  color: $vector-blue
+  background-color: $dark
+
+#event
+  display: none
+
+#output-box
+  display: none
+
+  .title
+    margin-top: 2rem
+
+#program
+  font-family: monospace
+  font-size: 1rem
+  font-color: $dark
