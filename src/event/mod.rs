@@ -84,6 +84,20 @@ impl Event {
             _ => panic!("Failed type coercion, {:?} is not a metric", self),
         }
     }
+
+    pub fn metadata(&self) -> &EventMetadata {
+        match self {
+            Self::Log(log) => &log.metadata,
+            Self::Metric(metric) => &metric.metadata,
+        }
+    }
+
+    pub fn mut_metadata(&mut self) -> &mut EventMetadata {
+        match self {
+            Self::Log(log) => &mut log.metadata,
+            Self::Metric(metric) => &mut metric.metadata,
+        }
+    }
 }
 
 fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
