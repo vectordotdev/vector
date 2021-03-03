@@ -188,7 +188,6 @@ impl FrameHandler for DnstapFrameHandler {
         let mut event = Event::new_empty_log();
 
         let log_event = event.as_mut_log();
-        log_event.insert(log_schema().source_type_key(), String::from("dnstap"));
 
         if let Some(host) = received_from {
             log_event.insert(self.host_key(), host);
