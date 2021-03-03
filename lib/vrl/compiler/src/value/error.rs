@@ -6,11 +6,7 @@ use diagnostic::DiagnosticError;
 pub enum Error {
     #[error(
         r#"expected {}, got {got}"#,
-        if .expected.is_many() {
-            format!("{}", .expected)
-        } else {
-            format!(r#""{}""#, .expected)
-        }
+        .expected
     )]
     Expected { got: Kind, expected: Kind },
 

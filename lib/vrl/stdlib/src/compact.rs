@@ -229,7 +229,6 @@ fn compact_array(array: Vec<Value>, options: &CompactOptions) -> Vec<Value> {
         .collect()
 }
 
-/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -385,11 +384,13 @@ mod test {
                                          "key3": "",
             ]],
             want: Ok(Value::Object(map!["key2": 1])),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
         with_array {
             args: func_args![value: vec![Value::Null, Value::from(1), Value::from(""),]],
             want: Ok(Value::Array(vec![Value::from(1)])),
+            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
         }
 
         nullish {
@@ -402,7 +403,7 @@ mod test {
                 nullish: true
             ],
             want: Ok(Value::Object(map!["key2": 1])),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
     ];
 }
-*/

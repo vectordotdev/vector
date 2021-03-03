@@ -173,87 +173,41 @@ impl Expression for ToBoolFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![
-//         boolean_infallible {
-//             expr: |_| ToBoolFn { value: lit!(true).boxed() },
-//             def: TypeDef { kind: Kind::Boolean, ..Default::default() },
-//         }
+    test_function![
+        to_bool => ToBool;
 
-//         integer_infallible {
-//             expr: |_| ToBoolFn { value: lit!(1).boxed() },
-//             def: TypeDef { kind: Kind::Boolean, ..Default::default() },
-//         }
+        string_true {
+            args: func_args![value: "true"],
+            want: Ok(true),
+            tdef: TypeDef::new().fallible().boolean(),
+        }
 
-//         float_infallible {
-//             expr: |_| ToBoolFn { value: lit!(1.0).boxed() },
-//             def: TypeDef { kind: Kind::Boolean, ..Default::default() },
-//         }
+        string_false {
+            args: func_args![value: "no"],
+            want: Ok(false),
+            tdef: TypeDef::new().fallible().boolean(),
+        }
 
-//         null_infallible {
-//             expr: |_| ToBoolFn { value: lit!(null).boxed() },
-//             def: TypeDef { kind: Kind::Boolean, ..Default::default() },
-//         }
+        string_error {
+            args: func_args![value: "cabbage"],
+            want: Err(r#"Invalid boolean value "cabbage""#),
+            tdef: TypeDef::new().fallible().boolean(),
+        }
 
-//         string_fallible {
-//             expr: |_| ToBoolFn { value: lit!("foo").boxed() },
-//             def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
-//         }
+        number_true {
+            args: func_args![value: 20],
+            want: Ok(true),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//         map_fallible {
-//             expr: |_| ToBoolFn { value: map!{}.boxed() },
-//             def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
-//         }
-
-//         array_fallible {
-//             expr: |_| ToBoolFn { value: array![].boxed() },
-//             def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
-//         }
-
-//         timestamp_fallible {
-//             expr: |_| ToBoolFn { value: Literal::from(chrono::Utc::now()).boxed() },
-//             def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
-//         }
-
-//         fallible_value_without_default {
-//             expr: |_| ToBoolFn { value: lit!("foo").boxed() },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Boolean,
-//                 ..Default::default()
-//             },
-//         }
-//     ];
-
-//     #[test]
-//     fn to_bool() {
-//         use crate::map;
-
-//         let cases = vec![
-//             (
-//                 map!["foo": "true"],
-//                 Ok(Value::Boolean(true)),
-//                 ToBoolFn::new(Box::new(Path::from("foo"))),
-//             ),
-//             (
-//                 map!["foo": 20],
-//                 Ok(Value::Boolean(true)),
-//                 ToBoolFn::new(Box::new(Path::from("foo"))),
-//             ),
-//         ];
-
-//         let mut state = state::Program::default();
-
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        number_false {
+            args: func_args![value: 0],
+            want: Ok(false),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
+    ];
+}
