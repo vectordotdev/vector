@@ -349,7 +349,7 @@ mod test {
             event.record(&mut visitor);
 
             let mut events = self.events.lock().unwrap();
-            events.push(visitor.message.unwrap_or("".to_string()));
+            events.push(visitor.message.unwrap_or_default());
         }
     }
 

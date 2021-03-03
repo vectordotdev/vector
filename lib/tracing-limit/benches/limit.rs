@@ -82,11 +82,11 @@ where
     S: Subscriber,
 {
     fn new(mutex: Mutex<String>) -> Self {
-        return VisitingLayer {
+        VisitingLayer {
             mutex,
 
             _subscriber: std::marker::PhantomData,
-        };
+        }
     }
 }
 
