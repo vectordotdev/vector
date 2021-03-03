@@ -52,7 +52,7 @@ impl Expression for StripWhitespaceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
-        Ok(value.unwrap_bytes_utf8_lossy().trim().into())
+        Ok(value.try_bytes_utf8_lossy()?.trim().into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

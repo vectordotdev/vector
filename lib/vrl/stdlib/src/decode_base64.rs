@@ -49,7 +49,7 @@ struct DecodeBase64Fn {
 
 impl Expression for DecodeBase64Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.unwrap_bytes();
+        let value = self.value.resolve(ctx)?.try_bytes()?;
 
         let charset = self
             .charset

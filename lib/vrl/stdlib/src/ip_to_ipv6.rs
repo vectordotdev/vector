@@ -43,7 +43,7 @@ impl Expression for IpToIpv6Fn {
         let ip: IpAddr = self
             .value
             .resolve(ctx)?
-            .unwrap_bytes_utf8_lossy()
+            .try_bytes_utf8_lossy()?
             .parse()
             .map_err(|err| format!("unable to parse IP address: {}", err))?;
 

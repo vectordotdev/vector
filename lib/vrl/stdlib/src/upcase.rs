@@ -40,7 +40,7 @@ impl Expression for UpcaseFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
-        Ok(value.unwrap_bytes_utf8_lossy().to_uppercase().into())
+        Ok(value.try_bytes_utf8_lossy()?.to_uppercase().into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

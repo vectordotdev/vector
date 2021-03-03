@@ -1,27 +1,19 @@
 # object: { "foo": "bar" }
 # result:
 #
-# error[E110]: invalid argument type
-#   ┌─ :4:15
+# error[E103]: unhandled fallible assignment
+#   ┌─ :4:8
 #   │
 # 4 │ .foo = upcase(.foo) # string
-#   │               ^^^^
-#   │               │
-#   │               this expression resolves to one of "string" or "null"
-#   │               but the parameter "value" expects the exact type "string"
+#   │ ------ ^^^^^^^^^^^^
+#   │ │      │
+#   │ │      this expression is fallible
+#   │ │      update the expression to be infallible
+#   │ or change this to an infallible assignment:
+#   │ .foo, err = upcase(.foo)
 #   │
-#   = try: ensuring an appropriate type at runtime
-#   =
-#   =     .foo = string!(.foo)
-#   =     upcase(.foo)
-#   =
-#   = try: coercing to an appropriate type and specifying a default value as a fallback in case coercion fails
-#   =
-#   =     .foo = to_string(.foo) ?? "default"
-#   =     upcase(.foo)
-#   =
 #   = see documentation about error handling at https://errors.vrl.dev/#handling
-#   = learn more about error code 110 at https://errors.vrl.dev/110
+#   = learn more about error code 103 at https://errors.vrl.dev/103
 #   = see language documentation at https://vrl.dev
 
 .foo # any

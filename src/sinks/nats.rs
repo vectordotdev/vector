@@ -85,17 +85,17 @@ impl SinkConfig for NatsSinkConfig {
 }
 
 impl NatsSinkConfig {
-    fn to_nats_options(&self) -> nats::Options {
+    fn to_nats_options(&self) -> async_nats::Options {
         // Set reconnect_buffer_size on the nats client to 0 bytes so that the
         // client doesn't buffer internally (to avoid message loss).
-        nats::Options::new()
+        async_nats::Options::new()
             .with_name(&self.name)
             .reconnect_buffer_size(0)
     }
 
-    async fn connect(&self) -> crate::Result<nats::asynk::Connection> {
+    async fn connect(&self) -> crate::Result<async_nats::Connection> {
         self.to_nats_options()
-            .connect_async(&self.url)
+            .connect(&self.url)
             .map_err(|e| e.into())
             .await
     }
@@ -134,9 +134,9 @@ impl NatsSink {
     }
 }
 
-impl From<NatsOptions> for nats::Options {
+impl From<NatsOptions> for async_nats::Options {
     fn from(options: NatsOptions) -> Self {
-        nats::Options::new()
+        async_nats::Options::new()
             .with_name(&options.name)
             .reconnect_buffer_size(0)
     }
@@ -153,12 +153,9 @@ impl From<&NatsSinkConfig> for NatsOptions {
 #[async_trait]
 impl StreamSink for NatsSink {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let nats_options: nats::Options = self.options.clone().into();
+        let nats_options: async_nats::Options = self.options.clone().into();
 
-        let nc = nats_options
-            .connect_async(&self.url)
-            .await
-            .map_err(|_| ())?;
+        let nc = nats_options.connect(&self.url).await.map_err(|_| ())?;
 
         while let Some(event) = input.next().await {
             let subject = self.subject.render_string(&event).map_err(|missing_keys| {
@@ -240,7 +237,6 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
-    use futures::stream::StreamExt;
     use std::{thread, time::Duration};
 
     #[tokio::test]
@@ -277,10 +273,10 @@ mod integration_tests {
         thread::sleep(Duration::from_secs(3));
         let _ = sub.drain().await.unwrap();
 
-        let output: Vec<String> = sub
-            .map(|msg| String::from_utf8_lossy(&msg.data).to_string())
-            .collect()
-            .await;
+        let mut output: Vec<String> = Vec::new();
+        while let Some(msg) = sub.next().await {
+            output.push(String::from_utf8_lossy(&msg.data).to_string())
+        }
 
         assert_eq!(output.len(), input.len());
         assert_eq!(output, input);

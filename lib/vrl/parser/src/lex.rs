@@ -1056,7 +1056,6 @@ impl<'input> Lexer<'input> {
             Some((_, '\'')) => Ok('\''),
             Some((_, '"')) => Ok('"'),
             Some((_, '\\')) => Ok('\\'),
-            Some((_, '/')) => Ok('/'),
             Some((_, 'n')) => Ok('\n'),
             Some((_, 'r')) => Ok('\r'),
             Some((_, 't')) => Ok('\t'),
@@ -1719,6 +1718,23 @@ mod test {
                 (r#"                      ~ "#, IntegerLiteral(0)),
                 (r#"                       ~"#, RBracket),
                 (r#"                       ~"#, RQuery),
+            ],
+        );
+    }
+
+    #[test]
+    fn queries_negative_index() {
+        test(
+            data("v[-1] = 2"),
+            vec![
+                ("~        ", LQuery),
+                ("~        ", Identifier("v")),
+                (" ~       ", LBracket),
+                ("  ~~     ", IntegerLiteral(-1)),
+                ("    ~    ", RBracket),
+                ("    ~    ", RQuery),
+                ("      ~  ", Equals),
+                ("        ~", IntegerLiteral(2)),
             ],
         );
     }

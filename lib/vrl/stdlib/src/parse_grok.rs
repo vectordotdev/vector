@@ -1,6 +1,42 @@
 use std::collections::BTreeMap;
+use std::fmt;
 use std::sync::Arc;
-use vrl::prelude::*;
+use vrl::{
+    diagnostic::{Label, Span},
+    prelude::*,
+};
+
+#[derive(Debug)]
+pub enum Error {
+    InvalidGrokPattern(grok::Error),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::InvalidGrokPattern(err) => write!(f, "{}", err.to_string()),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl DiagnosticError for Error {
+    fn code(&self) -> usize {
+        109
+    }
+
+    fn labels(&self) -> Vec<Label> {
+        match self {
+            Error::InvalidGrokPattern(err) => {
+                vec![Label::primary(
+                    format!("grok pattern error: {}", err.to_string()),
+                    Span::default(),
+                )]
+            }
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseGrok;
@@ -55,15 +91,14 @@ impl Function for ParseGrok {
         let pattern = arguments
             .required_literal("pattern")?
             .to_value()
-            .unwrap_bytes_utf8_lossy()
+            .try_bytes_utf8_lossy()
+            .expect("grok pattern not bytes")
             .into_owned();
 
         let mut grok = grok::Grok::with_patterns();
         let pattern = Arc::new(
             grok.compile(&pattern, true)
-                .map_err(|e| e.to_string())
-                // FIXME
-                .unwrap(),
+                .map_err(|e| Box::new(Error::InvalidGrokPattern(e)) as Box<dyn DiagnosticError>)?,
         );
 
         let remove_empty = arguments
@@ -90,8 +125,8 @@ struct ParseGrokFn {
 impl Expression for ParseGrokFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let bytes = value.unwrap_bytes_utf8_lossy();
-        let remove_empty = self.remove_empty.resolve(ctx)?.unwrap_boolean();
+        let bytes = value.try_bytes_utf8_lossy()?;
+        let remove_empty = self.remove_empty.resolve(ctx)?.try_boolean()?;
 
         match self.pattern.match_against(&bytes) {
             Some(matches) => {

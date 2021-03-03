@@ -39,7 +39,7 @@ struct GetEnvVarFn {
 impl Expression for GetEnvVarFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.name.resolve(ctx)?;
-        let name = value.unwrap_bytes_utf8_lossy();
+        let name = value.try_bytes_utf8_lossy()?;
 
         std::env::var(name.as_ref())
             .map(Into::into)

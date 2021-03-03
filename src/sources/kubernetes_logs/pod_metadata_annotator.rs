@@ -9,7 +9,7 @@ use crate::{
 };
 use evmap::ReadHandle;
 use k8s_openapi::{
-    api::core::v1::{Container, Pod, PodSpec, PodStatus},
+    api::core::v1::{Container, ContainerStatus, Pod, PodSpec, PodStatus},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use serde::{Deserialize, Serialize};
@@ -25,6 +25,7 @@ pub struct FieldsSpec {
     pub pod_labels: String,
     pub pod_node_name: String,
     pub container_name: String,
+    pub container_id: String,
     pub container_image: String,
 }
 
@@ -39,6 +40,7 @@ impl Default for FieldsSpec {
             pod_labels: "kubernetes.pod_labels".to_owned(),
             pod_node_name: "kubernetes.pod_node_name".to_owned(),
             container_name: "kubernetes.container_name".to_owned(),
+            container_id: "kubernetes.container_id".to_owned(),
             container_image: "kubernetes.container_image".to_owned(),
         }
     }
@@ -77,10 +79,11 @@ impl PodMetadataAnnotator {
         annotate_from_file_info(log, &self.fields_spec, &file_info);
         annotate_from_metadata(log, &self.fields_spec, &pod.metadata);
 
+        let container;
         if let Some(ref pod_spec) = pod.spec {
             annotate_from_pod_spec(log, &self.fields_spec, pod_spec);
 
-            let container = pod_spec
+            container = pod_spec
                 .containers
                 .iter()
                 .find(|c| c.name == file_info.container_name);
@@ -91,6 +94,14 @@ impl PodMetadataAnnotator {
 
         if let Some(ref pod_status) = pod.status {
             annotate_from_pod_status(log, &self.fields_spec, pod_status);
+            if let Some(ref container_statuses) = pod_status.container_statuses {
+                let container_status = container_statuses
+                    .iter()
+                    .find(|c| c.name == file_info.container_name);
+                if let Some(container_status) = container_status {
+                    annotate_from_container_status(log, &self.fields_spec, container_status)
+                }
+            }
         }
         Some(())
     }
@@ -153,6 +164,18 @@ fn annotate_from_pod_status(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_st
                 .filter_map(|v| v.ip.clone())
                 .collect::<Vec<String>>();
             log.insert(key, inner);
+        }
+    }
+}
+
+fn annotate_from_container_status(
+    log: &mut LogEvent,
+    fields_spec: &FieldsSpec,
+    container_status: &ContainerStatus,
+) {
+    for (ref key, ref val) in [(&fields_spec.container_id, &container_status.container_id)].iter() {
+        if let Some(val) = val {
+            log.insert(key, val.to_owned());
         }
     }
 }
@@ -447,6 +470,36 @@ mod tests {
         for (fields_spec, pod_status, expected) in cases.into_iter() {
             let mut log = LogEvent::default();
             annotate_from_pod_status(&mut log, &fields_spec, &pod_status);
+            assert_eq!(log, expected);
+        }
+    }
+
+    #[test]
+    fn test_annotate_from_container_status() {
+        let cases = vec![
+            (
+                FieldsSpec::default(),
+                ContainerStatus::default(),
+                LogEvent::default(),
+            ),
+            (
+                FieldsSpec {
+                    ..FieldsSpec::default()
+                },
+                ContainerStatus {
+                    container_id: Some("container_id_foo".to_owned()),
+                    ..ContainerStatus::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert("kubernetes.container_id", "container_id_foo");
+                    log
+                },
+            ),
+        ];
+        for (fields_spec, container_status, expected) in cases.into_iter() {
+            let mut log = LogEvent::default();
+            annotate_from_container_status(&mut log, &fields_spec, &container_status);
             assert_eq!(log, expected);
         }
     }
