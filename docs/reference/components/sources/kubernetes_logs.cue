@@ -1,4 +1,5 @@
 package metadata
+import "encoding/yaml"
 
 components: sources: kubernetes_logs: {
 	_directory: "/var/log"
@@ -204,6 +205,406 @@ components: sources: kubernetes_logs: {
 		}
 		timezone: configuration._timezone
 	}
+
+    helm_charts: {
+        fields: {
+            existingConfigMap: {
+                description: "Set this to a non-empty value to use existing `ConfigMap` for `vector`, instead of using a generated one."
+                required: false
+                type: string: {
+                    default: ""
+                }
+            }
+            hostMetricsSource: {
+                description: "The 'built-in' host metrics source emitting the metrics gathered from the node that Vector is executing on."
+                type: object: {
+                    options: {
+                        config: {
+                            description: "Additional config to embed at the host metrics source."
+                            type: object: {
+                                default: {}
+                            }
+                        }
+                        enabled: {
+                            description: "Disable to omit the host metrics source from being added."
+                            type: bool: {
+                                default: true
+                            }
+                        },
+                        rawConfig: {
+                            description: "(DEPRECATED) Raw TOML config to embed at the host metrics source."
+                            type: null: {
+                                default: null
+                            }
+                        },
+                        sourceId: {
+                            description: "The name to use for the 'built-in' host metrics source."
+                            type: string: {
+                                default: "host_metrics"
+                            }
+                        }
+                    }
+                }
+            }
+            internalMetricsSource: {
+                description: "The 'built-in' internal metrics source emitting Vector's internal opertaional metrics."
+                type: object: {
+                    options: {
+                        config: {
+                            description: "Additional config to embed at the internal metrics source."
+                            type: object: {
+                                default: {}
+                            }
+                        }
+                        enabled: {
+                            description: "Disable to omit the internal metrics source from being added."
+                            type: bool: {
+                                default: true
+                            }
+                        }
+                        rawConfig: {
+                            description: "(DEPRECATED) Raw TOML config to embed at the internal metrics source."
+                            type: null: {
+                                default: null
+                            }
+                        }
+                        sourceId: {
+                            description: "The name to use for the 'built-in' host metrics source."
+                            type: string: {
+                                default: "internal_metrics"
+                            }
+                        }
+                    }
+                }
+            }
+            kubernetesLogsSource: {
+                description: """
+                    The 'built-in' kubernetes logs source to colelct logs from the `Pod`s running on the `Node`.
+                    Will be added by default, unless explicitly disabled.
+                """
+                required: false
+                type: object: {
+                    options: {
+                        enabled: {
+                            description: "Disable to omit the kubernetes logs source from being added."
+                            type: bool: {
+                                default: true
+                            }
+                        }
+                        sourceId: {
+                            description: "The name to use for the 'built-in' kubernetes logs source."
+                            type: string: {
+                                default: "kubernetes_logs"
+                            }
+                        }
+                        config: {
+                            description: "Additional config to embed at the kubernetes logs source."
+                            type: object: {
+                                default: {} 
+                            }
+                        }
+                        rawConfig: {
+                            description: "THIS FIELD IS DEPRECATED. Raw TOML config to embed at the kubernetes logs source."
+                            type: null: {
+                                default: null
+                            }
+                        }
+                    }
+                }
+            }
+            logSchema: {
+                description: "Schema portion of the generated `vector` config."
+                type: object: {
+                    options: {
+                        hostKey: {
+                            type: string: {
+                                default: "host"
+                            }
+                        }
+                        messageKey: {
+                            type: string: {
+                                default: "message"
+                            }
+                        }
+                        sourceTypeKey: {
+                            type: string: {
+                                default: "source_type"
+                            }
+                        }
+                        timestampKey: {
+                            type: string: {
+                                default: "timestamp"
+                            }
+                        }
+                    }
+                }
+            }
+            podRollmeAnnotation: {
+                description: """
+                   Adds an annotation to the `Pod`s managed by `DaemonSet` with a random value, generated at Helm Chart template evaluation time. Enabling this will caus the `Pod`s to be recreated every time the value changes - effectively restarting them on each update.
+                """
+                required: false
+                type: bool: {
+                    default: false
+                }
+            }
+            podValuesChecksumAnnotation: {
+                description: """
+                    Adds an annotation to the `Pod`s managed by `DaemonSet` with a checksum of the Helm release values (as in `values.yaml` content and `--set` flags). Enabling this will cause the `Pod`s to be recreated every time values change.
+                """
+                required: false
+                type: bool: {
+                    default: false
+                }
+            }
+            podSecurityContext: {
+                description: "PodSecurityContext to set at the `Pod`s managed by `DaemonSet`."
+                required: false
+                type: object: {
+                    options: {}
+                }
+                examples: [
+                    yaml.Marshal({"fsGroup":"2000"})
+                ]
+            }
+            prometheusSink: {
+                description: """
+                    The 'built-in' prometheus sink exposing metrics in the Prometheus scraping format. 
+                    
+                    When using this 'built-in' sink, we automatically configure container ports, and ensure things are ready for discovery and scraping via Prometheus' `kubernetes_sd_configs` jobs.
+                 """
+                type: object: {
+                    options: {
+                        addPodAnnotations: {
+                            description: """
+                                Add Prometheus annotations to Pod to opt-in for Prometheus scraping. 
+
+                                To be used in clusters that rely on Pod annotations in the form of `prometheus.io/scrape` to discover scrape targets.
+                            """
+                            type: boolean: {
+                                default: false
+                            }
+                        }
+                        config: {
+                            description: "Additional config to embed at the prometheus sink."
+                            type: object: {
+                                default: {}
+                            }
+                        }
+                        enabled: {
+                            description: "Disable to omit the prometheus sink from being added."
+                            type: bool: {
+                                default: true
+                            }
+                        }
+                        excludeInternalMetrics: {
+                            description: "Set this to `true` to opt-out from automatically adding the built-in internal metrics source to the inputs."
+                            type: bool: {
+                                default: false
+                            }
+                        }
+                        inputs: {
+                            description: "Inputs of the built-in prometheus sink. If you have built-in internal metrics source enabled, we'll add it as a input here under the hood, so you don't have to pass it here. Unless `excludeInternalMetrics` is set to `true`, in which case you're responsible of wiring up the internal metrics."
+                            type: array: {
+                                default: []
+                            }
+                        }
+                        listenAddress: {
+                            description: "The address to listen at."
+                            type: string: {
+                                default: "0.0.0.0"
+                            }
+                        }
+                        listenPort: {
+                            description: "The port to listen at."
+                            type: string: {
+                                default: "9090"
+                            }
+                        }
+                        podMonitor: {
+                            description: "Use prometheus-operator `PodMonitor` to opt-in for Prometheus scraping. To be used in clusters that rely on prometheus-operator to gether metrics. You might want to set `podMonitorSelectorNilUsesHelmValues=false` if you're using prometheus-operator Helm chart to allow `PodMonitor` resources discovery in all namespaces.",
+                            type: object: {
+                                options: {
+                                    enabled: {
+                                        description: "Whether to add the `PodMonitor` resource or not. `prometheus-operator` CRDs are necessary, otherwise you'll get an error."
+                                        type: bool: {
+                                            default: false
+                                        }
+                                    }
+                                    extraRelabelings: {
+                                        description: "Additional relabelings to include in the `PodMonitor`."
+                                        type: array: {
+                                            default: []
+                                        }
+                                    }
+                                }
+                        }
+                        rawConfig: {
+                            description: "(DEPRECATED) Raw TOML config to embed at the prometheus sink."
+                            type: null: { 
+                                default: null
+                            }
+                        }
+                        sinkId: {
+                            description: "The name to use for the 'built-in' prometheus sink."
+                            type: string: {
+                                default: "prometheus_sink"
+                            }
+                        }
+                    }
+                }
+            }
+            securityContext: {
+                description: "Security context to set at the `vector` container at the `Pod`s managed by `DaemonSet`."
+                required: false
+                type: object: {
+                    examples: [yaml.Marshal({"capabilities":{"drop": ["ALL"]},"readOnlyRootFilesystem":"true", "runAsNonRoot":"true", "runAsUser": "1000"})]
+                    options: {}
+                }
+            }
+            serviceAccount: {
+				type: object: {
+					examples: []
+					options: {
+                        create: {
+                            description: "Specifies whether a service account should be created."
+                            required: true
+                            type: bool: {
+                                default: true
+                            }
+                        }
+                        annotations: {
+                            description: "Annotations to add to the service account."
+                            required: false
+                            type: object: {
+                                examples: [yaml.Marshal({"mykey":"myvalue"})]
+                                options: {}
+                            }
+                        }
+                        name: {
+                            description: """
+                                The name of the service account to use. If not set and `create` is true, a name is generated using the `fullname` template.
+                                """
+                                required: false
+                                type: string: {
+                                    default: ""
+
+                                }
+                            }
+                        }
+                    }
+				}
+            }
+            sources: {
+                description: "Sources to add to the generated `vector` config (besides 'built-in' kubernetes logs source)."
+                type: object: {
+                    default: {}
+                }
+            }
+            sinks: {
+                description: "Sinks to add to the generated `vector` config."
+                type: object: {
+                    default: {}
+                }
+                examples: [
+                    yaml.Marshal({
+                        "sink_name": {
+                            "type": "sink_type",
+                            "inputs": ["input_1", "input_2"],
+                            "option": "value"
+                        }
+                    })
+                ]
+            }
+            tolerations: {
+                description: "Tolerations to set for the `Pod`s managed by `DaemonSet`."
+                required: true,
+                type: array: {
+                    examples: [
+                        yaml.Marshal({
+                            key: "node-role.kubernetes.io/master"
+                            effect: "NoSchedule"
+                        })
+                    ]
+                }
+            },
+            transforms: {
+                description: "Transforms to add to the generated `vector` config."
+                type: object: {
+                    default: {}
+                }
+                examples: [
+                    yaml.Marshal({
+                        "transform_name": {
+                            "type": "transform_type",
+                            "inputs": ["input_1", "input_2"],
+                            "option": "value"
+                        }
+                    })
+                ]
+            },
+            vectorApi: {
+                description: "The Vector API. Will be disabled by default."
+                type: object: {
+                    options: {
+                        address: {
+                            description:"The address to listen at."
+                            type: string: {
+                                default: "0.0.0.0:8686"
+                            }
+                        }
+                        enabled: {
+                            description: "Turn the Vector API on or off."
+                            type: bool: {
+                                default: false
+                            }
+                        }
+                        playground: {
+                            description: "Enable or disable the built-in GraphQL Playground (a web IDE for working on GraphQL queries)."
+                            type: bool: {
+                                default: true
+                            }
+                        }
+                    }
+                }
+            },
+            vectorSink: {
+                description: """
+                    The 'built-in' vector sink, to send the logs to the vector aggregator. Disabled by default when using vector-agent chart. Enabled by default when using `vector` chart, and automatically configured.
+                """
+                type: object: {
+                    options: {
+                        enabled: {
+                            description: "Disable to omit the vector sink from being added."
+                            type: bool: {
+                                default: false
+                            }
+                        }
+                        sinkId: {
+                            description: "The name to use for the 'built-in' vector sink."
+                            type: string: {
+                                default: "vector_sink"
+                            }
+                        }
+                        inputs: {
+                            description: "Inputs of the built-in vector sink."
+                            type: array: {
+                                default: null
+                                examples: ["my_input_1", "my_input_2"]
+                            }
+                        }
+                        host: {
+                            description: "The host of the Vector to send the data to."
+                            type: string: {
+                                default: null
+                                examples: ["vector.internal"]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
 	output: logs: line: {
 		description: "An individual line from a `Pod` log file."

@@ -1,0 +1,466 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "type": "object",
+    "properties": {
+        "affinity": {
+            "type": "object"
+        },
+        "env": {
+            "type": "array",
+            "description": "Extra env vars to pass to the `vector` container.",
+            "default": [] 
+        },
+        "existingConfigMap": {
+            "type": "string",
+            "description": "Set this to non-empty value to use existing `ConfigMap` for `vector`, instead of using a generated one.",
+            "default": ""
+        },
+        "extraConfigDirSources": {
+            "type": "array",
+            "description": "Additional sources to include at the `config-dir` projection of the `Pod`s managed by `DaemonSet`.",
+            "default": [] 
+        },
+        "extraContainersPorts": {
+            "type": "array",
+            "description": "Additional container ports to pass to the `vector` container of the `Pod`s managed by `DaemonSet`.",
+            "default": []
+        },
+        "extraVolumeMounts": {
+            "type": "array",
+            "description": "Additional volume mounts to pass to the `vector` container of the `Pod`s managed by `DaemonSet`.",
+            "default": []
+        },
+        "extraVolumes": {
+            "type": "array",
+            "description": "Additional volumes to pass to the `Pod`s managed by `DaemonSet`.",
+            "default": ""
+        },
+        "fullnameOverride": {
+            "type": "string",
+            "description": "Override the full chart name (name prefixed with release name) used in templates.",
+            "default": ""
+        },
+        "globalOptions": {
+            "type": "object",
+            "description": "Global parts of the generated `vector` config.",
+            "properties": {
+                "dataDir": {
+                    "type": "string",
+                    "description": "Specifies the (in-container) data dir used by `vector`.",
+                    "default": "/vector-data-dir"
+                }
+            }
+        },
+        "hostMetricsSource": {
+            "type": "object",
+            "description": "The 'built-in' host metrics source emitting the metrics gathered from the node that Vector is executing on.",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "description": "Additional config to embed at the host metrics source.",
+                    "default": {}
+                },
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Disable to omit the host metrics source from being added.",
+                    "default": true
+                },
+                "rawConfig": {
+                    "type": "null",
+                    "description": "(DEPRECATED) Raw TOML config to embed at the host metrics source.",
+                    "default": null
+                },
+                "sourceId": {
+                    "type": "string",
+                    "description": "The name to use for the 'built-in' host metrics source.",
+                    "default": "host_metrics"
+                }
+            }
+        },
+        "image": {
+            "type": "object",
+            "properties": {
+                "base": {
+                    "type": "string",
+                    "default": "debian"
+                },
+                "pullPolicy": {
+                    "type": "string",
+                    "default": "IfNotPresent"
+                },
+                "repository": {
+                    "type": "string",
+                    "default": "timberio/vector"
+                },
+                "tag": {
+                    "type": "string",
+                    "description": "Overrides the image tag, the default is `{image.version}-{image.base}`.",
+                    "default": ""
+                },
+                "version": {
+                    "type": "string",
+                    "description": "Overrides the image version, the default is the Chart appVersion.",
+                    "default": ""
+                }
+            }
+        },
+        "imagePullSecrets": {
+            "type": "array",
+            "description":"Image pull secrets to use at the `Pod`s managed by `DaemonSet`.",
+            "default": []
+        },
+        "internalMetricsSource": {
+            "type": "object",
+            "description": "The 'built-in' internal metrics source emitting Vector's internal operaional metrics.",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "description": "Additional config to embed at the internal metrics source.",
+                    "default": {}
+                },
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Disable to omit the internal metrics source from being added.",
+                    "default": true,
+                },
+                "rawConfig": {
+                    "type": "null",
+                    "description":"(DEPRECATED) Raw TOML config to embed at the internal metrics source.",
+                    "default": null
+                },
+                "sourceId": {
+                    "type": "string",
+                    "description": "The name to use for the 'built-in' host metrics source.",
+                    "default": "internal_metrics"
+                }
+            }
+        },
+        "kubernetesLogsSource": {
+            "type": "object",
+            "description": "The 'built-in' kubernetes logs source to collect logs from the `Pod`s running on the `Node`. Will be added by default, unless explicitly disabled.",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "description": "Additional config to embed at the kubernetes logs source.",
+                    "default": {}
+                },
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Disable to omit the kubernetes logs source from being added.",
+                    "default": true
+                },
+                "rawConfig": {
+                    "type": "null",
+                    "description": "(DEPRECATED) Raw TOML config to embed at the kubernetes logs source.",
+                    "default": null
+                },
+                "sourceId": {
+                    "type": "string",
+                    "description": "The name to use for the 'built-in' kubernetes logs source.",
+                    "default": "kubernetes_logs"
+                }
+            }
+        },
+        "logSchema": {
+            "type": "object",
+            "description" : "Schema portion of the generated `vector` config.",
+            "properties": {
+                "hostKey": {
+                    "type": "string",
+                    "default": "host"
+                },
+                "messageKey": {
+                    "type": "string",
+                    "default": "message"
+                },
+                "sourceTypeKey": {
+                    "type": "string",
+                    "default": "source_type"
+                },
+                "timestampKey": {
+                    "type": "string",
+                    "default": "timestamp"
+                }
+            }
+        },
+        "nameOverride": {
+            "type": "string",
+            "description": "Override the chart name used in templates."
+        },
+        "nodeSelector": {
+            "type": "object",
+            "default": {}
+        },
+        "podAnnotations": {
+            "type": "object",
+            "description": "Annotations to add to the `Pod`s managed by `DaemonSet`.",
+            "default": {}
+        },
+        "podLabels": {
+            "type": "object",
+            "description": "Labels to add to the `Pod`s managed by `DaemonSet`.",
+            "default": {}
+        },
+        "podRollmeAnnotation": {
+            "type": "boolean",
+            "description": "Add an annotation to the `Pod`s managed by `DaemonSet` with a random value, generated at Helm Chart template evaluation time. Enabling this will cause the `Pod`s to be recreated every time the value changes - effectively restarting them on each update.",
+            "default": false
+        },
+        "podSecurityContext": {
+            "type": "object",
+            "description": "PodSecurityContext to set at the `Pod`s managed by `DaemonSet`.",
+            "default": {},
+            "examples": [
+                "fsGroup: 2000"
+            ]
+        },
+        "podValuesChecksumAnnotation": {
+            "type": "boolean",
+            "description": " Add an annotation to the `Pod`s managed by `DaemonSet` with a checksum of the Helm release values (as in `values.yaml` content and `--set` flags). Enabling this will cause the `Pod`s to be recreated every time values change.",
+            "default": false
+        },
+        "prometheusSink": {
+            "type": "object",
+            "description": "The 'built-in' prometheus sink exposing metrics in the Prometheus scraping format. When using this 'built-in' sink, we automatically configure container ports, and ensure things are ready for discovery and scraping via Prometheus' `kubernetes_sd_configs` jobs.",
+            "properties": {
+                "addPodAnnotations": {
+                    "type": "boolean",
+                    "description": "Add Prometheus annotations to Pod to opt-in for Prometheus scraping. To be used in clusters that rely on Pod annotations in the form of `prometheus.io/scrape` to discover scrape targets.",
+                    "default": false
+                },
+                "config": {
+                    "type": "object",
+                    "description": "Additional config to embed at the prometheus sink.",
+                    "default": {}
+                },
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Disable to omit the prometheus sink from being added.",
+                    "default": true
+                },
+                "excludeInternalMetrics": {
+                    "type": "boolean",
+                    "description": "Set this to `true` to opt-out from automatically adding the built-in internal metrics source to the inputs.",
+                    "default": false
+                },
+                "inputs": {
+                    "type": "array",
+                    "description": "Inputs of the built-in prometheus sink. If you have built-in internal metrics source enabled, we'll add it as a input here under the hood, so you don't have to pass it here. Unless `excludeInternalMetrics` is set to `true`, in which case you're responsible of wiring up the internal metrics.",
+                    "default": []
+                },
+                "listenAddress": {
+                    "type": "string",
+                    "description": "The address to listen at.",
+                    "default": "0.0.0.0"
+                },
+                "listenPort": {
+                    "type": "string",
+                    "description": "The port to listen at.",
+                    "default": "9090"
+                },
+                "podMonitor": {
+                    "type": "object",
+                    "description": "Use prometheus-operator `PodMonitor` to opt-in for Prometheus scraping. To be used in clusters that rely on prometheus-operator to gether metrics. You might want to set `podMonitorSelectorNilUsesHelmValues=false` if you're using prometheus-operator Helm chart to allow `PodMonitor` resources discovery in all namespaces.",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description": "Whether to add the `PodMonitor` resource or not. `prometheus-operator` CRDs are necessary, otherwise you'll get an error.",
+                            "default": false
+                        },
+                        "extraRelabelings": {
+                            "type": "array",
+                            "description": "Additional relabelings to include in the `PodMonitor`.",
+                            "default": []
+                        }
+                    }
+                },
+                "rawConfig": {
+                    "type": "null",
+                    "description": "(DEPRECATED) Raw TOML config to embed at the prometheus sink.",
+                    "default": null
+                },
+                "sinkId": {
+                    "type": "string",
+                    "description": "The name to use for the 'built-in' prometheus sink.",
+                    "default": "prometheus_sink"
+                }
+            }
+        },
+        "psp": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": false
+                }
+            }
+        },
+        "rbac": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": true
+                }
+            }
+        },
+        "resources": {
+            "type": "object",
+            "default": {}
+        },
+        "securityContext": {
+            "type": "object",
+            "description": "Security context to set at the `vector` container at the `Pod`s managed by `DaemonSet`.",
+            "default": {},
+            "examples": [
+                {"capabilities":
+                    { "drop":
+                        [
+                            "ALL"
+                        ]
+                    },
+                    "runAsNonRoot": true,
+                    "runAsUser": "1000"
+                }
+            ]
+        },
+        "serviceAccount": {
+            "type": "object",
+            "description": "Specifies whether a service account should be created.",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "description": "Annotations to add to the service account.",
+                    "default": {} 
+                },
+                "create": {
+                    "type": "boolean",
+                    "description": "Specifies whether a service account should be created.",
+                    "default": true
+                },
+                "name": {
+                    "type": "string",
+                    "description": "The name of the service account to use. If not set and `create` is true, a name is generated using the `fullname` template.",
+                    "default": ""
+                }
+            }
+        },
+        "sinks": {
+            "type": "object",
+            "description": "Sinks to add to the generated `vector` config.",
+            "default": {},
+            "examples": [
+                {
+                    "sink_name": {
+                        "type": "sink_type",
+                        "inputs": ["input_1", "input_2"],
+                        "option": "value"
+                    }
+                }
+            ]
+        },
+        "sources": {
+            "type": "object",
+            "description": "Sources to add to the generated `vector` config (besides 'built-in' kubernetes logs source).",
+            "default": {}
+        },
+        "tolerations": {
+            "type": "array",
+            "description": "Tolerations to set for the `Pod`s managed by `DaemonSet`.",
+            "items": {
+                "type": "object",
+                "description": "This toleration is to have the `DaemonSet` runnable on master nodes. Remove it if your masters can't run pods.",
+                "properties": {
+                    "effect": {
+                        "type": "string",
+                        "default": "NoSchedule"
+                    },
+                    "key": {
+                        "type": "string",
+                        "default": "node-role.kubernetes.io/master"
+                    }
+                }
+            }
+        },
+        "transforms": {
+            "type": "object",
+            "description": "Transforms to add to the generated `vector` config.",
+            "default": {},
+            "examples": [
+                {
+                    "transform_name": {
+                        "type": "transform_type",
+                        "inputs": ["input_1", "input_2"],
+                        "option": "value"
+                    }
+                }
+            ]
+        },
+        "updateStrategy": {
+            "type": "string",
+            "default": "RollingUpdate"
+        },
+        "vectorApi": {
+            "type": "object",
+            "description": "The Vector API. Will be disabled by default.",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "description":"The address to listen at.",
+                    "default": "0.0.0.0:8686"
+                },
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Turn the Vector API on or off.",
+                    "default": false
+                },
+                "playground": {
+                    "type": "boolean",
+                    "description": "Enable or disable the built-in GraphQL Playground (a web IDE for working on GraphQL queries).",
+                    "default": true
+                }
+            }
+        },
+        "vectorSink": {
+            "type": "object",
+            "description":"The 'built-in' vector sink, to send the logs to the vector aggregator. Disabled by default when using `vector-agent` chart. Enabled by default when using `vector` chart, and automatically configured.",
+            "properties": {
+                "config": {
+                    "type": "object",
+                    "description": "Additional config to embed at the vector sink.",
+                    "default": {}
+                },
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Disable to omit the vector sink from being added.",
+                    "default": false 
+                },
+                "host": {
+                    "type": "null",
+                    "description": "The host of the Vector to send the data to.",
+                    "default": null
+                },
+                "inputs": {
+                    "type": "null",
+                    "description": "Inputs of the built-in vector sink.",
+                    "default": null
+                },
+                "port": {
+                    "type": "null",
+                    "description": "The port of the Vector to send the data to.",
+                    "default": null 
+                },
+                "rawConfig": {
+                    "type": "null",
+                    "description": "(DEPRECATED) Raw TOML config to embed at the vector sink.",
+                    "default": null
+                },
+                "sinkId": {
+                    "type": "string",
+                    "description": "The name to use for the 'built-in' vector sink.",
+                    "default": "vector_sink" 
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,57 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "type": "object",
+    "properties": {
+        "vector-agent": {
+            "type": "object",
+            "description":"Default values for vector. This is a YAML-formatted file. Declare variables to be passed into your templates. Override some values globally from a single location instead of specifying them in each chart. Note: these values are also respected by all charts, so you can keep using them if you switch from the `vector` chart the specific role oriented charts.",
+            "properties": {
+                "vectorSink": {
+                    "type": "object",
+                    "description": "See the possible settings at the `vector-agent` chart. Since we're deploying both `vector-agent` and `vector-aggregator`, configure the built-in vector sink to send data over to aggregator out of",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "description":"Enable vector sink to send the data over to the `vector-aggregator`.",
+                            "default": true
+                        },
+                        "host": {
+                            "type": "string",
+                            "description": "Configure the host to point to the `vector-aggregator`.",
+                            "default": "vector-aggregator"
+                        },
+                        "inputs": {
+                            "type": "array",
+                            "description": "By default, send over the logs from the built-in `kubernetes_logs` source.",
+                            "default": ["kubernetes_logs"],
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "port": {
+                            "type": "string",
+                            "description": "Set the port to match the one used by `vector-aggregator`.",
+                            "default": "9000"
+                        }
+                    }
+                }
+            }
+        },
+        "vector-aggregator": {
+            "type": "object",
+            "properties": {
+                "vectorSource": {
+                    "type": "object",
+                    "description": "See the possible settings at the `vector-aggregator` chart. Pass some setting here explicitly to guarantee they match values set at `vector-agent`.",
+                    "properties": {
+                        "listenPort": {
+                            "type": "string",
+                            "description": "Use the same port that's specified at `vector-agent`.",
+                            "default": "9000"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
