@@ -1,4 +1,4 @@
-use crate::event::{lookup::Segment, util, Lookup, PathComponent, Value};
+use super::{lookup::Segment, util, EventMetadata, Lookup, PathComponent, Value};
 use serde::{Serialize, Serializer};
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
@@ -10,6 +10,7 @@ use std::{
 #[derive(PartialEq, Debug, Clone, Default)]
 pub struct LogEvent {
     fields: BTreeMap<String, Value>,
+    metadata: EventMetadata,
 }
 
 impl LogEvent {
@@ -139,14 +140,16 @@ impl LogEvent {
 
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
-        LogEvent { fields: map }
+        LogEvent {
+            fields: map,
+            metadata: EventMetadata,
+        }
     }
 }
 
-impl Into<BTreeMap<String, Value>> for LogEvent {
-    fn into(self) -> BTreeMap<String, Value> {
-        let Self { fields } = self;
-        fields
+impl From<LogEvent> for BTreeMap<String, Value> {
+    fn from(log: LogEvent) -> Self {
+        log.fields
     }
 }
 
@@ -154,13 +157,14 @@ impl From<HashMap<String, Value>> for LogEvent {
     fn from(map: HashMap<String, Value>) -> Self {
         LogEvent {
             fields: map.into_iter().collect(),
+            metadata: EventMetadata,
         }
     }
 }
 
-impl Into<HashMap<String, Value>> for LogEvent {
-    fn into(self) -> HashMap<String, Value> {
-        self.fields.into_iter().collect()
+impl From<LogEvent> for HashMap<String, Value> {
+    fn from(log: LogEvent) -> Self {
+        log.fields.into_iter().collect()
     }
 }
 
@@ -186,8 +190,7 @@ impl TryInto<serde_json::Value> for LogEvent {
     type Error = crate::Error;
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
-        let Self { fields } = self;
-        Ok(serde_json::to_value(fields)?)
+        Ok(serde_json::to_value(self.fields)?)
     }
 }
 
