@@ -34,7 +34,10 @@ impl Function for ParseApacheLog {
         let variants = vec![value!("common"), value!("combined"), value!("error")];
 
         let value = arguments.required("value");
-        let format = arguments.required_enum("format", &variants)?.unwrap_bytes();
+        let format = arguments
+            .required_enum("format", &variants)?
+            .try_bytes()
+            .expect("format not bytes");
 
         let timestamp_format = arguments.optional("timestamp_format");
 
