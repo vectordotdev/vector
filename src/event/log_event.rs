@@ -10,7 +10,7 @@ use std::{
 #[derive(PartialEq, Debug, Clone, Default)]
 pub struct LogEvent {
     fields: BTreeMap<String, Value>,
-    metadata: EventMetadata,
+    pub(super) metadata: EventMetadata,
 }
 
 impl LogEvent {
