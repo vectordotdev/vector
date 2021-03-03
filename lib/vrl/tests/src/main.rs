@@ -107,6 +107,7 @@ fn main() {
 
                 match result {
                     Ok(got) => {
+                        let got = vrl_value_to_json_value(got);
                         let mut failed = false;
 
                         if !test.skip {
@@ -114,20 +115,25 @@ fn main() {
                                 match regex::Regex::new(
                                     &want[2..want.len() - 1].replace("\\'", "'"),
                                 ) {
-                                    Ok(want) => want.into(),
+                                    Ok(want) => want.to_string().into(),
                                     Err(_) => want.into(),
                                 }
                             } else if want.starts_with("t'") && want.ends_with('\'') {
                                 match DateTime::<Utc>::from_str(&want[2..want.len() - 1]) {
-                                    Ok(want) => want.into(),
+                                    Ok(want) => {
+                                        want.to_rfc3339_opts(SecondsFormat::AutoSi, true).into()
+                                    }
                                     Err(_) => want.into(),
                                 }
                             } else if want.starts_with("s'") && want.ends_with('\'') {
                                 want[2..want.len() - 1].into()
                             } else {
-                                match serde_json::from_str::<'_, Value>(&want.trim()) {
+                                match serde_json::from_str::<'_, serde_json::Value>(&want.trim()) {
                                     Ok(want) => want,
-                                    Err(_) => want.into(),
+                                    Err(err) => {
+                                        eprintln!("{}", err);
+                                        want.into()
+                                    }
                                 }
                             };
 
@@ -138,11 +144,10 @@ fn main() {
                                 failed_count += 1;
 
                                 if !cmd.no_diff {
-                                    let want = want.to_string();
-                                    let got = got.to_string();
+                                    let want = serde_json::to_string_pretty(&want).unwrap();
+                                    let got = serde_json::to_string_pretty(&got).unwrap();
 
-                                    let diff = prettydiff::diff_chars(&want, &got)
-                                        .set_highlight_whitespace(true);
+                                    let diff = prettydiff::diff_lines(&want, &got);
                                     println!("  {}", diff);
                                 }
 
@@ -256,4 +261,23 @@ fn print_result(failed_count: usize) {
     }
 
     std::process::exit(code)
+}
+
+fn vrl_value_to_json_value(value: Value) -> serde_json::Value {
+    use serde_json::Value::*;
+    use std::iter::FromIterator;
+
+    match value {
+        v @ Value::Bytes(_) => String(v.try_bytes_utf8_lossy().unwrap().into_owned()),
+        Value::Integer(v) => v.into(),
+        Value::Float(v) => v.into_inner().into(),
+        Value::Boolean(v) => v.into(),
+        Value::Object(v) => serde_json::Value::from_iter(
+            v.into_iter().map(|(k, v)| (k, vrl_value_to_json_value(v))),
+        ),
+        Value::Array(v) => serde_json::Value::from_iter(v.into_iter().map(vrl_value_to_json_value)),
+        Value::Timestamp(v) => v.to_rfc3339_opts(SecondsFormat::AutoSi, true).into(),
+        Value::Regex(v) => v.to_string().into(),
+        Value::Null => Null,
+    }
 }

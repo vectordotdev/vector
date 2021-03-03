@@ -70,7 +70,7 @@ impl Test {
                 .get("log")
                 .cloned()
                 .map(|value| match serde_json::from_value::<Value>(value) {
-                    Ok(value) => value.to_string(),
+                    Ok(value) => serde_json::to_string(&value).unwrap(),
                     Err(err) => {
                         error = Some(format!("unable to parse log as JSON: {}", err));
                         Value::Null.to_string()
