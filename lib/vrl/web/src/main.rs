@@ -39,7 +39,7 @@ impl Processor {
     fn parse_input(&mut self, object: &mut impl Target, program: &str, state: &mut CompilerState) -> String {
         let program = match vrl::compile_with_state(program, &stdlib::all(), state) {
             Ok(program) => program,
-            Err(diagnostics) => return Formatter::new(program, diagnostics).colored().to_string(),
+            Err(diagnostics) => return Formatter::new(program, diagnostics).to_string(),
         };
 
         let runtime = &mut self.runtime;
