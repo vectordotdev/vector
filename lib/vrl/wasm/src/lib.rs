@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use vrl::Value;
+use vrl::{diagnostic::Formatter, state, Runtime, Value};
+use vrl_stdlib as stdlib;
 use wasm_bindgen::prelude::*;
 
 #[derive(Deserialize, Serialize)]
@@ -8,17 +9,53 @@ struct Input {
     event: Value,
 }
 
-fn vrl_resolve(input: Input) -> Result<Value, String> {
-    Ok(input.event)
+#[derive(Deserialize, Serialize)]
+struct VrlCompileResult {
+    output: Value,
+    result: Value,
 }
 
+#[derive(Deserialize, Serialize)]
+struct ErrorResult {
+    error: String,
+}
+
+impl ErrorResult {
+    fn new(error: String) -> Self {
+        Self { error }
+    }
+}
+
+impl VrlCompileResult {
+    fn new(output: Value, result: Value) -> Self {
+        Self { output, result }
+    }
+}
+
+fn compile(mut input: Input) -> Result<VrlCompileResult, ErrorResult> {
+    let event = &mut input.event;
+    let mut state = state::Compiler::default();
+    let mut runtime = Runtime::new(state::Runtime::default());
+    let program = match vrl::compile_with_state(&input.program, &stdlib::all(), &mut state) {
+        Ok(program) => program,
+        Err(diagnostics) => {
+            let msg = Formatter::new(&input.program, diagnostics).to_string();
+            return Err(ErrorResult::new(msg));
+        }
+    };
+
+    match runtime.resolve(event, &program) {
+        Ok(result) => Ok(VrlCompileResult::new(result, event.clone())),
+        Err(err) => Err(ErrorResult::new(err.to_string()))
+    }
+}
 
 #[wasm_bindgen]
 pub fn resolve(incoming: &JsValue) -> JsValue {
     let input: Input = incoming.into_serde().unwrap();
 
-    match vrl_resolve(input) {
-        Ok(event) => JsValue::from_str(&event.to_string()),
-        Err(err) => JsValue::from_str(&err.to_string())
+    match compile(input) {
+        Ok(res) => JsValue::from_serde(&res).unwrap(),
+        Err(err) => JsValue::from_serde(&err).unwrap()
     }
 }

@@ -9,16 +9,25 @@
       import { default as wasm, resolve } from "./pkg/vrl_wasm.js";
 
       wasm().then((module) => {
+        const program = `
+          . |= parse_key_value!(string!(.message))
+          .timestamp = format_timestamp!(to_timestamp!(.timestamp), format: "%+")
+          .id = uuid_v4()
+        `;
+
         const input = {
-          program: "something",
+          program: program,
           event: {
-            foo: "bar"
+            message: "foo=bar bar=baz",
+            timestamp: "2021-03-02T18:51:01.513Z"
           }
         };
 
         let result = resolve(input);
 
-        window.alert(result);
+        let json = JSON.stringify(result);
+
+        window.alert(json);
       });
     </script>
   </body>
