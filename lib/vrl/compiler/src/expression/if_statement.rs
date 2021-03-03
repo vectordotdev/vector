@@ -27,7 +27,7 @@ impl IfStatement {
 
 impl Expression for IfStatement {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let predicate = self.predicate.resolve(ctx)?.unwrap_boolean();
+        let predicate = self.predicate.resolve(ctx)?.try_boolean()?;
 
         match predicate {
             true => self.consequent.resolve(ctx),

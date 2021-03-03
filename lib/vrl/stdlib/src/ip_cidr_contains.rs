@@ -73,14 +73,14 @@ impl Expression for IpCidrContainsFn {
             let value = self.value.resolve(ctx)?;
 
             value
-                .unwrap_bytes_utf8_lossy()
+                .try_bytes_utf8_lossy()?
                 .parse()
                 .map_err(|err| format!("unable to parse IP address: {}", err))?
         };
 
         let cidr = {
             let value = self.cidr.resolve(ctx)?;
-            let cidr = value.unwrap_bytes_utf8_lossy();
+            let cidr = value.try_bytes_utf8_lossy()?;
 
             IpCidr::from_str(cidr).map_err(|err| format!("unable to parse CIDR: {}", err))?
         };

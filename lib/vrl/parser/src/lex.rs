@@ -220,6 +220,7 @@ pub struct Lexer<'input> {
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub enum Token<S> {
     Identifier(S),
+    PathField(S),
     FunctionCall(S),
     Operator(S),
 
@@ -300,6 +301,7 @@ impl<S> Token<S> {
         use self::Token::*;
         match self {
             Identifier(s) => Identifier(f(s)),
+            PathField(s) => PathField(f(s)),
             FunctionCall(s) => FunctionCall(f(s)),
             Operator(s) => Operator(f(s)),
 
@@ -359,6 +361,7 @@ where
 
         let s = match *self {
             Identifier(_) => "Identifier",
+            PathField(_) => "PathField",
             FunctionCall(_) => "FunctionCall",
             Operator(_) => "Operator",
             StringLiteral(_) => "StringLiteral",
@@ -422,6 +425,8 @@ impl<'input> Token<&'input str> {
             | "undefined" | "int" | "integer" | "iter" | "object" | "regex" | "return"
             | "string" | "traverse" | "timestamp" | "duration" | "unless" | "walk" | "while"
             | "loop" => ReservedIdentifier(s),
+
+            _ if s.contains('@') => PathField(s),
 
             _ => Identifier(s),
         }
@@ -1051,7 +1056,6 @@ impl<'input> Lexer<'input> {
             Some((_, '\'')) => Ok('\''),
             Some((_, '"')) => Ok('"'),
             Some((_, '\\')) => Ok('\\'),
-            Some((_, '/')) => Ok('/'),
             Some((_, 'n')) => Ok('\n'),
             Some((_, 'r')) => Ok('\r'),
             Some((_, 't')) => Ok('\t'),
@@ -1069,7 +1073,7 @@ impl<'input> Lexer<'input> {
 // -----------------------------------------------------------------------------
 
 fn is_ident_start(ch: char) -> bool {
-    matches!(ch, 'a'..='z')
+    matches!(ch, '@' | 'a'..='z')
 }
 
 fn is_ident_continue(ch: char) -> bool {
@@ -1346,6 +1350,25 @@ mod test {
                 (r#"            ~  "#, RQuery),
                 (r#"              ~"#, LQuery),
                 (r#"              ~"#, Dot),
+                (r#"              ~"#, RQuery),
+            ],
+        );
+    }
+
+    #[test]
+    fn ampersat_in_query() {
+        test(
+            data(r#".@foo .bar.@ook"#),
+            vec![
+                (r#"~              "#, LQuery),
+                (r#"~              "#, Dot),
+                (r#" ~~~~          "#, PathField("@foo")),
+                (r#"    ~          "#, RQuery),
+                (r#"      ~        "#, LQuery),
+                (r#"      ~        "#, Dot),
+                (r#"       ~~~     "#, Identifier("bar")),
+                (r#"          ~    "#, Dot),
+                (r#"           ~~~~"#, PathField("@ook")),
                 (r#"              ~"#, RQuery),
             ],
         );
@@ -1695,6 +1718,23 @@ mod test {
                 (r#"                      ~ "#, IntegerLiteral(0)),
                 (r#"                       ~"#, RBracket),
                 (r#"                       ~"#, RQuery),
+            ],
+        );
+    }
+
+    #[test]
+    fn queries_negative_index() {
+        test(
+            data("v[-1] = 2"),
+            vec![
+                ("~        ", LQuery),
+                ("~        ", Identifier("v")),
+                (" ~       ", LBracket),
+                ("  ~~     ", IntegerLiteral(-1)),
+                ("    ~    ", RBracket),
+                ("    ~    ", RQuery),
+                ("      ~  ", Equals),
+                ("        ~", IntegerLiteral(2)),
             ],
         );
     }

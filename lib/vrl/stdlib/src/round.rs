@@ -60,12 +60,16 @@ struct RoundFn {
 
 impl Expression for RoundFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let precision = self.precision.resolve(ctx)?.unwrap_integer();
+        let precision = self.precision.resolve(ctx)?.try_integer()?;
 
         match self.value.resolve(ctx)? {
             Value::Float(f) => Ok(round_to_precision(f.into_inner(), precision, f64::round).into()),
-            v @ Value::Integer(_) => Ok(v),
-            _ => unreachable!(),
+            value @ Value::Integer(_) => Ok(value),
+            value => Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::Float | Kind::Integer,
+            }
+            .into()),
         }
     }
 

@@ -44,7 +44,7 @@ struct ParseSyslogFn {
 impl Expression for ParseSyslogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let message = value.unwrap_bytes_utf8_lossy();
+        let message = value.try_bytes_utf8_lossy()?;
 
         let parsed = syslog_loose::parse_message_with_year_exact(&message, resolve_year)?;
 

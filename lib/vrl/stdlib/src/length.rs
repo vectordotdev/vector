@@ -58,7 +58,11 @@ impl Expression for LengthFn {
             Array(v) => Ok(v.len().into()),
             Object(v) => Ok(v.len().into()),
             Bytes(v) => Ok(v.len().into()),
-            _ => unreachable!("argument-type invariant"),
+            value => Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::Array | Kind::Object | Kind::Bytes,
+            }
+            .into()),
         }
     }
 

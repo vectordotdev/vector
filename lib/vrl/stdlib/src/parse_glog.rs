@@ -62,7 +62,7 @@ struct ParseGlogFn {
 
 impl Expression for ParseGlogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.unwrap_bytes();
+        let bytes = self.value.resolve(ctx)?.try_bytes()?;
         let message = String::from_utf8_lossy(&bytes);
 
         let mut log: BTreeMap<String, Value> = BTreeMap::new();
