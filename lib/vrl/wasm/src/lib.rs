@@ -18,7 +18,6 @@ struct VrlCompileResult {
     result: Value,
 }
 
-
 impl VrlCompileResult {
     fn new(output: Value, result: Value) -> Self {
         Self { output, result }
@@ -37,7 +36,6 @@ impl ErrorResult {
     }
 }
 
-
 fn compile(mut input: Input) -> Result<VrlCompileResult, ErrorResult> {
     let event = &mut input.event;
     let mut state = state::Compiler::default();
@@ -53,7 +51,7 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, ErrorResult> {
 
     match runtime.resolve(event, &program) {
         Ok(result) => Ok(VrlCompileResult::new(result, event.clone())),
-        Err(err) => Err(ErrorResult::new(err.to_string()))
+        Err(err) => Err(ErrorResult::new(err.to_string())),
     }
 }
 
@@ -64,6 +62,6 @@ pub fn resolve(incoming: &JsValue) -> JsValue {
 
     match compile(input) {
         Ok(res) => JsValue::from_serde(&res).unwrap(),
-        Err(err) => JsValue::from_serde(&err).unwrap()
+        Err(err) => JsValue::from_serde(&err).unwrap(),
     }
 }
