@@ -180,13 +180,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         body: Bytes,
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
-        full_path: &str,
+        path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
     fn run(
         self,
         address: SocketAddr,
-        path: &'static str,
+        path: &str,
+        strict_path: bool,
         tls: &Option<TlsConfig>,
         auth: &Option<HttpSourceAuthConfig>,
         out: Pipeline,
@@ -194,14 +195,16 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
+        let path = path.to_owned();
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
-
             let mut filter: BoxedFilter<()> = warp::post().boxed();
-            if !path.is_empty() && path != "/" {
-                for s in path.split('/') {
-                    filter = filter.and(warp::path(s)).boxed();
-                }
+            for s in path.split('/').filter(|&x| !x.is_empty()) {
+                filter = filter.and(warp::path(s.to_string())).boxed()
+            }
+            if strict_path {
+                debug!(message = "Strict path enabled.");
+                filter = filter.and(warp::path::end()).boxed();
             }
             let svc = filter
                 .and(warp::path::full())

@@ -82,7 +82,15 @@ impl SourceConfig for LogplexConfig {
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
         };
-        source.run(self.address, "events", &self.tls, &self.auth, out, shutdown)
+        source.run(
+            self.address,
+            "events",
+            true,
+            &self.tls,
+            &self.auth,
+            out,
+            shutdown,
+        )
     }
 
     fn output_type(&self) -> DataType {
