@@ -38,10 +38,21 @@ impl Function for ParseCommonLog {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "parse common log",
-            source: r#"encode_json(parse_common_log!(s'127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326'))"#,
-            result: Ok(
-                indoc! {r#"s'{"host":"127.0.0.1","identity":"bob","message":"GET /apache_pb.gif HTTP/1.0","method":"GET","path":"/apache_pb.gif","protocol":"HTTP/1.0","size":2326,"status":200,"timestamp":"2000-10-10T20:55:36+00:00","user":"frank"}'"#},
-            ),
+            source: r#"parse_common_log!(s'127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326')"#,
+            result: Ok(indoc! {
+                r#"{
+                    "host":"127.0.0.1",
+                    "identity":"bob",
+                    "message":"GET /apache_pb.gif HTTP/1.0",
+                    "method":"GET",
+                    "path":"/apache_pb.gif",
+                    "protocol":"HTTP/1.0",
+                    "size":2326,
+                    "status":200,
+                    "timestamp":"2000-10-10T20:55:36Z",
+                    "user":"frank"
+                }"#
+            }),
         }]
     }
 }
