@@ -48,7 +48,7 @@ wasm().then((module) => {
   // The full input object
   const input = {
     program: program,
-    event: evemt
+    event: event
   };
 
   // Get a result back
@@ -71,7 +71,7 @@ to run a web server serving up this directory. Python provides an easy way to do
 python3 -m http.server 8000
 ```
 
-Navigate to http://localhost:8000 and the console should print JSON that looks like this:
+Navigate to http://localhost:8000 and the console should print JSON that looks like this (though not formatted):
 
 ```json
 {
