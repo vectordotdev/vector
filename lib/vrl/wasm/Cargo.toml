@@ -2,5 +2,14 @@
 name = "vrl-wasm"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
+description = "A WebAssembly module for running Vector Remap Language"
+repository = "https://github.com/timberio/vector"
+license = "MIT"
 edition = "2018"
 publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2.71"
