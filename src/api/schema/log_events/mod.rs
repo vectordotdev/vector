@@ -1,21 +1,45 @@
-mod log;
+mod event;
 mod notification;
 
-use log::LogEvent;
+use event::LogEvent;
 
 use crate::api::{
     tap::{TapController, TapNotification, TapResult, TapSink},
     ControlSender,
 };
-use async_graphql::{Context, Subscription, Union};
+use async_graphql::{Context, Enum, InputObject, Subscription, Union};
 use futures::{channel::mpsc, StreamExt};
+use itertools::Itertools;
 use tokio::{select, stream::Stream, time};
+
+#[derive(Enum, Copy, Clone, PartialEq, Eq)]
+pub enum LogEventSampleType {
+    First,
+    Last,
+    Range,
+}
+
+#[derive(InputObject)]
+pub struct LogEventSample {
+    #[graphql(name = "type")]
+    sample_type: LogEventSampleType,
+    value: usize,
+}
+
+impl Default for LogEventSample {
+    fn default() -> Self {
+        LogEventSample {
+            sample_type: LogEventSampleType::First,
+            value: 100,
+        }
+    }
+}
 
 #[derive(Union)]
 /// Log event result which can be a payload for log events, or an error
 pub enum LogEventResult {
     /// Log event payload
-    LogEvent(log::LogEvent),
+    LogEvent(event::LogEvent),
     /// Log notification
     Notification(notification::LogEventNotification),
 }
@@ -41,19 +65,20 @@ impl From<TapResult> for LogEventResult {
 }
 
 #[derive(Default)]
-pub struct EventsSubscription;
+pub struct LogEventsSubscription;
 
 #[Subscription]
-impl EventsSubscription {
+impl LogEventsSubscription {
     /// A stream of log events emitted from component(s)
     pub async fn output_log_events<'a>(
         &'a self,
         ctx: &'a Context<'a>,
         component_names: Vec<String>,
         #[graphql(default = 500)] interval: i32,
+        #[graphql(default)] sample: LogEventSample,
     ) -> impl Stream<Item = Vec<LogEventResult>> + 'a {
         let control_tx = ctx.data_unchecked::<ControlSender>().clone();
-        create_log_events_stream(control_tx, &component_names, interval)
+        create_log_events_stream(control_tx, &component_names, interval, sample)
     }
 }
 
@@ -64,6 +89,7 @@ fn create_log_events_stream(
     control_tx: ControlSender,
     component_names: &[String],
     interval: i32,
+    sample: LogEventSample,
 ) -> impl Stream<Item = Vec<LogEventResult>> {
     let (tx, mut rx) = mpsc::unbounded();
     let (mut log_tx, log_rx) = mpsc::unbounded::<Vec<LogEventResult>>();
@@ -88,7 +114,36 @@ fn create_log_events_stream(
                 _ = interval.tick() => {
                     // If there are any existing results after the interval tick, emit.
                     if !results.is_empty() {
-                        let _ = log_tx.start_send(results.drain(..).collect());
+                        let results = results.drain(..).into_iter();
+                        let number_of_results = results.len();
+
+                        let results = match sample.sample_type {
+                            LogEventSampleType::First => results.take(sample.value).collect(),
+                            LogEventSampleType::Last => results.rev().take(sample.value).collect(),
+                            LogEventSampleType::Range => {
+                                results
+                                    .into_iter()
+                                    .chunks(
+                                        number_of_results
+                                            .checked_div(sample.value)
+                                            .unwrap_or(1)
+                                            .max(1),
+                                    )
+                                    .into_iter()
+                                    .enumerate()
+                                    .flat_map(|(i, chunk)| {
+                                        let mut chunk = chunk.collect_vec();
+                                        if matches!(i.checked_sub(1), Some(i) if i > 0 && i == number_of_results - 1) {
+                                            chunk = chunk.into_iter().rev().collect_vec();
+                                        }
+                                        chunk.into_iter().take(1)
+                                    })
+                                    .take(sample.value)
+                                    .collect()
+                            }
+                        };
+
+                        let _ = log_tx.start_send(results);
                     }
                 }
             }

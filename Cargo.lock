@@ -8257,7 +8257,6 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-probe",
- "parking_lot",
  "percent-encoding",
  "pest",
  "pest_derive",

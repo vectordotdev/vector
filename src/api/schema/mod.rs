@@ -1,7 +1,7 @@
 pub mod components;
-pub mod events;
 pub mod filter;
 mod health;
+mod log_events;
 mod meta;
 mod metrics;
 mod relay;
@@ -22,7 +22,7 @@ pub struct Subscription(
     health::HealthSubscription,
     metrics::MetricsSubscription,
     components::ComponentsSubscription,
-    events::EventsSubscription,
+    log_events::LogEventsSubscription,
 );
 
 /// Build a new GraphQL schema, comprised of Query, Mutation and Subscription types
