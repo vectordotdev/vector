@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>vrl-wasm</title>
+  </head>
+  <body>
+    <script type="module">
+      import { default as wasm, resolve } from "./pkg/vrl_wasm.js";
+
+      wasm().then((module) => {
+        const input = {
+          program: "something",
+          event: {
+            foo: "bar"
+          }
+        };
+
+        let result = resolve(input);
+
+        window.alert(result);
+      });
+    </script>
+  </body>
+</html>
