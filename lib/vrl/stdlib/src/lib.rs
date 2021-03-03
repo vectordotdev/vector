@@ -62,6 +62,8 @@ mod join;
 mod length;
 #[cfg(feature = "log")]
 mod log;
+#[cfg(any(feature = "parse_common_log", feature = "parse_apache_log"))]
+mod log_util;
 #[cfg(feature = "match")]
 mod r#match;
 #[cfg(feature = "md5")]
