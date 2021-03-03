@@ -55,8 +55,7 @@ remap: #Remap & {
 			title: "Parse Syslog logs"
 			input: log: message: "<102>1 2020-12-22T15:22:31.111Z vector-user.biz su 2666 ID389 - Something went wrong"
 			source: """
-				structured = parse_syslog!(.message)
-				. = merge(., structured)
+				. |= parse_syslog!(.message)
 				"""
 			output: log: {
 				appname:   "su"
@@ -95,13 +94,12 @@ remap: #Remap & {
 			title: "Parse custom logs"
 			input: log: message: #"2021/01/20 06:39:15 [error] 17755#17755: *3569904 open() "/usr/share/nginx/html/test.php" failed (2: No such file or directory), client: xxx.xxx.xxx.xxx, server: localhost, request: "GET /test.php HTTP/1.1", host: "yyy.yyy.yyy.yyy""#
 			source: #"""
-				structured = parse_regex!(.message, r'^(?P<timestamp>\d+/\d+/\d+ \d+:\d+:\d+) \[(?P<severity>\w+)\] (?P<pid>\d+)#(?P<tid>\d+):(?: \*(?P<connid>\d+))? (?P<message>.*)$')
-				. = merge(., structured)
+				. |= parse_regex!(.message, r'^(?P<timestamp>\d+/\d+/\d+ \d+:\d+:\d+) \[(?P<severity>\w+)\] (?P<pid>\d+)#(?P<tid>\d+):(?: \*(?P<connid>\d+))? (?P<message>.*)$')
 
 				# Coerce parsed fields
 				.timestamp = parse_timestamp(.timestamp, "%Y/%m/%d %H:%M:%S") ?? now()
-				.pid = to_int(.pid) ?? null
-				.tid = to_int(.tid) ?? null
+				.pid = to_int!(.pid)
+				.tid = to_int!(.tid)
 
 				# Extract structured data
 				message_parts = split(.message, ", ", limit: 2) ?? []
@@ -135,8 +133,8 @@ remap: #Remap & {
 			source: #"""
 				structured =
 				  parse_syslog(.message) ??
-				  parse_common_log(.message) ?? {}
-				  # parse_regex!(.message, r'^(?P<timestamp>\d+/\d+/\d+ \d+:\d+:\d+) \[(?P<severity>\w+)\] (?P<pid>\d+)#(?P<tid>\d+):(?: \*(?P<connid>\d+))? (?P<message>.*)$')
+				  parse_common_log(.message) ??
+				  parse_regex!(.message, r'^(?P<timestamp>\d+/\d+/\d+ \d+:\d+:\d+) \[(?P<severity>\w+)\] (?P<pid>\d+)#(?P<tid>\d+):(?: \*(?P<connid>\d+))? (?P<message>.*)$')
 				. = merge(., structured)
 				"""#
 			output: log: {
