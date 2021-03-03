@@ -12,4 +12,6 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+vrl = { path = "../core" }
+vrl-stdlib = { path = "../stdlib", features = ["wasm_compatible"], optional = true }
 wasm-bindgen = "0.2.71"
