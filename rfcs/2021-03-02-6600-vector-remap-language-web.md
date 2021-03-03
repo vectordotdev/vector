@@ -1,4 +1,4 @@
-# RFC 6600 - 2021-03-02 - Vector Remap Language on the web
+# RFC 6600 - 2021-03-03 - Vector Remap Language on the web
 
 From the beginning of our work on [Vector Remap Language][VRL] (VRL), we've had discussions about
 novel ways to make VRL approachable and even downright fun for users. Thus far, we've done some
