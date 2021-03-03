@@ -5,10 +5,9 @@ use std::collections::BTreeMap;
 use vrl::prelude::*;
 
 lazy_static! {
-    // Information about the common log format taken from the
-    // - W3C specification: https://www.w3.org/Daemon/User/Config/Logging.html#common-logfile-format
-    // - Apache HTTP Server docs: https://httpd.apache.org/docs/1.3/logs.html#common
-    //
+   // Information about the common log format taken from the
+   // - W3C specification: https://www.w3.org/Daemon/User/Config/Logging.html#common-logfile-format
+   // - Apache HTTP Server docs: https://httpd.apache.org/docs/1.3/logs.html#common
    pub static ref REGEX_APACHE_COMMON_LOG: Regex = Regex::new(
         r#"(?x)                                 # Ignore whitespace and comments in the regex expression.
         ^\s*                                    # Start with any number of whitespaces.
@@ -31,7 +30,6 @@ lazy_static! {
 
     // For the combined log format
     // - Apache HTTP Server docs: https://httpd.apache.org/docs/1.3/logs.html#combined
-    //
     pub static ref REGEX_APACHE_COMBINED_LOG: Regex = Regex::new(
         r#"(?x)                                 # Ignore whitespace and comments in the regex expression.
         ^\s*                                    # Start with any number of whitespaces.
@@ -62,7 +60,6 @@ lazy_static! {
     // Error log format defined here
     // It is possible to customise the format output by apache. This function just handles the default defined here.
     // https://github.com/mingrammer/flog/blob/9bc83b14408ca446e934c32e4a88a81a46e78d83/log.go#L16
-    //
     pub static ref REGEX_APACHE_ERROR_LOG: Regex = Regex::new(
         r#"(?x)                                     # Ignore whitespace and comments in the regex expression.
         ^\s*                                        # Start with any number of whitespaces.
@@ -103,6 +100,9 @@ fn parse_time(time: &str, format: &str) -> std::result::Result<DateTime<Utc>, St
         })
 }
 
+/// Takes the field as a string and returns a `Value`.
+/// Most fields are `Value::Bytes`, but some are other types, we convert to those
+/// types based on the fieldname.
 fn capture_value(
     name: &str,
     value: &str,
@@ -119,6 +119,7 @@ fn capture_value(
     })
 }
 
+/// Extracts the log fields from the regex and adds them to a `Value::Object`.
 pub fn log_fields(
     regex: &Regex,
     captures: &Captures,

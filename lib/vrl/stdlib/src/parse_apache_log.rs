@@ -95,7 +95,7 @@ impl Expression for ParseApacheLogFn {
             b"common" => &*log_util::REGEX_APACHE_COMMON_LOG,
             b"combined" => &*log_util::REGEX_APACHE_COMBINED_LOG,
             b"error" => &*log_util::REGEX_APACHE_ERROR_LOG,
-            _ => panic!(),
+            _ => unreachable!(),
         };
 
         let captures = regex
