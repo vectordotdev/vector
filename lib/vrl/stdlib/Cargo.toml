@@ -117,7 +117,7 @@ wasm_compatible = [
   "timestamp",
   "truncate",
   "upcase",
-  "uuid",
+  "uuid_v4",
 ]
 
 array = []
