@@ -48,7 +48,7 @@ lazy_static! {
         (-|(?P<size>\d+))\s+                    # Match `-` or at least one digit.
         (-|"(-|(\s*                             # Match `-` or `"` followed by `-` or and any number of whitespaces...
         (?P<referrer>[[\\"][^"]]*?)             # Match any character except `"`, but `\"`
-        ")))                                    # Match the closing quote 
+        ")))                                    # Match the closing quote
         \s+                                     # Match whitespace
         (-|"(-|(\s*                             # Match `-` or `"` followed by `-` or and any number of whitespaces...
         (?P<agent>[[\\"][^"]]*?)                # Match any character except `"`, but `\"`
