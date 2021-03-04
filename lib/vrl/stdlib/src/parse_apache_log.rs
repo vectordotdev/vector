@@ -85,7 +85,7 @@ struct ParseApacheLogFn {
 impl Expression for ParseApacheLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?;
-        let message = bytes.try_bytes_utf8_lossy().unwrap();
+        let message = bytes.try_bytes_utf8_lossy()?;
         let timestamp_format = match &self.timestamp_format {
             None => "%d/%b/%Y:%T %z".to_owned(),
             Some(timestamp_format) => timestamp_format
