@@ -38,14 +38,14 @@ remap: functions: ip_subnet: {
 		{
 			title: "IPv4 subnet"
 			source: #"""
-				ip_subnet("192.168.10.32", "255.255.255.0")
+				ip_subnet!("192.168.10.32", "255.255.255.0")
 				"""#
 			return: "192.168.10.0"
 		},
 		{
 			title: "IPv6 subnet"
 			source: #"""
-				ip_subnet("2404:6800:4003:c02::64", "/32")
+				ip_subnet!("2404:6800:4003:c02::64", "/32")
 				"""#
 			return: "2404:6800::"
 		},

@@ -30,14 +30,14 @@ remap: functions: ip_cidr_contains: {
 		{
 			title: "IPv4 contains CIDR"
 			source: #"""
-				ip_cidr_contains("192.168.0.0/16", "192.168.10.32")
+				ip_cidr_contains!("192.168.0.0/16", "192.168.10.32")
 				"""#
 			return: true
 		},
 		{
 			title: "IPv6 contains CIDR"
 			source: #"""
-				ip_cidr_contains("2001:4f8:4:ba::/64", "2001:4f8:4:ba:2e0:81ff:fe22:d1f1")
+				ip_cidr_contains!("2001:4f8:4:ba::/64", "2001:4f8:4:ba:2e0:81ff:fe22:d1f1")
 				"""#
 			return: true
 		},

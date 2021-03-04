@@ -33,7 +33,7 @@ remap: functions: to_string: {
 			source: #"""
 				to_string(true)
 				"""#
-			return: true
+			return: "true"
 		},
 		{
 			title: "Coerce to a string (int)"

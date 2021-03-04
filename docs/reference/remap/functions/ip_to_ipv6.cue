@@ -29,7 +29,7 @@ remap: functions: ip_to_ipv6: {
 		{
 			title: "IPv4 to IPv6"
 			source: #"""
-				ip_to_ipv6("192.168.10.32")
+				ip_to_ipv6!("192.168.10.32")
 				"""#
 			return: "::ffff:192.168.10.32"
 		},

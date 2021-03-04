@@ -43,8 +43,7 @@ remap: expressions: block: {
 					parse_json!(message)
 				}
 				"""#
-			return: Hello: "World!"
-			output: log: structured: return
+			output: log: structured: Hello: "World!"
 		},
 	]
 }

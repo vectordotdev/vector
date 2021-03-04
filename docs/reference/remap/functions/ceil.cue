@@ -35,7 +35,7 @@ remap: functions: ceil: {
 			source: #"""
 				ceil(4.345)
 				"""#
-			return: 4
+			return: 5.0
 		},
 		{
 			title: "Round a number up (with precision)"

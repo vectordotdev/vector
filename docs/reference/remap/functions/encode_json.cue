@@ -23,7 +23,7 @@ remap: functions: encode_json: {
 			source: #"""
 				.payload = encode_json({"hello": "world"})
 				"""#
-			return: #"{"hello": "world"}"#
+			return: #"{"hello":"world"}"#
 		},
 	]
 }

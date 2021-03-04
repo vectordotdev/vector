@@ -44,9 +44,9 @@ remap: functions: flatten: {
 				})
 				"""#
 			return: {
-				"grandparent.parent1.child1": 1
-				"grandparent.parent1.child2": 2
-				"grandparent.parent2.child1": 2
+				"parent1.child1": 1
+				"parent1.child2": 2
+				"parent2.child3": 3
 			}
 		},
 	]

@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::process::Command;
 // use vrl::Value;
@@ -6,16 +7,55 @@ use serde_json::{Map, Value};
 
 use crate::Test;
 
+/// A list of function examples that should be skipped in the test run.
+///
+/// This mostly consists of functions that have a non-deterministic result.
+const SKIP_FUNCTION_EXAMPLES: &[&str] = &[
+    "uuid_v4",
+    "strip_ansi_escape_codes",
+    "get_hostname",
+    "now",
+    "get_env_var",
+];
+
+#[derive(Debug, Deserialize)]
+pub struct Reference {
+    examples: Vec<Example>,
+    functions: HashMap<String, Examples>,
+    expressions: HashMap<String, Examples>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Examples {
+    examples: Vec<Example>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Example {
     title: String,
-    input: Map<String, Value>,
+    #[serde(default)]
+    input: Option<Event>,
     source: String,
-    output: Option<Map<String, Value>>,
-    raises: Option<Map<String, Value>>,
+    #[serde(rename = "return")]
+    returns: Option<Value>,
+    output: Option<Event>,
+    raises: Option<Error>,
 }
 
-pub struct Function;
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct Event {
+    log: Map<String, Value>,
+
+    // TODO: unsupported for now
+    metric: Option<Map<String, Value>>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct Error {
+    compiletime: String,
+}
 
 pub fn tests() -> Vec<Test> {
     let dir = fs::canonicalize("../../../scripts").unwrap();
@@ -26,93 +66,93 @@ pub fn tests() -> Vec<Test> {
         .output()
         .expect("failed to execute process");
 
-    dbg!(&output);
+    let Reference {
+        examples,
+        functions,
+        expressions,
+    } = serde_json::from_slice(&output.stdout).unwrap();
 
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    examples_to_tests("reference", {
+        let mut map = HashMap::default();
+        map.insert("program".to_owned(), Examples { examples });
+        map
+    })
+    .chain(examples_to_tests("functions", functions))
+    .chain(examples_to_tests("expressions", expressions))
+    .collect()
+}
 
-    let examples: Vec<_> = json
-        .pointer("/examples")
-        .unwrap()
-        .as_array()
-        .cloned()
-        .unwrap_or_else(|| vec![])
-        .into_iter()
-        .map(|value| serde_json::from_value(value).unwrap())
-        .map(|example| Test::from_cue_example(example))
-        .collect();
-
-    examples
+fn examples_to_tests(
+    category: &'static str,
+    examples: HashMap<String, Examples>,
+) -> Box<dyn Iterator<Item = Test>> {
+    Box::new(
+        examples
+            .into_iter()
+            .map(move |(k, v)| {
+                v.examples
+                    .into_iter()
+                    .map(|example| Test::from_cue_example(category, k.clone(), example))
+                    .collect::<Vec<_>>()
+            })
+            .flatten(),
+    )
 }
 
 impl Test {
-    fn from_cue_example(example: Example) -> Self {
+    fn from_cue_example(category: &'static str, name: String, example: Example) -> Self {
         use vrl::Value;
 
-        let mut skip = false;
-        let mut error = None;
-        let object: Value = example
-            .input
-            .get("log")
-            .cloned()
-            .map(|value| match serde_json::from_value(value) {
-                Ok(value) => value,
-                Err(err) => {
-                    error = Some(format!("unable to parse log as JSON: {}", err));
-                    Value::Null
-                }
-            })
-            .unwrap_or_else(|| {
-                // TODO: Add support for metric tests.
-                skip = true;
-                Value::Null
-            });
+        let Example {
+            title,
+            input,
+            mut source,
+            returns,
+            output,
+            raises,
+        } = example;
 
-        let result = match example.output {
-            Some(output) => output
-                .get("log")
-                .cloned()
-                .map(|value| match serde_json::from_value::<Value>(value) {
-                    Ok(value) => serde_json::to_string(&value).unwrap(),
-                    Err(err) => {
-                        error = Some(format!("unable to parse log as JSON: {}", err));
-                        Value::Null.to_string()
-                    }
-                })
-                .unwrap_or_else(|| {
-                    // TODO: Add support for metric tests.
-                    skip = true;
-                    Value::Null.to_string()
-                }),
-            None => match example.raises {
-                Some(raises) => raises
-                    .get("compiletime")
-                    .cloned()
-                    .map(|value| match serde_json::from_value::<Value>(value) {
-                        Ok(value) => value
-                            .try_bytes_utf8_lossy()
-                            .unwrap_or_default()
-                            .into_owned(),
-                        Err(err) => {
-                            error = Some(format!("unable to parse compiletime as JSON: {}", err));
-                            "".to_owned()
-                        }
-                    })
-                    .unwrap_or_else(|| {
-                        error = Some("compiletime field expected".to_owned());
-                        Value::Null.to_string()
-                    }),
-                None => {
-                    error = Some("one of output or raises field must be present".to_owned());
-                    Value::Null.to_string()
-                }
-            },
+        let mut skip = SKIP_FUNCTION_EXAMPLES.contains(&name.as_str());
+
+        let object = match input {
+            Some(event) => {
+                serde_json::from_value::<Value>(serde_json::Value::Object(event.log)).unwrap()
+            }
+            None => Value::Object(BTreeMap::default()),
+        };
+
+        if returns.is_some() && output.is_some() {
+            panic!(
+                "example must either specify return or output, not both: {}/{}",
+                category, &name
+            );
+        }
+
+        if let Some(output) = &output {
+            if output.metric.is_some() {
+                skip = true;
+            }
+
+            // when checking the output, we need to add `.` at the end of the
+            // program to make sure we correctly evaluate the external object.
+            source += "; .";
+        }
+
+        let result = match raises {
+            Some(error) => error.compiletime,
+            None => serde_json::to_string(
+                &returns
+                    .or_else(|| output.map(|event| serde_json::Value::Object(event.log)))
+                    .unwrap_or_default(),
+            )
+            .unwrap(),
         };
 
         Self {
-            name: example.title,
-            category: "docs/examples".to_owned(),
-            error,
-            source: example.source,
+            name: title,
+            category: format!("docs/{}/{}", category, name),
+            error: None,
+            source: source,
             object,
             result,
             result_approx: false,

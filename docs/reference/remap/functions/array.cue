@@ -26,7 +26,7 @@ remap: functions: array: {
 			title: "Declare an array type"
 			input: log: value: [1, 2, 3]
 			source: #"""
-				array(.value)
+				array!(.value)
 				"""#
 			return: input.log.value
 		},
