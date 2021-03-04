@@ -20,7 +20,6 @@ required-features = ["default-no-api-client"]
 lto = true        # Optimize our binary at link stage.
 codegen-units = 1 # Increases compile time but improves optmization alternatives.
 debug = false     # Do not include debug symbols in the executable.
-opt-level = 3     # Optimize with 'all' optimization flipped on. May produce larger binaries than 's' or 'z'.
 
 [profile.bench]
 debug = true
