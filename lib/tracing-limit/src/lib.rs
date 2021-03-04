@@ -1,6 +1,5 @@
 use dashmap::DashMap;
-use std::fmt;
-use std::time::Instant;
+use std::{fmt, time::Instant};
 use tracing_core::{
     callsite::Identifier,
     field::{display, Field, Value, Visit},
@@ -15,13 +14,18 @@ use tracing_subscriber::layer::{Context, Layer};
 extern crate tracing;
 
 const RATE_LIMIT_SECS_FIELD: &str = "internal_log_rate_secs";
-const COMPONENT_NAME_FIELD: &str = "component_name";
 const MESSAGE_FIELD: &str = "message";
+
+// These fields will cause events to be independently rate limited by the values
+// for these keys
+const COMPONENT_NAME_FIELD: &str = "component_name";
+const VRL_LINE_NUMBER: &str = "vrl_line_number";
+const VRL_POSITION: &str = "vrl_position";
 
 #[derive(Eq, PartialEq, Hash, Clone)]
 struct RateKeyIdentifier {
     callsite: Identifier,
-    component_name: Option<String>,
+    rate_limit_key_values: RateLimitedSpanKeys,
 }
 
 pub struct RateLimitedLayer<S, L>
@@ -115,23 +119,24 @@ where
         let mut limit_visitor = LimitVisitor::default();
         event.record(&mut limit_visitor);
 
-        let component_name = {
-            let mut scope = ctx
+        let rate_limit_key_values = {
+            let scope = ctx
                 .lookup_current()
                 .into_iter()
                 .flat_map(|span| span.from_root().chain(std::iter::once(span)));
 
-            scope.find_map(|span| {
+            scope.fold(RateLimitedSpanKeys::default(), |mut keys, span| {
                 let extensions = span.extensions();
-                extensions
-                    .get::<RateLimitedSpanKeys>()
-                    .and_then(|fields| fields.component_name.clone())
+                if let Some(span_keys) = extensions.get::<RateLimitedSpanKeys>() {
+                    keys.merge(span_keys);
+                }
+                keys
             })
         };
 
         let id = RateKeyIdentifier {
             callsite: metadata.callsite(),
-            component_name,
+            rate_limit_key_values,
         };
 
         let mut state = self.events.entry(id).or_insert(State {
@@ -256,22 +261,91 @@ fn is_limited(metadata: &Metadata<'_>) -> bool {
         .any(|f| f.name() == RATE_LIMIT_SECS_FIELD)
 }
 
+#[derive(PartialEq, Eq, Clone, Hash)]
+enum TraceValue {
+    String(String),
+    Int(i64),
+    Uint(u64),
+    Bool(bool),
+}
+
+impl From<bool> for TraceValue {
+    fn from(b: bool) -> Self {
+        TraceValue::Bool(b)
+    }
+}
+
+impl From<i64> for TraceValue {
+    fn from(i: i64) -> Self {
+        TraceValue::Int(i)
+    }
+}
+
+impl From<u64> for TraceValue {
+    fn from(u: u64) -> Self {
+        TraceValue::Uint(u)
+    }
+}
+
+impl From<String> for TraceValue {
+    fn from(s: String) -> Self {
+        TraceValue::String(s)
+    }
+}
+
 /// RateLimitedSpanKeys records span keys that we use to rate limit callsites separately by. For
 /// example, if a given trace callsite is called from two different components, then they will be
 /// rate limited separately.
-#[derive(Default)]
+#[derive(Default, Eq, PartialEq, Hash, Clone)]
 struct RateLimitedSpanKeys {
-    pub component_name: Option<String>,
+    component_name: Option<TraceValue>,
+    vrl_line_number: Option<TraceValue>,
+    vrl_position: Option<TraceValue>,
 }
 
-impl Visit for RateLimitedSpanKeys {
-    fn record_str(&mut self, field: &Field, value: &str) {
-        if field.name() == COMPONENT_NAME_FIELD {
-            self.component_name = Some(value.to_string());
+impl RateLimitedSpanKeys {
+    fn record(&mut self, field: &Field, value: TraceValue) {
+        match field.name() {
+            COMPONENT_NAME_FIELD => self.component_name = Some(value),
+            VRL_LINE_NUMBER => self.vrl_line_number = Some(value),
+            VRL_POSITION => self.vrl_position = Some(value),
+            _ => {}
         }
     }
 
-    fn record_debug(&mut self, _field: &Field, _value: &dyn fmt::Debug) {}
+    fn merge(&mut self, other: &Self) {
+        if let Some(component_name) = &other.component_name {
+            self.component_name = Some(component_name.clone());
+        }
+        if let Some(vrl_line_number) = &other.vrl_line_number {
+            self.vrl_line_number = Some(vrl_line_number.clone());
+        }
+        if let Some(vrl_position) = &other.vrl_position {
+            self.vrl_position = Some(vrl_position.clone());
+        }
+    }
+}
+
+impl Visit for RateLimitedSpanKeys {
+    fn record_i64(&mut self, field: &Field, value: i64) {
+        self.record(field, value.into());
+    }
+
+    fn record_u64(&mut self, field: &Field, value: u64) {
+        self.record(field, value.into());
+    }
+
+    fn record_bool(&mut self, field: &Field, value: bool) {
+        self.record(field, value.into());
+    }
+
+    fn record_str(&mut self, field: &Field, value: &str) {
+        self.record(field, value.to_owned().into());
+    }
+
+    fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
+        self.record(field, format!("{:?}", value).into());
+    }
 }
 
 #[derive(Default)]
@@ -387,7 +461,7 @@ mod test {
     }
 
     #[test]
-    fn rate_limit_by_component_name() {
+    fn rate_limit_by_span_key() {
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
         let recorder = RecordingLayer::new(Arc::clone(&events));
@@ -396,12 +470,19 @@ mod test {
         tracing::subscriber::with_default(sub, || {
             for _ in 0..21 {
                 for key in &["foo", "bar"] {
-                    let span = info_span!("span", component_name = &key);
-                    let _enter = span.enter();
-                    info!(
-                        message = format!("Hello {}!", key).as_str(),
-                        internal_log_rate_secs = 1
-                    );
+                    for line_number in &[1, 2] {
+                        let span = info_span!(
+                            "span",
+                            component_name = &key,
+                            vrl_line_number = &line_number
+                        );
+                        let _enter = span.enter();
+                        info!(
+                            message =
+                                format!("Hello {} on line_number {}!", key, line_number).as_str(),
+                            internal_log_rate_secs = 1
+                        );
+                    }
                 }
                 std::thread::sleep(std::time::Duration::from_millis(100));
             }
@@ -414,20 +495,34 @@ mod test {
         assert_eq!(
             *events,
             vec![
-                "Hello foo!",
-                "Hello bar!",
-                "Internal log [Hello foo!] is being rate limited.",
-                "Internal log [Hello bar!] is being rate limited.",
-                "Internal log [Hello foo!] has been rate limited 9 times.",
-                "Hello foo!",
-                "Internal log [Hello bar!] has been rate limited 9 times.",
-                "Hello bar!",
-                "Internal log [Hello foo!] is being rate limited.",
-                "Internal log [Hello bar!] is being rate limited.",
-                "Internal log [Hello foo!] has been rate limited 9 times.",
-                "Hello foo!",
-                "Internal log [Hello bar!] has been rate limited 9 times.",
-                "Hello bar!",
+                "Hello foo on line_number 1!",
+                "Hello foo on line_number 2!",
+                "Hello bar on line_number 1!",
+                "Hello bar on line_number 2!",
+                "Internal log [Hello foo on line_number 1!] is being rate limited.",
+                "Internal log [Hello foo on line_number 2!] is being rate limited.",
+                "Internal log [Hello bar on line_number 1!] is being rate limited.",
+                "Internal log [Hello bar on line_number 2!] is being rate limited.",
+                "Internal log [Hello foo on line_number 1!] has been rate limited 9 times.",
+                "Hello foo on line_number 1!",
+                "Internal log [Hello foo on line_number 2!] has been rate limited 9 times.",
+                "Hello foo on line_number 2!",
+                "Internal log [Hello bar on line_number 1!] has been rate limited 9 times.",
+                "Hello bar on line_number 1!",
+                "Internal log [Hello bar on line_number 2!] has been rate limited 9 times.",
+                "Hello bar on line_number 2!",
+                "Internal log [Hello foo on line_number 1!] is being rate limited.",
+                "Internal log [Hello foo on line_number 2!] is being rate limited.",
+                "Internal log [Hello bar on line_number 1!] is being rate limited.",
+                "Internal log [Hello bar on line_number 2!] is being rate limited.",
+                "Internal log [Hello foo on line_number 1!] has been rate limited 9 times.",
+                "Hello foo on line_number 1!",
+                "Internal log [Hello foo on line_number 2!] has been rate limited 9 times.",
+                "Hello foo on line_number 2!",
+                "Internal log [Hello bar on line_number 1!] has been rate limited 9 times.",
+                "Hello bar on line_number 1!",
+                "Internal log [Hello bar on line_number 2!] has been rate limited 9 times.",
+                "Hello bar on line_number 2!",
             ]
             .into_iter()
             .map(std::borrow::ToOwned::to_owned)
