@@ -8,7 +8,7 @@
         "env": {
             "type": "array",
             "description": "Extra env vars to pass to the `vector` container.",
-            "default": []
+            "default": [] 
         },
         "existingConfigMap": {
             "type": "string",
@@ -18,7 +18,7 @@
         "extraConfigDirSources": {
             "type": "array",
             "description": "Additional sources to include at the `config-dir` projection of the `Pod`s managed by `StatefulSet`.",
-            "default": []
+            "default": [] 
         },
         "extraContainersPorts": {
             "type": "array",
@@ -306,7 +306,7 @@
                 "annotations": {
                     "type": "object",
                     "description": "Annotations to add to the service account.",
-                    "default": {}
+                    "default": {} 
                 },
                 "create": {
                     "type": "boolean",
@@ -359,12 +359,12 @@
                         "annotations": {
                             "type": "object",
                             "description": "Additional annotations to apply to the created `PersistentVolumeClaim`.",
-                            "default": {}
+                            "default": {} 
                         },
                         "labels": {
                             "type": "object",
                             "description": "Additional labels to apply to the created `PersistentVolumeClaim`.",
-                            "default": {}
+                            "default": {} 
                         },
                         "size": {
                             "type": "string",
@@ -451,7 +451,7 @@
                 "config": {
                     "type": "object",
                     "description": "Additional config to embed at the vector source.",
-                    "default": {}
+                    "default": {} 
                 },
                 "enabled": {
                     "type": "boolean",
