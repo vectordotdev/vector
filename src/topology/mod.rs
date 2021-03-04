@@ -803,7 +803,7 @@ impl RunningTopology {
                 if let Some(tx) = self.outputs.get(&input_name) {
                     if let Some((sink_name, sink)) = tap_sink.make_output(&input_name) {
                         debug!(
-                            message = "Restarting tap",
+                            message = "Restarting tap.",
                             id = sink_name.as_str(),
                             input = input_name.as_str()
                         );
