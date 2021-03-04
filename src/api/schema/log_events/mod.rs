@@ -8,9 +8,9 @@ use crate::api::{
     ControlSender,
 };
 use async_graphql::{validators::IntRange, Context, Subscription, Union};
-use futures::{channel::mpsc, StreamExt};
+use futures::StreamExt;
 use itertools::Itertools;
-use tokio::{select, stream::Stream, time};
+use tokio::{select, stream::Stream, sync::mpsc, time};
 
 #[derive(Union)]
 /// Log event result which can be a payload for log events, or an error
@@ -68,8 +68,8 @@ fn create_log_events_stream(
     interval: u64,
     limit: usize,
 ) -> impl Stream<Item = Vec<LogEventResult>> {
-    let (tx, mut rx) = mpsc::unbounded();
-    let (mut log_tx, log_rx) = mpsc::unbounded::<Vec<LogEventResult>>();
+    let (tx, mut rx) = mpsc::channel(limit);
+    let (mut log_tx, log_rx) = mpsc::channel::<Vec<LogEventResult>>(10);
 
     let tap_sink = TapSink::new(&component_names, tx);
 
@@ -112,7 +112,7 @@ fn create_log_events_stream(
                             .take(limit)
                             .collect();
 
-                        let _ = log_tx.start_send(results);
+                        let _ = log_tx.send(results);
                     }
                 }
             }

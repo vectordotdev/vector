@@ -19,6 +19,7 @@ impl LogEvent {
 }
 
 #[Object]
+/// Log event contains
 impl LogEvent {
     /// Name of the component associated with the log event
     async fn component_name(&self) -> &str {

@@ -3,15 +3,16 @@ use crate::{
     event::{Event, LogEvent},
     topology::fanout::RouterSink,
 };
-use futures::{channel::mpsc, SinkExt, StreamExt};
+use futures::{channel::mpsc as futures_mpsc, SinkExt, StreamExt};
 use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
     sync::Arc,
 };
+use tokio::sync::mpsc as tokio_mpsc;
 use uuid::Uuid;
 
-type TapSender = mpsc::UnboundedSender<TapResult>;
+type TapSender = tokio_mpsc::Sender<TapResult>;
 
 /// A tap notification signals whether a component is matched or unmatched.
 pub enum TapNotification {
@@ -71,14 +72,14 @@ impl TapSink {
     /// Internal function to build a `RouterSink` from an input name. This will spawn an async
     /// task to forward on `LogEvent`s to the tap channel.
     fn make_router(&self, input_name: &str) -> RouterSink {
-        let (event_tx, mut event_rx) = mpsc::unbounded();
+        let (event_tx, mut event_rx) = futures_mpsc::unbounded();
         let mut tap_tx = self.tap_tx.clone();
         let input_name = input_name.to_string();
 
         tokio::spawn(async move {
             while let Some(ev) = event_rx.next().await {
                 if let Event::Log(ev) = ev {
-                    let _ = tap_tx.start_send(TapResult::LogEvent(input_name.clone(), ev));
+                    let _ = tap_tx.send(TapResult::LogEvent(input_name.clone(), ev));
                 }
             }
         });
@@ -88,7 +89,7 @@ impl TapSink {
 
     /// Private convenience for sending a `TapResult` to the connected receiver.
     fn send(&self, msg: TapResult) {
-        let _ = self.tap_tx.clone().start_send(msg);
+        let _ = self.tap_tx.clone().send(msg);
     }
 
     /// Returns the input names of the components this sink is observing as a vector of
