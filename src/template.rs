@@ -456,7 +456,9 @@ mod tests {
     fn render_metric_without_tags() {
         let template = Template::try_from("name={{name}} component={{tags.component}}").unwrap();
         assert_eq!(
-            Err(vec!["tags.component".into()]),
+            Err(TemplateRenderingError::MissingKeys {
+                missing_keys: vec!["tags.component".into()]
+            }),
             template.render(&sample_metric().into())
         );
     }
@@ -476,7 +478,9 @@ mod tests {
         let template = Template::try_from("namespace={{namespace}} name={{name}}").unwrap();
         let metric = sample_metric();
         assert_eq!(
-            Err(vec!["namespace".into()]),
+            Err(TemplateRenderingError::MissingKeys {
+                missing_keys: vec!["namespace".into()]
+            }),
             template.render(&metric.into())
         );
     }
