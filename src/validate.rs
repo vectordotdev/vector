@@ -80,8 +80,6 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     }
 }
 
-/// Ok if all configs were successfully validated.
-/// Err Some contains only successfully validated configs.
 fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     // Prepare paths
     let paths = opts.paths_with_formats();
@@ -92,18 +90,43 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         return None;
     };
 
+    // Load
     let paths_list: Vec<_> = paths.iter().map(|(path, _)| path).collect();
-    match config::load_from_paths(&paths, opts.deny_warnings) {
-        Ok(config) => {
-            fmt.success(format!("Loaded {:?}", &paths_list));
-            Some(config)
+    let mut report_error = |errors| {
+        fmt.title(format!("Failed to load {:?}", &paths_list));
+        fmt.sub_error(errors);
+    };
+    config::init_log_schema(&paths, true)
+        .map_err(&mut report_error)
+        .ok()?;
+    let (builder, load_warnings) = config::load_builder_from_paths(&paths)
+        .map_err(&mut report_error)
+        .ok()?;
+
+    // Build
+    let (config, build_warnings) = builder
+        .build_with_warnings()
+        .map_err(&mut report_error)
+        .ok()?;
+
+    // Warnings
+    let warnings = load_warnings
+        .into_iter()
+        .chain(build_warnings)
+        .collect::<Vec<_>>();
+    if !warnings.is_empty() {
+        if opts.deny_warnings {
+            report_error(warnings);
+            return None;
         }
-        Err(errors) => {
-            fmt.title(format!("Failed to load {:?}", &paths_list));
-            fmt.sub_error(errors);
-            None
-        }
+
+        fmt.title(format!("Loaded with warnings {:?}", &paths_list));
+        fmt.sub_warning(warnings);
+    } else {
+        fmt.success(format!("Loaded {:?}", &paths_list));
     }
+
+    Some(config)
 }
 
 async fn validate_environment(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {
@@ -123,10 +146,6 @@ async fn validate_components(
     diff: &ConfigDiff,
     fmt: &mut Formatter,
 ) -> Option<Pieces> {
-    crate::config::LOG_SCHEMA
-        .set(config.global.log_schema.clone())
-        .expect("Couldn't set schema");
-
     match topology::builder::build_pieces(config, diff, HashMap::new()).await {
         Ok(pieces) => {
             fmt.success("Component configuration");
@@ -292,6 +311,14 @@ impl Formatter {
             "",
             width = title.as_ref().len()
         ))
+    }
+
+    /// A list of warnings that go with a title.
+    fn sub_warning<I: IntoIterator>(&mut self, warnings: I)
+    where
+        I::Item: fmt::Display,
+    {
+        self.sub(self.warning_intro.clone(), warnings)
     }
 
     /// A list of errors that go with a title.

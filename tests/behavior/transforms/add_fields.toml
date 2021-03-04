@@ -42,7 +42,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a == [0, "1", 2.0] && \
+        .a == [0, "1", 2.0] &&
         .b == [0, null, "two"]
       '''
 

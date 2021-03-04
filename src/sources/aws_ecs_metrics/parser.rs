@@ -496,8 +496,8 @@ mod test {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
 
-    fn namespace() -> Option<String> {
-        Some("aws_ecs".into())
+    fn namespace() -> String {
+        "aws_ecs".into()
     }
 
     #[test]
@@ -535,14 +535,14 @@ mod test {
         }"##;
 
         assert_eq!(
-            parse(json.as_bytes(), namespace()).unwrap(),
+            parse(json.as_bytes(), Some(namespace())).unwrap(),
             vec![
                 Metric::new(
-                    "blkio_recursive_io_service_bytes_total".into(),
+                    "blkio_recursive_io_service_bytes_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_namespace(namespace())
+                .with_namespace(Some(namespace()))
                 .with_tags(Some(
                     vec![
                         ("device".into(), "202:26368".into()),
@@ -558,11 +558,11 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "blkio_recursive_io_service_bytes_total".into(),
+                    "blkio_recursive_io_service_bytes_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 520192.0 },
                 )
-                .with_namespace(namespace())
+                .with_namespace(Some(namespace()))
                 .with_tags(Some(
                     vec![
                         ("device".into(), "202:26368".into()),
@@ -613,14 +613,14 @@ mod test {
         }"##;
 
         assert_eq!(
-            parse(json.as_bytes(), namespace()).unwrap(),
+            parse(json.as_bytes(), Some(namespace())).unwrap(),
             vec![
                 Metric::new(
-                    "cpu_online_cpus".into(),
+                    "cpu_online_cpus",
                     MetricKind::Absolute,
                     MetricValue::Gauge { value: 2.0 },
                 )
-                .with_namespace(namespace())
+                .with_namespace(Some(namespace()))
                 .with_tags(Some(
                     vec![
                         (
@@ -634,13 +634,13 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_usage_system_jiffies_total".into(),
+                    "cpu_usage_system_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: 2007130000000.0
                     },
                 )
-                .with_namespace(namespace())
+                .with_namespace(Some(namespace()))
                 .with_tags(Some(
                     vec![
                         (
@@ -654,11 +654,11 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_usage_usermode_jiffies_total".into(),
+                    "cpu_usage_usermode_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 510000000.0 },
                 )
-                .with_namespace(namespace())
+                .with_namespace(Some(namespace()))
                 .with_tags(Some(
                     vec![
                         (
@@ -672,11 +672,11 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_usage_kernelmode_jiffies_total".into(),
+                    "cpu_usage_kernelmode_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 190000000.0 },
                 )
-                .with_namespace(namespace())
+                .with_namespace(Some(namespace()))
                 .with_tags(Some(
                     vec![
                         (
@@ -690,13 +690,13 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_usage_total_jiffies_total".into(),
+                    "cpu_usage_total_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: 2324920942.0
                     },
                 )
-                .with_namespace(namespace())
+                .with_namespace(Some(namespace()))
                 .with_tags(Some(
                     vec![
                         (
@@ -710,11 +710,11 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_throttling_periods_total".into(),
+                    "cpu_throttling_periods_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_namespace(namespace())
+                .with_namespace(Some(namespace()))
                 .with_tags(Some(
                     vec![
                         (
@@ -728,11 +728,11 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_throttled_periods_total".into(),
+                    "cpu_throttled_periods_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_namespace(namespace())
+                .with_namespace(Some(namespace()))
                 .with_tags(Some(
                     vec![
                         (
@@ -746,11 +746,11 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_throttled_time_seconds_total".into(),
+                    "cpu_throttled_time_seconds_total",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_namespace(namespace())
+                .with_namespace(Some(namespace()))
                 .with_tags(Some(
                     vec![
                         (
@@ -764,13 +764,13 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_usage_percpu_jiffies_total".into(),
+                    "cpu_usage_percpu_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: 1095931487.0
                     },
                 )
-                .with_namespace(namespace())
+                .with_namespace(Some(namespace()))
                 .with_tags(Some(
                     vec![
                         ("cpu".into(), "0".into()),
@@ -785,13 +785,13 @@ mod test {
                 ))
                 .with_timestamp(Some(ts())),
                 Metric::new(
-                    "cpu_usage_percpu_jiffies_total".into(),
+                    "cpu_usage_percpu_jiffies_total",
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: 1228989455.0
                     },
                 )
-                .with_namespace(namespace())
+                .with_namespace(Some(namespace()))
                 .with_tags(Some(
                     vec![
                         ("cpu".into(), "1".into()),
@@ -859,7 +859,7 @@ mod test {
             }
         }"##;
 
-        let metrics = parse(json.as_bytes(), namespace()).unwrap();
+        let metrics = parse(json.as_bytes(), Some(namespace())).unwrap();
 
         assert_eq!(
             metrics
@@ -867,11 +867,11 @@ mod test {
                 .find(|m| m.name() == "memory_used_bytes")
                 .unwrap(),
             &Metric::new(
-                "memory_used_bytes".into(),
+                "memory_used_bytes",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 40120320.0 },
             )
-            .with_namespace(namespace())
+            .with_namespace(Some(namespace()))
             .with_tags(Some(
                 vec![
                     (
@@ -892,11 +892,11 @@ mod test {
                 .find(|m| m.name() == "memory_max_used_bytes")
                 .unwrap(),
             &Metric::new(
-                "memory_max_used_bytes".into(),
+                "memory_max_used_bytes",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 47177728.0 },
             )
-            .with_namespace(namespace())
+            .with_namespace(Some(namespace()))
             .with_tags(Some(
                 vec![
                     (
@@ -917,11 +917,11 @@ mod test {
                 .find(|m| m.name() == "memory_active_anonymous_bytes")
                 .unwrap(),
             &Metric::new(
-                "memory_active_anonymous_bytes".into(),
+                "memory_active_anonymous_bytes",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 34885632.0 },
             )
-            .with_namespace(namespace())
+            .with_namespace(Some(namespace()))
             .with_tags(Some(
                 vec![
                     (
@@ -942,11 +942,11 @@ mod test {
                 .find(|m| m.name() == "memory_total_page_faults_total")
                 .unwrap(),
             &Metric::new(
-                "memory_total_page_faults_total".into(),
+                "memory_total_page_faults_total",
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 31131.0 },
             )
-            .with_namespace(namespace())
+            .with_namespace(Some(namespace()))
             .with_tags(Some(
                 vec![
                     (
@@ -985,7 +985,7 @@ mod test {
             }
         }"##;
 
-        let metrics = parse(json.as_bytes(), namespace()).unwrap();
+        let metrics = parse(json.as_bytes(), Some(namespace())).unwrap();
 
         assert_eq!(
             metrics
@@ -993,11 +993,11 @@ mod test {
                 .find(|m| m.name() == "network_receive_bytes_total")
                 .unwrap(),
             &Metric::new(
-                "network_receive_bytes_total".into(),
+                "network_receive_bytes_total",
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 329932716.0 },
             )
-            .with_namespace(namespace())
+            .with_namespace(Some(namespace()))
             .with_tags(Some(
                 vec![
                     ("device".into(), "eth1".into()),
@@ -1019,11 +1019,11 @@ mod test {
                 .find(|m| m.name() == "network_transmit_bytes_total")
                 .unwrap(),
             &Metric::new(
-                "network_transmit_bytes_total".into(),
+                "network_transmit_bytes_total",
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 2001229.0 },
             )
-            .with_namespace(namespace())
+            .with_namespace(Some(namespace()))
             .with_tags(Some(
                 vec![
                     ("device".into(), "eth1".into()),

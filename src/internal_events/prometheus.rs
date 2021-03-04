@@ -1,8 +1,8 @@
 use super::InternalEvent;
-#[cfg(feature = "sources-prometheus")]
-use crate::sources::prometheus::parser::ParserError;
 use hyper::StatusCode;
 use metrics::{counter, histogram};
+#[cfg(feature = "sources-prometheus")]
+use prometheus_parser::ParserError;
 #[cfg(feature = "sources-prometheus")]
 use std::borrow::Cow;
 use std::time::Instant;

@@ -31,6 +31,8 @@ serviceAccount:
   # If not set and `create` is true, a name is generated using the `fullname`
   # template.
   name: ""
+  # Automount API credentials for a service account.
+  automountServiceAccountToken: true
 
 # Add an annotation to the `Pod`s managed by `DaemonSet` with a random value,
 # generated at Helm Chart template evaluation time.

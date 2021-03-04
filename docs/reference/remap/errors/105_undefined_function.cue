@@ -8,7 +8,7 @@ remap: errors: "105": {
 		"""
 	rationale:   null
 	resolution: """
-		This is typically due to a typo, correcting the function name will resolve this.
+		This is typically due to a typo. Correcting the function name should resolve this.
 		"""
 
 	examples: [
@@ -16,16 +16,6 @@ remap: errors: "105": {
 			"title": "\(title) (typo)"
 			source: #"""
 				parse_keyvalue(.message)
-				"""#
-			raises: compiletime: #"""
-				error: \#(title)
-				  ┌─ :1:1
-				  │
-				1 │ parse_keyvalue(.message)
-				  │ ^^^^^^^^^^^^^^
-				  │ │
-				  │ Undefined function
-				  │
 				"""#
 			diff: #"""
 				-parse_keyvalue(.message)

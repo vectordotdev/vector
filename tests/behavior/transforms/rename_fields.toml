@@ -24,15 +24,15 @@
       type = "remap"
       source = '''
         # Plain
-        !exists(.a) && \
-        .renamed_a == "a" && \
+        !exists(.a) &&
+        .renamed_a == "a" &&
         # Moved via a nested string
-        .b.renamed_c == "c" && \
-        !exists(.b.c) && \
+        .b.renamed_c == "c" &&
+        !exists(.b.c) &&
         # Didnt change
-        .b.d == "d" && \
+        .b.d == "d" &&
         # Moved via a map
-        .b.renamed_e == "e" && \
+        .b.renamed_e == "e" &&
         # Replaced if conflict
         .existing == "replaces"
       '''
@@ -60,12 +60,12 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a.b == 1 && \
-        exists(.a) && \
-        .renamed_c == 2 && \
-        .renamed_d == "d" && \
-        !exists(.b.d) && \
-        .renamed_e == "e" && \
-        !exists(.b.e) && \
+        .a.b == 1 &&
+        exists(.a) &&
+        .renamed_c == 2 &&
+        .renamed_d == "d" &&
+        !exists(.b.d) &&
+        .renamed_e == "e" &&
+        !exists(.b.e) &&
         !exists(.b)
       '''

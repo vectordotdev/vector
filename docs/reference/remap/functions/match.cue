@@ -27,7 +27,7 @@ remap: functions: match: {
 		{
 			title: "Regex match on a string"
 			source: """
-				match("I'm a little teapot", /teapot/)
+				match("I'm a little teapot", r'teapot')
 				"""
 			return: true
 		},

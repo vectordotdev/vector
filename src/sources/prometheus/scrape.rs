@@ -10,7 +10,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources,
     tls::{TlsOptions, TlsSettings},
-    Event, Pipeline,
+    Pipeline,
 };
 use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use hyper::{Body, Request};
@@ -191,13 +191,13 @@ fn prometheus(
                             let byte_size = body.len();
                             let body = String::from_utf8_lossy(&body);
 
-                            match parser::parse(&body) {
+                            match parser::parse_text(&body) {
                                 Ok(metrics) => {
                                     emit!(PrometheusEventReceived {
                                         byte_size,
                                         count: metrics.len(),
                                     });
-                                    Some(stream::iter(metrics).map(Event::Metric).map(Ok))
+                                    Some(stream::iter(metrics).map(Ok))
                                 }
                                 Err(error) => {
                                     if url.path() == "/" {
@@ -435,7 +435,7 @@ mod integration_tests {
         // Sample some well-known metrics
         let build = find_metric("prometheus_build_info");
         assert!(matches!(build.data.kind, MetricKind::Absolute));
-        assert!(matches!(build.data.value, MetricValue::Gauge { ..}));
+        assert!(matches!(build.data.value, MetricValue::Gauge { .. }));
         assert!(build.tags().unwrap().contains_key("branch"));
         assert!(build.tags().unwrap().contains_key("version"));
 

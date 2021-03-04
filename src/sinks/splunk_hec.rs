@@ -33,7 +33,7 @@ pub struct HecSinkConfig {
     // Deprecated name
     #[serde(alias = "host")]
     pub endpoint: String,
-    #[serde(default = "default_host_key")]
+    #[serde(default = "host_key")]
     pub host_key: String,
     #[serde(default)]
     pub indexed_fields: Vec<String>,
@@ -65,8 +65,8 @@ pub enum Encoding {
     Json,
 }
 
-fn default_host_key() -> String {
-    crate::config::LogSchema::default().host_key().to_string()
+fn host_key() -> String {
+    crate::config::log_schema().host_key().to_string()
 }
 
 inventory::submit! {
@@ -78,7 +78,7 @@ impl GenerateConfig for HecSinkConfig {
         toml::Value::try_from(Self {
             token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
             endpoint: "endpoint".to_owned(),
-            host_key: default_host_key(),
+            host_key: host_key(),
             indexed_fields: vec![],
             index: None,
             sourcetype: None,

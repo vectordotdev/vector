@@ -1,5 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+    },
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::LogEvent,
     event::Value,
@@ -106,7 +108,7 @@ impl GenerateConfig for LogToMetricConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         Ok(Transform::function(LogToMetric::new(self.clone())))
     }
 
@@ -420,7 +422,7 @@ mod tests {
         assert_eq!(
             metric.into_metric(),
             Metric::new(
-                "status".into(),
+                "status",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
@@ -451,11 +453,11 @@ mod tests {
         assert_eq!(
             metric.into_metric(),
             Metric::new(
-                "http_requests_total".into(),
+                "http_requests_total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_namespace(Some("app".into()))
+            .with_namespace(Some("app"))
             .with_tags(Some(
                 vec![
                     ("method".to_owned(), "post".to_owned()),
@@ -487,7 +489,7 @@ mod tests {
         assert_eq!(
             metric.into_metric(),
             Metric::new(
-                "exception_total".into(),
+                "exception_total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
@@ -531,7 +533,7 @@ mod tests {
         assert_eq!(
             metric.into_metric(),
             Metric::new(
-                "amount_total".into(),
+                "amount_total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 33.99 },
             )
@@ -557,7 +559,7 @@ mod tests {
         assert_eq!(
             metric.into_metric(),
             Metric::new(
-                "memory_rss_bytes".into(),
+                "memory_rss_bytes",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 123.0 },
             )
@@ -630,7 +632,7 @@ mod tests {
         assert_eq!(
             output.pop().unwrap().into_metric(),
             Metric::new(
-                "exception_total".into(),
+                "exception_total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
@@ -639,7 +641,7 @@ mod tests {
         assert_eq!(
             output.pop().unwrap().into_metric(),
             Metric::new(
-                "status".into(),
+                "status",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
@@ -682,17 +684,17 @@ mod tests {
         assert_eq!(
             output.pop().unwrap().into_metric(),
             Metric::new(
-                "xyz_exception_total".into(),
+                "xyz_exception_total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
-            .with_namespace(Some("local".into()))
+            .with_namespace(Some("local"))
             .with_timestamp(Some(ts()))
         );
         assert_eq!(
             output.pop().unwrap().into_metric(),
             Metric::new(
-                "local_abc_status_set".into(),
+                "local_abc_status_set",
                 MetricKind::Incremental,
                 MetricValue::Set {
                     values: vec!["42".into()].into_iter().collect()
@@ -720,7 +722,7 @@ mod tests {
         assert_eq!(
             metric.into_metric(),
             Metric::new(
-                "unique_user_ip".into(),
+                "unique_user_ip",
                 MetricKind::Incremental,
                 MetricValue::Set {
                     values: vec!["1.2.3.4".into()].into_iter().collect()
@@ -747,7 +749,7 @@ mod tests {
         assert_eq!(
             metric.into_metric(),
             Metric::new(
-                "response_time".into(),
+                "response_time",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: crate::samples![2.5 => 1],
@@ -775,7 +777,7 @@ mod tests {
         assert_eq!(
             metric.into_metric(),
             Metric::new(
-                "response_time".into(),
+                "response_time",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: crate::samples![2.5 => 1],

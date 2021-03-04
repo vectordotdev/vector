@@ -190,7 +190,7 @@ fn apache_metrics(
                                     Some(&tags),
                                 )
                                 .chain(vec![Ok(Metric::new(
-                                    "up".into(),
+                                    "up",
                                     MetricKind::Absolute,
                                     MetricValue::Gauge { value: 1.0 },
                                 )
@@ -224,7 +224,7 @@ fn apache_metrics(
                                 });
                                 Some(
                                     stream::iter(vec![Metric::new(
-                                        "up".into(),
+                                        "up",
                                         MetricKind::Absolute,
                                         MetricValue::Gauge { value: 1.0 },
                                     )
@@ -242,7 +242,7 @@ fn apache_metrics(
                                 });
                                 Some(
                                     stream::iter(vec![Metric::new(
-                                        "up".into(),
+                                        "up",
                                         MetricKind::Absolute,
                                         MetricValue::Gauge { value: 0.0 },
                                     )

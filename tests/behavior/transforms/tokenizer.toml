@@ -13,9 +13,9 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .timestamp == "2020-01-01T12:34:56Z"
-        .level == "INFO"
-        .message == "hello, world"
+        .timestamp == "2020-01-01T12:34:56Z" &&
+        .level == "INFO" &&
+        .message == "hello, world" &&
         .trailer == "this is a trailer field"
       '''
 
@@ -34,7 +34,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .nested.timestamp == "2020-01-01T12:34:56Z"
-        .nested.level == "INFO"
+        .nested.timestamp == "2020-01-01T12:34:56Z" &&
+        .nested.level == "INFO" &&
         .nested.message == "hello"
       '''

@@ -85,20 +85,10 @@ components: sources: file: {
 					type: string: {
 						default: "checksum"
 						enum: {
-							checksum:         "Read `bytes` bytes from the head of the file to uniquely identify files via a checksum."
+							checksum:         "Read the first line of the file, skipping the first `ignored_header_bytes` bytes, to uniquely identify files via a checksum."
 							device_and_inode: "Uses the [device and inode](\(urls.inode)) to unique identify files."
 						}
 						syntax: "literal"
-					}
-				}
-				bytes: {
-					common:        false
-					description:   "The number of bytes read off the head of the file to generate a unique fingerprint."
-					relevant_when: "strategy = \"checksum\""
-					required:      false
-					type: uint: {
-						default: 256
-						unit:    "bytes"
 					}
 				}
 				ignored_header_bytes: {
@@ -113,7 +103,7 @@ components: sources: file: {
 				}
 			}
 		}
-		glob_minimum_cooldown: {
+		glob_minimum_cooldown_ms: {
 			common:      false
 			description: "Delay between file discovery calls. This controls the interval at which Vector searches for files."
 			required:    false
@@ -138,9 +128,9 @@ components: sources: file: {
 			required:    false
 			type: bool: default: false
 		}
-		ignore_older: {
+		ignore_older_secs: {
 			common:      true
-			description: "Ignore files with a data modification date that does not exceed this age."
+			description: "Ignore files with a data modification date older than the specified number of seconds."
 			required:    false
 			type: uint: {
 				default: null
@@ -193,7 +183,7 @@ components: sources: file: {
 			required:    false
 			type: bool: default: false
 		}
-		remove_after: {
+		remove_after_secs: {
 			common:      false
 			description: "Timeout from reaching `eof` after which file will be removed from filesystem, unless new data is written in the meantime. If not specified, files will not be removed."
 			required:    false
@@ -562,5 +552,6 @@ components: sources: file: {
 		files_resumed_total:           components.sources.internal_metrics.output.metrics.files_resumed_total
 		files_unwatched_total:         components.sources.internal_metrics.output.metrics.files_unwatched_total
 		fingerprint_read_errors_total: components.sources.internal_metrics.output.metrics.fingerprint_read_errors_total
+		glob_errors_total:             components.sources.internal_metrics.output.metrics.glob_errors_total
 	}
 }

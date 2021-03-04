@@ -3,11 +3,11 @@ package metadata
 remap: expressions: comparison: {
 	title: "Comparison"
 	description: """
-		An _comparison_ expression compares two expressions (operands) and produces a boolean as defined by the
+		A _comparison_ expression compares two expressions (operands) and produces a Boolean as defined by the
 		operator.
 		"""
 	return: """
-		Returns a boolean as defined by the operator.
+		Returns a Boolean as defined by the operator.
 		"""
 
 	grammar: {

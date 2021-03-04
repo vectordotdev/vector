@@ -3,6 +3,7 @@ package metadata
 #Remap: {
 	#Characteristic: {
 		anchor:      name
+		enum?:       #Enum
 		name:        string
 		title:       string
 		description: string
@@ -13,28 +14,18 @@ package metadata
 	}
 
 	#Example: {
-		title:  string
-		input?: #Event
-		source: string
-		raises?: {
-			compiletime?: string
-			runtime?:     string
-		}
-
-		if raises == _|_ {
-			return?: _
-			output?: #Event
-		}
-
-		if raises != _|_ {
-			diff?: string
-		}
+		title:   string
+		input?:  #Event
+		source:  string
+		diff?:   string
+		return?: _
+		output?: #Event
 
 		notes?: [string, ...string]
 		warnings?: [string, ...string]
 	}
 
-	#Type: "any" | "array" | "boolean" | "float" | "integer" | "map" | "null" | "path" | "string" | "regex" | "timestamp"
+	#Type: "any" | "array" | "boolean" | "float" | "integer" | "object" | "null" | "path" | "string" | "regex" | "timestamp"
 
 	concepts:    _
 	description: string
@@ -45,16 +36,17 @@ package metadata
 	functions:   _
 	literals:    _
 	principles:  _
+	syntax:      _
 }
 
 remap: #Remap & {
 	description: #"""
-		**Vector Remap Language** (VRL) is an [expression-oriented](\#(urls.expression_oriented_language)) language
-		designed for transforming obervability data (logs and metrics) in a [safe](\#(urls.vrl_safety)) and
-		[performant](\#(urls.vrl_performance)) manner. It features a simple [syntax](\#(urls.vrl_expressions)) and a
-		rich set of built-in [functions](\#(urls.vrl_functions)) tailored specifically to observability use cases.
+		**Vector Remap Language** (VRL) is an expression-oriented language designed for transforming observability data
+		(logs and metrics) in a [safe](\#(urls.vrl_safety)) and [performant](\#(urls.vrl_performance)) manner. It
+		features a simple [syntax](\#(urls.vrl_expressions)) and a rich set of built-in
+		[functions](\#(urls.vrl_functions)) tailored specifically to observability use cases.
 
-		You can use VRL in Vector via the [`remap` trasnform](\#(urls.vector_remap_transform)), and for a more in-depth
+		You can use VRL in Vector via the [`remap` transform](\#(urls.vector_remap_transform)), and for a more in-depth
 		picture, see the [announcement blog post](\#(urls.vrl_announcement)).
 		"""#
 

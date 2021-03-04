@@ -18,7 +18,7 @@ extern crate derivative;
 #[macro_use]
 extern crate pest_derive;
 #[cfg(feature = "vrl-cli")]
-extern crate remap_cli;
+extern crate vrl_cli;
 
 #[cfg(feature = "jemallocator")]
 #[global_allocator]
@@ -26,7 +26,6 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[macro_use]
 pub mod config;
-pub mod buffers;
 pub mod cli;
 pub mod conditions;
 pub mod dns;
@@ -41,6 +40,7 @@ pub mod internal_events;
 pub mod api;
 pub mod app;
 pub mod async_read;
+pub mod buffers;
 pub mod encoding_transcode;
 pub mod heartbeat;
 pub mod http;
@@ -52,8 +52,6 @@ pub mod list;
 pub mod mapping;
 pub mod metrics;
 pub(crate) mod pipeline;
-#[cfg(any(feature = "sinks-prometheus", feature = "sources-prometheus"))]
-pub(crate) mod prometheus;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod serde;

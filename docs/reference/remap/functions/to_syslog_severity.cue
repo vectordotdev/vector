@@ -27,7 +27,7 @@ remap: functions: to_syslog_severity: {
 
 	examples: [
 		{
-			title: "Coerce to Syslog serverity"
+			title: "Coerce to Syslog severity"
 			source: """
 				to_syslog_severity("alert")
 				"""

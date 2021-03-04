@@ -107,7 +107,7 @@ impl Source {
 
     /// Source metrics
     pub async fn metrics(&self) -> metrics::SourceMetrics {
-        metrics::by_component_name(&self.get_name()).to_source_metrics(&self.get_component_type())
+        metrics::by_component_name(&self.get_name()).into_source_metrics(&self.get_component_type())
     }
 }
 

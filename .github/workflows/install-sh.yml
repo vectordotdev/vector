@@ -12,7 +12,7 @@ on:
 
 jobs:
   sync-install:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v1
       - run: sudo apt-get install --yes python3-setuptools python3.6-dev
@@ -25,7 +25,7 @@ jobs:
   test-install:
     needs:
       - sync-install
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - run: sudo apt-get install --yes curl bc
       - run:  curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash -s -- -y
@@ -37,7 +37,7 @@ jobs:
     needs:
       - sync-install
       - test-install
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - name: Discord notification
       env:

@@ -8,7 +8,7 @@ remap: errors: "107": {
 		"""
 	rationale:   null
 	resolution: """
-		Supply all required function arguments to adhere to the function's documented signature.
+		Supply all of the required function arguments to adhere to the function's documented signature.
 		"""
 
 	examples: [
@@ -16,16 +16,6 @@ remap: errors: "107": {
 			"title": title
 			source: #"""
 				parse_timestamp(.timestamp)
-				"""#
-			raises: compiletime: #"""
-				error: \#(title)
-				  ┌─ :1:1
-				  │
-				1 │ parse_timestamp(.timestamp)
-				  │ ^^^^^^^^^^^^^^^^^^^^^^^^^^
-				  │ │
-				  │ The required `format` argument is missing
-				  │
 				"""#
 			diff: #"""
 				-parse_timestamp(.timestamp)

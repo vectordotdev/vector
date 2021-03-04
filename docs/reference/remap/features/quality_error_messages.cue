@@ -1,15 +1,16 @@
 remap: features: quality_error_messages: {
 	title: "Quality error messages"
 	description: """
-		VRL strives to provide high-quality, helpful error messages, reducing the development iteration	cycle.
+		VRL strives to provide high-quality, helpful error messages, streamling the development and iteration workflow
+		around VRL programs.
 
-		For example, the following VRL program:
+		This VRL program, for example...
 
 		```vrl
 		.foo, err = upcase(.foo)
 		```
 
-		Would result in this error:
+		...would result in this error:
 
 		```rust
 		error: program aborted
@@ -21,7 +22,7 @@ remap: features: quality_error_messages: {
 		  │ function call error
 		  │ unable to parse json: key must be a string at line 1 column 3
 		  │
-		  = see function documentation at: https://master.vector.dev/docs/reference/remap/#parse_json
+		  = see function documentation at: https://master.vector.dev/docs/reference/vrl/functions/#parse_json
 		  = see language documentation at: https://vector.dev/docs/reference/vrl/
 		```
 		"""

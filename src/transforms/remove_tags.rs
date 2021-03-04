@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     transforms::{FunctionTransform, Transform},
     Event,
 };
@@ -29,7 +29,7 @@ impl GenerateConfig for RemoveTagsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_tags")]
 impl TransformConfig for RemoveTagsConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         Ok(Transform::function(RemoveTags::new(self.tags.clone())))
     }
 
@@ -88,7 +88,7 @@ mod tests {
     fn remove_tags() {
         let event = Event::Metric(
             Metric::new(
-                "foo".into(),
+                "foo",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 10.0 },
             )
@@ -117,7 +117,7 @@ mod tests {
     fn remove_all_tags() {
         let event = Event::Metric(
             Metric::new(
-                "foo".into(),
+                "foo",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 10.0 },
             )
@@ -137,7 +137,7 @@ mod tests {
     #[test]
     fn remove_tags_from_none() {
         let event = Event::Metric(Metric::new(
-            "foo".into(),
+            "foo",
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["bar".into()].into_iter().collect(),

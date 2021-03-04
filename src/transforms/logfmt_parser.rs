@@ -1,11 +1,12 @@
 use crate::{
-    config::{DataType, TransformConfig, TransformDescription},
+    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{LogfmtParserConversionFailed, LogfmtParserMissingField},
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use std::collections::HashMap;
 use std::str;
 
@@ -15,6 +16,7 @@ pub struct LogfmtConfig {
     pub field: Option<String>,
     pub drop_field: bool,
     pub types: HashMap<String, String>,
+    pub timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -26,12 +28,13 @@ impl_generate_config_from_default!(LogfmtConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().into());
-        let conversions = parse_conversion_map(&self.types)?;
+        let timezone = self.timezone.unwrap_or(globals.timezone);
+        let conversions = parse_conversion_map(&self.types, timezone)?;
 
         Ok(Transform::function(Logfmt {
             field,
@@ -108,7 +111,7 @@ impl FunctionTransform for Logfmt {
 mod tests {
     use super::LogfmtConfig;
     use crate::{
-        config::TransformConfig,
+        config::{GlobalOptions, TransformConfig},
         event::{LogEvent, Value},
         Event,
     };
@@ -125,8 +128,9 @@ mod tests {
             field: None,
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
+            timezone: Default::default(),
         }
-        .build()
+        .build(&GlobalOptions::default())
         .await
         .unwrap();
         let parser = parser.as_function();

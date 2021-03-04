@@ -2,12 +2,12 @@ use super::collector::{self, MetricCollector as _};
 use crate::{
     config::{self, SinkConfig, SinkDescription},
     event::{Event, Metric},
-    http::HttpClient,
+    http::{Auth, HttpClient},
     internal_events::TemplateRenderingFailed,
     sinks::{
         self,
         util::{
-            buffer::metrics::{MetricNormalize, MetricSet, MetricsBuffer},
+            buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
             BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
             TowerRequestConfig,
@@ -52,6 +52,8 @@ pub(crate) struct RemoteWriteConfig {
     pub tenant_id: Option<Template>,
 
     pub tls: Option<TlsOptions>,
+
+    pub auth: Option<Auth>,
 }
 
 inventory::submit! {
@@ -83,6 +85,7 @@ impl SinkConfig for RemoteWriteConfig {
 
         let client = HttpClient::new(tls_settings)?;
         let tenant_id = self.tenant_id.clone();
+        let auth = self.auth.clone();
 
         let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
         let service = RemoteWriteService {
@@ -91,30 +94,33 @@ impl SinkConfig for RemoteWriteConfig {
             client,
             buckets,
             quantiles,
+            auth,
         };
 
         let sink = {
             let service = request.service(HttpRetryLogic, service);
             let service = ServiceBuilder::new().service(service);
-            let buffer =
-                PartitionBuffer::new(MetricsBuffer::<PrometheusMetricNormalize>::new(batch.size));
+            let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
+            let mut normalizer = MetricNormalizer::<PrometheusMetricNormalize>::default();
+
             PartitionBatchSink::new(service, buffer, batch.timeout, cx.acker())
                 .with_flat_map(move |event: Event| {
-                    let tenant_id = tenant_id.as_ref().and_then(|template| {
-                        template
-                            .render_string(&event)
-                            .map_err(|error| {
-                                emit!(TemplateRenderingFailed {
-                                    error,
-                                    field: Some("tenant_id"),
-                                    drop_event: false,
+                    stream::iter(normalizer.apply(event).map(|event| {
+                        let tenant_id = tenant_id.as_ref().and_then(|template| {
+                            template
+                                .render_string(&event)
+                                .map_err(|error| {
+                                    emit!(TemplateRenderingFailed {
+                                        error,
+                                        field: Some("tenant_id"),
+                                        drop_event: false,
+                                    })
                                 })
-                            })
-                            .ok()
-                    });
-                    let key = PartitionKey { tenant_id };
-                    let inner = PartitionInnerBuffer::new(event, key);
-                    stream::iter(Some(Ok(inner)))
+                                .ok()
+                        });
+                        let key = PartitionKey { tenant_id };
+                        Ok(PartitionInnerBuffer::new(event, key))
+                    }))
                 })
                 .sink_map_err(
                     |error| error!(message = "Prometheus remote_write sink error.", %error),
@@ -165,6 +171,7 @@ struct RemoteWriteService {
     client: HttpClient,
     buckets: Vec<f64>,
     quantiles: Vec<f64>,
+    auth: Option<Auth>,
 }
 
 impl RemoteWriteService {
@@ -209,7 +216,10 @@ impl tower::Service<PartitionInnerBuffer<Vec<Metric>, PartitionKey>> for RemoteW
             builder = builder.header("X-Scope-OrgID", tenant_id);
         }
 
-        let request = builder.body(body.into()).unwrap();
+        let mut request = builder.body(body.into()).unwrap();
+        if let Some(auth) = &self.auth {
+            auth.apply(&mut request);
+        }
         let client = self.client.clone();
 
         Box::pin(async move {
@@ -233,12 +243,13 @@ mod tests {
     use crate::{
         config::SinkContext,
         event::{MetricKind, MetricValue},
-        prometheus::proto,
         sinks::util::test::build_test_server,
         test_util,
     };
     use futures::StreamExt;
     use http::HeaderMap;
+    use indoc::indoc;
+    use prometheus_parser::proto;
 
     #[test]
     fn generate_config() {
@@ -261,6 +272,35 @@ mod tests {
         let (headers, req) = &outputs[0];
 
         assert!(!headers.contains_key("x-scope-orgid"));
+
+        assert_eq!(req.timeseries.len(), 1);
+        assert_eq!(
+            req.timeseries[0].labels,
+            labels!("__name__" => "gauge-2", "production" => "true", "region" => "us-west-1")
+        );
+        assert_eq!(req.timeseries[0].samples.len(), 1);
+        assert_eq!(req.timeseries[0].samples[0].value, 32.0);
+        assert_eq!(req.metadata.len(), 1);
+        assert_eq!(req.metadata[0].r#type, proto::MetricType::Gauge as i32);
+        assert_eq!(req.metadata[0].metric_family_name, "gauge-2");
+    }
+
+    #[tokio::test]
+    async fn sends_authenticated_request() {
+        let outputs = send_request(
+            indoc! {r#"
+                tenant_id = "tenant-%Y"
+                [auth]
+                strategy = "basic"
+                user = "user"
+                password = "password"
+            "#},
+            vec![create_event("gauge-2".into(), 32.0)],
+        )
+        .await;
+
+        assert_eq!(outputs.len(), 1);
+        let (_headers, req) = &outputs[0];
 
         assert_eq!(req.timeseries.len(), 1);
         assert_eq!(
@@ -304,6 +344,34 @@ mod tests {
         assert_eq!(orgid.len(), 11);
     }
 
+    #[tokio::test]
+    async fn retains_state_between_requests() {
+        // This sink converts all incremental events to absolute, and
+        // should accumulate their totals between batches.
+        let outputs = send_request(
+            r#"batch.max_events = 1"#,
+            vec![
+                create_inc_event("counter-1".into(), 12.0),
+                create_inc_event("counter-2".into(), 13.0),
+                create_inc_event("counter-1".into(), 14.0),
+            ],
+        )
+        .await;
+
+        assert_eq!(outputs.len(), 3);
+
+        let check_output = |index: usize, name: &str, value: f64| {
+            let (_, req) = &outputs[index];
+            assert_eq!(req.timeseries.len(), 1);
+            assert_eq!(req.timeseries[0].labels, labels!("__name__" => name));
+            assert_eq!(req.timeseries[0].samples.len(), 1);
+            assert_eq!(req.timeseries[0].samples[0].value, value);
+        };
+        check_output(0, "counter-1", 12.0);
+        check_output(1, "counter-2", 13.0);
+        check_output(2, "counter-1", 26.0);
+    }
+
     async fn send_request(
         config: &str,
         events: Vec<Event>,
@@ -329,6 +397,10 @@ mod tests {
             assert_eq!(headers["content-encoding"], "snappy");
             assert_eq!(headers["content-type"], "application/x-protobuf");
 
+            if config.auth.is_some() {
+                assert!(headers.contains_key("authorization"));
+            }
+
             let decoded = snap::raw::Decoder::new()
                 .decompress_vec(&body)
                 .expect("Invalid snappy compressed data");
@@ -341,18 +413,27 @@ mod tests {
     }
 
     pub(super) fn create_event(name: String, value: f64) -> Event {
-        Event::Metric(
-            Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
-                .with_tags(Some(
-                    vec![
-                        ("region".to_owned(), "us-west-1".to_owned()),
-                        ("production".to_owned(), "true".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
-                ))
-                .with_timestamp(Some(chrono::Utc::now())),
+        Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
+            .with_tags(Some(
+                vec![
+                    ("region".to_owned(), "us-west-1".to_owned()),
+                    ("production".to_owned(), "true".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
+            ))
+            .with_timestamp(Some(chrono::Utc::now()))
+            .into()
+    }
+
+    fn create_inc_event(name: String, value: f64) -> Event {
+        Metric::new(
+            name,
+            MetricKind::Incremental,
+            MetricValue::Counter { value },
         )
+        .with_timestamp(Some(chrono::Utc::now()))
+        .into()
     }
 }
 
