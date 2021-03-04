@@ -16,14 +16,16 @@ extern crate tracing;
 const RATE_LIMIT_SECS_FIELD: &str = "internal_log_rate_secs";
 const MESSAGE_FIELD: &str = "message";
 
-/// Keys in RATE_LIMIT_SPAN_GROUPS will cause events to be independently rate limited by the values
-/// for these keys
-const RATE_LIMIT_SPAN_GROUPS: &[&str] = &["component_name", "vrl_line_number", "vrl_position"];
+// These fields will cause events to be independently rate limited by the values
+// for these keys
+const COMPONENT_NAME_FIELD: &str = "component_name";
+const VRL_LINE_NUMBER: &str = "vrl_line_number";
+const VRL_POSITION: &str = "vrl_position";
 
 #[derive(Eq, PartialEq, Hash, Clone)]
 struct RateKeyIdentifier {
     callsite: Identifier,
-    rate_limit_key_values: Vec<(String, TraceValue)>,
+    rate_limit_key_values: RateLimitedSpanKeys,
 }
 
 pub struct RateLimitedLayer<S, L>
@@ -123,15 +125,12 @@ where
                 .into_iter()
                 .flat_map(|span| span.from_root().chain(std::iter::once(span)));
 
-            scope.fold(vec![], |mut acc, span| {
-                let mut extensions = span.extensions_mut();
-                acc.append(
-                    &mut extensions
-                        .get_mut::<RateLimitedSpanKeys>()
-                        .map(|fields| std::mem::take(&mut fields.values))
-                        .unwrap_or_default(),
-                );
-                acc
+            scope.fold(RateLimitedSpanKeys::default(), |mut keys, span| {
+                let extensions = span.extensions();
+                if let Some(span_keys) = extensions.get::<RateLimitedSpanKeys>() {
+                    keys.merge(span_keys);
+                }
+                keys
             })
         };
 
@@ -297,15 +296,32 @@ impl From<String> for TraceValue {
 /// RateLimitedSpanKeys records span keys that we use to rate limit callsites separately by. For
 /// example, if a given trace callsite is called from two different components, then they will be
 /// rate limited separately.
-#[derive(Default)]
+#[derive(Default, Eq, PartialEq, Hash, Clone)]
 struct RateLimitedSpanKeys {
-    pub values: Vec<(String, TraceValue)>,
+    component_name: Option<TraceValue>,
+    vrl_line_number: Option<TraceValue>,
+    vrl_position: Option<TraceValue>,
 }
 
 impl RateLimitedSpanKeys {
     fn record(&mut self, field: &Field, value: TraceValue) {
-        if RATE_LIMIT_SPAN_GROUPS.contains(&field.name()) {
-            self.values.push((field.name().to_owned(), value));
+        match field.name() {
+            COMPONENT_NAME_FIELD => self.component_name = Some(value),
+            VRL_LINE_NUMBER => self.vrl_line_number = Some(value),
+            VRL_POSITION => self.vrl_position = Some(value),
+            _ => {}
+        }
+    }
+
+    fn merge(&mut self, other: &Self) {
+        if let Some(component_name) = &other.component_name {
+            self.component_name = Some(component_name.clone());
+        }
+        if let Some(vrl_line_number) = &other.vrl_line_number {
+            self.vrl_line_number = Some(vrl_line_number.clone());
+        }
+        if let Some(vrl_position) = &other.vrl_position {
+            self.vrl_position = Some(vrl_position.clone());
         }
     }
 }
