@@ -5,17 +5,23 @@ use wasm_bindgen::prelude::*;
 
 // The module takes in a VRL program and a VRL event as input
 #[derive(Deserialize, Serialize)]
-struct Input {
-    program: String,
-    event: Value,
+pub struct Input {
+    pub program: String,
+    pub event: Value,
+}
+
+impl Input {
+    pub fn new(program: &str, event: Value) -> Self {
+        Self { program: program.to_owned(), event }
+    }
 }
 
 // The module returns the result of the last expression and the event that results from the
 // applied program
 #[derive(Deserialize, Serialize)]
-struct VrlCompileResult {
-    output: Value,
-    result: Value,
+pub struct VrlCompileResult {
+    pub output: Value,
+    pub result: Value,
 }
 
 impl VrlCompileResult {
@@ -26,7 +32,7 @@ impl VrlCompileResult {
 
 // Errors are output as JSON
 #[derive(Deserialize, Serialize)]
-struct ErrorResult {
+pub struct ErrorResult {
     error: String,
 }
 
