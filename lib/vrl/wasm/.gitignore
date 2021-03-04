@@ -1,2 +1,2 @@
-dist/
+# wasm-pack output
 pkg/
