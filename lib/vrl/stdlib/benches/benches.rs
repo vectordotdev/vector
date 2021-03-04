@@ -659,7 +659,7 @@ bench_function! {
             "port": 24259,
             "severity": "alert",
             "thread": "3814",
-            "timestamp": "2021-03-01T12:00:19+00:00"
+            "timestamp": (DateTime::parse_from_rfc3339("2021-03-01T12:00:19Z").unwrap().with_timezone(&Utc)),
         })),
     }
 }
