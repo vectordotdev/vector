@@ -8519,6 +8519,7 @@ dependencies = [
 name = "vrl-wasm"
 version = "0.1.0"
 dependencies = [
+ "indoc",
  "serde",
  "vrl",
  "vrl-stdlib",
