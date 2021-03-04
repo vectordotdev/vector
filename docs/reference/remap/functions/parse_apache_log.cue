@@ -9,7 +9,7 @@ remap: functions: parse_apache_log: {
 		"""
 	notices: [
 		"""
-			Missing information in the log message may be indicated by `-`. These fields will not be present in the result.
+				Missing information in the log message may be indicated by `-`. These fields will not be present in the result.
 			""",
 	]
 
