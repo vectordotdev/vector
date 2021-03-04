@@ -120,7 +120,9 @@ where
         event.record(&mut limit_visitor);
 
         let limit = limit_visitor.limit.unwrap_or(0);
-        // if the event has a rate limit fof 0 or an invalid rate limit, just pass through
+        // If the event has a rate limit of 0 or an invalid rate limit, just pass through.
+        // This has the same effect as allowing it through without the additional locking and state
+        // initialization.
         if limit == 0 {
             return self.inner.on_event(event, ctx);
         }
