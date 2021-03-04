@@ -401,6 +401,7 @@ components: {
 		fields: [Name=string]: {
 			name: Name
 			description: != ""
+			required: bool | *false
 			type: #Type
 		}
 	}

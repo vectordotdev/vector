@@ -310,7 +310,7 @@ _values: {
 	relevant_when?: string
 
 	// `required` requires the option to be set.
-	required: bool
+	required: bool | *false
 
 	// `warnings` warn the user about some aspects of the option.
 	//
@@ -322,7 +322,7 @@ _values: {
 		// `common` specifes that the option is commonly used. It will bring the
 		// option to the top of the documents, surfacing it from other
 		// less common, options.
-		common: bool
+		common: bool | *false
 	}
 
 	// `sort` sorts the option, otherwise options will be sorted alphabetically.
@@ -393,6 +393,8 @@ _values: {
 	// Set `required` to `true` to force disable defaults. Defaults should
 	// be specified on the array level and not the type level.
 	items: type: #TypePrimitive & {_args: required: true}
+
+	examples?: [...]
 }
 
 #TypeBool: {
@@ -424,10 +426,12 @@ _values: {
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
-	examples: [#Object] | *[]
+	examples?: [#Object] | [string] | *[]
 
 	// `options` represent the child options for this option.
-	options: #Schema
+	options?: #Schema
+
+	default?: #Object
 }
 
 #TypeString: {
