@@ -27,6 +27,12 @@ remap: functions: log: {
 			}
 			default: "info"
 		},
+		{
+			name:        "rate_limit_secs"
+			description: "Specifies that the log message is output no more than once per the given number of seconds."
+			required:    false
+			default:     1
+		},
 	]
 	internal_failure_reasons: []
 	return: types: ["null"]
@@ -35,7 +41,7 @@ remap: functions: log: {
 		{
 			title: "Log a message"
 			source: #"""
-				log("Hello, World!", level: "info")
+				log("Hello, World!", level: "info", rate_limit_secs: 60)
 				"""#
 			return: null
 		},
