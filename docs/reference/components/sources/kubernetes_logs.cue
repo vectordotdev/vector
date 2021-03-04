@@ -1,8 +1,6 @@
 package metadata
 import "encoding/yaml"
 
-import "encoding/yaml"
-
 components: sources: kubernetes_logs: {
 	_directory: "/var/log"
 
