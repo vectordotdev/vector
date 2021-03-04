@@ -29,7 +29,7 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use tokio::time::{delay_for, Duration};
+use tokio::time::{sleep, Duration};
 
 // Maximum number of futures blocked by [send_result](https://docs.rs/rdkafka/0.24.0/rdkafka/producer/future_producer/struct.FutureProducer.html#method.send_result)
 const SEND_RESULT_LIMIT: usize = 5;
@@ -312,7 +312,7 @@ impl Sink<Event> for KafkaSink {
                     {
                         debug!(message = "The rdkafka queue full.", %error, %seqno, internal_log_rate_secs = 1);
                         record = future_record;
-                        delay_for(Duration::from_millis(10)).await;
+                        sleep(Duration::from_millis(10)).await;
                     }
                     Err((error, _)) => break Err(error),
                 }

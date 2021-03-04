@@ -3,7 +3,7 @@ use crate::{
     shutdown::ShutdownSignal,
     trace, Pipeline,
 };
-use futures::{stream, SinkExt};
+use futures::{stream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::error::RecvError;
 
@@ -41,7 +41,8 @@ impl SourceConfig for InternalLogsConfig {
 
 async fn run(out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
     let mut out = out.sink_map_err(|error| error!(message = "Error sending log.", %error));
-    let mut rx = trace::subscribe();
+    let subscription = trace::subscribe();
+    let mut rx = subscription.receiver;
 
     out.send_all(&mut stream::iter(subscription.buffer).map(Ok))
         .await?;

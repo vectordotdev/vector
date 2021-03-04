@@ -240,6 +240,7 @@ impl S3SinkConfig {
     pub async fn healthcheck(self, client: S3Client) -> crate::Result<()> {
         let req = client.head_bucket(HeadBucketRequest {
             bucket: self.bucket.clone(),
+            expected_bucket_owner: None,
         });
 
         match req.await {

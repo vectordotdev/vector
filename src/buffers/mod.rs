@@ -15,7 +15,7 @@ use std::{
     task::{Context, Poll},
 };
 #[cfg(feature = "leveldb")]
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 
 #[cfg(feature = "leveldb")]
 pub mod disk;
