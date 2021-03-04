@@ -79,7 +79,9 @@ impl TapSink {
         tokio::spawn(async move {
             while let Some(ev) = event_rx.next().await {
                 if let Event::Log(ev) = ev {
-                    let _ = tap_tx.send(TapResult::LogEvent(input_name.clone(), ev));
+                    let _ = tap_tx
+                        .send(TapResult::LogEvent(input_name.clone(), ev))
+                        .await;
                 }
             }
         });
@@ -89,7 +91,11 @@ impl TapSink {
 
     /// Private convenience for sending a `TapResult` to the connected receiver.
     fn send(&self, msg: TapResult) {
-        let _ = self.tap_tx.clone().send(msg);
+        let tap_tx = self.tap_tx.clone();
+
+        tokio::spawn(async move {
+            let _ = tap_tx.clone().send(msg).await;
+        });
     }
 
     /// Returns the input names of the components this sink is observing as a vector of

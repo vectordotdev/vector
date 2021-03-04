@@ -112,7 +112,7 @@ fn create_log_events_stream(
                             .take(limit)
                             .collect();
 
-                        let _ = log_tx.send(results);
+                        let _ = log_tx.send(results).await;
                     }
                 }
             }
