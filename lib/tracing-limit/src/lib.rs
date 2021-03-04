@@ -1,5 +1,5 @@
 use dashmap::DashMap;
-use std::{fmt, time::Instant};
+use std::fmt;
 use tracing_core::{
     callsite::Identifier,
     field::{display, Field, Value, Visit},
@@ -12,6 +12,12 @@ use tracing_subscriber::layer::{Context, Layer};
 #[cfg(test)]
 #[macro_use]
 extern crate tracing;
+
+#[cfg(test)]
+use mock_instant::Instant;
+
+#[cfg(not(test))]
+use std::time::Instant;
 
 const RATE_LIMIT_SECS_FIELD: &str = "internal_log_rate_secs";
 const MESSAGE_FIELD: &str = "message";
@@ -389,7 +395,11 @@ impl Visit for LimitVisitor {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::sync::{Arc, Mutex};
+    use mock_instant::MockClock;
+    use std::{
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
     use tracing_subscriber::layer::SubscriberExt;
 
     #[derive(Default)]
@@ -440,7 +450,7 @@ mod test {
         tracing::subscriber::with_default(sub, || {
             for _ in 0..21 {
                 info!(message = "Hello world!", internal_log_rate_secs = 1);
-                std::thread::sleep(std::time::Duration::from_millis(100));
+                MockClock::advance(Duration::from_millis(100));
             }
         });
 
@@ -487,13 +497,11 @@ mod test {
                         );
                     }
                 }
-                std::thread::sleep(std::time::Duration::from_millis(100));
+                MockClock::advance(Duration::from_millis(100));
             }
         });
 
         let events = events.lock().unwrap();
-
-        dbg!(&events);
 
         assert_eq!(
             *events,

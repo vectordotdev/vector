@@ -4212,6 +4212,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "mock_instant"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "717e29a243b81f8130e31e24e04fb151b04a44b5a7d05370935f7d937e9de06d"
+
+[[package]]
 name = "mongodb"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7762,6 +7768,7 @@ dependencies = [
  "ansi_term 0.12.1",
  "criterion",
  "dashmap 4.0.2",
+ "mock_instant",
  "tracing 0.1.23",
  "tracing-core 0.1.17",
  "tracing-subscriber",
