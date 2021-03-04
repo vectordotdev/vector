@@ -55,6 +55,9 @@ components: {
 
 		env_vars: #EnvVars
 
+		// Applies only to the kubernetes_logs source (for now)
+		helm_chart?: #HelmChart
+
 		// `alias` is used to register a component's former name when it
 		// undergoes a name change.
 		alias?: !=""
@@ -391,6 +394,15 @@ components: {
 				can_verify_hostname: bool
 			}
 			enabled_default: bool
+		}
+	}
+
+	#HelmChart: {
+		fields: [Name=string]: {
+			name:        Name
+			description: !=""
+			required:    bool | *false
+			type:        #Type
 		}
 	}
 
