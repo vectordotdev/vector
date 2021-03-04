@@ -119,6 +119,14 @@ where
         let mut limit_visitor = LimitVisitor::default();
         event.record(&mut limit_visitor);
 
+        let limit = limit_visitor.limit.unwrap_or(0);
+        // If the event has a rate limit of 0 or an invalid rate limit, just pass through.
+        // This has the same effect as allowing it through without the additional locking and state
+        // initialization.
+        if limit == 0 {
+            return self.inner.on_event(event, ctx);
+        }
+
         let rate_limit_key_values = {
             let scope = ctx
                 .lookup_current()
@@ -142,10 +150,7 @@ where
         let mut state = self.events.entry(id).or_insert(State {
             start: Instant::now(),
             count: 0,
-            // if this is None, then a non-integer was passed as the rate limit
-            limit: limit_visitor
-                .limit
-                .expect("unreachable; if you see this, there is a bug"),
+            limit,
             message: limit_visitor
                 .message
                 .unwrap_or_else(|| event.metadata().name().into()),
@@ -155,7 +160,7 @@ where
         state.count += 1;
 
         //check if we are still rate limiting
-        if state.start.elapsed().as_secs() < state.limit.get() {
+        if state.start.elapsed().as_secs() < state.limit {
             // check and increment the current count
             // if 0: this is the first message, just pass it through
             // if 1: this is the first rate limited message
@@ -221,7 +226,7 @@ where
         ctx: &Context<S>,
         metadata: &'static Metadata<'static>,
         message: String,
-        rate_limit: std::num::NonZeroU64,
+        rate_limit: u64,
     ) {
         let fields = metadata.fields();
 
@@ -250,7 +255,7 @@ where
 struct State {
     start: Instant,
     count: u64,
-    limit: std::num::NonZeroU64,
+    limit: u64,
     message: String,
 }
 
@@ -350,23 +355,21 @@ impl Visit for RateLimitedSpanKeys {
 
 #[derive(Default)]
 struct LimitVisitor {
-    pub limit: Option<std::num::NonZeroU64>,
+    pub limit: Option<u64>,
     pub message: Option<String>,
 }
 
 impl Visit for LimitVisitor {
     fn record_u64(&mut self, field: &Field, value: u64) {
         if field.name() == RATE_LIMIT_SECS_FIELD {
-            self.limit = std::num::NonZeroU64::new(value);
+            self.limit = Some(value);
         }
     }
 
     fn record_i64(&mut self, field: &Field, value: i64) {
         if field.name() == RATE_LIMIT_SECS_FIELD {
             use std::convert::TryFrom;
-            self.limit = std::num::NonZeroU64::new(
-                u64::try_from(value).expect("rate-limit must not be negative"),
-            );
+            self.limit = Some(u64::try_from(value).unwrap_or_default());
         }
     }
 
