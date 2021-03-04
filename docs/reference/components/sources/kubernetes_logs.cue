@@ -640,25 +640,25 @@ components: sources: kubernetes_logs: {
 				type: object: {
 					options: {
 						hostKey: {
-							description: "TODO"
+							description: "The schema key  for message host."
 							type: string: {
 								default: "host"
 							}
 						}
 						messageKey: {
-							description: "TODO"
+							description: "The schema key for messages"
 							type: string: {
 								default: "message"
 							}
 						}
 						sourceTypeKey: {
-							description: "TODO"
+							description: "The schema key for message source type."
 							type: string: {
 								default: "source_type"
 							}
 						}
 						timestampKey: {
-							description: "TODO"
+							description: "The schema key for message timestamp."
 							type: string: {
 								default: "timestamp"
 							}
@@ -786,7 +786,7 @@ components: sources: kubernetes_logs: {
 						}
 					}
 					serviceAccount: {
-						description: "TODO"
+						description: "Configuration options for service account."
 						type: object: {
 							options: {
 								create: {
