@@ -28,10 +28,14 @@ remap: functions: log: {
 			default: "info"
 		},
 		{
-			name:        "rate_limit_secs"
-			description: "Specifies that the log message is output no more than once per the given number of seconds."
-			required:    false
-			default:     1
+			name: "rate_limit_secs"
+			description: #"""
+				Specifies that the log message is output no more than once per the given number of seconds.
+				Use a value of `0` to turn rate limiting off.
+				"""#
+			type: ["integer"]
+			required: false
+			default:  1
 		},
 	]
 	internal_failure_reasons: []
