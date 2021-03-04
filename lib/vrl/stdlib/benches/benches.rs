@@ -41,6 +41,9 @@ criterion_group!(
               merge,
               // TODO: value is dynamic so we cannot assert equality
               //now,
+              parse_apache_log_common,
+              parse_apache_log_combined,
+              parse_apache_log_error,
               parse_aws_alb_log,
               parse_aws_cloudwatch_log_subscription_message,
               parse_aws_vpc_flow_log,
@@ -601,6 +604,73 @@ bench_function! {
             "type": "IPv4",
             "version": 3,
             "vpc_id": "vpc-abcdefab012345678",
+        })),
+    }
+}
+
+bench_function! {
+    parse_apache_log_common => vrl_stdlib::ParseApacheLog;
+
+    literal {
+        args: func_args![value: r#"127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326"#,
+                         format: "common"
+        ],
+        want: Ok(value!({
+            "host": "127.0.0.1",
+            "identity": "bob",
+            "user": "frank",
+            "timestamp": (DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().with_timezone(&Utc)),
+            "message": "GET /apache_pb.gif HTTP/1.0",
+            "method": "GET",
+            "path": "/apache_pb.gif",
+            "protocol": "HTTP/1.0",
+            "status": 200,
+            "size": 2326,
+        })),
+    }
+}
+
+bench_function! {
+    parse_apache_log_combined => vrl_stdlib::ParseApacheLog;
+
+    literal {
+        args: func_args![value: r#"127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326 "http://www.seniorinfomediaries.com/vertical/channels/front-end/bandwidth" "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0""#,
+                         format: "combined"
+        ],
+        want: Ok(value!({
+            "agent": "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0",
+            "host": "127.0.0.1",
+            "identity": "bob",
+            "user": "frank",
+            "referrer": "http://www.seniorinfomediaries.com/vertical/channels/front-end/bandwidth",
+            "timestamp": (DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().with_timezone(&Utc)),
+            "message": "GET /apache_pb.gif HTTP/1.0",
+            "method": "GET",
+            "path": "/apache_pb.gif",
+            "protocol": "HTTP/1.0",
+            "status": 200,
+            "size": 2326,
+        })),
+    }
+}
+
+bench_function! {
+    parse_apache_log_error => vrl_stdlib::ParseApacheLog;
+
+
+    literal {
+        args: func_args![value: r#"[01/Mar/2021:12:00:19 +0000] [ab:alert] [pid 4803:tid 3814] [client 147.159.108.175:24259] I will bypass the haptic COM bandwidth, that should matrix the CSS driver!"#,
+                         format: "error"
+        ],
+        want: Ok(value!({
+            "client": "147.159.108.175",
+            "message": "I will bypass the haptic COM bandwidth, that should matrix the CSS driver!",
+            "module": "ab",
+            "pid": 4803,
+            "port": 24259,
+            "severity": "alert",
+            "thread": "3814",
+            "timestamp": "2021-03-01T12:00:19+00:00"
         })),
     }
 }
