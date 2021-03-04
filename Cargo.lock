@@ -8430,6 +8430,7 @@ dependencies = [
  "regex",
  "serde",
  "thiserror",
+ "tracing 0.1.23",
  "vrl-diagnostic",
  "vrl-parser",
 ]

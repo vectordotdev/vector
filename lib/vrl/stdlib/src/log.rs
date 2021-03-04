@@ -1,4 +1,4 @@
-use tracing::{debug, error, info, info_span, trace, warn, warn_span};
+use tracing::{debug, error, info, trace, warn};
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -44,15 +44,7 @@ impl Function for Log {
         ]
     }
 
-    fn compile(&self, mut _arguments: ArgumentList) -> Compiled {
-        unimplemented!()
-    }
-
-    fn compile_with_span(
-        &self,
-        span: vrl::diagnostic::Span,
-        mut arguments: ArgumentList,
-    ) -> Compiled {
+    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
         let levels = vec![
             "trace".into(),
             "debug".into(),
@@ -71,7 +63,6 @@ impl Function for Log {
 
         Ok(Box::new(LogFn {
             value,
-            span,
             level,
             rate_limit_secs,
         }))
@@ -82,7 +73,6 @@ impl Function for Log {
 struct LogFn {
     value: Box<dyn Expression>,
     level: Bytes,
-    span: vrl::diagnostic::Span,
     rate_limit_secs: Option<Box<dyn Expression>>,
 }
 
@@ -95,19 +85,11 @@ impl Expression for LogFn {
         };
 
         match self.level.as_ref() {
-            b"trace" => trace!("{}", value),
-            b"debug" => debug!("{}", value),
-            b"warn" => {
-                let span = warn_span!("remap", vrl_position = &self.span.start());
-                let _ = span.enter();
-                warn!(message = %value, internal_log_rate_secs = rate_limit_secs)
-            }
-            b"error" => error!("{}", value),
-            _ => {
-                let span = info_span!("remap", vrl_position = &self.span.start());
-                let _ = span.enter();
-                info!(message = %value, internal_log_rate_secs = rate_limit_secs)
-            }
+            b"trace" => trace!(message = %value, internal_log_rate_secs = rate_limit_secs),
+            b"debug" => debug!(message = %value, internal_log_rate_secs = rate_limit_secs),
+            b"warn" => warn!(message = %value, internal_log_rate_secs = rate_limit_secs),
+            b"error" => error!(message = %value, internal_log_rate_secs = rate_limit_secs),
+            _ => info!(message = %value, internal_log_rate_secs = rate_limit_secs),
         }
 
         Ok(Value::Null)
@@ -118,22 +100,19 @@ impl Expression for LogFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     #[test]
-//     fn log() {
-//         // This is largely just a smoke test to ensure it doesn't crash as there isn't really much to test.
-//         let mut state = state::Program::default();
-//         let func = LogFn::new(
-//             Box::new(Array::from(vec![Value::from(42)])),
-//             "warn".to_string(),
-//         );
-//         let mut object = Value::Map(map![]);
-//         let got = func.resolve(&mut ctx);
+    test_function![
+        log => Log;
 
-//         assert_eq!(Ok(Value::Null), got);
-//     }
-// }
+        doesnotcrash {
+            args: func_args! [ value: value!(42),
+                               level: value!("warn"),
+                               rate_limit_secs: value!(5) ],
+            want: Ok(Value::Null),
+            tdef: TypeDef::new().infallible().null(),
+        }
+    ];
+}
