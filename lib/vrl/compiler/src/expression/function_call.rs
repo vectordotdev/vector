@@ -162,7 +162,7 @@ impl FunctionCall {
             })?;
 
         let expr = function
-            .compile(list)
+            .compile_with_span(call_span, list)
             .map_err(|error| Error::Compilation { call_span, error })?;
 
         let mut type_def = expr.type_def(state);

@@ -1,4 +1,4 @@
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, info_span, trace, warn, warn_span};
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -21,6 +21,11 @@ impl Function for Log {
                 kind: kind::BYTES,
                 required: false,
             },
+            Parameter {
+                keyword: "rate_limit_secs",
+                kind: kind::INTEGER,
+                required: false,
+            },
         ]
     }
 
@@ -39,7 +44,15 @@ impl Function for Log {
         ]
     }
 
-    fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+    fn compile(&self, mut _arguments: ArgumentList) -> Compiled {
+        unimplemented!()
+    }
+
+    fn compile_with_span(
+        &self,
+        span: vrl::diagnostic::Span,
+        mut arguments: ArgumentList,
+    ) -> Compiled {
         let levels = vec![
             "trace".into(),
             "debug".into(),
@@ -54,8 +67,14 @@ impl Function for Log {
             .unwrap_or_else(|| "info".into())
             .try_bytes()
             .expect("log level not bytes");
+        let rate_limit_secs = arguments.optional("rate_limit_secs");
 
-        Ok(Box::new(LogFn { value, level }))
+        Ok(Box::new(LogFn {
+            value,
+            span,
+            level,
+            rate_limit_secs,
+        }))
     }
 }
 
@@ -63,18 +82,32 @@ impl Function for Log {
 struct LogFn {
     value: Box<dyn Expression>,
     level: Bytes,
+    span: vrl::diagnostic::Span,
+    rate_limit_secs: Option<Box<dyn Expression>>,
 }
 
 impl Expression for LogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let rate_limit_secs = match &self.rate_limit_secs {
+            Some(expr) => expr.resolve(ctx)?.try_integer()?,
+            None => 1,
+        };
 
         match self.level.as_ref() {
             b"trace" => trace!("{}", value),
             b"debug" => debug!("{}", value),
-            b"warn" => warn!("{}", value),
+            b"warn" => {
+                let span = warn_span!("remap", vrl_position = &self.span.start());
+                let _ = span.enter();
+                warn!(message = %value, internal_log_rate_secs = rate_limit_secs)
+            }
             b"error" => error!("{}", value),
-            _ => info!("{}", value),
+            _ => {
+                let span = info_span!("remap", vrl_position = &self.span.start());
+                let _ = span.enter();
+                info!(message = %value, internal_log_rate_secs = rate_limit_secs)
+            }
         }
 
         Ok(Value::Null)

@@ -39,6 +39,10 @@ pub trait Function: Sync + fmt::Debug {
     /// resolved to its final [`Value`].
     fn compile(&self, arguments: ArgumentList) -> Compiled;
 
+    fn compile_with_span(&self, _span: Span, arguments: ArgumentList) -> Compiled {
+        self.compile(arguments)
+    }
+
     /// An optional list of parameters the function accepts.
     ///
     /// This list is used at compile-time to check function arity, keyword names
