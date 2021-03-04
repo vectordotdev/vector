@@ -546,6 +546,17 @@ components: sources: kubernetes_logs: {
 		}
 	}
 
+	helm_chart: {
+		fields: {
+			existingConfigMap: {
+				description: "Set this to a non-empty value to use existing `ConfigMap` for `vector`, instead of using a generated one."
+				type: string: {
+					default: ""
+				}
+			}
+		}
+	}
+
 	telemetry: metrics: {
 		k8s_format_picker_edge_cases_total:     components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
 		k8s_docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
