@@ -8,7 +8,7 @@
         "env": {
             "type": "array",
             "description": "Extra env vars to pass to the `vector` container.",
-            "default": []
+            "default": [] 
         },
         "existingConfigMap": {
             "type": "string",
@@ -18,7 +18,7 @@
         "extraConfigDirSources": {
             "type": "array",
             "description": "Additional sources to include at the `config-dir` projection of the `Pod`s managed by `DaemonSet`.",
-            "default": []
+            "default": [] 
         },
         "extraContainersPorts": {
             "type": "array",
@@ -331,7 +331,7 @@
                 "annotations": {
                     "type": "object",
                     "description": "Annotations to add to the service account.",
-                    "default": {}
+                    "default": {} 
                 },
                 "create": {
                     "type": "boolean",
@@ -433,7 +433,7 @@
                 "enabled": {
                     "type": "boolean",
                     "description": "Disable to omit the vector sink from being added.",
-                    "default": false
+                    "default": false 
                 },
                 "host": {
                     "type": "null",
@@ -448,7 +448,7 @@
                 "port": {
                     "type": "null",
                     "description": "The port of the Vector to send the data to.",
-                    "default": null
+                    "default": null 
                 },
                 "rawConfig": {
                     "type": "null",
@@ -458,7 +458,7 @@
                 "sinkId": {
                     "type": "string",
                     "description": "The name to use for the 'built-in' vector sink.",
-                    "default": "vector_sink"
+                    "default": "vector_sink" 
                 }
             }
         }
