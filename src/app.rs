@@ -235,6 +235,9 @@ impl Application {
                 // This is wrapped in a `cfg_if!` call to branch two paths-- one where the API
                 // feature is compuled, and one where it isn't. This is distinct from the API
                 // being *enabled*, which is checked by the relevant `select!` branch.
+                //
+                // Ideally, there'd be a way to conditionally add a branch, but the `select!`
+                // macro doesn't seem to entertain child macros-- resulting in this repetition.
                 cfg_if! (
                     if #[cfg(feature = "api")] {
                         tokio::select! {
@@ -257,7 +260,7 @@ impl Application {
                                     // Reload paths
                                     config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
                                     // Reload config
-                                    let new_config = config::load_from_paths(&config_paths, false).map_err(handle_config_errors).ok();
+                                    let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
 
                                     if let Some(mut new_config) = new_config {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
@@ -300,7 +303,7 @@ impl Application {
                                     // Reload paths
                                     config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
                                     // Reload config
-                                    let new_config = config::load_from_paths(&config_paths, false).map_err(handle_config_errors).ok();
+                                    let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
 
                                     if let Some(mut new_config) = new_config {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);

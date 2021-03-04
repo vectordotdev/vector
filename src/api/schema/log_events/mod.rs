@@ -7,42 +7,10 @@ use crate::api::{
     tap::{TapController, TapNotification, TapResult, TapSink},
     ControlSender,
 };
-use async_graphql::{validators::IntRange, Context, Enum, InputObject, Subscription, Union};
+use async_graphql::{validators::IntRange, Context, Subscription, Union};
 use futures::{channel::mpsc, StreamExt};
 use itertools::Itertools;
 use tokio::{select, stream::Stream, time};
-
-#[derive(Enum, Copy, Clone, PartialEq, Eq)]
-/// Where to sample log events from
-pub enum LogEventSampleWhere {
-    /// Start of the batch of log events
-    Head,
-    /// End of the batch of log events
-    Tail,
-    /// Even distribution of the batch of log events
-    Range,
-}
-
-#[derive(InputObject)]
-/// Control how log event batches are sampled
-pub struct LogEventSample {
-    #[graphql(name = "where")]
-    /// Where to sample log events from
-    sample_where: LogEventSampleWhere,
-
-    /// Maximum number of requested log events
-    #[graphql(validator(IntRange(min = "1", max = "1_000")))]
-    max: usize,
-}
-
-impl Default for LogEventSample {
-    fn default() -> Self {
-        LogEventSample {
-            sample_where: LogEventSampleWhere::Head,
-            max: 100,
-        }
-    }
-}
 
 #[derive(Union)]
 /// Log event result which can be a payload for log events, or an error
@@ -84,10 +52,10 @@ impl LogEventsSubscription {
         ctx: &'a Context<'a>,
         component_names: Vec<String>,
         #[graphql(default = 500)] interval: i32,
-        #[graphql(default)] sample: LogEventSample,
+        #[graphql(default = 100, validator(IntRange(min = "1", max = "10_000")))] limit: usize,
     ) -> impl Stream<Item = Vec<LogEventResult>> + 'a {
         let control_tx = ctx.data_unchecked::<ControlSender>().clone();
-        create_log_events_stream(control_tx, &component_names, interval as u64, sample)
+        create_log_events_stream(control_tx, &component_names, interval as u64, limit)
     }
 }
 
@@ -98,7 +66,7 @@ fn create_log_events_stream(
     control_tx: ControlSender,
     component_names: &[String],
     interval: u64,
-    sample: LogEventSample,
+    limit: usize,
 ) -> impl Stream<Item = Vec<LogEventResult>> {
     let (tx, mut rx) = mpsc::unbounded();
     let (mut log_tx, log_rx) = mpsc::unbounded::<Vec<LogEventResult>>();
@@ -123,39 +91,26 @@ fn create_log_events_stream(
                 _ = interval.tick() => {
                     // If there are any existing results after the interval tick, emit.
                     if !results.is_empty() {
-                        let results = results.drain(..);
                         let results_len = results.len();
 
-                        // Take from the head, tail or a range of the results.
-                        let results = match sample.sample_where {
-                            LogEventSampleWhere::Head => results.take(sample.max).collect(),
-                            LogEventSampleWhere::Tail => results.rev().take(sample.max).collect(),
-                            LogEventSampleWhere::Range => {
-                                // For a 'range', we split the captured events into chunks,
-                                // returning the first event from each chunk-- except the *last*
-                                // chunk, which returns the final record. This means the user
-                                // always gets at least the first and last result if they've
-                                // requested a max > 1.
-                                results
-                                    .chunks(
-                                        results_len
-                                            .checked_div(sample.max)
-                                            .unwrap_or(1)
-                                            .max(1),
-                                    )
-                                    .into_iter()
-                                    .enumerate()
-                                    .flat_map(|(i, chunk)| {
-                                        let mut chunk = chunk.collect_vec();
-                                        if matches!(i.checked_sub(1), Some(i) if i > 0 && i == results_len - 1) {
-                                            chunk = chunk.into_iter().rev().collect_vec();
-                                        }
-                                        chunk.into_iter().take(1)
-                                    })
-                                    .take(sample.max)
-                                    .collect()
-                            }
-                        };
+                        // Events are 'sampled' up to the maximum 'limit', over an even
+                        // distribution of all events captured over the interval. We enumerate
+                        // chunks here to ensure the very last event is always returned when
+                        // limit > 1.
+                        let results = results
+                            .drain(..)
+                            .chunks(results_len.checked_div(limit).unwrap_or(1).max(1))
+                            .into_iter()
+                            .enumerate()
+                            .flat_map(|(i, chunk)| {
+                                let mut chunk = chunk.collect_vec();
+                                if matches!(i.checked_sub(1), Some(i) if i > 0 && i == results_len - 1) {
+                                    chunk = chunk.into_iter().rev().collect_vec();
+                                }
+                                chunk.into_iter().take(1)
+                            })
+                            .take(limit)
+                            .collect();
 
                         let _ = log_tx.start_send(results);
                     }

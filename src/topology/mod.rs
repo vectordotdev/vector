@@ -653,7 +653,7 @@ impl RunningTopology {
         self.outputs.insert(name.to_string(), output);
 
         #[cfg(feature = "api")]
-        self.reattach_tap_sinks(name);
+        self.reconnect_tap_sinks(name);
     }
 
     fn setup_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
@@ -738,28 +738,7 @@ impl RunningTopology {
     }
 
     #[cfg(feature = "api")]
-    fn reattach_tap_sinks(&mut self, input_name: &str) {
-        let input_name = input_name.to_string();
-
-        for tap_sink in self.tap_sinks.iter() {
-            if tap_sink.input_names().contains(&input_name) {
-                if let Some(tx) = self.outputs.get(&input_name) {
-                    if let Some((sink_name, sink)) = tap_sink.make_output(&input_name) {
-                        debug!(
-                            message = "Restarting tap",
-                            id = sink_name.as_str(),
-                            input = input_name.as_str()
-                        );
-                        tap_sink.component_matched(&input_name);
-                        let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
-                    }
-                }
-            }
-        }
-    }
-
-    #[cfg(feature = "api")]
-    /// Attaches a tap sink.
+    /// Attach a tap sink to running topology.
     pub fn attach_tap_sink(&mut self, tap_sink: Arc<crate::api::tap::TapSink>) {
         // Keep a weak ref around in running topology. This will allow subsequent config
         // changes to re-attach the tap within explicit control messages. If there are no
@@ -790,7 +769,8 @@ impl RunningTopology {
     }
 
     #[cfg(feature = "api")]
-    /// Detaches a tap sink.
+    /// Detach a tap sink from running topology. This is typically done in response to a control
+    /// message at the app-level that the tap request has closed.
     pub fn detach_tap_sink(&mut self, tap_sink: Arc<crate::api::tap::TapSink>) {
         // Explicitly removing isn't strictly necessary, as the weak ref will drop when the
         // tap sink falls out of scope. However, since the intention of this ref is for when
@@ -799,10 +779,9 @@ impl RunningTopology {
 
         tap_sink
             .inputs()
-            .iter()
+            .into_iter()
             .for_each(|(input_name, sink_name)| {
-                if let Some(tx) = self.outputs.get(input_name) {
-                    let sink_name = sink_name.to_string();
+                if let Some(tx) = self.outputs.get(&input_name) {
                     debug!(
                         message = "Removing tap",
                         id = sink_name.as_str(),
@@ -811,6 +790,29 @@ impl RunningTopology {
                     let _ = tx.send(fanout::ControlMessage::Remove(sink_name));
                 }
             })
+    }
+
+    #[cfg(feature = "api")]
+    /// Reconnect tap sinks, by iterating the weak refs of tap sinks and rewiring outputs to
+    /// currently active tap requests.
+    fn reconnect_tap_sinks(&mut self, input_name: &str) {
+        let input_name = input_name.to_string();
+
+        for tap_sink in self.tap_sinks.iter() {
+            if tap_sink.input_names().contains(&input_name) {
+                if let Some(tx) = self.outputs.get(&input_name) {
+                    if let Some((sink_name, sink)) = tap_sink.make_output(&input_name) {
+                        debug!(
+                            message = "Restarting tap",
+                            id = sink_name.as_str(),
+                            input = input_name.as_str()
+                        );
+                        tap_sink.component_matched(&input_name);
+                        let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -86,14 +86,29 @@ impl TapSink {
         Box::new(event_tx.sink_map_err(|_| ()))
     }
 
+    /// Private convenience for sending a `TapResult` to the connected receiver.
     fn send(&self, msg: TapResult) {
         let _ = self.tap_tx.clone().start_send(msg);
     }
 
+    /// Returns the input names of the components this sink is observing as a vector of
+    /// cloned strings.
     pub fn input_names(&self) -> Vec<String> {
         self.inputs.keys().cloned().collect()
     }
 
+    /// Get a cloned `HashMap` of the inputs. The use of a UUID for the sink name is an
+    /// implementation detail, so this is returned as a string to the caller to match
+    /// the expectations of topology.
+    pub fn inputs(&self) -> HashMap<String, String> {
+        self.inputs
+            .iter()
+            .map(|(name, uuid)| (name.to_string(), uuid.to_string()))
+            .collect()
+    }
+
+    /// Returns (if it exists) a tuple of the generated sink name, and a router for handling
+    /// incoming `Event`s, based on the configured input name.
     pub fn make_output(&self, input_name: &str) -> Option<(String, RouterSink)> {
         let id = self.inputs.get(input_name)?;
 
@@ -113,12 +128,15 @@ impl TapSink {
     }
 }
 
+/// `Hash` is implemented for `TapSink` to shortcut checking to the UUID assigned to a
+/// given sink.
 impl Hash for TapSink {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.id.hash(state)
     }
 }
 
+/// Equality on a `TapSink` is based on whether its UUID matches
 impl PartialEq for TapSink {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
@@ -127,6 +145,8 @@ impl PartialEq for TapSink {
 
 impl Eq for TapSink {}
 
+/// A tap controller holds a `ControlSender` and a thread-safe res to a sink, to bubble up a
+/// control message to the top of the app when a sink has 'started' or 'stopped'.
 pub struct TapController {
     control_tx: ControlSender,
     sink: Arc<TapSink>,
@@ -141,6 +161,9 @@ impl TapController {
     }
 }
 
+/// When a `TapController` goes out of scope, a control message is sent to the controller to
+/// alert that a tap sink is no longer valid. This is distinct to the weak ref that topology holds
+/// for the sink, as it allows explicit action to be taken at the time the subscription goes away.
 impl Drop for TapController {
     fn drop(&mut self) {
         let _ = self
