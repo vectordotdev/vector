@@ -147,12 +147,10 @@ impl Application {
                     path = ?config_paths
                 );
 
-                let mut config =
-                    config::load_from_paths(&config_paths, false).map_err(handle_config_errors)?;
+                config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
-                config::LOG_SCHEMA
-                    .set(config.global.log_schema.clone())
-                    .expect("Couldn't set schema");
+                let mut config =
+                    config::load_from_paths(&config_paths).map_err(handle_config_errors)?;
 
                 if !config.healthchecks.enabled {
                     info!("Health checks are disabled.");
