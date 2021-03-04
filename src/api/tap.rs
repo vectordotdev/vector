@@ -13,11 +13,14 @@ use uuid::Uuid;
 
 type TapSender = mpsc::UnboundedSender<TapResult>;
 
+/// A tap notification signals whether a component is matched or unmatched.
 pub enum TapNotification {
     ComponentMatched,
     ComponentNotMatched,
 }
 
+/// A tap result can either contain a log event (payload), or a notification that's intended
+/// to be communicated back to the client to alert them about the status of the tap request.
 pub enum TapResult {
     LogEvent(String, LogEvent),
     Notification(String, TapNotification),
@@ -33,11 +36,16 @@ impl TapResult {
     }
 }
 
+/// Tap control messages are used at the app-level to alert the caller when a tap has been
+/// started or stopped. A 'stopped' tap request typically means that the client either terminated
+/// the subscription explicitly, or the connection went away.
 pub enum TapControl {
     Start(Arc<TapSink>),
     Stop(Arc<TapSink>),
 }
 
+/// A tap sink acts as a receiver of `LogEvent` data, and relays it to the connecting
+/// GraphQL client.
 pub struct TapSink {
     id: Uuid,
     inputs: HashMap<String, Uuid>,
@@ -45,9 +53,9 @@ pub struct TapSink {
 }
 
 impl TapSink {
-    /// Creates a new tap sink, and spawn a listener per sink
     pub fn new(input_names: &[String], tap_tx: TapSender) -> Self {
-        // Map each input name to a UUID
+        // Map each input name to a UUID. The string output of the UUID will be used as the
+        // sink name for topology. This never changes.
         let inputs = input_names
             .iter()
             .map(|name| (name.to_string(), Uuid::new_v4()))
@@ -84,13 +92,6 @@ impl TapSink {
 
     pub fn input_names(&self) -> Vec<String> {
         self.inputs.keys().cloned().collect()
-    }
-
-    pub fn inputs(&self) -> HashMap<String, Uuid> {
-        self.inputs
-            .iter()
-            .map(|(name, uuid)| (name.to_string(), *uuid))
-            .collect()
     }
 
     pub fn make_output(&self, input_name: &str) -> Option<(String, RouterSink)> {
