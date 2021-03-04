@@ -50,7 +50,7 @@ struct TagTypesExternallyFn {
 impl Expression for TagTypesExternallyFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let tagged_externally = tag_type_externally(&value);
+        let tagged_externally = tag_type_externally(value);
 
         Ok(tagged_externally)
     }
@@ -67,30 +67,30 @@ impl Expression for TagTypesExternallyFn {
     }
 }
 
-fn tag_type_externally(value: &Value) -> Value {
+fn tag_type_externally(value: Value) -> Value {
     let (key, value) = match value {
-        value @ Value::Bytes(_) => (Some("bytes"), value.clone()),
-        value @ Value::Integer(_) => (Some("integer"), value.clone()),
-        value @ Value::Float(_) => (Some("float"), value.clone()),
-        value @ Value::Boolean(_) => (Some("boolean"), value.clone()),
+        value @ Value::Bytes(_) => (Some("bytes"), value),
+        value @ Value::Integer(_) => (Some("integer"), value),
+        value @ Value::Float(_) => (Some("float"), value),
+        value @ Value::Boolean(_) => (Some("boolean"), value),
         Value::Object(object) => (
             None,
             object
-                .iter()
-                .map(|(key, value)| (key.clone(), tag_type_externally(value)))
+                .into_iter()
+                .map(|(key, value)| (key, tag_type_externally(value)))
                 .collect::<BTreeMap<String, Value>>()
                 .into(),
         ),
         Value::Array(array) => (
             None,
             array
-                .iter()
+                .into_iter()
                 .map(tag_type_externally)
                 .collect::<Vec<_>>()
                 .into(),
         ),
-        value @ Value::Timestamp(_) => (Some("timestamp"), value.clone()),
-        value @ Value::Regex(_) => (Some("regex"), value.clone()),
+        value @ Value::Timestamp(_) => (Some("timestamp"), value),
+        value @ Value::Regex(_) => (Some("regex"), value),
         Value::Null => (Some("null"), Value::Null),
     };
 
