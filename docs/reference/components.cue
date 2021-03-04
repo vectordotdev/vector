@@ -399,10 +399,10 @@ components: {
 
 	#HelmChart: {
 		fields: [Name=string]: {
-			name: Name
-			description: != ""
-			required: bool | *false
-			type: #Type
+			name:        Name
+			description: !=""
+			required:    bool | *false
+			type:        #Type
 		}
 	}
 

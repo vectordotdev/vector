@@ -776,11 +776,11 @@ components: sources: kubernetes_logs: {
 						type: object: {
 							examples: [
 								yaml.Marshal({
-									"capabilities": {"drop": ["ALL"]},
-									"readOnlyRootFilesystem": "true",
-									"runAsNonRoot": "true",
-									"runAsUser": "1000"
-								})
+									"capabilities": {"drop": ["ALL"]}
+									"readOnlyRootFilesystem": "true"
+									"runAsNonRoot":           "true"
+									"runAsUser":              "1000"
+								}),
 							]
 							options: {}
 						}
@@ -801,7 +801,7 @@ components: sources: kubernetes_logs: {
 										examples: [
 											yaml.Marshal({
 												"mykey": "myvalue"
-											})
+											}),
 										]
 										options: {}
 									}
