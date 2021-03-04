@@ -21,6 +21,11 @@ impl Function for Log {
                 kind: kind::BYTES,
                 required: false,
             },
+            Parameter {
+                keyword: "rate_limit_secs",
+                kind: kind::INTEGER,
+                required: false,
+            },
         ]
     }
 
@@ -54,8 +59,13 @@ impl Function for Log {
             .unwrap_or_else(|| "info".into())
             .try_bytes()
             .expect("log level not bytes");
+        let rate_limit_secs = arguments.optional("rate_limit_secs");
 
-        Ok(Box::new(LogFn { value, level }))
+        Ok(Box::new(LogFn {
+            value,
+            level,
+            rate_limit_secs,
+        }))
     }
 }
 
@@ -63,18 +73,23 @@ impl Function for Log {
 struct LogFn {
     value: Box<dyn Expression>,
     level: Bytes,
+    rate_limit_secs: Option<Box<dyn Expression>>,
 }
 
 impl Expression for LogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
+        let rate_limit_secs = match &self.rate_limit_secs {
+            Some(expr) => expr.resolve(ctx)?.try_integer()?,
+            None => 1,
+        };
 
         match self.level.as_ref() {
-            b"trace" => trace!("{}", value),
-            b"debug" => debug!("{}", value),
-            b"warn" => warn!("{}", value),
-            b"error" => error!("{}", value),
-            _ => info!("{}", value),
+            b"trace" => trace!(message = %value, internal_log_rate_secs = rate_limit_secs),
+            b"debug" => debug!(message = %value, internal_log_rate_secs = rate_limit_secs),
+            b"warn" => warn!(message = %value, internal_log_rate_secs = rate_limit_secs),
+            b"error" => error!(message = %value, internal_log_rate_secs = rate_limit_secs),
+            _ => info!(message = %value, internal_log_rate_secs = rate_limit_secs),
         }
 
         Ok(Value::Null)
@@ -85,22 +100,19 @@ impl Expression for LogFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     #[test]
-//     fn log() {
-//         // This is largely just a smoke test to ensure it doesn't crash as there isn't really much to test.
-//         let mut state = state::Program::default();
-//         let func = LogFn::new(
-//             Box::new(Array::from(vec![Value::from(42)])),
-//             "warn".to_string(),
-//         );
-//         let mut object = Value::Map(map![]);
-//         let got = func.resolve(&mut ctx);
+    test_function![
+        log => Log;
 
-//         assert_eq!(Ok(Value::Null), got);
-//     }
-// }
+        doesnotcrash {
+            args: func_args! [ value: value!(42),
+                               level: value!("warn"),
+                               rate_limit_secs: value!(5) ],
+            want: Ok(Value::Null),
+            tdef: TypeDef::new().infallible().null(),
+        }
+    ];
+}
