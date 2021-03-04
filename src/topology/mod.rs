@@ -752,7 +752,7 @@ impl RunningTopology {
             if let Some(tx) = self.outputs.get(input_name) {
                 if let Some((sink_name, sink)) = tap_sink.make_output(input_name) {
                     debug!(
-                        message = "Starting tap",
+                        message = "Starting tap.",
                         id = sink_name.as_str(),
                         input = input_name.as_str()
                     );
@@ -760,7 +760,7 @@ impl RunningTopology {
                 }
             } else {
                 debug!(
-                    message = "Waiting for tap component",
+                    message = "Waiting for tap component.",
                     input = input_name.as_str()
                 );
                 let _ = tap_sink.component_not_matched(input_name);
@@ -783,7 +783,7 @@ impl RunningTopology {
             .for_each(|(input_name, sink_name)| {
                 if let Some(tx) = self.outputs.get(&input_name) {
                     debug!(
-                        message = "Removing tap",
+                        message = "Removing tap.",
                         id = sink_name.as_str(),
                         input = input_name.as_str()
                     );
