@@ -60,6 +60,9 @@ impl<'a> ToLua<'a> for Metric {
         let tbl = ctx.create_table()?;
 
         tbl.set("name", self.name())?;
+        if let Some(namespace) = self.namespace() {
+            tbl.set("namespace", namespace)?;
+        }
         if let Some(ts) = self.data.timestamp {
             tbl.set("timestamp", timestamp_to_table(ctx, ts)?)?;
         }
@@ -145,6 +148,7 @@ impl<'a> FromLua<'a> for Metric {
             .get::<_, Option<LuaTable>>("timestamp")?
             .map(table_to_timestamp)
             .transpose()?;
+        let namespace: Option<String> = table.get("namespace")?;
         let tags: Option<BTreeMap<String, String>> = table.get("tags")?;
         let kind = table
             .get::<_, Option<MetricKind>>("kind")?
@@ -199,6 +203,7 @@ impl<'a> FromLua<'a> for Metric {
         };
 
         Ok(Metric::new(name, kind, value)
+            .with_namespace(namespace)
             .with_tags(tags)
             .with_timestamp(timestamp))
     }
@@ -228,6 +233,7 @@ mod test {
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
         )
+        .with_namespace(Some("namespace_example"))
         .with_tags(Some(
             vec![("example tag".to_string(), "example value".to_string())]
                 .into_iter()
@@ -237,6 +243,7 @@ mod test {
         let assertions = vec![
             "type(metric) == 'table'",
             "metric.name == 'example counter'",
+            "metric.namespace == 'namespace_example'",
             "type(metric.timestamp) == 'table'",
             "metric.timestamp.year == 2018",
             "metric.timestamp.month == 11",
@@ -395,6 +402,7 @@ mod test {
     fn from_lua_counter_full() {
         let value = r#"{
             name = "example counter",
+            namespace = "example_namespace",
             timestamp = {
                 year = 2018,
                 month = 11,
@@ -416,6 +424,7 @@ mod test {
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
         )
+        .with_namespace(Some("example_namespace"))
         .with_tags(Some(
             vec![("example tag".to_string(), "example value".to_string())]
                 .into_iter()

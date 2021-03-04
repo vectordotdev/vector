@@ -84,13 +84,13 @@ pub(crate) struct ParseKeyValueFn {
 impl Expression for ParseKeyValueFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let bytes = value.unwrap_bytes_utf8_lossy();
+        let bytes = value.try_bytes_utf8_lossy()?;
 
         let value = self.key_value_delimiter.resolve(ctx)?;
-        let key_value_delimiter = value.unwrap_bytes_utf8_lossy();
+        let key_value_delimiter = value.try_bytes_utf8_lossy()?;
 
         let value = self.field_delimiter.resolve(ctx)?;
-        let field_delimiter = value.unwrap_bytes_utf8_lossy();
+        let field_delimiter = value.try_bytes_utf8_lossy()?;
 
         let values = parse(&bytes, &key_value_delimiter, &field_delimiter)?;
 

@@ -5,9 +5,15 @@
 #   │
 # 1 │ ╭
 # 2 │ │ "foo\xbar"
-# 3 │ │
+# 3 │ │ "foo\\bar"
+# 4 │ │ "foo\/bar"
+# 5 │ │ "foo\bar"
+# 6 │ │
 #   │ ╰^ unexpected error: invalid escape character: \x
 #   │
 #   = see language documentation at https://vrl.dev
 
 "foo\xbar"
+"foo\\bar"
+"foo\/bar"
+"foo\bar"

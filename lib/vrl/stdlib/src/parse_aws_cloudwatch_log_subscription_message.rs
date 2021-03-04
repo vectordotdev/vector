@@ -67,7 +67,7 @@ struct ParseAwsCloudWatchLogSubscriptionMessageFn {
 
 impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.unwrap_bytes();
+        let bytes = self.value.resolve(ctx)?.try_bytes()?;
 
         let message = serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&bytes)
             .map_err(|e| format!("unable to parse: {}", e))?;

@@ -53,7 +53,8 @@ impl Function for Sha2 {
         let variant = arguments
             .optional_enum("variant", &variants)?
             .unwrap_or_else(|| value!("SHA-512/256"))
-            .unwrap_bytes();
+            .try_bytes()
+            .expect("variant not bytes");
 
         Ok(Box::new(Sha2Fn { value, variant }))
     }
@@ -67,7 +68,7 @@ struct Sha2Fn {
 
 impl Expression for Sha2Fn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.unwrap_bytes();
+        let value = self.value.resolve(ctx)?.try_bytes()?;
 
         let hash = match self.variant.as_ref() {
             b"SHA-224" => encode::<Sha224>(&value),

@@ -10,6 +10,7 @@ license = "MPL-2.0"
 ansi_term = "0.12"
 tracing-core = "0.1"
 tracing-subscriber = "0.2"
+dashmap = "4"
 
 [dev-dependencies]
 criterion = "0.3"
