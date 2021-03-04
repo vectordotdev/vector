@@ -10,7 +10,10 @@ use cfg_if::cfg_if;
 use std::{cmp::max, collections::HashMap, path::PathBuf};
 
 use futures::StreamExt;
-use tokio::sync::mpsc;
+use tokio::{
+    runtime::{self, Runtime},
+    sync::mpsc,
+};
 
 #[cfg(feature = "sources-host_metrics")]
 use crate::sources::host_metrics;
@@ -26,7 +29,6 @@ use crate::internal_events::{
     VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed, VectorReloaded,
     VectorStarted, VectorStopped,
 };
-use tokio::runtime::{self, Runtime};
 
 pub struct ApplicationConfig {
     pub config_paths: Vec<(PathBuf, config::FormatHint)>,
@@ -233,11 +235,11 @@ impl Application {
 
             let signal = loop {
                 // This is wrapped in a `cfg_if!` call to branch two paths-- one where the API
-                // feature is compuled, and one where it isn't. This is distinct from the API
+                // feature is compiled, and one where it isn't. This is distinct from the API
                 // being *enabled*, which is checked by the relevant `select!` branch.
                 //
                 // Ideally, there'd be a way to conditionally add a branch, but the `select!`
-                // macro doesn't seem to entertain child macros-- resulting in this repetition.
+                // macro doesn't seem to allow for child macros-- resulting in this repetition.
                 cfg_if! (
                     if #[cfg(feature = "api")] {
                         tokio::select! {

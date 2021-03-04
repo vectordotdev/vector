@@ -12,7 +12,7 @@ use tokio::sync::mpsc;
 // Control tx/rx channels use Tokio unbounded channels to take advantage of async on the
 // receiver end, and sync on the sender. This allows us to trigger a control message when
 // the returned stream is canceled externally (e.g. the subscription terminating on the client)
-// by implementing `Drop`
+// by implementing `Drop`.
 
 pub type ControlSender = mpsc::UnboundedSender<ControlMessage>;
 pub type ControlReceiver = mpsc::UnboundedReceiver<ControlMessage>;

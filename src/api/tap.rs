@@ -135,7 +135,7 @@ impl TapSink {
     }
 }
 
-/// `Hash` is implemented for `TapSink` to shortcut checking to the UUID assigned to a
+/// `Hash` is implemented for `TapSink` to limit checking to the UUID assigned to a
 /// given sink.
 impl Hash for TapSink {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -143,7 +143,7 @@ impl Hash for TapSink {
     }
 }
 
-/// Equality on a `TapSink` is based on whether its UUID matches
+/// Equality on a `TapSink` is based on whether its UUID matches.
 impl PartialEq for TapSink {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
@@ -152,7 +152,7 @@ impl PartialEq for TapSink {
 
 impl Eq for TapSink {}
 
-/// A tap controller holds a `ControlSender` and a thread-safe res to a sink, to bubble up a
+/// A tap controller holds a `ControlSender` and a thread-safe ref to a sink, to bubble up a
 /// control message to the top of the app when a sink has 'started' or 'stopped'.
 pub struct TapController {
     control_tx: ControlSender,

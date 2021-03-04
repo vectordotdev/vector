@@ -1,7 +1,7 @@
 use async_graphql::{Enum, SimpleObject};
 
 #[derive(Enum, Copy, Clone, PartialEq, Eq)]
-/// Type of log event error
+/// Log event notification type
 pub enum LogEventNotificationType {
     /// A component was found that matched the provided name
     ComponentMatched,

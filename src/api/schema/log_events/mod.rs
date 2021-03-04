@@ -13,11 +13,11 @@ use itertools::Itertools;
 use tokio::{select, stream::Stream, sync::mpsc, time};
 
 #[derive(Union)]
-/// Log event result which can be a payload for log events, or an error
+/// Log event result which can be a log event or notification
 pub enum LogEventResult {
-    /// Log event payload
+    /// Log event
     LogEvent(event::LogEvent),
-    /// Log notification
+    /// Notification
     Notification(notification::LogEventNotification),
 }
 
@@ -52,10 +52,17 @@ impl LogEventsSubscription {
         ctx: &'a Context<'a>,
         component_names: Vec<String>,
         #[graphql(default = 500)] interval: i32,
-        #[graphql(default = 100, validator(IntRange(min = "1", max = "10_000")))] limit: usize,
+        #[graphql(default = 100, validator(IntRange(min = "1", max = "10_000")))] limit: i32,
     ) -> impl Stream<Item = Vec<LogEventResult>> + 'a {
         let control_tx = ctx.data_unchecked::<ControlSender>().clone();
-        create_log_events_stream(control_tx, &component_names, interval as u64, limit)
+        create_log_events_stream(
+            control_tx,
+            &component_names,
+            // GraphQL only supports 32 bit ints out-the-box due to JSON limitations; we're
+            // casting here to separate concerns and avoid 64 bit scalar deserialization.
+            interval as u64,
+            limit as usize,
+        )
     }
 }
 
@@ -93,7 +100,7 @@ fn create_log_events_stream(
                     if !results.is_empty() {
                         let results_len = results.len();
 
-                        // Events are 'sampled' up to the maximum 'limit', over an even
+                        // Events are 'sampled' up to the maximum 'limit', per an even
                         // distribution of all events captured over the interval. We enumerate
                         // chunks here to ensure the very last event is always returned when
                         // limit > 1.
