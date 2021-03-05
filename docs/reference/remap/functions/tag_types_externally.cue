@@ -60,7 +60,7 @@ remap: functions: tag_types_externally: {
 				},
 				{
 					bytes: "bar"
-				}
+				},
 			]
 		},
 	]
