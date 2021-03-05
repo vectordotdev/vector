@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["wee_alloc"]
+dev = ["console_error_panic_hook"]
 
 [dependencies]
 vrl = { path = "../core" }
@@ -22,6 +23,7 @@ serde = { version = "1.0.123", features = ["derive"] }
 indoc = "1.0.3"
 cfg-if = "1.0.0"
 wee_alloc = { version = "0.4.5", optional = true }
+console_error_panic_hook = { version = "0.1.6", optional = true }
 
 [dev-dependencies]
 indoc = "1.0.3"

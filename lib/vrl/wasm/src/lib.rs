@@ -12,6 +12,19 @@ cfg_if! {
     }
 }
 
+cfg_if! {
+    // Sets a panic hook when running in dev mode. When enabled, any panics are
+    // forwared to `console.error`, which provides a stack trace in the browser
+    // or in Node.js. Disabled by default.
+    if #[cfg(feature = "dev")] {
+        extern crate console_error_panic_hook;
+        pub use self::console_error_panic_hook::set_once as set_panic_hook;
+    } else {
+        #[inline]
+        pub fn set_panic_hook() {}
+    }
+}
+
 // The module takes in a VRL program and a VRL event as input
 #[derive(Deserialize, Serialize)]
 pub struct Input {
