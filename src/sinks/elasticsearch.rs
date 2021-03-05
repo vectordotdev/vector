@@ -668,6 +668,34 @@ mod tests {
 "#;
         assert_eq!(std::str::from_utf8(&encoded).unwrap(), &expected[..]);
     }
+
+    #[test]
+    fn validate_host_header_on_aws_requests() {
+        let config = ElasticSearchConfig {
+            auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default {})),
+            endpoint: "http://abc-123.us-east-1.es.amazonaws.com".into(),
+            batch: BatchConfig {
+                max_events: Some(1),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+
+        let signed_request = common.signed_request(
+            "POST",
+            &"http://abc-123.us-east-1.es.amazonaws.com"
+                .parse::<Uri>()
+                .unwrap(),
+            true,
+        );
+
+        assert_eq!(
+            signed_request.hostname(),
+            "abc-123.us-east-1.es.amazonaws.com".to_string()
+        );
+    }
 }
 
 #[cfg(test)]
@@ -833,24 +861,6 @@ mod integration_tests {
             false,
         )
         .await;
-    }
-
-    #[test]
-    async fn validate_host_header_on_aws_requests() {
-        let config = ElasticSearchConfig {
-            auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default {})),
-            endpoint: "http://abc-123.us-east-1.es.es.amazonaws.com".into(),
-            ..config()
-        };
-
-        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
-
-        let signed_request =
-            common.signed_request("POST", "http://abc-123.us-east-1.es.es.amazonaws.com", true);
-        assert_eq!(
-            signed_request.hostname(),
-            "abc-123.us-east-1.es.es.amazonaws.com".into()
-        );
     }
 
     #[tokio::test]
