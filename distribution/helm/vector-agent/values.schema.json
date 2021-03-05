@@ -121,7 +121,7 @@
                 "enabled": {
                     "type": "boolean",
                     "description": "Disable to omit the internal metrics source from being added.",
-                    "default": true,
+                    "default": true
                 },
                 "rawConfig": {
                     "type": "null",
