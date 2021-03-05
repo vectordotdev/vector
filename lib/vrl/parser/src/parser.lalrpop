@@ -14,6 +14,7 @@ extern {
 
     enum Tok<'input> {
         "identifier" => Token::Identifier(<&'input str>),
+        "path field" => Token::PathField(<&'input str>),
         "string literal" => Token::StringLiteral(<StringLiteral<&'input str>>),
         "integer literal" => Token::IntegerLiteral(<i64>),
         "float literal" => Token::FloatLiteral(<NotNan<f64>>),
@@ -40,6 +41,7 @@ extern {
         "?" => Token::Question,
         "|" => Token::Pipe,
         "=" => Token::Equals,
+        "|=" => Token::MergeEquals,
         "," => Token::Comma,
         "_" => Token::Underscore,
         ":" => Token::Colon,
@@ -58,6 +60,7 @@ extern {
         ">=" => Token::Operator(">="),
         "==" => Token::Operator("=="),
         "!=" => Token::Operator("!="),
+        "|" => Token::Operator("|"),
 
         "&&" => Token::Operator("&&"),
         "||" => Token::Operator("||"),
@@ -217,6 +220,8 @@ NonterminalNewline: () = "\n";
 
 Ident: Ident = "identifier" => Ident(<>.to_owned());
 
+PathField: Ident = "path field" => Ident(<>.to_owned());
+
 // An identifier that is allowed to include reserved keywords.
 AnyIdent: Ident = {
     "identifier" => Ident(<>.to_owned()),
@@ -242,15 +247,22 @@ Assignment: Node<Assignment> = {
     Sp<AssignmentInfallible>,
 };
 
+AssignmentOp: AssignmentOp = {
+    "=" => AssignmentOp::Assign,
+    "|=" => AssignmentOp::Merge,
+}
+
 AssignmentSingle: Assignment = {
-    <target: Sp<AssignmentTarget>> "="
-        <expr: Box<Expr>> => Assignment::Single { target, expr },
+    <target: Sp<AssignmentTarget>>
+        <op: AssignmentOp>
+        <expr: Box<Expr>> => Assignment::Single { target, op, expr },
 }
 
 AssignmentInfallible: Assignment = {
     <ok: Sp<AssignmentTarget>> ","
-        <err: Sp<AssignmentTarget>> "="
-        <expr: Box<Expr>> => Assignment::Infallible{ ok, err, expr},
+        <err: Sp<AssignmentTarget>>
+        <op: AssignmentOp>
+        <expr: Box<Expr>> => Assignment::Infallible{ ok, err, op, expr},
 }
 
 #[inline]
@@ -286,12 +298,17 @@ Equal: Expr = {
 };
 
 Compare: Expr = {
-    Op<Compare, ">=", Add>,
-    Op<Compare, ">", Add>,
-    Op<Compare, "<=", Add>,
-    Op<Compare, "<", Add>,
-    Add,
+    Op<Compare, ">=", Merge>,
+    Op<Compare, ">", Merge>,
+    Op<Compare, "<=", Merge>,
+    Op<Compare, "<", Merge>,
+    Merge,
 };
+
+Merge: Expr = {
+    Op<Merge, "|", Add>,
+    Add,
+}
 
 Add: Expr = {
     Op<Add, "+", Factor>,
@@ -363,6 +380,7 @@ PathSegment: PathSegment = {
 
 pub Field: Field = {
     AnyIdent => Field::Regular(<>),
+    PathField => Field::Regular(<>),
     String => Field::Quoted(<>),
 };
 

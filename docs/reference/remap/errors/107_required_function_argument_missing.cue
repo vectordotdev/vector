@@ -17,16 +17,6 @@ remap: errors: "107": {
 			source: #"""
 				parse_timestamp(.timestamp)
 				"""#
-			raises: compiletime: #"""
-				error: \#(title)
-				  ┌─ :1:1
-				  │
-				1 │ parse_timestamp(.timestamp)
-				  │ ^^^^^^^^^^^^^^^^^^^^^^^^^^
-				  │ │
-				  │ The required `format` argument is missing
-				  │
-				"""#
 			diff: #"""
 				-parse_timestamp(.timestamp)
 				+parse_timestamp(.timestamp, format: "%D")

@@ -1,4 +1,4 @@
-use super::{default_host_key, logs::HumioLogsConfig, Encoding};
+use super::{host_key, logs::HumioLogsConfig, Encoding};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig},
     sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
@@ -25,7 +25,7 @@ pub struct HumioMetricsConfig {
 
     event_type: Option<Template>,
 
-    #[serde(default = "default_host_key")]
+    #[serde(default = "host_key")]
     host_key: String,
 
     #[serde(default)]
@@ -67,7 +67,7 @@ impl GenerateConfig for HumioMetricsConfig {
 #[typetag::serde(name = "humio_metrics")]
 impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut transform = self.transform.clone().build().await?;
+        let mut transform = self.transform.clone().build(&cx.globals).await?;
         let sink = HumioLogsConfig {
             token: self.token.clone(),
             endpoint: self.endpoint.clone(),

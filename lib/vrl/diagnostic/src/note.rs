@@ -1,3 +1,5 @@
+use crate::Urls;
+use std::convert::Into;
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -11,6 +13,21 @@ pub enum Note {
 
     #[doc(hidden)]
     SeeDocs(String, String),
+    #[doc(hidden)]
+    Basic(String),
+}
+
+impl Note {
+    pub fn solution(title: impl Into<String>, content: Vec<impl Into<String>>) -> Vec<Self> {
+        let mut notes = vec![Self::Basic(format!("try: {}", title.into()))];
+
+        notes.push(Self::Basic(" ".to_owned()));
+        for line in content {
+            notes.push(Self::Basic(format!("    {}", line.into())));
+        }
+        notes.push(Self::Basic(" ".to_owned()));
+        notes
+    }
 }
 
 impl fmt::Display for Note {
@@ -18,23 +35,34 @@ impl fmt::Display for Note {
         use Note::*;
 
         match self {
-            Hint(hint) => write!(f, "hint: {}", hint),
+            Hint(hint) => {
+                write!(f, "hint: {}", hint)
+            }
             CoerceValue => {
-                Hint("coerce the value using one of the coercion functions".to_owned()).fmt(f)
+                Hint("coerce the value to the required type using a coercion function".to_owned())
+                    .fmt(f)
             }
             SeeFunctionDocs(ident) => {
-                SeeDocs("function".to_owned(), format!("TODO/{}", ident)).fmt(f)
+                let url = Urls::func_docs(ident);
+                SeeDocs("function".to_owned(), url).fmt(f)
             }
-            SeeErrorDocs => SeeDocs("error handling".to_owned(), "".to_owned()).fmt(f),
-            SeeLangDocs => SeeDocs("language".to_owned(), "".to_owned()).fmt(f),
-            SeeCodeDocs(code) => write!(f, "learn more at: https://errors.vrl.dev/{}", code),
-            SeeDocs(kind, path) => {
-                write!(
-                    f,
-                    "see {} documentation at: https://vector.dev/docs/reference/vrl/{}",
-                    kind, path
-                )
+            SeeErrorDocs => {
+                let url = Urls::error_handling_url();
+                SeeDocs("error handling".to_owned(), url).fmt(f)
             }
+            SeeLangDocs => {
+                let url = Urls::vrl_root_url();
+
+                write!(f, "see language documentation at {}", url)
+            }
+            SeeCodeDocs(code) => {
+                let url = Urls::error_code_url(code);
+                write!(f, "learn more about error code {} at {}", code, url)
+            }
+            SeeDocs(kind, url) => {
+                write!(f, "see documentation about {} at {}", kind, url)
+            }
+            Basic(string) => write!(f, "{}", string),
         }
     }
 }

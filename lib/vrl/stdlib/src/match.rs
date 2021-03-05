@@ -55,9 +55,9 @@ pub(crate) struct MatchFn {
 impl Expression for MatchFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.unwrap_bytes_utf8_lossy();
+        let string = value.try_bytes_utf8_lossy()?;
 
-        let pattern = self.pattern.resolve(ctx)?.unwrap_regex();
+        let pattern = self.pattern.resolve(ctx)?.try_regex()?;
 
         Ok(pattern.is_match(&string).into())
     }

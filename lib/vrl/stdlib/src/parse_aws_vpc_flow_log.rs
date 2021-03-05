@@ -83,11 +83,11 @@ impl ParseAwsVpcFlowLogFn {
 
 impl Expression for ParseAwsVpcFlowLogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.unwrap_bytes();
+        let bytes = self.value.resolve(ctx)?.try_bytes()?;
         let input = String::from_utf8_lossy(&bytes);
 
         if let Some(expr) = &self.format {
-            let bytes = expr.resolve(ctx)?.unwrap_bytes();
+            let bytes = expr.resolve(ctx)?.try_bytes()?;
             parse_log(&input, Some(&String::from_utf8_lossy(&bytes)))
         } else {
             parse_log(&input, None)
@@ -130,6 +130,7 @@ impl Expression for ParseAwsVpcFlowLogFn {
 
 type ParseResult<T> = std::result::Result<T, String>;
 
+#[allow(clippy::unnecessary_wraps)] // match other parse methods
 fn identity<'a>(_key: &'a str, value: &'a str) -> ParseResult<&'a str> {
     Ok(value)
 }

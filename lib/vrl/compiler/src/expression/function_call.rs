@@ -1,14 +1,16 @@
 use crate::expression::{FunctionArgument, Noop};
-use crate::function::ArgumentList;
+use crate::function::{ArgumentList, Parameter};
 use crate::parser::{Ident, Node};
 use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
-use diagnostic::{DiagnosticError, Label, Note};
+use diagnostic::{DiagnosticError, Label, Note, Urls};
 use std::fmt;
+use tracing::{span, Level};
 
 #[derive(Clone)]
 pub struct FunctionCall {
     abort_on_error: bool,
     expr: Box<dyn Expression>,
+    maybe_fallible_arguments: bool,
 
     // used for enhancing runtime error messages (using abort-instruction).
     //
@@ -62,7 +64,7 @@ impl FunctionCall {
                 Span::new(start, end)
             };
 
-            return Err(Error::ArityMismatch {
+            return Err(Error::WrongNumberOfArgs {
                 arguments_span,
                 max: function.parameters().len(),
             });
@@ -86,6 +88,7 @@ impl FunctionCall {
             .map(|arg| format!("{:?}", arg))
             .collect::<Vec<_>>();
 
+        let mut maybe_fallible_arguments = false;
         for node in arguments {
             let (argument_span, argument) = node.take();
 
@@ -118,14 +121,20 @@ impl FunctionCall {
 
             // Check if the argument is of the expected type.
             let expr_kind = argument.type_def(state).kind();
-            if !parameter.kind().contains(expr_kind) {
+            let param_kind = parameter.kind();
+
+            if !param_kind.intersects(expr_kind) {
                 return Err(Error::InvalidArgumentKind {
-                    keyword: parameter.keyword,
+                    function_ident: function.identifier(),
+                    abort_on_error,
+                    arguments_fmt,
+                    parameter: *parameter,
                     got: expr_kind,
-                    expected: parameter.kind(),
-                    expr_span: argument.span(),
+                    argument,
                     argument_span,
                 });
+            } else if !param_kind.contains(expr_kind) {
+                maybe_fallible_arguments = true;
             }
 
             // Check if the argument is infallible.
@@ -146,7 +155,7 @@ impl FunctionCall {
             .filter(|(_, p)| p.required)
             .filter(|(_, p)| !list.keywords().contains(&p.keyword))
             .try_for_each(|(i, p)| -> Result<_, _> {
-                Err(Error::RequiredArgument {
+                Err(Error::MissingArgument {
                     call_span,
                     keyword: p.keyword,
                     position: i,
@@ -157,11 +166,15 @@ impl FunctionCall {
             .compile(list)
             .map_err(|error| Error::Compilation { call_span, error })?;
 
+        let mut type_def = expr.type_def(state);
+
+        if maybe_fallible_arguments {
+            type_def.fallible = true;
+        }
+
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the
         // resulting program incorrectly convey this function call might fail.
-        let type_def = expr.type_def(state);
-
         if abort_on_error && !type_def.is_fallible() {
             return Err(Error::AbortInfallible {
                 ident_span,
@@ -170,9 +183,10 @@ impl FunctionCall {
         }
 
         Ok(Self {
-            span: call_span,
             abort_on_error,
             expr,
+            maybe_fallible_arguments,
+            span: call_span,
             arguments_fmt,
             arguments_dbg,
             ident: function.identifier(),
@@ -183,9 +197,10 @@ impl FunctionCall {
         let expr = Box::new(Noop) as _;
 
         Self {
-            span: Span::default(),
             abort_on_error: false,
             expr,
+            maybe_fallible_arguments: false,
+            span: Span::default(),
             arguments_fmt: vec![],
             arguments_dbg: vec![],
             ident: "noop",
@@ -195,21 +210,83 @@ impl FunctionCall {
 
 impl Expression for FunctionCall {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.expr.resolve(ctx).map_err(|mut err| {
-            err.message = format!(
-                r#"function call error for "{}" at ({}:{}): {}"#,
-                self.ident,
-                self.span.start(),
-                self.span.end(),
-                err.message
-            );
+        span!(Level::ERROR, "remap", vrl_position = &self.span.start()).in_scope(|| {
+            self.expr.resolve(ctx).map_err(|mut err| {
+                err.message = format!(
+                    r#"function call error for "{}" at ({}:{}): {}"#,
+                    self.ident,
+                    self.span.start(),
+                    self.span.end(),
+                    err.message
+                );
 
-            err
+                err
+            })
         })
     }
 
     fn type_def(&self, state: &State) -> TypeDef {
         let mut type_def = self.expr.type_def(state);
+
+        // If one of the arguments only partially matches the function type
+        // definition, then we mark the entire function as fallible.
+        //
+        // This allows for progressive type-checking, by handling any potential
+        // type error the function throws, instead of having to enforce
+        // exact-type invariants for individual arguments.
+        //
+        // That is, this program triggers the `InvalidArgumentKind` error:
+        //
+        //     slice(10, 1)
+        //
+        // This is because `slice` expects either a string or an array, but it
+        // receives an integer. The concept of "progressive type checking" does
+        // not apply in this case, because this call can never succeed.
+        //
+        // However, given these example events:
+        //
+        //     { "foo": "bar" }
+        //     { "foo": 10.5 }
+        //
+        // If we were to run the same program, but against the `foo` field:
+        //
+        //     slice(.foo, 1)
+        //
+        // In this situation, progressive type checking _does_ make sense,
+        // because we can't know at compile-time what the eventual value of
+        // `.foo` will be. We mark `.foo` as "any", which includes the "array"
+        // and "string" types, so the program can now be made infallible by
+        // handling any potential type error the function returns:
+        //
+        //     slice(.foo, 1) ?? []
+        //
+        // Note that this rule doesn't just apply to "any" kind (in fact, "any"
+        // isn't a kind, it's simply a term meaning "all possible VRL values"),
+        // but it applies whenever there's an _intersection_ but not an exact
+        // _match_ between two types.
+        //
+        // Here's another example to demonstrate this:
+        //
+        //     { "foo": "foobar" }
+        //     { "foo": ["foo", "bar"] }
+        //     { "foo": 10.5 }
+        //
+        //     foo = slice(.foo, 1) ?? .foo
+        //     .foo = upcase(foo) ?? foo
+        //
+        // This would result in the following outcomes:
+        //
+        //     { "foo": "OOBAR" }
+        //     { "foo": ["bar", "baz"] }
+        //     { "foo": 10.5 }
+        //
+        // For the first event, both the `slice` and `upcase` functions succeed.
+        // For the second event, only the `slice` function succeeds.
+        // For the third event, both functions fail.
+        //
+        if self.maybe_fallible_arguments {
+            type_def.fallible = true;
+        }
 
         if self.abort_on_error {
             type_def.fallible = false;
@@ -266,6 +343,7 @@ impl PartialEq for FunctionCall {
 // -----------------------------------------------------------------------------
 
 #[derive(thiserror::Error, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum Error {
     #[error("call to undefined function")]
     Undefined {
@@ -274,8 +352,8 @@ pub enum Error {
         idents: Vec<&'static str>,
     },
 
-    #[error("function argument arity mismatch")]
-    ArityMismatch { arguments_span: Span, max: usize },
+    #[error("wrong number of function arguments")]
+    WrongNumberOfArgs { arguments_span: Span, max: usize },
 
     #[error("unknown function argument keyword")]
     UnknownKeyword {
@@ -284,8 +362,8 @@ pub enum Error {
         keywords: Vec<&'static str>,
     },
 
-    #[error("function argument missing")]
-    RequiredArgument {
+    #[error("missing function argument")]
+    MissingArgument {
         call_span: Span,
         keyword: &'static str,
         position: usize,
@@ -297,15 +375,17 @@ pub enum Error {
         error: Box<dyn DiagnosticError>,
     },
 
-    #[error("cannot abort function that never fails")]
+    #[error("can't abort infallible function")]
     AbortInfallible { ident_span: Span, abort_span: Span },
 
     #[error("invalid argument type")]
     InvalidArgumentKind {
-        keyword: &'static str,
+        function_ident: &'static str,
+        abort_on_error: bool,
+        arguments_fmt: Vec<String>,
+        parameter: Parameter,
         got: Kind,
-        expected: Kind,
-        expr_span: Span,
+        argument: FunctionArgument,
         argument_span: Span,
     },
 
@@ -319,10 +399,10 @@ impl DiagnosticError for Error {
 
         match self {
             Undefined { .. } => 105,
-            ArityMismatch { .. } => 106,
+            WrongNumberOfArgs { .. } => 106,
             UnknownKeyword { .. } => 108,
             Compilation { .. } => 610,
-            RequiredArgument { .. } => 107,
+            MissingArgument { .. } => 107,
             AbortInfallible { .. } => 620,
             InvalidArgumentKind { .. } => 110,
             FallibleArgument { .. } => 630,
@@ -359,7 +439,7 @@ impl DiagnosticError for Error {
                 vec
             }
 
-            ArityMismatch {
+            WrongNumberOfArgs {
                 arguments_span,
                 max,
             } => {
@@ -402,7 +482,7 @@ impl DiagnosticError for Error {
                 })
                 .collect(),
 
-            RequiredArgument {
+            MissingArgument {
                 call_span,
                 keyword,
                 position,
@@ -421,18 +501,22 @@ impl DiagnosticError for Error {
                 abort_span,
             } => {
                 vec![
-                    Label::primary("this function cannot fail", ident_span),
+                    Label::primary("this function can't fail", ident_span),
                     Label::context("remove this abort-instruction", abort_span),
                 ]
             }
 
             InvalidArgumentKind {
-                expr_span,
-                argument_span,
-                keyword,
+                parameter,
                 got,
-                expected,
+                argument,
+                argument_span,
+                ..
             } => {
+                let keyword = parameter.keyword;
+                let expected = parameter.kind();
+                let expr_span = argument.span();
+
                 // TODO: extract this out into a helper
                 let kind_str = |kind: &Kind| {
                     if kind.is_any() {
@@ -453,7 +537,7 @@ impl DiagnosticError for Error {
                         format!(
                             r#"but the parameter "{}" expects {}"#,
                             keyword,
-                            kind_str(expected)
+                            kind_str(&expected)
                         ),
                         argument_span,
                     ),
@@ -474,7 +558,75 @@ impl DiagnosticError for Error {
         use Error::*;
 
         match self {
+            WrongNumberOfArgs { .. } => vec![Note::SeeDocs(
+                "function arguments".to_owned(),
+                Urls::expression_docs_url("#arguments"),
+            )],
             AbortInfallible { .. } | FallibleArgument { .. } => vec![Note::SeeErrorDocs],
+            InvalidArgumentKind {
+                function_ident,
+                abort_on_error,
+                arguments_fmt,
+                parameter,
+                argument,
+                ..
+            } => {
+                // TODO: move this into a generic helper function
+                let guard = match parameter.kind() {
+                    Kind::Bytes => format!("string!({})", argument),
+                    Kind::Integer => format!("int!({})", argument),
+                    Kind::Float => format!("float!({})", argument),
+                    Kind::Boolean => format!("bool!({})", argument),
+                    Kind::Object => format!("object!({})", argument),
+                    Kind::Array => format!("array!({})", argument),
+                    Kind::Timestamp => format!("timestamp!({})", argument),
+                    _ => return vec![],
+                };
+
+                let coerce = match parameter.kind() {
+                    Kind::Bytes => Some(format!(r#"to_string({}) ?? "default""#, argument)),
+                    Kind::Integer => Some(format!("to_int({}) ?? 0", argument)),
+                    Kind::Float => Some(format!("to_float({}) ?? 0", argument)),
+                    Kind::Boolean => Some(format!("to_bool({}) ?? false", argument)),
+                    Kind::Timestamp => Some(format!("to_timestamp({}) ?? now()", argument)),
+                    _ => None,
+                };
+
+                let args = {
+                    let mut args = String::new();
+                    let mut iter = arguments_fmt.iter().peekable();
+                    while let Some(arg) = iter.next() {
+                        args.push_str(arg);
+                        if iter.peek().is_some() {
+                            args.push_str(", ");
+                        }
+                    }
+
+                    args
+                };
+
+                let abort = if *abort_on_error { "!" } else { "" };
+
+                let mut notes = vec![];
+
+                let call = format!("{}{}({})", function_ident, abort, args);
+
+                notes.append(&mut Note::solution(
+                    "ensuring an appropriate type at runtime",
+                    vec![format!("{} = {}", argument, guard), call.clone()],
+                ));
+
+                if let Some(coerce) = coerce {
+                    notes.append(&mut Note::solution(
+                        "coercing to an appropriate type and specifying a default value as a fallback in case coercion fails",
+                        vec![format!("{} = {}", argument, coerce), call],
+                    ))
+                }
+
+                notes.push(Note::SeeErrorDocs);
+
+                notes
+            }
             _ => vec![],
         }
     }

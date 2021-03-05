@@ -1,4 +1,4 @@
-use crate::{transforms::FunctionTransform, Event};
+use crate::{internal_events::EventOut, transforms::FunctionTransform, Event};
 use futures::{task::Poll, Sink};
 use std::{collections::VecDeque, fmt, pin::Pin, task::Context};
 use tokio::sync::mpsc;
@@ -76,6 +76,7 @@ impl Sink<Event> for Pipeline {
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
+        emit!(EventOut { count: 1 });
         // Note how this gets **swapped** with `new_working_set` in the loop.
         // At the end of the loop, it will only contain finalized events.
         let mut working_set = vec![item];

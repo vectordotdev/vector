@@ -147,12 +147,10 @@ impl Application {
                     path = ?config_paths
                 );
 
-                let mut config =
-                    config::load_from_paths(&config_paths, false).map_err(handle_config_errors)?;
+                config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
-                config::LOG_SCHEMA
-                    .set(config.global.log_schema.clone())
-                    .expect("Couldn't set schema");
+                let mut config =
+                    config::load_from_paths(&config_paths).map_err(handle_config_errors)?;
 
                 if !config.healthchecks.enabled {
                     info!("Health checks are disabled.");
@@ -233,7 +231,7 @@ impl Application {
                         // Reload paths
                         config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
                         // Reload config
-                        let new_config = config::load_from_paths(&config_paths, false).map_err(handle_config_errors).ok();
+                        let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
 
                         if let Some(mut new_config) = new_config {
                             new_config.healthchecks.set_require_healthy(opts.require_healthy);

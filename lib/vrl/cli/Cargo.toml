@@ -21,6 +21,7 @@ serde_json = "1"
 structopt = { version = "0.3", default-features = false }
 thiserror = "1"
 webbrowser = { version = "0.5", default-features = false, optional = true }
+lazy_static = { version = "1", optional = true }
 indoc = "1.0.3"
 
 [dependencies.stdlib]
@@ -29,4 +30,4 @@ path = "../stdlib"
 
 [features]
 default = ["repl"]
-repl = ["prettytable-rs", "regex", "rustyline", "webbrowser"]
+repl = ["lazy_static", "prettytable-rs", "regex", "rustyline", "webbrowser"]

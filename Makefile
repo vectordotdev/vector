@@ -1,6 +1,9 @@
 # .PHONY: $(MAKECMDGOALS) all
 .DEFAULT_GOAL := help
 
+mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+mkfile_dir := $(dir $(mkfile_path))
+
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
@@ -16,6 +19,8 @@ endif
 export SCOPE ?= ""
 # Override this with any extra flags for cargo bench
 export CARGO_BENCH_FLAGS ?= ""
+# override this to put criterion output elsewhere
+export CRITERION_HOME ?= "$(mkfile_dir)target/criterion"
 # Override to false to disable autospawning services on integration tests.
 export AUTOSPAWN ?= true
 # Override to control if services are turned off after integration tests.
@@ -277,9 +282,9 @@ test: ## Run the unit test suite
 
 .PHONY: test-components
 test-components: ## Test with all components enabled
-# TODO(jesse) add `wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
+# TODO(jesse) add `language-benches wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
 # test-components: $(WASM_MODULE_OUTPUTS)
-test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches remap-benches"
+test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches metrics-benches remap-benches"
 test-components: test
 
 .PHONY: test-all
@@ -538,6 +543,11 @@ bench: ## Run benchmarks in /benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
+.PHONY: bench-remap-functions
+bench-remap-functions: ## Run remap-functions benches
+	${MAYBE_ENVIRONMENT_EXEC} CRITERION_HOME="$(CRITERION_HOME)" cargo bench --manifest-path lib/vrl/stdlib/Cargo.toml ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
 .PHONY: bench-remap
 bench-remap: ## Run remap benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "remap-benches" --bench remap ${CARGO_BENCH_FLAGS}
@@ -560,7 +570,7 @@ bench-metrics: ## Run metrics benches
 
 .PHONY: bench-all
 bench-all: ### Run all benches
-bench-all: $(WASM_MODULE_OUTPUTS)
+bench-all: $(WASM_MODULE_OUTPUTS) bench-remap-functions
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches metrics-benches language-benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
@@ -632,6 +642,11 @@ check-kubernetes-yaml: ## Check that the generated Kubernetes YAML configs are u
 
 check-events: ## Check that events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events.sh
+
+##@ Rustdoc
+build-rustdoc: ## Build Vector's Rustdocs
+	# This command is mostly intended for use by the build process in timberio/vector-rustdoc
+	${MAYBE_ENVIRONMENT_EXEC} cargo doc --no-deps
 
 ##@ Packaging
 
@@ -768,6 +783,12 @@ release-helm: ## Package and release Helm Chart
 .PHONY: sync-install
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
+
+##@ Vector Remap Language
+
+.PHONY: test-vrl
+test-vrl: ## Run the VRL test suite
+	@scripts/test-vrl.sh
 
 ##@ Utility
 

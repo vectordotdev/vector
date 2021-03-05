@@ -47,6 +47,7 @@ components: transforms: metric_to_log: {
 				syntax: "literal"
 			}
 		}
+		timezone: configuration._timezone
 	}
 
 	input: {

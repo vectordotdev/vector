@@ -20,17 +20,6 @@ remap: errors: "110": {
 		source: #"""
 			downcase(.message)
 			"""#
-		raises: compiletime: #"""
-			error: \#(title)
-			  ┌─ :1:1
-			  │
-			1 │ downcase(.message)
-			  │          ^^^^^^^^
-			  │          │
-			  │          this expression resolves to unknown type
-			  |          but the parameter "value" expects the exact type "string"
-			  │
-			"""#
 	}]
 
 	examples: [

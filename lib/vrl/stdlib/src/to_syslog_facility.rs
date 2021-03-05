@@ -47,7 +47,7 @@ struct ToSyslogFacilityFn {
 
 impl Expression for ToSyslogFacilityFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.unwrap_integer();
+        let value = self.value.resolve(ctx)?.try_integer()?;
 
         // Facility codes: https://en.wikipedia.org/wiki/Syslog#Facility
         let code = match value {

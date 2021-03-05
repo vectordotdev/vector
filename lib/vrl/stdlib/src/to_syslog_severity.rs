@@ -48,7 +48,7 @@ struct ToSyslogSeverityFn {
 impl Expression for ToSyslogSeverityFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let level = self.value.resolve(ctx)?;
-        let level = level.unwrap_bytes_utf8_lossy();
+        let level = level.try_bytes_utf8_lossy()?;
 
         // Severity levels: https://en.wikipedia.org/wiki/Syslog#Severity_level
         let severity = match &level[..] {

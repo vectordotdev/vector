@@ -19,16 +19,6 @@ remap: errors: "100": {
 			source: #"""
 				get_env_var("HOST")
 				"""#
-			raises: compiletime: #"""
-				error: \#(title)
-				  ┌─ :1:1
-				  │
-				1 │ 	(5 / 2)
-				  │     ^^^^^
-				  │     │
-				  │     this expression is unhandled
-				  │
-				"""#
 			diff: #"""
 				- 	get_env_var("HOST")
 				+# 	.host = get_env_var("HOST")

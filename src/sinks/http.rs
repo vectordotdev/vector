@@ -303,13 +303,15 @@ mod tests {
         },
         test_util::{next_addr, random_lines_with_stream},
     };
-    use bytes::buf::BufExt;
+    use bytes::{buf::BufExt, Bytes};
     use flate2::read::GzDecoder;
     use futures::{stream, StreamExt};
     use headers::{Authorization, HeaderMapExt};
+    use http::request::Parts;
     use hyper::Method;
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};
+    use tokio::sync::mpsc::Receiver;
 
     #[test]
     fn generate_config() {
@@ -376,7 +378,7 @@ mod tests {
         assert_downcast_matches!(
             super::validate_headers(&config.request.headers, &None).unwrap_err(),
             BuildError,
-            BuildError::InvalidHeaderName{..}
+            BuildError::InvalidHeaderName { .. }
         );
     }
 
@@ -434,23 +436,15 @@ mod tests {
         pump.await.unwrap();
         drop(trigger);
 
-        let output_lines = rx
-            .flat_map(|(parts, body)| {
-                assert_eq!(Method::POST, parts.method);
-                assert_eq!("/frames", parts.uri.path());
-                assert_eq!(
-                    Some(Authorization::basic("waldo", "hunter2")),
-                    parts.headers.typed_get()
-                );
-                stream::iter(BufReader::new(GzDecoder::new(body.reader())).lines())
-            })
-            .map(Result::unwrap)
-            .map(|line| {
-                let val: serde_json::Value = serde_json::from_str(&line).unwrap();
-                val.get("message").unwrap().as_str().unwrap().to_owned()
-            })
-            .collect::<Vec<_>>()
-            .await;
+        let output_lines = get_received(rx, |parts| {
+            assert_eq!(Method::POST, parts.method);
+            assert_eq!("/frames", parts.uri.path());
+            assert_eq!(
+                Some(Authorization::basic("waldo", "hunter2")),
+                parts.headers.typed_get()
+            );
+        })
+        .await;
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
@@ -489,23 +483,15 @@ mod tests {
         pump.await.unwrap();
         drop(trigger);
 
-        let output_lines = rx
-            .flat_map(|(parts, body)| {
-                assert_eq!(Method::PUT, parts.method);
-                assert_eq!("/frames", parts.uri.path());
-                assert_eq!(
-                    Some(Authorization::basic("waldo", "hunter2")),
-                    parts.headers.typed_get()
-                );
-                stream::iter(BufReader::new(GzDecoder::new(body.reader())).lines())
-            })
-            .map(Result::unwrap)
-            .map(|line| {
-                let val: serde_json::Value = serde_json::from_str(&line).unwrap();
-                val.get("message").unwrap().as_str().unwrap().to_owned()
-            })
-            .collect::<Vec<_>>()
-            .await;
+        let output_lines = get_received(rx, |parts| {
+            assert_eq!(Method::PUT, parts.method);
+            assert_eq!("/frames", parts.uri.path());
+            assert_eq!(
+                Some(Authorization::basic("waldo", "hunter2")),
+                parts.headers.typed_get()
+            );
+        })
+        .await;
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
@@ -541,27 +527,70 @@ mod tests {
         pump.await.unwrap();
         drop(trigger);
 
-        let output_lines = rx
-            .flat_map(|(parts, body)| {
-                assert_eq!(Method::POST, parts.method);
-                assert_eq!("/frames", parts.uri.path());
-                assert_eq!(
-                    Some("bar"),
-                    parts.headers.get("foo").map(|v| v.to_str().unwrap())
-                );
-                assert_eq!(
-                    Some("quux"),
-                    parts.headers.get("baz").map(|v| v.to_str().unwrap())
-                );
-                stream::iter(BufReader::new(GzDecoder::new(body.reader())).lines())
-            })
-            .map(Result::unwrap)
-            .map(|line| {
-                let val: serde_json::Value = serde_json::from_str(&line).unwrap();
-                val.get("message").unwrap().as_str().unwrap().to_owned()
-            })
-            .collect::<Vec<_>>()
-            .await;
+        let output_lines = get_received(rx, |parts| {
+            assert_eq!(Method::POST, parts.method);
+            assert_eq!("/frames", parts.uri.path());
+            assert_eq!(
+                Some("bar"),
+                parts.headers.get("foo").map(|v| v.to_str().unwrap())
+            );
+            assert_eq!(
+                Some("quux"),
+                parts.headers.get("baz").map(|v| v.to_str().unwrap())
+            );
+        })
+        .await;
+
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    }
+
+    #[tokio::test]
+    async fn retries_on_no_connection() {
+        let num_lines = 10;
+
+        let in_addr = next_addr();
+
+        let config = r#"
+        uri = "http://$IN_ADDR/frames"
+        compression = "gzip"
+        encoding = "ndjson"
+
+        [auth]
+        strategy = "basic"
+        user = "waldo"
+        password = "hunter2"
+    "#
+        .replace("$IN_ADDR", &format!("{}", in_addr));
+        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+        let cx = SinkContext::new_test();
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let pump = tokio::spawn(sink.run(events));
+
+        // This ordering starts the sender before the server has built
+        // its accepting socket. The delay below ensures that the sink
+        // attempts to connect at least once before creating the
+        // listening socket.
+        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+        let (rx, trigger, server) = build_test_server(in_addr);
+        tokio::spawn(server);
+
+        pump.await.unwrap().unwrap();
+        drop(trigger);
+
+        let output_lines = get_received(rx, |parts| {
+            assert_eq!(Method::POST, parts.method);
+            assert_eq!("/frames", parts.uri.path());
+            assert_eq!(
+                Some(Authorization::basic("waldo", "hunter2")),
+                parts.headers.typed_get()
+            );
+        })
+        .await;
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
@@ -618,5 +647,22 @@ mod tests {
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
+    }
+
+    async fn get_received(
+        rx: Receiver<(Parts, Bytes)>,
+        assert_parts: impl Fn(Parts),
+    ) -> Vec<String> {
+        rx.flat_map(|(parts, body)| {
+            assert_parts(parts);
+            stream::iter(BufReader::new(GzDecoder::new(body.reader())).lines())
+        })
+        .map(Result::unwrap)
+        .map(|line| {
+            let val: serde_json::Value = serde_json::from_str(&line).unwrap();
+            val.get("message").unwrap().as_str().unwrap().to_owned()
+        })
+        .collect::<Vec<_>>()
+        .await
     }
 }

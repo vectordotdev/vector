@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, TransformConfig, TransformDescription},
+    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
     internal_events::{TokenizerConvertFailed, TokenizerFieldMissing},
     transforms::{FunctionTransform, Transform},
@@ -7,7 +7,7 @@ use crate::{
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use shared::tokenize::parse;
+use shared::{tokenize::parse, TimeZone};
 use std::collections::HashMap;
 use std::str;
 
@@ -18,6 +18,7 @@ pub struct TokenizerConfig {
     pub field: Option<String>,
     pub drop_field: bool,
     pub types: HashMap<String, String>,
+    pub timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -29,13 +30,14 @@ impl_generate_config_from_default!(TokenizerConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "tokenizer")]
 impl TransformConfig for TokenizerConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().to_string());
 
-        let types = parse_check_conversion_map(&self.types, &self.field_names)?;
+        let timezone = self.timezone.unwrap_or(globals.timezone);
+        let types = parse_check_conversion_map(&self.types, &self.field_names, timezone)?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| **f == *field);
@@ -123,8 +125,11 @@ impl FunctionTransform for Tokenizer {
 #[cfg(test)]
 mod tests {
     use super::TokenizerConfig;
-    use crate::event::{LogEvent, Value};
-    use crate::{config::TransformConfig, Event};
+    use crate::{
+        config::{GlobalOptions, TransformConfig},
+        event::{LogEvent, Value},
+        Event,
+    };
 
     #[test]
     fn generate_config() {
@@ -146,8 +151,9 @@ mod tests {
             field,
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
+            timezone: Default::default(),
         }
-        .build()
+        .build(&GlobalOptions::default())
         .await
         .unwrap();
         let parser = parser.as_function();

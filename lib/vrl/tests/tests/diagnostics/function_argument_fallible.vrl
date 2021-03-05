@@ -9,7 +9,7 @@
 #   │        this expression can fail
 #   │        handle the error before passing it in as an argument
 #   │
-#   = see error handling documentation at: https://vector.dev/docs/reference/vrl/
-#   = see language documentation at: https://vector.dev/docs/reference/vrl/
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = see language documentation at https://vrl.dev
 
 to_int(5 / 4)
