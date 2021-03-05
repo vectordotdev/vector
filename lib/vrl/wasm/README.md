@@ -55,6 +55,14 @@ const expected = {
 }
 ```
 
+## Testing
+
+To run the tests:
+
+```bash
+wasm-pack test --node
+```
+
 [vrl]: https://vrl.dev
 [wasm]: https://webassembly.org
 [wasm-pack]: https://github.com/rustwasm/wasm-pack

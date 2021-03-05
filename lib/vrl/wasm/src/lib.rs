@@ -21,7 +21,10 @@ pub struct Input {
 
 impl Input {
     pub fn new(program: &str, event: Value) -> Self {
-        Self { program: program.to_owned(), event }
+        Self {
+            program: program.to_owned(),
+            event,
+        }
     }
 }
 
@@ -41,15 +44,7 @@ impl VrlCompileResult {
 
 // Errors are output as JSON
 #[derive(Deserialize, Serialize)]
-pub struct ErrorResult {
-    error: String,
-}
-
-impl ErrorResult {
-    fn new(error: String) -> Self {
-        Self { error }
-    }
-}
+pub struct ErrorResult(pub String);
 
 fn compile(mut input: Input) -> Result<VrlCompileResult, ErrorResult> {
     let event = &mut input.event;
@@ -60,13 +55,13 @@ fn compile(mut input: Input) -> Result<VrlCompileResult, ErrorResult> {
         Ok(program) => program,
         Err(diagnostics) => {
             let msg = Formatter::new(&input.program, diagnostics).to_string();
-            return Err(ErrorResult::new(msg));
+            return Err(ErrorResult(msg));
         }
     };
 
     match runtime.resolve(event, &program) {
         Ok(result) => Ok(VrlCompileResult::new(result, event.clone())),
-        Err(err) => Err(ErrorResult::new(err.to_string())),
+        Err(err) => Err(ErrorResult(err.to_string())),
     }
 }
 
