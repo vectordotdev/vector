@@ -18,7 +18,6 @@ expanding into more specifics.
    1. [Github Pull Requests](#github-pull-requests)
       1. [Title](#title)
       1. [Reviews & Approvals](#reviews--approvals)
-      1. [Bors review process](#bors-review-process)
       1. [Merge Style](#merge-style)
    1. [CI](#ci)
       1. [Releasing](#releasing)
@@ -192,34 +191,6 @@ All pull requests should be reviewed by:
 
 If there are any CODEOWNERs automatically assigned, you should also wait for
 their review.
-
-#### Bors review process
-
-[![Bors enabled](https://bors.tech/images/badge_small.svg)](https://app.bors.tech/repositories/28346)
-
-Once you’ve reviewed the PR, instead of clicking the green “Merge Button”, leave a comment like this on the pull request:
-
-```text
-bors r+
-```
-
-Equivalently, you can comment the following:
-
-```text
-bors merge
-```
-
-The pull request, as well as any other pull requests that are reviewed around the same time, will be merged into a branch called `staging`. CI will run there and report the result back. If that result is “OK”, `master` gets fast-forwarded to reach it.
-
-There’s also:
-
-```text
-bors try
-```
-
-When this is run, your branch and master get merged into `trying`, and bors will report the results just like the `staging` branch would. Only reviewers can push to this.
-
-The review process is outlined in the [Review guide](REVIEWING.md).
 
 #### Merge Style
 
