@@ -17,7 +17,7 @@ remap: functions: tag_types_externally: {
 		},
 	]
 	internal_failure_reasons: []
-	return: types: ["object", "array"]
+	return: types: ["object", "array", "null"]
 	examples: [
 		{
 			title: "Tag types externally (scalar)"
@@ -62,6 +62,13 @@ remap: functions: tag_types_externally: {
 					string: "bar"
 				},
 			]
+		},
+		{
+			title: "Tag types externally (null)"
+			source: #"""
+				tag_types_externally(null)
+				"""#
+			return: null
 		},
 	]
 }

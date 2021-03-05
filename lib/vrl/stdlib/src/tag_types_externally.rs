@@ -36,6 +36,11 @@ impl Function for TagTypesExternally {
                 source: r#"tag_types_externally(["foo", "bar"])"#,
                 result: Ok(r#"[{ "string": "foo" }, { "string": "bar" }]"#),
             },
+            Example {
+                title: "null",
+                source: r#"tag_types_externally(null)"#,
+                result: Ok("null"),
+            },
         ]
     }
 
@@ -72,6 +77,7 @@ impl Expression for TagTypesExternallyFn {
             kind if kind.is_array() => TypeDef::new()
                 .infallible()
                 .array_mapped::<(), Kind>(map! { (): Kind::all() }),
+            kind if kind.is_null() => TypeDef::new().infallible().null(),
             _ => TypeDef::new()
                 .infallible()
                 .object::<(), Kind>(map! { (): Kind::all() }),
@@ -103,7 +109,7 @@ fn tag_type_externally(value: Value) -> Value {
         ),
         value @ Value::Timestamp(_) => (Some("timestamp"), value),
         value @ Value::Regex(_) => (Some("regex"), value),
-        Value::Null => (Some("null"), Value::Null),
+        Value::Null => (None, Value::Null),
     };
 
     if let Some(key) = key {
@@ -216,10 +222,8 @@ mod tests {
             args: func_args! {
                 value: Value::Null
             },
-            want: Ok(btreemap! {
-                "null" => Value::Null
-            }),
-            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
+            want: Ok(Value::Null),
+            tdef: TypeDef::new().null(),
         }
     ];
 }

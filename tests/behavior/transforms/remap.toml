@@ -1072,7 +1072,7 @@
         .array == [{ "string": "foo" }] &&
         .timestamp == { "timestamp": to_timestamp!("2021-01-01T00:00:00.00Z") } &&
         .regex == { "regex": ".*" } &&
-        .null == { "null": null }
+        .null == null
       '''
 
 # [transforms.remap_function_strip_whitespace]
