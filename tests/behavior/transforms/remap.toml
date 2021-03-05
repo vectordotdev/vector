@@ -1050,7 +1050,7 @@
     .map = tag_types_externally({ "foo": "bar" })
     .array = tag_types_externally(["foo"])
     .timestamp = tag_types_externally(to_timestamp!("2021-01-01T00:00:00.00Z"))
-    .regex = tag_types_externally(/.*/)
+    .regex = tag_types_externally(r'.*')
     .null = tag_types_externally(null)
   """
 [[tests]]
@@ -1064,14 +1064,14 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .bytes == { "bytes": "foo" } && \
-        .integer == { "integer": 123 } && \
-        .float == { "float": 123.45 } && \
-        .boolean == { "boolean": true } && \
-        .map == { "foo": { "bytes": "bar" } } && \
-        .array == [{ "bytes": "foo" }] && \
-        .timestamp == { "timestamp": to_timestamp!("2021-01-01T00:00:00.00Z") } && \
-        .regex == { "regex": ".*" } && \
+        .bytes == { "bytes": "foo" } &&
+        .integer == { "integer": 123 } &&
+        .float == { "float": 123.45 } &&
+        .boolean == { "boolean": true } &&
+        .map == { "foo": { "bytes": "bar" } } &&
+        .array == [{ "bytes": "foo" }] &&
+        .timestamp == { "timestamp": to_timestamp!("2021-01-01T00:00:00.00Z") } &&
+        .regex == { "regex": ".*" } &&
         .null == { "null": null }
       '''
 
