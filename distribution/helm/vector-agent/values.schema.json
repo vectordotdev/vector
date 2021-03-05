@@ -254,9 +254,9 @@
                     "default": "0.0.0.0"
                 },
                 "listenPort": {
-                    "type": "integer",
+                    "type": ["string", "integer", "null"],
                     "description": "The port to listen at.",
-                    "default": 9090
+                    "default": "9090"
                 },
                 "podMonitor": {
                     "type": "object",
@@ -446,7 +446,7 @@
                     "default": null
                 },
                 "port": {
-                    "type": ["integer", "null"],
+                    "type": ["string", "integer", "null"],
                     "description": "The port of the Vector to send the data to.",
                     "default": null 
                 },
