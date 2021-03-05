@@ -12,10 +12,13 @@ remap: errors: "305": {
 		"""
 	resolution: """
 		If you know that a value is necessarily zero, don't divide by it. If a value *could* be
-		zero, handle the potential error thrown by the operation:
+		zero, capture the potential error thrown by the operation:
 
 		```vrl
 		result, err = 27 / .some_value
+		if err != nil {
+			# Handle error
+		}
 		```
 		"""
 }
