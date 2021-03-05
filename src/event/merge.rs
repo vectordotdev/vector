@@ -121,6 +121,6 @@ mod test {
             log
         };
 
-        assert_eq!(merged, expected);
+        shared::assert_event_data_eq!(merged, expected);
     }
 }

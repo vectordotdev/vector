@@ -1,5 +1,6 @@
 use super::{lookup::Segment, util, EventMetadata, Lookup, PathComponent, Value};
 use serde::{Serialize, Serializer};
+use shared::EventDataEq;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
@@ -135,6 +136,12 @@ impl LogEvent {
         }
         trace!(entry = ?current_pointer, "Result.");
         Ok(current_pointer)
+    }
+}
+
+impl EventDataEq for LogEvent {
+    fn event_data_eq(&self, other: &Self) -> bool {
+        self.fields == other.fields && self.metadata.event_data_eq(&other.metadata)
     }
 }
 

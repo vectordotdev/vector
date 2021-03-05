@@ -3,6 +3,7 @@ use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
+use shared::EventDataEq;
 use std::collections::{BTreeMap, HashMap};
 
 pub mod discriminant;
@@ -31,6 +32,12 @@ pub const PARTIAL: &str = "_partial";
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct EventMetadata;
+
+impl EventDataEq for EventMetadata {
+    fn event_data_eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Event {
@@ -96,6 +103,16 @@ impl Event {
         match self {
             Self::Log(log) => &mut log.metadata,
             Self::Metric(metric) => &mut metric.metadata,
+        }
+    }
+}
+
+impl EventDataEq for Event {
+    fn event_data_eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Log(a), Self::Log(b)) => a.event_data_eq(b),
+            (Self::Metric(a), Self::Metric(b)) => a.event_data_eq(b),
+            _ => false,
         }
     }
 }
