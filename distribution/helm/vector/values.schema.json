@@ -29,9 +29,9 @@
                             }
                         },
                         "port": {
-                            "type": "string",
+                            "type": "integer",
                             "description": "Set the port to match the one used by `vector-aggregator`.",
-                            "default": "9000"
+                            "default": 9000
                         }
                     }
                 }
@@ -45,9 +45,9 @@
                     "description": "See the possible settings at the `vector-aggregator` chart. Pass some setting here explicitly to guarantee they match values set at `vector-agent`.",
                     "properties": {
                         "listenPort": {
-                            "type": "string",
+                            "type": "integer",
                             "description": "Use the same port that's specified at `vector-agent`.",
-                            "default": "9000"
+                            "default": 9000
                         }
                     }
                 }

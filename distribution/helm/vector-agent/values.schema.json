@@ -254,9 +254,9 @@
                     "default": "0.0.0.0"
                 },
                 "listenPort": {
-                    "type": "string",
+                    "type": "integer",
                     "description": "The port to listen at.",
-                    "default": "9090"
+                    "default": 9090
                 },
                 "podMonitor": {
                     "type": "object",
