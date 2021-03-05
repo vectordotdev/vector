@@ -40,7 +40,7 @@ remap: functions: tag_types_externally: {
 				"""#
 			return: {
 				message: {
-					bytes: "Hello world"
+					string: "Hello world"
 				}
 				request: {
 					duration_ms: {
@@ -56,10 +56,10 @@ remap: functions: tag_types_externally: {
 				"""#
 			return: [
 				{
-					bytes: "foo"
+					string: "foo"
 				},
 				{
-					bytes: "bar"
+					string: "bar"
 				},
 			]
 		},

@@ -1043,7 +1043,7 @@
   inputs = []
   type = "remap"
   source = """
-    .bytes = tag_types_externally("foo")
+    .string = tag_types_externally("foo")
     .integer = tag_types_externally(123)
     .float = tag_types_externally(123.45)
     .boolean = tag_types_externally(true)
@@ -1064,12 +1064,12 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .bytes == { "bytes": "foo" } &&
+        .string == { "string": "foo" } &&
         .integer == { "integer": 123 } &&
         .float == { "float": 123.45 } &&
         .boolean == { "boolean": true } &&
-        .map == { "foo": { "bytes": "bar" } } &&
-        .array == [{ "bytes": "foo" }] &&
+        .map == { "foo": { "string": "bar" } } &&
+        .array == [{ "string": "foo" }] &&
         .timestamp == { "timestamp": to_timestamp!("2021-01-01T00:00:00.00Z") } &&
         .regex == { "regex": ".*" } &&
         .null == { "null": null }

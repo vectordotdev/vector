@@ -28,13 +28,13 @@ impl Function for TagTypesExternally {
                     })
                 "#},
                 result: Ok(
-                    r#"{ "message": { "bytes": "Hello world" }, "request": { "duration_ms": { "float": 67.9 } } }"#,
+                    r#"{ "message": { "string": "Hello world" }, "request": { "duration_ms": { "float": 67.9 } } }"#,
                 ),
             },
             Example {
                 title: "array",
                 source: r#"tag_types_externally(["foo", "bar"])"#,
-                result: Ok(r#"[{ "bytes": "foo" }, { "bytes": "bar" }]"#),
+                result: Ok(r#"[{ "string": "foo" }, { "string": "bar" }]"#),
             },
         ]
     }
@@ -81,7 +81,7 @@ impl Expression for TagTypesExternallyFn {
 
 fn tag_type_externally(value: Value) -> Value {
     let (key, value) = match value {
-        value @ Value::Bytes(_) => (Some("bytes"), value),
+        value @ Value::Bytes(_) => (Some("string"), value),
         value @ Value::Integer(_) => (Some("integer"), value),
         value @ Value::Float(_) => (Some("float"), value),
         value @ Value::Boolean(_) => (Some("boolean"), value),
@@ -131,7 +131,7 @@ mod tests {
                 value: "foo"
             },
             want: Ok(btreemap! {
-                "bytes" => "foo",
+                "string" => "foo",
             }),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
@@ -174,7 +174,7 @@ mod tests {
             },
             want: Ok(btreemap! {
                 "foo" => btreemap! {
-                    "bytes" => "bar"
+                    "string" => "bar"
                 }
             }),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
@@ -186,7 +186,7 @@ mod tests {
             },
             want: Ok(vec![
                 btreemap! {
-                    "bytes" => "foo"
+                    "string" => "foo"
                 },
             ]),
             tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
