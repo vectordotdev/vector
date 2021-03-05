@@ -162,7 +162,7 @@ impl KinesisFirehoseService {
                 cx.acker(),
             )
             .sink_map_err(|error| error!(message = "Fatal kinesis firehose sink error.", %error))
-            .with_flat_map(move |e| stream::iter(encode_event(e, &encoding)).map(Ok));
+            .with_flat_map(move |e| stream::iter(Some(encode_event(e, &encoding))).map(Ok));
 
         Ok(sink)
     }
@@ -240,7 +240,7 @@ enum HealthcheckError {
     StreamNamesMismatch { name: String, stream_name: String },
 }
 
-fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Record> {
+fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Record {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
     let data = match encoding.codec() {
@@ -254,7 +254,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
 
     let data = Bytes::from(data);
 
-    Some(Record { data })
+    Record { data }
 }
 
 #[cfg(test)]
@@ -270,7 +270,7 @@ mod tests {
     #[test]
     fn firehose_encode_event_text() {
         let message = "hello world".to_string();
-        let event = encode_event(message.clone().into(), &Encoding::Text.into()).unwrap();
+        let event = encode_event(message.clone().into(), &Encoding::Text.into());
 
         assert_eq!(&event.data[..], message.as_bytes());
     }
@@ -280,7 +280,7 @@ mod tests {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("key", "value");
-        let event = encode_event(event, &Encoding::Json.into()).unwrap();
+        let event = encode_event(event, &Encoding::Json.into());
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 

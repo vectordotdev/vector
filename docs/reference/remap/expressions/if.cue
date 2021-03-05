@@ -3,9 +3,9 @@ package metadata
 remap: expressions: if: {
 	title: "If"
 	description: """
-		An _if_ expression specifies the conditional execution of two branches according to the value of a boolean
-		expression. If the boolean expression evaluates to `true`, the "if" branch is executed, otherwise, if present,
-		the "else" branch is executed.
+		An _if_ expression specifies the conditional execution of two branches according to the value of a Boolean
+		expression. If the Boolean expression evaluates to `true`, the "if" branch is executed, otherwise the "else"
+		branch is executed (if present).
 		"""
 	return: """
 		The result of the last expression evaluated in the executed branch or null if no expression is evaluated.
@@ -13,13 +13,13 @@ remap: expressions: if: {
 
 	grammar: {
 		source: """
-			"if" ~ boolean_expression ~ block ~ ("else if" ~ boolean_expression ~ block)* ~ ("else" ~ block)?
+			"if" ~ predicate ~ block ~ ("else if" ~ predicate ~ block)* ~ ("else" ~ block)?
 			"""
 		definitions: {
-			boolean_expression: {
+			predicate: {
 				description: """
-					The `boolean_expression` must be an expression that resolves to a boolean. If a boolean is not
-					returned a compile-time error will be raised.
+					The `predicate` _must_ be an expression that resolves to a Boolean. If a Boolean isn't returned, a
+					compile-time error is raised.
 					"""
 			}
 		}

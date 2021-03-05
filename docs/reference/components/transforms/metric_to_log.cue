@@ -12,6 +12,7 @@ components: transforms: metric_to_log: {
 		commonly_used: true
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -43,8 +44,10 @@ components: transforms: metric_to_log: {
 			type: string: {
 				default: "hostname"
 				examples: ["host", "hostname"]
+				syntax: "literal"
 			}
 		}
+		timezone: configuration._timezone
 	}
 
 	input: {

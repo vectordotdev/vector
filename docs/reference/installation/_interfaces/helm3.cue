@@ -19,7 +19,7 @@ installation: _interfaces: "helm3": {
 	package_manager_name: installation.package_managers.helm.name
 	platform_name:        "kubernetes"
 
-	roles: [Name=string]: {
+	role_implementations: [Name=string]: {
 		commands: {
 			_repo_name:                string | *"timberio"
 			_chart_name:               string
@@ -57,7 +57,7 @@ installation: _interfaces: "helm3": {
 		}
 	}
 
-	roles: {
+	role_implementations: {
 		agent: {
 			title:       "Agent"
 			description: #"""

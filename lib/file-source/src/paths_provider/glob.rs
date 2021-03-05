@@ -1,6 +1,7 @@
 //! [`Glob`] paths provider.
 
 use super::PathsProvider;
+use crate::FileSourceInternalEvents;
 
 use glob::Pattern;
 use std::path::PathBuf;
@@ -11,13 +12,14 @@ pub use glob::MatchOptions;
 ///
 /// Provides the paths to the files on the file system that match include
 /// patterns and don't match the exclude patterns.
-pub struct Glob {
+pub struct Glob<E: FileSourceInternalEvents> {
     include_patterns: Vec<String>,
     exclude_patterns: Vec<Pattern>,
     glob_match_options: MatchOptions,
+    emitter: E,
 }
 
-impl Glob {
+impl<E: FileSourceInternalEvents> Glob<E> {
     /// Create a new [`Glob`].
     ///
     /// Returns `None` if patterns aren't valid.
@@ -25,6 +27,7 @@ impl Glob {
         include_patterns: &[PathBuf],
         exclude_patterns: &[PathBuf],
         glob_match_options: MatchOptions,
+        emitter: E,
     ) -> Option<Self> {
         let include_patterns = include_patterns
             .iter()
@@ -41,11 +44,12 @@ impl Glob {
             include_patterns,
             exclude_patterns,
             glob_match_options,
+            emitter,
         })
     }
 }
 
-impl PathsProvider for Glob {
+impl<E: FileSourceInternalEvents> PathsProvider for Glob<E> {
     type IntoIter = Vec<PathBuf>;
 
     fn paths(&self) -> Self::IntoIter {
@@ -54,7 +58,13 @@ impl PathsProvider for Glob {
             .flat_map(|include_pattern| {
                 glob::glob_with(include_pattern.as_str(), self.glob_match_options)
                     .expect("failed to read glob pattern")
-                    .filter_map(|val| val.ok())
+                    .filter_map(|val| {
+                        val.map_err(|error| {
+                            self.emitter
+                                .emit_path_globbing_failed(error.path(), error.error())
+                        })
+                        .ok()
+                    })
             })
             .filter(|candidate_path: &PathBuf| -> bool {
                 !self.exclude_patterns.iter().any(|exclude_pattern| {

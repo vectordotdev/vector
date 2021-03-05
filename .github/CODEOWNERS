@@ -1,235 +1,223 @@
 # https://help.github.com/articles/about-codeowners/
+#
+# This file is sorted alpgabetically by the path
 
-/PRIVACY.md @binarylogic @jamtur01
-/LICENSE @binarylogic @jamtur01
-/CONTRIBUTING.md @binarylogic @jamtur01
-/CODE_OF_CONDUCT.md @binarylogic @jamtur01
-/NOTICE @binarylogic @jamtur01
-/SECURITY.md @binarylogic @jamtur01
+#
+# Root
+#
+
+/*.md @timberio/vector-admin
+/.* @timberio/vector-support
+/.graphqlconfig @timberio/vector-enterprise
+/build.rs @timberio/vector-core @timberio/vector-support
+/Cargo* @timberio/vector-support
+/CONTRIBUTING.md @timberio/vector-admin @timberio/vector-core @timberio/vector-support
+/Cross.toml @timberio/vector-releasing
+/deny.toml @timberio/vector-support
+/kustomization.yaml @timberio/vector-kubernetes
+/LICENSE @timberio/vector-admin
+/Makefile @timberio/vector-support
+/NOTICE @timberio/vector-admin @timberio/vector-support
+/RELEASING.md @timberio/vector-releasing
+/rust-toolchain @timberio/vector-core @timberio/vector-support
+/skaffold.yaml @timberio/vector-kubernetes
+
+#
+# .github
+#
+
+/.github/**/* @timberio/vector-admin @timberio/vector-support
+/.github/ISSUE_TEMPLATE/ @timberio/vector-admin
+/.github/workflows/ @timberio/vector-support @timberio/vector-releasing
+/.github/workflows/**/k8s* @timberio/vector-kubernetes
+
+#
+# docs
+#
+
+/docs/reference/components/sinks.cue @timberio/vector-integrations
+/docs/reference/components/sinks/ @timberio/vector-integrations
+/docs/reference/components/sinks/aws* @timberio/vector-aws
+/docs/reference/components/sinks/datadog* @timberio/vector-core @timberio/vector-integrations
+/docs/reference/components/sinks/gcp* @timberio/vector-gcp
+/docs/reference/components/sinks/http.cue @timberio/vector-core @timberio/vector-integrations
+/docs/reference/components/sinks/kubernetes* @timberio/vector-kubernetes
+/docs/reference/components/sinks/socket.cue @timberio/vector-core @timberio/vector-integrations
+/docs/reference/components/sinks/vector.cue @timberio/vector-core @timberio/vector-integrations
+
+/docs/reference/components/sources.cue @timberio/vector-integrations
+/docs/reference/components/sources/ @timberio/vector-integrations
+/docs/reference/components/sources/aws* @timberio/vector-aws
+/docs/reference/components/sources/datadog* @timberio/vector-core @timberio/vector-integrations
+/docs/reference/components/sources/gcp* @timberio/vector-gcp
+/docs/reference/components/sources/host* @timberio/vector-core @timberio/vector-integrations
+/docs/reference/components/sources/http.cue @timberio/vector-core @timberio/vector-integrations
+/docs/reference/components/sources/internal_* @timberio/vector-core @timberio/vector-integrations
+/docs/reference/components/sources/kubernetes* @timberio/vector-kubernetes
+/docs/reference/components/sources/socket.cue @timberio/vector-core @timberio/vector-integrations
+/docs/reference/components/sources/vector.cue @timberio/vector-core @timberio/vector-integrations
+
+/docs/reference/components/transforms.cue @timberio/vector-processing
+/docs/reference/components/transforms/* @timberio/vector-processing
+/docs/reference/components/transforms/aws* @timberio/vector-aws
+/docs/reference/components/transforms/gcp* @timberio/vector-gcp
+/docs/reference/components/transforms/kubernetes* @timberio/vector-kubernetes
+
+/docs/reference/data_model.cue @timberio/vector-core @timberio/vector-processing
+/docs/reference/data_model/ @timberio/vector-core @timberio/vector-processing
+
+/docs/reference/installation.cue @timberio/vector-integrations
+/docs/reference/installation/ @timberio/vector-integrations
+/docs/reference/installation/**/kubectl* @timberio/vector-kubernetes
+/docs/reference/installation/**/helm* @timberio/vector-kubernetes
+/docs/reference/installation/**/kubernetes* @timberio/vector-kubernetes
+
+/docs/reference/releases.cue @timberio/vector-releasing
+/docs/reference/releases/ @timberio/vector-releasing
+
+/docs/reference/remap.cue @timberio/vector-processing
+/docs/reference/remap/ @timberio/vector-processing
+
+#
+# distribution
+#
+
+/distribution/ @timberio/vector-releasing
+/distribution/docker* @timberio/vector-kubernetes @timberio/vector-releasing
+/distribution/helm* @timberio/vector-kubernetes @timberio/vector-releasing
+/distribution/kubernetes* @timberio/vector-kubernetes @timberio/vector-releasing
+
+#
+# lib
+#
+
+/lib/ @timberio/vector-support
+/lib/file-source/ @timberio/vector-core
+/lib/k8s-*/ @timberio/vector-kubernetes
+/lib/prometheus-parser/ @timberio/vector-integrations
+/lib/remap-*/ @timberio/vector-processing
+/lib/vector-api-*/ @timberio/vector-enterprise
+
+#
+# proto
+#
+
+/proto/ @timberio/vector-core
+
+#
+# skaffold
+#
 
 /skaffold/ @timberio/vector-kubernetes
-/skaffold.yaml @timberio/vector-kubernetes
-/kustomization.yaml @timberio/vector-kubernetes
 
-/docs/reference/components/sinks/*_metrics.cue @lukesteensen
-/docs/reference/components/sinks/aws_kinesis_streams.cue @jszwedko
-/docs/reference/components/sinks/aws_s3.cue @jszwedko
-/docs/reference/components/sinks/aws_sqs.cue @fanatid
-/docs/reference/components/sinks/console.cue @lukesteensen
-/docs/reference/components/sinks/gcp @bruceg
-/docs/reference/components/sinks/http.cue @jszwedko
-/docs/reference/components/sinks/humio_logs.cue @jszwedko
-/docs/reference/components/sinks/splunk_hec.cue @ktff
-/docs/reference/components/sinks/kafka.cue @lukesteensen
-/docs/reference/components/sinks/prometheus_exporter.cue @lukesteensen
-/docs/reference/components/sinks/prometheus_remote_write.cue @bruceg
-/docs/reference/components/sinks/splunk_hec.cue @lukesteensen
-/docs/reference/components/sinks/statsd.cue @lukesteensen
-/docs/reference/components/sinks/tcp.cue @bruceg @lukesteensen
+#
+# scripts
+#
 
-/docs/reference/components/sources/apache_metrics.cue @jszwedko
-/docs/reference/components/sources/aws_s3.cue @jszwedko
-/docs/reference/components/sources/docker.cue @fanatid
-/docs/reference/components/sources/generator.cue @bruceg
-/docs/reference/components/sources/host_metrics.cue @bruceg
-/docs/reference/components/sources/internal_logs.cue @bruceg
-/docs/reference/components/sources/journald.cue @bruceg
-/docs/reference/components/sources/kubernetes_logs.cue @timberio/vector-kubernetes
-/docs/reference/components/sources/mongodb_metrics.cue @fanatid
-/docs/reference/components/sources/nginx_metrics.cue @fanatid
-/docs/reference/components/sources/postgresql_metrics.cue @fanatid @jszwedko
-/docs/reference/components/sources/prometheus_scrape.cue @bruceg
-/docs/reference/components/sources/prometheus_remote_write.cue @bruceg
-/docs/reference/components/sources/stdin.cue @bruceg
-/docs/reference/components/sources/syslog.cue @lukesteensen
-/docs/reference/components/sources/tcp.cue @bruceg
-/docs/reference/components/sources/udp.cue @bruceg
-/docs/reference/components/sources/vector.cue @lukesteensen
-/docs/reference/components/sources/splunk_hec.cue @ktff
+/scripts/ @timberio/vector-releasing @timberio/vector-support
+/scripts/docker* @timberio/vector-kubernetes
+/scripts/*helm* @timberio/vector-kubernetes
+/scripts/*kubernetes* @timberio/vector-kubernetes
+/scripts/*minikube* @timberio/vector-kubernetes
 
-/docs/reference/components/transforms/add_tags.cue @lukesteensen
-/docs/reference/components/transforms/ansi_stripper.cue @JeanMertz
-/docs/reference/components/transforms/coercer.cue @bruceg
-/docs/reference/components/transforms/filter.cue @bruceg
-/docs/reference/components/transforms/field_filter.cue @lukesteensen
-/docs/reference/components/transforms/geoip.cue @lukesteensen
-/docs/reference/components/transforms/grok_parser.cue @lukesteensen
-/docs/reference/components/transforms/log_to_metric.cue @lukesteensen
-/docs/reference/components/transforms/merge.cue @MOZGIII
-/docs/reference/components/transforms/regex_parser.cue @lukesteensen
-/docs/reference/components/transforms/remap.cue @JeanMertz @FungusHumungus
-/docs/reference/components/transforms/remove_tags.cue @lukesteensen
-/docs/reference/components/transforms/sampler.cue @lukesteensen
-/docs/reference/components/transforms/split.cue @lukesteensen
-/docs/reference/components/transforms/tokenzier.cue @lukesteensen
+#
+# Src
+#
 
-/docs/reference/remap/ @JeanMertz
-/docs/reference/remap/assert.cue @FungusHumungus
-/docs/reference/remap/compact.cue @FungusHumungus
-/docs/reference/remap/exists.cue @FungusHumungus
-/docs/reference/remap/flatten.cue @FungusHumungus
-/docs/reference/remap/ip_cidr_contains.cue @FungusHumungus
-/docs/reference/remap/ip_subnet.cue @FungusHumungus
-/docs/reference/remap/ip_to_ipv6.cue @FungusHumungus
-/docs/reference/remap/ipv6_to_ipv4.cue @FungusHumungus
-/docs/reference/remap/log.cue @FungusHumungus
-/docs/reference/remap/merge.cue @FungusHumungus
-/docs/reference/remap/parse_grok.cue @FungusHumungus
-/docs/reference/remap/parse_aws_alb_log.cue @fanatid
-/docs/reference/remap/parse_aws_cloudwatch_log_subscription_message.cue @fanatid
-/docs/reference/remap/parse_aws_vpc_flow_log.cue @fanatid
-
-/docs/reference/**/*kubectl* @timberio/vector-kubernetes
-/docs/reference/**/*helm* @timberio/vector-kubernetes
-/docs/reference/**/*kubernetes* @timberio/vector-kubernetes
-
-/distribution/ @hoverbear @jamtur01
-/distribution/docker/ @timberio/vector-kubernetes
-/distribution/helm/ @timberio/vector-kubernetes
-/distribution/kubernetes/ @timberio/vector-kubernetes
-
-/lib/file-source/src/paths_provider/mod.rs @MOZGIII
-/lib/file-source/src/paths_provider/glob.rs @MOZGIII
-/lib/k8s-test-framework/ @timberio/vector-kubernetes
-/lib/k8s-e2e-tests/ @timberio/vector-kubernetes
-/lib/prometheus-parser/ @juchiast
-/lib/vector-wasm/ @hoverbear @JeanMertz
-
-/lib/remap-cli/ @JeanMertz
-
-/lib/remap-lang/ @JeanMertz @FungusHumungus
-/lib/remap-functions/ @JeanMertz
-/lib/remap-functions/src/assert.rs @FungusHumungus
-/lib/remap-functions/src/compact.rs @FungusHumungus
-/lib/remap-functions/src/exists.rs @FungusHumungus
-/lib/remap-functions/src/flatten.rs @FungusHumungus
-/lib/remap-functions/src/ip_cidr_contains.rs @FungusHumungus
-/lib/remap-functions/src/ip_subnet.rs @FungusHumungus
-/lib/remap-functions/src/ip_to_ipv6.rs @FungusHumungus
-/lib/remap-functions/src/ipv6_to_ipv4.rs @FungusHumungus
-/lib/remap-functions/src/log.rs @FungusHumungus
-/lib/remap-functions/src/merge.rs @FungusHumungus
-/lib/remap/functions/src/parse_aws_alb_log.rs @fanatid
-/lib/remap/functions/src/parse_aws_cloudwatch_log_subscription_message.rs @fanatid
-/lib/remap/functions/src/parse_aws_vpc_flow_log.rs @fanatid
-/lib/remap-functions/src/parse_grok.rs @FungusHumungus
-
-/proto/ @lukesteensen
-
-/scripts/build-* @hoverbear
-/scripts/ci-docker-images/ @hoverbear @jamtur01
-/scripts/check-docs.sh @binarylogic @jamtur01
-/scripts/check-* @jamtur01
-/scripts/docker-* @jamtur01
-/scripts/environment/* @hoverbear @jamtur01
-/scripts/load-meta.rb @binarylogic @jamtur01
-/scripts/package-* @jamtur01
-/scripts/release-* @hoverbear
-/scripts/upgrade-* @hoverbear
-/scripts/*docker* @timberio/vector-kubernetes
-/scripts/ci-setup-minikube.sh @timberio/vector-kubernetes
-/scripts/environment/setup-helm.sh @timberio/vector-kubernetes
-/scripts/release-helm.sh @timberio/vector-kubernetes
-/scripts/deploy-kubernetes-test.sh @timberio/vector-kubernetes
-/scripts/test-e2e-kubernetes.sh @timberio/vector-kubernetes
-/scripts/helm-dependencies.sh @timberio/vector-kubernetes
-/scripts/kubernetes-yaml.sh @timberio/vector-kubernetes
-/scripts/kubernetes-yaml/ @timberio/vector-kubernetes
-/scripts/helm-template-snapshot.sh @timberio/vector-kubernetes
-
-/src/metrics.rs @lukesteensen
-/src/main.rs @lukesteensen
-/src/region.rs @bruceg
-/src/template.rs @lukesteensen
-/src/tls @bruceg
-/src/types.rs @bruceg
-/src/line_agg.rs @MOZGIII
-/src/signal.rs @ktff
-/src/validate.rs @ktff
-/src/heartbeat.rs @ktff
-
-/src/buffers/ @lukesteensen
-
-/src/event/merge.rs @MOZGIII
-/src/event/merge_state.rs @MOZGIII
-/src/event/discriminant.rs @MOZGIII
-
-/src/internal_events/ @JeanMertz
-
+/src/* @timberio/vector-core
+/src/api/ @timberio/vector-enterprise
+/src/buffers/ @timberio/vector-core
+/src/conditions/ @timberio/vector-processing
+/src/config/ @timberio/vector-core
+/src/event/ @timberio/vector-core @timberio/vector-processing
+/src/generate.rs @timberio/vector-support
+/src/internal_events/adaptive_concurrency* @timberio/vector-core
+/src/internal_events/apache_* @timberio/vector-integrations
+/src/internal_events/api* @timberio/vector-enterprise
+/src/internal_events/aws* @timberio/vector-aws
+/src/internal_events/blackhole.rs @timberio/vector-support
+/src/internal_events/console.rs @timberio/vector-integrations
+/src/internal_events/datadog* @timberio/vector-core @timberio/vector-integrations
+/src/internal_events/dedupe.rs @timberio/vector-processing
+/src/internal_events/docker* @timberio/vector-integrations
+/src/internal_events/elasticsearch.rs @timberio/vector-integrations
+/src/internal_events/gcp* @timberio/vector-gcp
+/src/internal_events/file.rs @timberio/vector-core @timberio/vector-integrations
+/src/internal_events/filter.rs @timberio/vector-processing
+/src/internal_events/generator.rs @timberio/vector-support
+/src/internal_events/geoip.rs @timberio/vector-processing
+/src/internal_events/heartbeat.rs @timberio/vector-core
+/src/internal_events/host_*.rs @timberio/vector-integrations
+/src/internal_events/http* @timberio/vector-core @timberio/vector-integrations
+/src/internal_events/journald.rs @timberio/vector-integrations
+/src/internal_events/kafka.rs @timberio/vector-integrations
+/src/internal_events/kubernetes* @timberio/vector-kubernetes
+/src/internal_events/log_to_metric.rs @timberio/vector-processing
+/src/internal_events/logplex.rs @timberio/vector-integrations
+/src/internal_events/lua.rs @timberio/vector-processing
+/src/internal_events/metric_to_log.rs @timberio/vector-processing
+/src/internal_events/mod.rs @timberio/vector-core
+/src/internal_events/mongodb_*.rs @timberio/vector-integrations
+/src/internal_events/nats.rs @timberio/vector-integrations
+/src/internal_events/nginx_*.rs @timberio/vector-integrations
+/src/internal_events/postgresql_*.rs @timberio/vector-integrations
+/src/internal_events/process.rs @timberio/vector-core
+/src/internal_events/prometheus.rs @timberio/vector-integrations
+/src/internal_events/pulsar.rs @timberio/vector-integrations
+/src/internal_events/reduce.rs @timberio/vector-processing
+/src/internal_events/remap.rs @timberio/vector-processing
+/src/internal_events/route.rs @timberio/vector-processing
+/src/internal_events/sample.rs @timberio/vector-processing
+/src/internal_events/sematext_*.rs @timberio/vector-core @timberio/vector-integrations
+/src/internal_events/socket.rs @timberio/vector-core @timberio/vector-integrations
+/src/internal_events/splunk_*.rs @timberio/vector-integrations
+/src/internal_events/statsd_*.rs @timberio/vector-integrations
+/src/internal_events/stdin.rs @timberio/vector-integrations
+/src/internal_events/syslog.rs @timberio/vector-integrations
+/src/internal_events/tcp.rs @timberio/vector-core @timberio/vector-integrations
+/src/internal_events/topology.rs @timberio/vector-core
+/src/internal_events/udp.rs @timberio/vector-core @timberio/vector-integrations
+/src/internal_events/unix.rs @timberio/vector-core @timberio/vector-integrations
+/src/internal_events/vector.rs @timberio/vector-core @timberio/vector-integrations
+/src/internal_events/windows.rs @timberio/vector-integrations
+/src/kafka.rs @timberio/vector-integrations
 /src/kubernetes/ @timberio/vector-kubernetes
+/src/mapping/ @timberio/vector-processing
+/src/metrics.rs @timberio/vector-core @timberio/vector-processing
+/src/prometheus.rs @timberio/vector-integrations
+/src/rusoto/ @timberio/vector-aws
+/src/sinks/ @timberio/vector-integrations
+/src/sinks/aws* @timberio/vector-aws
+/src/sinks/datadog* @timberio/vector-core
+/src/sinks/gcp* @timberio/vector-gcp
+/src/sinks/http* @timberio/vector-core @timberio/vector-integrations
+/src/sinks/kubernetes* @timberio/vector-kubernetes
+/src/sinks/socket* @timberio/vector-core @timberio/vector-integrations
+/src/sinks/vector* @timberio/vector-core @timberio/vector-integrations
+/src/sinks/util/ @timberio/vector-core @timberio/vector-integrations
+/src/sources/ @timberio/vector-integrations
+/src/sources/aws* @timberio/vector-aws
+/src/sources/datadog* @timberio/vector-core
+/src/sources/gcp* @timberio/vector-gcp
+/src/sources/http* @timberio/vector-core @timberio/vector-integrations
+/src/sources/kubernetes* @timberio/vector-core @timberio/vector-kubernetes
+/src/sources/socket* @timberio/vector-core @timberio/vector-integrations
+/src/sources/vector* @timberio/vector-core @timberio/vector-integrations
+/src/sources/util/ @timberio/vector-core @timberio/vector-integrations
+/src/test_util/ @timberio/vector-support
+/src/tls/ @timberio/vector-core @timberio/vector-integrations
+/src/top/ @timberio/vector-enterprise
+/src/topology/ @timberio/vector-core
+/src/transforms/ @timberio/vector-processing
+/src/transforms/aws* @timberio/vector-aws
+/src/transforms/datadog* @timberio/vector-core
+/src/transforms/gcp* @timberio/vector-gcp
+/src/transforms/kubernetes* @timberio/vector-core @timberio/vector-kubernetes
 
-/src/mapping/ @JeanMertz @FungusHumungus
+#
+# tests
+#
 
-/src/sinks/*_metrics.rs @lukesteensen
-/src/sinks/aws_kinesis_streams.rs @jszwedko
-/src/sinks/aws_s3.rs @jszwedko
-/src/sinks/console.rs @lukesteensen
-/src/sinks/gcp @bruceg
-/src/sinks/http.rs @jszwedko
-/src/sinks/humio_logs.rs @jszwedko
-/src/sinks/splunk_hec.rs @ktff
-/src/sinks/kafka.rs @lukesteensen
-/src/sinks/prometheus/collector.rs @bruceg
-/src/sinks/prometheus/remote_write.rs @bruceg
-/src/sinks/prometheus/exporter.rs @lukesteensen
-/src/sinks/splunk_hec.rs @lukesteensen
-/src/sinks/statsd.rs @lukesteensen
-/src/sinks/tcp.rs @bruceg
-/src/sinks/tcp.rs @lukesteensen
-/src/sinks/util/adaptive_concurrency @bruceg
-
-/src/sources/apache_metrics/ @jszwedko
-/src/sources/aws_kinesis_firehose/ @jszwedko
-/src/sources/aws_s3.rs @jszwedko
-/src/sources/docker.rs @fanatid
-/src/sources/generator.rs @bruceg
-/src/sources/host_metrics.rs @bruceg
-/src/sources/internal_logs.rs @bruceg
-/src/sources/journald.rs @bruceg
-/src/sources/mongodb_metrics/ @fanatid
-/src/sources/nginx/ @fanatid
-/src/sources/postgresql_metrics.rs @fanatid @jszwedko
-/src/sources/prometheus @bruceg
-/src/sources/stdin.rs @bruceg
-/src/sources/syslog.rs @lukesteensen
-/src/sources/tcp.rs @bruceg
-/src/sources/udp.rs @bruceg
-/src/sources/vector.rs @lukesteensen
-/src/sources/util/multiline_config.rs @MOZGIII @JeanMertz
-/src/sources/kubernetes_logs/ @timberio/vector-kubernetes
-/src/sources/splunk_hec.rs @ktff
-
-/src/topology/ @lukesteensen
-
-/src/transforms/add_tags.rs @lukesteensen
-/src/transforms/ansi_stripper.rs @JeanMertz
-/src/transforms/aws_cloudwatch_logs_subscription_parser.rs @jszwedko
-/src/transforms/coercer.rs @bruceg
-/src/transforms/filter.rs @bruceg
-/src/transforms/field_filter.rs @lukesteensen
-/src/transforms/geoip.rs @lukesteensen
-/src/transforms/grok_parser.rs @lukesteensen
-/src/transforms/key_value_parser.rs @Nick011 @bruceg
-/src/transforms/log_to_metric.rs @lukesteensen
-/src/transforms/merge.rs @MOZGIII
-/src/transforms/regex_parser.rs @lukesteensen
-/src/transforms/remap.rs @JeanMertz @FungusHumungus
-/src/transforms/remove_tags.rs @lukesteensen
-/src/transforms/sampler.rs @lukesteensen
-/src/transforms/split.rs @lukesteensen
-/src/transforms/tokenzier.rs @lukesteensen
-
-/src/wasm/ @hoverbear @JeanMertz
-
-/tests/buffering.rs @MOZGIII
-/tests/data/wasm/ @hoverbear @JeanMertz
-/tests/shutdown.rs @ktff
-/tests/cli.rs @ktff
-/tests/helm-snapshots/ @timberio/vector-kubernetes
-
-/.github/semantic* @binarylogic @jamtur01
-/.github/SUPPORT.md @binarylogic @jamtur01
-/.github/PULL_REQUEST_TEMPLATE.md @binarylogic @jamtur01
-/.github/ISSUE_TEMPLATE/ @binarylogic @jamtur01
-/.github/workflows/k8s_e2e.yml @timberio/vector-kubernetes
-/.github/workflows/ @jamtur01
+/tests/ @timberio/vector-core
+/tests/behavior @timberio/vector-processing
+/tests/helm* @timberio/vector-kubernetes

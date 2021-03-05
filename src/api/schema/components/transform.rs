@@ -88,7 +88,7 @@ impl Transform {
 
     /// Transform metrics
     pub async fn metrics(&self) -> metrics::TransformMetrics {
-        metrics::by_component_name(&self.0.name).to_transform_metrics(&self.get_component_type())
+        metrics::by_component_name(&self.0.name).into_transform_metrics(&self.get_component_type())
     }
 }
 

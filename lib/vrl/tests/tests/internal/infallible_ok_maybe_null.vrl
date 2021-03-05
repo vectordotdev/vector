@@ -1,0 +1,21 @@
+# object: { "foo": "bar" }
+# result:
+#
+# error[E103]: unhandled fallible assignment
+#   ┌─ :4:8
+#   │
+# 4 │ .foo = upcase(.foo) # string
+#   │ ------ ^^^^^^^^^^^^
+#   │ │      │
+#   │ │      this expression is fallible
+#   │ │      update the expression to be infallible
+#   │ or change this to an infallible assignment:
+#   │ .foo, err = upcase(.foo)
+#   │
+#   = see documentation about error handling at https://errors.vrl.dev/#handling
+#   = learn more about error code 103 at https://errors.vrl.dev/103
+#   = see language documentation at https://vrl.dev
+
+.foo # any
+.foo, err = to_string(.foo) # string or null
+.foo = upcase(.foo) # string

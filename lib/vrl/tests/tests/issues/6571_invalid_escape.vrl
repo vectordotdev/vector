@@ -1,0 +1,13 @@
+# issue: https://github.com/timberio/vector/issues/6571
+# object: "foo\/bar"
+# result: error[E202]: syntax error
+#   ┌─ :1:1
+#   │
+# 1 │ ╭
+# 2 │ │ .field = "foo\/bar"
+# 3 │ │
+#   │ ╰^ unexpected error: invalid escape character: \/
+#   │
+#   = see language documentation at https://vrl.dev
+
+.field = "foo\/bar"

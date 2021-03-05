@@ -215,7 +215,7 @@ fn create_service_arguments(
     config_paths: &[(PathBuf, config::FormatHint)],
 ) -> Option<Vec<OsString>> {
     let config_paths = config::process_paths(&config_paths)?;
-    match config::load_from_paths(&config_paths, false) {
+    match config::load_from_paths(&config_paths) {
         Ok(_) => Some(
             config_paths
                 .iter()

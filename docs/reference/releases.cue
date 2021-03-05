@@ -18,8 +18,9 @@ releases: {
 	#CommitSha: =~"^[a-z0-9]{40}$"
 
 	#Release: {
-		codename: string
-		date:     string
+		codename:     string
+		date:         string
+		description?: string
 
 		commits: [#Commit, ...#Commit]
 		whats_next: #Any

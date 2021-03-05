@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: get_env_var: {
+	category: "System"
+	description: """
+		Gets the value of the environment variable specifed by `name`.
+		"""
+
 	arguments: [
 		{
 			name:        "name"
@@ -14,10 +19,7 @@ remap: functions: get_env_var: {
 		"Value of environment variable `name` is not valid unicode",
 	]
 	return: types: ["string"]
-	category: "System"
-	description: #"""
-		Get the value of an environment variable. If the variable does not exists, an error is returned.
-		"""#
+
 	examples: [
 		{
 			title: "Get environment variable"

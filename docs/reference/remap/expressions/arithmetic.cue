@@ -5,7 +5,7 @@ remap: expressions: arithmetic: {
 	description: """
 		An _arithmetic_ expression performs an operation on two expressions (operands) as defined by the operator.
 
-		Although arithmetic is commonly performed with numbers, it can apply to other types as well, such as strings.
+		Although arithmetic is commonly applied to numbers, you can use it with other types as well, such as strings.
 		"""
 	return: """
 		Returns the result of the expression as defined by the operator.
@@ -23,7 +23,7 @@ remap: expressions: arithmetic: {
 			}
 			operator: {
 				description: """
-					The `operator` defines the operation performed on the left-hand and right-hand side operands.
+					The `operator` defines the operation performed on the left-hand- and right-hand-side operands.
 					"""
 				enum: {
 					"+":  "Sum. Operates on `int`, `float`, and `string` types."

@@ -89,7 +89,9 @@ mod remap;
 mod remove_fields;
 #[cfg(feature = "transforms-rename_fields")]
 mod rename_fields;
-mod sampler;
+#[cfg(feature = "transforms-route")]
+mod route;
+mod sample;
 #[cfg(feature = "sinks-sematext")]
 mod sematext_metrics;
 mod socket;
@@ -101,8 +103,6 @@ mod statsd_sink;
 #[cfg(feature = "sources-statsd")]
 mod statsd_source;
 mod stdin;
-#[cfg(feature = "transforms-swimlanes")]
-mod swimlanes;
 mod syslog;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 mod tag_cardinality_limit;
@@ -209,7 +209,9 @@ pub use self::remap::*;
 pub use self::remove_fields::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
-pub use self::sampler::*;
+#[cfg(feature = "transforms-route")]
+pub use self::route::*;
+pub use self::sample::*;
 #[cfg(feature = "sinks-sematext")]
 pub use self::sematext_metrics::*;
 pub(crate) use self::socket::*;
@@ -221,8 +223,6 @@ pub use self::statsd_sink::*;
 #[cfg(feature = "sources-statsd")]
 pub use self::statsd_source::*;
 pub use self::stdin::*;
-#[cfg(feature = "transforms-swimlanes")]
-pub use self::swimlanes::*;
 pub use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub(crate) use self::tag_cardinality_limit::*;

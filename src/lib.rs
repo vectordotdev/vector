@@ -18,7 +18,7 @@ extern crate derivative;
 #[macro_use]
 extern crate pest_derive;
 #[cfg(feature = "vrl-cli")]
-extern crate remap_cli;
+extern crate vrl_cli;
 
 // Configure the global allocator. Do not remove this line, even if it appears
 // unused.
@@ -26,7 +26,6 @@ extern crate vector_global_alloc;
 
 #[macro_use]
 pub mod config;
-pub mod buffers;
 pub mod cli;
 pub mod conditions;
 pub mod dns;
@@ -41,6 +40,7 @@ pub mod internal_events;
 pub mod api;
 pub mod app;
 pub mod async_read;
+pub mod buffers;
 pub mod encoding_transcode;
 pub mod heartbeat;
 pub mod http;
@@ -52,8 +52,6 @@ pub mod list;
 pub mod mapping;
 pub mod metrics;
 pub(crate) mod pipeline;
-#[cfg(any(feature = "sinks-prometheus", feature = "sources-prometheus"))]
-pub(crate) mod prometheus;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod serde;
@@ -63,6 +61,7 @@ pub mod signal;
 pub mod sink;
 pub mod sinks;
 pub mod sources;
+pub(crate) mod stats;
 pub mod stream;
 pub mod tcp;
 pub mod template;
@@ -75,7 +74,10 @@ pub mod trace;
 pub mod transforms;
 pub mod trigger;
 pub mod types;
+#[cfg(any(feature = "sources-utils-udp", feature = "sinks-utils-udp"))]
+pub mod udp;
 pub mod unit_test;
+pub(crate) mod utilization;
 pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;

@@ -2,7 +2,7 @@
 #![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 
 use async_trait::async_trait;
-use futures::{compat::Future01CompatExt, future, FutureExt, Sink, StreamExt};
+use futures::{future, FutureExt, Sink, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::{
     pin::Pin,
@@ -98,7 +98,7 @@ async fn test_sink_panic() {
 
     let _ = std::panic::take_hook();
     assert!(crash.next().await.is_some());
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
     delay_for(Duration::from_millis(100)).await;
 
     let output_lines = output_lines.await;
@@ -182,7 +182,7 @@ async fn test_sink_error() {
     delay_for(Duration::from_millis(100)).await;
 
     assert!(crash.next().await.is_some());
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
     delay_for(Duration::from_millis(100)).await;
 
     let output_lines = output_lines.await;
@@ -249,7 +249,7 @@ async fn test_source_error() {
     delay_for(Duration::from_millis(100)).await;
 
     assert!(crash.next().await.is_some());
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
     delay_for(Duration::from_millis(100)).await;
 
     let output_lines = output_lines.await;
@@ -318,7 +318,7 @@ async fn test_source_panic() {
     let _ = std::panic::take_hook();
 
     assert!(crash.next().await.is_some());
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
     delay_for(Duration::from_millis(100)).await;
 
     let output_lines = output_lines.await;

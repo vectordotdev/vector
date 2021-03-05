@@ -48,7 +48,7 @@ impl SocketSinkConfig {
 
     pub fn make_basic_tcp_config(address: String) -> Self {
         Self::new(
-            Mode::Tcp(TcpSinkConfig::new(address, None, None)),
+            Mode::Tcp(TcpSinkConfig::from_address(address)),
             EncodingConfig::from(Encoding::Text),
         )
     }
@@ -109,9 +109,7 @@ mod test {
         let receiver = UdpSocket::bind(addr).unwrap();
 
         let config = SocketSinkConfig {
-            mode: Mode::Udp(UdpSinkConfig {
-                address: addr.to_string(),
-            }),
+            mode: Mode::Udp(UdpSinkConfig::from_address(addr.to_string())),
             encoding: Encoding::Json.into(),
         };
         let context = SinkContext::new_test();
@@ -153,7 +151,7 @@ mod test {
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig::new(addr.to_string(), None, None)),
+            mode: Mode::Tcp(TcpSinkConfig::from_address(addr.to_string())),
             encoding: Encoding::Json.into(),
         };
 
@@ -224,6 +222,7 @@ mod test {
                         ..Default::default()
                     },
                 }),
+                None,
             )),
             encoding: Encoding::Text.into(),
         };
@@ -331,7 +330,7 @@ mod test {
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig::new(addr.to_string(), None, None)),
+            mode: Mode::Tcp(TcpSinkConfig::from_address(addr.to_string())),
             encoding: Encoding::Text.into(),
         };
 

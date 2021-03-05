@@ -3,8 +3,8 @@
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, take_while, take_while1},
-    character::complete::char,
-    combinator::{map, opt, value},
+    character::complete::{char, digit1},
+    combinator::{map, opt, recognize, value},
     error::ParseError,
     multi::fold_many0,
     number::complete::double,
@@ -34,6 +34,8 @@ pub enum ErrorKind {
     ParseNameError { input: String },
     #[snafu(display("parse float value error, parsing: `{}`", input))]
     ParseFloatError { input: String },
+    #[snafu(display("parse timestamp error, parsing: `{}`", input))]
+    ParseTimestampError { input: String },
 
     // Error that we didn't catch
     #[snafu(display("error kind: {:?}, parsing: `{}`", kind, input))]
@@ -76,7 +78,7 @@ type NomErrorType<'a> = (&'a str, nom::error::ErrorKind);
 
 type NomError<'a> = nom::Err<NomErrorType<'a>>;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MetricKind {
     Counter,
     Gauge,
@@ -96,6 +98,7 @@ pub struct Metric {
     pub name: String,
     pub labels: BTreeMap<String, String>,
     pub value: f64,
+    pub timestamp: Option<i64>,
 }
 
 impl Metric {
@@ -113,18 +116,20 @@ impl Metric {
         let (input, name) = parse_name(input)?;
         let (input, labels) = Self::parse_labels(input)?;
         let (input, value) = Self::parse_value(input)?;
+        let (input, timestamp) = Self::parse_timestamp(input)?;
         Ok((
             input,
             Metric {
                 name,
                 labels,
                 value,
+                timestamp,
             },
         ))
     }
 
     /// Float value, and +Inf, -Int, Nan.
-    pub fn parse_value(input: &str) -> IResult<f64> {
+    pub(crate) fn parse_value(input: &str) -> IResult<f64> {
         let input = trim_space(input);
         alt((
             value(f64::INFINITY, tag("+Inf")),
@@ -138,6 +143,13 @@ impl Metric {
             }
             .into()
         })
+    }
+
+    fn parse_timestamp(input: &str) -> IResult<Option<i64>> {
+        let input = trim_space(input);
+        opt(map(recognize(pair(opt(char('-')), digit1)), |s: &str| {
+            s.parse().unwrap()
+        }))(input)
     }
 
     fn parse_name_value(input: &str) -> IResult<(String, String)> {
@@ -312,7 +324,7 @@ pub enum Line {
 
 impl Line {
     /// Parse a single line. Return `None` if it is a comment or an empty line.
-    pub fn parse(input: &str) -> Result<Option<Self>, ErrorKind> {
+    pub(crate) fn parse(input: &str) -> Result<Option<Self>, ErrorKind> {
         let input = input.trim();
         if input.is_empty() {
             return Ok(None);
@@ -379,19 +391,7 @@ fn match_char(c: char) -> impl Fn(&str) -> IResult<char> {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    macro_rules! map {
-        ($($key:expr => $value:expr),*) => {
-            {
-                #[allow(unused_mut)]
-                let mut m = ::std::collections::BTreeMap::new();
-                $(
-                    m.insert($key.into(), $value.into());
-                )*
-                m
-            }
-        };
-    }
+    use shared::btreemap;
 
     #[test]
     fn test_parse_escaped_string() {
@@ -577,36 +577,35 @@ mod test {
         let input = wrap("{}");
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, map! {});
+        assert_eq!(r, btreemap! {});
 
         let input = wrap(r#"{name="value"}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, map! { "name" => "value" });
+        assert_eq!(r, btreemap! { "name" => "value" });
 
         let input = wrap(r#"{name="value",}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, map! { "name" => "value" });
+        assert_eq!(r, btreemap! { "name" => "value" });
 
         let input = wrap(r#"{ name = "" ,b="a=b" , a="},", _c = "\""}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(
             r,
-            map! {"name" => "", "a" => "},", "b" => "a=b", "_c" => "\""}
+            btreemap! {"name" => "", "a" => "},", "b" => "a=b", "_c" => "\""}
         );
         assert_eq!(left, tail);
 
         let input = wrap("100");
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, "100".to_owned() + tail);
-        assert_eq!(r, map! {});
+        assert_eq!(r, btreemap! {});
 
         // We don't allow these values
 
         let input = wrap(r#"{name="value}"#);
         let error = Metric::parse_labels(&input).unwrap_err().into();
-        println!("{}", error);
         assert!(matches!(
             error,
             ErrorKind::ExpectedChar { expected: '"', .. }
@@ -614,7 +613,6 @@ mod test {
 
         let input = wrap(r#"{ a="b" c="d" }"#);
         let error = Metric::parse_labels(&input).unwrap_err().into();
-        println!("{}", error);
         assert!(matches!(
             error,
             ErrorKind::ExpectedChar { expected: ',', .. }
@@ -622,11 +620,14 @@ mod test {
 
         let input = wrap(r#"{ a="b" ,, c="d" }"#);
         let error = Metric::parse_labels(&input).unwrap_err().into();
-        println!("{}", error);
-        assert!(matches!(
-            error,
-            ErrorKind::ParseNameError { .. }
-        ));
+        assert!(matches!(error, ErrorKind::ParseNameError { .. }));
+    }
+
+    #[test]
+    fn test_parse_timestamp() {
+        assert_eq!(Metric::parse_timestamp(""), Ok(("", None)));
+        assert_eq!(Metric::parse_timestamp("123"), Ok(("", Some(123))));
+        assert_eq!(Metric::parse_timestamp(" -23"), Ok(("", Some(-23))));
     }
 
     #[test]

@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: ip_cidr_contains: {
+	category: "IP"
+	description: """
+		Determines if the `ip` is contained within the block referenced by the `cidr`.
+		"""
+
 	arguments: [
 		{
 			name:        "cidr"
@@ -20,10 +25,7 @@ remap: functions: ip_cidr_contains: {
 		"`ip` is not a valid IP address",
 	]
 	return: types: ["boolean"]
-	category: "IP"
-	description: #"""
-		Returns `true` if the given `ip` is contained within the block referenced by the `cidr`.
-		"""#
+
 	examples: [
 		{
 			title: "IPv4 contains CIDR"

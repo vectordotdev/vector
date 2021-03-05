@@ -1,0 +1,14 @@
+# result:
+#
+# error[E205]: reserved keyword
+#   ┌─ :2:1
+#   │
+# 2 │ array = []
+#   │ ^^^^^
+#   │ │
+#   │ this identifier name is reserved for future use in the language
+#   │ use a different name instead
+#   │
+#   = see language documentation at https://vrl.dev
+
+array = []

@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::Event,
-    http::{Auth, HttpClient, MaybeAuth},
+    http::{Auth, HttpClient, HttpError, MaybeAuth},
     internal_events::{ElasticSearchEventEncoded, ElasticSearchMissingKeys},
     rusoto::{self, region_from_endpoint, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
@@ -294,8 +294,11 @@ struct ESResultResponse {
     items: Vec<ESResultItem>,
 }
 #[derive(Deserialize, Debug)]
-struct ESResultItem {
-    index: ESIndexResult,
+enum ESResultItem {
+    #[serde(rename = "index")]
+    Index(ESIndexResult),
+    #[serde(rename = "create")]
+    Create(ESIndexResult),
 }
 #[derive(Deserialize, Debug)]
 struct ESIndexResult {
@@ -308,8 +311,17 @@ struct ESErrorDetails {
     err_type: String,
 }
 
+impl ESResultItem {
+    fn result(self) -> ESIndexResult {
+        match self {
+            ESResultItem::Index(r) => r,
+            ESResultItem::Create(r) => r,
+        }
+    }
+}
+
 impl RetryLogic for ElasticSearchRetryLogic {
-    type Error = hyper::Error;
+    type Error = HttpError;
     type Response = hyper::Response<Bytes>;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
@@ -353,7 +365,7 @@ fn get_error_reason(body: &str) -> String {
             "some messages failed, could not parse response, error: {}",
             json_error
         ),
-        Ok(resp) => match resp.items.into_iter().find_map(|item| item.index.error) {
+        Ok(resp) => match resp.items.into_iter().find_map(|item| item.result().error) {
             Some(error) => format!("error type: {}, reason: {}", error.err_type, error.reason),
             None => format!("error response: {}", body),
         },
@@ -441,6 +453,7 @@ impl ElasticSearchCommon {
 
     fn signed_request(&self, method: &str, uri: &Uri, use_params: bool) -> SignedRequest {
         let mut request = SignedRequest::new(method, "es", &self.region, uri.path());
+        request.set_hostname(uri.host().map(|host| host.into()));
         if use_params {
             for (key, value) in &self.query_params {
                 request.add_param(key, value);
@@ -619,6 +632,20 @@ mod tests {
     }
 
     #[test]
+    fn get_index_error_reason() {
+        let json = "{\"took\":185,\"errors\":true,\"items\":[{\"index\":{\"_index\":\"test-hgw28jv10u\",\"_type\":\"log_lines\",\"_id\":\"3GhQLXEBE62DvOOUKdFH\",\"status\":400,\"error\":{\"type\":\"illegal_argument_exception\",\"reason\":\"mapper [message] of different type, current_type [long], merged_type [text]\"}}}]}";
+        let reason = get_error_reason(&json);
+        assert_eq!(reason, "error type: illegal_argument_exception, reason: mapper [message] of different type, current_type [long], merged_type [text]");
+    }
+
+    #[test]
+    fn get_create_error_reason() {
+        let json = "{\"took\":3,\"errors\":true,\"items\":[{\"create\":{\"_index\":\"test-hgw28jv10u\",\"_type\":\"_doc\",\"_id\":\"aBLq1HcBWD7eBWkW2nj4\",\"status\":400,\"error\":{\"type\":\"mapper_parsing_exception\",\"reason\":\"object mapping for [host] tried to parse field [host] as object, but found a concrete value\"}}}]}";
+        let reason = get_error_reason(&json);
+        assert_eq!(reason, "error type: mapper_parsing_exception, reason: object mapping for [host] tried to parse field [host] as object, but found a concrete value");
+    }
+
+    #[test]
     fn allows_using_excepted_fields() {
         let config = ElasticSearchConfig {
             index: Some(String::from("{{ idx }}")),
@@ -640,6 +667,34 @@ mod tests {
 {"foo":"bar","message":"hello there"}
 "#;
         assert_eq!(std::str::from_utf8(&encoded).unwrap(), &expected[..]);
+    }
+
+    #[test]
+    fn validate_host_header_on_aws_requests() {
+        let config = ElasticSearchConfig {
+            auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default {})),
+            endpoint: "http://abc-123.us-east-1.es.amazonaws.com".into(),
+            batch: BatchConfig {
+                max_events: Some(1),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+
+        let signed_request = common.signed_request(
+            "POST",
+            &"http://abc-123.us-east-1.es.amazonaws.com"
+                .parse::<Uri>()
+                .unwrap(),
+            true,
+        );
+
+        assert_eq!(
+            signed_request.hostname(),
+            "abc-123.us-east-1.es.amazonaws.com".to_string()
+        );
     }
 }
 

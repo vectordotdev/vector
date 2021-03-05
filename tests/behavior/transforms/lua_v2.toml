@@ -20,7 +20,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        !exists(.a) && \
+        !exists(.a) &&
         .b == "example value"
       '''
 
@@ -47,7 +47,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .some_field == "some value" && \
+        .some_field == "some value" &&
         .inserted_field == "inserted value"
       '''
 

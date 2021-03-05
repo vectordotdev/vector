@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{AddTagsTagNotOverwritten, AddTagsTagOverwritten},
     transforms::{FunctionTransform, Transform},
@@ -39,7 +39,7 @@ impl GenerateConfig for AddTagsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         Ok(Transform::function(AddTags::new(
             self.tags.clone(),
             self.overwrite,
@@ -68,7 +68,7 @@ impl AddTags {
 impl FunctionTransform for AddTags {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         if !self.tags.is_empty() {
-            let tags = &mut event.as_mut_metric().tags;
+            let tags = &mut event.as_mut_metric().series.tags;
 
             if tags.is_none() {
                 *tags = Some(BTreeMap::new());
@@ -114,14 +114,11 @@ mod tests {
 
     #[test]
     fn add_tags() {
-        let event = Event::Metric(Metric {
-            name: "bar".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Gauge { value: 10.0 },
-        });
+        let event = Event::Metric(Metric::new(
+            "bar",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 10.0 },
+        ));
 
         let map: IndexMap<String, String> = vec![
             ("region".into(), "us-east-1".into()),
@@ -132,7 +129,7 @@ mod tests {
 
         let mut transform = AddTags::new(map, true);
         let metric = transform.transform_one(event).unwrap().into_metric();
-        let tags = metric.tags.unwrap();
+        let tags = metric.tags().unwrap();
 
         assert_eq!(tags.len(), 2);
         assert_eq!(tags.get("region"), Some(&"us-east-1".to_owned()));
@@ -143,14 +140,14 @@ mod tests {
     fn add_tags_override() {
         let mut tags = BTreeMap::new();
         tags.insert("region".to_string(), "us-east-1".to_string());
-        let event = Event::Metric(Metric {
-            name: "bar".into(),
-            namespace: None,
-            timestamp: None,
-            tags: Some(tags),
-            kind: MetricKind::Absolute,
-            value: MetricValue::Gauge { value: 10.0 },
-        });
+        let event = Event::Metric(
+            Metric::new(
+                "bar",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 10.0 },
+            )
+            .with_tags(Some(tags)),
+        );
 
         let map: IndexMap<String, String> = vec![("region".to_string(), "overridden".to_string())]
             .into_iter()
@@ -159,7 +156,7 @@ mod tests {
         let mut transform = AddTags::new(map, false);
 
         let metric = transform.transform_one(event).unwrap().into_metric();
-        let tags = metric.tags.unwrap();
+        let tags = metric.tags().unwrap();
 
         assert_eq!(tags.get("region"), Some(&"us-east-1".to_owned()));
     }

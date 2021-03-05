@@ -313,8 +313,8 @@ impl HostMetrics {
 fn filter_host_metric(metrics: &[Metric], name: &str) -> f64 {
     metrics
         .iter()
-        .find(|m| matches!(&m.namespace, Some(n) if n == "host") && m.name == name)
-        .map(|m| match m.value {
+        .find(|m| matches!(m.namespace(), Some(n) if n == "host") && m.name() == name)
+        .map(|m| match m.data.value {
             MetricValue::Gauge { value } => value,
             MetricValue::Counter { value } => value,
             _ => 0.00,
