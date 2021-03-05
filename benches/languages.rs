@@ -269,7 +269,7 @@ fn benchmark_multifaceted(c: &mut Criterion) {
     let input = r#"<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet"#;
     let output = serde_json::from_str(r#"{ "appname": "su", "facility": "user", "severity": "warning", "message": "tps report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "Sat Dec 19 21:48:09 2020", "version": 3 }"#).unwrap();
 
-    benchmark_configs(c, "multifaceted", configs, "in", "last", input, output);
+    benchmark_configs(c, "multifaceted", configs, "in", "last", input, &output);
 }
 
 /// Benches a set of transform configs for comparison
