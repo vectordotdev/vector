@@ -107,7 +107,7 @@ components: sources: http: {
 				}
 			}
 		}
-		url_path: {
+		path: {
 			common:      false
 			description: "The URL path on which log event POST request shall be sent."
 			required:    false
@@ -118,14 +118,14 @@ components: sources: http: {
 			}
 		}
 		strict_path: {
-			common:      false
+			common: false
 			description: """
-				If set to true only request using the exact URL path specified in url_path will be accepted,
-				else event log sent to a URL path that starts with the value of url_path will be accepted.
-				With strict_path sets to false and url_path sets to \"/\" the configured HTTP source will
+				If set to true only request using the exact URL path specified in path will be accepted,
+				else event log sent to a URL path that starts with the value of path will be accepted.
+				With strict_path set to false and path set to \"/\" the configured HTTP source will
 				accept log events from any URL path. 
 				"""
-			required:    false
+			required: false
 			type: bool: default: true
 		}
 		path_key: {
@@ -154,7 +154,7 @@ components: sources: http: {
 				}
 				path: {
 					description: "The HTTP path the event was received from. The key can be changed using the path_key configuration setting"
-					required:     true
+					required:    true
 					type: string: {
 						examples: ["/", "/logs/event712"]
 						syntax: "literal"
@@ -175,7 +175,7 @@ components: sources: http: {
 				}
 				path: {
 					description: "The HTTP path the event was received from. The key can be changed using the path_key configuration setting"
-					required:     true
+					required:    true
 					type: string: {
 						examples: ["/", "/logs/event712"]
 						syntax: "literal"
@@ -188,7 +188,7 @@ components: sources: http: {
 
 	examples: [
 		{
-			_url_path:   "/"
+			_path:   "/"
 			_line:       "Hello world"
 			_user_agent: "my-service/v2.1"
 			title:       "text/plain"
@@ -200,7 +200,7 @@ components: sources: http: {
 			}
 			input: """
 				```http
-				POST \( _url_path ) HTTP/1.1
+				POST \( _path ) HTTP/1.1
 				Content-Type: text/plain
 				User-Agent: \( _user_agent )
 				X-Forwarded-For: \( _values.local_host )
@@ -213,13 +213,13 @@ components: sources: http: {
 					host:         _values.local_host
 					message:      _line
 					timestamp:    _values.current_timestamp
-					path:         _url_path
+					path:         _path
 					"User-Agent": _user_agent
 				}
 			}]
 		},
 		{
-			_url_path:   "/events"
+			_path:   "/events"
 			_path_key:   "vector_http_path"
 			_line:       "{\"key\": \"val\"}"
 			_user_agent: "my-service/v2.1"
@@ -229,12 +229,12 @@ components: sources: http: {
 				address:  "0.0.0.0:\(_port)"
 				encoding: "json"
 				headers: ["User-Agent"]
-				url_path: _url_path
+				_path: _path
 				path_key: _path_key
 			}
 			input: """
 				```http
-				POST \( _url_path ) HTTP/1.1
+				POST \( _path ) HTTP/1.1
 				Content-Type: application/json
 				User-Agent: \( _user_agent )
 				X-Forwarded-For: \( _values.local_host )
@@ -246,7 +246,7 @@ components: sources: http: {
 					host:         _values.local_host
 					key:          "val"
 					timestamp:    _values.current_timestamp
-					_path_key:    _url_path
+					_path_key:    _path
 					"User-Agent": _user_agent
 				}
 			}]

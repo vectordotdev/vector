@@ -1,5 +1,6 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, Resource, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        SourceDescription},
     event::{Event, Value},
     shutdown::ShutdownSignal,
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
@@ -17,16 +18,21 @@ use tokio_util::codec::Decoder;
 use warp::http::{HeaderMap, HeaderValue, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(default)]
 pub struct SimpleHttpConfig {
     address: SocketAddr,
+    #[serde(default)]
     encoding: Encoding,
+    #[serde(default)]
     headers: Vec<String>,
+    #[serde(default)]
     query_parameters: Vec<String>,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
+    #[serde(default = "crate::serde::default_true")]
     strict_path: bool,
-    url_path: String,
+    #[serde(default = "default_path")]
+    path: String,
+    #[serde(default = "default_path_key")]
     path_key: String,
 }
 
@@ -34,23 +40,30 @@ inventory::submit! {
     SourceDescription::new::<SimpleHttpConfig>("http")
 }
 
-impl Default for SimpleHttpConfig {
-    fn default() -> Self {
-        Self {
-            address: "0.0.0.0:80".parse().unwrap(),
+impl GenerateConfig for SimpleHttpConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            address: "0.0.0.0:8080".parse().unwrap(),
             encoding: Default::default(),
             headers: Vec::new(),
             query_parameters: Vec::new(),
             tls: None,
             auth: None,
             path_key: "path".to_string(),
-            url_path: "/".to_string(),
+            path: "/".to_string(),
             strict_path: true,
-        }
+        })
+        .unwrap()
     }
 }
 
-impl_generate_config_from_default!(SimpleHttpConfig);
+pub fn default_path() -> String {
+    "/".to_string()
+}
+
+pub fn default_path_key() -> String {
+    "path".to_string()
+}
 
 #[derive(Clone)]
 struct SimpleHttpSource {
@@ -111,7 +124,7 @@ impl SourceConfig for SimpleHttpConfig {
         };
         source.run(
             self.address,
-            &self.url_path.as_str(),
+            &self.path.as_str(),
             self.strict_path,
             &self.tls,
             &self.auth,
@@ -286,12 +299,12 @@ mod tests {
         headers: Vec<String>,
         query_parameters: Vec<String>,
         path_key: &str,
-        url_path: &str,
+        path: &str,
         strict_path: bool,
     ) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
-        let url_path = url_path.to_owned();
+        let path = path.to_owned();
         let path_key = path_key.to_owned();
         tokio::spawn(async move {
             SimpleHttpConfig {
@@ -303,7 +316,7 @@ mod tests {
                 auth: None,
                 strict_path,
                 path_key,
-                url_path,
+                path,
             }
             .build(
                 "default",
