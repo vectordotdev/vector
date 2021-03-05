@@ -436,17 +436,17 @@
                     "default": false 
                 },
                 "host": {
-                    "type": "null",
+                    "type": ["string", "null"],
                     "description": "The host of the Vector to send the data to.",
                     "default": null
                 },
                 "inputs": {
-                    "type": "null",
+                    "type": ["array", "null"],
                     "description": "Inputs of the built-in vector sink.",
                     "default": null
                 },
                 "port": {
-                    "type": "null",
+                    "type": ["integer", "null"],
                     "description": "The port of the Vector to send the data to.",
                     "default": null 
                 },

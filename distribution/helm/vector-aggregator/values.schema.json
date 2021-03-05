@@ -469,7 +469,7 @@
                     "default": "9000"
                 },
                 "nodePort": {
-                    "type": "null",
+                    "type": ["integer","null"],
                     "description": "Specific node port to bind (useful if `service.type` is set to `NodePort`).",
                     "default": null
                 },
