@@ -3,10 +3,10 @@ use nom::{
     branch::alt,
     bytes::complete::{escaped, tag, take_until, take_while1},
     character::complete::{char, satisfy, space0},
-    combinator::{map, rest},
+    combinator::{eof, map, peek, rest},
     error::{ContextError, ParseError, VerboseError},
     multi::{many1, separated_list1},
-    sequence::{delimited, preceded, tuple},
+    sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
 use std::iter::FromIterator;
@@ -171,18 +171,31 @@ fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 
 /// Parses a string delimited by the given character.
 /// Can be escaped using `\`.
+/// The terminator indicates the character that should follow the delimited field.
+/// This captures the situation where a field is not actually delimited but starts with
+/// some text that appears delimited:
+/// `field: "some kind" of value`
+/// We want to error in this situation rather than return a partially parsed field.
+/// An error means the parser will then attempt to parse this as an undelimited field.
 fn parse_delimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     delimiter: char,
+    field_terminator: &'a str,
 ) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, E> {
     move |input| {
-        delimited(
-            char(delimiter),
-            escaped(
-                take_while1(|c: char| c != '\\' && c != delimiter),
-                '\\',
-                satisfy(|c| c == '\\' || c == delimiter),
+        terminated(
+            delimited(
+                char(delimiter),
+                escaped(
+                    take_while1(|c: char| c != '\\' && c != delimiter),
+                    '\\',
+                    satisfy(|c| c == '\\' || c == delimiter),
+                ),
+                char(delimiter),
             ),
-            char(delimiter),
+            peek(alt((
+                parse_field_delimiter(field_terminator),
+                preceded(space0, eof),
+            ))),
         )(input)
     }
 }
@@ -207,7 +220,10 @@ fn parse_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 ) -> impl Fn(&'a str) -> IResult<&'a str, Value, E> {
     move |input| {
         map(
-            alt((parse_delimited('"'), parse_undelimited(field_delimiter))),
+            alt((
+                parse_delimited('"', field_delimiter),
+                parse_undelimited(field_delimiter),
+            )),
             Into::into,
         )(input)
     }
@@ -216,12 +232,16 @@ fn parse_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 /// Parses the key.
 /// Parsing strategies are the same as parse_value, but we don't need to convert the result to a `Value`.
 fn parse_key<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
-    field_delimiter: &'a str,
+    key_value_delimiter: &'a str,
 ) -> impl Fn(&'a str) -> IResult<&'a str, &'a str, E> {
-    move |input| alt((parse_delimited('"'), parse_undelimited(field_delimiter)))(input)
+    move |input| {
+        alt((
+            parse_delimited('"', key_value_delimiter),
+            parse_undelimited(key_value_delimiter),
+        ))(input)
+    }
 }
 
-/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -256,6 +276,32 @@ mod test {
     }
 
     #[test]
+    fn test_parse_key_values() {
+        assert_eq!(
+            Ok(vec![
+                ("ook".to_string(), "pook".into()),
+                ("onk".to_string(), "ponk".into())
+            ]),
+            parse("ook=pook onk=ponk", "=", " ")
+        );
+    }
+
+    #[test]
+    fn test_parse_key() {
+        // delimited
+        assert_eq!(
+            Ok(("", "noog")),
+            parse_key::<VerboseError<&str>>("=")(r#""noog""#)
+        );
+
+        // undelimited
+        assert_eq!(
+            Ok(("", "noog")),
+            parse_key::<VerboseError<&str>>("=")("noog")
+        );
+    }
+
+    #[test]
     fn test_parse_value() {
         // delimited
         assert_eq!(
@@ -267,6 +313,27 @@ mod test {
         assert_eq!(
             Ok(("", "noog".into())),
             parse_value::<VerboseError<&str>>(" ")("noog")
+        );
+    }
+
+    #[test]
+    fn test_parse_delimited_with_internal_quotes() {
+        assert!(parse_delimited::<VerboseError<&str>>('"', "=")(r#""noog" nonk"#).is_err());
+    }
+
+    #[test]
+    fn test_parse_delimited_with_internal_delimiters() {
+        assert_eq!(
+            Ok(("", "noog nonk")),
+            parse_delimited::<VerboseError<&str>>('"', " ")(r#""noog nonk""#)
+        );
+    }
+
+    #[test]
+    fn test_parse_undelimited_with_quotes() {
+        assert_eq!(
+            Ok(("", r#""noog" nonk"#)),
+            parse_undelimited::<VerboseError<&str>>(":")(r#""noog" nonk"#)
         );
     }
 
@@ -290,7 +357,9 @@ mod test {
                              bytes: "13",
                              tls_version: "tls1.1",
                              protocol: "http"})),
-            tdef: TypeDef::new().fallible().object(map!{}),
+            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
+                (): Kind::all()
+            }),
         }
 
         logfmt {
@@ -302,7 +371,9 @@ mod test {
                              tag: "stopping_fetchers",
                              id: "ConsumerFetcherManager-1382721708341",
                              module: "kafka.consumer.ConsumerFetcherManager"})),
-            tdef: TypeDef::new().fallible().object(map!{}),
+            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
+                (): Kind::all()
+            }),
         }
 
         // From https://github.com/timberio/vector/issues/5347
@@ -320,7 +391,9 @@ mod test {
                              PolicyID: "3",
                              Action: "PERMIT",
                              Content: "Session Backout"})),
-            tdef: TypeDef::new().fallible().object(map!{}),
+            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
+                (): Kind::all()
+            }),
         }
 
         spaces {
@@ -330,7 +403,9 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::new().fallible().object(map!{}),
+            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
+                (): Kind::all()
+            }),
         }
 
         delimited {
@@ -341,7 +416,9 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::new().fallible().object(map!{}),
+            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
+                (): Kind::all()
+            }),
         }
 
         delimited_with_spaces {
@@ -352,7 +429,9 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::new().fallible().object(map!{}),
+            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
+                (): Kind::all()
+            }),
         }
 
         multiple_chars {
@@ -363,7 +442,9 @@ mod test {
             ],
             want: Ok(value!({"zork one": r#"zoog\"zink\"zork"#,
                              nonk: "nink"})),
-            tdef: TypeDef::new().fallible().object(map!{}),
+            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
+                (): Kind::all()
+            }),
         }
 
         error {
@@ -372,8 +453,10 @@ mod test {
                 key_value_delimiter: "--",
                 field_delimiter: "||",
             ],
-            want: Err("function call error: 0: at line 1, in Tag:\nI am not a valid line.\n                      ^\n\n"),
-            tdef: TypeDef::new().fallible().object(map!{}),
+            want: Err("0: at line 1, in Tag:\nI am not a valid line.\n                      ^\n\n"),
+            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
+                (): Kind::all()
+            }),
         }
 
         // The following case demonstrates a scenario that could potentially be considered an
@@ -388,20 +471,50 @@ mod test {
             ],
             want: Ok(value!({zork: r#"zoog"#,
                              nonk: "nink norgle: noog"})),
-            tdef: TypeDef::new().fallible().object(map!{}),
+            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
+                (): Kind::all()
+            }),
         }
 
-        // If the value field is delimited, then it can't parse the rest of the
-        // line, so it raises an error.
+        // If the value field is delimited and we miss the separator,
+        // the following field is consumed by the current one.
         missing_separator_delimited {
             args: func_args! [
                 value: r#"zork: zoog, nonk: "nink" norgle: noog"#,
                 key_value_delimiter: ":",
                 field_delimiter: ",",
             ],
-            want: Err("function call error: could not parse whole line successfully"),
-            tdef: TypeDef::new().fallible().object(map!{}),
+            want: Ok(value!({zork: "zoog",
+                             nonk: r#""nink" norgle: noog"#})),
+            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
+                (): Kind::all()
+            }),
+        }
+
+        multi_line_with_quotes {
+            args: func_args! [
+                value: "To: tom\ntest: \"tom\" test",
+                key_value_delimiter: ":",
+                field_delimiter: "\n",
+            ],
+            want: Ok(value!({"To": "tom",
+                             "test": "\"tom\" test"})),
+            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
+                (): Kind::all()
+            }),
+        }
+
+        multi_line_with_quotes_spaces {
+            args: func_args! [
+                value: "To: tom\ntest: \"tom test\"  ",
+                key_value_delimiter: ":",
+                field_delimiter: "\n",
+            ],
+            want: Ok(value!({"To": "tom",
+                             "test": "tom test"})),
+            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
+                (): Kind::all()
+            }),
         }
     ];
 }
-*/
