@@ -55,15 +55,15 @@ impl Expression for TagTypesExternallyFn {
         Ok(tagged_externally)
     }
 
-    fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new()
-            .infallible()
-            .object::<(), Kind>(map! {
-                (): Kind::all()
-            })
-            .add_array_mapped::<(), Kind>(map! {
-                (): Kind::all()
-            })
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        match self.value.type_def(state).kind() {
+            kind if kind.is_array() => TypeDef::new()
+                .infallible()
+                .array_mapped::<(), Kind>(map! { (): Kind::all() }),
+            _ => TypeDef::new()
+                .infallible()
+                .object::<(), Kind>(map! { (): Kind::all() }),
+        }
     }
 }
 
