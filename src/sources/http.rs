@@ -1,6 +1,8 @@
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
-        SourceDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        SourceDescription,
+    },
     event::{Event, Value},
     shutdown::ShutdownSignal,
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},

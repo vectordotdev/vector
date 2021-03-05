@@ -123,7 +123,7 @@ components: sources: http: {
 				If set to true only request using the exact URL path specified in path will be accepted,
 				else event log sent to a URL path that starts with the value of path will be accepted.
 				With strict_path set to false and path set to \"/\" the configured HTTP source will
-				accept log events from any URL path. 
+				accept log events from any URL path.
 				"""
 			required: false
 			type: bool: default: true
@@ -188,7 +188,7 @@ components: sources: http: {
 
 	examples: [
 		{
-			_path:   "/"
+			_path:       "/"
 			_line:       "Hello world"
 			_user_agent: "my-service/v2.1"
 			title:       "text/plain"
@@ -219,7 +219,7 @@ components: sources: http: {
 			}]
 		},
 		{
-			_path:   "/events"
+			_path:       "/events"
 			_path_key:   "vector_http_path"
 			_line:       "{\"key\": \"val\"}"
 			_user_agent: "my-service/v2.1"
@@ -229,7 +229,7 @@ components: sources: http: {
 				address:  "0.0.0.0:\(_port)"
 				encoding: "json"
 				headers: ["User-Agent"]
-				_path: _path
+				_path:    _path
 				path_key: _path_key
 			}
 			input: """
