@@ -453,6 +453,7 @@ impl ElasticSearchCommon {
 
     fn signed_request(&self, method: &str, uri: &Uri, use_params: bool) -> SignedRequest {
         let mut request = SignedRequest::new(method, "es", &self.region, uri.path());
+        request.set_hostname(uri.host().map(|host| host.into()));
         if use_params {
             for (key, value) in &self.query_params {
                 request.add_param(key, value);
@@ -666,6 +667,34 @@ mod tests {
 {"foo":"bar","message":"hello there"}
 "#;
         assert_eq!(std::str::from_utf8(&encoded).unwrap(), &expected[..]);
+    }
+
+    #[test]
+    fn validate_host_header_on_aws_requests() {
+        let config = ElasticSearchConfig {
+            auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default {})),
+            endpoint: "http://abc-123.us-east-1.es.amazonaws.com".into(),
+            batch: BatchConfig {
+                max_events: Some(1),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+
+        let signed_request = common.signed_request(
+            "POST",
+            &"http://abc-123.us-east-1.es.amazonaws.com"
+                .parse::<Uri>()
+                .unwrap(),
+            true,
+        );
+
+        assert_eq!(
+            signed_request.hostname(),
+            "abc-123.us-east-1.es.amazonaws.com".to_string()
+        );
     }
 }
 
