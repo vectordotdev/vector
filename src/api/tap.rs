@@ -4,6 +4,7 @@ use crate::{
     topology::fanout::RouterSink,
 };
 use futures::{channel::mpsc as futures_mpsc, SinkExt, StreamExt};
+use std::fmt::Debug;
 use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
@@ -11,6 +12,7 @@ use std::{
 };
 use tokio::sync::mpsc as tokio_mpsc;
 use uuid::Uuid;
+use vrl::prelude::fmt::Formatter;
 
 type TapSender = tokio_mpsc::Sender<TapResult>;
 
@@ -135,6 +137,12 @@ impl TapSink {
     }
 }
 
+impl Debug for TapSink {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.id)
+    }
+}
+
 /// `Hash` is implemented for `TapSink` to limit checking to the UUID assigned to a
 /// given sink.
 impl Hash for TapSink {
@@ -178,5 +186,85 @@ impl Drop for TapController {
             .send(ControlMessage::Tap(TapControl::Stop(Arc::clone(
                 &self.sink,
             ))));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TapControl, TapController, TapResult, TapSink};
+
+    use crate::topology::fanout::Fanout;
+    use crate::{
+        api::ControlMessage,
+        event::{
+            metric::{Metric, MetricKind, MetricValue},
+            Event,
+        },
+    };
+    use futures::SinkExt;
+    use tokio::sync::mpsc;
+
+    #[test]
+    /// Sinks should generate different UUIDs, even if they share the same channel. A sink should
+    /// be equal to itself, but never another sink.
+    fn sink_eq() {
+        let (sink_tx, _sink_rx) = mpsc::channel(10);
+
+        let sink1 = TapSink::new(&["test".to_string()], sink_tx.clone());
+        let sink2 = TapSink::new(&["test".to_string()], sink_tx);
+
+        assert_eq!(sink1, sink1);
+        assert_eq!(sink2, sink2);
+        assert_ne!(sink1, sink2);
+    }
+
+    #[tokio::test]
+    /// `TapController` should send a `TapControl::Start` followed by `TapControl::Stop` on drop.
+    async fn tap_controller_signals() {
+        let (sink_tx, _sink_rx) = mpsc::channel(10);
+        let (tx, mut rx) = mpsc::unbounded_channel();
+
+        let sink = TapSink::new(&["test".to_string()], sink_tx);
+        let control = TapController::new(tx, sink);
+        drop(control);
+
+        assert!(matches!(
+            rx.recv().await,
+            Some(ControlMessage::Tap(TapControl::Start(_)))
+        ));
+
+        assert!(matches!(
+            rx.recv().await,
+            Some(ControlMessage::Tap(TapControl::Stop(_)))
+        ));
+    }
+
+    #[tokio::test]
+    /// A tap sink should discard non `LogEvent` events.
+    async fn sink_log_events() {
+        let (sink_tx, mut sink_rx) = mpsc::channel(10);
+        let name = "test";
+
+        let sink = TapSink::new(&[name.to_string()], sink_tx);
+
+        let log_event = Event::new_empty_log();
+        let metric_event = Event::from(Metric::new(
+            "test",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        ));
+
+        let (_, sink) = sink.make_output(name).unwrap();
+
+        let mut fanout = Fanout::new().0;
+        fanout.add(name.to_string(), sink);
+
+        let _ = fanout.send(metric_event).await.unwrap();
+        let _ = fanout.send(log_event).await.unwrap();
+
+        assert!(matches!(
+            sink_rx.recv().await,
+            Some(TapResult::LogEvent(returned_name, _)) if returned_name == name
+        ));
     }
 }
