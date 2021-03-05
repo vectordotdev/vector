@@ -368,6 +368,9 @@ impl RunningTopology {
             self.remove_outputs(&name);
         }
 
+        #[cfg(feature = "api")]
+        self.diff_tap_sinks(&diff);
+
         // Sinks
 
         // Resource conflicts
@@ -597,13 +600,6 @@ impl RunningTopology {
 
     fn remove_outputs(&mut self, name: &str) {
         self.outputs.remove(name);
-
-        #[cfg(feature = "api")]
-        self.tap_sinks.iter().for_each(|tap_sink| {
-            if let Some(pattern) = tap_sink.find_match(name) {
-                tap_sink.send_not_matched(&pattern);
-            }
-        })
     }
 
     fn remove_inputs(&mut self, name: &str) {
@@ -814,6 +810,31 @@ impl RunningTopology {
                         let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
                     }
                 }
+            }
+        }
+    }
+
+    #[cfg(feature = "api")]
+    /// Handle config differences in tap sinks by alerting to unmatched components.
+    fn diff_tap_sinks(&mut self, diff: &ConfigDiff) {
+        let to_keep = diff
+            .sources
+            .changed_and_added()
+            .chain(diff.transforms.changed_and_added())
+            .collect::<Vec<_>>();
+
+        let to_remove = diff
+            .sources
+            .removed_and_changed()
+            .chain(diff.transforms.removed_and_changed())
+            .collect::<Vec<_>>();
+
+        for tap_sink in self.tap_sinks.iter() {
+            let to_keep = tap_sink.all_matched_patterns(&to_keep);
+            let to_remove = tap_sink.all_matched_patterns(&to_remove);
+
+            for pattern in to_remove.difference(&to_keep) {
+                tap_sink.send_not_matched(pattern);
             }
         }
     }

@@ -110,7 +110,7 @@ impl TapSink {
     }
 
     /// Returns the pattern of inputs used to assess whether a component matches.
-    pub fn patterns(&self) -> Vec<String> {
+    pub fn patterns(&self) -> HashSet<String> {
         self.patterns.iter().cloned().collect()
     }
 
@@ -137,6 +137,18 @@ impl TapSink {
             .iter()
             .find(|pattern| pattern.matches_glob(component_name))
             .map(|pattern| pattern.to_string())
+    }
+
+    pub fn all_matched_patterns(&self, component_names: &[&String]) -> HashSet<String> {
+        self.patterns
+            .iter()
+            .filter(|pattern| {
+                component_names
+                    .iter()
+                    .any(|&component_name| pattern.matches_glob(component_name))
+            })
+            .map(|pattern| pattern.to_string())
+            .collect()
     }
 
     /// Returns (if it exists) a tuple of the generated sink name, and a router for handling
@@ -286,5 +298,25 @@ mod tests {
             sink_rx.recv().await,
             Some(TapResult::LogEvent(returned_name, _)) if returned_name == name
         ));
+    }
+
+    #[test]
+    /// A configured tap sink should match glob patterns
+    fn matches() {
+        let (sink_tx, _sink_rx) = mpsc::channel(10);
+        let sink = TapSink::new(
+            &["abc".to_string(), "123".to_string(), "xyz".to_string()],
+            sink_tx,
+        );
+
+        // Should find.
+        for pattern in &["abc", "a*c", "12?"] {
+            assert!(sink.matches(pattern));
+        }
+
+        // Should not find.
+        for pattern in &["xzy", "abcd", "12??"] {
+            assert!(!sink.matches(pattern));
+        }
     }
 }
