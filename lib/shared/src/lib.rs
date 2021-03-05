@@ -9,8 +9,11 @@ pub mod conversion;
 #[cfg(feature = "conversion")]
 pub mod datetime;
 
-#[cfg(feature = "tokenize")]
-pub mod tokenize;
-
 #[cfg(feature = "conversion")]
 pub use datetime::TimeZone;
+
+pub mod equivalent;
+pub use equivalent::Equivalent;
+
+#[cfg(feature = "tokenize")]
+pub mod tokenize;
