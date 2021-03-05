@@ -33,9 +33,14 @@ impl Function for ParseGlog {
         &[Example {
             title: "valid",
             source: r#"parse_glog!("I20210131 14:48:54.411655 15520 main.c++:9] Hello world!")"#,
-            result: Ok(
-                r#"{"file":"main.c++","id":15520,"level":"info","line":9,"message":"Hello world!","timestamp":"2021-01-31T14:48:54.411655Z"}"#,
-            ),
+            result: Ok(indoc! { r#"{
+                "file": "main.c++",
+                "id": 15520,
+                "level": "info",
+                "line": 9,
+                "message": "Hello world!",
+                "timestamp": "2021-01-31T14:48:54.411655Z"
+            }"#}),
         }]
     }
 

@@ -14,7 +14,7 @@ impl Function for ParseTokens {
             title: "valid",
             source: r#"parse_tokens(s'A sentence "with \"a\" sentence inside" and [some brackets]')"#,
             result: Ok(
-                r#"["A","sentence","with \\\"a\\\" sentence inside","and","some brackets"]"#,
+                r#"["A", "sentence", "with \\\"a\\\" sentence inside", "and", "some brackets"]"#,
             ),
         }]
     }

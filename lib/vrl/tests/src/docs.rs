@@ -1,9 +1,8 @@
 use serde::Deserialize;
+use serde_json::{Map, Value};
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::process::Command;
-// use vrl::Value;
-use serde_json::{Map, Value};
 
 use crate::Test;
 
