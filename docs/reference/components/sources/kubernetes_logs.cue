@@ -157,7 +157,10 @@ components: sources: kubernetes_logs: {
 			common:      false
 			description: "Optional path to a kubeconfig file readable by Vector. If not set, Vector will try to connect to Kubernetes using in-cluster configuration."
 			required:    false
-			type: string: default: null
+			type: string: {
+				default: null
+				syntax:  "literal"
+			}
 		}
 		self_node_name: {
 			common:      false
