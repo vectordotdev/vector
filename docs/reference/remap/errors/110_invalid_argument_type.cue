@@ -6,7 +6,7 @@ remap: errors: "110": {
 		An argument passed to a [function call expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor))
 		isn't a supported type.
 		"""
-	rationale: remap._fail_safe_blurb
+	rationale:   remap._fail_safe_blurb
 	resolution: #"""
 		You must guarantee the type of the variable by using the appropriate [type](\(urls.vrl_functions)#type) or
 		[coercion](\(urls.vrl_functions)#coerce) function.
