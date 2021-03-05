@@ -1,4 +1,4 @@
-use super::{default_host_key, logs::HumioLogsConfig, Encoding};
+use super::{host_key, logs::HumioLogsConfig, Encoding};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig},
     sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
@@ -25,7 +25,7 @@ pub struct HumioMetricsConfig {
 
     event_type: Option<Template>,
 
-    #[serde(default = "default_host_key")]
+    #[serde(default = "host_key")]
     host_key: String,
 
     #[serde(default)]

@@ -56,11 +56,17 @@ impl From<Config> for ConfigBuilder {
 
 impl ConfigBuilder {
     pub fn build(self) -> Result<Config, Vec<String>> {
-        self.build_with(false)
+        let (config, warnings) = self.build_with_warnings()?;
+
+        for warning in warnings {
+            warn!("{}", warning);
+        }
+
+        Ok(config)
     }
 
-    pub fn build_with(self, deny_warnings: bool) -> Result<Config, Vec<String>> {
-        compiler::compile(self, deny_warnings)
+    pub fn build_with_warnings(self) -> Result<(Config, Vec<String>), Vec<String>> {
+        compiler::compile(self)
     }
 
     pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, name: T, source: S) {

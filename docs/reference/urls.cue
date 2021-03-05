@@ -7,6 +7,7 @@ urls: {
 	ansi_escape_codes:                                        "\(wikipedia)/wiki/ANSI_escape_code"
 	apache:                                                   "https://httpd.apache.org"
 	apache_common:                                            "\(apache)/docs/1.3/logs.html#common"
+	apache_combined:                                          "\(apache)/docs/1.3/logs.html#combined"
 	apache_error:                                             "\(apache)/docs/1.3/logs.html#errorlog"
 	apache_extended_status:                                   "\(apache)/docs/current/mod/core.html#extendedstatus"
 	apache_install:                                           "\(apache)/docs/current/install.html"

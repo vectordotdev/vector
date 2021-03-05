@@ -17,6 +17,7 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
 ---
 # Source: vector-agent/templates/configmap.yaml
 apiVersion: v1

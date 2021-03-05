@@ -23,6 +23,11 @@ art in this project, then makes a proposal for where to go next.
   * [Rethink test-harness](#rethink-test-harness)
   * [Run Vector Continuously](#run-vector-continuously)
 * [Proposal](#proposal)
+* [Plan of Action](#plan-of-action)
+  * [Ad Hoc Sprint](#ad-hoc-sprint)
+  * [Criterion](#criterion)
+  * [Test-Harness](#test-harness)
+  * [Pursue `diagnostic` Command](#pursue-diagnostic-command)
 
 ## Summary
 
@@ -499,3 +504,204 @@ pursue [Run Vector Continuously](#run-vector-continuously) in the future but the
 feedback loop here is especially long. The approaches above will pay dividends
 sooner and with more focus, where Run Vector Continuously is meant to search for
 long-tail issues.
+
+## Plan of Action
+
+In this section we break down the plan of action for the proposed future work,
+given in the previous section. There are three complementary, long-term efforts
+here. They will be pursued in a roughly a concurrent manner, depending on how
+many people are available for the work. As an example, the `diagnostic` task
+"Report on Vector's Environment" will improve the test-harness work with regard
+to increasing reliability but is not a blocking task. The criterion "Discover
+Tolerances" will help establish a baseline for test-harness tests introduced in
+"Expand Test Coverage" but we might also take some arbitrary commit as "base"
+for new tests.
+
+### Ad Hoc Sprint
+
+Performance work is a matter of being familiar with the code base under
+examination, it's goals and the context in which it runs. I'd like for everyone
+working on Vector performance as a full-time concern to have an initial ramp
+sprint.
+
+Completion criteria: My aim in my own ramp sprint will be to deepen my
+understanding of the code base by pursuing low-hanging fruit present in
+flamegraph traces of the project for representative workload, see test-harness
+section below, pair with people on their PRs and stub out documentation notes on
+performance work in Vector.
+
+### Criterion
+
+Our criterion benchmarks establish non-integrated and partially-integrated
+performance profiles for Vector components. Our existing strategy here is ideal
+and we intend no major changes.
+
+#### Push Into the Critical PR Path
+
+Our existing criterion benchmarks do act as a check on our PRs but are not
+mandatory. The feedback loop today is very long, roughly an hour to two hours
+and would provide significant friction for contributors if the check were
+mandatory presently. We must reduce the total time the criterion check takes and
+then, once done, push the criterion benchmarks into the critical path for PRs.
+
+Completion criteria: Without reducing the scope or reliability of our criterion
+benchmarks we intend to complete the full run in a reasonable amount of time,
+say 10 minutes. This implies giving more hardware to the CI process tasked with
+benchmarking and splitting the load across multiple machines.
+
+#### Expand Coverage
+
+Our existing approach to criterion is in a good state. We will be well-served by
+expanding this coverage. At a minimum every source/sink/transform must have a
+benchmark that establishes its bytes-per-second throughput. Additional
+benchmarks that help us determine whether regressions have been introduce and
+where are, of course, for the common good. The source/sink/transforms should be
+tackled in priority order.
+
+Completion criteria: Once every source/sink/transform is covered with criterion
+benchmarks to the standard where we can declare its bytes-per-second throughput
+and guard against regressions in the same this task will be completed.
+
+#### Discover Tolerances
+
+As we expand our criterion coverage we will be able to declare the
+bytes-per-second throughput of our major components. We will include these
+tolerances in our documentation _and_ use these tolerances to calculate the cost
+to run Vector for certain workloads, given the relevant IO and host details. For
+instance, how much does a `syslog -> json_parser -> elasticsearch` Vector cost
+to run if the user is running in GCP us-central1 and expects 1Gb/second of
+syslog per host?
+
+Completion criteria: When a source/sink/transform is covered by criterion
+benchmarks and has a machine discovered throughput characterization we will
+document this for our end users. This task is completed when all tolerances are
+known, documented and find use in higher level documentation for users.
+
+### Test-Harness
+
+The test-harness is our place for integrated performance testing. The results
+are unreliable, infrequent and, while we gain a non-trivial portion of system
+information from the test subjects we do not necessarily have _actionable_
+information from the subjects. These are the concerns we have to repair.
+
+In roughly this order we will do the following.
+
+#### Focus our Efforts
+
+We will pull a single _performance test_ to focus our efforts on. This test will
+be `file -> json_parser -> http`. We will deterministically generate json lines,
+parse and then emit to an HTTP sink for a period of 1 hour. The file source and
+http sink will be our **primary sources of measure**. The source will record its
+**per second** throughput (lines, bytes) in a manner that DOES avoid coordinated
+omission. Files will be rotated by the generator after +100Mb have been written
+to them. Rotated files will be rotated for five iterations, then deleted. The
+HTTP sink will record the **per second** throughput (lines, bytes) received
+from Vector. No attempt will be made to verify the correctness of
+transmission. Each peer will run in the same VM but isolated into different
+cgroups with isolated resources.
+
+Completion criteria: A new performance test `file -> json_parser -> http` will
+be runnable in a reproducible VM environment for 1 hour. The data from the file
+source and HTTP sink will be collected and shipped off-system. The test-harness
+will be rigged to run this test on-demand for a given nightly vector.
+
+#### Run Nightly
+
+We will rig up an additional system to run the test from the previous section
+nightly, shipping the data as before.
+
+Completion criteria: There will be a process in place to run suitable
+performance tests nightly, using the most recent nightly builds of vector.
+
+#### Reduce Noise
+
+In order to drive stability in our results we have to reduce noise. This is done
+partially by careful configuration of our VMs and elimination of unreliable VMs
+before benchmarks begin -- see `diagnostic` work below -- but because some tests
+will be subject to nondeterminism outside our control we'll need to adjust for
+this on a test by test basis. We expect, especially for the first test, to
+primarily adjust by the use of repeat and parallel runs. After the fact analysis
+of runs can be done to summarize the result, in much the same way as our
+criterion benchmarks function.
+
+Completion criteria: We will be able to run our performance tests in a way that
+reduce noise automatically, based on detected instability. Criterion is our
+model. User's configuration knobs will set details surrounding max parallelism,
+total runtime and etc.
+
+#### Backfill Performance Tests
+
+The value of our performance tests comes in their comparison with previous
+results. We must have the ability to "backfill" results for new benchmarks or
+for when we substantially change our benchmark approach.
+
+Completion criteria: We will backfill our performance tests far back enough to
+give a reasonable trend-line. In cases where compatibility has been broken
+between vector releases we'll support alternate configuration where reasonable.
+
+#### Expand Side-Channel Data
+
+To this point the only data we've collected with any serious intention have been
+the **primary sources of measure**. These measurements give us a notion of how
+the project is trending but does not necessarily give us any guidance as to why
+or what to do about it. We will collect
+[perf](https://perf.wiki.kernel.org/index.php/Main_Page) data from our test
+runs, with the key insights being dependent on the test. We will collect
+flamegraphs of our runs. Likewise, we will collect Vector's internal telemetry
+into a comparable state. We may also explore eBPF tracing to track syscall
+counts.
+
+Completion criteria: Our aim with collecting side-channel data is to provide
+comparison between versions. If, for instance, the test is sensitive to context
+switches how have context switches changed between versions and to what degree
+can we inject new telemetry into Vector to measure (and reduce) this behavior?
+While collecting information is useful the main result here will be tooling to
+_compare_ versions, to demonstrate change.
+
+#### Expand Test Coverage
+
+Once we have pursued a single test to its utmost we must expand out. The
+existing pool of performance tests in test-harness are suitable for conversion,
+though we might consider a new variant if user needs are evident.
+
+Completion criteria: This work will be "complete" when we have five total tests
+in the new test-harness style. Realistically we will continually add onto the
+harness until such time as it no longer proves useful to us, but we gotta draw
+the line somewhere.
+
+### Pursue `diagnostic` Command
+
+We describe in [Issue 4660](https://github.com/timberio/vector/issues/4660) the
+desire to pursue a diagnostic command for Vector. There are two, complementary
+themes for such a tool and we will pursue them both. The ordering of these
+themes will be what provides the most efficacy for our problems at hand.
+
+#### Report on Vector's Internals
+
+Vector maintains self-telemetry but we have a hard time getting at this
+information in user deployments. We need Vector to be able to answer questions
+of itself to the degree that it can report things like "the file source is
+spending most of its time writing checkpoints" or similar. It's possible that we
+will expose this information through other means, but the `diagnostic` will
+output a normalized report for use in tickets and otherwise.
+
+Completion criteria: This work will be complete when Vector is able to
+self-telemeter and answer relevant details about potential places for resource
+constraints, serialization and the like. When available this report will be
+consumed by the test-harness for after-run details.
+
+#### Report on Vector's Environment
+
+Our users will run Vector in a wide variety of environments, which we may need
+to replicate. For instance, if a user reports that Vector's file source is
+unusually slow it _may_ be slow because they have an unusually slow disk or are
+present in a system with low memory and high swap utilization. The `diagnostic`
+will perform fundamental timing tests -- see
+[above](#build-a-vector-diagnostic-sub-command) -- that will inform us about
+potential weirdness. We may consider including recommendations in the output for
+users. This diagnostic information will be used in test-harness to reject VMs
+that would give poor data stability.
+
+Completion criteria: This work will be complete when Vector is able to detect
+key features of its environment and report on these, drawing special attention
+to any aberrant details.
