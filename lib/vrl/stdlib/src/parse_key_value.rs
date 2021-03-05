@@ -290,13 +290,13 @@ mod test {
     fn test_parse_key() {
         // delimited
         assert_eq!(
-            Ok(("", "noog".into())),
+            Ok(("", "noog")),
             parse_key::<VerboseError<&str>>("=")(r#""noog""#)
         );
 
         // undelimited
         assert_eq!(
-            Ok(("", "noog".into())),
+            Ok(("", "noog")),
             parse_key::<VerboseError<&str>>("=")("noog")
         );
     }
@@ -324,7 +324,7 @@ mod test {
     #[test]
     fn test_parse_delimited_with_internal_delimiters() {
         assert_eq!(
-            Ok(("", "noog nonk".into())),
+            Ok(("", "noog nonk")),
             parse_delimited::<VerboseError<&str>>('"', " ")(r#""noog nonk""#)
         );
     }
@@ -332,7 +332,7 @@ mod test {
     #[test]
     fn test_parse_undelimited_with_quotes() {
         assert_eq!(
-            Ok(("", r#""noog" nonk"#.into())),
+            Ok(("", r#""noog" nonk"#)),
             parse_undelimited::<VerboseError<&str>>(":")(r#""noog" nonk"#)
         );
     }
