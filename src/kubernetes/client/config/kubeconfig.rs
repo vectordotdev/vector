@@ -64,10 +64,12 @@ fn kubeconfig_reader(config: &str) -> Result<Config, Error> {
         },
     };
 
-    let mut tls_options = TlsOptions::default();
-    tls_options.ca_file = cluster.certificate_authority.as_ref().map(PathBuf::from);
-    tls_options.crt_file = user.client_certificate.as_ref().map(PathBuf::from);
-    tls_options.key_file = user.client_key.as_ref().map(PathBuf::from);
+    let tls_options = TlsOptions {
+        ca_file: cluster.certificate_authority.as_ref().map(PathBuf::from),
+        crt_file: user.client_certificate.as_ref().map(PathBuf::from),
+        key_file: user.client_key.as_ref().map(PathBuf::from),
+        ..Default::default()
+    };
 
     Ok(Config {
         base,
