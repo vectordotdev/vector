@@ -104,7 +104,6 @@ fn tag_type_externally(value: Value) -> Value {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -116,44 +115,48 @@ mod tests {
         tag_types_externally => TagTypesExternally;
 
         tag_bytes {
-            args: btreemap! {
-                "value" => "foo"
+            args: func_args! {
+                value: "foo"
             },
             want: Ok(btreemap! {
                 "bytes" => "foo",
             }),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
         tag_integer {
-            args: btreemap! {
-                "value" => 123
+            args: func_args! {
+                value: 123
             },
             want: Ok(btreemap! {
                 "integer" => 123
-            })
+            }),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
         tag_float {
-            args: btreemap! {
-                "value" => 123.45
+            args: func_args! {
+                value: 123.45
             },
             want: Ok(btreemap! {
                 "float" => 123.45
-            })
+            }),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
         tag_boolean {
-            args: btreemap! {
-                "value" => true
+            args: func_args! {
+                value: true
             },
             want: Ok(btreemap! {
                 "boolean" => true
-            })
+            }),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
         tag_map {
-            args: btreemap! {
-                "value" => btreemap! {
+            args: func_args! {
+                value: btreemap! {
                     "foo" => "bar"
                 }
             },
@@ -161,93 +164,50 @@ mod tests {
                 "foo" => btreemap! {
                     "bytes" => "bar"
                 }
-            })
+            }),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
         tag_array {
-            args: btreemap! {
-                "value" => vec!["foo"]
+            args: func_args! {
+                value: vec!["foo"]
             },
             want: Ok(vec![
                 btreemap! {
                     "bytes" => "foo"
                 },
-            ])
+            ]),
+            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
         }
 
         tag_timestamp {
-            args: btreemap! {
-                "value" => Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)
+            args: func_args! {
+                value: Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)
             },
             want: Ok(btreemap! {
                 "timestamp" => Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)
-            })
+            }),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
         tag_regex {
-            args: btreemap! {
-                "value" => Regex::new(".*").unwrap()
+            args: func_args! {
+                value: Regex::new(".*").unwrap()
             },
             want: Ok(btreemap! {
                 "regex" => Regex::new(".*").unwrap()
-            })
+            }),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
         tag_null {
-            args: btreemap! {
-                "value" => Value::Null
+            args: func_args! {
+                value: Value::Null
             },
             want: Ok(btreemap! {
                 "null" => Value::Null
-            })
-        }
-    ];
-
-    test_type_def![
-        value_bytes {
-            expr: |_| TagTypesExternallyFn { value: lit!("foo").boxed() },
-            def: TypeDef { fallible: false, kind: value::Kind::Map | value::Kind::Array, ..Default::default() },
-        }
-
-        value_integer {
-            expr: |_| TagTypesExternallyFn { value: lit!(123).boxed() },
-            def: TypeDef { fallible: false, kind: value::Kind::Map | value::Kind::Array, ..Default::default() },
-        }
-
-        value_float {
-            expr: |_| TagTypesExternallyFn { value: lit!(123.45).boxed() },
-            def: TypeDef { fallible: false, kind: value::Kind::Map | value::Kind::Array, ..Default::default() },
-        }
-
-        value_boolean {
-            expr: |_| TagTypesExternallyFn { value: lit!(true).boxed() },
-            def: TypeDef { fallible: false, kind: value::Kind::Map | value::Kind::Array, ..Default::default() },
-        }
-
-        value_map {
-            expr: |_| TagTypesExternallyFn { value: map!{}.boxed() },
-            def: TypeDef { fallible: false, kind: value::Kind::Map | value::Kind::Array, ..Default::default() },
-        }
-
-        value_array {
-            expr: |_| TagTypesExternallyFn { value: array![].boxed() },
-            def: TypeDef { fallible: false, kind: value::Kind::Map | value::Kind::Array, ..Default::default() },
-        }
-
-        value_timestamp {
-            expr: |_| TagTypesExternallyFn { value: lit!(Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed() },
-            def: TypeDef { fallible: false, kind: value::Kind::Map | value::Kind::Array, ..Default::default() },
-        }
-
-        value_regex {
-            expr: |_| TagTypesExternallyFn { value: lit!(Regex::new(".*").unwrap()).boxed() },
-            def: TypeDef { fallible: false, kind: value::Kind::Map | value::Kind::Array, ..Default::default() },
-        }
-
-        value_null {
-            expr: |_| TagTypesExternallyFn { value: lit!(Value::Null).boxed() },
-            def: TypeDef { fallible: false, kind: value::Kind::Map | value::Kind::Array, ..Default::default() },
+            }),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
     ];
 }
-*/
