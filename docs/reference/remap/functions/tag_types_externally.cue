@@ -20,7 +20,16 @@ remap: functions: tag_types_externally: {
 	return: types: ["map"]
 	examples: [
 		{
-			title: "Tag types externally"
+			title: "Tag types externally (scalar)"
+			source: #"""
+				tag_types_externally(123)
+				"""#
+			return: {
+				integer: 123
+			}
+		},
+		{
+			title: "Tag types externally (object)"
 			source: #"""
 				tag_types_externally({
 					"message": "Hello world",
@@ -39,6 +48,20 @@ remap: functions: tag_types_externally: {
 					}
 				}
 			}
+		},
+		{
+			title: "Tag types externally (array)"
+			source: #"""
+				tag_types_externally(["foo", "bar"])
+				"""#
+			return: [
+				{
+					bytes: "foo"
+				},
+				{
+					bytes: "bar"
+				}
+			]
 		},
 	]
 }
