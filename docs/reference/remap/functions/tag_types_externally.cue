@@ -17,7 +17,7 @@ remap: functions: tag_types_externally: {
 		},
 	]
 	internal_failure_reasons: []
-	return: types: ["map"]
+	return: types: ["object", "array"]
 	examples: [
 		{
 			title: "Tag types externally (scalar)"
