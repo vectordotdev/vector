@@ -133,9 +133,7 @@ mod tests {
         tag_types_externally => TagTypesExternally;
 
         tag_bytes {
-            args: func_args! {
-                value: "foo"
-            },
+            args: func_args![value: "foo"],
             want: Ok(btreemap! {
                 "string" => "foo",
             }),
@@ -143,9 +141,7 @@ mod tests {
         }
 
         tag_integer {
-            args: func_args! {
-                value: 123
-            },
+            args: func_args![value: 123],
             want: Ok(btreemap! {
                 "integer" => 123
             }),
@@ -153,9 +149,7 @@ mod tests {
         }
 
         tag_float {
-            args: func_args! {
-                value: 123.45
-            },
+            args: func_args![value: 123.45],
             want: Ok(btreemap! {
                 "float" => 123.45
             }),
@@ -163,9 +157,7 @@ mod tests {
         }
 
         tag_boolean {
-            args: func_args! {
-                value: true
-            },
+            args: func_args![value: true],
             want: Ok(btreemap! {
                 "boolean" => true
             }),
@@ -173,11 +165,7 @@ mod tests {
         }
 
         tag_map {
-            args: func_args! {
-                value: btreemap! {
-                    "foo" => "bar"
-                }
-            },
+            args: func_args![value: btreemap! {"foo" => "bar"}],
             want: Ok(btreemap! {
                 "foo" => btreemap! {
                     "string" => "bar"
@@ -187,9 +175,7 @@ mod tests {
         }
 
         tag_array {
-            args: func_args! {
-                value: vec!["foo"]
-            },
+            args: func_args![value: vec!["foo"]],
             want: Ok(vec![
                 btreemap! {
                     "string" => "foo"
@@ -199,9 +185,7 @@ mod tests {
         }
 
         tag_timestamp {
-            args: func_args! {
-                value: Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)
-            },
+            args: func_args![value: Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)],
             want: Ok(btreemap! {
                 "timestamp" => Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)
             }),
@@ -209,9 +193,7 @@ mod tests {
         }
 
         tag_regex {
-            args: func_args! {
-                value: Regex::new(".*").unwrap()
-            },
+            args: func_args![value: Regex::new(".*").unwrap()],
             want: Ok(btreemap! {
                 "regex" => Regex::new(".*").unwrap()
             }),
@@ -219,9 +201,7 @@ mod tests {
         }
 
         tag_null {
-            args: func_args! {
-                value: Value::Null
-            },
+            args: func_args![value: Value::Null],
             want: Ok(Value::Null),
             tdef: TypeDef::new().null(),
         }
