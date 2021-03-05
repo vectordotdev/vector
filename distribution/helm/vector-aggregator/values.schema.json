@@ -98,7 +98,7 @@
                     "default": true
                 },
                 "rawConfig": {
-                    "type": "null",
+                    "type": "string",
                     "description":"(DEPRECATED) Raw TOML config to embed at the internal metrics source.",
                     "default": null
                 },
@@ -227,7 +227,7 @@
                     }
                 },
                 "rawConfig": {
-                    "type": "null",
+                    "type": "string",
                     "description": "(DEPRECATED) Raw TOML config to embed at the prometheus sink.",
                     "default": null
                 },
@@ -474,7 +474,7 @@
                     "default": null
                 },
                 "rawConfig": {
-                    "type": "null",
+                    "type": "string",
                     "description": "(DEPRECATED) Raw TOML config to embed at the internal metrics source.",
                     "default": null
                 },
