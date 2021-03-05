@@ -114,7 +114,7 @@ impl TapSink {
         self.patterns.iter().cloned().collect()
     }
 
-    /// Returns a vector of sink IDs, as strings.
+    /// Returns a vector of sink IDs as strings.
     pub fn sink_ids(&self) -> Vec<String> {
         self.sink_ids
             .read()
