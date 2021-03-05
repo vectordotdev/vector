@@ -600,7 +600,9 @@ impl RunningTopology {
 
         #[cfg(feature = "api")]
         self.tap_sinks.iter().for_each(|tap_sink| {
-            tap_sink.component_not_matched(name);
+            if let Some(pattern) = tap_sink.find_match(name) {
+                tap_sink.send_not_matched(&pattern);
+            }
         })
     }
 
@@ -745,27 +747,35 @@ impl RunningTopology {
         // valid inputs, this ref will drop.
         self.tap_sinks.insert(Arc::clone(&tap_sink));
 
-        // Tap names are user-supplied, and could therefore be invalid. Loop over each and
-        // wire up valid sinks. If the input is invalid, a control message will be sent to the
-        // sink which will bubble up to the client.
-        tap_sink.input_names().iter().for_each(|input_name| {
-            if let Some(tx) = self.outputs.get(input_name) {
-                if let Some((sink_name, sink)) = tap_sink.make_output(input_name) {
-                    debug!(
-                        message = "Starting tap.",
-                        id = sink_name.as_str(),
-                        input = input_name.as_str()
-                    );
-                    let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
-                }
-            } else {
+        tap_sink.patterns().iter().for_each(|pattern| {
+            let found = self
+                .outputs
+                .iter()
+                .fold(false, |found, (component_name, tx)| {
+                    if tap_sink.matches(component_name) {
+                        if let Some((sink_name, sink)) = tap_sink.make_output(component_name) {
+                            debug!(
+                                message = "Starting tap.",
+                                id = sink_name.as_str(),
+                                component = component_name.as_str(),
+                                pattern = pattern.as_str()
+                            );
+                            let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
+                        }
+                        true
+                    } else {
+                        found
+                    }
+                });
+
+            if !found {
                 debug!(
-                    message = "Waiting for tap component.",
-                    input = input_name.as_str()
+                    message = "Waiting for matched tap component(s).",
+                    pattern = pattern.as_str()
                 );
-                let _ = tap_sink.component_not_matched(input_name);
+                let _ = tap_sink.send_not_matched(pattern);
             }
-        })
+        });
     }
 
     #[cfg(feature = "api")]
@@ -777,19 +787,12 @@ impl RunningTopology {
         // re-attaching sinks, we'll defensively drop here to make that intent clearer.
         self.tap_sinks.remove(&tap_sink);
 
-        tap_sink
-            .inputs()
-            .into_iter()
-            .for_each(|(input_name, sink_name)| {
-                if let Some(tx) = self.outputs.get(&input_name) {
-                    debug!(
-                        message = "Removing tap.",
-                        id = sink_name.as_str(),
-                        input = input_name.as_str()
-                    );
-                    let _ = tx.send(fanout::ControlMessage::Remove(sink_name));
-                }
-            })
+        tap_sink.sink_ids().into_iter().for_each(|sink_id| {
+            if let Some(tx) = self.outputs.get(&sink_id) {
+                debug!(message = "Removing tap.", id = sink_id.as_str());
+                let _ = tx.send(fanout::ControlMessage::Remove(sink_id));
+            }
+        })
     }
 
     #[cfg(feature = "api")]
@@ -799,7 +802,7 @@ impl RunningTopology {
         let input_name = input_name.to_string();
 
         for tap_sink in self.tap_sinks.iter() {
-            if tap_sink.input_names().contains(&input_name) {
+            if let Some(pattern) = tap_sink.find_match(&input_name) {
                 if let Some(tx) = self.outputs.get(&input_name) {
                     if let Some((sink_name, sink)) = tap_sink.make_output(&input_name) {
                         debug!(
@@ -807,7 +810,7 @@ impl RunningTopology {
                             id = sink_name.as_str(),
                             input = input_name.as_str()
                         );
-                        tap_sink.component_matched(&input_name);
+                        tap_sink.send_matched(&pattern);
                         let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
                     }
                 }

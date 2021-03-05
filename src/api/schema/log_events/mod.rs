@@ -29,13 +29,14 @@ impl From<TapResult> for LogEventResult {
         match t {
             TapResult::LogEvent(name, ev) => Self::LogEvent(LogEvent::new(&name, ev)),
             TapResult::Notification(name, n) => match n {
-                TapNotification::ComponentMatched => Self::Notification(LogEventNotification::new(
+                TapNotification::Matched => Self::Notification(LogEventNotification::new(
                     &name,
-                    LogEventNotificationType::ComponentMatched,
+                    LogEventNotificationType::Matched,
                 )),
-                TapNotification::ComponentNotMatched => Self::Notification(
-                    LogEventNotification::new(&name, LogEventNotificationType::ComponentNotMatched),
-                ),
+                TapNotification::NotMatched => Self::Notification(LogEventNotification::new(
+                    &name,
+                    LogEventNotificationType::NotMatched,
+                )),
             },
         }
     }

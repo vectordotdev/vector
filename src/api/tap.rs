@@ -4,22 +4,35 @@ use crate::{
     topology::fanout::RouterSink,
 };
 use futures::{channel::mpsc as futures_mpsc, SinkExt, StreamExt};
-use std::fmt::Debug;
+use parking_lot::RwLock;
 use std::{
-    collections::HashMap,
+    collections::HashSet,
+    fmt::Debug,
     hash::{Hash, Hasher},
     sync::Arc,
 };
 use tokio::sync::mpsc as tokio_mpsc;
 use uuid::Uuid;
-use vrl::prelude::fmt::Formatter;
 
 type TapSender = tokio_mpsc::Sender<TapResult>;
 
-/// A tap notification signals whether a component is matched or unmatched.
+trait GlobMatcher<T> {
+    fn matches_glob(&self, rhs: T) -> bool;
+}
+
+impl GlobMatcher<&str> for String {
+    fn matches_glob(&self, rhs: &str) -> bool {
+        match glob::Pattern::new(self) {
+            Ok(pattern) => pattern.matches(rhs),
+            _ => false,
+        }
+    }
+}
+
+/// A tap notification signals whether a pattern matches a component
 pub enum TapNotification {
-    ComponentMatched,
-    ComponentNotMatched,
+    Matched,
+    NotMatched,
 }
 
 /// A tap result can either contain a log event (payload), or a notification that's intended
@@ -30,12 +43,12 @@ pub enum TapResult {
 }
 
 impl TapResult {
-    pub fn component_matched(input_name: &str) -> Self {
-        Self::Notification(input_name.to_string(), TapNotification::ComponentMatched)
+    pub fn matched(input_name: &str) -> Self {
+        Self::Notification(input_name.to_string(), TapNotification::Matched)
     }
 
-    pub fn component_not_matched(input_name: &str) -> Self {
-        Self::Notification(input_name.to_string(), TapNotification::ComponentNotMatched)
+    pub fn not_matched(input_name: &str) -> Self {
+        Self::Notification(input_name.to_string(), TapNotification::NotMatched)
     }
 }
 
@@ -51,38 +64,35 @@ pub enum TapControl {
 /// GraphQL client.
 pub struct TapSink {
     id: Uuid,
-    inputs: HashMap<String, Uuid>,
+    patterns: HashSet<String>,
+    sink_ids: RwLock<HashSet<Uuid>>,
     tap_tx: TapSender,
 }
 
 impl TapSink {
-    pub fn new(input_names: &[String], tap_tx: TapSender) -> Self {
-        // Map each input name to a UUID. The string output of the UUID will be used as the
-        // sink name for topology. This never changes.
-        let inputs = input_names
-            .iter()
-            .map(|name| (name.to_string(), Uuid::new_v4()))
-            .collect();
+    pub fn new(patterns: &[String], tap_tx: TapSender) -> Self {
+        let patterns = patterns.iter().cloned().collect();
 
         Self {
             id: Uuid::new_v4(),
-            inputs,
+            patterns,
+            sink_ids: RwLock::new(HashSet::new()),
             tap_tx,
         }
     }
 
     /// Internal function to build a `RouterSink` from an input name. This will spawn an async
     /// task to forward on `LogEvent`s to the tap channel.
-    fn make_router(&self, input_name: &str) -> RouterSink {
+    fn make_router(&self, component_name: &str) -> RouterSink {
         let (event_tx, mut event_rx) = futures_mpsc::unbounded();
         let mut tap_tx = self.tap_tx.clone();
-        let input_name = input_name.to_string();
+        let component_name = component_name.to_string();
 
         tokio::spawn(async move {
             while let Some(ev) = event_rx.next().await {
                 if let Event::Log(ev) = ev {
                     let _ = tap_tx
-                        .send(TapResult::LogEvent(input_name.clone(), ev))
+                        .send(TapResult::LogEvent(component_name.clone(), ev))
                         .await;
                 }
             }
@@ -94,51 +104,63 @@ impl TapSink {
     /// Private convenience for sending a `TapResult` to the connected receiver.
     fn send(&self, msg: TapResult) {
         let tap_tx = self.tap_tx.clone();
-
         tokio::spawn(async move {
             let _ = tap_tx.clone().send(msg).await;
         });
     }
 
-    /// Returns the input names of the components this sink is observing as a vector of
-    /// cloned strings.
-    pub fn input_names(&self) -> Vec<String> {
-        self.inputs.keys().cloned().collect()
+    /// Returns the pattern of inputs used to assess whether a component matches.
+    pub fn patterns(&self) -> Vec<String> {
+        self.patterns.iter().cloned().collect()
     }
 
-    /// Get a cloned `HashMap` of the inputs. The use of a UUID for the sink name is an
-    /// implementation detail, so this is returned as a string to the caller to match
-    /// the expectations of topology.
-    pub fn inputs(&self) -> HashMap<String, String> {
-        self.inputs
+    /// Returns a vector of sink IDs, as strings.
+    pub fn sink_ids(&self) -> Vec<String> {
+        self.sink_ids
+            .read()
             .iter()
-            .map(|(name, uuid)| (name.to_string(), uuid.to_string()))
+            .map(|uuid| uuid.to_string())
             .collect()
+    }
+
+    /// Returns true if the provided component name matches a glob pattern of the inputs that
+    /// this sink is observing.
+    pub fn matches(&self, component_name: &str) -> bool {
+        self.patterns
+            .iter()
+            .any(|pattern| pattern.matches_glob(component_name))
+    }
+
+    /// Returns the pattern that matches against a component name, if found.
+    pub fn find_match(&self, component_name: &str) -> Option<String> {
+        self.patterns
+            .iter()
+            .find(|pattern| pattern.matches_glob(component_name))
+            .map(|pattern| pattern.to_string())
     }
 
     /// Returns (if it exists) a tuple of the generated sink name, and a router for handling
     /// incoming `Event`s, based on the configured input name.
-    pub fn make_output(&self, input_name: &str) -> Option<(String, RouterSink)> {
-        let id = self.inputs.get(input_name)?;
+    pub fn make_output(&self, component_name: &str) -> Option<(String, RouterSink)> {
+        let id = Uuid::new_v4();
+        let mut sink_ids = self.sink_ids.write();
+        sink_ids.insert(id);
+        drop(sink_ids);
 
-        Some((id.to_string(), self.make_router(input_name)))
+        Some((id.to_string(), self.make_router(component_name)))
     }
 
-    pub fn component_matched(&self, input_name: &str) {
-        if self.inputs.contains_key(input_name) {
-            self.send(TapResult::component_matched(input_name))
-        }
+    pub fn send_matched(&self, pattern: &str) {
+        self.send(TapResult::matched(pattern))
     }
 
-    pub fn component_not_matched(&self, input_name: &str) {
-        if self.inputs.contains_key(input_name) {
-            self.send(TapResult::component_not_matched(input_name))
-        }
+    pub fn send_not_matched(&self, pattern: &str) {
+        self.send(TapResult::not_matched(pattern))
     }
 }
 
 impl Debug for TapSink {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.id)
     }
 }
@@ -213,8 +235,6 @@ mod tests {
         let sink1 = TapSink::new(&["test".to_string()], sink_tx.clone());
         let sink2 = TapSink::new(&["test".to_string()], sink_tx);
 
-        assert_eq!(sink1, sink1);
-        assert_eq!(sink2, sink2);
         assert_ne!(sink1, sink2);
     }
 

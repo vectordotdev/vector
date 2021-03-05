@@ -3,10 +3,10 @@ use async_graphql::{Enum, SimpleObject};
 #[derive(Enum, Copy, Clone, PartialEq, Eq)]
 /// Log event notification type
 pub enum LogEventNotificationType {
-    /// A component was found that matched the provided name
-    ComponentMatched,
-    /// There isn't currently a component that matches this name
-    ComponentNotMatched,
+    /// A component was found that matched the provided pattern
+    Matched,
+    /// There isn't currently a component that matches this pattern
+    NotMatched,
 }
 
 #[derive(SimpleObject)]
