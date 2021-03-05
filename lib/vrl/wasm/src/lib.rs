@@ -1,7 +1,16 @@
+use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 use vrl::{diagnostic::Formatter, state, Runtime, Value};
 use vrl_stdlib as stdlib;
 use wasm_bindgen::prelude::*;
+
+cfg_if! {
+    // Use `wee_alloc` as the global allocator (enabled by default).
+    if #[cfg(feature = "wee_alloc")] {
+        #[global_allocator]
+        static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+    }
+}
 
 // The module takes in a VRL program and a VRL event as input
 #[derive(Deserialize, Serialize)]
