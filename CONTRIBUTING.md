@@ -372,10 +372,10 @@ If you run `make` you'll see a full list of all our tasks. Some of these will st
 
 #### Directory Structure
 
-- [`/.meta`](/.meta) - Project metadata used to generate documentation.
 - [`/benches`](/benches) - Internal benchmarks.
 - [`/config`](/config) - Public facing Vector config, included in releases.
 - [`/distribution`](/distribution) - Distribution artifacts for various targets.
+- [`/docs`](/docs) - Structured data used to generate documentation.
 - [`/lib`](/lib) - External libraries that do not depend on `vector` but are used within the project.
 - [`/proto`](/proto) - Protobuf definitions.
 - [`/scripts`](/scripts) - Scripts used to generate docs and maintain the repo.
@@ -928,9 +928,59 @@ your feature.
 
 ### Documentation
 
-Documentation is very important to the Vector project! All documentation is
-located in the `/docs` folder. To ensure your change is valid, you can run
-`make check-docs`, which validates your changes to the `/docs` directory.
+Documentation is very important to the Vector project! The official
+docs at https://vector.dev/docs are built using structured data written in
+[CUE], a language designed for data templating and validation. All of Vector's
+CUE sources are in the `/docs` folder.
+
+> Vector is currently using CUE version **0.3.0-beta.5**. Be sure to use
+> precisely this version, as CUE is evolving quickly and you can expect breaking
+> changes in each release.
+
+#### How the docs work
+
+When the HTML output for the Vector docs is built, the `vector` repo is cloned
+(in another repo) and these CUE sources are converted into one big JSON object
+using the `cue export` command. That JSON is then used as an input to the site
+build.
+
+#### Formatting
+
+Vector has some CUE-related CI checks that are run whenever changes are made to
+the `docs` directory. This includes checks to make sure that the CUE sources are
+properly formatted. To run CUE's autoformatting, run this command from the
+`vector` root:
+
+```bash
+cue fmt ./docs/**/*.cue
+```
+
+If that rewrites any files, make sure to commit your changes or else you'll see
+CI failures.
+
+#### Validation
+
+In addition to proper formatting, the CUE sources need to be *valid*, that is,
+the provided data needs to conform to various CUE schemas. To check the validity
+of the CUE sources:
+
+```bash
+make check-docs
+```
+
+#### Development flow
+
+A good practice for writing CUE is to make small, incremental changes and to
+frequently check to ensure that those changes are valid. If you introduce larger
+changes that introduce multiple errors, you may have difficulty interpreting
+CUE's verbose (and not always super helpful) log output. In fact, we recommend
+using a tool like [watchexec] to validate the sources every time you save a
+change:
+
+```bash
+# From the root
+watchexec "make check-docs"
+```
 
 ### Changelog
 
@@ -1021,6 +1071,7 @@ contact us at vector@timber.io.
 
 [urls.aws_announcements]: https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&wn-featured-announcements.sort-by=item.additionalFields.numericSort&wn-featured-announcements.sort-order=asc
 [urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository
+[urls.cue]: https://cuelang.org
 [urls.existing_issues]: https://github.com/timberio/vector/issues
 [urls.fork_repo]: https://help.github.com/en/github/getting-started-with-github/fork-a-repo
 [urls.github_sign_commits]: https://help.github.com/en/github/authenticating-to-github/signing-commits
@@ -1029,3 +1080,4 @@ contact us at vector@timber.io.
 [urls.performance_highlight]: https://vector.dev/highlights/2020-04-11-overall-performance-increase
 [urls.submit_pr]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
+[urls.watchexec]: https://github.com/watchexec/watchexec
