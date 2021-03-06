@@ -119,6 +119,7 @@ pub async fn build_pieces(
 
         let (input_tx, input_rx) = futures::channel::mpsc::channel(100);
         let input_tx = buffers::BufferInputCloner::Memory(input_tx, buffers::WhenFull::Block);
+        let input_rx = crate::utilization::wrap(input_rx);
 
         let (output, control) = Fanout::new();
 
@@ -209,11 +210,13 @@ pub async fn build_pieces(
             // which will enable us to reuse rx to rebuild
             // old configuration by passing this Arc<Mutex<Option<_>>>
             // yet again.
-            let mut rx = rx
+            let rx = rx
                 .lock()
                 .unwrap()
                 .take()
                 .expect("Task started but input has been taken.");
+
+            let mut rx = Box::pin(crate::utilization::wrap(rx));
 
             sink.run(
                 rx.by_ref()

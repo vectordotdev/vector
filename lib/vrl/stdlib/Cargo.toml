@@ -76,6 +76,7 @@ default = [
     "parse_aws_alb_log",
     "parse_aws_cloudwatch_log_subscription_message",
     "parse_aws_vpc_flow_log",
+    "parse_apache_log",
     "parse_common_log",
     "parse_duration",
     "parse_glog",
@@ -152,6 +153,7 @@ md5 = ["md-5", "hex"]
 merge = []
 now = ["chrono"]
 object = []
+parse_apache_log = ["chrono"]
 parse_aws_alb_log = ["nom"]
 parse_aws_cloudwatch_log_subscription_message = ["serde_json", "shared/aws_cloudwatch_logs_subscription", "shared/btreemap"]
 parse_aws_vpc_flow_log = []

@@ -4,6 +4,7 @@ use crate::parser::{Ident, Node};
 use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use std::fmt;
+use tracing::{span, Level};
 
 #[derive(Clone)]
 pub struct FunctionCall {
@@ -209,16 +210,18 @@ impl FunctionCall {
 
 impl Expression for FunctionCall {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.expr.resolve(ctx).map_err(|mut err| {
-            err.message = format!(
-                r#"function call error for "{}" at ({}:{}): {}"#,
-                self.ident,
-                self.span.start(),
-                self.span.end(),
-                err.message
-            );
+        span!(Level::ERROR, "remap", vrl_position = &self.span.start()).in_scope(|| {
+            self.expr.resolve(ctx).map_err(|mut err| {
+                err.message = format!(
+                    r#"function call error for "{}" at ({}:{}): {}"#,
+                    self.ident,
+                    self.span.start(),
+                    self.span.end(),
+                    err.message
+                );
 
-            err
+                err
+            })
         })
     }
 
