@@ -211,6 +211,9 @@ impl Application {
             // Using cfg_if flattens nesting.
             cfg_if! (
                 if #[cfg(feature = "api")] {
+                    // Tap register, to contain a set of weak refs to tap sinks
+                    let mut tap_register = api::TapRegister::new();
+
                     // Controller channel for the API server.
                     let (api_tx, mut api_rx) = api::make_control();
 
@@ -249,10 +252,10 @@ impl Application {
                                 match msg {
                                     ControlMessage::Tap(tap) => match tap {
                                         TapControl::Start(sink) => {
-                                            topology.attach_tap_sink(sink);
+                                            tap_register.attach(sink, &mut topology);
                                         },
                                         TapControl::Stop(sink) => {
-                                            topology.detach_tap_sink(sink);
+                                            tap_register.detach(sink, &mut topology);
                                         }
                                     }
                                 }
@@ -265,15 +268,20 @@ impl Application {
                                     let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
 
                                     if let Some(mut new_config) = new_config {
+                                        let diff = config::ConfigDiff::new(&topology.config(), &new_config);
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
                                         match topology
                                             .reload_config_and_respawn(new_config)
                                             .await
                                         {
                                             Ok(true) => {
+                                                // Pass the new config to the API server.
                                                 if let Some(ref api_server) = api_server {
                                                     api_server.update_config(topology.config())
                                                 }
+
+                                                // Rewire tap sinks with topology.
+                                                tap_register.reconnect(&diff, &mut topology);
 
                                                 emit!(VectorReloaded { config_paths: &config_paths })
                                             },

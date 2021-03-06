@@ -5,7 +5,7 @@ pub mod tap;
 
 pub use schema::build_schema;
 pub use server::Server;
-pub use tap::TapControl;
+pub use tap::{TapControl, TapRegister};
 
 use tokio::sync::mpsc;
 

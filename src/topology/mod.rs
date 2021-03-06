@@ -45,15 +45,13 @@ type BuiltBuffer = (
 #[allow(dead_code)]
 pub struct RunningTopology {
     inputs: HashMap<String, buffers::BufferInputCloner>,
-    outputs: HashMap<String, fanout::ControlChannel>,
+    pub outputs: HashMap<String, fanout::ControlChannel>,
     source_tasks: HashMap<String, TaskHandle>,
     tasks: HashMap<String, TaskHandle>,
     shutdown_coordinator: SourceShutdownCoordinator,
     detach_triggers: HashMap<String, DisabledTrigger>,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
-    #[cfg(feature = "api")]
-    tap_sinks: weak_table::WeakHashSet<std::sync::Weak<crate::api::tap::TapSink>>,
 }
 
 pub async fn start_validated(
@@ -72,8 +70,6 @@ pub async fn start_validated(
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
         abort_tx,
-        #[cfg(feature = "api")]
-        tap_sinks: weak_table::WeakHashSet::new(),
     };
 
     if !running_topology
@@ -368,9 +364,6 @@ impl RunningTopology {
             self.remove_outputs(&name);
         }
 
-        #[cfg(feature = "api")]
-        self.diff_tap_sinks(&diff);
-
         // Sinks
 
         // Resource conflicts
@@ -649,9 +642,6 @@ impl RunningTopology {
         }
 
         self.outputs.insert(name.to_string(), output);
-
-        #[cfg(feature = "api")]
-        self.reconnect_tap_sinks(name);
     }
 
     fn setup_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
@@ -733,110 +723,6 @@ impl RunningTopology {
     /// Borrows the Config.
     pub fn config(&self) -> &Config {
         &self.config
-    }
-
-    #[cfg(feature = "api")]
-    /// Attach a tap sink to running topology.
-    pub fn attach_tap_sink(&mut self, tap_sink: Arc<crate::api::tap::TapSink>) {
-        // Keep a weak ref around in running topology. This will allow subsequent config
-        // changes to re-attach the tap within explicit control messages. If there are no
-        // valid inputs, this ref will drop.
-        self.tap_sinks.insert(Arc::clone(&tap_sink));
-
-        tap_sink.patterns().iter().for_each(|pattern| {
-            let found = self
-                .outputs
-                .iter()
-                .fold(false, |found, (component_name, tx)| {
-                    if tap_sink.matches(component_name) {
-                        if let Some((sink_name, sink)) = tap_sink.make_output(component_name) {
-                            debug!(
-                                message = "Starting tap.",
-                                id = sink_name.as_str(),
-                                component = component_name.as_str(),
-                                pattern = pattern.as_str()
-                            );
-                            let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
-                        }
-                        true
-                    } else {
-                        found
-                    }
-                });
-
-            if !found {
-                debug!(
-                    message = "Waiting for matched tap component(s).",
-                    pattern = pattern.as_str()
-                );
-                let _ = tap_sink.send_not_matched(pattern);
-            }
-        });
-    }
-
-    #[cfg(feature = "api")]
-    /// Detach a tap sink from running topology. This is typically done in response to a control
-    /// message at the app-level that the tap request has closed.
-    pub fn detach_tap_sink(&mut self, tap_sink: Arc<crate::api::tap::TapSink>) {
-        // Explicitly removing isn't strictly necessary, as the weak ref will drop when the
-        // tap sink falls out of scope. However, since the intention of this ref is for when
-        // re-attaching sinks, we'll defensively drop here to make that intent clearer.
-        self.tap_sinks.remove(&tap_sink);
-
-        tap_sink.sink_ids().into_iter().for_each(|sink_id| {
-            if let Some(tx) = self.outputs.get(&sink_id) {
-                debug!(message = "Removing tap.", id = sink_id.as_str());
-                let _ = tx.send(fanout::ControlMessage::Remove(sink_id));
-            }
-        })
-    }
-
-    #[cfg(feature = "api")]
-    /// Reconnect tap sinks, by iterating the weak refs of tap sinks and rewiring outputs to
-    /// currently active tap requests.
-    fn reconnect_tap_sinks(&mut self, input_name: &str) {
-        let input_name = input_name.to_string();
-
-        for tap_sink in self.tap_sinks.iter() {
-            if let Some(pattern) = tap_sink.find_match(&input_name) {
-                if let Some(tx) = self.outputs.get(&input_name) {
-                    if let Some((sink_name, sink)) = tap_sink.make_output(&input_name) {
-                        debug!(
-                            message = "Restarting tap.",
-                            id = sink_name.as_str(),
-                            input = input_name.as_str()
-                        );
-                        tap_sink.send_matched(&pattern);
-                        let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
-                    }
-                }
-            }
-        }
-    }
-
-    #[cfg(feature = "api")]
-    /// Handle config differences in tap sinks by alerting to unmatched components.
-    fn diff_tap_sinks(&mut self, diff: &ConfigDiff) {
-        let to_keep = diff
-            .sources
-            .changed_and_added()
-            .chain(diff.transforms.changed_and_added())
-            .collect::<Vec<_>>();
-
-        let to_remove = diff
-            .sources
-            .removed_and_changed()
-            .chain(diff.transforms.removed_and_changed())
-            .collect::<Vec<_>>();
-
-        for tap_sink in self.tap_sinks.iter() {
-            let to_keep = tap_sink.all_matched_patterns(&to_keep);
-            let to_remove = tap_sink.all_matched_patterns(&to_remove);
-
-            for pattern in to_remove.difference(&to_keep) {
-                tap_sink.send_not_matched(pattern);
-            }
-        }
     }
 }
 

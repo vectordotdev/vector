@@ -1,7 +1,8 @@
 use super::{ControlMessage, ControlSender};
 use crate::{
+    config::ConfigDiff,
     event::{Event, LogEvent},
-    topology::fanout::RouterSink,
+    topology::{fanout, RunningTopology},
 };
 use futures::{channel::mpsc as futures_mpsc, SinkExt, StreamExt};
 use parking_lot::RwLock;
@@ -9,10 +10,11 @@ use std::{
     collections::HashSet,
     fmt::Debug,
     hash::{Hash, Hasher},
-    sync::Arc,
+    sync::{Arc, Weak},
 };
 use tokio::sync::mpsc as tokio_mpsc;
 use uuid::Uuid;
+use weak_table::WeakHashSet;
 
 type TapSender = tokio_mpsc::Sender<TapResult>;
 
@@ -60,6 +62,74 @@ pub enum TapControl {
     Stop(Arc<TapSink>),
 }
 
+/// A tap register holds weak references to tap sinks. Taps can be attached/detached, which
+/// update topology and send relevant event notifications to the client.
+pub struct TapRegister {
+    tap_sinks: WeakHashSet<Weak<TapSink>>,
+}
+
+impl TapRegister {
+    pub fn new() -> Self {
+        Self {
+            tap_sinks: WeakHashSet::new(),
+        }
+    }
+
+    /// Wire a tap with topology, and add it to the register.
+    pub fn attach(&mut self, tap_sink: Arc<TapSink>, topology: &mut RunningTopology) {
+        tap_sink.attach(topology);
+        self.tap_sinks.insert(tap_sink);
+    }
+
+    /// Remove a tap from topology, and explicitly remove from the register.
+    pub fn detach(&mut self, tap_sink: Arc<TapSink>, topology: &mut RunningTopology) {
+        tap_sink.detach(topology);
+        self.tap_sinks.remove(&tap_sink);
+    }
+
+    /// Reconnect a diff'd config with topology, against all registered tap sinks.
+    pub fn reconnect(&mut self, diff: &ConfigDiff, topology: &mut RunningTopology) {
+        let to_keep = diff
+            .sources
+            .changed_and_added()
+            .chain(diff.transforms.changed_and_added())
+            .collect::<Vec<_>>();
+
+        let to_remove = diff
+            .sources
+            .removed_and_changed()
+            .chain(diff.transforms.removed_and_changed())
+            .collect::<Vec<_>>();
+
+        for tap_sink in &self.tap_sinks {
+            // Rewire sinks.
+            for input_name in &to_keep {
+                if let Some(pattern) = tap_sink.find_match(*input_name) {
+                    if let Some(tx) = topology.outputs.get(*input_name) {
+                        if let Some((sink_name, sink)) = tap_sink.make_output(*input_name) {
+                            debug!(
+                                message = "Restarting tap.",
+                                id = sink_name.as_str(),
+                                input = input_name.as_str()
+                            );
+                            tap_sink.send_matched(&pattern);
+                            let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
+                        }
+                    }
+                }
+            }
+
+            // Alert tap sinks about patterns that weren't matched by the new config.
+            let patterns_to_keep = tap_sink.all_matched_patterns(&to_keep);
+            let patterns_to_remove = tap_sink.all_matched_patterns(&to_remove);
+
+            for pattern in patterns_to_remove.difference(&patterns_to_keep) {
+                tap_sink.send_not_matched(pattern);
+            }
+        }
+    }
+}
+
 /// A tap sink acts as a receiver of `LogEvent` data, and relays it to the connecting
 /// GraphQL client.
 pub struct TapSink {
@@ -83,7 +153,7 @@ impl TapSink {
 
     /// Internal function to build a `RouterSink` from an input name. This will spawn an async
     /// task to forward on `LogEvent`s to the tap channel.
-    fn make_router(&self, component_name: &str) -> RouterSink {
+    fn make_router(&self, component_name: &str) -> fanout::RouterSink {
         let (event_tx, mut event_rx) = futures_mpsc::unbounded();
         let mut tap_tx = self.tap_tx.clone();
         let component_name = component_name.to_string();
@@ -101,7 +171,7 @@ impl TapSink {
         Box::new(event_tx.sink_map_err(|_| ()))
     }
 
-    /// Private convenience for sending a `TapResult` to the connected receiver.
+    /// Convenience for sending a `TapResult` to the connected receiver.
     fn send(&self, msg: TapResult) {
         let tap_tx = self.tap_tx.clone();
         tokio::spawn(async move {
@@ -110,12 +180,12 @@ impl TapSink {
     }
 
     /// Returns the pattern of inputs used to assess whether a component matches.
-    pub fn patterns(&self) -> HashSet<String> {
+    fn patterns(&self) -> HashSet<String> {
         self.patterns.iter().cloned().collect()
     }
 
     /// Returns a vector of sink IDs as strings.
-    pub fn sink_ids(&self) -> Vec<String> {
+    fn sink_ids(&self) -> Vec<String> {
         self.sink_ids
             .read()
             .iter()
@@ -125,21 +195,22 @@ impl TapSink {
 
     /// Returns true if the provided component name matches a glob pattern of the inputs that
     /// this sink is observing.
-    pub fn matches(&self, component_name: &str) -> bool {
+    fn matches(&self, component_name: &str) -> bool {
         self.patterns
             .iter()
             .any(|pattern| pattern.matches_glob(component_name))
     }
 
     /// Returns the pattern that matches against a component name, if found.
-    pub fn find_match(&self, component_name: &str) -> Option<String> {
+    fn find_match(&self, component_name: &str) -> Option<String> {
         self.patterns
             .iter()
             .find(|pattern| pattern.matches_glob(component_name))
             .map(|pattern| pattern.to_string())
     }
 
-    pub fn all_matched_patterns(&self, component_names: &[&String]) -> HashSet<String> {
+    /// Returns a set of patterns that match the provided input.
+    fn all_matched_patterns(&self, component_names: &[&String]) -> HashSet<String> {
         self.patterns
             .iter()
             .filter(|pattern| {
@@ -153,7 +224,7 @@ impl TapSink {
 
     /// Returns (if it exists) a tuple of the generated sink name, and a router for handling
     /// incoming `Event`s, based on the configured input name.
-    pub fn make_output(&self, component_name: &str) -> Option<(String, RouterSink)> {
+    fn make_output(&self, component_name: &str) -> Option<(String, fanout::RouterSink)> {
         let id = Uuid::new_v4();
         let mut sink_ids = self.sink_ids.write();
         sink_ids.insert(id);
@@ -162,12 +233,57 @@ impl TapSink {
         Some((id.to_string(), self.make_router(component_name)))
     }
 
-    pub fn send_matched(&self, pattern: &str) {
+    /// Send a 'matched' notification.
+    fn send_matched(&self, pattern: &str) {
         self.send(TapResult::matched(pattern))
     }
 
-    pub fn send_not_matched(&self, pattern: &str) {
+    /// Send a 'not matched' notification.
+    fn send_not_matched(&self, pattern: &str) {
         self.send(TapResult::not_matched(pattern))
+    }
+
+    /// Attach the current tap to running topology.
+    fn attach(&self, topology: &mut RunningTopology) {
+        self.patterns().iter().for_each(|pattern| {
+            let found = topology
+                .outputs
+                .iter()
+                .fold(false, |found, (component_name, tx)| {
+                    if self.matches(component_name) {
+                        if let Some((sink_name, sink)) = self.make_output(component_name) {
+                            debug!(
+                                message = "Starting tap.",
+                                id = sink_name.as_str(),
+                                component = component_name.as_str(),
+                                pattern = pattern.as_str()
+                            );
+                            let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
+                        }
+                        true
+                    } else {
+                        found
+                    }
+                });
+
+            if !found {
+                debug!(
+                    message = "Waiting for matched tap component(s).",
+                    pattern = pattern.as_str()
+                );
+                let _ = self.send_not_matched(pattern);
+            }
+        });
+    }
+
+    /// Detach the current tap from running topology.
+    fn detach(&self, topology: &mut RunningTopology) {
+        self.sink_ids().into_iter().for_each(|sink_id| {
+            if let Some(tx) = topology.outputs.get(&sink_id) {
+                debug!(message = "Removing tap.", id = sink_id.as_str());
+                let _ = tx.send(fanout::ControlMessage::Remove(sink_id));
+            }
+        })
     }
 }
 
