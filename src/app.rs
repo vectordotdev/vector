@@ -211,13 +211,13 @@ impl Application {
             // Using cfg_if flattens nesting.
             cfg_if! (
                 if #[cfg(feature = "api")] {
-                    // Tap register, to contain a set of weak refs to tap sinks
+                    // Tap register, to contain a set of weak refs to tap sinks.
                     let mut tap_register = api::TapRegister::new();
 
                     // Controller channel for the API server.
                     let (api_tx, mut api_rx) = api::make_control();
 
-                    // assigned to prevent the API terminating when falling out of scope
+                    // Assigned to prevent the API terminating when falling out of scope.
                     let api_server = if api_config.enabled {
                         emit!(ApiStarted {
                             addr: api_config.address.unwrap(),
@@ -252,10 +252,10 @@ impl Application {
                                 match msg {
                                     ControlMessage::Tap(tap) => match tap {
                                         TapControl::Start(sink) => {
-                                            tap_register.attach(sink, &mut topology);
+                                            tap_register.attach(&mut topology, sink);
                                         },
                                         TapControl::Stop(sink) => {
-                                            tap_register.detach(sink, &mut topology);
+                                            tap_register.detach(&mut topology, sink);
                                         }
                                     }
                                 }
@@ -277,11 +277,11 @@ impl Application {
                                             Ok(true) => {
                                                 // Pass the new config to the API server.
                                                 if let Some(ref api_server) = api_server {
-                                                    api_server.update_config(topology.config())
-                                                }
+                                                    api_server.update_config(topology.config());
 
-                                                // Rewire tap sinks with topology.
-                                                tap_register.reconnect(&diff, &mut topology);
+                                                    // Rewire tap sinks with topology.
+                                                    tap_register.reconnect(&mut topology, &diff);
+                                                }
 
                                                 emit!(VectorReloaded { config_paths: &config_paths })
                                             },

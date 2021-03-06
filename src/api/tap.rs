@@ -77,19 +77,19 @@ impl TapRegister {
     }
 
     /// Wire a tap with topology, and add it to the register.
-    pub fn attach(&mut self, tap_sink: Arc<TapSink>, topology: &mut RunningTopology) {
+    pub fn attach(&mut self, topology: &mut RunningTopology, tap_sink: Arc<TapSink>) {
         tap_sink.attach(topology);
         self.tap_sinks.insert(tap_sink);
     }
 
     /// Remove a tap from topology, and explicitly remove from the register.
-    pub fn detach(&mut self, tap_sink: Arc<TapSink>, topology: &mut RunningTopology) {
+    pub fn detach(&mut self, topology: &mut RunningTopology, tap_sink: Arc<TapSink>) {
         tap_sink.detach(topology);
         self.tap_sinks.remove(&tap_sink);
     }
 
     /// Reconnect a diff'd config with topology, for all registered tap sinks.
-    pub fn reconnect(&mut self, diff: &ConfigDiff, topology: &mut RunningTopology) {
+    pub fn reconnect(&mut self, topology: &mut RunningTopology, diff: &ConfigDiff) {
         let to_keep = diff
             .sources
             .changed_and_added()
