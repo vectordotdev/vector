@@ -2,8 +2,7 @@ use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
     config, generate, heartbeat, list, metrics, signal,
     signal::SignalTo,
-    topology,
-    topology::RunningTopology,
+    topology::{self, RunningTopology},
     trace, unit_test, validate,
 };
 use cfg_if::cfg_if;
