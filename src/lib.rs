@@ -61,6 +61,7 @@ pub mod signal;
 pub mod sink;
 pub mod sinks;
 pub mod sources;
+pub(crate) mod stats;
 pub mod stream;
 pub mod tcp;
 pub mod template;
@@ -76,6 +77,7 @@ pub mod types;
 #[cfg(any(feature = "sources-utils-udp", feature = "sinks-utils-udp"))]
 pub mod udp;
 pub mod unit_test;
+pub(crate) mod utilization;
 pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;

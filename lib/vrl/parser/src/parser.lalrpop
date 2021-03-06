@@ -74,14 +74,14 @@ extern {
         "}" => Token::RBrace,
         ")" => Token::RParen,
 
-        "_r" => Token::InternalTest("_r"),
-        "_e" => Token::InternalTest("_e"),
-        "_m" => Token::InternalTest("_m"),
-        "_a" => Token::InternalTest("_a"),
-        "_q" => Token::InternalTest("_q"),
-        "_c" => Token::InternalTest("_c"),
-        "_as" => Token::InternalTest("_as"),
-        "_fn" => Token::InternalTest("_fn"),
+        "?r" => Token::InternalTest("?r"),
+        "?e" => Token::InternalTest("?e"),
+        "?m" => Token::InternalTest("?m"),
+        "?a" => Token::InternalTest("?a"),
+        "?q" => Token::InternalTest("?q"),
+        "?c" => Token::InternalTest("?c"),
+        "?as" => Token::InternalTest("?as"),
+        "?fn" => Token::InternalTest("?fn"),
     }
 }
 
@@ -100,32 +100,32 @@ pub Program: Program = NonterminalNewline* <RootExprs> => Program(<>);
 // and exposes entries into the parser that we don't want or need.
 pub Test: Test = {
     // root
-    "_r" <Expr> => Test::Expr(<>),
+    "?r" <Expr> => Test::Expr(<>),
 
     // expressions
-    "_e" <Literal> => Test::Literal(<>),
-    "_e" <Container> => Test::Container(<>),
+    "?e" <Literal> => Test::Literal(<>),
+    "?e" <Container> => Test::Container(<>),
 
     // arithmetic (math)
-    "_m" <ArithmeticExpr> => Test::Arithmetic(<>),
+    "?m" <ArithmeticExpr> => Test::Arithmetic(<>),
 
     // atoms
-    "_a" <String> => Test::String(<>),
-    "_a" <Integer> => Test::Integer(<>),
-    "_a" <Float> => Test::Float(<>),
-    "_a" <Boolean> => Test::Boolean(<>),
-    "_a" <Null> => Test::Null(()),
-    "_a" <Regex> => Test::Regex(<>),
+    "?a" <String> => Test::String(<>),
+    "?a" <Integer> => Test::Integer(<>),
+    "?a" <Float> => Test::Float(<>),
+    "?a" <Boolean> => Test::Boolean(<>),
+    "?a" <Null> => Test::Null(()),
+    "?a" <Regex> => Test::Regex(<>),
 
     // collections
-    "_c" <Block> => Test::Block(<>),
-    "_c" <Array> => Test::Array(<>),
-    "_c" <Object> => Test::Object(<>),
+    "?c" <Block> => Test::Block(<>),
+    "?c" <Array> => Test::Array(<>),
+    "?c" <Object> => Test::Object(<>),
 
     // other
-    "_as" <Assignment> => Test::Assignment(<>),
-    "_fn" <FunctionCall> => Test::FunctionCall(<>),
-    "_q" <Query> => Test::Query(<>),
+    "?as" <Assignment> => Test::Assignment(<>),
+    "?fn" <FunctionCall> => Test::FunctionCall(<>),
+    "?q" <Query> => Test::Query(<>),
 };
 
 // -----------------------------------------------------------------------------

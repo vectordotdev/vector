@@ -44,8 +44,10 @@ macro_rules! func_args {
 macro_rules! bench_function {
     ($name:tt => $func:path; $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))? $(,)* })+) => {
         fn $name(c: &mut criterion::Criterion) {
+            let mut group = c.benchmark_group(&format!("remap-functions/{}", stringify!($name)));
+            group.throughput(criterion::Throughput::Elements(1));
             $(
-                c.bench_function(&format!("{}: {}", stringify!($name), stringify!($case)), |b| {
+                group.bench_function(&format!("{}", stringify!($case)), |b| {
                     let (expression, want) = $crate::__prep_bench_or_test!($func, $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
                     let mut compiler_state = $crate::state::Compiler::default();
                     let mut runtime_state = $crate::state::Runtime::default();
