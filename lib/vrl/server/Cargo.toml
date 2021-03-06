@@ -1,0 +1,13 @@
+[package]
+name = "vrl-server"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+warp = "0.3"
+anyhow = "1.0.38"
+thiserror = "1.0.24"
+structopt = "0.3.21"
