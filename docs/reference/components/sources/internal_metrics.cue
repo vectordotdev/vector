@@ -431,12 +431,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		template_rendering_errors_total: {
-			description:       "The total number of failed template rendering."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
 		open_connections: {
 			description:       "The number of current open connections to Vector."
 			type:              "gauge"
