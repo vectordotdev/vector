@@ -18,6 +18,7 @@ use weak_table::WeakHashSet;
 
 type TapSender = tokio_mpsc::Sender<TapResult>;
 
+/// Clients can supply glob patterns to find matched topology components.
 trait GlobMatcher<T> {
     fn matches_glob(&self, rhs: T) -> bool;
 }
@@ -31,7 +32,7 @@ impl GlobMatcher<&str> for String {
     }
 }
 
-/// A tap notification signals whether a pattern matches a component
+/// A tap notification signals whether a pattern matches a component.
 pub enum TapNotification {
     Matched,
     NotMatched,
@@ -87,7 +88,7 @@ impl TapRegister {
         self.tap_sinks.remove(&tap_sink);
     }
 
-    /// Reconnect a diff'd config with topology, against all registered tap sinks.
+    /// Reconnect a diff'd config with topology, for all registered tap sinks.
     pub fn reconnect(&mut self, diff: &ConfigDiff, topology: &mut RunningTopology) {
         let to_keep = diff
             .sources
@@ -106,15 +107,15 @@ impl TapRegister {
             for input_name in &to_keep {
                 if let Some(pattern) = tap_sink.find_match(*input_name) {
                     if let Some(tx) = topology.outputs.get(*input_name) {
-                        if let Some((sink_name, sink)) = tap_sink.make_output(*input_name) {
-                            debug!(
-                                message = "Restarting tap.",
-                                id = sink_name.as_str(),
-                                input = input_name.as_str()
-                            );
-                            tap_sink.send_matched(&pattern);
-                            let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
-                        }
+                        let (sink_name, sink) = tap_sink.make_output(*input_name);
+                        debug!(
+                            message = "Restarting tap.",
+                            id = sink_name.as_str(),
+                            input = input_name.as_str()
+                        );
+
+                        tap_sink.send_matched(&pattern);
+                        let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
                     }
                 }
             }
@@ -127,6 +128,12 @@ impl TapRegister {
                 tap_sink.send_not_matched(pattern);
             }
         }
+    }
+}
+
+impl Default for TapRegister {
+    fn default() -> Self {
+        TapRegister::new()
     }
 }
 
@@ -151,8 +158,8 @@ impl TapSink {
         }
     }
 
-    /// Internal function to build a `RouterSink` from an input name. This will spawn an async
-    /// task to forward on `LogEvent`s to the tap channel.
+    /// Build a `RouterSink` from an input name. This will spawn an async task to forward
+    /// on `LogEvent`s to the tap channel.
     fn make_router(&self, component_name: &str) -> fanout::RouterSink {
         let (event_tx, mut event_rx) = futures_mpsc::unbounded();
         let mut tap_tx = self.tap_tx.clone();
@@ -222,23 +229,23 @@ impl TapSink {
             .collect()
     }
 
-    /// Returns (if it exists) a tuple of the generated sink name, and a router for handling
-    /// incoming `Event`s, based on the configured input name.
-    fn make_output(&self, component_name: &str) -> Option<(String, fanout::RouterSink)> {
+    /// Returns a tuple of the generated sink name, and a router for handling incoming
+    /// `Event`s, based on the configured component name.
+    fn make_output(&self, component_name: &str) -> (String, fanout::RouterSink) {
         let id = Uuid::new_v4();
         let mut sink_ids = self.sink_ids.write();
         sink_ids.insert(id);
         drop(sink_ids);
 
-        Some((id.to_string(), self.make_router(component_name)))
+        (id.to_string(), self.make_router(component_name))
     }
 
-    /// Send a 'matched' notification.
+    /// Send a 'matched' notification result.
     fn send_matched(&self, pattern: &str) {
         self.send(TapResult::matched(pattern))
     }
 
-    /// Send a 'not matched' notification.
+    /// Send a 'not matched' notification result.
     fn send_not_matched(&self, pattern: &str) {
         self.send(TapResult::not_matched(pattern))
     }
@@ -251,21 +258,21 @@ impl TapSink {
                 .iter()
                 .fold(false, |found, (component_name, tx)| {
                     if self.matches(component_name) {
-                        if let Some((sink_name, sink)) = self.make_output(component_name) {
-                            debug!(
-                                message = "Starting tap.",
-                                id = sink_name.as_str(),
-                                component = component_name.as_str(),
-                                pattern = pattern.as_str()
-                            );
-                            let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
-                        }
+                        let (sink_name, sink) = self.make_output(component_name);
+                        debug!(
+                            message = "Starting tap.",
+                            id = sink_name.as_str(),
+                            component = component_name.as_str(),
+                            pattern = pattern.as_str()
+                        );
+                        let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
                         true
                     } else {
                         found
                     }
                 });
 
+            // If the component pattern didn't provide any matches, alert the client.
             if !found {
                 debug!(
                     message = "Waiting for matched tap component(s).",
@@ -327,7 +334,7 @@ impl TapController {
 }
 
 /// When a `TapController` goes out of scope, a control message is sent to the controller to
-/// alert that a tap sink is no longer valid. This is distinct to the weak ref that topology holds
+/// alert that a tap sink is no longer valid. This is distinct to the weak ref that `TapRegister` holds
 /// for the sink, as it allows explicit action to be taken at the time the subscription goes away.
 impl Drop for TapController {
     fn drop(&mut self) {
@@ -402,7 +409,7 @@ mod tests {
             MetricValue::Counter { value: 1.0 },
         ));
 
-        let (_, sink) = sink.make_output(name).unwrap();
+        let (_, sink) = sink.make_output(name);
 
         let mut fanout = Fanout::new().0;
         fanout.add(name.to_string(), sink);
@@ -417,21 +424,21 @@ mod tests {
     }
 
     #[test]
-    /// A configured tap sink should match glob patterns
+    /// A configured tap sink should match glob patterns.
     fn matches() {
         let (sink_tx, _sink_rx) = mpsc::channel(10);
         let sink = TapSink::new(
-            &["abc".to_string(), "123".to_string(), "xyz".to_string()],
+            &["ab*".to_string(), "12?".to_string(), "xy?".to_string()],
             sink_tx,
         );
 
         // Should find.
-        for pattern in &["abc", "a*c", "12?"] {
+        for pattern in &["abc", "123", "xyz"] {
             assert!(sink.matches(pattern));
         }
 
         // Should not find.
-        for pattern in &["xzy", "abcd", "12??"] {
+        for pattern in &["xzy", "ad*", "1234"] {
             assert!(!sink.matches(pattern));
         }
     }
