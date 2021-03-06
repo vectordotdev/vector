@@ -6,10 +6,10 @@ edition = "2018"
 publish = false
 
 [dependencies]
-stdlib = { package = "vrl-stdlib", path = "../stdlib" }
-vrl = { path = "../core" }
-tokio = { version = "1", features = ["full"] }
-warp = "0.3"
-thiserror = "1.0.24"
-structopt = "0.3.21"
+http = "0.2.3"
 serde = { version = "1.0.124", features = ["derive"] }
+stdlib = { package = "vrl-stdlib", path = "../stdlib" }
+structopt = "0.3.21"
+tokio = { version = "1.2.0", features = ["macros", "rt-multi-thread"] }
+vrl = { path = "../core" }
+warp = "0.3"

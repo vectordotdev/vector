@@ -1,13 +1,12 @@
+mod error;
 mod funcs;
 mod resolve;
 
+use error::handle_err;
 use funcs::function_metadata;
 use resolve::resolve_vrl_input;
 use structopt::StructOpt;
 use warp::Filter;
-
-#[derive(Debug, thiserror::Error)]
-enum Error {}
 
 #[derive(Debug, StructOpt)]
 struct Opts {
@@ -16,7 +15,7 @@ struct Opts {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() {
     let opts = Opts::from_args();
 
     let resolve = warp::path("resolve")
@@ -28,9 +27,7 @@ async fn main() -> Result<(), Error> {
         .and(warp::get())
         .and_then(function_metadata);
 
-    let routes = resolve.or(functions);
+    let routes = resolve.or(functions).recover(handle_err);
 
-    let _ = warp::serve(routes).run(([127, 0, 0, 1], opts.port)).await;
-
-    Ok(())
+    warp::serve(routes).run(([127, 0, 0, 1], opts.port)).await;
 }

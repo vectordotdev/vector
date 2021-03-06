@@ -17,11 +17,11 @@ pub enum Outcome {
 }
 
 pub async fn resolve_vrl_input(input: Input) -> Result<impl Reply, Infallible> {
-    let outcome = compile(input);
+    let outcome = resolve(input);
     Ok(json(&outcome))
 }
 
-fn compile(mut input: Input) -> Outcome {
+fn resolve(mut input: Input) -> Outcome {
     let event = &mut input.event;
     let mut state = state::Compiler::default();
     let mut runtime = Runtime::new(state::Runtime::default());
