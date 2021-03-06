@@ -160,7 +160,6 @@ components: sinks: prometheus_remote_write: {
 	}
 
 	telemetry: metrics: {
-		processing_errors_total:         components.sources.internal_metrics.output.metrics.processing_errors_total
-		template_rendering_errors_total: components.sources.internal_metrics.output.metrics.template_rendering_errors_total
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

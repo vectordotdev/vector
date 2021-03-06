@@ -435,7 +435,7 @@ components: sinks: aws_s3: components._aws & {
 	]
 
 	telemetry: metrics: {
-		events_discarded_total:          components.sources.internal_metrics.output.metrics.events_discarded_total
-		template_rendering_errors_total: components.sources.internal_metrics.output.metrics.template_rendering_errors_total
+		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

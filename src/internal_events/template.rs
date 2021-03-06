@@ -22,7 +22,8 @@ impl<'a> InternalEvent for TemplateRenderingFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("template_rendering_errors_total", 1);
+        counter!("processing_errors_total", 1,
+            "error_type" => "render_error");
         if self.drop_event {
             counter!("events_discarded_total", 1);
         }
