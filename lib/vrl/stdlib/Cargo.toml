@@ -83,6 +83,7 @@ default = [
     "parse_grok",
     "parse_json",
     "parse_key_value",
+    "parse_logfmt",
     "parse_regex_all",
     "parse_regex",
     "parse_syslog",
@@ -163,6 +164,7 @@ parse_glog = ["chrono"]
 parse_grok = ["grok"]
 parse_json = ["serde_json"]
 parse_key_value = ["nom"]
+parse_logfmt = ["parse_key_value"]
 parse_regex = ["regex"]
 parse_regex_all = ["regex"]
 parse_syslog = ["syslog_loose"]
