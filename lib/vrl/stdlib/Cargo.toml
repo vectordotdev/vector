@@ -104,6 +104,7 @@ default = [
     "string",
     "strip_ansi_escape_codes",
     "strip_whitespace",
+    "tag_types_externally",
     "timestamp",
     "to_bool",
     "to_float",
@@ -185,6 +186,7 @@ starts_with = []
 string = []
 strip_ansi_escape_codes = ["bytes", "strip-ansi-escapes"]
 strip_whitespace = []
+tag_types_externally = []
 timestamp = []
 to_bool = ["shared/conversion"]
 to_float = ["shared/conversion"]

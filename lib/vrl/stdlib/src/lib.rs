@@ -136,6 +136,8 @@ mod string;
 mod strip_ansi_escape_codes;
 #[cfg(feature = "strip_whitespace")]
 mod strip_whitespace;
+#[cfg(feature = "tag_types_externally")]
+mod tag_types_externally;
 #[cfg(feature = "timestamp")]
 mod timestamp;
 #[cfg(feature = "to_bool")]
@@ -299,6 +301,8 @@ pub use string::String;
 pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
 #[cfg(feature = "strip_whitespace")]
 pub use strip_whitespace::StripWhitespace;
+#[cfg(feature = "tag_types_externally")]
+pub use tag_types_externally::TagTypesExternally;
 #[cfg(feature = "timestamp")]
 pub use timestamp::Timestamp;
 #[cfg(feature = "to_bool")]
@@ -466,6 +470,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(StripAnsiEscapeCodes),
         #[cfg(feature = "strip_whitespace")]
         Box::new(StripWhitespace),
+        #[cfg(feature = "tag_types_externally")]
+        Box::new(TagTypesExternally),
         #[cfg(feature = "timestamp")]
         Box::new(Timestamp),
         #[cfg(feature = "to_bool")]
