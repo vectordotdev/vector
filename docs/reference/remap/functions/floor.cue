@@ -35,7 +35,7 @@ remap: functions: floor: {
 			source: #"""
 				floor(4.345)
 				"""#
-			return: 4
+			return: 4.0
 		},
 		{
 			title: "Round a number down (with precision)"

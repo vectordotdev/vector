@@ -500,10 +500,13 @@ impl<'input> Iterator for Lexer<'input> {
                     ':' => Some(Ok(self.token(start, Colon))),
                     ',' => Some(Ok(self.token(start, Comma))),
 
-                    '_' if self.test_peek(char::is_alphabetic) => {
+                    '_' if !self.test_peek(is_ident_continue) => {
+                        Some(Ok(self.token(start, Underscore)))
+                    }
+
+                    '?' if self.test_peek(char::is_alphabetic) => {
                         Some(Ok(self.internal_test(start)))
                     }
-                    '_' => Some(Ok(self.token(start, Underscore))),
 
                     '!' if self.test_peek(|ch| ch == '!' || !is_operator(ch)) => {
                         Some(Ok(self.token(start, Bang)))
@@ -809,6 +812,7 @@ impl<'input> Lexer<'input> {
                 '.' if last_char == Some(')') => valid = true,
                 '.' if last_char == Some('}') => valid = true,
                 '.' if last_char == Some(']') => valid = true,
+                '.' if last_char == Some('"') => valid = true,
                 '.' if last_char.map(is_ident_continue) == Some(true) => {
                     // we need to make sure we're not dealing with a float here
                     let digits = self.input[..pos]
@@ -1073,12 +1077,12 @@ impl<'input> Lexer<'input> {
 // -----------------------------------------------------------------------------
 
 fn is_ident_start(ch: char) -> bool {
-    matches!(ch, '@' | 'a'..='z')
+    matches!(ch, '@' | '_' | 'a'..='z' | 'A'..='Z')
 }
 
 fn is_ident_continue(ch: char) -> bool {
     match ch {
-        '0'..='9' | '_' => true,
+        '0'..='9' => true,
         ch => is_ident_start(ch),
     }
 }
@@ -1692,6 +1696,25 @@ mod test {
                 ("        ~       ", RQuery),
                 ("          ~     ", Equals),
                 ("            ~~~~", True),
+            ],
+        );
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn quoted_path_queries() {
+        use StringLiteral as S;
+        use Token::StringLiteral as L;
+
+        test(
+            data(r#"."parent.key.with.special characters".child"#),
+            vec![
+                (r#"~                                          "#, LQuery),
+                (r#"~                                          "#, Dot),
+                (r#" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      "#, L(S::Escaped("parent.key.with.special characters"))),
+                (r#"                                     ~     "#, Dot),
+                (r#"                                      ~~~~~"#, Identifier("child")),
+                (r#"                                          ~"#, RQuery),
             ],
         );
     }

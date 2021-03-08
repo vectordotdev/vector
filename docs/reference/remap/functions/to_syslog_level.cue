@@ -24,7 +24,7 @@ remap: functions: to_syslog_level: {
 		{
 			title: "Coerce to a Syslog level"
 			source: """
-				to_syslog_level("5")
+				to_syslog_level!(5)
 				"""
 			return: "notice"
 		},

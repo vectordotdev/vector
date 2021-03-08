@@ -166,16 +166,10 @@ impl FunctionCall {
             .compile(list)
             .map_err(|error| Error::Compilation { call_span, error })?;
 
-        let mut type_def = expr.type_def(state);
-
-        if maybe_fallible_arguments {
-            type_def.fallible = true;
-        }
-
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the
         // resulting program incorrectly convey this function call might fail.
-        if abort_on_error && !type_def.is_fallible() {
+        if abort_on_error && !maybe_fallible_arguments && !expr.type_def(state).is_fallible() {
             return Err(Error::AbortInfallible {
                 ident_span,
                 abort_span: Span::new(ident_span.end(), ident_span.end() + 1),
