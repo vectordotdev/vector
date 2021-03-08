@@ -37,6 +37,8 @@ mod dedupe;
 mod docker_logs;
 mod elasticsearch;
 mod encoding_transcode;
+#[cfg(feature = "sources-eventstoredb")]
+mod eventstoredb_metrics;
 #[cfg(feature = "transforms-filter")]
 mod filter;
 #[cfg(feature = "sources-generator")]
@@ -161,6 +163,8 @@ pub use self::encoding_transcode::*;
     feature = "sources-kubernetes-logs",
     feature = "sinks-file",
 ))]
+#[cfg(feature = "sources-eventstoredb")]
+pub use self::eventstoredb_metrics::*;
 pub use self::file::*;
 #[cfg(feature = "transforms-filter")]
 pub use self::filter::*;
