@@ -29,7 +29,7 @@ remap: functions: parse_json: {
 		{
 			title: "Parse JSON"
 			source: #"""
-				parse_json("{\"key\": \"val\"}")
+				parse_json!("{\"key\": \"val\"}")
 				"""#
 			return: key: "val"
 		},

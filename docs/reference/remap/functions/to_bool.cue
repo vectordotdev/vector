@@ -33,7 +33,7 @@ remap: functions: to_bool: {
 		{
 			title: "Coerce to a boolean (string)"
 			source: """
-				to_bool("yes")
+				to_bool!("yes")
 				"""
 			return: true
 		},

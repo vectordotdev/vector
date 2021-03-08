@@ -26,7 +26,6 @@ impl Op {
         let lhs_type_def = lhs.type_def(state);
 
         let (rhs_span, rhs) = rhs.take();
-        let rhs_type_def = rhs.type_def(state);
 
         if matches!(opcode, Eq | Ne | Lt | Le | Gt | Ge) {
             if let Expr::Op(op) = &lhs {
@@ -43,8 +42,6 @@ impl Op {
                     rhs_span,
                     op_span,
                 });
-            } else if rhs_type_def.is_fallible() {
-                return Err(expression::Error::Fallible { span: rhs_span }.into());
             }
         }
 

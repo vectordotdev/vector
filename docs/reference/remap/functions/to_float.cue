@@ -29,7 +29,7 @@ remap: functions: to_float: {
 		{
 			title: "Coerce to a float"
 			source: """
-				to_float("3.145")
+				to_float!("3.145")
 				"""
 			return: 3.145
 		},

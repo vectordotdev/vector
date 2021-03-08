@@ -12,10 +12,9 @@ impl Function for ParseTokens {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "valid",
-            // TODO: Remove `encode_json` hack.
-            source: r#"encode_json(parse_tokens(s'A sentence "with \"a\" sentence inside" and [some brackets]'))"#,
+            source: r#"parse_tokens(s'A sentence "with \"a\" sentence inside" and [some brackets]')"#,
             result: Ok(
-                r##"s'["A","sentence","with \\\"a\\\" sentence inside","and","some brackets"]'"##,
+                r#"["A", "sentence", "with \\\"a\\\" sentence inside", "and", "some brackets"]"#,
             ),
         }]
     }

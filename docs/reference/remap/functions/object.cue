@@ -35,7 +35,7 @@ remap: functions: object: {
 				field2: "value2"
 			}
 			source: #"""
-				object(.value)
+				object!(.value)
 				"""#
 			return: input.log.value
 		},

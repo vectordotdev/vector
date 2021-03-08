@@ -812,6 +812,7 @@ impl<'input> Lexer<'input> {
                 '.' if last_char == Some(')') => valid = true,
                 '.' if last_char == Some('}') => valid = true,
                 '.' if last_char == Some(']') => valid = true,
+                '.' if last_char == Some('"') => valid = true,
                 '.' if last_char.map(is_ident_continue) == Some(true) => {
                     // we need to make sure we're not dealing with a float here
                     let digits = self.input[..pos]
@@ -1695,6 +1696,25 @@ mod test {
                 ("        ~       ", RQuery),
                 ("          ~     ", Equals),
                 ("            ~~~~", True),
+            ],
+        );
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn quoted_path_queries() {
+        use StringLiteral as S;
+        use Token::StringLiteral as L;
+
+        test(
+            data(r#"."parent.key.with.special characters".child"#),
+            vec![
+                (r#"~                                          "#, LQuery),
+                (r#"~                                          "#, Dot),
+                (r#" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      "#, L(S::Escaped("parent.key.with.special characters"))),
+                (r#"                                     ~     "#, Dot),
+                (r#"                                      ~~~~~"#, Identifier("child")),
+                (r#"                                          ~"#, RQuery),
             ],
         );
     }

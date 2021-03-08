@@ -1,5 +1,6 @@
 use super::Value;
 use bytes::Bytes;
+use chrono::SecondsFormat;
 use serde::de::{Error, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::BTreeMap;
@@ -20,7 +21,9 @@ impl Serialize for Value {
             Boolean(v) => serializer.serialize_bool(*v),
             Object(v) => serializer.collect_map(v),
             Array(v) => serializer.collect_seq(v),
-            Timestamp(v) => serializer.serialize_str(&v.to_rfc3339()),
+            Timestamp(v) => {
+                serializer.serialize_str(&v.to_rfc3339_opts(SecondsFormat::AutoSi, true))
+            }
             Regex(v) => serializer.serialize_str(&v.to_string()),
             Null => serializer.serialize_none(),
         }

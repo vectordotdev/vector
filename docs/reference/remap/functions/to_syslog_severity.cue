@@ -29,7 +29,7 @@ remap: functions: to_syslog_severity: {
 		{
 			title: "Coerce to Syslog severity"
 			source: """
-				to_syslog_severity("alert")
+				to_syslog_severity!("alert")
 				"""
 			return: 1
 		},

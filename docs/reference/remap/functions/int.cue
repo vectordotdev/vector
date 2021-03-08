@@ -26,7 +26,7 @@ remap: functions: int: {
 			title: "Declare an integer type"
 			input: log: value: 42
 			source: #"""
-				int(.value)
+				int!(.value)
 				"""#
 			return: input.log.value
 		},

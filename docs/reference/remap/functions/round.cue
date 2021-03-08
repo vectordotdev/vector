@@ -35,7 +35,7 @@ remap: functions: round: {
 			source: #"""
 				round(4.345)
 				"""#
-			return: 4
+			return: 4.0
 		},
 		{
 			title: "Round a number (with precision)"
