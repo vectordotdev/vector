@@ -57,9 +57,9 @@ impl fmt::Display for Value {
                 write!(f, "[{}]", joined)
             }
             Value::Timestamp(val) => {
-                write!(f, "{}", val.to_rfc3339_opts(SecondsFormat::AutoSi, true))
+                write!(f, "t'{}'", val.to_rfc3339_opts(SecondsFormat::AutoSi, true))
             }
-            Value::Regex(regex) => write!(f, "/{}/", regex.to_string()),
+            Value::Regex(regex) => write!(f, "r'{}'", regex.to_string()),
             Value::Null => write!(f, "null"),
         }
     }
