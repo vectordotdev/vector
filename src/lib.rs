@@ -20,9 +20,9 @@ extern crate pest_derive;
 #[cfg(feature = "vrl-cli")]
 extern crate vrl_cli;
 
-// Configure the global allocator. Do not remove this line, even if it appears
-// unused.
-extern crate vector_global_alloc;
+#[cfg(feature = "jemallocator")]
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[macro_use]
 pub mod config;

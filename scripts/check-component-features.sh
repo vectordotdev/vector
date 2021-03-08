@@ -11,13 +11,6 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-# Here are all the features that will be added along the tested features.
-# Used mainly for passing mandatory, mutually exclusive features -
-# which are designed to force an error in not properly set.
-FORCED_FEATURES=(
-  alloc-jemalloc # check with jemalloc
-)
-
 toml-extract() {
   WHAT="$1"
   remarshal --if toml --of json | jq -r "$WHAT"
@@ -32,21 +25,14 @@ extract-features() {
 }
 
 check-listed-features() {
-  xargs -I{} sh -cx "(cargo check --tests --no-default-features --features '${FORCED_FEATURES[*]}' --features {}) || exit 255"
-}
-
-cargo-clean-when-in-ci() {
-  if [[ "${CI:-"false"}" == "true" ]]; then
-    echo "Cleaning to save some disk space"
-    cargo clean
-  fi
+  xargs -I{} sh -cx "(cargo check --tests --no-default-features --features {}) || exit 255"
 }
 
 echo "Checking that Vector and tests can be built without default features..."
-cargo check --tests --no-default-features --features "${FORCED_FEATURES[*]}"
+cargo check --tests --no-default-features
 
 echo "Checking that all components have corresponding features in Cargo.toml..."
-COMPONENTS="$(cargo run --no-default-features --features "${FORCED_FEATURES[*]}" -- list)"
+COMPONENTS="$(cargo run --no-default-features -- list)"
 if (echo "$COMPONENTS" | grep -E -v "(Log level|^(Sources:|Transforms:|Sinks:|)$)" >/dev/null); then
   echo "Some of the components do not have a corresponding feature flag in Cargo.toml:"
   # shellcheck disable=SC2001
@@ -57,12 +43,18 @@ fi
 echo "Checking that each source feature can be built without other features..."
 extract-features sources | check-listed-features
 
-cargo-clean-when-in-ci
+if (${CI:-false}); then
+  echo "Cleaning to save some disk space"
+  cargo clean
+fi
 
 echo "Checking that each transform feature can be built without other features..."
 extract-features transforms | check-listed-features
 
-cargo-clean-when-in-ci
+if (${CI:-false}); then
+  echo "Cleaning to save some disk space"
+  cargo clean
+fi
 
 echo "Checking that each sink feature can be built without other features..."
 extract-features sinks | check-listed-features
