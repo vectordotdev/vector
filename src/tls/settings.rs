@@ -452,7 +452,6 @@ fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::BoolAndSome;
 
     const TEST_PKCS12_PATH: &str = "tests/data/localhost.p12";
     const TEST_PEM_CRT_BYTES: &[u8] = include_bytes!("../../tests/data/localhost.crt");
@@ -620,8 +619,8 @@ mod test {
         TlsConfig {
             enabled,
             options: TlsOptions {
-                crt_file: set_crt.and_some(TEST_PEM_CRT_PATH.into()),
-                key_file: set_key.and_some(TEST_PEM_KEY_PATH.into()),
+                crt_file: set_crt.then(|| TEST_PEM_CRT_PATH.into()),
+                key_file: set_key.then(|| TEST_PEM_KEY_PATH.into()),
                 ..Default::default()
             },
         }

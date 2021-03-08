@@ -38,7 +38,7 @@ remap: functions: parse_regex_all: {
 		{
 			title: "Parse via Regex (all matches)"
 			source: """
-				parse_regex_all("first group and second group.", r'(?P<number>.*?) group')
+				parse_regex_all!("first group and second group.", r'(?P<number>\\w+) group')
 				"""
 			return: [
 				{

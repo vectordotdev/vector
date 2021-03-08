@@ -51,8 +51,9 @@ remap: functions: log: {
 		},
 		{
 			title: "Log an error"
+			input: log: field: "not an integer"
 			source: #"""
-				ts, err = format_timestamp(to_timestamp("10-Oct-2020 1"))
+				ts, err = to_int(.field)
 				if err != null {
 					log(err, level: "error")
 				}

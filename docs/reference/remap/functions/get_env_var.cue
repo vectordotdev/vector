@@ -24,7 +24,7 @@ remap: functions: get_env_var: {
 		{
 			title: "Get environment variable"
 			source: #"""
-				get_env_var("HOME")
+				get_env_var!("HOME")
 				"""#
 			return: "/root"
 		},

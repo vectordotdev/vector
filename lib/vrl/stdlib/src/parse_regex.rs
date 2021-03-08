@@ -63,7 +63,7 @@ impl Expression for ParseRegexFn {
             .pattern
             .captures(&value)
             .map(|capture| util::capture_regex_to_map(&self.pattern, capture))
-            .ok_or("unable to parse regular expression")?;
+            .ok_or("could not find any pattern matches")?;
 
         Ok(parsed.into())
     }

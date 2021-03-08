@@ -34,14 +34,14 @@ remap: functions: starts_with: {
 		{
 			title: "String starts with (case sensitive)"
 			source: #"""
-				starts_with("The Needle In The Haystack", \"The Needle\")
+				starts_with("The Needle In The Haystack", "The Needle")
 				"""#
 			return: true
 		},
 		{
 			title: "String starts with (case insensitive)"
 			source: #"""
-				starts_with("The Needle In The Haystack", \"the needle\", case_sensitive: false)
+				starts_with("The Needle In The Haystack", "the needle", case_sensitive: false)
 				"""#
 			return: true
 		},

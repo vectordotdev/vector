@@ -1039,6 +1039,42 @@
 #         .bar == "foob..."
 #       '''
 
+[transforms.remap_function_tag_types_externally]
+  inputs = []
+  type = "remap"
+  source = """
+    .string = tag_types_externally("foo")
+    .integer = tag_types_externally(123)
+    .float = tag_types_externally(123.45)
+    .boolean = tag_types_externally(true)
+    .map = tag_types_externally({ "foo": "bar" })
+    .array = tag_types_externally(["foo"])
+    .timestamp = tag_types_externally(to_timestamp!("2021-01-01T00:00:00.00Z"))
+    .regex = tag_types_externally(r'.*')
+    .null = tag_types_externally(null)
+  """
+[[tests]]
+  name = "remap_function_tag_types_externally"
+  [tests.input]
+    insert_at = "remap_function_tag_types_externally"
+    type = "log"
+    log_fields = {}
+  [[tests.outputs]]
+    extract_from = "remap_function_tag_types_externally"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '''
+        .string == { "string": "foo" } &&
+        .integer == { "integer": 123 } &&
+        .float == { "float": 123.45 } &&
+        .boolean == { "boolean": true } &&
+        .map == { "foo": { "string": "bar" } } &&
+        .array == [{ "string": "foo" }] &&
+        .timestamp == { "timestamp": to_timestamp!("2021-01-01T00:00:00.00Z") } &&
+        .regex == { "regex": ".*" } &&
+        .null == null
+      '''
+
 # [transforms.remap_function_strip_whitespace]
 #   inputs = []
 #   type = "remap"

@@ -24,7 +24,7 @@ remap: functions: to_syslog_facility: {
 		{
 			title: "Coerce to a Syslog facility"
 			source: """
-				to_syslog_facility("4")
+				to_syslog_facility!(4)
 				"""
 			return: "auth"
 		},

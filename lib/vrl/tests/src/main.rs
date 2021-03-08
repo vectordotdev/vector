@@ -1,12 +1,11 @@
 use ansi_term::Colour;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use glob::glob;
-use std::collections::BTreeMap;
-use std::fs;
-use std::path::Path;
 use std::str::FromStr;
 use structopt::StructOpt;
-use vrl::{diagnostic::Formatter, function::Example, state, Runtime, Value};
+use vrl::{diagnostic::Formatter, state, Runtime, Value};
+
+use vrl_tests::{docs, Test};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "VRL Tests", about = "Vector Remap Language Tests")]
@@ -19,6 +18,9 @@ pub struct Cmd {
 
     #[structopt(short, long)]
     verbose: bool,
+
+    #[structopt(short, long)]
+    no_diff: bool,
 
     #[structopt(long)]
     skip_functions: bool,
@@ -66,6 +68,7 @@ fn main() {
 
             tests.into_iter()
         })
+        .chain(docs::tests().into_iter())
         .collect::<Vec<_>>();
 
     for mut test in tests {
@@ -104,6 +107,7 @@ fn main() {
 
                 match result {
                     Ok(got) => {
+                        let got = vrl_value_to_json_value(got);
                         let mut failed = false;
 
                         if !test.skip {
@@ -111,20 +115,25 @@ fn main() {
                                 match regex::Regex::new(
                                     &want[2..want.len() - 1].replace("\\'", "'"),
                                 ) {
-                                    Ok(want) => want.into(),
+                                    Ok(want) => want.to_string().into(),
                                     Err(_) => want.into(),
                                 }
                             } else if want.starts_with("t'") && want.ends_with('\'') {
                                 match DateTime::<Utc>::from_str(&want[2..want.len() - 1]) {
-                                    Ok(want) => want.into(),
+                                    Ok(want) => {
+                                        want.to_rfc3339_opts(SecondsFormat::AutoSi, true).into()
+                                    }
                                     Err(_) => want.into(),
                                 }
                             } else if want.starts_with("s'") && want.ends_with('\'') {
                                 want[2..want.len() - 1].into()
                             } else {
-                                match serde_json::from_str::<'_, Value>(&want.trim()) {
+                                match serde_json::from_str::<'_, serde_json::Value>(&want.trim()) {
                                     Ok(want) => want,
-                                    Err(_) => want.into(),
+                                    Err(err) => {
+                                        eprintln!("{}", err);
+                                        want.into()
+                                    }
                                 }
                             };
 
@@ -134,12 +143,14 @@ fn main() {
                                 println!("{} (expectation)", Colour::Red.bold().paint("FAILED"));
                                 failed_count += 1;
 
-                                let want = want.to_string();
-                                let got = got.to_string();
+                                if !cmd.no_diff {
+                                    let want = serde_json::to_string_pretty(&want).unwrap();
+                                    let got = serde_json::to_string_pretty(&got).unwrap();
 
-                                let diff = prettydiff::diff_chars(&want, &got)
-                                    .set_highlight_whitespace(true);
-                                println!("  {}", diff);
+                                    let diff = prettydiff::diff_lines(&want, &got);
+                                    println!("  {}", diff);
+                                }
+
                                 failed = true;
                             }
                         }
@@ -166,8 +177,11 @@ fn main() {
                                 println!("{} (runtime)", Colour::Red.bold().paint("FAILED"));
                                 failed_count += 1;
 
-                                let diff = prettydiff::diff_lines(&want, &got);
-                                println!("{}", diff);
+                                if !cmd.no_diff {
+                                    let diff = prettydiff::diff_lines(&want, &got);
+                                    println!("{}", diff);
+                                }
+
                                 failed = true;
                             }
                         }
@@ -197,8 +211,11 @@ fn main() {
                         println!("{} (compilation)", Colour::Red.bold().paint("FAILED"));
                         failed_count += 1;
 
-                        let diff = prettydiff::diff_lines(&want, &got);
-                        println!("{}", diff);
+                        if !cmd.no_diff {
+                            let diff = prettydiff::diff_lines(&want, &got);
+                            println!("{}", diff);
+                        }
+
                         failed = true;
                     }
                 }
@@ -216,143 +233,6 @@ fn main() {
     }
 
     print_result(failed_count)
-}
-
-#[derive(Debug)]
-struct Test {
-    name: String,
-    category: String,
-    error: Option<String>,
-    source: String,
-    object: Value,
-    result: String,
-    result_approx: bool,
-    skip: bool,
-}
-
-enum CaptureMode {
-    Result,
-    Object,
-    None,
-    Done,
-}
-
-impl Test {
-    fn from_path(path: &Path) -> Self {
-        let name = test_name(path);
-        let category = test_category(&path);
-        let content = fs::read_to_string(path).expect("content");
-
-        let mut source = String::new();
-        let mut object = String::new();
-        let mut result = String::new();
-        let mut result_approx = false;
-        let mut skip = false;
-
-        if content.starts_with("# SKIP") {
-            skip = true;
-        }
-
-        let mut capture_mode = CaptureMode::None;
-        for mut line in content.lines() {
-            if line.starts_with('#') && !matches!(capture_mode, CaptureMode::Done) {
-                line = line.strip_prefix('#').expect("prefix");
-                line = line.strip_prefix(' ').unwrap_or(line);
-
-                if line.starts_with("object:") {
-                    capture_mode = CaptureMode::Object;
-                    line = line.strip_prefix("object:").expect("object").trim_start();
-                } else if line.starts_with("result: ~") {
-                    capture_mode = CaptureMode::Result;
-                    result_approx = true;
-                    line = line.strip_prefix("result: ~").expect("result").trim_start();
-                } else if line.starts_with("result:") {
-                    capture_mode = CaptureMode::Result;
-                    line = line.strip_prefix("result:").expect("result").trim_start();
-                }
-
-                match capture_mode {
-                    CaptureMode::None | CaptureMode::Done => continue,
-                    CaptureMode::Result => {
-                        result.push_str(line);
-                        result.push('\n');
-                    }
-                    CaptureMode::Object => {
-                        object.push_str(line);
-                    }
-                }
-            } else {
-                capture_mode = CaptureMode::Done;
-
-                source.push_str(line);
-                source.push('\n')
-            }
-        }
-
-        let mut error = None;
-        let object = if object.is_empty() {
-            Value::Object(BTreeMap::default())
-        } else {
-            match serde_json::from_str::<'_, Value>(&object) {
-                Ok(value) => value,
-                Err(err) => {
-                    error = Some(format!("unable to parse object as JSON: {}", err));
-                    Value::Null
-                }
-            }
-        };
-
-        result = result.trim_end().to_owned();
-
-        Self {
-            name,
-            category,
-            error,
-            source,
-            object,
-            result,
-            result_approx,
-            skip,
-        }
-    }
-
-    fn from_example(func: &'static str, example: &Example) -> Self {
-        let object = Value::Object(BTreeMap::default());
-        let result = match example.result {
-            Ok(string) => string.to_owned(),
-            Err(err) => err.to_string(),
-        };
-
-        Self {
-            name: example.title.to_owned(),
-            category: format!("functions/{}", func),
-            error: None,
-            source: example.source.to_owned(),
-            object,
-            result,
-            result_approx: false,
-            skip: false,
-        }
-    }
-}
-
-fn test_category(path: &Path) -> String {
-    path.to_string_lossy()
-        .strip_prefix("tests/")
-        .expect("test")
-        .rsplitn(2, '/')
-        .nth(1)
-        .unwrap()
-        .to_owned()
-}
-
-fn test_name(path: &Path) -> String {
-    path.to_string_lossy()
-        .rsplitn(2, '/')
-        .next()
-        .unwrap()
-        .trim_end_matches(".vrl")
-        .replace("_", " ")
 }
 
 fn compare_partial_diagnostic(got: &str, want: &str) -> bool {
@@ -381,4 +261,23 @@ fn print_result(failed_count: usize) {
     }
 
     std::process::exit(code)
+}
+
+fn vrl_value_to_json_value(value: Value) -> serde_json::Value {
+    use serde_json::Value::*;
+    use std::iter::FromIterator;
+
+    match value {
+        v @ Value::Bytes(_) => String(v.try_bytes_utf8_lossy().unwrap().into_owned()),
+        Value::Integer(v) => v.into(),
+        Value::Float(v) => v.into_inner().into(),
+        Value::Boolean(v) => v.into(),
+        Value::Object(v) => serde_json::Value::from_iter(
+            v.into_iter().map(|(k, v)| (k, vrl_value_to_json_value(v))),
+        ),
+        Value::Array(v) => serde_json::Value::from_iter(v.into_iter().map(vrl_value_to_json_value)),
+        Value::Timestamp(v) => v.to_rfc3339_opts(SecondsFormat::AutoSi, true).into(),
+        Value::Regex(v) => v.to_string().into(),
+        Value::Null => Null,
+    }
 }

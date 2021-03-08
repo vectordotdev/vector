@@ -51,7 +51,7 @@ remap: functions: parse_apache_log: {
 		{
 			title: "Parse via Apache log format (common)"
 			source: #"""
-				parse_apache_log("127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] \"GET /apache_pb.gif HTTP/1.0\" 200 2326", format: "common")
+				parse_apache_log!("127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] \"GET /apache_pb.gif HTTP/1.0\" 200 2326", format: "common")
 				"""#
 			return: {
 				host:      "127.0.0.1"
@@ -69,8 +69,8 @@ remap: functions: parse_apache_log: {
 		{
 			title: "Parse via Apache log format (combined)"
 			source: #"""
-				parse_apache_log(
-					s'127.0.0.1 bob frank [10/Oct/2000:20:55:36 +0000] \"GET /apache_pb.gif HTTP/1.0\" 200 2326 "http://www.seniorinfomediaries.com/vertical/channels/front-end/bandwidth" "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0"',
+				parse_apache_log!(
+					s'127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326 "http://www.seniorinfomediaries.com/vertical/channels/front-end/bandwidth" "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0"',
 					"combined",
 				)
 				"""#
@@ -92,7 +92,7 @@ remap: functions: parse_apache_log: {
 		{
 			title: "Parse via Apache log format (error)"
 			source: #"""
-				parse_apache_log(
+				parse_apache_log!(
 					s'[01/Mar/2021:12:00:19 +0000] [ab:alert] [pid 4803:tid 3814] [client 147.159.108.175:24259] I will bypass the haptic COM bandwidth, that should matrix the CSS driver!',
 					"error"
 				)
@@ -105,7 +105,7 @@ remap: functions: parse_apache_log: {
 				port:      24259
 				severity:  "alert"
 				thread:    "3814"
-				timestamp: "2021-03-01T12:00:19+00:00"
+				timestamp: "2021-03-01T12:00:19Z"
 			}
 		},
 	]
