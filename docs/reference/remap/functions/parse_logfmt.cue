@@ -3,7 +3,7 @@ package metadata
 remap: functions: parse_logfmt: {
 	category:    "Parse"
 	description: #"""
-		Parses the `value` in key/value format as [logfmt](\#(urls.logfmt)).
+		Parses the `value` in [logfmt](\#(urls.logfmt)).
 
 		* Keys and values can be wrapped with `"`.
 		* `"` characters can be escaped by `\`.
