@@ -302,6 +302,10 @@ test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs uni
 test-behavior: ## Runs behaviorial test
 	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/**/*
 
+.PHONY: test-global-alloc
+test-global-alloc: ## Runs custom tests for lib/vector-global-alloc
+	${MAYBE_ENVIRONMENT_EXEC} cd lib/vector-global-alloc && ./test.sh
+
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
@@ -508,14 +512,14 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh kafka start
 	sleep 30 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features shutdown-tests --test shutdown -- --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "alloc-jemalloc shutdown-tests" --test shutdown -- --test-threads 4
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh kafka stop
 endif
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --test cli -- --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "alloc-jemalloc" --test cli -- --test-threads 4
 
 .PHONY: test-wasm-build-modules
 test-wasm-build-modules: $(WASM_MODULE_OUTPUTS) ### Build all WASM test modules
@@ -534,7 +538,7 @@ $(WASM_MODULE_OUTPUTS): ### Build a specific WASM module
 test-wasm: export TEST_THREADS=1
 test-wasm: export TEST_LOG=vector=trace
 test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-fail-fast --no-default-features --features "transforms-field_filter transforms-wasm transforms-lua transforms-add_fields" --lib --all-targets -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-fail-fast --no-default-features --features "alloc-jemalloc transforms-field_filter transforms-wasm transforms-lua transforms-add_fields" --lib --all-targets -- --nocapture
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 

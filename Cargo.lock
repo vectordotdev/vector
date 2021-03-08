@@ -7885,6 +7885,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
+name = "trybuild"
+version = "1.0.38"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17b06f8610494cbeb9a7665b398306f0109ab8708296d7f24b0bcd89178bb350"
+dependencies = [
+ "glob 0.3.0",
+ "lazy_static",
+ "serde",
+ "serde_json",
+ "termcolor",
+ "toml",
+]
+
+[[package]]
 name = "tui"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8334,6 +8348,7 @@ dependencies = [
  "url",
  "uuid 0.8.2",
  "vector-api-client",
+ "vector-global-alloc",
  "vector-wasm",
  "vrl",
  "vrl-cli",
@@ -8360,6 +8375,15 @@ dependencies = [
  "url",
  "uuid 0.8.2",
  "weak-table",
+]
+
+[[package]]
+name = "vector-global-alloc"
+version = "0.1.1"
+dependencies = [
+ "cfg-if 1.0.0",
+ "jemallocator",
+ "trybuild",
 ]
 
 [[package]]
