@@ -32,7 +32,7 @@ remap: functions: string: {
 			title: "Delcare a string type"
 			input: log: message: '{"field": "value"}'
 			source: #"""
-				string(.message)
+				string!(.message)
 				"""#
 			return: input.log.message
 		},

@@ -32,7 +32,7 @@ remap: functions: bool: {
 			title: "Declare a boolean type"
 			input: log: value: false
 			source: #"""
-				bool(.value)
+				bool!(.value)
 				"""#
 			return: input.log.value
 		},

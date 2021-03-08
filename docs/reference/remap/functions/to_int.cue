@@ -32,14 +32,14 @@ remap: functions: to_int: {
 		{
 			title: "Coerce to an int (string)"
 			source: """
-				to_int("2")
+				to_int!("2")
 				"""
 			return: 2
 		},
 		{
 			title: "Coerce to an int (timestamp)"
 			source: """
-				to_int(to_timestamp("2020-12-30 22:20:53.824727 UTC"))
+				to_int(t'2020-12-30T22:20:53.824727Z')
 				"""
 			return: 1609366853
 		},

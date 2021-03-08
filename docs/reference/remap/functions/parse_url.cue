@@ -23,7 +23,7 @@ remap: functions: parse_url: {
 		{
 			title: "Parse URL"
 			source: #"""
-				parse_url("ftp://foo:bar@vector.dev:4343/foobar?hello=world#123")
+				parse_url!("ftp://foo:bar@vector.dev:4343/foobar?hello=world#123")
 				"""#
 			return: {
 				scheme:   "ftp"

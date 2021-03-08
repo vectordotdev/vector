@@ -255,6 +255,7 @@ AssignmentOp: AssignmentOp = {
 AssignmentSingle: Assignment = {
     <target: Sp<AssignmentTarget>>
         <op: AssignmentOp>
+        NonterminalNewline*
         <expr: Box<Expr>> => Assignment::Single { target, op, expr },
 }
 
@@ -262,6 +263,7 @@ AssignmentInfallible: Assignment = {
     <ok: Sp<AssignmentTarget>> ","
         <err: Sp<AssignmentTarget>>
         <op: AssignmentOp>
+        NonterminalNewline*
         <expr: Box<Expr>> => Assignment::Infallible{ ok, err, op, expr},
 }
 

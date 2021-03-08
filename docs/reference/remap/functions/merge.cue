@@ -53,7 +53,7 @@ remap: functions: merge: {
 					{
 						"parent1": {
 							"child2": 4,
-							"child5": 4
+							"child5": 5
 						}
 					}
 				)
@@ -82,7 +82,7 @@ remap: functions: merge: {
 					{
 						"parent1": {
 							"child2": 4,
-							"child5": 4
+							"child5": 5
 						}
 					},
 					deep: true
