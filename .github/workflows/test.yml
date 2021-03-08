@@ -213,7 +213,7 @@ jobs:
           tar \
               -xvf "${TEMP}/cue_0.3.0-beta.5_Linux_x86_64.tar.gz" \
               -C "${TEMP}"
-          cp "${TEMP}/cue" /usr/bin/cue
+          sudo cp "${TEMP}/cue" /usr/bin/cue
       - run: make test-vrl
 
   check-component-features:
