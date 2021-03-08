@@ -71,12 +71,12 @@ struct TruncateFn {
 impl Expression for TruncateFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let mut value = value.unwrap_bytes_utf8_lossy().into_owned();
+        let mut value = value.try_bytes_utf8_lossy()?.into_owned();
 
-        let limit = self.limit.resolve(ctx)?.unwrap_integer();
+        let limit = self.limit.resolve(ctx)?.try_integer()?;
         let limit = if limit < 0 { 0 } else { limit as usize };
 
-        let ellipsis = self.ellipsis.resolve(ctx)?.unwrap_boolean();
+        let ellipsis = self.ellipsis.resolve(ctx)?.try_boolean()?;
 
         let pos = if let Some((pos, chr)) = value.char_indices().take(limit).last() {
             // char_indices gives us the starting position of the character at limit,

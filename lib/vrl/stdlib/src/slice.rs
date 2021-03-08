@@ -67,9 +67,9 @@ struct SliceFn {
 
 impl Expression for SliceFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let start = self.start.resolve(ctx)?.unwrap_integer();
+        let start = self.start.resolve(ctx)?.try_integer()?;
         let end = match &self.end {
-            Some(expr) => Some(expr.resolve(ctx)?.unwrap_integer()),
+            Some(expr) => Some(expr.resolve(ctx)?.try_integer()?),
             None => None,
         };
 
@@ -102,12 +102,23 @@ impl Expression for SliceFn {
             Value::Array(mut v) => range(v.len() as i64)
                 .map(|range| v.drain(range).collect::<Vec<_>>())
                 .map(Value::from),
-            _ => unreachable!(),
+            value => Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::Bytes | Kind::Array,
+            }
+            .into()),
         }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value.type_def(state).fallible()
+        let td = TypeDef::new().fallible();
+
+        match self.value.type_def(state) {
+            v if v.is_bytes() || v.is_array() => td.merge(v),
+            _ => td.bytes().add_array_mapped::<(), Kind>(map! {
+                (): Kind::all(),
+            }),
+        }
     }
 }
 

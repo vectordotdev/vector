@@ -12,10 +12,9 @@ impl Function for ParseTokens {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "valid",
-            // TODO: Remove `encode_json` hack.
-            source: r#"encode_json(parse_tokens(s'A sentence "with \"a\" sentence inside" and [some brackets]'))"#,
+            source: r#"parse_tokens(s'A sentence "with \"a\" sentence inside" and [some brackets]')"#,
             result: Ok(
-                r##"s'["A","sentence","with \\\"a\\\" sentence inside","and","some brackets"]'"##,
+                r#"["A", "sentence", "with \\\"a\\\" sentence inside", "and", "some brackets"]"#,
             ),
         }]
     }
@@ -52,7 +51,7 @@ impl ParseTokensFn {
 impl Expression for ParseTokensFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.unwrap_bytes_utf8_lossy();
+        let string = value.try_bytes_utf8_lossy()?;
 
         let tokens: Value = tokenize::parse(&string)
             .into_iter()

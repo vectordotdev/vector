@@ -21,7 +21,7 @@ remap: functions: parse_glog: {
 		{
 			title: "Parse via glog"
 			source: #"""
-				parse_glog("I20210131 14:48:54.411655 15520 main.c++:9] Hello world!")
+				parse_glog!("I20210131 14:48:54.411655 15520 main.c++:9] Hello world!")
 				"""#
 			return: {
 				level:     "info"

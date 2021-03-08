@@ -36,21 +36,21 @@ remap: functions: to_unix_timestamp: {
 		{
 			title: "Convert to a Unix timestamp (seconds)"
 			source: #"""
-				to_unix_timestamp(to_timestamp("2021-01-01T00:00:00+00:00"))
+				to_unix_timestamp(t'2021-01-01T00:00:00+00:00')
 				"""#
 			return: 1609459200
 		},
 		{
 			title: "Convert to a Unix timestamp (milliseconds)"
 			source: #"""
-				to_unix_timestamp(to_timestamp("2021-01-01T00:00:00+00:00"), unit: "milliseconds")
+				to_unix_timestamp(t'2021-01-01T00:00:00Z', unit: "milliseconds")
 				"""#
 			return: 1609459200000
 		},
 		{
 			title: "Convert to a Unix timestamp (nanoseconds)"
 			source: #"""
-				to_unix_timestamp(to_timestamp("2021-01-01T00:00:00+00:00"), unit: "nanoseconds")
+				to_unix_timestamp(t'2021-01-01T00:00:00Z', unit: "nanoseconds")
 				"""#
 			return: 1609459200000000000
 		},

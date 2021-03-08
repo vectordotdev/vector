@@ -111,44 +111,23 @@ remap: expressions: arithmetic: {
 		{
 			title: "Float division (int)"
 			source: #"""
-				2 / 1
+				2 / 1 ?? null
 				"""#
 			return: 2.0
 		},
 		{
 			title: "Float division (float)"
 			source: #"""
-				2.0 / 1.0
+				2.0 / 1.0 ?? null
 				"""#
 			return: 2.0
 		},
 		{
 			title: "Float division (numeric)"
 			source: #"""
-				2.0 / 1
+				2.0 / 1 ?? null
 				"""#
 			return: 2.0
-		},
-		{
-			title: "Integer division (int)"
-			source: #"""
-				2 / 1
-				"""#
-			return: 2
-		},
-		{
-			title: "Integer division (float)"
-			source: #"""
-				2.0 / 1.0
-				"""#
-			return: 2
-		},
-		{
-			title: "Integer division (numeric)"
-			source: #"""
-				2.0 / 1
-				"""#
-			return: 2
 		},
 		{
 			title: "Remainder"

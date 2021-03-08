@@ -56,14 +56,14 @@ pub(crate) struct ParseRegexFn {
 
 impl Expression for ParseRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let bytes = self.value.resolve(ctx)?.unwrap_bytes();
+        let bytes = self.value.resolve(ctx)?.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
 
         let parsed = self
             .pattern
             .captures(&value)
             .map(|capture| util::capture_regex_to_map(&self.pattern, capture))
-            .ok_or("unable to parse regular expression")?;
+            .ok_or("could not find any pattern matches")?;
 
         Ok(parsed.into())
     }

@@ -71,8 +71,8 @@ pub(crate) struct SplitFn {
 impl Expression for SplitFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.unwrap_bytes_utf8_lossy();
-        let limit = self.limit.resolve(ctx)?.unwrap_integer() as usize;
+        let string = value.try_bytes_utf8_lossy()?;
+        let limit = self.limit.resolve(ctx)?.try_integer()? as usize;
 
         self.pattern.resolve(ctx).and_then(|pattern| match pattern {
             Value::Regex(pattern) => Ok(pattern
@@ -87,7 +87,11 @@ impl Expression for SplitFn {
                     .collect::<Vec<_>>()
                     .into())
             }
-            _ => unreachable!(),
+            value => Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::Regex | Kind::Bytes,
+            }
+            .into()),
         })
     }
 

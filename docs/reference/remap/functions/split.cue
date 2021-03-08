@@ -45,7 +45,7 @@ remap: functions: split: {
 		{
 			title: "Split a string (with a limit)"
 			source: #"""
-				split("apples and pears and bananas", " and ", limit: 1)
+				split("apples and pears and bananas", " and ", limit: 2)
 				"""#
 			return: ["apples", "pears and bananas"]
 		},

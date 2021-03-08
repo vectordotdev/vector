@@ -29,7 +29,7 @@ remap: functions: length: {
 			title: "Length (object)"
 			source: """
 				length({
-					"portland": "Trail Blazers"
+					"portland": "Trail Blazers",
 					"seattle":  "Supersonics"
 				})
 				"""
@@ -40,10 +40,10 @@ remap: functions: length: {
 			source: """
 				length({
 					"home": {
-						"city":  "Portland"
+						"city":  "Portland",
 						"state": "Oregon"
-					}
-					"name": "Trail Blazers"
+					},
+					"name": "Trail Blazers",
 					"mascot": {
 						"name": "Blaze the Trail Cat"
 					}

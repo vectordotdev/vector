@@ -57,12 +57,12 @@ impl Expression for IpSubnetFn {
         let value: IpAddr = self
             .value
             .resolve(ctx)?
-            .unwrap_bytes_utf8_lossy()
+            .try_bytes_utf8_lossy()?
             .parse()
             .map_err(|err| format!("unable to parse IP address: {}", err))?;
 
         let mask = self.subnet.resolve(ctx)?;
-        let mask = mask.unwrap_bytes_utf8_lossy();
+        let mask = mask.try_bytes_utf8_lossy()?;
 
         let mask = if mask.starts_with('/') {
             // The parameter is a subnet.

@@ -30,14 +30,14 @@ remap: functions: join: {
 		{
 			title: "Join array (no separator)"
 			source: #"""
-				join(["bring", "us", "together"])
+				join!(["bring", "us", "together"])
 				"""#
 			return: "bringustogether"
 		},
 		{
 			title: "Join array (comma separator)"
 			source: #"""
-				join(["sources", "transforms", "sinks"], separator: ", ")
+				join!(["sources", "transforms", "sinks"], separator: ", ")
 				"""#
 			return: "sources, transforms, sinks"
 		},

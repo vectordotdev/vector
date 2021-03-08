@@ -25,7 +25,7 @@ remap: functions: upcase: {
 			source: #"""
 				upcase("Hello, World!")
 				"""#
-			output: log: message: "HELLO, WORLD!"
+			return: "HELLO, WORLD!"
 		},
 	]
 }

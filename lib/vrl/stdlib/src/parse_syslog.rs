@@ -22,10 +22,21 @@ impl Function for ParseSyslog {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "parse syslog",
-            source: r#"encode_json(parse_syslog!(s'<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!'))"#,
-            result: Ok(
-                r#"s'{"appname":"non","exampleSDID@32473.eventID":"1011","exampleSDID@32473.eventSource":"Application","exampleSDID@32473.iut":"3","facility":"user","hostname":"dynamicwireless.name","message":"Try to override the THX port, maybe it will reboot the neural interface!","msgid":"ID931","procid":2426,"severity":"notice","timestamp":"2020-03-13T20:45:38.119+00:00","version":1}'"#,
-            ),
+            source: r#"parse_syslog!(s'<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!')"#,
+            result: Ok(indoc! {r#"{
+                "appname": "non",
+                "exampleSDID@32473.eventID": "1011",
+                "exampleSDID@32473.eventSource": "Application",
+                "exampleSDID@32473.iut": "3",
+                "facility": "user",
+                "hostname": "dynamicwireless.name",
+                "message": "Try to override the THX port, maybe it will reboot the neural interface!",
+                "msgid": "ID931",
+                "procid": 2426,
+                "severity": "notice",
+                "timestamp": "2020-03-13T20:45:38.119Z",
+                "version": 1
+            }"#}),
         }]
     }
 
@@ -44,7 +55,7 @@ struct ParseSyslogFn {
 impl Expression for ParseSyslogFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let message = value.unwrap_bytes_utf8_lossy();
+        let message = value.try_bytes_utf8_lossy()?;
 
         let parsed = syslog_loose::parse_message_with_year_exact(&message, resolve_year)?;
 

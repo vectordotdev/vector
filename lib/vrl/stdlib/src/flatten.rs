@@ -54,7 +54,11 @@ impl Expression for FlattenFn {
                     .map(|(k, v)| (k, v.clone()))
                     .collect(),
             )),
-            _ => unreachable!(),
+            value => Err(value::Error::Expected {
+                got: value.kind(),
+                expected: Kind::Array | Kind::Object,
+            }
+            .into()),
         }
     }
 
