@@ -32,7 +32,7 @@ remap: functions: ipv6_to_ipv4: {
 		{
 			title: "IPv6 to IPv4"
 			source: #"""
-				ipv6_to_ipv4("::ffff:192.168.0.1")
+				ipv6_to_ipv4!("::ffff:192.168.0.1")
 				"""#
 			return: "192.168.0.1"
 		},

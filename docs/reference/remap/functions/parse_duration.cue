@@ -41,7 +41,7 @@ remap: functions: parse_duration: {
 		{
 			title: "Parse duration (milliseconds)"
 			source: #"""
-				parse_duration("1005ms", unit: "s")
+				parse_duration!("1005ms", unit: "s")
 				"""#
 			return: 1.005
 		},

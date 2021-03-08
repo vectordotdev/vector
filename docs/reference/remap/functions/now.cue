@@ -16,7 +16,7 @@ remap: functions: now: {
 			source: #"""
 				now()
 				"""#
-			return: "2020-10-21T20:53:12.212221Z"
+			return: "2021-03-04T10:51:15.928937Z"
 		},
 	]
 }

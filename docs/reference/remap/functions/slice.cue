@@ -38,14 +38,14 @@ remap: functions: slice: {
 		{
 			title: "Slice a string (positve index)"
 			source: #"""
-				slice("Supercalifragilisticexpialidocious", start: 5, end: 13)
+				slice!("Supercalifragilisticexpialidocious", start: 5, end: 13)
 				"""#
 			return: "califrag"
 		},
 		{
 			title: "Slice a string (negative index)"
 			source: #"""
-				slice("Supercalifragilisticexpialidocious", start: 5, end: -14)
+				slice!("Supercalifragilisticexpialidocious", start: 5, end: -14)
 				"""#
 			return: "califragilistic"
 		},
