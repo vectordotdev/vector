@@ -5966,7 +5966,7 @@ dependencies = [
  "async-trait",
  "bytes 0.5.6",
  "futures 0.3.13",
- "rusoto_core",
+ "rusoto_core 0.45.0",
  "serde_urlencoded 0.6.1",
  "xml-rs",
 ]
@@ -5981,7 +5981,6 @@ dependencies = [
  "base64 0.12.3",
  "bytes 0.5.6",
  "crc32fast",
- "flate2",
  "futures 0.3.13",
  "http",
  "hyper 0.13.10",
@@ -5991,12 +5990,38 @@ dependencies = [
  "md5",
  "percent-encoding",
  "pin-project 0.4.27",
- "rusoto_credential",
- "rusoto_signature",
+ "rusoto_credential 0.45.0",
+ "rusoto_signature 0.45.0",
  "rustc_version",
  "serde",
  "serde_json",
  "tokio 0.2.25",
+ "xml-rs",
+]
+
+[[package]]
+name = "rusoto_core"
+version = "0.46.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02aff20978970d47630f08de5f0d04799497818d16cafee5aec90c4b4d0806cf"
+dependencies = [
+ "async-trait",
+ "base64 0.13.0",
+ "bytes 1.0.1",
+ "crc32fast",
+ "flate2",
+ "futures 0.3.13",
+ "http",
+ "hyper 0.14.4",
+ "hyper-tls 0.5.0",
+ "lazy_static",
+ "log",
+ "rusoto_credential 0.46.0",
+ "rusoto_signature 0.46.0",
+ "rustc_version",
+ "serde",
+ "serde_json",
+ "tokio 1.2.0",
  "xml-rs",
 ]
 
@@ -6021,6 +6046,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusoto_credential"
+version = "0.46.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e91e4c25ea8bfa6247684ff635299015845113baaa93ba8169b9e565701b58e"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dirs-next 2.0.0",
+ "futures 0.3.13",
+ "hyper 0.14.4",
+ "serde",
+ "serde_json",
+ "shlex",
+ "tokio 1.2.0",
+ "zeroize",
+]
+
+[[package]]
 name = "rusoto_es"
 version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6029,7 +6072,7 @@ dependencies = [
  "async-trait",
  "bytes 0.5.6",
  "futures 0.3.13",
- "rusoto_core",
+ "rusoto_core 0.45.0",
  "serde",
  "serde_derive",
  "serde_json",
@@ -6044,7 +6087,7 @@ dependencies = [
  "async-trait",
  "bytes 0.5.6",
  "futures 0.3.13",
- "rusoto_core",
+ "rusoto_core 0.45.0",
  "serde",
  "serde_json",
 ]
@@ -6058,7 +6101,7 @@ dependencies = [
  "async-trait",
  "bytes 0.5.6",
  "futures 0.3.13",
- "rusoto_core",
+ "rusoto_core 0.45.0",
  "serde",
  "serde_json",
 ]
@@ -6072,7 +6115,7 @@ dependencies = [
  "async-trait",
  "bytes 0.5.6",
  "futures 0.3.13",
- "rusoto_core",
+ "rusoto_core 0.45.0",
  "serde",
  "serde_json",
 ]
@@ -6086,7 +6129,7 @@ dependencies = [
  "async-trait",
  "bytes 0.5.6",
  "futures 0.3.13",
- "rusoto_core",
+ "rusoto_core 0.45.0",
  "xml-rs",
 ]
 
@@ -6107,12 +6150,37 @@ dependencies = [
  "md5",
  "percent-encoding",
  "pin-project 0.4.27",
- "rusoto_credential",
+ "rusoto_credential 0.45.0",
  "rustc_version",
  "serde",
  "sha2 0.9.3",
  "time 0.2.25",
  "tokio 0.2.25",
+]
+
+[[package]]
+name = "rusoto_signature"
+version = "0.46.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5486e6b1673ab3e0ba1ded284fb444845fe1b7f41d13989a54dd60f62a7b2baa"
+dependencies = [
+ "base64 0.13.0",
+ "bytes 1.0.1",
+ "futures 0.3.13",
+ "hex",
+ "hmac 0.10.1",
+ "http",
+ "hyper 0.14.4",
+ "log",
+ "md5",
+ "percent-encoding",
+ "pin-project-lite 0.2.4",
+ "rusoto_credential 0.46.0",
+ "rustc_version",
+ "serde",
+ "sha2 0.9.3",
+ "time 0.2.25",
+ "tokio 1.2.0",
 ]
 
 [[package]]
@@ -6124,7 +6192,7 @@ dependencies = [
  "async-trait",
  "bytes 0.5.6",
  "futures 0.3.13",
- "rusoto_core",
+ "rusoto_core 0.45.0",
  "serde_urlencoded 0.6.1",
  "xml-rs",
 ]
@@ -6139,7 +6207,7 @@ dependencies = [
  "bytes 0.5.6",
  "chrono",
  "futures 0.3.13",
- "rusoto_core",
+ "rusoto_core 0.45.0",
  "serde_urlencoded 0.6.1",
  "tempfile",
  "xml-rs",
@@ -7386,8 +7454,11 @@ dependencies = [
  "memchr",
  "mio 0.7.7",
  "num_cpus",
+ "once_cell",
  "pin-project-lite 0.2.4",
+ "signal-hook-registry",
  "tokio-macros 1.1.0",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -8283,14 +8354,14 @@ dependencies = [
  "reqwest 0.10.10",
  "rlua",
  "rusoto_cloudwatch",
- "rusoto_core",
- "rusoto_credential",
+ "rusoto_core 0.46.0",
+ "rusoto_credential 0.45.0",
  "rusoto_es",
  "rusoto_firehose",
  "rusoto_kinesis",
  "rusoto_logs",
  "rusoto_s3",
- "rusoto_signature",
+ "rusoto_signature 0.45.0",
  "rusoto_sqs",
  "rusoto_sts",
  "rusty-fork",
