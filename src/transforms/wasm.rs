@@ -331,4 +331,23 @@ mod tests {
         )
         .await;
     }
+
+    #[tokio::test]
+    async fn multifaceted() {
+        crate::test_util::trace_init();
+        let span = span!(tracing::Level::TRACE, "transforms::wasm::multifaceted");
+        let _enter = span.enter();
+
+        let config = r#"
+            module = "tests/data/wasm/multifaceted/target/wasm32-wasi/release/multifaceted.wasm"
+            artifact_cache = "target/artifacts"
+            "#;
+
+        test_config(
+            config,
+            "tests/data/wasm/multifaceted/fixtures/a/input.json",
+            "tests/data/wasm/multifaceted/fixtures/a/expected.json",
+        )
+        .await;
+    }
 }
