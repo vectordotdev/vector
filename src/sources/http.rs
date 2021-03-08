@@ -199,7 +199,7 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>
     })
 }
 
-fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
+pub fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
     match enc {
         Encoding::Text => body_to_lines(body)
             .map(|r| Ok(Event::from(r?)))
@@ -222,7 +222,9 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
 fn json_parse_object(value: JsonValue) -> Result<Event, ErrorMessage> {
     let mut event = Event::new_empty_log();
     let log = event.as_mut_log();
-    log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
+    if !log.contains(log_schema().timestamp_key()) {
+        log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
+    }
     match value {
         JsonValue::Object(map) => {
             for (k, v) in map {
