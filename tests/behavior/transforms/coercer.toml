@@ -7,7 +7,7 @@
     float_field = "float"
     string_field = "string"
     timestamp_field = "timestamp"
-    timestamp_field_formatted = "timestamp|%Y-%m-%d %H:%M:%S"
+    timestamp_field_formatted = "timestamp|%Y-%m-%d %H:%M:%S%z"
 [[tests]]
   name = "coercer_simple"
   [tests.input]
@@ -19,7 +19,7 @@
       float_field = "3.1415926535"
       string_field = -1
       timestamp_field = "2020-02-20T12:34:56.123456789Z"
-      timestamp_field_formatted = "2020-02-20 12:34:56"
+      timestamp_field_formatted = "2020-02-20 12:34:56+0000"
   [[tests.outputs]]
     extract_from = "coercer_simple"
     [[tests.outputs.conditions]]
