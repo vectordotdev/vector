@@ -419,7 +419,7 @@
     .a = sha1(string!(.a))
 
     if sha1(string!(.b)) == "62cdb7020ff920e5aa642c3d4066950dd1f01f4d" {
-      .b = sha1(.a + .b + "baz")
+      .b = sha1(.a + string!(.b) + "baz")
     }
   """
 [[tests]]
@@ -464,7 +464,7 @@
     .a = md5(string!(.a))
 
     if md5(string!(.b)) == "37b51d194a7513e45b56f6524f2d51f2" {
-      .b = md5(.a + .b + "baz")
+      .b = md5(.a + string!(.b) + "baz")
     }
   """
 [[tests]]
