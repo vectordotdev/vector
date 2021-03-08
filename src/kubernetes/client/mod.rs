@@ -41,7 +41,7 @@ pub struct Client {
     inner: HttpClient,
     uri_scheme: uri::Scheme,
     uri_authority: uri::Authority,
-    auth_header: HeaderValue,
+    auth_header: Option<HeaderValue>,
 }
 
 impl Client {
@@ -69,8 +69,10 @@ impl Client {
         let uri_scheme = scheme.ok_or("no scheme")?;
         let uri_authority = authority.ok_or("no authority")?;
 
-        let auth_header = format!("Bearer {}", token);
-        let auth_header = HeaderValue::from_str(auth_header.as_str())?;
+        let auth_header = match &token {
+            Some(t) => Some(HeaderValue::from_str(format!("Bearer {}", t).as_str())?),
+            None => None,
+        };
 
         Ok(Self {
             inner,
@@ -94,9 +96,9 @@ impl Client {
         let body = body.into();
 
         parts.uri = self.adjust_uri(parts.uri);
-        parts
-            .headers
-            .insert(header::AUTHORIZATION, self.auth_header.clone());
+        if let Some(ah) = self.auth_header.as_ref() {
+            parts.headers.insert(header::AUTHORIZATION, ah.clone());
+        }
 
         Request::from_parts(parts, body)
     }
