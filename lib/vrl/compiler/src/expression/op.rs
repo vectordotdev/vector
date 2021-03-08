@@ -118,17 +118,16 @@ impl Expression for Op {
 
         let lhs_def = self.lhs.type_def(state);
         let rhs_def = self.rhs.type_def(state);
-        let merged_def = lhs_def.clone().merge(rhs_def.clone());
 
         let lhs_kind = lhs_def.kind();
         let rhs_kind = rhs_def.kind();
 
         match self.opcode {
             // ok/err ?? ok
-            Err if rhs_def.is_infallible() => merged_def.infallible(),
+            Err if rhs_def.is_infallible() => lhs_def.merge(rhs_def).infallible(),
 
             // ... ?? ...
-            Err => merged_def,
+            Err => lhs_def.merge(rhs_def),
 
             // null || ...
             Or if lhs_kind.is_null() => rhs_def,
@@ -143,38 +142,43 @@ impl Expression for Op {
                 (lhs_def - K::Null).merge(rhs_def)
             }
 
-            Or => merged_def,
+            Or => lhs_def.merge(rhs_def),
 
             // ... | ...
-            Merge => merged_def,
+            Merge => lhs_def.merge(rhs_def),
 
             // null && ...
-            And if lhs_kind.is_null() => rhs_def.scalar(K::Boolean),
+            And if lhs_kind.is_null() => rhs_def
+                .fallible_unless(K::Null | K::Boolean)
+                .scalar(K::Boolean),
 
             // ... && ...
-            And => merged_def
+            And => lhs_def
                 .fallible_unless(K::Null | K::Boolean)
+                .merge(rhs_def.fallible_unless(K::Null | K::Boolean))
                 .scalar(K::Boolean),
 
             // ... == ...
             // ... != ...
-            Eq | Ne => merged_def.boolean(),
+            Eq | Ne => lhs_def.merge(rhs_def).boolean(),
 
             // ... >  ...
             // ... >= ...
             // ... <  ...
             // ... <= ...
-            Gt | Ge | Lt | Le => merged_def
+            Gt | Ge | Lt | Le => lhs_def
                 .fallible_unless(K::Integer | K::Float)
+                .merge(rhs_def.fallible_unless(K::Integer | K::Float))
                 .scalar(K::Boolean),
 
             // ... / ...
-            Div => merged_def.fallible().float(),
+            Div => TypeDef::new().fallible().float(),
 
             // "bar" + ...
             // ... + "bar"
-            Add if lhs_kind.is_bytes() || rhs_kind.is_bytes() => merged_def
+            Add if lhs_kind.is_bytes() || rhs_kind.is_bytes() => lhs_def
                 .fallible_unless(K::Bytes | K::Null)
+                .merge(rhs_def.fallible_unless(K::Bytes | K::Null))
                 .scalar(K::Bytes),
 
             // ... + 1.0
@@ -185,8 +189,9 @@ impl Expression for Op {
             // 1.0 - ...
             // 1.0 * ...
             // 1.0 % ...
-            Add | Sub | Mul | Rem if lhs_kind.is_float() || rhs_kind.is_float() => merged_def
+            Add | Sub | Mul | Rem if lhs_kind.is_float() || rhs_kind.is_float() => lhs_def
                 .fallible_unless(K::Integer | K::Float)
+                .merge(rhs_def.fallible_unless(K::Integer | K::Float))
                 .scalar(K::Float),
 
             // 1 + 1
@@ -194,24 +199,32 @@ impl Expression for Op {
             // 1 * 1
             // 1 % 1
             Add | Sub | Mul | Rem if lhs_kind.is_integer() && rhs_kind.is_integer() => {
-                merged_def.scalar(K::Integer)
+                lhs_def.merge(rhs_def).scalar(K::Integer)
             }
 
             // "bar" * 1
-            Mul if lhs_kind.is_bytes() && rhs_kind.is_integer() => merged_def.scalar(K::Bytes),
+            Mul if lhs_kind.is_bytes() && rhs_kind.is_integer() => {
+                lhs_def.merge(rhs_def).scalar(K::Bytes)
+            }
 
             // 1 * "bar"
-            Mul if lhs_kind.is_integer() && rhs_kind.is_bytes() => merged_def.scalar(K::Bytes),
+            Mul if lhs_kind.is_integer() && rhs_kind.is_bytes() => {
+                lhs_def.merge(rhs_def).scalar(K::Bytes)
+            }
 
             // ... + ...
             // ... * ...
-            Add | Mul => merged_def
+            Add | Mul => lhs_def
+                .merge(rhs_def)
                 .fallible()
                 .scalar(K::Bytes | K::Integer | K::Float),
 
             // ... - ...
             // ... % ...
-            Sub | Rem => merged_def.fallible().scalar(K::Integer | K::Float),
+            Sub | Rem => lhs_def
+                .merge(rhs_def)
+                .fallible()
+                .scalar(K::Integer | K::Float),
         }
     }
 }
@@ -331,11 +344,28 @@ mod tests {
     use crate::{test_type_def, value::Kind};
     use ast::Opcode::*;
     use ordered_float::NotNan;
+    use std::convert::TryInto;
 
-    fn op(opcode: ast::Opcode, lhs: impl Into<Literal>, rhs: impl Into<Literal>) -> Op {
+    fn op(
+        opcode: ast::Opcode,
+        lhs: impl TryInto<Literal> + fmt::Debug + Clone,
+        rhs: impl TryInto<Literal> + fmt::Debug + Clone,
+    ) -> Op {
+        use std::result::Result::Err;
+
+        let lhs = match lhs.clone().try_into() {
+            Ok(v) => v,
+            Err(_) => panic!("not a valid lhs expression: {:?}", lhs),
+        };
+
+        let rhs = match rhs.clone().try_into() {
+            Ok(v) => v,
+            Err(_) => panic!("not a valid rhs expression: {:?}", rhs),
+        };
+
         Op {
-            lhs: Box::new(lhs.into().into()),
-            rhs: Box::new(rhs.into().into()),
+            lhs: Box::new(lhs.into()),
+            rhs: Box::new(rhs.into()),
             opcode,
         }
     }
@@ -435,53 +465,173 @@ mod tests {
             want: TypeDef::new().fallible().bytes().add_integer().add_float(),
         }
 
-        remainder {
-            expr: |_| op(Rem, (), ()),
+        remainder_integer {
+            expr: |_| op(Rem, 5, 5),
+            want: TypeDef::new().infallible().integer(),
+        }
+
+        remainder_float {
+            expr: |_| op(Rem, 5.0, 5.0),
+            want: TypeDef::new().infallible().float(),
+        }
+
+        remainder_mixed {
+            expr: |_| op(Rem, 5, 5.0),
+            want: TypeDef::new().infallible().float(),
+        }
+
+        remainder_other {
+            expr: |_| op(Rem, 5, ()),
             want: TypeDef::new().fallible().integer().add_float(),
         }
 
-        subtract {
-            expr: |_| op(Sub, (), ()),
+        subtract_integer {
+            expr: |_| op(Sub, 1, 1),
+            want: TypeDef::new().infallible().integer(),
+        }
+
+        subtract_float {
+            expr: |_| op(Sub, 1.0, 1.0),
+            want: TypeDef::new().infallible().float(),
+        }
+
+        subtract_mixed {
+            expr: |_| op(Sub, 1, 1.0),
+            want: TypeDef::new().infallible().float(),
+        }
+
+        subtract_other {
+            expr: |_| op(Sub, 1, ()),
             want: TypeDef::new().fallible().integer().add_float(),
         }
 
-        divide {
-            expr: |_| op(Div, 10, 5),
+        divide_integer {
+            expr: |_| op(Div, 1, 1),
             want: TypeDef::new().fallible().float(),
         }
 
-        and {
+        divide_float {
+            expr: |_| op(Div, 1.0, 1.0),
+            want: TypeDef::new().fallible().float(),
+        }
+
+        divide_mixed {
+            expr: |_| op(Div, 1, 1.0),
+            want: TypeDef::new().fallible().float(),
+        }
+
+        divide_other {
+            expr: |_| op(Div, 1.0, ()),
+            want: TypeDef::new().fallible().float(),
+        }
+
+        and_null {
             expr: |_| op(And, (), ()),
-            want: TypeDef::new().boolean(),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        and_boolean {
+            expr: |_| op(And, true, true),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        and_mixed {
+            expr: |_| op(And, (), true),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        and_other {
+            expr: |_| op(And, (), "bar"),
+            want: TypeDef::new().fallible().boolean(),
         }
 
         equal {
             expr: |_| op(Eq, (), ()),
-            want: TypeDef::new().boolean(),
+            want: TypeDef::new().infallible().boolean(),
         }
 
         not_equal {
-            expr: |_| op(Ne, (), ()),
-            want: TypeDef::new().boolean(),
+            expr: |_| op(Ne, (), "foo"),
+            want: TypeDef::new().infallible().boolean(),
         }
 
-        greater {
-            expr: |_| op(Gt, (), ()),
+        greater_integer {
+            expr: |_| op(Gt, 1, 1),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        greater_float {
+            expr: |_| op(Gt, 1.0, 1.0),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        greater_mixed {
+            expr: |_| op(Gt, 1, 1.0),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        greater_other {
+            expr: |_| op(Gt, 1, "foo"),
             want: TypeDef::new().fallible().boolean(),
         }
 
-        greater_or_equal {
-            expr: |_| op(Ge, (), ()),
+        greater_or_equal_integer {
+            expr: |_| op(Ge, 1, 1),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        greater_or_equal_float {
+            expr: |_| op(Ge, 1.0, 1.0),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        greater_or_equal_mixed {
+            expr: |_| op(Ge, 1, 1.0),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        greater_or_equal_other {
+            expr: |_| op(Ge, 1, "foo"),
             want: TypeDef::new().fallible().boolean(),
         }
 
-        less {
-            expr: |_| op(Lt, (), ()),
+        less_integer {
+            expr: |_| op(Lt, 1, 1),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        less_float {
+            expr: |_| op(Lt, 1.0, 1.0),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        less_mixed {
+            expr: |_| op(Lt, 1, 1.0),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        less_other {
+            expr: |_| op(Lt, 1, "foo"),
             want: TypeDef::new().fallible().boolean(),
         }
 
-        less_or_equal {
-            expr: |_| op(Le, (), ()),
+        less_or_equal_integer {
+            expr: |_| op(Le, 1, 1),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        less_or_equal_float {
+            expr: |_| op(Le, 1.0, 1.0),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        less_or_equal_mixed {
+            expr: |_| op(Le, 1, 1.0),
+            want: TypeDef::new().infallible().boolean(),
+        }
+
+        less_or_equal_other {
+            expr: |_| op(Le, 1, "baz"),
             want: TypeDef::new().fallible().boolean(),
         }
 
