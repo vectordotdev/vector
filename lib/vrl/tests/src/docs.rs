@@ -151,7 +151,7 @@ impl Test {
             name: title,
             category: format!("docs/{}/{}", category, name),
             error: None,
-            source: source,
+            source,
             object,
             result,
             result_approx: false,

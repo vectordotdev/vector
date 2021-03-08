@@ -31,7 +31,7 @@ remap: functions: parse_logfmt: {
 		{
 			title: "Parse logfmt log"
 			source: #"""
-				parse_logfmt(
+				parse_logfmt!(
 					"@timestamp=\"Sun Jan 10 16:47:39 EST 2021\" level=info msg=\"Stopping all fetchers\" tag#production=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager"
 				)
 				"""#

@@ -206,14 +206,14 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: |
-        TEMP=$(mktemp -d)
-        curl \
-            -L https://github.com/cuelang/cue/releases/download/v0.3.0-beta.5/cue_0.3.0-beta.5_Linux_x86_64.tar.gz \
-            -o "${TEMP}/cue_0.3.0-beta.5_Linux_x86_64.tar.gz"
-        tar \
-            -xvf "${TEMP}/cue_0.3.0-beta.5_Linux_x86_64.tar.gz" \
-            -C "${TEMP}"
-        cp "${TEMP}/cue" /usr/bin/cue
+          TEMP=$(mktemp -d)
+          curl \
+              -L https://github.com/cuelang/cue/releases/download/v0.3.0-beta.5/cue_0.3.0-beta.5_Linux_x86_64.tar.gz \
+              -o "${TEMP}/cue_0.3.0-beta.5_Linux_x86_64.tar.gz"
+          tar \
+              -xvf "${TEMP}/cue_0.3.0-beta.5_Linux_x86_64.tar.gz" \
+              -C "${TEMP}"
+          sudo cp "${TEMP}/cue" /usr/bin/cue
       - run: make test-vrl
 
   check-component-features:
