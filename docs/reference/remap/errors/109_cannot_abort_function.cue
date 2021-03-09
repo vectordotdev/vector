@@ -1,5 +1,8 @@
 package metadata
 
+/*
+Leave this out until we decide on a better system for classifying function-specific error codes
+
 remap: errors: "109": {
 	title:       "Cannot abort function"
 	description: """
@@ -24,3 +27,4 @@ remap: errors: "109": {
 		},
 	]
 }
+*/
