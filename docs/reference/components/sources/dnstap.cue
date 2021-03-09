@@ -25,7 +25,7 @@ components: sources: dnstap: {
 					port:      0
 					protocols: ["unix"]
 					socket: "/run/bind/dnstap.sock"
-					ssl: "disabled"
+					ssl:    "disabled"
 				}
 			}
 			tls: enabled: false
@@ -51,7 +51,7 @@ components: sources: dnstap: {
 		max_frame_length: {
 			common:      false
 			description: "Max dnstap frame length that the dns source can handle."
-			required: false
+			required:    false
 			type: uint: {
 				default: 102400
 				unit:    "bytes"
@@ -77,7 +77,7 @@ components: sources: dnstap: {
 			required: false
 			type: uint: {
 				default: null
-				unit: null
+				unit:    null
 				examples: [0o777, 0o754, 508]
 			}
 		}
@@ -94,7 +94,7 @@ components: sources: dnstap: {
 					Enabling concurrent dnstap frame handling may increase memory 
 					consumption significantly. To limit memory usage, 
 					set \"max_frame_handling_tasks\" accordingly.
-					"""
+					""",
 			]
 		}
 		max_frame_handling_tasks: {
@@ -115,7 +115,7 @@ components: sources: dnstap: {
 					""",
 				"""
 					Upraising the limit may increase memory consumption. Be cautious!
-					"""
+					""",
 			]
 		}
 		socket_receive_buffer_size: {
@@ -127,14 +127,14 @@ components: sources: dnstap: {
 			required: false
 			type: uint: {
 				default: null
-				unit: "bytes"
+				unit:    "bytes"
 			}
 			warnings: [
 				"""
 					System-wide setting of max socket receive buffer size 
 					(i.e. value of '/proc/sys/net/core/rmem_max' on Linux) 
 					may need adjustment accordingly.
-					"""
+					""",
 			]
 		}
 		socket_send_buffer_size: {
@@ -146,14 +146,14 @@ components: sources: dnstap: {
 			required: false
 			type: uint: {
 				default: null
-				unit: "bytes"
+				unit:    "bytes"
 			}
 			warnings: [
 				"""
 					System-wide setting of max socket send buffer size 
 					(i.e. value of '/proc/sys/net/core/wmem_max' on Linux) 
 					may need adjustment accordingly.
-					"""
+					""",
 			]
 		}
 		raw_data_only: {
@@ -171,7 +171,7 @@ components: sources: dnstap: {
 		description: "A single dnstap event."
 		fields: {
 			dataType: {
-				common: true
+				common:      true
 				description: "Dnstap event data type. Currently only 'Message' type is defined."
 				required:    false
 				type: string: {
@@ -186,13 +186,13 @@ components: sources: dnstap: {
 				type: uint: {
 					unit: null
 					examples: [1]
-				}				
+				}
 			}
 			messageType: {
 				relevant_when: "dataTypeId = 1"
-				common: true
-				description: "Dnstap message type."
-				required: false
+				common:        true
+				description:   "Dnstap message type."
+				required:      false
 				type: string: {
 					enum: {
 						AuthQuery: """
@@ -274,12 +274,12 @@ components: sources: dnstap: {
 			}
 			messageTypeId: {
 				relevant_when: "dataTypeId = 1"
-				description: "Numeric ID of dnstap message type."
-				required:    true
+				description:   "Numeric ID of dnstap message type."
+				required:      true
 				type: uint: {
 					unit: null
 					examples: [6]
-				}				
+				}
 			}
 			time: {
 				relevant_when: "dataTypeId = 1"
@@ -298,11 +298,11 @@ components: sources: dnstap: {
 			}
 			timePrecision: {
 				relevant_when: "dataTypeId = 1"
-				description: "The time precision used by field 'time'."
-				required: true
+				description:   "The time precision used by field 'time'."
+				required:      true
 				type: string: {
 					enum: {
-						s: "second"
+						s:  "second"
 						ms: "millisecond"
 						us: "microsecond"
 						ns: "nanosecond"
@@ -310,25 +310,25 @@ components: sources: dnstap: {
 				}
 			}
 			serverId: {
-				common: true
+				common:      true
 				description: "DNS server identity."
-				required: false
+				required:    false
 				type: string: {
 					examples: ["ns1.example.com"]
 				}
 			}
 			serverVersion: {
-				common: true
+				common:      true
 				description: "DNS server version."
-				required: false
+				required:    false
 				type: string: {
 					examples: ["BIND 9.16.8"]
 				}
 			}
 			extraInfo: {
-				common: false
+				common:      false
 				description: "Extra data for this event."
-				required: false
+				required:    false
 				type: string: {
 					examples: ["an arbitrary byte-string annotation"]
 				}
@@ -342,7 +342,7 @@ components: sources: dnstap: {
 				required: true
 				type: string: {
 					enum: {
-						INET: "IPv4 (RFC 791)."
+						INET:  "IPv4 (RFC 791)."
 						INET6: "IPv6 (RFC 2460)."
 					}
 				}
@@ -363,17 +363,17 @@ components: sources: dnstap: {
 			}
 			sourceAddress: {
 				relevant_when: "dataTypeId = 1"
-				description: "The network address of the message initiator."
-				required: true
+				description:   "The network address of the message initiator."
+				required:      true
 				type: string: {
 					examples: ["192.0.2.8", "fc00::100"]
 				}
 			}
 			sourcePort: {
 				relevant_when: "dataTypeId = 1"
-				common: true
-				description: "The transport port of the message initiator."
-				required: false
+				common:        true
+				description:   "The transport port of the message initiator."
+				required:      false
 				type: uint: {
 					default: 0
 					examples: [52398]
@@ -381,26 +381,26 @@ components: sources: dnstap: {
 			}
 			responseAddress: {
 				relevant_when: "dataTypeId = 1"
-				description: "The network address of the message responder."
-				required: true
+				description:   "The network address of the message responder."
+				required:      true
 				type: string: {
 					examples: ["192.0.2.18", "fc00::200"]
 				}
 			}
 			responsePort: {
 				relevant_when: "dataTypeId = 1"
-				common: true
-				description: "The transport port of the message responder."
-				required: false
+				common:        true
+				description:   "The transport port of the message responder."
+				required:      false
 				type: uint: {
 					default: 0
 					examples: [60364]
 				}
 			}
 			error: {
-				common: false
+				common:      false
 				description: "Error message upon failure while parsing dnstap data."
-				required: false
+				required:    false
 				type: string: {
 					examples: ["Encountered error : Unexpected number of records in update section: 0"]
 				}
@@ -418,9 +418,9 @@ components: sources: dnstap: {
 			}
 			requestData: {
 				relevant_when: "dataTypeId = 1"
-				common: true
-				description: "Request message data for DNS query/update."
-				required: false
+				common:        true
+				description:   "Request message data for DNS query/update."
+				required:      false
 				type: object: {
 					options: {
 						time: {
@@ -437,10 +437,10 @@ components: sources: dnstap: {
 						}
 						timePrecision: {
 							description: "The time precision used by field 'time'."
-							required: true
+							required:    true
 							type: string: {
 								enum: {
-									s: "second"
+									s:  "second"
 									ms: "millisecond"
 									us: "microsecond"
 									ns: "nanosecond"
@@ -469,24 +469,24 @@ components: sources: dnstap: {
 							required: false
 							type: string: {
 								enum: {
-									NoError: "No Error"
-									FormErr: "Format Error"                      
-									ServFail: "Server Failure"
-									NXDomain: "Non-Existent Domain"
-									NotImp: "Not Implemented"
-									Refused: "Query Refused"
-									YXDomain: "Name Exists when it should not"
-									YXRRSet: "RR Set Exists when it should not"
-									NXRRSet: "RR Set that should exist does not"
-									NotAuth: "Server Not Authoritative for zone"
-									NotZone: "Name not contained in zone"
-									BADSIG: "TSIG Signature Failure"
-									BADKEY: "Key not recognized"
-									BADTIME: "Signature out of time window"
-									BADMODE: "Bad TKEY Mode"
-									BADNAME: "Duplicate key name"
-									BADALG: "Algorithm not supported"
-									BADTRUNC: "Bad Truncation"
+									NoError:   "No Error"
+									FormErr:   "Format Error"
+									ServFail:  "Server Failure"
+									NXDomain:  "Non-Existent Domain"
+									NotImp:    "Not Implemented"
+									Refused:   "Query Refused"
+									YXDomain:  "Name Exists when it should not"
+									YXRRSet:   "RR Set Exists when it should not"
+									NXRRSet:   "RR Set that should exist does not"
+									NotAuth:   "Server Not Authoritative for zone"
+									NotZone:   "Name not contained in zone"
+									BADSIG:    "TSIG Signature Failure"
+									BADKEY:    "Key not recognized"
+									BADTIME:   "Signature out of time window"
+									BADMODE:   "Bad TKEY Mode"
+									BADNAME:   "Duplicate key name"
+									BADALG:    "Algorithm not supported"
+									BADTRUNC:  "Bad Truncation"
 									BADCOOKIE: "Bad/missing server cookie"
 								}
 							}
@@ -513,27 +513,27 @@ components: sources: dnstap: {
 							type: object: {
 								examples: [
 									{
-										"aa": false,
-										"ad": true,
-										"anCount": 0,
-										"arCount": 1,
-										"cd": false,
-										"id": 3341,
-										"nsCount": 0,
-										"opcode": 0,
-										"qdCount": 1,
-										"qr": 0,
-										"ra": false,
-										"rcode": 0,
-										"rd": true,
-										"tc": false
-									}
+										"aa":      false
+										"ad":      true
+										"anCount": 0
+										"arCount": 1
+										"cd":      false
+										"id":      3341
+										"nsCount": 0
+										"opcode":  0
+										"qdCount": 1
+										"qr":      0
+										"ra":      false
+										"rcode":   0
+										"rd":      true
+										"tc":      false
+									},
 								]
 								options: {}
 							}
 						}
 						question: {
-							common:true
+							common: true
 							description: """
 								Question section of DNS query request message. See DNS 
 								related RFCs for detailed information about its content.
@@ -542,17 +542,17 @@ components: sources: dnstap: {
 							type: object: {
 								examples: [
 									{
-										"class": "IN",
-										"domainName": "host.example.com.",
-										"questionType": "A",
+										"class":          "IN"
+										"domainName":     "host.example.com."
+										"questionType":   "A"
 										"questionTypeId": 1
-									}
+									},
 								]
 								options: {}
 							}
 						}
 						additional: {
-							common:true
+							common: true
 							description: """
 								Additional section of DNS query request message. See DNS 
 								related RFCs for detailed information about its content.
@@ -561,19 +561,19 @@ components: sources: dnstap: {
 							type: object: {
 								examples: [
 									{
-										"class": "IN",
-										"domainName": "ns.example.com.",
-										"rData": "192.0.2.1",
-										"recordType": "A",
-										"recordTypeId": 1,
-										"ttl": 3600
-									}
+										"class":        "IN"
+										"domainName":   "ns.example.com."
+										"rData":        "192.0.2.1"
+										"recordType":   "A"
+										"recordTypeId": 1
+										"ttl":          3600
+									},
 								]
 								options: {}
 							}
 						}
 						opt: {
-							common:true
+							common: true
 							description: """
 								A pseudo section containing EDNS options of DNS query request 
 								message. See DNS related RFCs for detailed information about 
@@ -583,24 +583,24 @@ components: sources: dnstap: {
 							type: object: {
 								examples: [
 									{
-										"do": false,
-										"ednsVersion": 0,
-										"extendedRcode": 0,
+										"do":            false
+										"ednsVersion":   0
+										"extendedRcode": 0
 										"options": [
 											{
-												"optCode": 10,
-												"optName": "Cookie",
+												"optCode":  10
+												"optName":  "Cookie"
 												"optValue": "hbbDFmHUM9w="
-											}
-										],
+											},
+										]
 										"udpPayloadSize": 4096
-									}
+									},
 								]
 								options: {}
 							}
 						}
 						zone: {
-							common:true
+							common: true
 							description: """
 								Zone section of DNS update request message. See DNS related 
 								RFCs for detailed information about its content.
@@ -609,17 +609,17 @@ components: sources: dnstap: {
 							type: object: {
 								examples: [
 									{
-										"zClass": "IN",
-										"zName": "example.com.",
-										"zType": "SOA",
+										"zClass":  "IN"
+										"zName":   "example.com."
+										"zType":   "SOA"
 										"zTypeId": 6
-									}
+									},
 								]
 								options: {}
 							}
 						}
 						prerequisite: {
-							common:true
+							common: true
 							description: """
 								Prerequisite section of DNS update request message. See DNS 
 								related RFCs for detailed information about its content.
@@ -628,18 +628,18 @@ components: sources: dnstap: {
 							type: object: {
 								examples: [
 									{
-										"class": "IN",
-										"domainName": "host.example.com.",
-										"rData": "192.0.2.100",
-										"recordType": "A",
+										"class":        "IN"
+										"domainName":   "host.example.com."
+										"rData":        "192.0.2.100"
+										"recordType":   "A"
 										"recordTypeId": 1
-									}
+									},
 								]
 								options: {}
 							}
 						}
 						update: {
-							common:true
+							common: true
 							description: """
 								Update section of DNS update request message. See DNS related 
 								RFCs for detailed information about its content.
@@ -648,13 +648,13 @@ components: sources: dnstap: {
 							type: object: {
 								examples: [
 									{
-										"class": "IN",
-										"domainName": "h1.example.com.",
-										"rData": "192.0.2.110",
-										"recordType": "A",
-										"recordTypeId": 1,
-										"ttl": 3600
-									}
+										"class":        "IN"
+										"domainName":   "h1.example.com."
+										"rData":        "192.0.2.110"
+										"recordType":   "A"
+										"recordTypeId": 1
+										"ttl":          3600
+									},
 								]
 								options: {}
 							}
@@ -664,9 +664,9 @@ components: sources: dnstap: {
 			}
 			responseData: {
 				relevant_when: "dataTypeId = 1"
-				common: true
-				description: "Response message data for DNS query/update."
-				required: false
+				common:        true
+				description:   "Response message data for DNS query/update."
+				required:      false
 				type: object: {
 					options: {
 						time: {
@@ -683,10 +683,10 @@ components: sources: dnstap: {
 						}
 						timePrecision: {
 							description: "The time precision used by field 'time'."
-							required: true
+							required:    true
 							type: string: {
 								enum: {
-									s: "second"
+									s:  "second"
 									ms: "millisecond"
 									us: "microsecond"
 									ns: "nanosecond"
@@ -706,29 +706,29 @@ components: sources: dnstap: {
 							}
 						}
 						rcodeName: {
-							common: true
+							common:      true
 							description: "Textual response code corresponding to the 'fullRcode'"
-							required: false
+							required:    false
 							type: string: {
 								enum: {
-									NoError: "No Error"
-									FormErr: "Format Error"                      
-									ServFail: "Server Failure"
-									NXDomain: "Non-Existent Domain"
-									NotImp: "Not Implemented"
-									Refused: "Query Refused"
-									YXDomain: "Name Exists when it should not"
-									YXRRSet: "RR Set Exists when it should not"
-									NXRRSet: "RR Set that should exist does not"
-									NotAuth: "Server Not Authoritative for zone"
-									NotZone: "Name not contained in zone"
-									BADSIG: "TSIG Signature Failure"
-									BADKEY: "Key not recognized"
-									BADTIME: "Signature out of time window"
-									BADMODE: "Bad TKEY Mode"
-									BADNAME: "Duplicate key name"
-									BADALG: "Algorithm not supported"
-									BADTRUNC: "Bad Truncation"
+									NoError:   "No Error"
+									FormErr:   "Format Error"
+									ServFail:  "Server Failure"
+									NXDomain:  "Non-Existent Domain"
+									NotImp:    "Not Implemented"
+									Refused:   "Query Refused"
+									YXDomain:  "Name Exists when it should not"
+									YXRRSet:   "RR Set Exists when it should not"
+									NXRRSet:   "RR Set that should exist does not"
+									NotAuth:   "Server Not Authoritative for zone"
+									NotZone:   "Name not contained in zone"
+									BADSIG:    "TSIG Signature Failure"
+									BADKEY:    "Key not recognized"
+									BADTIME:   "Signature out of time window"
+									BADMODE:   "Bad TKEY Mode"
+									BADNAME:   "Duplicate key name"
+									BADALG:    "Algorithm not supported"
+									BADTRUNC:  "Bad Truncation"
 									BADCOOKIE: "Bad/missing server cookie"
 								}
 							}
@@ -755,27 +755,27 @@ components: sources: dnstap: {
 							type: object: {
 								examples: [
 									{
-										"aa": true,
-										"ad": false,
-										"anCount": 1,
-										"arCount": 0,
-										"cd": false,
-										"id": 49653,
-										"nsCount": 1,
-										"opcode": 0,
-										"qdCount": 1,
-										"qr": 1,
-										"ra": true,
-										"rcode": 0,
-										"rd": true,
-										"tc": false
-									}
+										"aa":      true
+										"ad":      false
+										"anCount": 1
+										"arCount": 0
+										"cd":      false
+										"id":      49653
+										"nsCount": 1
+										"opcode":  0
+										"qdCount": 1
+										"qr":      1
+										"ra":      true
+										"rcode":   0
+										"rd":      true
+										"tc":      false
+									},
 								]
 								options: {}
 							}
 						}
 						question: {
-							common:true
+							common: true
 							description: """
 								Question section of DNS query response message. See DNS 
 								related RFCs for detailed information about its content.
@@ -784,17 +784,17 @@ components: sources: dnstap: {
 							type: object: {
 								examples: [
 									{
-										"class": "IN",
-										"domainName": "host.example.com.",
-										"questionType": "A",
+										"class":          "IN"
+										"domainName":     "host.example.com."
+										"questionType":   "A"
 										"questionTypeId": 1
-									}
+									},
 								]
 								options: {}
 							}
 						}
 						answers: {
-							common:true
+							common: true
 							description: """
 								Answers section of DNS query response message. See DNS 
 								related RFCs for detailed information about its content.
@@ -803,19 +803,19 @@ components: sources: dnstap: {
 							type: object: {
 								examples: [
 									{
-										"class": "IN",
-										"domainName": "host.example.com.",
-										"rData": "192.0.2.100",
-										"recordType": "A",
-										"recordTypeId": 1,
-										"ttl": 3600
-									}
+										"class":        "IN"
+										"domainName":   "host.example.com."
+										"rData":        "192.0.2.100"
+										"recordType":   "A"
+										"recordTypeId": 1
+										"ttl":          3600
+									},
 								]
 								options: {}
 							}
 						}
 						authority: {
-							common:true
+							common: true
 							description: """
 								Authority section of DNS query response message. See DNS 
 								related RFCs for detailed information about its content.
@@ -824,19 +824,19 @@ components: sources: dnstap: {
 							type: object: {
 								examples: [
 									{
-										"class": "IN",
-										"domainName": "example.com.",
-										"rData": "ns1.example.com.",
-										"recordType": "NS",
-										"recordTypeId": 2,
-										"ttl": 86400
-									}
+										"class":        "IN"
+										"domainName":   "example.com."
+										"rData":        "ns1.example.com."
+										"recordType":   "NS"
+										"recordTypeId": 2
+										"ttl":          86400
+									},
 								]
 								options: {}
 							}
 						}
 						additional: {
-							common:true
+							common: true
 							description: """
 								Additional section of DNS query response message. See DNS 
 								related RFCs for detailed information about its content.
@@ -845,19 +845,19 @@ components: sources: dnstap: {
 							type: object: {
 								examples: [
 									{
-										"class": "IN",
-										"domainName": "ns.example.com.",
-										"rData": "192.0.2.1",
-										"recordType": "A",
-										"recordTypeId": 1,
-										"ttl": 3600
-									}
+										"class":        "IN"
+										"domainName":   "ns.example.com."
+										"rData":        "192.0.2.1"
+										"recordType":   "A"
+										"recordTypeId": 1
+										"ttl":          3600
+									},
 								]
 								options: {}
 							}
 						}
 						opt: {
-							common:true
+							common: true
 							description: """
 								A pseudo section containing EDNS options of DNS query response 
 								message. See DNS related RFCs for detailed information about 
@@ -867,24 +867,24 @@ components: sources: dnstap: {
 							type: object: {
 								examples: [
 									{
-										"do": false,
-										"ednsVersion": 0,
-										"extendedRcode": 0,
+										"do":            false
+										"ednsVersion":   0
+										"extendedRcode": 0
 										"options": [
 											{
-												"optCode": 10,
-												"optName": "Cookie",
+												"optCode":  10
+												"optName":  "Cookie"
 												"optValue": "hbbDFmHUM9wBAAAAX1q1McL4KhalWTS3"
-											}
-										],
+											},
+										]
 										"udpPayloadSize": 4096
-									}
+									},
 								]
 								options: {}
 							}
 						}
 						zone: {
-							common:true
+							common: true
 							description: """
 								Zone section of DNS update response message. See DNS related 
 								RFCs for detailed information about its content.
@@ -893,11 +893,11 @@ components: sources: dnstap: {
 							type: object: {
 								examples: [
 									{
-										"zClass": "IN",
-										"zName": "example.com.",
-										"zType": "SOA",
+										"zClass":  "IN"
+										"zName":   "example.com."
+										"zType":   "SOA"
 										"zTypeId": 6
-									}
+									},
 								]
 								options: {}
 							}
@@ -912,10 +912,10 @@ components: sources: dnstap: {
 		{
 			title: "Dnstap events for a pair of regular DNS query and response."
 			configuration: {
-				max_frame_length: 102400
-				socket_file_mode: 508
-				socket_path: "/run/bind/dnstap.sock"
-				multithreaded: true
+				max_frame_length:         102400
+				socket_file_mode:         508
+				socket_path:              "/run/bind/dnstap.sock"
+				multithreaded:            true
 				max_frame_handling_tasks: 10000
 			}
 			input: """
@@ -928,121 +928,121 @@ components: sources: dnstap: {
 			output: [
 				{
 					log: {
-						"dataType": "Message",
-						"dataTypeId": 1,
-						"messageType": "ClientQuery",
-						"messageTypeId": 5,
+						"dataType":      "Message"
+						"dataTypeId":    1
+						"messageType":   "ClientQuery"
+						"messageTypeId": 5
 						"requestData": {
-							"fullRcode": 0,
+							"fullRcode": 0
 							"header": {
-								"aa": false,
-								"ad": false,
-								"anCount": 0,
-								"arCount": 0,
-								"cd": false,
-								"id": 49653,
-								"nsCount": 0,
-								"opcode": 0,
-								"qdCount": 1,
-								"qr": 0,
-								"ra": false,
-								"rcode": 0,
-								"rd": true,
-								"tc": false
-							},
+								"aa":      false
+								"ad":      false
+								"anCount": 0
+								"arCount": 0
+								"cd":      false
+								"id":      49653
+								"nsCount": 0
+								"opcode":  0
+								"qdCount": 1
+								"qr":      0
+								"ra":      false
+								"rcode":   0
+								"rd":      true
+								"tc":      false
+							}
 							"question": [
 								{
-									"class": "IN",
-									"domainName": "host.example.com.",
-									"questionType": "A",
+									"class":          "IN"
+									"domainName":     "host.example.com."
+									"questionType":   "A"
 									"questionTypeId": 1
-								}
-							],
-							"rcodeName": "NoError",
-							"time": 1614781642516276825,
+								},
+							]
+							"rcodeName":     "NoError"
+							"time":          1614781642516276825
 							"timePrecision": "ns"
-						},
-						"responseAddress": "127.0.0.1",
-						"responsePort": 0,
-						"serverId": "ns1.example.com",
-						"serverVersion": "BIND 9.16.8",
-						"socketFamily": "INET",
-						"socketProtocol": "UDP",
-						"sourceAddress": "127.0.0.1",
-						"sourcePort": 52398,
-						"time": 1614781642516276825,
-						"timePrecision": "ns"
+						}
+						"responseAddress": "127.0.0.1"
+						"responsePort":    0
+						"serverId":        "ns1.example.com"
+						"serverVersion":   "BIND 9.16.8"
+						"socketFamily":    "INET"
+						"socketProtocol":  "UDP"
+						"sourceAddress":   "127.0.0.1"
+						"sourcePort":      52398
+						"time":            1614781642516276825
+						"timePrecision":   "ns"
 					}
 				},
 				{
 					log: {
-						"dataType": "Message",
-						"dataTypeId": 1,
-						"messageType": "ClientResponse",
-						"messageTypeId": 6,
-						"responseAddress": "127.0.0.1",
+						"dataType":        "Message"
+						"dataTypeId":      1
+						"messageType":     "ClientResponse"
+						"messageTypeId":   6
+						"responseAddress": "127.0.0.1"
 						"responseData": {
 							"answers": [
 								{
-									"class": "IN",
-									"domainName": "host.example.com.",
-									"rData": "192.0.2.100",
-									"recordType": "A",
-									"recordTypeId": 1,
-									"ttl": 3600
-								}
-							],
+									"class":        "IN"
+									"domainName":   "host.example.com."
+									"rData":        "192.0.2.100"
+									"recordType":   "A"
+									"recordTypeId": 1
+									"ttl":          3600
+								},
+							]
 							"authority": [
 								{
-									"class": "IN",
-									"domainName": "example.com.",
-									"rData": "ns1.example.com.",
-									"recordType": "NS",
-									"recordTypeId": 2,
-									"ttl": 86400
-								}
-							],
-							"fullRcode": 0,
+									"class":        "IN"
+									"domainName":   "example.com."
+									"rData":        "ns1.example.com."
+									"recordType":   "NS"
+									"recordTypeId": 2
+									"ttl":          86400
+								},
+							]
+							"fullRcode": 0
 							"header": {
-								"aa": true,
-								"ad": false,
-								"anCount": 1,
-								"arCount": 0,
-								"cd": false,
-								"id": 49653,
-								"nsCount": 1,
-								"opcode": 0,
-								"qdCount": 1,
-								"qr": 1,
-								"ra": true,
-								"rcode": 0,
-								"rd": true,
-								"tc": false
-							},
+								"aa":      true
+								"ad":      false
+								"anCount": 1
+								"arCount": 0
+								"cd":      false
+								"id":      49653
+								"nsCount": 1
+								"opcode":  0
+								"qdCount": 1
+								"qr":      1
+								"ra":      true
+								"rcode":   0
+								"rd":      true
+								"tc":      false
+							}
 							"question": [
 								{
-									"class": "IN",
-									"domainName": "host.example.com.",
-									"questionType": "A",
+									"class":          "IN"
+									"domainName":     "host.example.com."
+									"questionType":   "A"
 									"questionTypeId": 1
-								}
-							],
-							"rcodeName": "NoError",
-							"time": 1614781642516276825,
+								},
+							]
+							"rcodeName":     "NoError"
+							"time":          1614781642516276825
 							"timePrecision": "ns"
-						},
-						"responsePort": 0,
-						"serverId": "ns1.example.com",
-						"serverVersion": "BIND 9.16.8",
-						"socketFamily": "INET",
-						"socketProtocol": "UDP",
-						"sourceAddress": "127.0.0.1",
-						"sourceId": "421bce7d-b4e6-b705-6057-7039628a9847",
-						"sourcePort": 52398,
-						"time": 1614781642516276825,
-						"timePrecision": "ns"
+						}
+						"responsePort":   0
+						"serverId":       "ns1.example.com"
+						"serverVersion":  "BIND 9.16.8"
+						"socketFamily":   "INET"
+						"socketProtocol": "UDP"
+						"sourceAddress":  "127.0.0.1"
+						"sourceId":       "421bce7d-b4e6-b705-6057-7039628a9847"
+						"sourcePort":     52398
+						"time":           1614781642516276825
+						"timePrecision":  "ns"
 					}
-				}
+				},
 			]
 			notes: """
 				* The BIND DNS server should host zone \"example.com\"
@@ -1055,10 +1055,10 @@ components: sources: dnstap: {
 		{
 			title: "Dnstap events for a pair of DNS update request and response."
 			configuration: {
-				socket_file_mode: 508
-				socket_path: "/run/bind/dnstap.sock"
+				socket_file_mode:           508
+				socket_path:                "/run/bind/dnstap.sock"
 				socket_receive_buffer_size: 10485760
-				socket_send_buffer_size: 10485760
+				socket_send_buffer_size:    10485760
 			}
 			input: """
 				Send a dynamic update to an authoritative BIND DNS server locally with following command:
@@ -1074,49 +1074,49 @@ components: sources: dnstap: {
 			output: [
 				{
 					log: {
-						"dataType": "Message",
-						"dataTypeId": 1,
-						"messageType": "UpdateQuery",
-						"messageTypeId": 13,
-						"responseAddress": "127.0.0.1",
-						"responsePort": 0,
-						"serverId": "ns1.example.com",
-						"serverVersion": "BIND 9.16.8",
-						"socketFamily": "INET",
-						"socketProtocol": "UDP",
-						"sourceAddress": "127.0.0.1",
-						"sourcePort": 53141,
-						"time": 1599832089886768480,
-						"timePrecision": "ns",
+						"dataType":        "Message"
+						"dataTypeId":      1
+						"messageType":     "UpdateQuery"
+						"messageTypeId":   13
+						"responseAddress": "127.0.0.1"
+						"responsePort":    0
+						"serverId":        "ns1.example.com"
+						"serverVersion":   "BIND 9.16.8"
+						"socketFamily":    "INET"
+						"socketProtocol":  "UDP"
+						"sourceAddress":   "127.0.0.1"
+						"sourcePort":      53141
+						"time":            1599832089886768480
+						"timePrecision":   "ns"
 						"requestData": {
-							"fullRcode": 0,
+							"fullRcode": 0
 							"header": {
-							"adCount": 0,
-							"id": 47320,
-							"opcode": 5,
-							"prCount": 0,
-							"qr": 0,
-							"rcode": 0,
-							"upCount": 1,
-							"zoCount": 1
-							},
-							"rcodeName": "NoError",
-							"time": 1599832089886768480,
-							"timePrecision": "ns",
-							"update": [
-							{
-								"class": "IN",
-								"domainName": "h1.example.com.",
-								"rData": "192.0.2.110",
-								"recordType": "A",
-								"recordTypeId": 1,
-								"ttl": 3600
+								"adCount": 0
+								"id":      47320
+								"opcode":  5
+								"prCount": 0
+								"qr":      0
+								"rcode":   0
+								"upCount": 1
+								"zoCount": 1
 							}
-							],
+							"rcodeName":     "NoError"
+							"time":          1599832089886768480
+							"timePrecision": "ns"
+							"update": [
+								{
+									"class":        "IN"
+									"domainName":   "h1.example.com."
+									"rData":        "192.0.2.110"
+									"recordType":   "A"
+									"recordTypeId": 1
+									"ttl":          3600
+								},
+							]
 							"zone": {
-								"zClass": "IN",
-								"zName": "example.com.",
-								"zType": "SOA",
+								"zClass":  "IN"
+								"zName":   "example.com."
+								"zType":   "SOA"
 								"zTypeId": 6
 							}
 						}
@@ -1124,44 +1124,44 @@ components: sources: dnstap: {
 				},
 				{
 					log: {
-						"dataType": "Message",
-						"dataTypeId": 1,
-						"messageType": "UpdateResponse",
-						"messageTypeId": 14,
-						"responseAddress": "127.0.0.1",
-						"responsePort": 0,
-						"serverId": "ns1.example.com",
-						"serverVersion": "BIND 9.16.8",
-						"socketFamily": "INET",
-						"socketProtocol": "UDP",
-						"sourceAddress": "127.0.0.1",
-						"sourcePort": 53141,
-						"time": 1599832089890768466,
-						"timePrecision": "ns",
+						"dataType":        "Message"
+						"dataTypeId":      1
+						"messageType":     "UpdateResponse"
+						"messageTypeId":   14
+						"responseAddress": "127.0.0.1"
+						"responsePort":    0
+						"serverId":        "ns1.example.com"
+						"serverVersion":   "BIND 9.16.8"
+						"socketFamily":    "INET"
+						"socketProtocol":  "UDP"
+						"sourceAddress":   "127.0.0.1"
+						"sourcePort":      53141
+						"time":            1599832089890768466
+						"timePrecision":   "ns"
 						"responseData": {
-							"fullRcode": 0,
+							"fullRcode": 0
 							"header": {
-								"adCount": 0,
-								"id": 47320,
-								"opcode": 5,
-								"prCount": 0,
-								"qr": 1,
-								"rcode": 0,
-								"upCount": 0,
+								"adCount": 0
+								"id":      47320
+								"opcode":  5
+								"prCount": 0
+								"qr":      1
+								"rcode":   0
+								"upCount": 0
 								"zoCount": 1
-							},
-							"rcodeName": "NoError",
-							"time": 1599832089890768466,
-							"timePrecision": "ns",
+							}
+							"rcodeName":     "NoError"
+							"time":          1599832089890768466
+							"timePrecision": "ns"
 							"zone": {
-								"zClass": "IN",
-								"zName": "example.com.",
-								"zType": "SOA",
+								"zClass":  "IN"
+								"zName":   "example.com."
+								"zType":   "SOA"
 								"zTypeId": 6
 							}
 						}
 					}
-				}
+				},
 			]
 			notes: """
 				* The BIND DNS server should host zone \"example.com\"
@@ -1170,7 +1170,7 @@ components: sources: dnstap: {
 				* Unix socket path configured in BIND and Vector should match each other
 				* BIND should have 'rw' permissions to the Unix socket
 				"""
-		}
+		},
 	]
 
 	how_it_works: {
@@ -1210,7 +1210,7 @@ components: sources: dnstap: {
 						Make sure the Unix domain sockets on both local and remote machines
 						having appropriate permissions set.
 						"""#
-				}
+				},
 			]
 		}
 

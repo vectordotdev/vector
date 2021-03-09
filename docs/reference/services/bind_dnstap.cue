@@ -8,7 +8,7 @@ services: bind_dnstap: {
 
 	setup: [
 		{
-			title: "Configure BIND to use dnstap"
+			title:       "Configure BIND to use dnstap"
 			description: """
 				Enable and configure BIND to use dnstap by following ISC KB article 
 				[Using DNSTAP with BIND](\(urls.bind_dnstap)).
@@ -18,9 +18,9 @@ services: bind_dnstap: {
 		{
 			title: "Configure Vector to accept BIND dnstap output"
 			vector: configure: sources: dnstap: {
-                type: "dnstap"
-                socket_path: "/run/bind/dnstap.sock"
-                socket_file_mode: 508
+				type:             "dnstap"
+				socket_path:      "/run/bind/dnstap.sock"
+				socket_file_mode: 508
 			}
 		},
 	]
