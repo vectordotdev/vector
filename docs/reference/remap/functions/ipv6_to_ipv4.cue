@@ -3,28 +3,29 @@ package metadata
 remap: functions: ipv6_to_ipv4: {
 	category: "IP"
 	description: """
-		Converts the `ip` to an IPv4 address.
-
-		If the parameter is already an IPv4 address it is passed through untouched. If it is an IPv6 address it has
-		to be an IPv4 compatible address.
+		Converts the `ip` to an IPv4 address. `ip` is returned unchanged if it's already an IPv4 address. If `ip` is
+		currently an IPv6 address then it needs to be IPv4 compatible, otherwise an error is thrown.
 		"""
 
 	arguments: [
 		{
 			name:        "ip"
-			description: "The IPv4 mapped IPv6 address to convert."
+			description: "The IPv4-mapped IPv6 address to convert."
 			required:    true
 			type: ["string"]
 		},
 	]
 	internal_failure_reasons: [
-		"`ip` is not a valid IP address",
-		"`ip` is an IPv6 address that is not compatible with IPv4",
+		"`ip` isn't a valid IP address",
+		"`ip` is an IPv6 address that isn't compatible with IPv4",
 	]
 	return: {
 		types: ["string"]
 		rules: [
-			"If the parameter is already an IPv4 address it is passed through untouched. If it is an IPv6 address it has to be an IPv4 compatible address.",
+			"""
+				The `ip` is returned unchanged if it's already an IPv4 address. If it's an IPv6 address it must be IPv4
+				compatible, otherwise an error is thrown.
+				""",
 		]
 	}
 

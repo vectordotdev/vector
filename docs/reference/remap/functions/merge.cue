@@ -21,7 +21,7 @@ remap: functions: merge: {
 		},
 		{
 			name:        "deep"
-			description: "If true a deep merge is performed, otherwise only top level fields are merged."
+			description: "A deep merge is performed if `true`, otherwise only top-level fields are merged."
 			required:    false
 			default:     false
 			type: ["boolean"]
@@ -31,8 +31,11 @@ remap: functions: merge: {
 	return: {
 		types: ["object"]
 		rules: [
-			#"If a key exists in both objects, the field from the `from` object is chosen."#,
-			#"If `deep` is specified, and a key exists in both objects, and both these fields are also objects, then those objects will merge recursively as well."#,
+			#"The field from the `from` object is chosen if a key exists in both objects."#,
+			#"""
+				Objects are merged recursively if `deep` is specified, a key exists in both objects, and both of those
+				fields are also objects.
+				"""#,
 		]
 	}
 
