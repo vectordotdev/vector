@@ -11,7 +11,7 @@ remap: errors: "204": {
 		"""
 	examples: [
 		{
-			title: "\(title)"
+			"title": "\(title)"
 			source: #"""
 				.field1 = "value1"
 				.field2 =
