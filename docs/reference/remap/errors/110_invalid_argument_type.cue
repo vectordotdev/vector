@@ -29,15 +29,7 @@ remap: errors: "110": {
 		{
 			"title": "\(title) (guard with errors)"
 			diff: #"""
-				 downcase(string!(.message))
-				"""#
-		},
-		{
-			"title": "\(title) (guard with if expressions)"
-			diff: #"""
-				+if string(.message) {
-				 	downcase(.message)
-				+ }
+				downcase(string!(.message))
 				"""#
 		},
 	]
