@@ -248,14 +248,14 @@ impl HttpSink for DatadogLogsTextService {
     type Output = Vec<Bytes>;
 
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
-        let encoded_event = encode_event(event, &self.config.encoding);
-        if let Some(e) = &encoded_event {
-            emit!(DatadogLogEventProcessed {
-                byte_size: e.len(),
-                count: 1,
-            });
-        }
-        encoded_event
+        encode_event(event, &self.config.encoding)
+            .map(|e| {
+	            emit!(DatadogLogEventProcessed {
+    	            byte_size: e.len(),
+        	        count: 1,
+            	});
+            	e
+            })
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
