@@ -15,13 +15,13 @@ remap: errors: "601": {
 
 	examples: [
 		{
-			"title": "\(title) (parsing)"
+			"title": "\(title) formatting"
 			source: #"""
-				parse_timestamp!("next Tuesday", format: "%v %R")
+				.timestamp = format_timestamp!(t'next Tuesday', format: "%v %R")
 				"""#
 			diff: #"""
-				- 	parse_timestamp!("next Tuesday", format: "%v %R")
-				+# 	parse_timestamp!("10-Oct-2020 16:00", format: "%v %R")
+				-.timestamp = format_timestamp!(t'next Tuesday', format: "%v %R")
+				+.timestamp = format_timestamp!(t'2021-03-09T16:33:02.405806Z', format: "%v %R")
 				"""#
 		},
 	]
