@@ -756,7 +756,7 @@ mod tests {
         .await;
 
         assert_eq!(
-            405,
+            404,
             send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path").await
         );
     }

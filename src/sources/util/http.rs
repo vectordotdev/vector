@@ -15,7 +15,7 @@ use snap::raw::Decoder as SnappyDecoder;
 use std::{collections::HashMap, convert::TryFrom, error::Error, fmt, io::Read, net::SocketAddr};
 use tracing_futures::Instrument;
 use warp::{
-    filters::{path::FullPath, BoxedFilter},
+    filters::{path::FullPath, path::Tail, BoxedFilter},
     http::{HeaderMap, StatusCode},
     reject::Rejection,
     Filter,
@@ -202,11 +202,19 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             for s in path.split('/').filter(|&x| !x.is_empty()) {
                 filter = filter.and(warp::path(s.to_string())).boxed()
             }
-            if strict_path {
-                debug!(message = "Strict path enabled.");
-                filter = filter.and(warp::path::end()).boxed();
-            }
             let svc = filter
+                .and(warp::path::tail())
+                .and_then(move |tail: Tail| async move {
+                    if !strict_path || tail.as_str().is_empty() {
+                        Ok(())
+                    } else {
+                        debug!(message = "Path rejected.");
+                        Err(warp::reject::custom(
+                            ErrorMessage::new(StatusCode::NOT_FOUND,
+                            StatusCode::NOT_FOUND.canonical_reason().unwrap().to_string())
+                        ))
+                    }
+                }).untuple_one()
                 .and(warp::path::full())
                 .and(warp::header::optional::<String>("authorization"))
                 .and(warp::header::optional::<String>("content-encoding"))
