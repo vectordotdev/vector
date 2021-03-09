@@ -7,13 +7,11 @@ use crate::{
 };
 use bytes::{Buf, Bytes, BytesMut};
 use futures::{
-    compat::Sink01CompatExt,
     executor::block_on,
     future,
     sink::{Sink, SinkExt},
     stream::{self, StreamExt, TryStreamExt},
 };
-use futures01::Sink as Sink01;
 use std::convert::TryInto;
 use std::fs;
 use std::marker::{Send, Sync};
@@ -420,7 +418,7 @@ pub fn build_framestream_unix_source(
 
         // the permissions to unix socket are restricted from 0o700 to 0o777, which are 448 and 511 in decimal
         if let Some(socket_permission) = frame_handler.socket_file_mode() {
-            if socket_permission < 448 || socket_permission > 511 {
+            if !(448..=511).contains(&socket_permission) {
                 panic!("Invalid Socket permission");
             }
             match fs::set_permissions(&path, fs::Permissions::from_mode(socket_permission)) {
@@ -450,7 +448,7 @@ pub fn build_framestream_unix_source(
             let peer_addr = socket.peer_addr().ok();
             let content_type = frame_handler.content_type();
             let listen_path = path.clone();
-            let event_sink = out.clone();
+            let mut event_sink = out.clone();
             let active_task_nums_ = Arc::clone(&active_parsing_task_nums);
 
             let span = info_span!("connection");
@@ -500,7 +498,7 @@ pub fn build_framestream_unix_source(
                 });
 
                 let handler = async move {
-                    let _ = event_sink.sink_compat().send_all(&mut events).await;
+                    let _ = event_sink.send_all(&mut events).await;
                     info!("finished sending");
 
                     //TODO: shutdown
@@ -545,20 +543,20 @@ pub fn build_framestream_unix_source(
 fn spawn_event_handling_tasks<S>(
     event_data: Bytes,
     event_handler: impl FrameHandler + Send + Sync + 'static,
-    event_sink: S,
+    mut event_sink: S,
     received_from: Option<Bytes>,
     active_task_nums: Arc<AtomicI32>,
     max_frame_handling_tasks: i32,
 ) -> JoinHandle<()>
 where
-    S: Sink01<SinkItem = Event, SinkError = ()> + Send + 'static,
+    S: Sink<Event> + Send + Unpin + 'static,
 {
     wait_for_task_quota(&active_task_nums, max_frame_handling_tasks);
 
     tokio::spawn(async move {
         future::ready({
             if let Some(evt) = event_handler.handle_event(received_from, event_data) {
-                if event_sink.sink_compat().send(evt).await.is_err() {
+                if event_sink.send(evt).await.is_err() {
                     error!("Encountered error while sending event");
                 }
             }
@@ -588,12 +586,10 @@ mod test {
     use crate::{event::Event, shutdown::SourceShutdownCoordinator, Pipeline};
     use bytes::{buf::Buf, Bytes, BytesMut};
     use futures::{
-        compat::Future01CompatExt,
         future,
         sink::{Sink, SinkExt},
         stream::{self, StreamExt},
     };
-    use futures01::Sink as Sink01;
     #[cfg(unix)]
     use std::{
         path::PathBuf,
@@ -785,7 +781,7 @@ mod test {
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
-        let shutdown_success = shutdown_complete.compat().await.unwrap();
+        let shutdown_success = shutdown_complete.await;
         assert_eq!(true, shutdown_success);
     }
 
@@ -818,7 +814,7 @@ mod test {
             vec![Ok(Bytes::from(&"hello"[..])), Ok(Bytes::from(&"world"[..]))],
         )
         .await;
-        let events = collect_n(rx, 2).await.unwrap();
+        let events = collect_n(rx, 2).await;
 
         //5 - send STOP frame
         send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
@@ -868,7 +864,7 @@ mod test {
             vec![Ok(Bytes::from(&"hello"[..])), Ok(Bytes::from(&"world"[..]))],
         )
         .await;
-        let events = collect_n(rx, 2).await.unwrap();
+        let events = collect_n(rx, 2).await;
 
         //5 - send STOP frame
         send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
@@ -989,7 +985,7 @@ mod test {
             vec![Ok(Bytes::from(&"hello"[..])), Ok(Bytes::from(&"world"[..]))],
         )
         .await;
-        let events = collect_n(rx, 2).await.unwrap();
+        let events = collect_n(rx, 2).await;
 
         //6 - send STOP frame
         send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
@@ -1029,7 +1025,7 @@ mod test {
             vec![Ok(Bytes::from(&"hello"[..])), Ok(Bytes::from(&"world"[..]))],
         )
         .await;
-        let events = collect_n(rx, 2).await.unwrap();
+        let events = collect_n(rx, 2).await;
 
         //5 - send STOP frame
         send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
@@ -1075,7 +1071,7 @@ mod test {
 
         join_handles.push(tokio::spawn(async move {
             future::ready({
-                let events = collect_n(rx, total_events as usize).await.unwrap();
+                let events = collect_n(rx, total_events as usize).await;
                 assert_eq!(total_events as usize, events.len(), "Missed events");
             })
             .await;

@@ -220,7 +220,7 @@ impl<'a> DnstapParser<'a> {
             .to_string();
 
         if let Some(query_time_sec) = dnstap_message.query_time_sec {
-            let mut timestamp_nanosec: i64 = query_time_sec as i64 * 1_000_000_000 as i64;
+            let mut timestamp_nanosec: i64 = query_time_sec as i64 * 1_000_000_000_i64;
 
             if let Some(query_time_nsec) = dnstap_message.query_time_nsec {
                 timestamp_nanosec += query_time_nsec as i64;
@@ -263,7 +263,7 @@ impl<'a> DnstapParser<'a> {
         }
 
         if let Some(response_time_sec) = dnstap_message.response_time_sec {
-            let mut timestamp_nanosec: i64 = response_time_sec as i64 * 1_000_000_000 as i64;
+            let mut timestamp_nanosec: i64 = response_time_sec as i64 * 1_000_000_000_i64;
 
             if let Some(response_time_nsec) = dnstap_message.response_time_nsec {
                 timestamp_nanosec += response_time_nsec as i64;

@@ -2724,7 +2724,7 @@ version = "0.1.0-rc.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ba5fb13a3b90581d22b4edf99e87c54316444622ae123d36816a227a7caa6df"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "futures 0.3.15",
  "glob 0.3.0",
  "heim-common",
@@ -5505,8 +5505,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54c0fb387dcbe19412ee9e7ddcca2aa31bedcc62e7f9faef6db431da5fadb883"
 dependencies = [
  "proc-macro2 1.0.24",
- "quote 1.0.7",
- "syn 1.0.54",
+ "quote 1.0.9",
+ "syn 1.0.62",
 ]
 
 [[package]]

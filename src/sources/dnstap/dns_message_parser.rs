@@ -69,7 +69,7 @@ impl DnsMessageParser {
                     response_code,
                     parse_response_code(response_code),
                     header,
-                    self.parse_dns_query_message_question_section(&msg)?,
+                    self.parse_dns_query_message_question_section(&msg),
                     self.parse_dns_message_section(msg.answers())?,
                     self.parse_dns_message_section(&msg.name_servers())?,
                     self.parse_dns_message_section(&msg.additionals())?,
@@ -102,24 +102,21 @@ impl DnsMessageParser {
     fn parse_dns_query_message_question_section(
         &self,
         dns_message: &TrustDnsMessage,
-    ) -> Result<Vec<QueryQuestion>, DnsMessageParserError> {
+    ) -> Vec<QueryQuestion> {
         let mut questions: Vec<QueryQuestion> = Vec::new();
         for query in dns_message.queries().iter() {
-            questions.push(self.parse_dns_query_question(query)?);
+            questions.push(self.parse_dns_query_question(query));
         }
-        Ok(questions)
+        questions
     }
 
-    fn parse_dns_query_question(
-        &self,
-        question: &Query,
-    ) -> Result<QueryQuestion, DnsMessageParserError> {
-        Ok(QueryQuestion::new(
+    fn parse_dns_query_question(&self, question: &Query) -> QueryQuestion {
+        QueryQuestion::new(
             question.name().to_string(),
             question.query_class().to_string(),
             format_record_type(question.query_type()),
             u16::from(question.query_type()),
-        ))
+        )
     }
 
     fn parse_dns_update_message_zone_section(
@@ -129,7 +126,7 @@ impl DnsMessageParser {
         let mut zones: Vec<ZoneInfo> = Vec::new();
 
         for query in dns_message.queries().iter() {
-            zones.push(self.parse_dns_query_question(query)?.into());
+            zones.push(self.parse_dns_query_question(query).into());
         }
 
         if zones.len() != 1 {
