@@ -155,7 +155,7 @@ bytesize = { version = "1.0.0", optional = true }
 chrono = { version = "0.4.19", features = ["serde"] }
 cidr-utils = "0.5.0"
 colored = "2.0"
-dashmap = "3"
+dashmap = "4"
 db-key = "0.0.5"
 derivative = "2.1.1"
 dirs-next = { version = "2.0.0", optional = true }
