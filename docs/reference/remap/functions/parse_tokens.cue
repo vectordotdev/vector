@@ -11,8 +11,8 @@ remap: functions: parse_tokens: {
 		"""#
 	notices: [
 		"""
-		All token values are returned as strings. We recommend manually coercing values to desired types as you see fit.
-		""",
+			All token values are returned as strings. We recommend manually coercing values to desired types as you see fit.
+			""",
 	]
 
 	arguments: [

@@ -19,13 +19,13 @@ remap: functions: parse_common_log: {
 			type: ["string"]
 		},
 		{
-			name:        "timestamp_format"
+			name: "timestamp_format"
 			description: """
 				The [date/time format](https://docs.rs/chrono/latest/chrono/format/strftime/index.html) to use for
 				encoding the timestamp.
 				"""
-			required:    false
-			default:     "%d/%b/%Y:%T %z"
+			required: false
+			default:  "%d/%b/%Y:%T %z"
 			type: ["string"]
 		},
 	]

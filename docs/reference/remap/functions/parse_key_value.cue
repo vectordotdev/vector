@@ -1,7 +1,7 @@
 package metadata
 
 remap: functions: parse_key_value: {
-	category:    "Parse"
+	category: "Parse"
 	description: #"""
 		Parses the `value` in key/value format. Also known as [logfmt](\(urls.logfmt)).
 
@@ -10,8 +10,8 @@ remap: functions: parse_key_value: {
 		"""#
 	notices: [
 		"""
-		All values are returned as strings. We recommend manually coercing values to desired types as you see fit.
-		""",
+			All values are returned as strings. We recommend manually coercing values to desired types as you see fit.
+			""",
 	]
 
 	arguments: [

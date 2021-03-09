@@ -20,13 +20,13 @@ remap: functions: parse_apache_log: {
 			type: ["string"]
 		},
 		{
-			name:        "timestamp_format"
+			name: "timestamp_format"
 			description: """
 				The [date/time format](https://docs.rs/chrono/latest/chrono/format/strftime/index.html) to use for
 				encoding the timestamp. The time is parsed in local time if the timestamp doesn't specify a timezone.
 				"""
-			required:    false
-			default:     "%d/%b/%Y:%T %z"
+			required: false
+			default:  "%d/%b/%Y:%T %z"
 			type: ["string"]
 		},
 		{

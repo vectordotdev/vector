@@ -15,8 +15,8 @@ remap: functions: parse_regex: {
 		support for the desired format.
 		""",
 		"""
-		All values are returned as strings. We recommend manually coercing values to desired types as you see fit.
-		""",
+			All values are returned as strings. We recommend manually coercing values to desired types as you see fit.
+			""",
 	]
 
 	arguments: [
