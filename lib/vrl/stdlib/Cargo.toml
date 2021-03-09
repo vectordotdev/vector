@@ -59,6 +59,7 @@ wasm_compatible = [
   "ends_with",
   "exists",
   "flatten",
+  "float",
   "floor",
   "format_number",
   "format_timestamp",
