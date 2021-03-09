@@ -211,7 +211,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         debug!(message = "Path rejected.");
                         Err(warp::reject::custom(
                             ErrorMessage::new(StatusCode::NOT_FOUND,
-                            StatusCode::NOT_FOUND.canonical_reason().unwrap().to_string())
+                            "Not found".to_string())
                         ))
                     }
                 }).untuple_one()
