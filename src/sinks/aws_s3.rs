@@ -1,5 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    internal_events::TemplateRenderingFailed,
     rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     serde::to_string,
     sinks::util::{
@@ -397,12 +398,12 @@ fn encode_event(
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
     let key = key_prefix
         .render_string(&event)
-        .map_err(|missing_keys| {
-            warn!(
-                message = "Keys do not exist on the event; dropping event.",
-                ?missing_keys,
-                internal_log_rate_secs = 30,
-            );
+        .map_err(|error| {
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("key_prefix"),
+                drop_event: true,
+            });
         })
         .ok()?;
 
