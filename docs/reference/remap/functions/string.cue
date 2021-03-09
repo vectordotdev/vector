@@ -3,33 +3,31 @@ package metadata
 remap: functions: string: {
 	category: "Type"
 	description: """
-		Errors if `value` is not a string, if `value` is a string it is returned.
-
-		This allows the type checker to guarantee that the returned value is a string and can be used in any function
-		that expects this type.
+		Returns the `value` if it's a string and errors otherwise. This enables the type checker to guarantee that the
+		returned value is a string and can be used in any function that expects one.
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: "The value to ensure is a string."
+			description: "The value that you need to ensure is a string."
 			required:    true
 			type: ["any"]
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a string.",
+		"`value` isn't a string.",
 	]
 	return: {
 		types: ["string"]
 		rules: [
-			#"If `value` is a string then it is returned."#,
-			#"Otherwise an error is raised."#,
+			#"Returns the `value` if it's a string."#,
+			#"Raises an error if not a string."#,
 		]
 	}
 	examples: [
 		{
-			title: "Delcare a string type"
+			title: "Declare a string type"
 			input: log: message: '{"field": "value"}'
 			source: #"""
 				string!(.message)
