@@ -109,7 +109,7 @@ components: sources: http: {
 		}
 		path: {
 			common:      false
-			description: "The URL path on which log event POST request shall be sent."
+			description: "The URL path on which log event POST requests shall be sent."
 			required:    false
 			type: string: {
 				default: "/"
@@ -120,17 +120,17 @@ components: sources: http: {
 		strict_path: {
 			common: false
 			description: """
-				If set to true only request using the exact URL path specified in path will be accepted,
-				else event log sent to a URL path that starts with the value of path will be accepted.
-				With strict_path set to false and path set to \"/\" the configured HTTP source will
-				accept log events from any URL path.
+				If set to `true`, only requests using the exact URL path specified in `path` will be accepted;
+				otherwise requests sent to a URL path that starts with the value of `path` will be accepted.
+				With `strict_path` set to `false` and `path` set to `""`, the configured HTTP source will
+				accept requests from any URL path.
 				"""
 			required: false
 			type: bool: default: true
 		}
 		path_key: {
 			common:      false
-			description: "The event key in which the requested URL path used to send the log event will be stored."
+			description: "The event key in which the requested URL path used to send the request will be stored."
 			required:    false
 			type: string: {
 				default: "path"
@@ -153,7 +153,7 @@ components: sources: http: {
 					}
 				}
 				path: {
-					description: "The HTTP path the event was received from. The key can be changed using the path_key configuration setting"
+					description: "The HTTP path the event was received from. The key can be changed using the `path_key` configuration setting"
 					required:    true
 					type: string: {
 						examples: ["/", "/logs/event712"]
@@ -174,7 +174,7 @@ components: sources: http: {
 					type: "*": {}
 				}
 				path: {
-					description: "The HTTP path the event was received from. The key can be changed using the path_key configuration setting"
+					description: "The HTTP path the event was received from. The key can be changed using the `path_key` configuration setting"
 					required:    true
 					type: string: {
 						examples: ["/", "/logs/event712"]
