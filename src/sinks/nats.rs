@@ -2,12 +2,12 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
-    internal_events::{NatsEventMissingKeys, NatsEventSendFail, NatsEventSendSuccess},
+    internal_events::{NatsEventSendFail, NatsEventSendSuccess, TemplateRenderingFailed},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     Event,
 };
 use async_trait::async_trait;
@@ -19,7 +19,7 @@ use std::convert::TryFrom;
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("invalid subject template: {}", source))]
-    SubjectTemplate { source: TemplateError },
+    SubjectTemplate { source: TemplateParseError },
 }
 
 /**
@@ -158,11 +158,18 @@ impl StreamSink for NatsSink {
         let nc = nats_options.connect(&self.url).await.map_err(|_| ())?;
 
         while let Some(event) = input.next().await {
-            let subject = self.subject.render_string(&event).map_err(|missing_keys| {
-                emit!(NatsEventMissingKeys {
-                    keys: &missing_keys
-                });
-            })?;
+            let subject = match self.subject.render_string(&event) {
+                Ok(subject) => subject,
+                Err(error) => {
+                    emit!(TemplateRenderingFailed {
+                        error,
+                        field: Some("subject"),
+                        drop_event: true,
+                    });
+                    self.acker.ack(1);
+                    continue;
+                }
+            };
 
             let log = encode_event(event, &self.encoding);
             let message_len = log.len();

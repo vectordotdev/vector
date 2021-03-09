@@ -14,9 +14,9 @@ use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
     ser::{Serialize, Serializer},
 };
+use snafu::Snafu;
 use std::borrow::Cow;
 use std::convert::TryFrom;
-use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -31,23 +31,20 @@ pub struct Template {
     has_fields: bool,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum TemplateError {
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
+pub enum TemplateParseError {
+    #[snafu(display("Invalid strftime item"))]
     StrftimeError,
 }
 
-impl Error for TemplateError {}
-
-impl fmt::Display for TemplateError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::StrftimeError => write!(f, "Invalid strftime item"),
-        }
-    }
+#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
+pub enum TemplateRenderingError {
+    #[snafu(display("Missing fields on event: {:?}", missing_keys))]
+    MissingKeys { missing_keys: Vec<String> },
 }
 
 impl TryFrom<&str> for Template {
-    type Error = TemplateError;
+    type Error = TemplateParseError;
 
     fn try_from(src: &str) -> Result<Self, Self::Error> {
         Template::try_from(Cow::Borrowed(src))
@@ -55,7 +52,7 @@ impl TryFrom<&str> for Template {
 }
 
 impl TryFrom<String> for Template {
-    type Error = TemplateError;
+    type Error = TemplateParseError;
 
     fn try_from(src: String) -> Result<Self, Self::Error> {
         Template::try_from(Cow::Owned(src))
@@ -63,7 +60,7 @@ impl TryFrom<String> for Template {
 }
 
 impl TryFrom<PathBuf> for Template {
-    type Error = TemplateError;
+    type Error = TemplateParseError;
 
     fn try_from(p: PathBuf) -> Result<Self, Self::Error> {
         Template::try_from(p.to_string_lossy().into_owned())
@@ -71,15 +68,15 @@ impl TryFrom<PathBuf> for Template {
 }
 
 impl TryFrom<Cow<'_, str>> for Template {
-    type Error = TemplateError;
+    type Error = TemplateParseError;
 
     fn try_from(src: Cow<'_, str>) -> Result<Self, Self::Error> {
         let (has_error, is_dynamic) = StrftimeItems::new(&src)
-            .fold((false, false), |pair, item| {
-                (pair.0 || is_error(&item), pair.1 || is_dynamic(&item))
+            .fold((false, false), |(error, dynamic), item| {
+                (error || is_error(&item), dynamic || is_dynamic(&item))
             });
         if has_error {
-            Err(TemplateError::StrftimeError)
+            Err(TemplateParseError::StrftimeError)
         } else {
             Ok(Template {
                 has_fields: RE.is_match(&src),
@@ -96,20 +93,20 @@ fn is_error(item: &Item) -> bool {
 
 fn is_dynamic(item: &Item) -> bool {
     match item {
-        Item::Error => false,
         Item::Fixed(_) => true,
         Item::Numeric(_, _) => true,
+        Item::Error => false,
         Item::Space(_) | Item::OwnedSpace(_) => false,
         Item::Literal(_) | Item::OwnedLiteral(_) => false,
     }
 }
 
 impl Template {
-    pub fn render(&self, event: &Event) -> Result<Bytes, Vec<String>> {
+    pub fn render(&self, event: &Event) -> Result<Bytes, TemplateRenderingError> {
         self.render_string(event).map(Into::into)
     }
 
-    pub fn render_string(&self, event: &Event) -> Result<String, Vec<String>> {
+    pub fn render_string(&self, event: &Event) -> Result<String, TemplateRenderingError> {
         match (self.has_fields, self.has_ts) {
             (false, false) => Ok(self.src.clone()),
             (true, false) => render_fields(&self.src, event),
@@ -145,8 +142,8 @@ impl Template {
     }
 }
 
-fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
-    let mut missing_fields = Vec::new();
+fn render_fields(src: &str, event: &Event) -> Result<String, TemplateRenderingError> {
+    let mut missing_keys = Vec::new();
     let out = RE
         .replace_all(src, |caps: &Captures<'_>| {
             let key = caps
@@ -158,15 +155,15 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
                 Event::Metric(metric) => render_metric_field(key, metric),
             }
             .unwrap_or_else(|| {
-                missing_fields.push(key.to_owned());
+                missing_keys.push(key.to_owned());
                 String::new()
             })
         })
         .into_owned();
-    if missing_fields.is_empty() {
+    if missing_keys.is_empty() {
         Ok(out)
     } else {
-        Err(missing_fields)
+        Err(TemplateRenderingError::MissingKeys { missing_keys })
     }
 }
 
@@ -325,7 +322,9 @@ mod tests {
         let template = Template::try_from("{{log_stream}}-{{foo}}").unwrap();
 
         assert_eq!(
-            Err(vec!["log_stream".to_string(), "foo".to_string()]),
+            Err(TemplateRenderingError::MissingKeys {
+                missing_keys: vec!["log_stream".to_string(), "foo".to_string()]
+            }),
             template.render(&event)
         );
     }
@@ -457,7 +456,9 @@ mod tests {
     fn render_metric_without_tags() {
         let template = Template::try_from("name={{name}} component={{tags.component}}").unwrap();
         assert_eq!(
-            Err(vec!["tags.component".into()]),
+            Err(TemplateRenderingError::MissingKeys {
+                missing_keys: vec!["tags.component".into()]
+            }),
             template.render(&sample_metric().into())
         );
     }
@@ -477,7 +478,9 @@ mod tests {
         let template = Template::try_from("namespace={{namespace}} name={{name}}").unwrap();
         let metric = sample_metric();
         assert_eq!(
-            Err(vec!["namespace".into()]),
+            Err(TemplateRenderingError::MissingKeys {
+                missing_keys: vec!["namespace".into()]
+            }),
             template.render(&metric.into())
         );
     }
@@ -495,7 +498,7 @@ mod tests {
     fn strftime_error() {
         assert_eq!(
             Template::try_from("%E").unwrap_err(),
-            TemplateError::StrftimeError
+            TemplateParseError::StrftimeError
         );
     }
 }

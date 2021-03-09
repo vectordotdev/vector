@@ -90,4 +90,9 @@ components: sinks: file: {
 				"""
 		}
 	}
+
+	telemetry: metrics: {
+		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+	}
 }
