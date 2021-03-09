@@ -32,6 +32,8 @@ pub mod expiring_hash_map;
 pub mod generate;
 #[macro_use]
 pub mod internal_events;
+#[cfg(feature = "lapin")]
+pub mod amqp;
 #[cfg(feature = "api")]
 pub mod api;
 pub mod app;
