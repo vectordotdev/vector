@@ -37,7 +37,7 @@ fn should_run(name: &str, pat: &Option<String>) -> bool {
         }
     }
 
-    return true;
+    true
 }
 
 fn main() {
