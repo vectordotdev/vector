@@ -12,7 +12,8 @@ impl<'a> InternalEvent for TemplateRenderingFailed<'a> {
     fn emit_logs(&self) {
         let mut msg = "Failed to render template".to_owned();
         if let Some(field) = self.field {
-            msg.push_str(&format!(" for \"{}\"", field));
+            use std::fmt::Write;
+            let _ = write!(msg, " for \"{}\"", field);
         }
         if self.drop_event {
             msg.push_str("; discarding event");
