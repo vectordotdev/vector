@@ -18,9 +18,6 @@
 #     "status": 201
 #   }
 
-. |= parse_common_log!(.log)
+. = parse_common_log!(.log)
 .total_bytes = del(.size)
-del(.log)
-del(.time)
-del(.stream)
 .

@@ -8,18 +8,19 @@
 # result:
 #
 # error[E103]: unhandled fallible assignment
-#   ┌─ :2:6
+#   ┌─ :2:5
 #   │
-# 2 │ . |= parse_common_log(.log)
-#   │ ---- ^^^^^^^^^^^^^^^^^^^^^^
-#   │ │    │
-#   │ │    this expression is fallible
-#   │ │    update the expression to be infallible
+# 2 │ . = parse_common_log(.log)
+#   │ --- ^^^^^^^^^^^^^^^^^^^^^^
+#   │ │   │
+#   │ │   this expression is fallible
+#   │ │   update the expression to be infallible
 #   │ or change this to an infallible assignment:
-#   │ , err = . | parse_common_log(.log)
+#   │ , err = parse_common_log(.log)
 #   │
 #   = see documentation about error handling at https://errors.vrl.dev/#handling
 #   = learn more about error code 103 at https://errors.vrl.dev/103
 #   = see language documentation at https://vrl.dev
 
-. |= parse_common_log(.log)
+. = parse_common_log(.log)
+.total_bytes = del(.size)

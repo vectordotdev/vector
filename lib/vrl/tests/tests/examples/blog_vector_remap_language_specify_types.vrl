@@ -20,14 +20,11 @@
 
 .log = to_string!(.log)
 
-., err |= parse_common_log(.log)
+., err = parse_common_log(.log)
 if err != null {
     # This error only occurs for malformed *strings*
     log("Failed to parse common-log: " + err, level: "error")
 } else {
     .total_bytes = del(.size)
-    del(.log)
-    del(.time)
-    del(.stream)
 }
 .
