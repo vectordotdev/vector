@@ -1,7 +1,7 @@
 package metadata
 
 remap: errors: "204": {
-	title:       "Unrecognized end-of-file (EOF)"
+	title: "Unrecognized end-of-file (EOF)"
 	description: """
 		The VRL parser has reached the end of the program in an invalid state, potentially due to a
 		typo or a dangling expression.
@@ -20,6 +20,6 @@ remap: errors: "204": {
 				-.bar =
 				+.field2 = "value2"
 				"""#
-		}
+		},
 	]
 }
