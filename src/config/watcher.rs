@@ -136,6 +136,7 @@ mod tests {
         tokio::time::timeout(timeout, signal.recv()).await.is_ok()
     }
 
+    #[cfg(not(target_os = "macos"))] // https://github.com/timberio/vector/issues/5000
     #[tokio::test]
     async fn file_update() {
         trace_init();
@@ -151,6 +152,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(target_os = "macos"))] // https://github.com/timberio/vector/issues/5000
     #[tokio::test]
     async fn sym_file_update() {
         trace_init();
