@@ -7,8 +7,8 @@ use crate::{
 use futures::{channel::mpsc as futures_mpsc, SinkExt, StreamExt};
 use itertools::Itertools;
 use parking_lot::RwLock;
-use std::cmp::Ordering;
 use std::{
+    cmp::Ordering,
     collections::HashSet,
     fmt::Debug,
     hash::{Hash, Hasher},
@@ -141,17 +141,6 @@ impl TapRegister {
             .for_each(|(tap_sink, pattern)| tap_sink.send_matched(&pattern));
     }
 }
-
-struct Test {
-    id: i32,
-}
-
-impl PartialEq for Test {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-impl Eq for Test {}
 
 impl Default for TapRegister {
     fn default() -> Self {
