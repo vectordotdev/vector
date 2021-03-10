@@ -42,13 +42,19 @@ macro_rules! impl_event_data_eq {
     };
 }
 
-impl<T: EventDataEq> EventDataEq for Vec<T> {
+impl<T: EventDataEq> EventDataEq for &[T] {
     fn event_data_eq(&self, other: &Self) -> bool {
         self.len() == other.len()
             && self
                 .iter()
                 .zip(other.iter())
                 .all(|(a, b)| a.event_data_eq(b))
+    }
+}
+
+impl<T: EventDataEq> EventDataEq for Vec<T> {
+    fn event_data_eq(&self, other: &Self) -> bool {
+        self.as_slice().event_data_eq(&other.as_slice())
     }
 }
 

@@ -258,13 +258,13 @@ mod tests {
         event3.as_mut_log().insert("unmatched", "another value2");
 
         // First event should always be passed through as-is.
-        let new_event = transform.transform_one(event1).unwrap();
-        assert_eq!(new_event.as_log()["matched"], "some value".into());
+        let new_event = transform.transform_one(event1.clone()).unwrap();
+        assert_eq!(new_event, event1);
 
         // Second event differs in matched field so should be outputted even though it
         // has the same value for unmatched field.
-        let new_event = transform.transform_one(event2).unwrap();
-        assert_eq!(new_event.as_log()["matched"], "some value2".into());
+        let new_event = transform.transform_one(event2.clone()).unwrap();
+        assert_eq!(new_event, event2);
 
         // Third event has the same value for "matched" as first event, so it should be dropped.
         assert_eq!(None, transform.transform_one(event3));
@@ -290,13 +290,13 @@ mod tests {
         event2.as_mut_log().insert("matched2", "some value");
 
         // First event should always be passed through as-is.
-        let new_event = transform.transform_one(event1).unwrap();
-        assert_eq!(new_event.as_log()["matched1"], "some value".into());
+        let new_event = transform.transform_one(event1.clone()).unwrap();
+        assert_eq!(new_event, event1);
 
         // Second event has a different matched field name with the same value, so it should not be
         // considered a dupe
-        let new_event = transform.transform_one(event2).unwrap();
-        assert_eq!(new_event.as_log()["matched2"], "some value".into());
+        let new_event = transform.transform_one(event2.clone()).unwrap();
+        assert_eq!(new_event, event2);
     }
 
     #[test]
@@ -324,9 +324,8 @@ mod tests {
         event2.as_mut_log().insert("matched1", "value1");
 
         // First event should always be passed through as-is.
-        let new_event = transform.transform_one(event1).unwrap();
-        assert_eq!(new_event.as_log()["matched1"], "value1".into());
-        assert_eq!(new_event.as_log()["matched2"], "value2".into());
+        let new_event = transform.transform_one(event1.clone()).unwrap();
+        assert_eq!(new_event, event1);
 
         // Second event is the same just with different field order, so it shouldn't be outputted.
         assert_eq!(None, transform.transform_one(event2));
@@ -354,22 +353,19 @@ mod tests {
         let mut event2 = Event::from("message");
         event2.as_mut_log().insert("matched", "some value2");
 
-        // This event is a duplicate of event1, but won't be treated as such.
-        let event3 = event1.clone();
-
         // First event should always be passed through as-is.
-        let new_event = transform.transform_one(event1).unwrap();
-        assert_eq!(new_event.as_log()["matched"], "some value".into());
+        let new_event = transform.transform_one(event1.clone()).unwrap();
+        assert_eq!(new_event, event1);
 
         // Second event gets outputted because it's not a dupe.  This causes the first
         // Event to be evicted from the cache.
-        let new_event = transform.transform_one(event2).unwrap();
-        assert_eq!(new_event.as_log()["matched"], "some value2".into());
+        let new_event = transform.transform_one(event2.clone()).unwrap();
+        assert_eq!(new_event, event2);
 
         // Third event is a dupe but gets outputted anyway because the first event has aged
         // out of the cache.
-        let new_event = transform.transform_one(event3).unwrap();
-        assert_eq!(new_event.as_log()["matched"], "some value".into());
+        let new_event = transform.transform_one(event1.clone()).unwrap();
+        assert_eq!(new_event, event1);
     }
 
     #[test]
@@ -394,13 +390,13 @@ mod tests {
         event2.as_mut_log().insert("matched", 123);
 
         // First event should always be passed through as-is.
-        let new_event = transform.transform_one(event1).unwrap();
-        assert_eq!(new_event.as_log()["matched"], "123".into());
+        let new_event = transform.transform_one(event1.clone()).unwrap();
+        assert_eq!(new_event, event1);
 
         // Second event should also get passed through even though the string representations of
         // "matched" are the same.
-        let new_event = transform.transform_one(event2).unwrap();
-        assert_eq!(new_event.as_log()["matched"], 123.into());
+        let new_event = transform.transform_one(event2.clone()).unwrap();
+        assert_eq!(new_event, event2);
     }
 
     #[test]
@@ -429,19 +425,13 @@ mod tests {
         event2.as_mut_log().insert("matched", map2);
 
         // First event should always be passed through as-is.
-        let new_event = transform.transform_one(event1).unwrap();
-        let res_value = new_event.as_log()["matched"].clone();
-        if let Value::Map(map) = res_value {
-            assert_eq!(map.get("key").unwrap(), &Value::from("123"));
-        }
+        let new_event = transform.transform_one(event1.clone()).unwrap();
+        assert_eq!(new_event, event1);
 
         // Second event should also get passed through even though the string representations of
         // "matched" are the same.
-        let new_event = transform.transform_one(event2).unwrap();
-        let res_value = new_event.as_log()["matched"].clone();
-        if let Value::Map(map) = res_value {
-            assert_eq!(map.get("key").unwrap(), &Value::from(123));
-        }
+        let new_event = transform.transform_one(event2.clone()).unwrap();
+        assert_eq!(new_event, event2);
     }
 
     #[test]
@@ -464,11 +454,11 @@ mod tests {
         let event2 = Event::from("message");
 
         // First event should always be passed through as-is.
-        let new_event = transform.transform_one(event1).unwrap();
-        assert_eq!(new_event.as_log()["matched"], Value::Null);
+        let new_event = transform.transform_one(event1.clone()).unwrap();
+        assert_eq!(new_event, event1);
 
         // Second event should also get passed through as null is different than missing
-        let new_event = transform.transform_one(event2).unwrap();
-        assert_eq!(false, new_event.as_log().contains("matched"));
+        let new_event = transform.transform_one(event2.clone()).unwrap();
+        assert_eq!(new_event, event2);
     }
 }

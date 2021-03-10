@@ -562,6 +562,7 @@ mod test {
     use crate::{config::log_schema, event::Event};
     use bytes::BufMut;
     use chrono::prelude::*;
+    use shared::assert_event_data_eq;
 
     #[test]
     fn generate_config() {
@@ -727,7 +728,7 @@ mod test {
             expected.insert("procid", 8449);
         }
 
-        assert_eq!(event_from_str(&"host".to_string(), None, &raw), expected);
+        assert_event_data_eq!(event_from_str(&"host".to_string(), None, &raw), expected);
     }
 
     #[test]
@@ -756,7 +757,7 @@ mod test {
         }
 
         let event = event_from_str(&"host".to_string(), None, &raw);
-        assert_eq!(event, expected);
+        assert_event_data_eq!(event, expected);
 
         let raw = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
@@ -764,7 +765,7 @@ mod test {
         );
 
         let event = event_from_str(&"host".to_string(), None, &raw);
-        assert_eq!(event, expected);
+        assert_event_data_eq!(event, expected);
     }
 
     #[test]
@@ -818,7 +819,7 @@ mod test {
             "#;
         let cleaned = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
-        assert_eq!(
+        assert_event_data_eq!(
             event_from_str(&"host".to_string(), None, raw),
             event_from_str(&"host".to_string(), None, cleaned)
         );
@@ -848,7 +849,7 @@ mod test {
             expected.insert("procid", 8539);
         }
 
-        assert_eq!(event, expected);
+        assert_event_data_eq!(event, expected);
     }
 
     #[test]
@@ -881,7 +882,7 @@ mod test {
             expected.insert("origin.x-info", "http://www.rsyslog.com");
         }
 
-        assert_eq!(event, expected);
+        assert_event_data_eq!(event, expected);
     }
 
     #[test]
@@ -913,7 +914,7 @@ mod test {
             expected.insert("origin.x-info", "http://www.rsyslog.com");
         }
 
-        assert_eq!(event_from_str(&"host".to_string(), None, &raw), expected);
+        assert_event_data_eq!(event_from_str(&"host".to_string(), None, &raw), expected);
     }
 
     #[test]

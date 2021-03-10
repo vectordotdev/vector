@@ -1,6 +1,7 @@
 #![cfg(feature = "leveldb")]
 
 use futures::{SinkExt, StreamExt};
+use shared::assert_event_data_eq;
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
 use tracing::trace;
@@ -132,7 +133,7 @@ fn test_buffering() {
             input_events2,
             output_events
         );
-        assert_eq!(input_events, &output_events[..num_events]);
-        assert_eq!(input_events2, &output_events[num_events..]);
+        assert_event_data_eq!(&input_events[..], &output_events[..num_events]);
+        assert_event_data_eq!(&input_events2[..], &output_events[num_events..]);
     });
 }

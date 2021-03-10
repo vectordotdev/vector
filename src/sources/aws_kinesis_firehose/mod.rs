@@ -87,6 +87,7 @@ mod tests {
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::{read::GzEncoder, Compression};
     use pretty_assertions::assert_eq;
+    use shared::assert_event_data_eq;
     use std::{
         io::{Cursor, Read},
         net::SocketAddr,
@@ -234,7 +235,7 @@ mod tests {
         assert_eq!(200, res.status().as_u16());
 
         let events = collect_ready(rx).await;
-        assert_eq!(
+        assert_event_data_eq!(
             events,
             vec![log_event! {
                 "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
@@ -295,7 +296,7 @@ mod tests {
         assert_eq!(200, res.status().as_u16());
 
         let events = collect_ready(rx).await;
-        assert_eq!(
+        assert_event_data_eq!(
             events,
             vec![log_event! {
                 "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms

@@ -20,6 +20,13 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
+    pub fn new_with_metadata(metadata: EventMetadata) -> Self {
+        Self {
+            fields: Default::default(),
+            metadata,
+        }
+    }
+
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
         util::log::get(&self.fields, key.as_ref())
@@ -273,7 +280,7 @@ where
 // Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
 impl<K: AsRef<str>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let mut log_event = LogEvent::default();
+        let mut log_event = Self::default();
         log_event.extend(iter);
         log_event
     }
@@ -631,7 +638,7 @@ mod test {
                 vrl::Target::insert(&mut event, &path, value.clone()),
                 result
             );
-            assert_eq!(event, expect);
+            shared::assert_event_data_eq!(event, expect);
             assert_eq!(vrl::Target::get(&event, &path), Ok(Some(value)));
         }
     }
