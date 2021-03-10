@@ -74,10 +74,8 @@ impl FunctionTransform for RemoveTags {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        event::metric::{Metric, MetricKind, MetricValue},
-        event::Event,
-    };
+    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use shared::btreemap;
 
     #[test]
     fn generate_config() {
@@ -86,67 +84,65 @@ mod tests {
 
     #[test]
     fn remove_tags() {
-        let event = Event::Metric(
-            Metric::new(
-                "foo",
-                MetricKind::Incremental,
-                MetricValue::Counter { value: 10.0 },
-            )
-            .with_tags(Some(
-                vec![
-                    ("env".to_owned(), "production".to_owned()),
-                    ("region".to_owned(), "us-east-1".to_owned()),
-                    ("host".to_owned(), "127.0.0.1".to_owned()),
-                ]
-                .into_iter()
-                .collect(),
-            )),
-        );
+        let metric = Metric::new(
+            "foo",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 10.0 },
+        )
+        .with_tags(Some(btreemap! {
+            "env" => "production",
+            "region" => "us-east-1",
+            "host" => "127.0.0.1",
+        }));
+        let expected = metric
+            .clone()
+            .with_tags(Some(btreemap! {"env" => "production"}));
 
         let mut transform = RemoveTags::new(vec!["region".into(), "host".into()]);
-        let metric = transform.transform_one(event).unwrap().into_metric();
-        let tags = metric.tags().unwrap();
+        let metric = transform
+            .transform_one(metric.into())
+            .unwrap()
+            .into_metric();
 
-        assert_eq!(tags.len(), 1);
-        assert!(tags.contains_key("env"));
-        assert!(!tags.contains_key("region"));
-        assert!(!tags.contains_key("host"));
+        assert_eq!(metric, expected);
     }
 
     #[test]
     fn remove_all_tags() {
-        let event = Event::Metric(
-            Metric::new(
-                "foo",
-                MetricKind::Incremental,
-                MetricValue::Counter { value: 10.0 },
-            )
-            .with_tags(Some(
-                vec![("env".to_owned(), "production".to_owned())]
-                    .into_iter()
-                    .collect(),
-            )),
-        );
+        let metric = Metric::new(
+            "foo",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 10.0 },
+        )
+        .with_tags(Some(btreemap! {"env" => "production"}));
+        let expected = metric.clone().with_tags(None);
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
-        let metric = transform.transform_one(event).unwrap().into_metric();
+        let metric = transform
+            .transform_one(metric.into())
+            .unwrap()
+            .into_metric();
 
-        assert!(metric.tags().is_none());
+        assert_eq!(metric, expected);
     }
 
     #[test]
     fn remove_tags_from_none() {
-        let event = Event::Metric(Metric::new(
+        let metric = Metric::new(
             "foo",
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["bar".into()].into_iter().collect(),
             },
-        ));
+        );
+        let expected = metric.clone().with_tags(None);
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
-        let metric = transform.transform_one(event).unwrap().into_metric();
+        let metric = transform
+            .transform_one(metric.into())
+            .unwrap()
+            .into_metric();
 
-        assert!(metric.tags().is_none());
+        assert_eq!(metric, expected);
     }
 }

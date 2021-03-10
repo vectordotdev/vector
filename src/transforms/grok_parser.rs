@@ -171,6 +171,7 @@ mod tests {
         types: &[(&str, &str)],
     ) -> LogEvent {
         let event = Event::from(event);
+        let metadata = event.metadata().clone();
         let mut parser = GrokParserConfig {
             pattern: pattern.into(),
             field: field.map(|s| s.into()),
@@ -183,7 +184,9 @@ mod tests {
         .unwrap();
         let parser = parser.as_function();
 
-        parser.transform_one(event).unwrap().into_log()
+        let result = parser.transform_one(event).unwrap().into_log();
+        assert_eq!(result.metadata(), &metadata);
+        result
     }
 
     #[tokio::test]

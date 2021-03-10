@@ -105,7 +105,7 @@ mod tests {
     use super::*;
     use crate::event::{
         metric::{MetricKind, MetricValue},
-        Metric, Value,
+        LogEvent, Metric, Value,
     };
     use indoc::formatdoc;
     use std::collections::BTreeMap;
@@ -122,10 +122,11 @@ mod tests {
     #[test]
     fn check_remap_adds() {
         let event = {
-            let mut event = Event::from("augment me");
-            event.as_mut_log().insert("copy_from", "buz");
-            event
+            let mut event = LogEvent::from("augment me");
+            event.insert("copy_from", "buz");
+            Event::from(event)
         };
+        let metadata = event.metadata().clone();
 
         let conf = RemapConfig {
             source: r#"  .foo = "bar"
@@ -143,6 +144,7 @@ mod tests {
         assert_eq!(get_field_string(&result, "foo"), "bar");
         assert_eq!(get_field_string(&result, "bar"), "baz");
         assert_eq!(get_field_string(&result, "copy"), "buz");
+        assert_eq!(result.metadata(), &metadata);
     }
 
     #[test]

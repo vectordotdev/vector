@@ -78,7 +78,7 @@ impl FunctionTransform for AnsiStripper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{Event, Value};
+    use crate::event::LogEvent;
 
     #[test]
     fn generate_config() {
@@ -92,13 +92,12 @@ mod tests {
                     field: "message".into(),
                 };
 
-                let event = Event::from($in);
-                let event = transform.transform_one(event).unwrap();
+                let log = LogEvent::from($in);
+                let mut expected = log.clone();
+                expected.insert("message", "foo bar");
+                let event = transform.transform_one(log.into()).unwrap();
 
-                assert_eq!(
-                    event.into_log().remove(crate::config::log_schema().message_key()).unwrap(),
-                    Value::from("foo bar")
-                );
+                assert_eq!(event.into_log(), expected);
             )+
         };
     }
