@@ -13,6 +13,5 @@ Examples:
   * enhancement(file source): Added `sort` option to sort discovered files
   * feat(new source): Initial `statsd` source
   * fix(file source): Fixed a bug discovering new files
-  * perf(observability): Improved logging performance
-  * docs: Clarified `batch_size` option
+  * chore(external docs): Clarified `batch_size` option
 -->
