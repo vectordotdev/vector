@@ -9,19 +9,19 @@ remap: functions: ip_to_ipv6: {
 	arguments: [
 		{
 			name:        "ip"
-			description: "The ip address to convert to IPv6."
+			description: "The IP address to convert to IPv6."
 			required:    true
 			type: ["string"]
 		},
 	]
 	internal_failure_reasons: [
-		"`ip` is not a valid IP address",
+		"`ip` isn't a valid IP address",
 	]
 	return: {
 		types: ["string"]
 		rules: [
-			"If `ip` is already an IPv6 address it is passed through untouched.",
-			"If `ip` is a IPv4 address then it converted to IPv4 mapped IPv6 addresses.",
+			"The `ip` is returned unchanged if it's already an IPv6 address.",
+			"The `ip` is converted to an IPv6 address if it's an IPv4 address.",
 		]
 	}
 

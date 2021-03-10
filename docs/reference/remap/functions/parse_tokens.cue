@@ -3,9 +3,7 @@ package metadata
 remap: functions: parse_tokens: {
 	category: "Parse"
 	description: #"""
-		Parses the `value` in "token" format.
-
-		A token is considered to be:
+		Parses the `value` in "token" format. A token is considered to be one of the following:
 
 		* A word surrounded by whitespace.
 		* Text delimited by double quotes: `".."`. Quotes can be included in the token if they are escaped by a backslash (`\`).
@@ -13,7 +11,7 @@ remap: functions: parse_tokens: {
 		"""#
 	notices: [
 		"""
-			All token values are returned as strings, it is recommended to manually coerce values as you see fit.
+			All token values are returned as strings. We recommend manually coercing values to desired types as you see fit.
 			""",
 	]
 
@@ -26,7 +24,7 @@ remap: functions: parse_tokens: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a properly formatted tokenized string",
+		"`value` isn't a properly formatted tokenized string",
 	]
 	return: types: ["array"]
 

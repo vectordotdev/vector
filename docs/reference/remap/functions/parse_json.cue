@@ -8,7 +8,7 @@ remap: functions: parse_json: {
 	notices: [
 		"""
 			Only JSON types are returned. If you need to convert a `string` into a `timestamp`, consider the
-			`parse_timestamp` function.
+			[`parse_timestamp`](#parse_timestamp) function.
 			""",
 	]
 
@@ -21,7 +21,7 @@ remap: functions: parse_json: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a valid JSON formatted payload",
+		"`value` isn't a valid JSON-formatted payload",
 	]
 	return: types: ["boolean", "integer", "float", "string", "object", "array", "null"]
 
