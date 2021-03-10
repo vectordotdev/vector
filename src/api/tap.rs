@@ -135,9 +135,6 @@ impl TapRegister {
             })
             .sorted()
             .dedup()
-            .inspect(|(tap_sink, pattern)| {
-                println!("Tap ID: {}, pattern: {}", tap_sink.id, pattern);
-            })
             .for_each(|(tap_sink, pattern)| tap_sink.send_matched(&pattern));
     }
 }
