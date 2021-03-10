@@ -75,7 +75,7 @@ else
   commands =
     <<~EOF
     git add #{ROOT_DIR} -A
-    git commit -sam 'chore: Prepare v#{release.version} release'
+    git commit -sam 'chore: Prepare v#{release.version} release' || true
     git tag -a v#{release.version} -m "v#{release.version}"
     git branch v#{branch_name} 2>/dev/null || true
     EOF
