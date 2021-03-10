@@ -17,7 +17,7 @@
 # Vector's API (disabled by default)
 # Enable and try it out with the `vector top` command
 [api]
-enabled = false
+# enabled = true
 # address = "127.0.0.1:8686"
 
 # Dummy Apache formatted logs
@@ -26,23 +26,25 @@ type = "generator"
 format = "syslog"
 interval = 1
 
-# Parse Apache formatted logs
+# Parse Syslog logs
 # See the Remap reference: https://vector.dev/docs/reference/vrl/
 [transforms.parse_logs]
 type = "remap"
+inputs = ["dummy_logs"]
 source = '''
-. = parse_syslog(.message)
+. = parse_syslog!(string!(.message))
 '''
 
-# Host-level metrics (cpu, memory, disk, etc)
-[sources.host_metrics]
-type = "host_metrics"
+# Host-level metrics (CPU, memory, disk, etc)
+#[sources.host_metrics]
+#type = "host_metrics"
 
 # Vector's own internal metrics
-[sources.internal_metrics]
-type = "internal_metrics"
+#[sources.internal_metrics]
+#type = "internal_metrics"
 
-# Print it all out for inspection
+# Print out parsed logs
 [sinks.print]
 type = "console"
-inputs = ["parse_logs", "host_metrics", "internal_metrics"]
+inputs = ["parse_logs"]
+encoding.codec = "json"
