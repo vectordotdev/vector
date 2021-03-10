@@ -5,13 +5,44 @@ After=network-online.target
 Requires=network-online.target
 
 [Service]
+EnvironmentFile=-/etc/default/vector
 User=vector
 Group=vector
 ExecStart=/usr/bin/vector
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=no
+
+# capabilities
 AmbientCapabilities=CAP_NET_BIND_SERVICE
-EnvironmentFile=-/etc/default/vector
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+# sandboxing
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectSystem=strict
+ProtectHome=yes
+StateDirectory=vector
+ProtectControlGroups=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+NoNewPrivileges=yes
+RemoveIPC=yes
+RestrictNamespaces=yes
+
+# syscall filtering
+SystemCallFilter=@aio @basic-io @debug @file-system @io-event @ipc @network-io @signal @sync @timer
+SystemCallArchitectures=native
+
+# process properties
+UMask=077
 
 [Install]
 WantedBy=multi-user.target
