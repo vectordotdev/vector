@@ -28,7 +28,7 @@ remap: functions: string: {
 	examples: [
 		{
 			title: "Declare a string type"
-			input: log: message: '{"field": "value"}'
+			input: log: message: #"{"field": "value"}"#
 			source: #"""
 				string!(.message)
 				"""#
