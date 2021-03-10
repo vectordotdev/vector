@@ -69,7 +69,7 @@ or [**install Vector**][docs.installation].
 
 * **Configuration**
   * [**Sources**][docs.configuration.sources] - [docker_logs][docs.sources.docker_logs], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [dozens more...][docs.sources]
-  * [**Transforms**][docs.configuration.transforms] - [filter][docs.transforms.filter], [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], and [dozens more...][docs.transforms]
+  * [**Transforms**][docs.configuration.transforms] - [filter][docs.transforms.filter], [log_to_metric][docs.transforms.log_to_metric], [lua][docs.transforms.lua], [remap][docs.transforms.remap], and [dozens more...][docs.transforms]
   * [**Sinks**][docs.configuration.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], and [dozens more...][docs.sinks]
   * [**Unit tests**][docs.configuration.tests]
 * [**Remap Language**][docs.reference.vrl]
@@ -201,11 +201,9 @@ Vector is an end-to-end, unified, open data platform.
 [docs.sources.socket]: https://vector.dev/docs/reference/configuration/sources/socket/
 [docs.sources]: https://vector.dev/docs/reference/configuration/sources/
 [docs.transforms.filter]: https://vector.dev/docs/reference/configuration/transforms/filter/
-[docs.transforms.json_parser]: https://vector.dev/docs/reference/configuration/transforms/json_parser/
 [docs.transforms.log_to_metric]: https://vector.dev/docs/reference/configuration/transforms/log_to_metric/
-[docs.transforms.logfmt_parser]: https://vector.dev/docs/reference/configuration/transforms/logfmt_parser/
 [docs.transforms.lua]: https://vector.dev/docs/reference/configuration/transforms/lua/
-[docs.transforms.regex_parser]: https://vector.dev/docs/reference/configuration/transforms/regex_parser/
+[docs.transforms.remap]: https://vector.dev/docs/reference/configuration/transforms/remap/
 [docs.transforms]: https://vector.dev/docs/reference/configuration/transforms/
 [docs.under-the-hood.architecture]: https://vector.dev/docs/about/under-the-hood/architecture/
 [docs.under-the-hood.guarantees]: https://vector.dev/docs/about/under-the-hood/guarantees/
