@@ -12,22 +12,17 @@
 # Chat: https://chat.vector.dev
 # ------------------------------------------------------------------------------
 
+# Change this if you need to use a non-default directory for data storage:
 # data_dir = "/var/lib/vector"
 
-# Vector's API (disabled by default)
-# Enable and try it out with the `vector top` command
-[api]
-# enabled = true
-# address = "127.0.0.1:8686"
-
-# Dummy Apache formatted logs
+# Random Syslog-formatted logs
 [sources.dummy_logs]
 type = "generator"
 format = "syslog"
 interval = 1
 
 # Parse Syslog logs
-# See the Remap reference: https://vector.dev/docs/reference/vrl/
+# See the Vector Remap Language reference for more info: https://vrl.dev
 [transforms.parse_logs]
 type = "remap"
 inputs = ["dummy_logs"]
@@ -35,16 +30,25 @@ source = '''
 . = parse_syslog!(string!(.message))
 '''
 
-# Host-level metrics (CPU, memory, disk, etc)
-#[sources.host_metrics]
-#type = "host_metrics"
-
-# Vector's own internal metrics
-#[sources.internal_metrics]
-#type = "internal_metrics"
-
-# Print out parsed logs
+# Print parsed logs to stdout
 [sinks.print]
 type = "console"
 inputs = ["parse_logs"]
 encoding.codec = "json"
+
+# Vector's GraphQL API (disabled by default)
+# Uncomment to try it out with the `vector top` command or
+# in your browser at http://localhost:8686
+#[api]
+#enabled = true
+#address = "127.0.0.1:8686"
+
+# Host-level metrics (CPU, memory, disk, etc.)
+# Uncomment this if you enable the API:
+#[sources.host_metrics]
+#type = "host_metrics"
+
+# Vector's own internal metrics
+# Uncomment this if you enable the API:
+#[sources.internal_metrics]
+#type = "internal_metrics"
