@@ -4051,7 +4051,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-util",
- "trust-dns-proto",
+ "trust-dns-proto 0.19.6",
  "trust-dns-resolver",
  "typed-builder 0.9.0",
  "uuid 0.8.2",
@@ -5500,9 +5500,9 @@ dependencies = [
 
 [[package]]
 name = "readonly"
-version = "0.1.6"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54c0fb387dcbe19412ee9e7ddcca2aa31bedcc62e7f9faef6db431da5fadb883"
+checksum = "45abc1c3a18669574c914b075cdc510c34bb3f1fb18f17b1ebf65ca5b3753796"
 dependencies = [
  "proc-macro2 1.0.24",
  "quote 1.0.9",
@@ -7455,6 +7455,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d57e219ba600dd96c2f6d82eb79645068e14edbc5c7e27514af40436b88150c"
 dependencies = [
  "async-trait",
+ "enum-as-inner",
+ "idna",
+ "lazy_static",
+ "log",
+ "rand 0.7.3",
+ "smallvec",
+ "thiserror",
+ "tokio 0.2.25",
+ "url",
+]
+
+[[package]]
+name = "trust-dns-proto"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98a0381b2864c2978db7f8e17c7b23cca5a3a5f99241076e13002261a8ecbabd"
+dependencies = [
+ "async-trait",
  "cfg-if 1.0.0",
  "data-encoding",
  "enum-as-inner",
@@ -7490,7 +7508,7 @@ dependencies = [
  "smallvec",
  "thiserror",
  "tokio",
- "trust-dns-proto",
+ "trust-dns-proto 0.19.6",
 ]
 
 [[package]]
@@ -7951,7 +7969,7 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "tracing-tower",
- "trust-dns-proto",
+ "trust-dns-proto 0.20.0",
  "tui",
  "twox-hash",
  "typetag",

@@ -253,8 +253,8 @@ impl DnsMessageParser {
         raw_rdata: &[u8],
     ) -> Result<(Option<String>, Option<Vec<u8>>), DnsMessageParserError> {
         let mut decoder = BinDecoder::new(raw_rdata);
-        let _max_lattitude: u32 = 0x8000_0000 + 90 * 3_600_000;
-        let _min_lattitude: u32 = 0x8000_0000 - 90 * 3_600_000;
+        let _max_latitude: u32 = 0x8000_0000 + 90 * 3_600_000;
+        let _min_latitude: u32 = 0x8000_0000 - 90 * 3_600_000;
         let _max_longitude: u32 = 0x8000_0000 + 180 * 3_600_000;
         let _min_longitude: u32 = 0x8000_0000 - 180 * 3_600_000;
         let _version = parse_u8(&mut decoder)?;
@@ -269,9 +269,9 @@ impl DnsMessageParser {
 
         let latitude = {
             let received_lat = parse_u32(&mut decoder)?;
-            if received_lat < _min_lattitude || received_lat > _max_lattitude {
+            if received_lat < _min_latitude || received_lat > _max_latitude {
                 return Err(DnsMessageParserError::SimpleError {
-                    cause: String::from("LOC record lattitude out of bounds"),
+                    cause: String::from("LOC record latitude out of bounds"),
                 });
             }
             let dir = if received_lat > 0x8000_0000 { "N" } else { "S" };
