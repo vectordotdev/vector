@@ -3,7 +3,7 @@
 
   <type>!?(<scope>): <description>
 
-  * `type` = chore, docs, enhancement, newfeat, perf
+  * `type` = chore, enhancement, feat, fix
   * `!` = signals a breaking change
   * `scope` = https://github.com/timberio/vector/blob/master/.github/semantic.yml#L4
   * `description` = short description of the change
