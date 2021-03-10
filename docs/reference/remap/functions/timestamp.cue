@@ -3,8 +3,8 @@ package metadata
 remap: functions: timestamp: {
 	category: "Type"
 	description: """
-		Returns the `value` if it's a timestamp and errors otherwise. This enables the type checker to guarantee that the
-		returned value is a timestamp and can be used in any function that expects one.
+		Returns the `value` if it's a timestamp and errors otherwise. This enables the type checker to guarantee that
+		the returned value is a timestamp and can be used in any function that expects one.
 		"""
 
 	arguments: [
@@ -16,7 +16,7 @@ remap: functions: timestamp: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a timestamp.",
+		"`value` isn't a timestamp.",
 	]
 	return: {
 		types: ["timestamp"]

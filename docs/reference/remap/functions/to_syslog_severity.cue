@@ -1,9 +1,9 @@
 package metadata
 
 remap: functions: to_syslog_severity: {
-	category:    "Coerce"
+	category:    "Convert"
 	description: """
-		Coerces the `value`, a Syslog [log level keyword](\(urls.syslog_levels)), into an Syslog integer
+		Converts the `value`, a Syslog [log level keyword](\(urls.syslog_levels)), into a Syslog integer
 		severity level (`0` to `7`).
 		"""
 
@@ -16,7 +16,7 @@ remap: functions: to_syslog_severity: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a valid Syslog level keyword",
+		"`value` isn't a valid Syslog level keyword",
 	]
 	return: {
 		types: ["integer"]

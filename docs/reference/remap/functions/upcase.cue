@@ -2,9 +2,8 @@ package metadata
 
 remap: functions: upcase: {
 	description: """
-		Upcases the `value`.
-
-		"Upcase" is defined according to the terms of the Unicode Derived Core Property Uppercase.
+		Upcases the `value`, where "upcase" is defined according to the terms of the Unicode Derived Core Property
+		Uppercase.
 		"""
 
 	arguments: [
