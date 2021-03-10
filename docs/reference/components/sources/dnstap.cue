@@ -9,6 +9,7 @@ components: sources: dnstap: {
 		deployment_roles: ["daemon"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -34,12 +35,14 @@ components: sources: dnstap: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      false
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  false
+			"armv7-unknown-linux-musleabihf": false
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          false
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
 
 		requirements: []
@@ -60,18 +63,19 @@ components: sources: dnstap: {
 		socket_path: {
 			description: """
 				Absolute path of server socket file to which BIND is configured
-				to send dnstap data. The socket file will be created by dnstap 
+				to send dnstap data. The socket file will be created by dnstap
 				source component automatically upon startup.
 				"""
 			required: true
 			type: string: {
 				examples: ["/run/bind/dnstap.sock"]
+				syntax: "file_system_path"
 			}
 		}
 		socket_file_mode: {
 			common: true
 			description: """
-				Unix file mode bits to be applied to server socket file 
+				Unix file mode bits to be applied to server socket file
 				as its designated file permissions.
 				"""
 			required: false
@@ -84,15 +88,15 @@ components: sources: dnstap: {
 		multithreaded: {
 			common: false
 			description: """
-				Whether or not to spawn a new asynchronous task for each dnstap 
+				Whether or not to spawn a new asynchronous task for each dnstap
 				frame. This is to enable concurrent dnstap frame handling.
 				"""
 			required: false
 			type: bool: default: false
 			warnings: [
 				"""
-					Enabling concurrent dnstap frame handling may increase memory 
-					consumption significantly. To limit memory usage, 
+					Enabling concurrent dnstap frame handling may increase memory
+					consumption significantly. To limit memory usage,
 					set \"max_frame_handling_tasks\" accordingly.
 					""",
 			]
@@ -106,11 +110,12 @@ components: sources: dnstap: {
 			required: false
 			type: uint: {
 				default: 1000
+				unit:    null
 			}
 			warnings: [
 				"""
-					Once the limit is reached, the reading of incoming dnstap data 
-					will be paused until the number of outstanding tasks decreases 
+					Once the limit is reached, the reading of incoming dnstap data
+					will be paused until the number of outstanding tasks decreases
 					below the limit.
 					""",
 				"""
@@ -121,7 +126,7 @@ components: sources: dnstap: {
 		socket_receive_buffer_size: {
 			common: false
 			description: """
-				Set receive buffer size of server Unix socket if specified. 
+				Set receive buffer size of server Unix socket if specified.
 				No change to the default size if omitted.
 				"""
 			required: false
@@ -131,8 +136,8 @@ components: sources: dnstap: {
 			}
 			warnings: [
 				"""
-					System-wide setting of max socket receive buffer size 
-					(i.e. value of '/proc/sys/net/core/rmem_max' on Linux) 
+					System-wide setting of max socket receive buffer size
+					(i.e. value of '/proc/sys/net/core/rmem_max' on Linux)
 					may need adjustment accordingly.
 					""",
 			]
@@ -140,7 +145,7 @@ components: sources: dnstap: {
 		socket_send_buffer_size: {
 			common: false
 			description: """
-				Set send buffer size of server Unix socket if specified. 
+				Set send buffer size of server Unix socket if specified.
 				No change to the default size if omitted.
 				"""
 			required: false
@@ -150,8 +155,8 @@ components: sources: dnstap: {
 			}
 			warnings: [
 				"""
-					System-wide setting of max socket send buffer size 
-					(i.e. value of '/proc/sys/net/core/wmem_max' on Linux) 
+					System-wide setting of max socket send buffer size
+					(i.e. value of '/proc/sys/net/core/wmem_max' on Linux)
 					may need adjustment accordingly.
 					""",
 			]
@@ -159,7 +164,7 @@ components: sources: dnstap: {
 		raw_data_only: {
 			common: false
 			description: """
-				Whether or not to write out raw dnstap frame data directly 
+				Whether or not to write out raw dnstap frame data directly
 				(to be encoded in Base64) without any parsing and formatting.
 				"""
 			required: false
@@ -178,6 +183,8 @@ components: sources: dnstap: {
 					enum: {
 						Message: "Payload is a dnstap message."
 					}
+					default: null
+					syntax:  "literal"
 				}
 			}
 			dataTypeId: {
@@ -196,80 +203,82 @@ components: sources: dnstap: {
 				type: string: {
 					enum: {
 						AuthQuery: """
-							A DNS query message received from a resolver by an 
-							authoritative name server, from the perspective of 
+							A DNS query message received from a resolver by an
+							authoritative name server, from the perspective of
 							the authoritative name server.
 							"""
 						AuthResponse: """
-							A DNS response message sent from an authoritative 
-							name server to a resolver, from the perspective of 
+							A DNS response message sent from an authoritative
+							name server to a resolver, from the perspective of
 							the authoritative name server.
 							"""
 						ResolverQuery: """
-							A DNS query message sent from a resolver to an 
-							authoritative name server, from the perspective 
-							of the resolver. Resolvers typically clear the 
+							A DNS query message sent from a resolver to an
+							authoritative name server, from the perspective
+							of the resolver. Resolvers typically clear the
 							RD (recursion desired) bit when sending queries.
 							"""
 						ResolverResponse: """
-							A DNS response message received from an authoritative 
-							name server by a resolver, from the perspective of the 
+							A DNS response message received from an authoritative
+							name server by a resolver, from the perspective of the
 							resolver.
 							"""
 						ClientQuery: """
-							A DNS query message sent from a client to a DNS server 
-							which is expected to perform further recursion, from 
-							the perspective of the DNS server. The client may be 
-							a stub resolver or forwarder or some other type of 
-							software which typically sets the RD (recursion desired) 
-							bit when querying the DNS server. The DNS server may be 
-							a simple forwarding proxy or it may be a full recursive 
+							A DNS query message sent from a client to a DNS server
+							which is expected to perform further recursion, from
+							the perspective of the DNS server. The client may be
+							a stub resolver or forwarder or some other type of
+							software which typically sets the RD (recursion desired)
+							bit when querying the DNS server. The DNS server may be
+							a simple forwarding proxy or it may be a full recursive
 							resolver.
 							"""
 						ClientResponse: """
-							A DNS response message sent from a DNS server to a client, 
-							from the perspective of the DNS server. The DNS server 
-							typically sets the RA(recursion available) bit when 
+							A DNS response message sent from a DNS server to a client,
+							from the perspective of the DNS server. The DNS server
+							typically sets the RA(recursion available) bit when
 							responding.
 							"""
 						ForwarderQuery: """
-							A DNS query message sent from a downstream DNS server to 
-							an upstream DNS server which is expected to perform 
-							further recursion, from the perspective of the downstream 
+							A DNS query message sent from a downstream DNS server to
+							an upstream DNS server which is expected to perform
+							further recursion, from the perspective of the downstream
 							DNS server.
 							"""
 						ForwarderResponse: """
-							A DNS response message sent from an upstream DNS server 
-							performing recursion to a downstream DNS server, from 
+							A DNS response message sent from an upstream DNS server
+							performing recursion to a downstream DNS server, from
 							the perspective of the downstream DNS server.
 							"""
 						StubQuery: """
-							A DNS query message sent from a stub resolver to a DNS 
+							A DNS query message sent from a stub resolver to a DNS
 							server, from the perspective of the stub resolver.
 							"""
 						StubResponse: """
-							A DNS response message sent from a DNS server to a stub 
+							A DNS response message sent from a DNS server to a stub
 							resolver, from the perspective of the stub resolver.
 							"""
 						ToolQuery: """
-							A DNS query message sent from a DNS software tool to a 
+							A DNS query message sent from a DNS software tool to a
 							DNS server, from the perspective of the tool.
 							"""
 						ToolResponse: """
-							A DNS response message received by a DNS software tool 
+							A DNS response message received by a DNS software tool
 							from a DNS server, from the perspective of the tool.
 							"""
 						UpdateQuery: """
-							A DNS update query message received from a resolver by 
-							an authoritative name server, from the perspective of 
+							A DNS update query message received from a resolver by
+							an authoritative name server, from the perspective of
 							the authoritative name server.
 							"""
 						UpdateResponse: """
-							A DNS update response message sent from an authoritative 
-							name server to a resolver, from the perspective of the 
+							A DNS update response message sent from an authoritative
+							name server to a resolver, from the perspective of the
 							authoritative name server.
 							"""
 					}
+					default: null
+					syntax:  "literal"
 				}
 			}
 			messageTypeId: {
@@ -284,10 +293,10 @@ components: sources: dnstap: {
 			time: {
 				relevant_when: "dataTypeId = 1"
 				description: """
-					The time at which the DNS message was sent or received. 
-					This is the number of time units (determined by 'timePrecision') 
-					since the UNIX epoch. For a DNS query/update request event, 
-					it's same as request time. For a DNS query/update response event, 
+					The time at which the DNS message was sent or received.
+					This is the number of time units (determined by 'timePrecision')
+					since the UNIX epoch. For a DNS query/update request event,
+					it's same as request time. For a DNS query/update response event,
 					it's same as response time.
 					"""
 				required: true
@@ -307,6 +316,7 @@ components: sources: dnstap: {
 						us: "microsecond"
 						ns: "nanosecond"
 					}
+					syntax: "literal"
 				}
 			}
 			serverId: {
@@ -315,6 +325,8 @@ components: sources: dnstap: {
 				required:    false
 				type: string: {
 					examples: ["ns1.example.com"]
+					default: null
+					syntax:  "literal"
 				}
 			}
 			serverVersion: {
@@ -323,6 +335,8 @@ components: sources: dnstap: {
 				required:    false
 				type: string: {
 					examples: ["BIND 9.16.8"]
+					default: null
+					syntax:  "literal"
 				}
 			}
 			extraInfo: {
@@ -331,12 +345,14 @@ components: sources: dnstap: {
 				required:    false
 				type: string: {
 					examples: ["an arbitrary byte-string annotation"]
+					default: null
+					syntax:  "literal"
 				}
 			}
 			socketFamily: {
 				relevant_when: "dataTypeId = 1"
 				description: """
-					The network protocol family of a socket. This specifies how 
+					The network protocol family of a socket. This specifies how
 					to interpret 'sourceAddress'/'responseAddress' fields.
 					"""
 				required: true
@@ -345,12 +361,13 @@ components: sources: dnstap: {
 						INET:  "IPv4 (RFC 791)."
 						INET6: "IPv6 (RFC 2460)."
 					}
+					syntax: "literal"
 				}
 			}
 			socketProtocol: {
 				relevant_when: "dataTypeId = 1"
 				description: """
-					The transport protocol of a socket. This specifies how to 
+					The transport protocol of a socket. This specifies how to
 					interpret 'sourcePort'/'responsePort' fields.
 					"""
 				required: true
@@ -359,6 +376,7 @@ components: sources: dnstap: {
 						UDP: "User Datagram Protocol (RFC 768)."
 						TCP: "Transmission Control Protocol (RFC 793)."
 					}
+					syntax: "literal"
 				}
 			}
 			sourceAddress: {
@@ -367,6 +385,7 @@ components: sources: dnstap: {
 				required:      true
 				type: string: {
 					examples: ["192.0.2.8", "fc00::100"]
+					syntax: "literal"
 				}
 			}
 			sourcePort: {
@@ -377,6 +396,7 @@ components: sources: dnstap: {
 				type: uint: {
 					default: 0
 					examples: [52398]
+					unit: null
 				}
 			}
 			responseAddress: {
@@ -385,6 +405,7 @@ components: sources: dnstap: {
 				required:      true
 				type: string: {
 					examples: ["192.0.2.18", "fc00::200"]
+					syntax: "literal"
 				}
 			}
 			responsePort: {
@@ -395,6 +416,7 @@ components: sources: dnstap: {
 				type: uint: {
 					default: 0
 					examples: [60364]
+					unit: null
 				}
 			}
 			error: {
@@ -403,17 +425,21 @@ components: sources: dnstap: {
 				required:    false
 				type: string: {
 					examples: ["Encountered error : Unexpected number of records in update section: 0"]
+					default: null
+					syntax:  "literal"
 				}
 			}
 			rawData: {
 				common: false
 				description: """
-					Raw dnstap binary data encoded in Base64. Presents only upon 
+					Raw dnstap binary data encoded in Base64. Presents only upon
 					failures or option 'raw_data_only' is enabled.
 					"""
 				required: false
 				type: string: {
 					examples: ["ChBqYW1lcy11YnVudHUtZGV2EgtCSU5EIDkuMTYuNXKdAQgCEAEYASIEfwAAASoEfwAAATDRyAM4AFoNB2V4YW1wbGUDY29tAGCTvf76BW3evGImcmlihYQAAAEAAAABAAACaDIHZXhhbXBsZQNjb20AAAYAAcAPAAYAAQAADhAAPQtiZGRzLWRuc3RhcAAKcG9zdG1hc3RlcgJubwVlbWFpbAZwbGVhc2UAJADGPgAADhAAAAJYACeNAAAADhB4AQ=="]
+					default: null
+					syntax:  "literal"
 				}
 			}
 			requestData: {
@@ -425,8 +451,8 @@ components: sources: dnstap: {
 					options: {
 						time: {
 							description: """
-								The time at which the DNS query/update request message 
-								was sent or received. This is the number of time units 
+								The time at which the DNS query/update request message
+								was sent or received. This is the number of time units
 								(determined by 'timePrecision') since the UNIX epoch.
 								"""
 							required: true
@@ -445,25 +471,27 @@ components: sources: dnstap: {
 									us: "microsecond"
 									ns: "nanosecond"
 								}
+								syntax: "literal"
 							}
 						}
 						fullRcode: {
 							common: true
 							description: """
-								The numeric rcode that is the sum of the 4bits header's 
-								rcode + the 8bits opt's extendedRcode when present. 
+								The numeric rcode that is the sum of the 4bits header's
+								rcode + the 8bits opt's extendedRcode when present.
 								Should be 0 for request.
 								"""
 							required: false
 							type: uint: {
 								unit: null
 								examples: [0]
+								default: null
 							}
 						}
 						rcodeName: {
 							common: true
 							description: """
-								Textual response code corresponding to the 'fullRcode'. 
+								Textual response code corresponding to the 'fullRcode'.
 								Should be 'No Error' for request.
 								"""
 							required: false
@@ -489,24 +517,28 @@ components: sources: dnstap: {
 									BADTRUNC:  "Bad Truncation"
 									BADCOOKIE: "Bad/missing server cookie"
 								}
+								default: null
+								syntax:  "literal"
 							}
 						}
 						rawData: {
 							common: false
 							description: """
-								Raw binary request message data encoded in Base64. 
+								Raw binary request message data encoded in Base64.
 								Presents only upon failures.
 								"""
 							required: false
 							type: string: {
 								examples: ["YoWEAAABAAAAAQAAAmgyB2V4YW1wbGUDY29tAAAGAAHADwAGAAEAAA4QAD0LYmRkcy1kbnN0YXAACnBvc3RtYXN0ZXICbm8FZW1haWwGcGxlYXNlACQAxj4AAA4QAAACWAAnjQAAAA4Q"]
+								default: null
+								syntax:  "literal"
 							}
 						}
 						header: {
 							common: true
 							description: """
-								Header section of DNS query/update request message. 
-								See DNS related RFCs for detailed information about 
+								Header section of DNS query/update request message.
+								See DNS related RFCs for detailed information about
 								its content.
 								"""
 							required: false
@@ -535,7 +567,7 @@ components: sources: dnstap: {
 						question: {
 							common: true
 							description: """
-								Question section of DNS query request message. See DNS 
+								Question section of DNS query request message. See DNS
 								related RFCs for detailed information about its content.
 								"""
 							required: false
@@ -554,7 +586,7 @@ components: sources: dnstap: {
 						additional: {
 							common: true
 							description: """
-								Additional section of DNS query request message. See DNS 
+								Additional section of DNS query request message. See DNS
 								related RFCs for detailed information about its content.
 								"""
 							required: false
@@ -575,8 +607,8 @@ components: sources: dnstap: {
 						opt: {
 							common: true
 							description: """
-								A pseudo section containing EDNS options of DNS query request 
-								message. See DNS related RFCs for detailed information about 
+								A pseudo section containing EDNS options of DNS query request
+								message. See DNS related RFCs for detailed information about
 								its content.
 								"""
 							required: false
@@ -602,7 +634,7 @@ components: sources: dnstap: {
 						zone: {
 							common: true
 							description: """
-								Zone section of DNS update request message. See DNS related 
+								Zone section of DNS update request message. See DNS related
 								RFCs for detailed information about its content.
 								"""
 							required: false
@@ -621,7 +653,7 @@ components: sources: dnstap: {
 						prerequisite: {
 							common: true
 							description: """
-								Prerequisite section of DNS update request message. See DNS 
+								Prerequisite section of DNS update request message. See DNS
 								related RFCs for detailed information about its content.
 								"""
 							required: false
@@ -641,7 +673,7 @@ components: sources: dnstap: {
 						update: {
 							common: true
 							description: """
-								Update section of DNS update request message. See DNS related 
+								Update section of DNS update request message. See DNS related
 								RFCs for detailed information about its content.
 								"""
 							required: false
@@ -671,8 +703,8 @@ components: sources: dnstap: {
 					options: {
 						time: {
 							description: """
-								The time at which the DNS query/update response message was 
-								sent or received. This is the number of time units (determined 
+								The time at which the DNS query/update response message was
+								sent or received. This is the number of time units (determined
 								by 'timePrecision') since the UNIX epoch.
 								"""
 							required: true
@@ -691,18 +723,20 @@ components: sources: dnstap: {
 									us: "microsecond"
 									ns: "nanosecond"
 								}
+								syntax: "literal"
 							}
 						}
 						fullRcode: {
 							common: true
 							description: """
-								The numeric rcode that is the sum of the 4bits header's 
+								The numeric rcode that is the sum of the 4bits header's
 								rcode + the 8bits opt's extendedRcode when present.
 								"""
 							required: false
 							type: uint: {
 								unit: null
 								examples: [0, 5]
+								default: null
 							}
 						}
 						rcodeName: {
@@ -731,24 +765,28 @@ components: sources: dnstap: {
 									BADTRUNC:  "Bad Truncation"
 									BADCOOKIE: "Bad/missing server cookie"
 								}
+								default: null
+								syntax:  "literal"
 							}
 						}
 						rawData: {
 							common: false
 							description: """
-								Raw binary response message data encoded in Base64. 
+								Raw binary response message data encoded in Base64.
 								Presents only upon failures.
 								"""
 							required: false
 							type: string: {
 								examples: ["YoWEAAABAAAAAQAAAmgyB2V4YW1wbGUDY29tAAAGAAHADwAGAAEAAA4QAD0LYmRkcy1kbnN0YXAACnBvc3RtYXN0ZXICbm8FZW1haWwGcGxlYXNlACQAxj4AAA4QAAACWAAnjQAAAA4Q"]
+								default: null
+								syntax:  "literal"
 							}
 						}
 						header: {
 							common: true
 							description: """
-								Header section of DNS query/update response message. 
-								See DNS related RFCs for detailed information about 
+								Header section of DNS query/update response message.
+								See DNS related RFCs for detailed information about
 								its content.
 								"""
 							required: false
@@ -777,7 +815,7 @@ components: sources: dnstap: {
 						question: {
 							common: true
 							description: """
-								Question section of DNS query response message. See DNS 
+								Question section of DNS query response message. See DNS
 								related RFCs for detailed information about its content.
 								"""
 							required: false
@@ -796,7 +834,7 @@ components: sources: dnstap: {
 						answers: {
 							common: true
 							description: """
-								Answers section of DNS query response message. See DNS 
+								Answers section of DNS query response message. See DNS
 								related RFCs for detailed information about its content.
 								"""
 							required: false
@@ -817,7 +855,7 @@ components: sources: dnstap: {
 						authority: {
 							common: true
 							description: """
-								Authority section of DNS query response message. See DNS 
+								Authority section of DNS query response message. See DNS
 								related RFCs for detailed information about its content.
 								"""
 							required: false
@@ -838,7 +876,7 @@ components: sources: dnstap: {
 						additional: {
 							common: true
 							description: """
-								Additional section of DNS query response message. See DNS 
+								Additional section of DNS query response message. See DNS
 								related RFCs for detailed information about its content.
 								"""
 							required: false
@@ -859,8 +897,8 @@ components: sources: dnstap: {
 						opt: {
 							common: true
 							description: """
-								A pseudo section containing EDNS options of DNS query response 
-								message. See DNS related RFCs for detailed information about 
+								A pseudo section containing EDNS options of DNS query response
+								message. See DNS related RFCs for detailed information about
 								its content.
 								"""
 							required: false
@@ -886,7 +924,7 @@ components: sources: dnstap: {
 						zone: {
 							common: true
 							description: """
-								Zone section of DNS update response message. See DNS related 
+								Zone section of DNS update response message. See DNS related
 								RFCs for detailed information about its content.
 								"""
 							required: false
@@ -1205,7 +1243,7 @@ components: sources: dnstap: {
 						The dnstap source component can create server UDS only on local
 						machine, but it's also possible to work with remote BIND server
 						too. To do it, you'd have to forward the server UDS from vector's
-						hosting machine to the remote BIND server (e.g. through "ssh") 
+						hosting machine to the remote BIND server (e.g. through "ssh")
 						once vector starts.
 						Make sure the Unix domain sockets on both local and remote machines
 						having appropriate permissions set.
@@ -1217,17 +1255,17 @@ components: sources: dnstap: {
 		multithreaded_mode: {
 			title: "Multi-threaded Mode"
 			body: #"""
-				By default, the dnstap source component reads and processes dnstap 
-				data sequentially as a pipeline: retrieving a dnstap data frame, 
+				By default, the dnstap source component reads and processes dnstap
+				data sequentially as a pipeline: retrieving a dnstap data frame,
 				parsing it thoroughly and composing a new vector event out of it,
 				and finally sending the event composed onto the next vector component
 				for further processing, then starting to retrieve next dnstap data frame.
-				The pipeline should work fine with casual DNS query flows, but may 
-				become inefficient on a multi-cpu-core machine under extreme load, 
-				and cause inbound UDS channel to be jammed over time, which might in turn 
+				The pipeline should work fine with casual DNS query flows, but may
+				become inefficient on a multi-cpu-core machine under extreme load,
+				and cause inbound UDS channel to be jammed over time, which might in turn
 				cause BIND to start dropping dnstap data.
 
-				To make the process more efficient on multi-cpu-core machine, we need to 
+				To make the process more efficient on multi-cpu-core machine, we need to
 				spread the load to all available CPU cores as much as possible, especially
 				the part of parsing dnstap data frame and composing vector event out of it.
 				And that's exactly what the "multi-threaded mode" is for.
@@ -1243,8 +1281,8 @@ components: sources: dnstap: {
 				milliseconds, and try again, until some tasks are finished, and the number of
 				outstanding tasks decreases below the limit.
 
-				To enable "multi-threaded mode" and configure the max number of outstanding 
-				tasks allowed, add options "multithreaded" and "max_frame_handling_tasks" 
+				To enable "multi-threaded mode" and configure the max number of outstanding
+				tasks allowed, add options "multithreaded" and "max_frame_handling_tasks"
 				in dnstap source configuration like below:
 
 				```toml
@@ -1260,12 +1298,12 @@ components: sources: dnstap: {
 		manipulate_uds_buffer_size: {
 			title: "Manipulate UDS Buffer Size"
 			body: #"""
-				The dnstap source component supports configuring UDS buffer size for 
+				The dnstap source component supports configuring UDS buffer size for
 				both receiving and sending, which may be helpful to handle spiked DNS
 				traffic more smoothly for some high performance use scenarios.
 
-				To configure receive/send buffer size for the server UDS, add options 
-				"socket_receive_buffer_size" and "socket_send_buffer_size" in dnstap 
+				To configure receive/send buffer size for the server UDS, add options
+				"socket_receive_buffer_size" and "socket_send_buffer_size" in dnstap
 				configuration accordingly, like below:
 
 				```toml
@@ -1277,7 +1315,7 @@ components: sources: dnstap: {
 				```
 
 				And certainly, for the buffer size settings to actually take effects,
-				you'd have to ensure that the system-wide settings of max socket 
+				you'd have to ensure that the system-wide settings of max socket
 				receive/send buffer sizes (i.e. values of '/proc/sys/net/core/rmem_max'
 				and '/proc/sys/net/core/wmem_max' on Linux) are large enough.
 				"""#

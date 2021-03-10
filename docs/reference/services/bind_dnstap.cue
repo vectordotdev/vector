@@ -10,7 +10,7 @@ services: bind_dnstap: {
 		{
 			title:       "Configure BIND to use dnstap"
 			description: """
-				Enable and configure BIND to use dnstap by following ISC KB article 
+				Enable and configure BIND to use dnstap by following ISC KB article
 				[Using DNSTAP with BIND](\(urls.bind_dnstap)).
 				"""
 			detour: url: urls.bind_dnstap
