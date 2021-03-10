@@ -14,7 +14,7 @@ impl Query {
     // TODO:
     // - error when trying to index into object
     // - error when trying to path into array
-    pub fn new(target: Target, path: Path) -> Self {
+    pub(crate) fn new(target: Target, path: Path) -> Self {
         Query { target, path }
     }
 
