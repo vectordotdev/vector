@@ -9,13 +9,13 @@ remap: functions: push: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The array"
+			description: "The target array."
 			required:    true
 			type: ["array"]
 		},
 		{
 			name:        "item"
-			description: "The item to push"
+			description: "The item to push."
 			required:    true
 			type: ["any"]
 		},
@@ -24,7 +24,7 @@ remap: functions: push: {
 	return: {
 		types: ["array"]
 		rules: [
-			"A new array is returned, the `value` is not modified in place.",
+			"Returns a new array. The `value` is _not_ modified in place.",
 		]
 	}
 

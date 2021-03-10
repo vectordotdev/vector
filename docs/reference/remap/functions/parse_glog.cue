@@ -14,14 +14,14 @@ remap: functions: parse_glog: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` does not match the `glog` format",
+		"`value` doesn't match the `glog` format",
 	]
 	return: types: ["object"]
 	examples: [
 		{
 			title: "Parse via glog"
 			source: #"""
-				parse_glog("I20210131 14:48:54.411655 15520 main.c++:9] Hello world!")
+				parse_glog!("I20210131 14:48:54.411655 15520 main.c++:9] Hello world!")
 				"""#
 			return: {
 				level:     "info"

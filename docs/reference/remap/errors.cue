@@ -6,16 +6,16 @@ remap: {
 	#Error: {
 		anchor:      "\(code)"
 		code:        >=100 & <1000 & int
-		description: string
-		rationale:   string | null
-		resolution:  string
 		title:       string
+		description: string
+		rationale:   string | *null
+		resolution?: string
 
-		examples: [remap.#Example, ...remap.#Example]
+		examples?: [remap.#Example, ...remap.#Example]
 	}
 
 	errors: [Code=string]: #Error & {
-		code: strconv.ParseInt(Code, 0, 8)
+		code: strconv.ParseInt(Code, 0, 16)
 	}
 
 	_fail_safe_blurb: """

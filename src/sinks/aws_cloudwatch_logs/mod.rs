@@ -3,6 +3,7 @@ mod request;
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
+    internal_events::TemplateRenderingFailed,
     rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -442,24 +443,24 @@ fn partition_encode(
 ) -> Option<PartitionInnerBuffer<InputLogEvent, CloudwatchKey>> {
     let group = match group.render_string(&event) {
         Ok(b) => b,
-        Err(missing_keys) => {
-            warn!(
-                message = "Keys in group template do not exist on the event; dropping event.",
-                ?missing_keys,
-                internal_log_rate_secs = 30
-            );
+        Err(error) => {
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("group"),
+                drop_event: true,
+            });
             return None;
         }
     };
 
     let stream = match stream.render_string(&event) {
         Ok(b) => b,
-        Err(missing_keys) => {
-            warn!(
-                message = "Keys in stream template do not exist on the event; dropping event.",
-                ?missing_keys,
-                internal_log_rate_secs = 30
-            );
+        Err(error) => {
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("stream"),
+                drop_event: true,
+            });
             return None;
         }
     };

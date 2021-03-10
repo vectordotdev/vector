@@ -25,7 +25,7 @@ impl Config {
         let token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token";
         let root_ca_file = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
 
-        let token = std::fs::read_to_string(token_file).context(Token)?;
+        let token = Some(std::fs::read_to_string(token_file).context(Token)?);
 
         let tls_options = TlsOptions {
             ca_file: Some(root_ca_file.into()),

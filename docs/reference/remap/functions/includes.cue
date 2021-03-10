@@ -3,19 +3,19 @@ package metadata
 remap: functions: includes: {
 	category: "Enumerate"
 	description: """
-		Determines whether the `value` includes the `item`.
+		Determines whether the `value` array includes the specified `item`.
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: "The array"
+			description: "The array."
 			required:    true
 			type: ["array"]
 		},
 		{
 			name:        "item"
-			description: "The item to check"
+			description: "The item to check."
 			required:    true
 			type: ["any"]
 		},

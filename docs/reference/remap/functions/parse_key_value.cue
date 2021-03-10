@@ -1,16 +1,16 @@
 package metadata
 
 remap: functions: parse_key_value: {
-	category:    "Parse"
+	category: "Parse"
 	description: #"""
-		Parses the `value` in key/value format. Also known as [logfmt](\#(urls.logfmt)).
+		Parses the `value` in key/value format. Also known as [logfmt](\(urls.logfmt)).
 
 		* Keys and values can be wrapped with `"`.
-		* `"` characters can be escaped by `\`.
+		* `"` characters can be escaped using `\`.
 		"""#
 	notices: [
 		"""
-			All values are returned as strings, it is recommended to manually coerce values as you see fit.
+			All values are returned as strings. We recommend manually coercing values to desired types as you see fit.
 			""",
 	]
 
@@ -37,7 +37,7 @@ remap: functions: parse_key_value: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a properly formatted key/value string",
+		"`value` isn't a properly formatted key/value string",
 	]
 	return: types: ["object"]
 
@@ -45,7 +45,7 @@ remap: functions: parse_key_value: {
 		{
 			title: "Parse logfmt log"
 			source: #"""
-				parse_key_value(
+				parse_key_value!(
 					"@timestamp=\"Sun Jan 10 16:47:39 EST 2021\" level=info msg=\"Stopping all fetchers\" tag#production=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager"
 				)
 				"""#
@@ -61,8 +61,8 @@ remap: functions: parse_key_value: {
 		{
 			title: "Parse comma delimited log"
 			source: #"""
-				parse_key_value(
-					"path:\"/cart_link\", host:store.app.com, fwd: \"102.30.171.16\", dyno: web.1 connect:0ms, service:87ms, status:304, bytes:632, protocol:https",
+				parse_key_value!(
+					"path:\"/cart_link\", host:store.app.com, fwd: \"102.30.171.16\", dyno: web.1, connect:0ms, service:87ms, status:304, bytes:632, protocol:https",
 					field_delimiter: ",",
 					key_value_delimiter: ":"
 				)

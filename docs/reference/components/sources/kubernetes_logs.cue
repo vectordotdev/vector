@@ -153,6 +153,15 @@ components: sources: kubernetes_logs: {
 			required:    false
 			type: bool: default: true
 		}
+		kube_config_file: {
+			common:      false
+			description: "Optional path to a kubeconfig file readable by Vector. If not set, Vector will try to connect to Kubernetes using in-cluster configuration."
+			required:    false
+			type: string: {
+				default: null
+				syntax:  "literal"
+			}
+		}
 		self_node_name: {
 			common:      false
 			description: "The name of the Kubernetes `Node` this Vector instance runs at. Configured to use an env var by default, to be evaluated to a value provided by Kubernetes at Pod deploy time."

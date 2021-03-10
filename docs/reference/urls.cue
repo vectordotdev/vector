@@ -149,6 +149,7 @@ urls: {
 	encoding_charset_labels:                                  "https://encoding.spec.whatwg.org/#concept-encoding-get"
 	encoding_standard:                                        "https://encoding.spec.whatwg.org/"
 	endler_dev:                                               "https://endler.dev/"
+	eof:                                                      "\(wikipedia)/wiki/End-of-file#EOF_character"
 	etsy:                                                     "https://www.etsy.com"
 	event_proto:                                              "\(vector_repo)/blob/master/proto/event.proto"
 	exit_codes:                                               "https://docs.rs/exitcode/latest/exitcode/#constants"

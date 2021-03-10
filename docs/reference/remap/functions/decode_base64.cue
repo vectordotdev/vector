@@ -34,14 +34,14 @@ remap: functions: decode_base64: {
 		{
 			title: "Decode Base64 data (default)"
 			source: """
-				decode_base64("eW91IGhhdmUgc3VjY2Vzc2Z1bGx5IGRlY29kZWQgbWU=")
+				decode_base64!("eW91IGhhdmUgc3VjY2Vzc2Z1bGx5IGRlY29kZWQgbWU=")
 				"""
 			return: "you have successfully decoded me"
 		},
 		{
 			title: "Decode Base64 data (URL safe)"
 			source: """
-				decode_base64("eW91IGNhbid0IG1ha2UgeW91ciBoZWFydCBmZWVsIHNvbWV0aGluZyBpdCB3b24ndA==", charset: "url_safe")
+				decode_base64!("eW91IGNhbid0IG1ha2UgeW91ciBoZWFydCBmZWVsIHNvbWV0aGluZyBpdCB3b24ndA==", charset: "url_safe")
 				"""
 			return: "you can't make your heart feel something it won't"
 		},
