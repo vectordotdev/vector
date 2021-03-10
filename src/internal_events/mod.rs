@@ -29,6 +29,8 @@ mod coercer;
 mod concat;
 #[cfg(feature = "sinks-console")]
 mod console;
+#[cfg(feature = "sinks-datadog")]
+mod datadog_logs;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
 #[cfg(feature = "sources-docker_logs")]
@@ -146,6 +148,8 @@ pub(crate) use self::coercer::*;
 pub use self::concat::*;
 #[cfg(feature = "sinks-console")]
 pub use self::console::*;
+#[cfg(feature = "sinks-datadog")]
+pub use self::datadog_logs::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-docker_logs")]
