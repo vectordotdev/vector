@@ -5,7 +5,9 @@ use crate::{
     topology::{fanout, RunningTopology},
 };
 use futures::{channel::mpsc as futures_mpsc, SinkExt, StreamExt};
+use itertools::Itertools;
 use parking_lot::RwLock;
+use std::cmp::Ordering;
 use std::{
     collections::HashSet,
     fmt::Debug,
@@ -102,34 +104,54 @@ impl TapRegister {
             .chain(diff.transforms.removed_and_changed())
             .collect::<Vec<_>>();
 
-        for tap_sink in &self.tap_sinks {
-            // Rewire sinks.
-            for input_name in &to_keep {
-                if let Some(pattern) = tap_sink.find_match(*input_name) {
-                    if let Some(tx) = topology.outputs.get(*input_name) {
-                        let (sink_name, sink) = tap_sink.make_output(*input_name);
-                        debug!(
-                            message = "Restarting tap.",
-                            id = sink_name.as_str(),
-                            input = input_name.as_str()
-                        );
+        self.tap_sinks
+            .iter()
+            .inspect(|tap_sink| {
+                tap_sink
+                    .all_matched_patterns(&to_remove)
+                    .difference(&tap_sink.all_matched_patterns(&to_keep))
+                    .for_each(|pattern| {
+                        tap_sink.send_not_matched(pattern);
+                    })
+            })
+            .cartesian_product(&to_keep)
+            .filter_map(|(tap_sink, input_name)| {
+                tap_sink
+                    .find_match(*input_name)
+                    .map(|pattern| {
+                        topology.outputs.get(*input_name).map(|tx| {
+                            let (sink_name, sink) = tap_sink.make_output(*input_name);
+                            debug!(
+                                message = "Restarting tap.",
+                                id = sink_name.as_str(),
+                                input = input_name.as_str()
+                            );
 
-                        tap_sink.send_matched(&pattern);
-                        let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
-                    }
-                }
-            }
-
-            // Alert tap sinks about patterns that weren't matched by the new config.
-            let patterns_to_keep = tap_sink.all_matched_patterns(&to_keep);
-            let patterns_to_remove = tap_sink.all_matched_patterns(&to_remove);
-
-            for pattern in patterns_to_remove.difference(&patterns_to_keep) {
-                tap_sink.send_not_matched(pattern);
-            }
-        }
+                            let _ = tx.send(fanout::ControlMessage::Add(sink_name, sink));
+                            (tap_sink, pattern)
+                        })
+                    })
+                    .flatten()
+            })
+            .sorted()
+            .dedup()
+            .inspect(|(tap_sink, pattern)| {
+                println!("Tap ID: {}, pattern: {}", tap_sink.id, pattern);
+            })
+            .for_each(|(tap_sink, pattern)| tap_sink.send_matched(&pattern));
     }
 }
+
+struct Test {
+    id: i32,
+}
+
+impl PartialEq for Test {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+impl Eq for Test {}
 
 impl Default for TapRegister {
     fn default() -> Self {
@@ -316,6 +338,18 @@ impl PartialEq for TapSink {
 }
 
 impl Eq for TapSink {}
+
+impl PartialOrd for TapSink {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.id.cmp(&other.id))
+    }
+}
+
+impl Ord for TapSink {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.id.cmp(&other.id)
+    }
+}
 
 /// A tap controller holds a `ControlSender` and a thread-safe ref to a sink, to bubble up a
 /// control message to the top of the app when a sink has 'started' or 'stopped'.
