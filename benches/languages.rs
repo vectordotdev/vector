@@ -221,7 +221,7 @@ fn benchmark_multifaceted(c: &mut Criterion) {
                   . = parse_syslog!(string!(.message))
                   .timestamp = format_timestamp!(to_timestamp!(.timestamp), format: "%c")
                   del(.hostname)
-                  .message = downcase(.message)
+                  .message = downcase(string!(.message))
                   """
             "#},
         ),
@@ -233,17 +233,52 @@ fn benchmark_multifaceted(c: &mut Criterion) {
                   inputs = ["in"]
                   version = "2"
                   source = """
+                  local severities = { "emerg", "alert", "crit", "error", "warning", "notice", "info", "debug" }
+                  local facilities = {
+                    "kern",
+                    "user",
+                    "mail",
+                    "daemon",
+                    "auth",
+                    "syslog",
+                    "lpr",
+                    "news",
+                    "uucp",
+                    "cron",
+                    "authpriv",
+                    "ftp",
+                    "ntp",
+                    "security",
+                    "console",
+                    "solaris-cron",
+                    "local0",
+                    "local1",
+                    "local2",
+                    "local3",
+                    "local4",
+                    "local5",
+                    "local6",
+                    "local7"
+                  };
+
                   local function parse_and_transform(message)
                     local pattern = "^<(%d+)>(%d+) (%S+) (%S+) (%S+) (%S+) (%S+) (%S+) (.+)$"
                     local priority, version, timestamp, _host, appname, procid, msgid, _sdata, message = string.match(message, pattern)
 
+                    priority = tonumber(priority)
+
+                    local facility = priority // 8
+                    local severity = priority - (facility * 8)
+
+                    facility = facilities[facility + 1]
+                    severity = severities[severity + 1]
+
                     local year, month, day, hour, minute, second, tz = string.match(timestamp, '(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+).(%d+)(%a)')
 
-                    timestamp = os.date('%c', os.time({year=year, month=month, day=day, hour=hour, minute=minute, second=second}))
-                    severity = "info"
+                    timestamp = os.date('%c', os.time({year=year, month=month, day=day, hour=hour, min=minute, sec=second}))
                     message = string.lower(message)
 
-                    return {severity = severity, priority = priority, version = version, timestamp = timestamp, appname = appname, procid = procid, msgid = msgid, message = message}
+                    return {priority = priority, facility = facility, severity = severity, version = tonumber(version), timestamp = timestamp, appname = appname, procid = tonumber(procid), msgid = msgid, message = message}
                   end
 
                   function process(event, emit)

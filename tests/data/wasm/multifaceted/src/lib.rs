@@ -48,24 +48,25 @@ pub extern "C" fn process(data: u32, length: u32) -> u32 {
     // **Please note that WASM support is still unstable!**
     //
     // We expect to alter this format in the future after some event data model improvements.
-    let mut event: HashMap<String, Value> = serde_json::from_slice(data).unwrap();
+    let event: HashMap<String, Value> = serde_json::from_slice(data).unwrap();
 
     // The following is equivalent to the remap script:
-    // . = parse_syslog!(.message)
-
-    let message = event.remove("message");
-
-    let message = message
-        .as_ref()
+    //
+    //. = parse_syslog!(string!(.message))
+    //.timestamp = format_timestamp!(to_timestamp!(.timestamp), format: "%c")
+    //del(.hostname)
+    //.message = downcase(string!(.message))
+    let message = event
+        .get("message")
         .map(|v| v.as_str().unwrap_or_default())
-        .unwrap_or_default();
+        .unwrap_or_default()
+        .to_owned();
 
-    let message = message.to_lowercase();
+    let mut event = HashMap::new();
 
     let parsed = syslog_loose::parse_message(&message);
 
-    event.insert("message".to_owned(), parsed.msg.into());
-
+    event.insert("message".to_owned(), parsed.msg.to_lowercase().into());
     // Delete the hostname field
     /*
     if let Some(host) = parsed.hostname {
