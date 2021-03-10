@@ -1,6 +1,6 @@
 <p align="center">
   <strong>
-    <a href="https://vector.dev/guides/getting-started/">Get Started<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://vector.dev/docs/setup/quickstart/">Quickstart<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/guides/">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/components/">Integrations<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
@@ -15,14 +15,14 @@
 ## What is Vector?
 
 Vector is a high-performance, end-to-end (agent & aggregator) observability data
-platform that puts you in control of your observability data.
+pipeline that puts you in control of your observability data.
 [Collect][docs.sources], [transform][docs.transforms], and [route][docs.sinks]
 all your logs, metrics, and traces to any vendors you want today and any other
-vendors you may want tomorrow. Vector enables cost reduction, novel data
-enrichment, and data security when you need it, not when is most convenient for
-your vendors. 100% open source and up to 10x faster than every alternative.
+vendors you may want tomorrow. Vector enables dramatic cost reduction, novel data
+enrichment, and data security where you need it, not where is most convenient for
+your vendors. Open source and up to 10x faster than every alternative.
 
-To get started, follow our [**getting started guides**][urls.getting_started]
+To get started, follow our [**quickstart guide**][docs.quickstart]
 or [**install Vector**][docs.installation].
 
 ### Principles
@@ -53,38 +53,40 @@ or [**install Vector**][docs.installation].
 
 ### About
 
-* [**Concepts**][docs.concepts]
-* [**Guarantees**][docs.guarantees]
-* [**Architecture**][docs.architecture] - [data model][docs.data-model] ([log][docs.data-model.log], [metric][docs.data-model.metric]), [topology model][docs.topology-model], [concurrency model][docs.concurrency-model], [runtime model][docs.runtime-model]
+* [**Concepts**][docs.about.concepts]
+* [**Under the hood**][docs.about.under-the-hood]
+  * [**Architecture**][docs.under-the-hood.architecture] - [data model][docs.architecture.data-model] ([log][docs.data-model.log], [metric][docs.data-model.metric]), [pipeline model][docs.architecture.pipeline-model], [concurrency model][docs.architecture.concurrency-model], [runtime model][docs.architecture.runtime-model]
+  * [**Networking**][docs.under-the-hood.networking] - [ARC][docs.networking.adaptive-request-concurrency]
+  * [**Guarantees**][docs.under-the-hood.guarantees]
 
 ### Setup
 
-* [**Installation**][docs.installation] - [operating systems][docs.operating_systems], [package managers][docs.package_managers], [platforms][docs.platforms] ([Kubernetes][docs.kubernetes]), [manual][docs.manual]
-* [**Configuration**][docs.setup.configuration]
-* [**Deployment**][docs.deployment] - [roles][docs.roles], [topologies][docs.topologies]
+* [**Quickstart**][docs.setup.quickstart]
+* [**Installation**][docs.setup.installation] - [operating systems][docs.installation.operating_systems], [package managers][docs.installation.package_managers], [platforms][docs.installation.platforms] ([Kubernetes][docs.platforms.kubernetes]), [manual][docs.installation.manual]
+* [**Deployment**][docs.deployment] - [roles][docs.deployment.roles], [topologies][docs.deployment.topologies]
 
 ### Reference
 
 * **Configuration**
-  * [**Sources**][docs.sources] - [docker_logs][docs.sources.docker_logs], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [dozens more...][docs.sources]
-  * [**Transforms**][docs.transforms] - [filter][docs.transforms.filter], [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], and [dozens more...][docs.transforms]
-  * [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], and [dozens more...][docs.sinks]
-  * [**Vector Remap Language**][docs.remap]
-  * [**Unit tests**][docs.unit-tests]
-* [**API**][docs.api]
-* [**CLI**][docs.cli]
+  * [**Sources**][docs.configuration.sources] - [docker_logs][docs.sources.docker_logs], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [dozens more...][docs.sources]
+  * [**Transforms**][docs.configuration.transforms] - [filter][docs.transforms.filter], [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], and [dozens more...][docs.transforms]
+  * [**Sinks**][docs.configuration.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], and [dozens more...][docs.sinks]
+  * [**Unit tests**][docs.configuration.tests]
+* [**Remap Language**][docs.reference.vrl]
+* [**API**][docs.reference.api]
+* [**CLI**][docs.reference.cli]
 
 ### Administration
 
-* [**Process management**][docs.process-management]
-* [**Monitoring & observing**][docs.monitoring]
-* [**Updating**][docs.updating]
-* [**Validating**][docs.validating]
+* [**Process management**][docs.administration.process-management]
+* [**Monitoring & observing**][docs.administration.monitoring]
+* [**Upgrading**][docs.administration.upgrading]
+* [**Validating**][docs.administration.validating]
 
 ### Resources
 
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter]
-* [**Releases**][urls.vector_releases] - [latest][urls.latest]
+* [**Releases**][urls.vector_releases] - [latest][urls.vector_releases]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 * **Policies** - [Security][urls.vector_security_policy], [Privacy][urls.vector_privacy_policy], [Code of Conduct][urls.vector_code_of_conduct]
 
@@ -151,96 +153,72 @@ Vector is an end-to-end, unified, open data platform.
   Developed with ❤️ by <strong><a href="https://timber.io">Timber.io</a></strong> - <a href="https://github.com/timberio/vector/security/policy">Security Policy</a> - <a href="https://github.com/timberio/vector/blob/master/PRIVACY.md">Privacy Policy</a>
 </p>
 
-[docs.administration.process-management]: https://vector.dev/docs/administration/process-management/
-[docs.administration.validating]: https://vector.dev/docs/administration/validating/
-[docs.api]: https://vector.dev/docs/reference/api/
-[docs.architecture]: https://vector.dev/docs/about/under-the-hood/architecture/
-[docs.cli]: https://vector.dev/docs/reference/cli/
-[docs.concepts]: https://vector.dev/docs/about/concepts/
-[docs.concurrency-model]: https://vector.dev/docs/about/under-the-hood/architecture/concurrency-model/
-[docs.setup.configuration]: https://vector.dev/docs/setup/configuration/
-[docs.data-model]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/
-[docs.data-model.log#timestamps]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/log/#timestamps
-[docs.data-model.log#types]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/log/#types
-[docs.data-model.log]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/log/
-[docs.data-model.metric#aggregated_histogram]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#aggregated_histogram
-[docs.data-model.metric#aggregated_summary]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/#aggregated_summary
-[docs.data-model.metric]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/metric/
-[docs.data_model]: https://vector.dev/docs/about/under-the-hood/architecture/data-model/
-[docs.deployment]: https://vector.dev/docs/setup/deployment/
-[docs.global-options#log_schema]: https://vector.dev/docs/reference/global-options/#log_schema
-[docs.guarantees]: https://vector.dev/docs/about/guarantees/
-[docs.installation]: https://vector.dev/docs/setup/installation/
-[docs.kubernetes]: https://vector.dev/docs/setup/installation/platforms/kubernetes/
-[docs.manual]: https://vector.dev/docs/setup/installation/manual/
-[docs.monitoring]: https://vector.dev/docs/administration/monitoring/
-[docs.operating_systems]: https://vector.dev/docs/setup/installation/operating-systems/
-[docs.package_managers]: https://vector.dev/docs/setup/installation/package-managers/
-[docs.platforms]: https://vector.dev/docs/setup/installation/platforms/
-[docs.process-management#reloading]: https://vector.dev/docs/administration/process-management/#reloading
-[docs.process-management#starting]: https://vector.dev/docs/administration/process-management/#starting
-[docs.process-management]: https://vector.dev/docs/administration/process-management/
-[docs.reference.templating]: https://vector.dev/docs/reference/templating/
-[docs.remap]: https://vector.dev/docs/reference/remap/
-[docs.roles#agent]: https://vector.dev/docs/setup/deployment/roles/#agent
-[docs.roles#aggregator]: https://vector.dev/docs/setup/deployment/roles/#aggregator
-[docs.roles#sidecar]: https://vector.dev/docs/setup/deployment/roles/#sidecar
-[docs.roles]: https://vector.dev/docs/setup/deployment/roles/
-[docs.runtime-model]: https://vector.dev/docs/about/under-the-hood/architecture/runtime-model/
-[docs.sinks.aws_cloudwatch_logs]: https://vector.dev/docs/reference/sinks/aws_cloudwatch_logs/
-[docs.sinks.aws_s3#partitioning]: https://vector.dev/docs/reference/sinks/aws_s3/#partitioning
-[docs.sinks.aws_s3]: https://vector.dev/docs/reference/sinks/aws_s3/
-[docs.sinks.clickhouse]: https://vector.dev/docs/reference/sinks/clickhouse/
-[docs.sinks.elasticsearch]: https://vector.dev/docs/reference/sinks/elasticsearch/
-[docs.sinks.gcp_cloud_storage]: https://vector.dev/docs/reference/sinks/gcp_cloud_storage/
-[docs.sinks.gcp_pubsub]: https://vector.dev/docs/reference/sinks/gcp_pubsub/
-[docs.sinks]: https://vector.dev/docs/reference/sinks/
-[docs.sources.docker_logs]: https://vector.dev/docs/reference/sources/docker_logs/
-[docs.sources.file#multiline]: https://vector.dev/docs/reference/sources/file/#multiline
-[docs.sources.file]: https://vector.dev/docs/reference/sources/file/
-[docs.sources.http]: https://vector.dev/docs/reference/sources/http/
-[docs.sources.journald]: https://vector.dev/docs/reference/sources/journald/
-[docs.sources.kafka]: https://vector.dev/docs/reference/sources/kafka/
-[docs.sources.socket]: https://vector.dev/docs/reference/sources/socket/
-[docs.sources]: https://vector.dev/docs/reference/sources/
-[docs.topologies]: https://vector.dev/docs/setup/deployment/topologies/
-[docs.topology-model]: https://vector.dev/docs/about/under-the-hood/architecture/topology-model/
-[docs.transforms.filter]: https://vector.dev/docs/reference/transforms/filter/
-[docs.transforms.grok_parser]: https://vector.dev/docs/reference/transforms/grok_parser/
-[docs.transforms.json_parser]: https://vector.dev/docs/reference/transforms/json_parser/
-[docs.transforms.log_to_metric]: https://vector.dev/docs/reference/transforms/log_to_metric/
-[docs.transforms.logfmt_parser]: https://vector.dev/docs/reference/transforms/logfmt_parser/
-[docs.transforms.lua]: https://vector.dev/docs/reference/transforms/lua/
-[docs.transforms.regex_parser#types]: https://vector.dev/docs/reference/transforms/regex_parser/#types
-[docs.transforms.regex_parser]: https://vector.dev/docs/reference/transforms/regex_parser/
-[docs.transforms.route]: https://vector.dev/docs/reference/transforms/route/
-[docs.transforms]: https://vector.dev/docs/reference/transforms/
-[docs.unit-tests]: https://vector.dev/docs/reference/tests/
-[docs.updating]: https://vector.dev/docs/administration/updating/
-[docs.validating]: https://vector.dev/docs/administration/validating/
-[docs.what-is-vector]: https://vector.dev/docs/about/what-is-vector/
-[guides.advanced.unit-testing]: https://vector.dev/guides/advanced/unit-testing/
-[pages.releases]: https://vector.dev/releases/
-[urls.getting_started]: https://vector.dev/guides/getting-started/
-[urls.issue_1802]: https://github.com/timberio/vector/issues/1802
-[urls.latest]: https://vector.dev/releases/latest/
-[urls.pr_721]: https://github.com/timberio/vector/pull/721
+[docs.about.concepts]: /docs/about/concepts/
+[docs.about.under-the-hood]: /docs/about/under-the-hood/
+[docs.administration.monitoring]: /docs/administration/monitoring/
+[docs.administration.process-management]: /docs/administration/process-management/
+[docs.administration.upgrading]: /docs/administration/upgrading/
+[docs.administration.validating]: /docs/administration/validating/
+[docs.architecture.concurrency-model]: /docs/about/under-the-hood/architecture/concurrency-model/
+[docs.architecture.data-model]: /docs/about/under-the-hood/architecture/data-model/
+[docs.architecture.pipeline-model]: /docs/about/under-the-hood/architecture/pipeline-model/
+[docs.architecture.runtime-model]: /docs/about/under-the-hood/architecture/runtime-model/
+[docs.configuration.sinks]: /docs/reference/configuration/sinks/
+[docs.configuration.sources]: /docs/reference/configuration/sources/
+[docs.configuration.tests]: /docs/reference/configuration/tests/
+[docs.configuration.transforms]: /docs/reference/configuration/transforms/
+[docs.data-model.log]: /docs/about/under-the-hood/architecture/data-model/log/
+[docs.data-model.metric]: /docs/about/under-the-hood/architecture/data-model/metric/
+[docs.deployment.roles]: /docs/setup/deployment/roles/
+[docs.deployment.topologies]: /docs/setup/deployment/topologies/
+[docs.deployment]: /docs/setup/deployment/
+[docs.installation.manual]: /docs/setup/installation/manual/
+[docs.installation.operating_systems]: /docs/setup/installation/operating-systems/
+[docs.installation.package_managers]: /docs/setup/installation/package-managers/
+[docs.installation.platforms]: /docs/setup/installation/platforms/
+[docs.installation]: /docs/setup/installation/
+[docs.networking.adaptive-request-concurrency]: /docs/about/under-the-hood/networking/adaptive-request-concurrency/
+[docs.platforms.kubernetes]: /docs/setup/installation/platforms/kubernetes/
+[docs.quickstart]: /docs/setup/quickstart/
+[docs.reference.api]: /docs/reference/api/
+[docs.reference.cli]: /docs/reference/cli/
+[docs.reference.vrl]: /docs/reference/vrl/
+[docs.roles#agent]: /docs/setup/deployment/roles/#agent
+[docs.roles#aggregator]: /docs/setup/deployment/roles/#aggregator
+[docs.setup.installation]: /docs/setup/installation/
+[docs.setup.quickstart]: /docs/setup/quickstart/
+[docs.sinks.aws_cloudwatch_logs]: /docs/reference/configuration/sinks/aws_cloudwatch_logs/
+[docs.sinks.aws_s3]: /docs/reference/configuration/sinks/aws_s3/
+[docs.sinks.clickhouse]: /docs/reference/configuration/sinks/clickhouse/
+[docs.sinks.elasticsearch]: /docs/reference/configuration/sinks/elasticsearch/
+[docs.sinks.gcp_cloud_storage]: /docs/reference/configuration/sinks/gcp_cloud_storage/
+[docs.sinks]: /docs/reference/configuration/sinks/
+[docs.sources.docker_logs]: /docs/reference/configuration/sources/docker_logs/
+[docs.sources.file]: /docs/reference/configuration/sources/file/
+[docs.sources.http]: /docs/reference/configuration/sources/http/
+[docs.sources.journald]: /docs/reference/configuration/sources/journald/
+[docs.sources.kafka]: /docs/reference/configuration/sources/kafka/
+[docs.sources.socket]: /docs/reference/configuration/sources/socket/
+[docs.sources]: /docs/reference/configuration/sources/
+[docs.transforms.filter]: /docs/reference/configuration/transforms/filter/
+[docs.transforms.json_parser]: /docs/reference/configuration/transforms/json_parser/
+[docs.transforms.log_to_metric]: /docs/reference/configuration/transforms/log_to_metric/
+[docs.transforms.logfmt_parser]: /docs/reference/configuration/transforms/logfmt_parser/
+[docs.transforms.lua]: /docs/reference/configuration/transforms/lua/
+[docs.transforms.regex_parser]: /docs/reference/configuration/transforms/regex_parser/
+[docs.transforms]: /docs/reference/configuration/transforms/
+[docs.under-the-hood.architecture]: /docs/about/under-the-hood/architecture/
+[docs.under-the-hood.guarantees]: /docs/about/under-the-hood/guarantees/
+[docs.under-the-hood.networking]: /docs/about/under-the-hood/networking/
 [urls.production_users]: https://github.com/timberio/vector/issues/790
 [urls.rust]: https://www.rust-lang.org/
-[urls.rust_memory_safety]: https://hacks.mozilla.org/2019/01/fearless-security-memory-safety/
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_code_of_conduct]: https://github.com/timberio/vector/blob/master/CODE_OF_CONDUCT.md
 [urls.vector_community]: https://vector.dev/community/
-[urls.vector_download]: https://vector.dev/releases/latest/download/
-[urls.vector_enriching_transforms]: https://vector.dev/components/?functions%5B%5D=enrich
-[urls.vector_highlights]: https://vector.dev/highlights/
-[urls.vector_parsing_transforms]: https://vector.dev/components/?functions%5B%5D=parse
-[urls.vector_performance]: https://vector.dev/#performance
 [urls.vector_privacy_policy]: https://github.com/timberio/vector/blob/master/PRIVACY.md
 [urls.vector_releases]: https://vector.dev/releases/latest/
-[urls.vector_repo]: https://github.com/timberio/vector
 [urls.vector_roadmap]: https://roadmap.vector.dev
 [urls.vector_security_policy]: https://github.com/timberio/vector/security/policy
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
 [urls.vector_twitter]: https://twitter.com/vectordotdev
-[urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc
+[urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22
