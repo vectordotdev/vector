@@ -173,7 +173,7 @@ hostname = "0.3.1"
 http = "0.2"
 hyper = "0.13"
 hyper-openssl = "0.8"
-indexmap = {version = "1.5.1", features = ["serde-1"]}
+indexmap = {version = "1.6.2", features = ["serde"]}
 indoc = "1.0.3"
 inventory = "0.1.10"
 jemallocator = { version = "0.3.0", optional = true }
