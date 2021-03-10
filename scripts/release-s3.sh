@@ -66,7 +66,7 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   echo "Uploaded archives"
 
   echo "Redirecting old artifact names"
-  for file in $(aws s3api list-objects-v2 --bucket packages.timber.io --prefix vector/$i/ --query 'Contents[*].Key' --output text  | tr "\t" "\n" | grep '\-nightly'); do
+  for file in $(aws s3api list-objects-v2 --bucket packages.timber.io --prefix "vector/$i/" --query 'Contents[*].Key' --output text  | tr "\t" "\n" | grep '\-nightly'); do
     file=$(basename "$file")
     # vector-nightly-amd64.deb -> vector-amd64.deb
     echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/nightly/$DATE/${file/-nightly/}" --website-redirect "/vector/nightly/$DATE/$file" --acl public-read
@@ -104,7 +104,7 @@ elif [[ "$CHANNEL" == "latest" ]]; then
     echo "Deleted old versioned artifacts"
 
     echo "Redirecting old artifact names in s3://packages.timber.io/vector/$i/"
-    for file in $(aws s3api list-objects-v2 --bucket packages.timber.io --prefix vector/$i/ --query 'Contents[*].Key' --output text  | tr "\t" "\n" | grep "\-$VERSION_EXACT"); do
+    for file in $(aws s3api list-objects-v2 --bucket packages.timber.io --prefix "vector/$i/" --query 'Contents[*].Key' --output text  | tr "\t" "\n" | grep "\-$VERSION_EXACT"); do
       file=$(basename "$file")
       # vector-$version-amd64.deb -> vector-amd64.deb
       echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/$i/${file/-$VERSION_EXACT/}" --website-redirect "/vector/$i/$file" --acl public-read
