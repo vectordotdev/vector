@@ -120,7 +120,12 @@ components: sinks: [Name=string]: {
 			if features.send.compression.enabled {
 				compression: {
 					common:      true
-					description: "The compression strategy used to compress the encoded event data before transmission."
+					description: """
+						The compression strategy used to compress the encoded event data before transmission.
+
+						Some cloud storage API clients and browsers will handle decompression transparently,
+						so files may not always appear to be compressed depending how they are accessed.
+						"""
 					required:    false
 					type: string: {
 						default: features.send.compression.default
