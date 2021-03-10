@@ -332,25 +332,26 @@ impl RuntimeTransform for Lua {
 }
 
 #[cfg(test)]
-fn format_error(error: &rlua::Error) -> String {
-    match error {
-        rlua::Error::CallbackError { traceback, cause } => format_error(&cause) + "\n" + traceback,
-        err => err.to_string(),
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
         event::{
             metric::{Metric, MetricKind, MetricValue},
-            Event, Value,
+            Event, LogEvent,
         },
         test_util::trace_init,
         transforms::TaskTransform,
     };
     use futures::{stream, StreamExt};
+
+    fn format_error(error: &rlua::Error) -> String {
+        match error {
+            rlua::Error::CallbackError { traceback, cause } => {
+                format_error(&cause) + "\n" + traceback
+            }
+            err => err.to_string(),
+        }
+    }
 
     fn from_config(config: &str) -> crate::Result<Box<Lua>> {
         Lua::new(&toml::from_str(config).unwrap()).map(Box::new)
@@ -371,12 +372,15 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("program me");
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let log = LogEvent::from("program me");
+        let mut expected = log.clone();
+        expected.insert("hello", "goodbye");
+
+        let in_stream = Box::pin(stream::iter(vec![log.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["hello"], "goodbye".into());
+        assert_eq!(output, expected.into());
         Ok(())
     }
 
@@ -396,12 +400,15 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::from("Hello, my name is Bob.");
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let log = LogEvent::from("Hello, my name is Bob.");
+        let mut expected = log.clone();
+        expected.insert("name", "Bob");
+
+        let in_stream = Box::pin(stream::iter(vec![log.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["name"], "Bob".into());
+        assert_eq!(output, expected.into());
         Ok(())
     }
 
@@ -420,14 +427,16 @@ mod tests {
         )
         .unwrap();
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("name", "Bob");
+        let mut log = LogEvent::new_empty();
+        log.insert("name", "Bob");
+        let mut expected = log.clone();
+        expected.remove("name");
 
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let in_stream = Box::pin(stream::iter(vec![log.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert!(output.as_log().get("name").is_none());
+        assert_eq!(output, expected.into());
         Ok(())
     }
 
@@ -445,8 +454,8 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let log = LogEvent::new_empty();
+        let in_stream = Box::pin(stream::iter(vec![log.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await;
 
@@ -469,13 +478,14 @@ mod tests {
         )
         .unwrap();
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("host", "127.0.0.1");
-        let input = Box::pin(stream::iter(vec![event]));
+        let mut log = LogEvent::new_empty();
+        log.insert("host", "127.0.0.1");
+        let input = Box::pin(stream::iter(vec![log.into()]));
         let output = transform.transform(input);
         let out = output.collect::<Vec<_>>().await;
 
         assert_eq!(out.len(), 2);
+        assert_eq!(out[0], out[1]);
         Ok(())
     }
 
@@ -498,13 +508,15 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
+        let log = LogEvent::new_empty();
+        let mut expected = log.clone();
+        expected.insert("result", "empty");
 
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let in_stream = Box::pin(stream::iter(vec![log.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["result"], "empty".into());
+        assert_eq!(output, expected.into());
         Ok(())
     }
 
@@ -523,12 +535,15 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let log = LogEvent::new_empty();
+        let mut expected = log.clone();
+        expected.insert("number", 3);
+
+        let in_stream = Box::pin(stream::iter(vec![log.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["number"], Value::Integer(3));
+        assert_eq!(output, expected.into());
         Ok(())
     }
 
@@ -547,12 +562,15 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let log = LogEvent::new_empty();
+        let mut expected = log.clone();
+        expected.insert("number", 3.14159);
+
+        let in_stream = Box::pin(stream::iter(vec![log.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["number"], Value::Float(3.14159));
+        assert_eq!(output, expected.into());
         Ok(())
     }
 
@@ -571,12 +589,15 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let log = LogEvent::new_empty();
+        let mut expected = log.clone();
+        expected.insert("bool", true);
+
+        let in_stream = Box::pin(stream::iter(vec![log.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["bool"], Value::Boolean(true));
+        assert_eq!(output, expected.into());
         Ok(())
     }
 
@@ -595,12 +616,15 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let log = LogEvent::new_empty();
+        let mut expected = log.clone();
+        expected.remove("junk");
+
+        let in_stream = Box::pin(stream::iter(vec![log.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log().get("junk"), None);
+        assert_eq!(output, expected.into());
         Ok(())
     }
 
@@ -642,11 +666,14 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::new_empty_log();
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let log = LogEvent::new_empty();
+        let mut expected = log.clone();
+        expected.remove("result");
+
+        let in_stream = Box::pin(stream::iter(vec![log.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
-        assert_eq!(output.as_log().get("result"), None);
+        assert_eq!(output, expected.into());
         Ok(())
     }
 
@@ -729,12 +756,15 @@ mod tests {
         );
         let transform = from_config(&config).unwrap();
 
-        let event = Event::new_empty_log();
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let log = LogEvent::new_empty();
+        let mut expected = log.clone();
+        expected.insert("new field", "new value");
+
+        let in_stream = Box::pin(stream::iter(vec![log.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["new field"], "new value".into());
+        assert_eq!(output, expected.into());
         Ok(())
     }
 
@@ -755,16 +785,18 @@ mod tests {
         )
         .unwrap();
 
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("name", "Bob");
-        event.as_mut_log().insert("friend", "Alice");
+        let mut log = LogEvent::new_empty();
+        log.insert("name", "Bob");
+        log.insert("friend", "Alice");
+        let mut expected = log.clone();
+        expected.insert("name", "nameBob");
+        expected.insert("friend", "friendAlice");
 
-        let in_stream = Box::pin(stream::iter(vec![event]));
+        let in_stream = Box::pin(stream::iter(vec![log.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await.unwrap();
 
-        assert_eq!(output.as_log()["name"], "nameBob".into());
-        assert_eq!(output.as_log()["friend"], "friendAlice".into());
+        assert_eq!(output, expected.into());
         Ok(())
     }
 
@@ -818,13 +850,23 @@ mod tests {
 
         let n: usize = 10;
 
-        let events = (0..n).map(|i| Event::from(format!("program me {}", i)));
+        let events = (0..n)
+            .map(|i| Event::from(format!("program me {}", i)))
+            .collect::<Vec<_>>();
+        let expected = events
+            .iter()
+            .cloned()
+            .map(|mut event| {
+                event.as_mut_log().insert("hello", "goodbye");
+                event
+            })
+            .collect::<Vec<_>>();
 
         let in_stream = Box::pin(stream::iter(events));
         let out_stream = transform.transform(in_stream);
         let output = out_stream.collect::<Vec<_>>().await;
 
-        assert_eq!(output.len(), n);
+        assert_eq!(output, expected);
         Ok(())
     }
 }

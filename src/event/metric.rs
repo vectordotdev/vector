@@ -278,6 +278,11 @@ impl Metric {
         self
     }
 
+    pub fn with_metadata(mut self, metadata: EventMetadata) -> Self {
+        self.metadata = metadata;
+        self
+    }
+
     /// Rewrite this into a Metric with the data marked as absolute.
     pub fn into_absolute(self) -> Self {
         Self {

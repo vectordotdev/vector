@@ -31,6 +31,11 @@ impl LogEvent {
         }
     }
 
+    pub fn with_metadata(mut self, metadata: EventMetadata) -> Self {
+        self.metadata = metadata;
+        self
+    }
+
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
         util::log::get(&self.fields, key.as_ref())

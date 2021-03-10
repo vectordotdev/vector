@@ -1,10 +1,12 @@
-use super::util::type_name;
-use crate::event::{Event, LogEvent, Metric};
+use super::util::{table_to_timestamp, timestamp_to_table, type_name};
+use crate::event::{Event, EventMetadata, LogEvent, Metric};
+use chrono::Utc;
 use rlua::prelude::*;
 
 impl<'a> ToLua<'a> for Event {
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
         let table = ctx.create_table()?;
+        table.set("metadata", self.metadata().to_lua(ctx)?)?;
         match self {
             Event::Log(log) => table.set("log", log.to_lua(ctx)?)?,
             Event::Metric(metric) => table.set("metric", metric.to_lua(ctx)?)?,
@@ -25,14 +27,29 @@ impl<'a> FromLua<'a> for Event {
                 })
             }
         };
-        match (table.get("log")?, table.get("metric")?) {
-            (LuaValue::Table(log), LuaValue::Nil) => {
-                Ok(Event::Log(LogEvent::from_lua(LuaValue::Table(log), ctx)?))
+        let metadata = match table.get("metadata")? {
+            metadata @ LuaValue::Table(_) => EventMetadata::from_lua(metadata, ctx)?,
+            LuaValue::Nil => EventMetadata::now(),
+            _ => {
+                return Err(LuaError::FromLuaConversionError {
+                    from: type_name(&value),
+                    to: "EventMetadata",
+                    message: Some("EventMetadata should be a table".to_string()),
+                })
             }
-            (LuaValue::Nil, LuaValue::Table(metric)) => Ok(Event::Metric(Metric::from_lua(
-                LuaValue::Table(metric),
-                ctx,
-            )?)),
+        };
+        match (table.get("log")?, table.get("metric")?) {
+            // This is less than ideal. The log or metric below is
+            // created with stub metadata which is then replaced by the
+            // actual metadata. However, I don't know how to properly
+            // pass the metadata parsed above down into these `from_lua`
+            // functions.
+            (log @ LuaValue::Table(_), LuaValue::Nil) => Ok(Event::Log(
+                LogEvent::from_lua(log, ctx)?.with_metadata(metadata),
+            )),
+            (LuaValue::Nil, metric @ LuaValue::Table(_)) => Ok(Event::Metric(
+                Metric::from_lua(metric, ctx)?.with_metadata(metadata),
+            )),
             _ => Err(LuaError::FromLuaConversionError {
                 from: type_name(&value),
                 to: "Event",
@@ -42,6 +59,35 @@ impl<'a> FromLua<'a> for Event {
                 ),
             }),
         }
+    }
+}
+
+impl<'a> ToLua<'a> for &EventMetadata {
+    fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
+        let table = ctx.create_table()?;
+        table.set("timestamp", timestamp_to_table(ctx, self.timestamp())?)?;
+        Ok(LuaValue::Table(table))
+    }
+}
+
+impl<'a> FromLua<'a> for EventMetadata {
+    fn from_lua(value: LuaValue<'a>, _ctx: LuaContext<'a>) -> LuaResult<Self> {
+        let table = match &value {
+            LuaValue::Table(t) => t,
+            _ => {
+                return Err(LuaError::FromLuaConversionError {
+                    from: type_name(&value),
+                    to: "EventMetadata",
+                    message: Some("EventMetadata should be a Lua table".to_string()),
+                })
+            }
+        };
+        let timestamp = table
+            .get::<_, Option<LuaTable>>("timestamp")?
+            .map(table_to_timestamp)
+            .transpose()?
+            .unwrap_or_else(Utc::now);
+        Ok(EventMetadata::with_timestamp(timestamp))
     }
 }
 
