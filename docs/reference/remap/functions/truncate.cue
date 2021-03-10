@@ -20,12 +20,12 @@ remap: functions: truncate: {
 			type: ["integer", "float"]
 		},
 		{
-			name:        "ellipsis"
+			name: "ellipsis"
 			description: """
 				An ellipsis (`...`) is appended if this is set to `true` _and_ the `value` string ends up being
 				truncated because it's exceeded the `limit`.
 				"""
-			required:    true
+			required: true
 			type: ["boolean"]
 		},
 	]

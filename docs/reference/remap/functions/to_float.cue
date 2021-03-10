@@ -8,11 +8,11 @@ remap: functions: to_float: {
 
 	arguments: [
 		{
-			name:        "value"
+			name: "value"
 			description: """
 				The value to convert to a float. Must be convertible to a float, otherwise an error is raised.
 				"""
-			required:    true
+			required: true
 			type: ["float", "integer", "boolean", "string"]
 		},
 	]
