@@ -921,7 +921,7 @@ mod tests {
                     _ => false,
                 }));
         } else {
-            error!("Invalid base64 encoded data");
+            error!("Invalid base64 encoded data.");
         }
     }
 
@@ -966,7 +966,7 @@ mod tests {
                         _ => false,
                     }));
         } else {
-            error!("Invalid base64 encoded data");
+            error!("Invalid base64 encoded data.");
         }
     }
 
@@ -979,7 +979,7 @@ mod tests {
         if let Err(e) = parser.parse_dnstap_data(Bytes::from(vec![1, 2, 3])) {
             assert!(e.to_string().contains("Protobuf message"));
         } else {
-            error!("Expected TrustDnsError");
+            error!("Expected TrustDnsError.");
         }
     }
 
@@ -1016,11 +1016,11 @@ mod tests {
             }
             let time_taken = Instant::now().duration_since(start);
             println!(
-                "Time taken to parse {} dnstap events carrying DNS query messages: {:#?}",
+                "Time taken to parse {} dnstap events carrying DNS query messages: {:#?}.",
                 num, time_taken
             );
         } else {
-            error!("Invalid base64 encoded data");
+            error!("Invalid base64 encoded data.");
         }
     }
 
@@ -1043,11 +1043,11 @@ mod tests {
             }
             let time_taken = Instant::now().duration_since(start);
             println!(
-                "Time taken to parse {} dnstap events carrying DNS update messages: {:#?}",
+                "Time taken to parse {} dnstap events carrying DNS update messages: {:#?}.",
                 num, time_taken
             );
         } else {
-            error!("Invalid base64 encoded data");
+            error!("Invalid base64 encoded data.");
         }
     }
 }

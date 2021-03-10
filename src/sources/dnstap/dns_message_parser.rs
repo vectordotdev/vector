@@ -1318,10 +1318,10 @@ mod tests {
                     "SOA"
                 );
             } else {
-                error!("Message is not parsed");
+                error!("Message is not parsed.");
             }
         } else {
-            error!("Invalid base64 encoded data");
+            error!("Invalid base64 encoded data.");
         }
     }
 
@@ -1334,12 +1334,12 @@ mod tests {
                     assert!(e.to_string().contains("unexpected end of input"))
                 }
                 DnsMessageParserError::SimpleError { cause: e } => {
-                    error!("Expected TrustDnsError, got {}", &e)
+                    error!("Expected TrustDnsError, got {}.", &e)
                 }
-                _ => error!("{}", err),
+                _ => error!("{}.", err),
             }
         } else {
-            error!("Expected TrustDnsError");
+            error!("Expected TrustDnsError.");
         }
     }
 
@@ -1367,18 +1367,18 @@ mod tests {
                 assert!(err.to_string().contains("Unsupported rdata"));
                 match err {
                     DnsMessageParserError::TrustDnsError { failure_source: e } => {
-                        error!("Expected TrustDnsError, got {}", &e)
+                        error!("Expected TrustDnsError, got {}.", &e)
                     }
                     DnsMessageParserError::SimpleError { cause: e } => {
                         assert!(e.contains("Unsupported rdata"))
                     }
-                    _ => error!("{}", err),
+                    _ => error!("{}.", err),
                 }
             } else {
-                error!("Expected Error");
+                error!("Expected Error.");
             }
         } else {
-            error!("Invalid base64 encoded data");
+            error!("Invalid base64 encoded data.");
         }
     }
 
@@ -1421,7 +1421,7 @@ mod tests {
                 .parse_as_update_message()
                 .is_err());
         } else {
-            error!("Invalid base64 encoded data");
+            error!("Invalid base64 encoded data.");
         }
     }
 
@@ -1438,10 +1438,10 @@ mod tests {
                 assert_eq!(&message.zone_to_update.zone_type.clone().unwrap(), "SOA");
                 assert_eq!(&message.zone_to_update.name, "example.com.");
             } else {
-                error!("Message is not parsed");
+                error!("Message is not parsed.");
             }
         } else {
-            error!("Invalid base64 encoded data");
+            error!("Invalid base64 encoded data.");
         }
     }
 
@@ -1997,7 +1997,7 @@ mod tests {
             assert!(rdata_text.is_ok());
             assert_eq!(expected_output, rdata_text.unwrap().0.unwrap());
         } else {
-            error!("Invalid base64 encoded rdata");
+            error!("Invalid base64 encoded rdata.");
         }
     }
 
@@ -2024,10 +2024,10 @@ mod tests {
                     );
                 }
             } else {
-                error!("Invalid base64 encoded raw rdata");
+                error!("Invalid base64 encoded raw rdata.");
             }
         } else {
-            error!("Invalid base64 encoded raw message");
+            error!("Invalid base64 encoded raw message.");
         }
     }
 
@@ -2045,11 +2045,11 @@ mod tests {
             }
             let time_taken = Instant::now().duration_since(start);
             println!(
-                "Time taken to parse {} DNS query messages: {:#?}",
+                "Time taken to parse {} DNS query messages: {:#?}.",
                 num, time_taken
             );
         } else {
-            error!("Invalid base64 encoded data");
+            error!("Invalid base64 encoded data.");
         }
     }
 }

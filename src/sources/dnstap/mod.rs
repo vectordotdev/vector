@@ -202,7 +202,7 @@ impl FrameHandler for DnstapFrameHandler {
         } else {
             match DnstapParser::new(&self.schema, log_event).parse_dnstap_data(frame) {
                 Err(error) => {
-                    error!("Dnstap protobuf decode error {:?}", error);
+                    error!("Dnstap protobuf decode error {:?}.", error);
                     None
                 }
                 Ok(_) => Some(event),

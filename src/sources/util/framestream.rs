@@ -86,7 +86,7 @@ impl ControlHeader {
             0x04 => Ok(ControlHeader::Ready),
             0x05 => Ok(ControlHeader::Finish),
             _ => {
-                error!("Don't know header value {} (expected 0x01 - 0x05)", val);
+                error!("Don't know header value {} (expected 0x01 - 0x05).", val);
                 Err(())
             }
         }
@@ -112,7 +112,7 @@ impl ControlField {
         match val {
             0x01 => Ok(ControlField::ContentType),
             _ => {
-                error!("Don't know field type {} (expected 0x01)", val);
+                error!("Don't know field type {} (expected 0x01).", val);
                 Err(())
             }
         }
@@ -126,7 +126,7 @@ impl ControlField {
 
 fn advance_u32(b: &mut Bytes) -> Result<u32, ()> {
     if b.len() < 4 {
-        error!("Malformed frame");
+        error!("Malformed frame.");
         return Err(());
     }
     let a = b.split_to(4);
@@ -161,7 +161,7 @@ impl FrameStreamReader {
                 Some(frame) //return data frame
             } else {
                 error!(
-                    "Received a data frame while in state {:?}",
+                    "Received a data frame while in state {:?}.",
                     self.state.control_state
                 );
                 None
@@ -197,7 +197,7 @@ impl FrameStreamReader {
                         self.state.control_state = ControlState::ReadingData;
                         self.state.is_bidirectional = false; //if first message was START then we are unidirectional (no responses)
                     }
-                    _ => error!("Got wrong control frame, expected READY"),
+                    _ => error!("Got wrong control frame, expected READY."),
                 }
             }
             ControlState::GotReady => {
@@ -208,7 +208,7 @@ impl FrameStreamReader {
                         //if didn't error, then we are ok to change state
                         self.state.control_state = ControlState::ReadingData;
                     }
-                    _ => error!("Got wrong control frame, expected START"),
+                    _ => error!("Got wrong control frame, expected START."),
                 }
             }
             ControlState::ReadingData => {
@@ -222,10 +222,10 @@ impl FrameStreamReader {
                         }
                         self.state.control_state = ControlState::Stopped; //stream is now done
                     }
-                    _ => error!("Got wrong control frame, expected STOP"),
+                    _ => error!("Got wrong control frame, expected STOP."),
                 }
             }
-            ControlState::Stopped => error!("Unexpected control frame, current state is STOPPED"),
+            ControlState::Stopped => error!("Unexpected control frame, current state is STOPPED."),
         };
         Ok(())
     }
@@ -257,14 +257,14 @@ impl FrameStreamReader {
             ControlHeader::Stop => {
                 //check that there are no fields
                 if !frame.is_empty() {
-                    error!("Unexpected fields in STOP header");
+                    error!("Unexpected fields in STOP header.");
                     Err(())
                 } else {
                     Ok(None)
                 }
             }
             _ => {
-                error!("Unexpected control header value {:?}", header.to_u32());
+                error!("Unexpected control header value {:?}.", header.to_u32());
                 Err(())
             }
         }
@@ -272,7 +272,7 @@ impl FrameStreamReader {
 
     fn process_content_type(&self, frame: &mut Bytes, is_start_frame: bool) -> Result<String, ()> {
         if frame.is_empty() {
-            error!("No fields in control frame");
+            error!("No fields in control frame.");
             return Err(());
         }
 
@@ -288,7 +288,7 @@ impl FrameStreamReader {
 
                     //enforce limit on content type string
                     if field_len > FSTRM_CONTROL_FIELD_CONTENT_TYPE_LENGTH_MAX {
-                        error!("Content-Type string is too long");
+                        error!("Content-Type string is too long.");
                         return Err(());
                     }
 
@@ -301,7 +301,7 @@ impl FrameStreamReader {
 
         if is_start_frame && content_types.len() > 1 {
             error!(
-                "START control frame can only have one content-type provided (got {})",
+                "START control frame can only have one content-type provided (got {}).",
                 content_types.len()
             );
             return Err(());
@@ -314,7 +314,7 @@ impl FrameStreamReader {
         }
 
         error!(
-            "Content types did not match up. Expected {} got {:?}",
+            "Content types did not match up. Expected {} got {:?}.",
             self.expected_content_type, content_types
         );
         Err(())
@@ -336,7 +336,7 @@ impl FrameStreamReader {
         let mut stream = stream::iter(vec![Ok(empty_frame), Ok(frame)].into_iter());
 
         if let Err(e) = block_on(self.response_sink.lock().unwrap().send_all(&mut stream)) {
-            error!("Encountered error '{:#?}' while sending control frame", e);
+            error!("Encountered error '{:#?}' while sending control frame.", e);
         }
     }
 }
@@ -366,17 +366,17 @@ pub fn build_framestream_unix_source(
 ) -> Source {
     let path = frame_handler.socket_path();
 
-    let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
+    let out = out.sink_map_err(|e| error!("Error sending event: {:?}.", e));
 
     //check if the path already exists (and try to delete it)
     match fs::metadata(&path) {
         Ok(_) => {
             //exists, so try to delete it
-            info!(message = "Deleting file", ?path);
-            fs::remove_file(&path).expect("Failed to delete existing socket");
+            info!(message = "Deleting file.", ?path);
+            fs::remove_file(&path).expect("Failed to delete existing socket.");
         }
         Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {} //doesn't exist, do nothing
-        Err(e) => error!("Failed to bind to listener socket; error = {:?}", e),
+        Err(e) => error!("Failed to bind to listener socket; error = {:?}.", e),
     };
 
     let fut = async move {
@@ -394,7 +394,7 @@ pub fn build_framestream_unix_source(
                 nix::sys::socket::sockopt::RcvBuf,
             );
             info!(
-                "Unix socket receive buffer size modified to {}",
+                "Unix socket receive buffer size modified to {}.",
                 rcv_buf_size.unwrap()
             );
         }
@@ -411,7 +411,7 @@ pub fn build_framestream_unix_source(
                 nix::sys::socket::sockopt::SndBuf,
             );
             info!(
-                "Unix socket buffer send size modified to {}",
+                "Unix socket buffer send size modified to {}.",
                 snd_buf_size.unwrap()
             );
         }
@@ -419,14 +419,14 @@ pub fn build_framestream_unix_source(
         // the permissions to unix socket are restricted from 0o700 to 0o777, which are 448 and 511 in decimal
         if let Some(socket_permission) = frame_handler.socket_file_mode() {
             if !(448..=511).contains(&socket_permission) {
-                panic!("Invalid Socket permission");
+                panic!("Invalid Socket permission.");
             }
             match fs::set_permissions(&path, fs::Permissions::from_mode(socket_permission)) {
                 Ok(_) => {
-                    info!("Socket permissions updated to {:o}", socket_permission);
+                    info!("Socket permissions updated to {:o}.", socket_permission);
                 }
                 Err(e) => error!(
-                    "Failed to update listener socket permissions; error = {:?}",
+                    "Failed to update listener socket permissions; error = {:?}.",
                     e
                 ),
             };
@@ -440,7 +440,7 @@ pub fn build_framestream_unix_source(
         while let Some(socket) = stream.next().await {
             let socket = match socket {
                 Err(e) => {
-                    error!("Failed to accept socket; error = {:?}", e);
+                    error!("Failed to accept socket; error = {:?}.", e);
                     continue;
                 }
                 Ok(s) => s,
@@ -499,7 +499,7 @@ pub fn build_framestream_unix_source(
 
                 let handler = async move {
                     let _ = event_sink.send_all(&mut events).await;
-                    info!("finished sending");
+                    info!("Finished sending.");
 
                     //TODO: shutdown
                     // let splitstream = events.get_ref().get_ref();
@@ -529,7 +529,7 @@ pub fn build_framestream_unix_source(
                             })
                         })
                         .await;
-                    info!("finished sending");
+                    info!("Finished sending.");
                 };
                 tokio::spawn(handler.instrument(span));
             }
@@ -557,7 +557,7 @@ where
         future::ready({
             if let Some(evt) = event_handler.handle_event(received_from, event_data) {
                 if event_sink.send(evt).await.is_err() {
-                    error!("Encountered error while sending event");
+                    error!("Encountered error while sending event.");
                 }
             }
             active_task_nums.fetch_sub(1, Ordering::AcqRel);
@@ -1049,7 +1049,7 @@ mod test {
     #[tokio::test(threaded_scheduler)]
     async fn test_spawn_event_handling_tasks() {
         let (tx, rx) = Pipeline::new_test();
-        let out = tx.sink_map_err(|e| error!("error sending event: {:?}", e));
+        let out = tx.sink_map_err(|e| error!("Error sending event: {:?}.", e));
 
         let max_frame_handling_tasks = 20;
         let active_task_nums = Arc::new(AtomicI32::new(0));
