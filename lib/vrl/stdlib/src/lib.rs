@@ -114,6 +114,8 @@ mod parse_url;
 mod push;
 //#[cfg(feature = "redact")]
 //mod redact;
+#[cfg(feature = "parse_query_string")]
+mod parse_query_string;
 #[cfg(feature = "replace")]
 mod replace;
 #[cfg(feature = "round")]
@@ -263,6 +265,8 @@ pub use parse_json::ParseJson;
 pub use parse_key_value::ParseKeyValue;
 #[cfg(feature = "parse_logfmt")]
 pub use parse_logfmt::ParseLogFmt;
+#[cfg(feature = "parse_query_string")]
+pub use parse_query_string::ParseQueryString;
 #[cfg(feature = "parse_regex")]
 pub use parse_regex::ParseRegex;
 #[cfg(feature = "parse_regex_all")]
@@ -430,6 +434,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseKeyValue),
         #[cfg(feature = "parse_logfmt")]
         Box::new(ParseLogFmt),
+        #[cfg(feature = "parse_query_string")]
+        Box::new(ParseQueryString),
         #[cfg(feature = "parse_regex")]
         Box::new(ParseRegex),
         #[cfg(feature = "parse_regex_all")]
