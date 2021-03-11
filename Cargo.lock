@@ -8436,6 +8436,7 @@ dependencies = [
  "paste",
  "regex",
  "serde",
+ "shared",
  "thiserror",
  "tracing 0.1.23",
  "vrl-diagnostic",
