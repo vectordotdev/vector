@@ -213,6 +213,7 @@ const TIMESTAMP_TZ_FORMATS: &[&str] = &[
     "%a %d %b %T %Z %Y",  // `date` command output
     "%a %d %b %T %z %Y",  // `date` command output, numeric TZ
     "%a %d %b %T %#z %Y", // `date` command output, numeric TZ
+    "%d/%b/%Y:%T %z",     // Common Log
 ];
 
 /// Parse a string into a timestamp using one of a set of formats
