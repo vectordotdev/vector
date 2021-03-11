@@ -342,6 +342,7 @@ mod tests {
         test_util::{random_string, trace_init},
         tls::MaybeTlsSettings,
     };
+    use chrono::Duration;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
     use tokio::{sync::mpsc, time};
@@ -356,17 +357,47 @@ mod tests {
 
     #[tokio::test]
     async fn prometheus_notls() {
-        export_and_fetch(PROMETHEUS_ADDRESS_NOTLS, None).await;
+        export_and_fetch_simple(PROMETHEUS_ADDRESS_NOTLS, None).await;
     }
 
     #[tokio::test]
     async fn prometheus_tls() {
         let mut tls_config = TlsConfig::test_config();
         tls_config.options.verify_hostname = Some(false);
-        export_and_fetch(PROMETHEUS_ADDRESS_TLS, Some(tls_config)).await;
+        export_and_fetch_simple(PROMETHEUS_ADDRESS_TLS, Some(tls_config)).await;
     }
 
-    async fn export_and_fetch(address: &str, tls_config: Option<TlsConfig>) {
+    #[tokio::test]
+    async fn updates_timestamps() {
+        let timestamp1 = Utc::now();
+        let (name, event1) = create_metric_gauge(None, 123.4);
+        let event1 = Event::from(event1.into_metric().with_timestamp(Some(timestamp1)));
+        let (_, event2) = create_metric_gauge(Some(name.clone()), 12.0);
+        let timestamp2 = timestamp1 + Duration::seconds(1);
+        let event2 = Event::from(event2.into_metric().with_timestamp(Some(timestamp2)));
+        let events = vec![event1, event2];
+
+        let body = export_and_fetch(PROMETHEUS_ADDRESS_NOTLS, None, events).await;
+        let timestamp = timestamp2.timestamp_millis();
+        assert_eq!(
+            body,
+            format!(
+                indoc! {r#"
+                    # HELP {name} {name}
+                    # TYPE {name} gauge
+                    {name}{{some_tag="some_value"}} 135.4 {timestamp}
+                "#},
+                name = name,
+                timestamp = timestamp
+            )
+        );
+    }
+
+    async fn export_and_fetch(
+        address: &str,
+        tls_config: Option<TlsConfig>,
+        events: Vec<Event>,
+    ) -> String {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
@@ -384,10 +415,9 @@ mod tests {
         let (tx, rx) = mpsc::unbounded_channel();
         tokio::spawn(sink.run(Box::pin(rx)));
 
-        let (name1, event) = create_metric_gauge(None, 123.4);
-        tx.send(event).expect("Failed to send.");
-        let (name2, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
-        tx.send(event).expect("Failed to send.");
+        for event in events {
+            tx.send(event).expect("Failed to send event.");
+        }
 
         time::delay_for(time::Duration::from_millis(100)).await;
 
@@ -401,11 +431,20 @@ mod tests {
             .expect("Could not fetch query");
 
         assert!(result.status().is_success());
+
         let body = result.into_body();
         let bytes = hyper::body::to_bytes(body)
             .await
             .expect("Reading body failed");
-        let body = String::from_utf8(bytes.to_vec()).unwrap();
+        String::from_utf8(bytes.to_vec()).unwrap()
+    }
+
+    async fn export_and_fetch_simple(address: &str, tls_config: Option<TlsConfig>) {
+        let (name1, event1) = create_metric_gauge(None, 123.4);
+        let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
+        let events = vec![event1, event2];
+
+        let body = export_and_fetch(address, tls_config, events).await;
 
         assert!(body.contains(&format!(
             indoc! {r#"
