@@ -283,13 +283,13 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl"]
+target-aarch64-unknown-linux-gnu = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
+target-aarch64-unknown-linux-musl = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
 # TODO: Enable leveldb here for armv7-unknown-linux-musleabihf
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl"]
-target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl"]
-target-x86_64-unknown-linux-gnu = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-all"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
+target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli"]
+target-x86_64-unknown-linux-gnu = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-all", "vrl-cli"]
+target-x86_64-unknown-linux-musl = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
 
 # Enables `rdkafka` dependency.
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
