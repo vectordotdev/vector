@@ -30,10 +30,7 @@ impl Assignment {
                 // Fallible expressions require infallible assignment.
                 if type_def.is_fallible() {
                     return Err(Error {
-                        variant: ErrorVariant::UnhandledError(
-                            target.to_string(),
-                            expr.to_string(),
-                        ),
+                        variant: ErrorVariant::UnhandledError(target.to_string(), expr.to_string()),
                         span,
                         expr_span,
                         assignment_span,
