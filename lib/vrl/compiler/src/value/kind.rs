@@ -122,6 +122,7 @@ impl Kind {
             Kind::Object => value!({}),
             Kind::Array => value!([]),
             Kind::Timestamp => Utc.timestamp(0, 0).into(),
+            #[allow(clippy::trivial_regex)]
             Kind::Regex => Regex::new("").unwrap().into(),
             _ => Value::Null,
         }
