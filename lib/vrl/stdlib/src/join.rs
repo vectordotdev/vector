@@ -73,108 +73,38 @@ impl Expression for JoinFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        /*let fallible = match self.value.type_def(state).kind.array() {
-            Some(array) => !array.values().all(|kind| kind.is(kind::BYTES)),
-            _ => true,
-        };
-
-        TypeDef::new().with_fallibility(fallible).bytes()
-        */
-
         TypeDef::new().fallible().bytes()
     }
 }
 
-/*
 #[cfg(test)]
 mod test {
     use super::*;
-    use value::Kind;
-
-    test_type_def![
-        value_string_array_infallible {
-            expr: |_| JoinFn {
-                value: array!["one", "two", "three"].boxed(),
-                separator: Some(lit!(", ").boxed()),
-            },
-            def: TypeDef {
-                fallible: false,
-                kind: Kind::Bytes,
-                ..Default::default()
-            },
-        }
-
-        value_mixed_array_fallible {
-            expr: |_| JoinFn {
-                value: array!["one", 1].boxed(),
-                separator: Some(lit!(", ").boxed()),
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: Kind::Bytes,
-                ..Default::default()
-            },
-        }
-
-        value_literal_fallible {
-            expr: |_| JoinFn {
-                value: lit!(427).boxed(),
-                separator: None,
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: Kind::Bytes,
-                ..Default::default()
-            },
-        }
-
-        separator_integer_fallible {
-            expr: |_| JoinFn {
-                value: array!["one", "two", "three"].boxed(),
-                separator: Some(lit!(427).boxed()),
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: Kind::Bytes,
-                ..Default::default()
-            },
-        }
-
-        both_types_wrong_fallible {
-            expr: |_| JoinFn {
-                value: lit!(true).boxed(),
-                separator: Some(lit!(427).boxed()),
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: Kind::Bytes,
-                ..Default::default()
-            },
-        }
-    ];
-
     test_function![
         join => Join;
 
         with_comma_separator {
-            args: func_args![value: array!["one", "two", "three"], separator: lit!(", ")],
+            args: func_args![value: value!(["one", "two", "three"]), separator: ", "],
             want: Ok(value!("one, two, three")),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         with_space_separator {
-            args: func_args![value: array!["one", "two", "three"], separator: lit!(" ")],
+            args: func_args![value: value!(["one", "two", "three"]), separator: " "],
             want: Ok(value!("one two three")),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         without_separator {
-            args: func_args![value: array!["one", "two", "three"]],
+            args: func_args![value: value!(["one", "two", "three"])],
             want: Ok(value!("onetwothree")),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         non_string_array_item_throws_error {
-            args: func_args![value: array!["one", "two", 3]],
-            want: Err("function call error: all array items must be strings"),
+            args: func_args![value: value!(["one", "two", 3])],
+            want: Err("all array items must be strings"),
+            tdef: TypeDef::new().fallible().bytes(),
         }
     ];
 }
-*/

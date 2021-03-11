@@ -8,7 +8,7 @@
 #   │
 # 2 │ "foo" ?? "bar"
 #   │ ----- ^^
-#   │ │     this error coalescing is unneeded
+#   │ │     this error coalescing is unnecessary
 #   │ │
 #   │ because this expression cannot fail
 #   │

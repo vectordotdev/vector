@@ -46,15 +46,6 @@ struct ParseTimestampFn {
     format: Box<dyn Expression>,
 }
 
-impl ParseTimestampFn {
-    // #[cfg(test)]
-    // fn new(format: &str, value: Box<dyn Expression>) -> Self {
-    //     let format = Box::new(Literal::from(format));
-
-    //     Self { value, format }
-    // }
-}
-
 impl Expression for ParseTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
@@ -82,88 +73,34 @@ impl Expression for ParseTimestampFn {
 
 #[cfg(test)]
 mod tests {
-    /*
     use super::*;
     use chrono::{DateTime, Utc};
-    use shared::btreemap;
 
-    vrl::test_type_def![
-        value_string_fallible {
-            expr: |_| ParseTimestampFn {
-                value: lit!("<timestamp>").boxed(),
-                format: lit!("<format>").boxed(),
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: value::Kind::Timestamp,
-                ..Default::default()
-            },
+    test_function![
+        parse_timestamp => ParseTimestamp;
+
+        parse_timestamp {
+            args: func_args![value: DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
+                             .unwrap()
+                             .with_timezone(&Utc),
+                             format:"%d/%m/%Y:%H:%M:%S %z"],
+            want: Ok(value!(
+                    DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
+                        .unwrap()
+                        .with_timezone(&Utc)
+            )),
+            tdef: TypeDef::new().fallible().timestamp(),
         }
 
-        value_timestamp_fallible {
-            expr: |_| ParseTimestampFn {
-                value: Literal::from(chrono::Utc::now()).boxed(),
-                format: lit!("<format>").boxed(),
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: value::Kind::Timestamp,
-                ..Default::default()
-            },
-        }
-
-        non_string_ot_timestamp_fallible {
-            expr: |_| ParseTimestampFn {
-                value: lit!(127).boxed(),
-                format: lit!("<format>").boxed(),
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: value::Kind::Timestamp,
-                ..Default::default()
-            },
+        parse_text {
+            args: func_args![value: "16/10/2019:12:00:00 +0000",
+                             format: "%d/%m/%Y:%H:%M:%S %z"],
+            want: Ok(value!(
+                    DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
+                        .unwrap()
+                        .with_timezone(&Utc)
+            )),
+            tdef: TypeDef::new().fallible().timestamp(),
         }
     ];
-
-    #[test]
-    fn parse_timestamp() {
-        let cases = vec![
-            (
-                btreemap! {
-                    "foo" => DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
-                              .unwrap()
-                              .with_timezone(&Utc),
-                },
-                Ok(
-                    DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
-                        .unwrap()
-                        .with_timezone(&Utc)
-                        .into(),
-                ),
-                ParseTimestampFn::new("%d/%m/%Y:%H:%M:%S %z", Box::new(Path::from("foo"))),
-            ),
-            (
-                btreemap! { "foo" => "16/10/2019:12:00:00 +0000" },
-                Ok(
-                    DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
-                        .unwrap()
-                        .with_timezone(&Utc)
-                        .into(),
-                ),
-                ParseTimestampFn::new("%d/%m/%Y:%H:%M:%S %z", Box::new(Path::from("foo"))),
-            ),
-        ];
-
-        let mut state = state::Program::default();
-
-        for (object, exp, func) in cases {
-            let mut object: Value = object.into();
-            let got = func
-                .resolve(&mut ctx)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
-        }
-    }
-    */
 }

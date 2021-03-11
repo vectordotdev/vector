@@ -150,4 +150,9 @@ components: sinks: kafka: {
 	}
 
 	how_it_works: components._kafka.how_it_works
+
+	telemetry: metrics: {
+		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+	}
 }

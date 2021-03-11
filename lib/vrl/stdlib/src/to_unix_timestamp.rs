@@ -114,15 +114,6 @@ struct ToUnixTimestampFn {
     unit: Unit,
 }
 
-impl ToUnixTimestampFn {
-    /*
-    #[cfg(test)]
-    fn new(value: Box<dyn Expression>, unit: Unit) -> Self {
-        Self { value, unit }
-    }
-    */
-}
-
 impl Expression for ToUnixTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let ts = self.value.resolve(ctx)?.try_timestamp()?;
@@ -141,76 +132,36 @@ impl Expression for ToUnixTimestampFn {
     }
 }
 
-/*
 #[cfg(test)]
 mod test {
     use super::*;
     use chrono::TimeZone;
 
-    test_type_def![
-        timestamp_infallible {
-            expr: |_| ToUnixTimestampFn {
-                value: Literal::from(chrono::Utc::now()).boxed(),
-                unit: Unit::Seconds,
-            },
-            def: TypeDef {
-                kind: Kind::Integer,
-                ..Default::default()
-            },
+    test_function![
+        to_unix_timestamp => ToUnixTimestamp;
+
+        seconds {
+            args: func_args![value: chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0),
+                             unit: "seconds"
+            ],
+            want: Ok(1609459200i64),
+            tdef: TypeDef::new().infallible().integer(),
         }
 
-        string_fallible {
-            expr: |_| ToUnixTimestampFn {
-                value: lit!("late December back in '63").boxed(),
-                unit: Unit::Seconds,
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: Kind::Integer,
-                ..Default::default()
-            },
+        milliseconds {
+            args: func_args![value: chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0),
+                             unit: "milliseconds"
+            ],
+            want: Ok(1609459200000i64),
+            tdef: TypeDef::new().infallible().integer(),
         }
+
+        nanoseconds {
+             args: func_args![value: chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0),
+                              unit: "nanoseconds"
+             ],
+             want: Ok(1609459200000000000i64),
+             tdef: TypeDef::new().infallible().integer(),
+         }
     ];
-
-    #[test]
-    fn to_unix_timestamp() {
-        let cases = vec![
-            (
-                map! {},
-                Ok(1609459200.into()),
-                ToUnixTimestampFn::new(
-                    Literal::from(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed(),
-                    Unit::Seconds,
-                ),
-            ),
-            (
-                map! {},
-                Ok(1609459200000i64.into()),
-                ToUnixTimestampFn::new(
-                    Literal::from(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed(),
-                    Unit::Milliseconds,
-                ),
-            ),
-            (
-                map! {},
-                Ok(1609459200000000000i64.into()),
-                ToUnixTimestampFn::new(
-                    Literal::from(chrono::Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)).boxed(),
-                    Unit::Nanoseconds,
-                ),
-            ),
-        ];
-
-        let mut state = state::Program::default();
-
-        for (object, exp, func) in cases {
-            let mut object: Value = object.into();
-            let got = func
-                .resolve(&mut ctx)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
-        }
-    }
 }
-*/

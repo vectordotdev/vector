@@ -6,7 +6,6 @@ remap: errors: "108": {
 		A [function call expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor)) passes an
 		unknown named argument.
 		"""
-	rationale:   null
 	resolution: """
 		Correct the name to align with the documented argument names for the function.
 		"""

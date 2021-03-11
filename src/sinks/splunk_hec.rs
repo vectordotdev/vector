@@ -2,7 +2,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
     http::HttpClient,
-    internal_events::{SplunkEventEncodeError, SplunkEventSent, SplunkMissingKeys},
+    internal_events::{SplunkEventEncodeError, SplunkEventSent, TemplateRenderingFailed},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
@@ -143,10 +143,11 @@ impl HttpSink for HecSinkConfig {
         let sourcetype = self.sourcetype.as_ref().and_then(|sourcetype| {
             sourcetype
                 .render_string(&event)
-                .map_err(|missing_keys| {
-                    emit!(SplunkMissingKeys {
-                        field: "sourcetype",
-                        keys: &missing_keys
+                .map_err(|error| {
+                    emit!(TemplateRenderingFailed {
+                        error,
+                        field: Some("sourcetype"),
+                        drop_event: false,
                     });
                 })
                 .ok()
@@ -155,10 +156,11 @@ impl HttpSink for HecSinkConfig {
         let source = self.source.as_ref().and_then(|source| {
             source
                 .render_string(&event)
-                .map_err(|missing_keys| {
-                    emit!(SplunkMissingKeys {
-                        field: "source",
-                        keys: &missing_keys
+                .map_err(|error| {
+                    emit!(TemplateRenderingFailed {
+                        error,
+                        field: Some("source"),
+                        drop_event: false,
                     });
                 })
                 .ok()
@@ -167,10 +169,11 @@ impl HttpSink for HecSinkConfig {
         let index = self.index.as_ref().and_then(|index| {
             index
                 .render_string(&event)
-                .map_err(|missing_keys| {
-                    emit!(SplunkMissingKeys {
-                        field: "index",
-                        keys: &missing_keys
+                .map_err(|error| {
+                    emit!(TemplateRenderingFailed {
+                        error,
+                        field: Some("index"),
+                        drop_event: false,
                     });
                 })
                 .ok()

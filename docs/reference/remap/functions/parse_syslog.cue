@@ -7,25 +7,25 @@ remap: functions: parse_syslog: {
 		"""
 	notices: [
 		"""
-		The function makes a best effort to parse the various Syslog formats out in the wild. This includes
+		The function makes a best effort to parse the various Syslog formats that exists out in the wild. This includes
 		[RFC 6587](\(urls.syslog_6587)), [RFC 5424](\(urls.syslog_5424)), [RFC 3164](\(urls.syslog_3164)), and other
 		common variations (such as the Nginx Syslog style).
 		""",
 		"""
-			All structured data values are returned as strings, it is recommended to manually coerce values as you see fit.
+			All values are returned as strings. We recommend manually coercing values to desired types as you see fit.
 			""",
 	]
 
 	arguments: [
 		{
 			name:        "value"
-			description: "The text containing the syslog message to parse."
+			description: "The text containing the Syslog message to parse."
 			required:    true
 			type: ["string"]
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a properly formatted Syslog log",
+		"`value` isn't a properly formatted Syslog message",
 	]
 	return: types: ["object"]
 

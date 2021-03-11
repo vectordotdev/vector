@@ -63,39 +63,43 @@ impl Expression for ParseAwsAlbLogFn {
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new()
             .fallible() // Log parsing error
-            .object::<&str, Kind>(map! {
-                "actions_executed": Kind::Bytes | Kind::Null,
-                "chosen_cert_arn": Kind::Bytes | Kind::Null,
-                "classification_reason": Kind::Bytes | Kind::Null,
-                "classification": Kind::Bytes | Kind::Null,
-                "client_host": Kind::Bytes,
-                "domain_name": Kind::Bytes | Kind::Null,
-                "elb_status_code": Kind::Bytes,
-                "elb": Kind::Bytes,
-                "error_reason": Kind::Bytes | Kind::Null,
-                "matched_rule_priority": Kind::Bytes | Kind::Null,
-                "received_bytes": Kind::Integer,
-                "redirect_url": Kind::Bytes | Kind::Null,
-                "request_creation_time": Kind::Bytes,
-                "request_method": Kind::Bytes,
-                "request_processing_time": Kind::Float,
-                "request_protocol": Kind::Bytes,
-                "request_url": Kind::Bytes,
-                "response_processing_time": Kind::Float,
-                "sent_bytes": Kind::Integer,
-                "ssl_cipher": Kind::Bytes | Kind::Null,
-                "ssl_protocol": Kind::Bytes | Kind::Null,
-                "target_group_arn": Kind::Bytes,
-                "target_host": Kind::Bytes | Kind::Null,
-                "target_port_list": Kind::Bytes | Kind::Null,
-                "target_processing_time": Kind::Float,
-                "target_status_code_list": Kind::Bytes | Kind::Null,
-                "target_status_code": Kind::Bytes | Kind::Null,
-                "timestamp": Kind::Bytes,
-                "trace_id": Kind::Bytes,
-                "type": Kind::Bytes,
-                "user_agent": Kind::Bytes,
-            })
+            .object::<&str, Kind>(inner_type_def())
+    }
+}
+
+fn inner_type_def() -> BTreeMap<&'static str, Kind> {
+    map! {
+        "actions_executed": Kind::Bytes | Kind::Null,
+        "chosen_cert_arn": Kind::Bytes | Kind::Null,
+        "classification_reason": Kind::Bytes | Kind::Null,
+        "classification": Kind::Bytes | Kind::Null,
+        "client_host": Kind::Bytes,
+        "domain_name": Kind::Bytes | Kind::Null,
+        "elb_status_code": Kind::Bytes,
+        "elb": Kind::Bytes,
+        "error_reason": Kind::Bytes | Kind::Null,
+        "matched_rule_priority": Kind::Bytes | Kind::Null,
+        "received_bytes": Kind::Integer,
+        "redirect_url": Kind::Bytes | Kind::Null,
+        "request_creation_time": Kind::Bytes,
+        "request_method": Kind::Bytes,
+        "request_processing_time": Kind::Float,
+        "request_protocol": Kind::Bytes,
+        "request_url": Kind::Bytes,
+        "response_processing_time": Kind::Float,
+        "sent_bytes": Kind::Integer,
+        "ssl_cipher": Kind::Bytes | Kind::Null,
+        "ssl_protocol": Kind::Bytes | Kind::Null,
+        "target_group_arn": Kind::Bytes,
+        "target_host": Kind::Bytes | Kind::Null,
+        "target_port_list": Kind::Bytes | Kind::Null,
+        "target_processing_time": Kind::Float,
+        "target_status_code_list": Kind::Bytes | Kind::Null,
+        "target_status_code": Kind::Bytes | Kind::Null,
+        "timestamp": Kind::Bytes,
+        "trace_id": Kind::Bytes,
+        "type": Kind::Bytes,
+        "user_agent": Kind::Bytes,
     }
 }
 
@@ -237,73 +241,263 @@ fn take_list(cond: impl Fn(char) -> bool) -> impl FnOnce(&str) -> SResult<Vec<&s
 
 #[cfg(test)]
 mod tests {
-    //     use super::*;
+    use super::*;
 
-    //     vrl::test_type_def![
-    //         value_string {
-    //             expr: |_| ParseAwsAlbLogFn { value: Literal::from("foo").boxed() },
-    //             def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
-    //         }
+    test_function![
+        parse_aws_alb_log => ParseAwsAlbLog;
 
-    //         value_optional {
-    //             expr: |_| ParseAwsAlbLogFn { value: Box::new(Noop) },
-    //             def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
-    //         }
-    //     ];
+        one {
+            args: func_args![value: r#"http 2018-07-02T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188 192.168.131.39:2817 10.0.0.1:80 0.000 0.001 0.000 200 200 34 366 "GET http://www.example.com:80/ HTTP/1.1" "curl/7.46.0" - - arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067 "Root=1-58337262-36d228ad5d99923122bbe354" "-" "-" 0 2018-07-02T22:22:48.364000Z "forward" "-" "-" 10.0.0.1:80 200 "-" "-""#],
+            want: Ok(value!({actions_executed: "forward",
+                             chosen_cert_arn: null,
+                             classification: null,
+                             classification_reason: null,
+                             client_host: "192.168.131.39:2817",
+                             domain_name: null,
+                             elb: "app/my-loadbalancer/50dc6c495c0c9188",
+                             elb_status_code: "200",
+                             error_reason: null,
+                             matched_rule_priority: "0",
+                             received_bytes: 34,
+                             redirect_url: null,
+                             request_creation_time: "2018-07-02T22:22:48.364000Z",
+                             request_method: "GET",
+                             request_processing_time: 0.0,
+                             request_protocol: "HTTP/1.1",
+                             request_url: "http://www.example.com:80/",
+                             response_processing_time: 0.0,
+                             sent_bytes: 366,
+                             ssl_cipher: null,
+                             ssl_protocol: null,
+                             target_group_arn: "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067",
+                             target_host: "10.0.0.1:80",
+                             target_port_list: ["10.0.0.1:80"],
+                             target_processing_time: 0.001,
+                             target_status_code: "200",
+                             target_status_code_list: ["200"],
+                             timestamp: "2018-07-02T22:23:00.186641Z",
+                             trace_id: "Root=1-58337262-36d228ad5d99923122bbe354",
+                             type: "http",
+                             user_agent: "curl/7.46.0"
 
-    //     #[test]
-    //     fn parse_aws_alb_log() {
-    //         let logs = vec![
-    //             r#"http 2018-07-02T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188
-    // 192.168.131.39:2817 10.0.0.1:80 0.000 0.001 0.000 200 200 34 366
-    // "GET http://www.example.com:80/ HTTP/1.1" "curl/7.46.0" - -
-    // arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067
-    // "Root=1-58337262-36d228ad5d99923122bbe354" "-" "-"
-    // 0 2018-07-02T22:22:48.364000Z "forward" "-" "-" 10.0.0.1:80 200 "-" "-""#,
-    //             r#"https 2018-07-02T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188
-    // 192.168.131.39:2817 10.0.0.1:80 0.086 0.048 0.037 200 200 0 57
-    // "GET https://www.example.com:443/ HTTP/1.1" "curl/7.46.0" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2
-    // arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067
-    // "Root=1-58337281-1d84f3d73c47ec4e58577259" "www.example.com" "arn:aws:acm:us-east-2:123456789012:certificate/12345678-1234-1234-1234-123456789012"
-    // 1 2018-07-02T22:22:48.364000Z "authenticate,forward" "-" "-" 10.0.0.1:80 200 "-" "-""#,
-    //             r#"h2 2018-07-02T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188
-    // 10.0.1.252:48160 10.0.0.66:9000 0.000 0.002 0.000 200 200 5 257
-    // "GET https://10.0.2.105:773/ HTTP/2.0" "curl/7.46.0" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2
-    // arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067
-    // "Root=1-58337327-72bd00b0343d75b906739c42" "-" "-"
-    // 1 2018-07-02T22:22:48.364000Z "redirect" "https://example.com:80/" "-" 10.0.0.66:9000 200 "-" "-""#,
-    //             r#"ws 2018-07-02T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188
-    // 10.0.0.140:40914 10.0.1.192:8010 0.001 0.003 0.000 101 101 218 587
-    // "GET http://10.0.0.30:80/ HTTP/1.1" "-" - -
-    // arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067
-    // "Root=1-58337364-23a8c76965a2ef7629b185e3" "-" "-"
-    // 1 2018-07-02T22:22:48.364000Z "forward" "-" "-" 10.0.1.192:8010 101 "-" "-""#,
-    //             r#"wss 2018-07-02T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188
-    // 10.0.0.140:44244 10.0.0.171:8010 0.000 0.001 0.000 101 101 218 786
-    // "GET https://10.0.0.30:443/ HTTP/1.1" "-" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2
-    // arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067
-    // "Root=1-58337364-23a8c76965a2ef7629b185e3" "-" "-"
-    // 1 2018-07-02T22:22:48.364000Z "forward" "-" "-" 10.0.0.171:8010 101 "-" "-""#,
-    //             r#"http 2018-11-30T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188
-    // 192.168.131.39:2817 - 0.000 0.001 0.000 200 200 34 366
-    // "GET http://www.example.com:80/ HTTP/1.1" "curl/7.46.0" - -
-    // arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067
-    // "Root=1-58337364-23a8c76965a2ef7629b185e3" "-" "-"
-    // 0 2018-11-30T22:22:48.364000Z "forward" "-" "-" "-" "-" "-" "-""#,
-    //             r#"http 2018-11-30T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188
-    // 192.168.131.39:2817 - 0.000 0.001 0.000 502 - 34 366
-    // "GET http://www.example.com:80/ HTTP/1.1" "curl/7.46.0" - -
-    // arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067
-    // "Root=1-58337364-23a8c76965a2ef7629b185e3" "-" "-"
-    // 0 2018-11-30T22:22:48.364000Z "forward" "-" "LambdaInvalidResponse" "-" "-" "-" "-""#,
-    //         ];
-    //         let logs = logs
-    //             .into_iter()
-    //             .map(|s| s.replace('\n', " "))
-    //             .collect::<Vec<String>>();
+            })),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+        }
 
-    //         for log in logs {
-    //             assert!(parse_log(&log).is_ok())
-    //         }
-    //     }
+        two {
+            args: func_args![value: r#"https 2018-07-02T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188 192.168.131.39:2817 10.0.0.1:80 0.086 0.048 0.037 200 200 0 57 "GET https://www.example.com:443/ HTTP/1.1" "curl/7.46.0" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067 "Root=1-58337281-1d84f3d73c47ec4e58577259" "www.example.com" "arn:aws:acm:us-east-2:123456789012:certificate/12345678-1234-1234-1234-123456789012" 1 2018-07-02T22:22:48.364000Z "authenticate,forward" "-" "-" 10.0.0.1:80 200 "-" "-""#],
+            want: Ok(value! ({actions_executed: "authenticate,forward",
+                              chosen_cert_arn: "arn:aws:acm:us-east-2:123456789012:certificate/12345678-1234-1234-1234-123456789012",
+                              classification: null,
+                              classification_reason: null,
+                              client_host: "192.168.131.39:2817",
+                              domain_name: "www.example.com",
+                              elb: "app/my-loadbalancer/50dc6c495c0c9188",
+                              elb_status_code: "200",
+                              error_reason: null,
+                              matched_rule_priority: "1",
+                              received_bytes: 0,
+                              redirect_url: null,
+                              request_creation_time: "2018-07-02T22:22:48.364000Z",
+                              request_method: "GET",
+                              request_processing_time: 0.086,
+                              request_protocol: "HTTP/1.1",
+                              request_url: "https://www.example.com:443/",
+                              response_processing_time: 0.037,
+                              sent_bytes: 57,
+                              ssl_cipher: "ECDHE-RSA-AES128-GCM-SHA256",
+                              ssl_protocol: "TLSv1.2",
+                              target_group_arn: "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067",
+                              target_host: "10.0.0.1:80",
+                              target_port_list: ["10.0.0.1:80"],
+                              target_processing_time: 0.048,
+                              target_status_code: "200",
+                              target_status_code_list: ["200"],
+                              timestamp: "2018-07-02T22:23:00.186641Z",
+                              trace_id: "Root=1-58337281-1d84f3d73c47ec4e58577259",
+                              type: "https",
+                              user_agent: "curl/7.46.0"})),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+        }
+
+        three {
+            args: func_args![value: r#"h2 2018-07-02T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188 10.0.1.252:48160 10.0.0.66:9000 0.000 0.002 0.000 200 200 5 257 "GET https://10.0.2.105:773/ HTTP/2.0" "curl/7.46.0" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067 "Root=1-58337327-72bd00b0343d75b906739c42" "-" "-" 1 2018-07-02T22:22:48.364000Z "redirect" "https://example.com:80/" "-" 10.0.0.66:9000 200 "-" "-""#],
+            want: Ok(value! ({actions_executed: "redirect",
+                              chosen_cert_arn: null,
+                              classification: null,
+                              classification_reason: null,
+                              client_host: "10.0.1.252:48160",
+                              domain_name: null,
+                              elb: "app/my-loadbalancer/50dc6c495c0c9188",
+                              elb_status_code: "200",
+                              error_reason: null,
+                              matched_rule_priority: "1",
+                              received_bytes: 5,
+                              redirect_url: "https://example.com:80/",
+                              request_creation_time: "2018-07-02T22:22:48.364000Z",
+                              request_method: "GET",
+                              request_processing_time: 0.0,
+                              request_protocol: "HTTP/2.0",
+                              request_url: "https://10.0.2.105:773/",
+                              response_processing_time: 0.0,
+                              sent_bytes: 257,
+                              ssl_cipher: "ECDHE-RSA-AES128-GCM-SHA256",
+                              ssl_protocol: "TLSv1.2",
+                              target_group_arn: "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067",
+                              target_host: "10.0.0.66:9000",
+                              target_port_list: ["10.0.0.66:9000"],
+                              target_processing_time: 0.002,
+                              target_status_code: "200",
+                              target_status_code_list: ["200"],
+                              timestamp: "2018-07-02T22:23:00.186641Z",
+                              trace_id: "Root=1-58337327-72bd00b0343d75b906739c42",
+                              type: "h2",
+                              user_agent: "curl/7.46.0"})),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+        }
+
+        four {
+            args: func_args![value: r#"ws 2018-07-02T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188 10.0.0.140:40914 10.0.1.192:8010 0.001 0.003 0.000 101 101 218 587 "GET http://10.0.0.30:80/ HTTP/1.1" "-" - - arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067 "Root=1-58337364-23a8c76965a2ef7629b185e3" "-" "-" 1 2018-07-02T22:22:48.364000Z "forward" "-" "-" 10.0.1.192:8010 101 "-" "-""#],
+            want: Ok(value!({actions_executed: "forward",
+                             chosen_cert_arn: null,
+                             classification: null,
+                             classification_reason: null,
+                             client_host: "10.0.0.140:40914",
+                             domain_name: null,
+                             elb: "app/my-loadbalancer/50dc6c495c0c9188",
+                             elb_status_code: "101",
+                             error_reason: null,
+                             matched_rule_priority: "1",
+                             received_bytes: 218,
+                             redirect_url: null,
+                             request_creation_time: "2018-07-02T22:22:48.364000Z",
+                             request_method: "GET",
+                             request_processing_time: 0.001,
+                             request_protocol: "HTTP/1.1",
+                             request_url: "http://10.0.0.30:80/",
+                             response_processing_time: 0.0,
+                             sent_bytes: 587,
+                             ssl_cipher: null,
+                             ssl_protocol: null,
+                             target_group_arn: "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067",
+                             target_host: "10.0.1.192:8010",
+                             target_port_list: ["10.0.1.192:8010"],
+                             target_processing_time: 0.003,
+                             target_status_code: "101",
+                             target_status_code_list: ["101"],
+                             timestamp: "2018-07-02T22:23:00.186641Z",
+                             trace_id: "Root=1-58337364-23a8c76965a2ef7629b185e3",
+                             type: "ws",
+                             user_agent: null})),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+        }
+
+        five {
+            args: func_args![value: r#"wss 2018-07-02T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188 10.0.0.140:44244 10.0.0.171:8010 0.000 0.001 0.000 101 101 218 786 "GET https://10.0.0.30:443/ HTTP/1.1" "-" ECDHE-RSA-AES128-GCM-SHA256 TLSv1.2 arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067 "Root=1-58337364-23a8c76965a2ef7629b185e3" "-" "-" 1 2018-07-02T22:22:48.364000Z "forward" "-" "-" 10.0.0.171:8010 101 "-" "-""#],
+            want: Ok(value! ({actions_executed: "forward",
+                              chosen_cert_arn: null,
+                              classification: null,
+                              classification_reason: null,
+                              client_host: "10.0.0.140:44244",
+                              domain_name: null,
+                              elb: "app/my-loadbalancer/50dc6c495c0c9188",
+                              elb_status_code: "101",
+                              error_reason: null,
+                              matched_rule_priority: "1",
+                              received_bytes: 218,
+                              redirect_url: null,
+                              request_creation_time: "2018-07-02T22:22:48.364000Z",
+                              request_method: "GET",
+                              request_processing_time: 0.0,
+                              request_protocol: "HTTP/1.1",
+                              request_url: "https://10.0.0.30:443/",
+                              response_processing_time: 0.0,
+                              sent_bytes: 786,
+                              ssl_cipher: "ECDHE-RSA-AES128-GCM-SHA256",
+                              ssl_protocol: "TLSv1.2",
+                              target_group_arn: "arn:aws:elasticloadbalancing:us-west-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067",
+                              target_host: "10.0.0.171:8010",
+                              target_port_list: ["10.0.0.171:8010"],
+                              target_processing_time: 0.001,
+                              target_status_code: "101",
+                              target_status_code_list: ["101"],
+                              timestamp: "2018-07-02T22:23:00.186641Z",
+                              trace_id: "Root=1-58337364-23a8c76965a2ef7629b185e3",
+                              type: "wss",
+                              user_agent: null})),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+        }
+
+        six {
+            args: func_args![value: r#"http 2018-11-30T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188 192.168.131.39:2817 - 0.000 0.001 0.000 200 200 34 366 "GET http://www.example.com:80/ HTTP/1.1" "curl/7.46.0" - - arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067 "Root=1-58337364-23a8c76965a2ef7629b185e3" "-" "-" 0 2018-11-30T22:22:48.364000Z "forward" "-" "-" "-" "-" "-" "-""#],
+            want: Ok(value! ({actions_executed: "forward",
+                              chosen_cert_arn: null,
+                              classification: null,
+                              classification_reason: null,
+                              client_host: "192.168.131.39:2817",
+                              domain_name: null,
+                              elb: "app/my-loadbalancer/50dc6c495c0c9188",
+                              elb_status_code: "200",
+                              error_reason: null,
+                              matched_rule_priority: "0",
+                              received_bytes: 34,
+                              redirect_url: null,
+                              request_creation_time: "2018-11-30T22:22:48.364000Z",
+                              request_method: "GET",
+                              request_processing_time: 0.0,
+                              request_protocol: "HTTP/1.1",
+                              request_url: "http://www.example.com:80/",
+                              response_processing_time: 0.0,
+                              sent_bytes: 366,
+                              ssl_cipher: null,
+                              ssl_protocol: null,
+                              target_group_arn: "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067",
+                              target_host: null,
+                              target_port_list: [],
+                              target_processing_time: 0.001,
+                              target_status_code: "200",
+                              target_status_code_list: [],
+                              timestamp: "2018-11-30T22:23:00.186641Z",
+                              trace_id: "Root=1-58337364-23a8c76965a2ef7629b185e3",
+                              type: "http",
+                              user_agent: "curl/7.46.0"})),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+        }
+
+        seven {
+            args: func_args![value: r#"http 2018-11-30T22:23:00.186641Z app/my-loadbalancer/50dc6c495c0c9188 192.168.131.39:2817 - 0.000 0.001 0.000 502 - 34 366 "GET http://www.example.com:80/ HTTP/1.1" "curl/7.46.0" - - arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067 "Root=1-58337364-23a8c76965a2ef7629b185e3" "-" "-" 0 2018-11-30T22:22:48.364000Z "forward" "-" "LambdaInvalidResponse" "-" "-" "-" "-""#],
+            want: Ok(value!({actions_executed: "forward",
+                             chosen_cert_arn: null,
+                             classification: null,
+                             classification_reason: null,
+                             client_host: "192.168.131.39:2817",
+                             domain_name: null,
+                             elb: "app/my-loadbalancer/50dc6c495c0c9188",
+                             elb_status_code: "502",
+                             error_reason: "LambdaInvalidResponse",
+                             matched_rule_priority: "0",
+                             received_bytes: 34,
+                             redirect_url: null,
+                             request_creation_time: "2018-11-30T22:22:48.364000Z",
+                             request_method: "GET",
+                             request_processing_time: 0.0,
+                             request_protocol: "HTTP/1.1",
+                             request_url: "http://www.example.com:80/",
+                             response_processing_time: 0.0,
+                             sent_bytes: 366,
+                             ssl_cipher: null,
+                             ssl_protocol: null,
+                             target_group_arn: "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/my-targets/73e2d6bc24d8a067",
+                             target_host: null,
+                             target_port_list: [],
+                             target_processing_time: 0.001,
+                             target_status_code: null,
+                             target_status_code_list: [],
+                             timestamp: "2018-11-30T22:23:00.186641Z",
+                             trace_id: "Root=1-58337364-23a8c76965a2ef7629b185e3",
+                             type: "http",
+                             user_agent: "curl/7.46.0"})),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+        }
+    ];
 }

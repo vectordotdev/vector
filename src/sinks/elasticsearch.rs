@@ -3,7 +3,7 @@ use crate::{
     emit,
     event::Event,
     http::{Auth, HttpClient, HttpError, MaybeAuth},
-    internal_events::{ElasticSearchEventEncoded, ElasticSearchMissingKeys},
+    internal_events::{ElasticSearchEventEncoded, TemplateRenderingFailed},
     rusoto::{self, region_from_endpoint, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -11,7 +11,7 @@ use crate::{
         retries::{RetryAction, RetryLogic},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
@@ -187,7 +187,7 @@ enum ParseError {
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
     AWSCredentialsGenerateFailed { source: CredentialsError },
     #[snafu(display("Index template parse error: {}", source))]
-    IndexTemplate { source: TemplateError },
+    IndexTemplate { source: TemplateParseError },
 }
 
 #[async_trait::async_trait]
@@ -199,9 +199,11 @@ impl HttpSink for ElasticSearchCommon {
         let index = self
             .index
             .render_string(&event)
-            .map_err(|missing_keys| {
-                emit!(ElasticSearchMissingKeys {
-                    keys: &missing_keys
+            .map_err(|error| {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("index"),
+                    drop_event: true,
                 });
             })
             .ok()?;

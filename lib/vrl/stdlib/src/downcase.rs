@@ -36,15 +36,6 @@ struct DowncaseFn {
     value: Box<dyn Expression>,
 }
 
-impl DowncaseFn {
-    /*
-    #[cfg(test)]
-    fn new(value: Box<dyn Expression>) -> Self {
-        Self { value }
-    }
-    */
-}
-
 impl Expression for DowncaseFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?.try_bytes()?;
@@ -57,42 +48,17 @@ impl Expression for DowncaseFn {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::btreemap;
 
-    #[test]
-    fn downcase() {
-        let cases = vec![(
-            btreemap! { "foo" => "FOO 2 bar" },
-            Ok(Value::from("foo 2 bar")),
-            DowncaseFn::new(Box::new(Path::from("foo"))),
-        )];
+    test_function![
+        downcase => Downcase;
 
-        let mut state = state::Program::default();
-
-        for (object, exp, func) in cases {
-            let mut object: Value = object.into();
-            let got = func
-                .resolve(&mut ctx)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
-        }
-    }
-
-    vrl::test_type_def![
-        string {
-            expr: |_| DowncaseFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { kind: value::Kind::Bytes, ..Default::default() },
-        }
-
-        non_string {
-            expr: |_| DowncaseFn { value: Literal::from(true).boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
+        simple {
+            args: func_args![value: "FOO 2 bar"],
+            want: Ok(value!("foo 2 bar")),
+            tdef: TypeDef::new().bytes(),
         }
     ];
 }
-*/

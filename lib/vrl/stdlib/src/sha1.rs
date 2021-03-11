@@ -49,45 +49,17 @@ impl Expression for Sha1Fn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
-//
-//     vrl::test_type_def![
-//         value_string {
-//             expr: |_| Sha1Fn { value: Literal::from("foo").boxed() },
-//             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-//         }
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//         value_non_string {
-//             expr: |_| Sha1Fn { value: Literal::from(1).boxed() },
-//             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-//         }
+    test_function![
+        sha1 => Sha1;
 
-//         value_optional {
-//             expr: |_| Sha1Fn { value: Box::new(Noop) },
-//             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-//         }
-//     ];
-
-//     #[test]
-//     fn sha1() {
-//         let cases = vec![(
-//             map!["foo": "foo"],
-//             Ok(Value::from("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")),
-//             Sha1Fn::new(Box::new(Path::from("foo"))),
-//         )];
-
-//         let mut state = state::Program::default();
-
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        sha {
+             args: func_args![value: "foo"],
+             want: Ok("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
+    ];
+}

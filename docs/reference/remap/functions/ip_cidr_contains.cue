@@ -3,26 +3,26 @@ package metadata
 remap: functions: ip_cidr_contains: {
 	category: "IP"
 	description: """
-		Determines if the `ip` is contained within the block referenced by the `cidr`.
+		Determines whether the `ip` is contained in the block referenced by the `cidr`.
 		"""
 
 	arguments: [
 		{
 			name:        "cidr"
-			description: "The CIDR mask - either v4 or v6."
+			description: "The CIDR mask (v4 or v6)."
 			required:    true
 			type: ["string"]
 		},
 		{
 			name:        "ip"
-			description: "The ip address - either a v4 or a v6 address."
+			description: "The IP address (v4 or v6)."
 			required:    true
 			type: ["string"]
 		},
 	]
 	internal_failure_reasons: [
-		"`cidr` is not a valid CIDR",
-		"`ip` is not a valid IP address",
+		"`cidr` isn't a valid CIDR",
+		"`ip` isn't a valid IP address",
 	]
 	return: types: ["boolean"]
 

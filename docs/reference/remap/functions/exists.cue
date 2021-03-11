@@ -3,13 +3,13 @@ package metadata
 remap: functions: exists: {
 	category: "Event"
 	description: """
-		Checks if the `path` exists for the current event.
+		Checks whether the `path` exists for the current event.
 		"""
 
 	arguments: [
 		{
 			name:        "path"
-			description: "The paths of the fields to check."
+			description: "The path of the field to check."
 			required:    true
 			multiple:    false
 			type: ["path"]
@@ -28,7 +28,7 @@ remap: functions: exists: {
 			return: true
 		},
 		{
-			title: "Exits (array element)"
+			title: "Exists (array element)"
 			input: log: array: [1, 2, 3]
 			source: #"""
 				exists(.array[2])

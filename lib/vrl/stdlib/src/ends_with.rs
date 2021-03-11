@@ -107,110 +107,70 @@ impl Expression for EndsWithFn {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
 
-    vrl::test_type_def![
-        value_string {
-            expr: |_| EndsWithFn {
-                value: Literal::from("foo").boxed(),
-                substring: Literal::from("foo").boxed(),
-                case_sensitive: None,
-            },
-            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
+    test_function![
+        ends_with => EndsWith;
+
+        no {
+            args: func_args![value: "bar",
+                             substring: "foo"],
+            want: Ok(value!(false)),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
-        value_non_string {
-            expr: |_| EndsWithFn {
-                value: Literal::from(true).boxed(),
-                substring: Literal::from("foo").boxed(),
-                case_sensitive: None,
-            },
-            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
+        opposite {
+            args: func_args![value: "bar",
+                             substring: "foobar"],
+            want: Ok(value!(false)),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
-        substring_non_string {
-            expr: |_| EndsWithFn {
-                value: Literal::from("foo").boxed(),
-                substring: Literal::from(true).boxed(),
-                case_sensitive: None,
-            },
-            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
+        subset {
+            args: func_args![value: "foobar",
+                             substring: "oba"],
+            want: Ok(value!(false)),
+            tdef: TypeDef::new().infallible().boolean(),
         }
 
-        case_sensitive_non_boolean {
-            expr: |_| EndsWithFn {
-                value: Literal::from("foo").boxed(),
-                substring: Literal::from("foo").boxed(),
-                case_sensitive: Some(Literal::from(1).boxed()),
-            },
-            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
+        yes {
+            args: func_args![value: "foobar",
+                             substring: "bar"],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
+
+        starts_with {
+            args: func_args![value: "foobar",
+                             substring: "foo"],
+            want: Ok(value!(false)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
+
+        uppercase {
+            args: func_args![value: "fooBAR",
+                             substring: "BAR",
+                             case_sensitive: true],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
+
+        case_sensitive {
+            args: func_args![value: "foobar",
+                             substring: "BAR",
+                             case_sensitive: true],
+            want: Ok(value!(false)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
+
+        case_insensitive {
+            args: func_args![value: "foobar",
+                             substring: "BAR",
+                             case_sensitive: false],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().infallible().boolean(),
         }
     ];
-
-    #[test]
-    fn ends_with() {
-        let cases = vec![
-            (
-                btreemap! {},
-                Ok(false.into()),
-                EndsWithFn::new(Box::new(Literal::from("bar")), "foo", false),
-            ),
-            (
-                btreemap! {},
-                Ok(false.into()),
-                EndsWithFn::new(Box::new(Literal::from("bar")), "foobar", false),
-            ),
-            (
-                btreemap! {},
-                Ok(true.into()),
-                EndsWithFn::new(Box::new(Literal::from("bar")), "bar", false),
-            ),
-            (
-                btreemap! {},
-                Ok(false.into()),
-                EndsWithFn::new(Box::new(Literal::from("foobar")), "oba", false),
-            ),
-            (
-                btreemap! {},
-                Ok(true.into()),
-                EndsWithFn::new(Box::new(Literal::from("foobar")), "bar", false),
-            ),
-            (
-                btreemap! {},
-                Ok(false.into()),
-                EndsWithFn::new(Box::new(Literal::from("foobar")), "foo", false),
-            ),
-            (
-                btreemap! {},
-                Ok(true.into()),
-                EndsWithFn::new(Box::new(Literal::from("fooBAR")), "BAR", true),
-            ),
-            (
-                btreemap! {},
-                Ok(false.into()),
-                EndsWithFn::new(Box::new(Literal::from("foobar")), "BAR", true),
-            ),
-            (
-                btreemap! {},
-                Ok(true.into()),
-                EndsWithFn::new(Box::new(Literal::from("foobar")), "BAR", false),
-            ),
-        ];
-
-        let mut state = state::Program::default();
-
-        for (object, exp, func) in cases {
-            let mut object: Value = object.into();
-            let got = func
-                .resolve(&mut ctx)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
-        }
-    }
 }
-*/

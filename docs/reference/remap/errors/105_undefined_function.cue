@@ -6,7 +6,6 @@ remap: errors: "105": {
 		A [function call expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor)) invokes an
 		unknown function.
 		"""
-	rationale:   null
 	resolution: """
 		This is typically due to a typo. Correcting the function name should resolve this.
 		"""

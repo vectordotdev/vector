@@ -71,72 +71,71 @@ impl Expression for ToSyslogSeverityFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     test_type_def![value_not_string_fallible {
-//         expr: |_| ToSyslogSeverityFn {
-//             value: Literal::from(27).boxed(),
-//         },
-//         def: TypeDef {
-//             fallible: true,
-//             kind: Kind::Integer,
-//             ..Default::default()
-//         },
-//     }];
+    test_function![
+        to_level => ToSyslogSeverity;
 
-//     test_function![
-//         to_level => ToSyslogSeverity;
+        emergency {
+            args: func_args![value: value!("emerg")],
+            want: Ok(value!(0)),
+            tdef: TypeDef::new().fallible().integer(),
+        }
 
-//         emergency {
-//             args: func_args![value: value!("emerg")],
-//             want: Ok(value!(0)),
-//         }
+        alert {
+            args: func_args![value: value!("alert")],
+            want: Ok(value!(1)),
+            tdef: TypeDef::new().fallible().integer(),
+        }
 
-//         alert {
-//             args: func_args![value: value!("alert")],
-//             want: Ok(value!(1)),
-//         }
+        critical {
+            args: func_args![value: value!("crit")],
+            want: Ok(value!(2)),
+            tdef: TypeDef::new().fallible().integer(),
+        }
 
-//         critical {
-//             args: func_args![value: value!("crit")],
-//             want: Ok(value!(2)),
-//         }
+        error {
+            args: func_args![value: value!("err")],
+            want: Ok(value!(3)),
+            tdef: TypeDef::new().fallible().integer(),
+        }
 
-//         error {
-//             args: func_args![value: value!("err")],
-//             want: Ok(value!(3)),
-//         }
+        warning {
+            args: func_args![value: value!("warn")],
+            want: Ok(value!(4)),
+            tdef: TypeDef::new().fallible().integer(),
+        }
 
-//         warning {
-//             args: func_args![value: value!("warn")],
-//             want: Ok(value!(4)),
-//         }
+        notice {
+            args: func_args![value: value!("notice")],
+            want: Ok(value!(5)),
+            tdef: TypeDef::new().fallible().integer(),
+        }
 
-//         notice {
-//             args: func_args![value: value!("notice")],
-//             want: Ok(value!(5)),
-//         }
+        informational {
+            args: func_args![value: value!("info")],
+            want: Ok(value!(6)),
+            tdef: TypeDef::new().fallible().integer(),
+        }
 
-//         informational {
-//             args: func_args![value: value!("info")],
-//             want: Ok(value!(6)),
-//         }
+        debug {
+            args: func_args![value: value!("debug")],
+            want: Ok(value!(7)),
+            tdef: TypeDef::new().fallible().integer(),
+        }
 
-//         debug {
-//             args: func_args![value: value!("debug")],
-//             want: Ok(value!(7)),
-//         }
+        invalid_level_1 {
+            args: func_args![value: value!("oopsie")],
+            want: Err("syslog level oopsie not valid"),
+            tdef: TypeDef::new().fallible().integer(),
+        }
 
-//         invalid_level_1 {
-//             args: func_args![value: value!("oopsie")],
-//             want: Err("function call error: level oopsie not valid"),
-//         }
-
-//         invalid_level_2 {
-//             args: func_args![value: value!("aww schucks")],
-//             want: Err("function call error: level aww schucks not valid"),
-//         }
-//     ];
-// }
+        invalid_level_2 {
+            args: func_args![value: value!("aww schucks")],
+            want: Err("syslog level aww schucks not valid"),
+            tdef: TypeDef::new().fallible().integer(),
+        }
+    ];
+}

@@ -18,7 +18,7 @@ remap: functions: flatten: {
 	return: {
 		types: ["array", "object"]
 		rules: [
-			"The return type will match the `value` type.",
+			"The return type matches the `value` type.",
 		]
 	}
 
