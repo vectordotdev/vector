@@ -98,33 +98,37 @@ impl Expression for ParseAwsVpcFlowLogFn {
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new()
             .fallible() // Log parsing error
-            .object::<&str, Kind>(map! {
-                "account_id": Kind::Integer | Kind::Null,
-                "action": Kind::Bytes | Kind::Null,
-                "az_id": Kind::Bytes | Kind::Null,
-                "bytes": Kind::Integer | Kind::Null,
-                "dstaddr": Kind::Bytes | Kind::Null,
-                "dstport": Kind::Integer | Kind::Null,
-                "end": Kind::Integer | Kind::Null,
-                "instance_id": Kind::Bytes | Kind::Null,
-                "interface_id": Kind::Bytes | Kind::Null,
-                "log_status": Kind::Bytes | Kind::Null,
-                "packets": Kind::Integer | Kind::Null,
-                "pkt_dstaddr": Kind::Bytes | Kind::Null,
-                "pkt_srcaddr": Kind::Bytes | Kind::Null,
-                "protocol": Kind::Integer | Kind::Null,
-                "region": Kind::Bytes | Kind::Null,
-                "srcaddr": Kind::Bytes | Kind::Null,
-                "srcport": Kind::Integer | Kind::Null,
-                "start": Kind::Integer | Kind::Null,
-                "sublocation_id": Kind::Bytes | Kind::Null,
-                "sublocation_type": Kind::Bytes | Kind::Null,
-                "subnet_id": Kind::Bytes | Kind::Null,
-                "tcp_flags": Kind::Integer | Kind::Null,
-                "type": Kind::Bytes | Kind::Null,
-                "version": Kind::Integer | Kind::Null,
-                "vpc_id": Kind::Bytes | Kind::Null,
-            })
+            .object::<&str, Kind>(inner_type_def())
+    }
+}
+
+fn inner_type_def() -> BTreeMap<&'static str, Kind> {
+    map! {
+        "account_id": Kind::Integer | Kind::Null,
+        "action": Kind::Bytes | Kind::Null,
+        "az_id": Kind::Bytes | Kind::Null,
+        "bytes": Kind::Integer | Kind::Null,
+        "dstaddr": Kind::Bytes | Kind::Null,
+        "dstport": Kind::Integer | Kind::Null,
+        "end": Kind::Integer | Kind::Null,
+        "instance_id": Kind::Bytes | Kind::Null,
+        "interface_id": Kind::Bytes | Kind::Null,
+        "log_status": Kind::Bytes | Kind::Null,
+        "packets": Kind::Integer | Kind::Null,
+        "pkt_dstaddr": Kind::Bytes | Kind::Null,
+        "pkt_srcaddr": Kind::Bytes | Kind::Null,
+        "protocol": Kind::Integer | Kind::Null,
+        "region": Kind::Bytes | Kind::Null,
+        "srcaddr": Kind::Bytes | Kind::Null,
+        "srcport": Kind::Integer | Kind::Null,
+        "start": Kind::Integer | Kind::Null,
+        "sublocation_id": Kind::Bytes | Kind::Null,
+        "sublocation_type": Kind::Bytes | Kind::Null,
+        "subnet_id": Kind::Bytes | Kind::Null,
+        "tcp_flags": Kind::Integer | Kind::Null,
+        "type": Kind::Bytes | Kind::Null,
+        "version": Kind::Integer | Kind::Null,
+        "vpc_id": Kind::Bytes | Kind::Null,
     }
 }
 
@@ -263,4 +267,58 @@ mod tests {
             }
         }
     }
+
+    test_function![
+        parse_aws_vpc_flow_log => ParseAwsVpcFlowLog;
+
+        default {
+             args: func_args![value: "2 123456789010 eni-1235b8ca123456789 172.31.16.139 172.31.16.21 20641 22 6 20 4249 1418530010 1418530070 ACCEPT OK"],
+             want: Ok(value!({
+                 "account_id": 123456789010_i64,
+                 "action": "ACCEPT",
+                 "bytes": 4249,
+                 "dstaddr": "172.31.16.21",
+                 "dstport": 22,
+                 "end": 1418530070,
+                 "interface_id": "eni-1235b8ca123456789",
+                 "log_status": "OK",
+                 "packets": 20,
+                 "protocol": 6,
+                 "srcaddr": "172.31.16.139",
+                 "srcport": 20641,
+                 "start": 1418530010,
+                 "version": 2
+             })),
+             tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+         }
+
+        fields {
+             args: func_args![value: "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 52.213.180.42 10.0.0.62 43416 5001 52.213.180.42 10.0.0.62 6 568 8 1566848875 1566848933 ACCEPT 2 OK",
+                              format: "version vpc_id subnet_id instance_id interface_id account_id type srcaddr dstaddr srcport dstport pkt_srcaddr pkt_dstaddr protocol bytes packets start end action tcp_flags log_status"],
+             want: Ok(value!({
+                 "account_id": 123456789010_i64,
+                 "action": "ACCEPT",
+                 "bytes": 568,
+                 "dstaddr": "10.0.0.62",
+                 "dstport": 5001,
+                 "end": 1566848933,
+                 "instance_id": "i-01234567890123456",
+                 "interface_id": "eni-1235b8ca123456789",
+                 "log_status": "OK",
+                 "packets": 8,
+                 "pkt_dstaddr": "10.0.0.62",
+                 "pkt_srcaddr": "52.213.180.42",
+                 "protocol": 6,
+                 "srcaddr": "52.213.180.42",
+                 "srcport": 43416,
+                 "start": 1566848875,
+                 "subnet_id": "subnet-aaaaaaaa012345678",
+                 "tcp_flags": 2,
+                 "type": "IPv4",
+                 "version": 3,
+                 "vpc_id": "vpc-abcdefab012345678"
+             })),
+             tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+         }
+    ];
 }
