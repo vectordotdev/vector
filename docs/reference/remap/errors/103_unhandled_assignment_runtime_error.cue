@@ -1,9 +1,9 @@
 package metadata
 
 remap: errors: "103": {
-	title:       "Unhandled assignment runtime error"
+	title:       "Unhandled error"
 	description: """
-		The right-hand side of an [assignment expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor))
+		The right-hand side of the [assignment expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor))
 		is fallible and can produce a [runtime error](\(urls.vrl_runtime_errors)), but the error isn't being
 		[handled](\(urls.vrl_error_handling)).
 		"""
