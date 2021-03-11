@@ -64,6 +64,15 @@ components: transforms: "remap": {
 				syntax: "remap_program"
 			}
 		}
+		drop_on_error: {
+			description: """
+				Drop the event if the VRL program returns an error at runtime.
+				"""
+			required: false
+			type: bool: {
+				default: false
+			}
+		}
 	}
 
 	input: {
