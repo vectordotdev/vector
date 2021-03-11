@@ -1,7 +1,7 @@
 # object: { "foo": "bar" }
 # result:
 #
-# error[E103]: unhandled fallible assignment
+# error[E103]: unhandled error
 #   ┌─ :4:8
 #   │
 # 4 │ .foo = upcase(.foo) # string
