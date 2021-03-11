@@ -219,7 +219,7 @@ remap: #Remap & {
 				structured = parse_key_value(.message)
 				"""
 			raises: compiletime: """
-				error[E103]: unhandled fallible assignment
+				error[E103]: unhandled error
 				  ┌─ :1:14
 				  │
 				1 │ structured = parse_key_value(.message)

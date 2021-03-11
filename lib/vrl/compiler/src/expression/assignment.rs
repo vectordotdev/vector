@@ -30,10 +30,7 @@ impl Assignment {
                 // Fallible expressions require infallible assignment.
                 if type_def.is_fallible() {
                     return Err(Error {
-                        variant: ErrorVariant::FallibleAssignment(
-                            target.to_string(),
-                            expr.to_string(),
-                        ),
+                        variant: ErrorVariant::UnhandledError(target.to_string(), expr.to_string()),
                         span,
                         expr_span,
                         assignment_span,
@@ -428,8 +425,8 @@ pub enum ErrorVariant {
     #[error("unnecessary no-op assignment")]
     UnnecessaryNoop(Span),
 
-    #[error("unhandled fallible assignment")]
-    FallibleAssignment(String, String),
+    #[error("unhandled error")]
+    UnhandledError(String, String),
 
     #[error("unnecessary error assignment")]
     InfallibleAssignment(String, String, Span, Span),
@@ -456,7 +453,7 @@ impl DiagnosticError for Error {
 
         match &self.variant {
             UnnecessaryNoop(..) => 640,
-            FallibleAssignment(..) => 103,
+            UnhandledError(..) => 103,
             InfallibleAssignment(..) => 104,
             InvalidTarget(..) => 641,
         }
@@ -471,7 +468,7 @@ impl DiagnosticError for Error {
                 Label::context("either assign to a path or variable here", *target_span),
                 Label::context("or remove the assignment", self.assignment_span),
             ],
-            FallibleAssignment(target, expr) => vec![
+            UnhandledError(target, expr) => vec![
                 Label::primary("this expression is fallible", self.expr_span),
                 Label::context("update the expression to be infallible", self.expr_span),
                 Label::context(
@@ -496,7 +493,7 @@ impl DiagnosticError for Error {
         use ErrorVariant::*;
 
         match &self.variant {
-            FallibleAssignment(..) | InfallibleAssignment(..) => vec![Note::SeeErrorDocs],
+            UnhandledError(..) | InfallibleAssignment(..) => vec![Note::SeeErrorDocs],
             _ => vec![],
         }
     }

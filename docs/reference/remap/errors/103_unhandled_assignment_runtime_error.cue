@@ -1,17 +1,17 @@
 package metadata
 
 remap: errors: "103": {
-	title:       "Unhandled assignment runtime error"
+	title:       "Unhandled error"
 	description: """
-		The right-hand side of an [assignment expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor))
-		is fallible and can produce a [runtime error](\(urls.vrl_runtime_errors)), but the error isn't being
+		The right-hand side of this [assignment](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor))
+		is fallible (that is, it can produce a [runtime error](\(urls.vrl_runtime_errors))), but the error isn't
 		[handled](\(urls.vrl_error_handling)).
 		"""
 	rationale:   remap._fail_safe_blurb
 	resolution:  """
-		[Handle](\(urls.vrl_error_handling)) the runtime error by [assigning](\(urls.vrl_error_handling_assigning)),
-		[coalescing](\(urls.vrl_error_handling_coalescing)), or [raising](\(urls.vrl_error_handling_raising)) the
-		error.
+		[Handle](\(urls.vrl_error_handling)) the runtime error by either
+		[assigning](\(urls.vrl_error_handling_assigning)) it, [coalescing](\(urls.vrl_error_handling_coalescing)) it, or
+		[raising](\(urls.vrl_error_handling_raising)) it.
 		"""
 
 	examples: [...{

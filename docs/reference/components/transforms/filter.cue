@@ -67,7 +67,7 @@ components: transforms: filter: {
 		{
 			title: "Drop debug logs"
 			configuration: {
-				condition: '.level == "debug"'
+				condition: #".level == "debug""#
 			}
 			input: [
 				{
