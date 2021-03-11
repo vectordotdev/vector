@@ -8,11 +8,11 @@
 #
 # ------------------------------------------------------------------------------
 # Website: https://vector.dev
-# Docs: https://vector.dev/docs/
+# Docs: https://vector.dev/docs
 # Chat: https://chat.vector.dev
 # ------------------------------------------------------------------------------
 
-# Change this if you need to use a non-default directory for data storage:
+# Change this to use a non-default directory for Vector data storage:
 # data_dir = "/var/lib/vector"
 
 # Random Syslog-formatted logs
@@ -42,13 +42,3 @@ encoding.codec = "json"
 #[api]
 #enabled = true
 #address = "127.0.0.1:8686"
-
-# Host-level metrics (CPU, memory, disk, etc.)
-# Uncomment this if you enable the API:
-#[sources.host_metrics]
-#type = "host_metrics"
-
-# Vector's own internal metrics
-# Uncomment this if you enable the API:
-#[sources.internal_metrics]
-#type = "internal_metrics"
