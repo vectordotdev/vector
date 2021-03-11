@@ -134,69 +134,23 @@ impl Expression for ToTimestampFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![
-//         timestamp_infallible {
-//             expr: |_| ToTimestampFn { value: Literal::from(chrono::Utc::now()).boxed() },
-//             def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
-//         }
+    test_function![
+        to_timestamp => ToTimestamp;
 
-//         integer_infallible {
-//             expr: |_| ToTimestampFn { value: lit!(1).boxed() },
-//             def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
-//         }
+        integer {
+             args: func_args![value: 1431648000],
+             want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms(0, 0, 0)),
+             tdef: TypeDef::new().timestamp(),
+        }
 
-//         float_infallible {
-//             expr: |_| ToTimestampFn { value: lit!(1.0).boxed() },
-//             def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
-//         }
-
-//         null_fallible {
-//             expr: |_| ToTimestampFn { value: lit!(null).boxed() },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Timestamp,
-//                 ..Default::default()
-//             },
-//         }
-
-//         string_fallible {
-//             expr: |_| ToTimestampFn { value: lit!("foo").boxed() },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Timestamp,
-//                 ..Default::default()
-//             },
-//         }
-
-//         map_fallible {
-//             expr: |_| ToTimestampFn { value: map!{}.boxed() },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Timestamp,
-//                 ..Default::default()
-//             },
-//         }
-
-//         array_fallible {
-//             expr: |_| ToTimestampFn { value: array![].boxed() },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Timestamp,
-//                 ..Default::default()
-//             },
-//         }
-
-//         boolean_fallible {
-//             expr: |_| ToTimestampFn { value: lit!(true).boxed() },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Timestamp,
-//                 ..Default::default()
-//             },
-//         }
-//     ];
-// }
+        float {
+             args: func_args![value: 1431648000.5],
+             want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms_milli(0, 0, 0, 500)),
+             tdef: TypeDef::new().timestamp(),
+         }
+    ];
+}

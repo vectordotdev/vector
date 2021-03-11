@@ -46,15 +46,6 @@ struct FloorFn {
     precision: Option<Box<dyn Expression>>,
 }
 
-impl FloorFn {
-    /*
-    #[cfg(test)]
-    fn new(value: Box<dyn Expression>, precision: Option<Box<dyn Expression>>) -> Self {
-        Self { value, precision }
-    }
-    */
-}
-
 impl Expression for FloorFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let precision = match &self.precision {
@@ -81,102 +72,50 @@ impl Expression for FloorFn {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
 
-    vrl::test_type_def![
-        value_float {
-            expr: |_| FloorFn {
-                value: Literal::from(1.0).boxed(),
-                precision: None,
-            },
-            def: TypeDef { kind: Kind::Float, ..Default::default() },
+    test_function![
+        floor => Floor;
+
+        lower {
+            args: func_args![value: 1234.2],
+            want: Ok(value!(1234.0)),
+            tdef: TypeDef::new().float(),
         }
 
-        value_integer {
-            expr: |_| FloorFn {
-                value: Literal::from(1).boxed(),
-                precision: None,
-            },
-            def: TypeDef { kind: Kind::Integer, ..Default::default() },
+        higher {
+            args: func_args![value: 1234.8],
+            want: Ok(value!(1234.0)),
+            tdef: TypeDef::new().float(),
         }
 
-        value_float_or_integer {
-            expr: |_| FloorFn {
-                value: Variable::new("foo".to_owned(), None).boxed(),
-                precision: None,
-            },
-            def: TypeDef { fallible: true, kind: Kind::Integer | Kind::Float, ..Default::default() },
+        exact {
+            args: func_args![value: 1234],
+            want: Ok(value!(1234)),
+            tdef: TypeDef::new().integer(),
         }
 
-        fallible_precision {
-            expr: |_| FloorFn {
-                value: Literal::from(1).boxed(),
-                precision: Some(Variable::new("foo".to_owned(), None).boxed()),
-            },
-            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+        precision {
+            args: func_args![value: 1234.39429,
+                             precision: 1],
+            want: Ok(value!(1234.3)),
+            tdef: TypeDef::new().float(),
+        }
+
+        bigger_precision {
+            args: func_args![value: 1234.56789,
+                             precision: 4],
+            want: Ok(value!(1234.5678)),
+            tdef: TypeDef::new().float(),
+        }
+
+        huge_number {
+            args: func_args![value: 9876543210123456789098765432101234567890987654321.987654321,
+                             precision: 5],
+            want: Ok(value!(9876543210123456789098765432101234567890987654321.98765)),
+            tdef: TypeDef::new().float(),
         }
     ];
-
-    #[test]
-    fn floor() {
-        let cases = vec![
-            (
-                btreemap! { "foo" => 1234.2 },
-                Ok(1234.0.into()),
-                FloorFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                btreemap! {},
-                Ok(1234.0.into()),
-                FloorFn::new(Box::new(Literal::from(Value::Float(1234.8))), None),
-            ),
-            (
-                btreemap! {},
-                Ok(1234.into()),
-                FloorFn::new(Box::new(Literal::from(Value::Integer(1234))), None),
-            ),
-            (
-                btreemap! {},
-                Ok(1234.3.into()),
-                FloorFn::new(
-                    Box::new(Literal::from(Value::Float(1234.39429))),
-                    Some(Box::new(Literal::from(1))),
-                ),
-            ),
-            (
-                btreemap! {},
-                Ok(1234.5678.into()),
-                FloorFn::new(
-                    Box::new(Literal::from(Value::Float(1234.56789))),
-                    Some(Box::new(Literal::from(4))),
-                ),
-            ),
-            (
-                btreemap! {},
-                Ok(9876543210123456789098765432101234567890987654321.98765.into()),
-                FloorFn::new(
-                    Box::new(Literal::from(
-                        9876543210123456789098765432101234567890987654321.987654321,
-                    )),
-                    Some(Box::new(Literal::from(5))),
-                ),
-            ),
-        ];
-
-        let mut state = state::Program::default();
-
-        for (object, exp, func) in cases {
-            let mut object: Value = object.into();
-            let got = func
-                .resolve(&mut ctx)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
-        }
-    }
 }
-*/

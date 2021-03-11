@@ -102,85 +102,74 @@ impl Expression for SplitFn {
     }
 }
 
-// #[cfg(test)]
-// #[allow(clippy::trivial_regex)]
-// mod test {
-//     use super::*;
+#[cfg(test)]
+#[allow(clippy::trivial_regex)]
+mod test {
+    use super::*;
 
-//     vrl::test_type_def![
-//         infallible {
-//             expr: |_| SplitFn {
-//                 value: Literal::from("foo").boxed(),
-//                 pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
-//                 limit: None,
-//             },
-//             def: TypeDef {
-//                 kind: value::Kind::Array,
-//                 ..Default::default()
-//             },
-//         }
+    test_function![
+        split => Split;
 
-//         value_fallible {
-//             expr: |_| SplitFn {
-//                 value: Literal::from(10).boxed(),
-//                 pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
-//                 limit: None,
-//             },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: value::Kind::Array,
-//                 ..Default::default()
-//             },
-//         }
+        empty {
+            args: func_args![value: "",
+                             pattern: " "
+            ],
+            want: Ok(value!([""])),
+            tdef: TypeDef::new()
+                .infallible()
+                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+        }
 
-//         pattern_expression_infallible {
-//             expr: |_| SplitFn {
-//                 value: Literal::from("foo").boxed(),
-//                 pattern: Literal::from("foo").boxed(),
-//                 limit: None,
-//             },
-//             def: TypeDef {
-//                 kind: value::Kind::Array,
-//                 ..Default::default()
-//             },
-//         }
+        single {
+            args: func_args![value: "foo",
+                             pattern: " "
+            ],
+            want: Ok(value!(["foo"])),
+            tdef: TypeDef::new()
+                .infallible()
+                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+        }
 
-//         pattern_expression_fallible {
-//             expr: |_| SplitFn {
-//                 value: Literal::from("foo").boxed(),
-//                 pattern: Literal::from(10).boxed(),
-//                 limit: None,
-//             },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: value::Kind::Array,
-//                 ..Default::default()
-//             },
-//         }
+        long {
+            args: func_args![value: "This is a long string.",
+                             pattern: " "
+            ],
+            want: Ok(value!(["This", "is", "a", "long", "string."])),
+            tdef: TypeDef::new()
+                .infallible()
+                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+        }
 
-//         limit_infallible {
-//             expr: |_| SplitFn {
-//                 value: Literal::from("foo").boxed(),
-//                 pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
-//                 limit: Some(Literal::from(10).boxed()),
-//             },
-//             def: TypeDef {
-//                 kind: value::Kind::Array,
-//                 ..Default::default()
-//             },
-//         }
+        regex {
+            args: func_args![value: "This is a long string",
+                             pattern: Value::Regex(regex::Regex::new(" ").unwrap().into()),
+                             limit: 2
+            ],
+            want: Ok(value!(["This", "is a long string"])),
+            tdef: TypeDef::new()
+                .infallible()
+                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+        }
 
-//         limit_fallible {
-//             expr: |_| SplitFn {
-//                 value: Literal::from("foo").boxed(),
-//                 pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
-//                 limit: Some(Literal::from("foo").boxed()),
-//             },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: value::Kind::Array,
-//                 ..Default::default()
-//             },
-//         }
-//     ];
-// }
+        non_space {
+            args: func_args![value: "ThisaisAlongAstring.",
+                             pattern: Value::Regex(regex::Regex::new("(?i)a").unwrap().into())
+            ],
+            want: Ok(value!(["This", "is", "long", "string."])),
+            tdef: TypeDef::new()
+                .infallible()
+                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+        }
+
+        unicode {
+             args: func_args![value: "˙ƃuᴉɹʇs ƃuol ɐ sᴉ sᴉɥ┴",
+                              pattern: " "
+             ],
+             want: Ok(value!(["˙ƃuᴉɹʇs", "ƃuol", "ɐ", "sᴉ", "sᴉɥ┴"])),
+             tdef: TypeDef::new()
+                .infallible()
+                .array_mapped::<(), Kind>(map! {(): Kind::Bytes}),
+         }
+
+    ];
+}

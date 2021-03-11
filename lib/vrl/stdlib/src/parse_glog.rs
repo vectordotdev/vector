@@ -125,18 +125,21 @@ impl Expression for ParseGlogFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().object::<&str, Kind>(map! {
-            "level": Kind::Bytes,
-            "timestamp": Kind::Timestamp,
-            "id": Kind::Integer,
-            "file": Kind::Bytes,
-            "line": Kind::Integer,
-            "message": Kind::Bytes,
-        })
+        TypeDef::new().fallible().object::<&str, Kind>(type_def())
     }
 }
 
-/*
+fn type_def() -> BTreeMap<&'static str, Kind> {
+    map! {
+        "level": Kind::Bytes,
+        "timestamp": Kind::Timestamp,
+        "id": Kind::Integer,
+        "file": Kind::Bytes,
+        "line": Kind::Integer,
+        "message": Kind::Bytes,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -156,6 +159,7 @@ mod tests {
                 "line" => 9,
                 "message" => "Hello world!",
             }),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
         }
 
         log_line_valid_strip_whitespace {
@@ -168,44 +172,31 @@ mod tests {
                 "line" => 9,
                 "message" => "Hello world!",
             }),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
         }
 
         log_line_invalid {
             args: func_args![value: "not a glog line"],
-            want: Err("function call error: failed parsing glog message"),
+            want: Err("failed parsing glog message"),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
         }
 
         log_line_invalid_log_level {
             args: func_args![value: "X20210131 14:48:54.411655 15520 main.c++:9] Hello world!"],
-            want: Err(r#"function call error: unrecognized log level "X""#),
+            want: Err(r#"unrecognized log level "X""#),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
         }
 
         log_line_invalid_timestamp {
             args: func_args![value: "I20210000 14:48:54.411655 15520 main.c++:9] Hello world!"],
-            want: Err("function call error: failed parsing timestamp 20210000 14:48:54.411655: input is out of range"),
+            want: Err("failed parsing timestamp 20210000 14:48:54.411655: input is out of range"),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
         }
 
         log_line_invalid_id {
             args: func_args![value: "I20210131 14:48:54.411655 99999999999999999999999999999 main.c++:9] Hello world!"],
-            want: Err("function call error: failed parsing id"),
-        }
-    ];
-
-    test_type_def![
-        value_string {
-            expr: |_| ParseGlogFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: Some(inner_type_def()) },
-        }
-
-        value_non_string {
-            expr: |_| ParseGlogFn { value: Literal::from(1).boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: Some(inner_type_def()) },
-        }
-
-        value_optional {
-            expr: |_| ParseGlogFn { value: Box::new(Noop) },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, inner_type_def: Some(inner_type_def()) },
+            want: Err("failed parsing id"),
+            tdef: TypeDef::new().fallible().object::<&str, Kind>(type_def()),
         }
     ];
 }
-*/

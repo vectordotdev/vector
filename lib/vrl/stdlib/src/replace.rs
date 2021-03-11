@@ -122,287 +122,140 @@ impl Expression for ReplaceFn {
     }
 }
 
-// #[cfg(test)]
-// #[allow(clippy::trivial_regex)]
-// mod test {
-//     use super::*;
-//     use crate::map;
+#[cfg(test)]
+#[allow(clippy::trivial_regex)]
+mod test {
+    use super::*;
 
-//     vrl::test_type_def![
-//         infallible {
-//             expr: |_| ReplaceFn {
-//                 value: Literal::from("foo").boxed(),
-//                 pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
-//                 with: Literal::from("foo").boxed(),
-//                 count: None,
-//             },
-//             def: TypeDef {
-//                 kind: value::Kind::Bytes,
-//                 ..Default::default()
-//             },
-//         }
+    test_function![
+        replace => Replace;
 
-//         value_fallible {
-//             expr: |_| ReplaceFn {
-//                 value: Literal::from(10).boxed(),
-//                 pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
-//                 with: Literal::from("foo").boxed(),
-//                 count: None,
-//             },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: value::Kind::Bytes,
-//                 ..Default::default()
-//             },
-//         }
+        replace_string1 {
+             args: func_args![value: "I like apples and bananas",
+                              pattern: "a",
+                              with: "o"
+             ],
+             want: Ok("I like opples ond bononos"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//         pattern_expression_infallible {
-//             expr: |_| ReplaceFn {
-//                 value: Literal::from("foo").boxed(),
-//                 pattern: Literal::from("foo").boxed(),
-//                 with: Literal::from("foo").boxed(),
-//                 count: None,
-//             },
-//             def: TypeDef {
-//                 kind: value::Kind::Bytes,
-//                 ..Default::default()
-//             },
-//         }
+        replace_string2 {
+             args: func_args![value: "I like apples and bananas",
+                              pattern: "a",
+                              with: "o",
+                              count: -1
+             ],
+             want: Ok("I like opples ond bononos"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//         pattern_expression_fallible {
-//             expr: |_| ReplaceFn {
-//                 value: Literal::from("foo").boxed(),
-//                 pattern: Literal::from(10).boxed(),
-//                 with: Literal::from("foo").boxed(),
-//                 count: None,
-//             },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: value::Kind::Bytes,
-//                 ..Default::default()
-//             },
-//         }
+        replace_string3 {
+             args: func_args![value: "I like apples and bananas",
+                              pattern: "a",
+                              with: "o",
+                              count: 0
+             ],
+             want: Ok("I like apples and bananas"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//         with_fallible {
-//             expr: |_| ReplaceFn {
-//                 value: Literal::from("foo").boxed(),
-//                 pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
-//                 with: Literal::from(10).boxed(),
-//                 count: None,
-//             },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: value::Kind::Bytes,
-//                 ..Default::default()
-//             },
-//         }
+        replace_string4 {
+             args: func_args![value: "I like apples and bananas",
+                              pattern: "a",
+                              with: "o",
+                              count: 1
+             ],
+             want: Ok("I like opples and bananas"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//         count_infallible {
-//             expr: |_| ReplaceFn {
-//                 value: Literal::from("foo").boxed(),
-//                 pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
-//                 with: Literal::from("foo").boxed(),
-//                 count: Some(Literal::from(10).boxed()),
-//             },
-//             def: TypeDef {
-//                 kind: value::Kind::Bytes,
-//                 ..Default::default()
-//             },
-//         }
+        replace_string5 {
+             args: func_args![value: "I like apples and bananas",
+                              pattern: "a",
+                              with: "o",
+                              count: 2
+             ],
+             want: Ok("I like opples ond bananas"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//         count_fallible {
-//             expr: |_| ReplaceFn {
-//                 value: Literal::from("foo").boxed(),
-//                 pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
-//                 with: Literal::from("foo").boxed(),
-//                 count: Some(Literal::from("foo").boxed()),
-//             },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: value::Kind::Bytes,
-//                 ..Default::default()
-//             },
-//         }
-//     ];
 
-//     #[test]
-//     fn check_replace_string() {
-//         let cases = vec![
-//             (
-//                 map![],
-//                 Ok("I like opples ond bononos".into()),
-//                 ReplaceFn::new(
-//                     Literal::from("I like apples and bananas").boxed(),
-//                     Literal::from("a").boxed(),
-//                     "o",
-//                     None,
-//                 ),
-//             ),
-//             (
-//                 map![],
-//                 Ok("I like opples ond bononos".into()),
-//                 ReplaceFn::new(
-//                     Literal::from("I like apples and bananas").boxed(),
-//                     Literal::from("a").boxed(),
-//                     "o",
-//                     Some(-1),
-//                 ),
-//             ),
-//             (
-//                 map![],
-//                 Ok("I like apples and bananas".into()),
-//                 ReplaceFn::new(
-//                     Literal::from("I like apples and bananas").boxed(),
-//                     Literal::from("a").boxed(),
-//                     "o",
-//                     Some(0),
-//                 ),
-//             ),
-//             (
-//                 map![],
-//                 Ok("I like opples and bananas".into()),
-//                 ReplaceFn::new(
-//                     Literal::from("I like apples and bananas").boxed(),
-//                     Literal::from("a").boxed(),
-//                     "o",
-//                     Some(1),
-//                 ),
-//             ),
-//             (
-//                 map![],
-//                 Ok("I like opples ond bananas".into()),
-//                 ReplaceFn::new(
-//                     Literal::from("I like apples and bananas").boxed(),
-//                     Literal::from("a").boxed(),
-//                     "o",
-//                     Some(2),
-//                 ),
-//             ),
-//         ];
+        replace_regex1 {
+             args: func_args![value: "I like opples ond bananas",
+                              pattern: regex::Regex::new("a").unwrap(),
+                              with: "o"
+             ],
+             want: Ok("I like opples ond bononos"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//         let mut state = state::Program::default();
 
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+        replace_regex2 {
+             args: func_args![value: "I like apples and bananas",
+                              pattern: regex::Regex::new("a").unwrap(),
+                              with: "o",
+                              count: -1
+             ],
+             want: Ok("I like opples ond bononos"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//             assert_eq!(got, exp);
-//         }
-//     }
+        replace_regex3 {
+             args: func_args![value: "I like apples and bananas",
+                              pattern: regex::Regex::new("a").unwrap(),
+                              with: "o",
+                              count: 0
+             ],
+             want: Ok("I like apples and bananas"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//     #[test]
-//     fn check_replace_regex() {
-//         let cases = vec![
-//             (
-//                 map![],
-//                 Ok("I like opples ond bononos".into()),
-//                 ReplaceFn::new(
-//                     Literal::from("I like apples and bananas").boxed(),
-//                     Literal::from(regex::Regex::new("a").unwrap()).boxed(),
-//                     "o",
-//                     None,
-//                 ),
-//             ),
-//             (
-//                 map![],
-//                 Ok("I like opples ond bononos".into()),
-//                 ReplaceFn::new(
-//                     Literal::from("I like apples and bananas").boxed(),
-//                     Literal::from(regex::Regex::new("a").unwrap()).boxed(),
-//                     "o",
-//                     Some(-1),
-//                 ),
-//             ),
-//             (
-//                 map![],
-//                 Ok("I like apples and bananas".into()),
-//                 ReplaceFn::new(
-//                     Literal::from("I like apples and bananas").boxed(),
-//                     Literal::from(regex::Regex::new("a").unwrap()).boxed(),
-//                     "o",
-//                     Some(0),
-//                 ),
-//             ),
-//             (
-//                 map![],
-//                 Ok("I like opples and bananas".into()),
-//                 ReplaceFn::new(
-//                     Literal::from("I like apples and bananas").boxed(),
-//                     Literal::from(regex::Regex::new("a").unwrap()).boxed(),
-//                     "o",
-//                     Some(1),
-//                 ),
-//             ),
-//             (
-//                 map![],
-//                 Ok("I like opples ond bananas".into()),
-//                 ReplaceFn::new(
-//                     Literal::from("I like apples and bananas").boxed(),
-//                     Literal::from(regex::Regex::new("a").unwrap()).boxed(),
-//                     "o",
-//                     Some(2),
-//                 ),
-//             ),
-//         ];
+        replace_regex4 {
+             args: func_args![value: "I like apples and bananas",
+                              pattern: regex::Regex::new("a").unwrap(),
+                              with: "o",
+                              count: 1
+             ],
+             want: Ok("I like opples and bananas"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//         let mut state = state::Program::default();
+        replace_regex5 {
+             args: func_args![value: "I like apples and bananas",
+                              pattern: regex::Regex::new("a").unwrap(),
+                              with: "o",
+                              count: 2
+             ],
+             want: Ok("I like opples ond bananas"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+        replace_other {
+            args: func_args![value: "I like apples and bananas",
+                             pattern: "apples",
+                             with: "biscuits"
+            ],
+             want: Ok( "I like biscuits and bananas"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//             assert_eq!(got, exp);
-//         }
-//     }
+        replace_other2 {
+             args: func_args![value: "I like apples and bananas",
+                              pattern: regex::Regex::new("a").unwrap(),
+                              with: "o",
+                              count: 1
+             ],
+             want: Ok("I like opples and bananas"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//     #[test]
-//     fn check_replace_other() {
-//         let cases = vec![
-//             (
-//                 map![],
-//                 Ok("I like biscuits and bananas".into()),
-//                 ReplaceFn::new(
-//                     Literal::from("I like apples and bananas").boxed(),
-//                     Literal::from("apples").boxed(),
-//                     "biscuits",
-//                     None,
-//                 ),
-//             ),
-//             (
-//                 map!["foo": "I like apples and bananas"],
-//                 Ok("I like opples and bananas".into()),
-//                 ReplaceFn::new(
-//                     Box::new(Path::from("foo")),
-//                     Literal::from(regex::Regex::new("a").unwrap()).boxed(),
-//                     "o",
-//                     Some(1),
-//                 ),
-//             ),
-//             (
-//                 map!["foo": "I like [apples] and bananas"],
-//                 Ok("I like biscuits and bananas".into()),
-//                 ReplaceFn::new(
-//                     Box::new(Path::from("foo")),
-//                     Literal::from(regex::Regex::new("\\[apples\\]").unwrap()).boxed(),
-//                     "biscuits",
-//                     None,
-//                 ),
-//             ),
-//         ];
-
-//         let mut state = state::Program::default();
-
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        replace_other3 {
+            args: func_args![value: "I like [apples] and bananas",
+                             pattern: regex::Regex::new("\\[apples\\]").unwrap(),
+                             with: "biscuits"
+            ],
+            want: Ok("I like biscuits and bananas"),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
+    ];
+}

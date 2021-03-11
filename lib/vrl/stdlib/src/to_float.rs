@@ -128,70 +128,23 @@ impl Expression for ToFloatFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![
-//         boolean_infallible {
-//             expr: |_| ToFloatFn { value: lit!(true).boxed() },
-//             def: TypeDef { kind: Kind::Float, ..Default::default() },
-//         }
+    test_function![
+        to_float => ToFloat;
 
-//         integer_infallible {
-//             expr: |_| ToFloatFn { value: lit!(1).boxed() },
-//             def: TypeDef { kind: Kind::Float, ..Default::default() },
-//         }
+        float {
+            args: func_args![value: 20.5],
+            want: Ok(20.5),
+            tdef: TypeDef::new().infallible().float(),
+        }
 
-//         float_infallible {
-//             expr: |_| ToFloatFn { value: lit!(1.0).boxed() },
-//             def: TypeDef { kind: Kind::Float, ..Default::default() },
-//         }
-
-//         null_infallible {
-//             expr: |_| ToFloatFn { value: lit!(null).boxed() },
-//             def: TypeDef { kind: Kind::Float, ..Default::default() },
-//         }
-
-//         string_fallible {
-//             expr: |_| ToFloatFn { value: lit!("foo").boxed() },
-//             def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
-//         }
-
-//         map_fallible {
-//             expr: |_| ToFloatFn { value: map!{}.boxed() },
-//             def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
-//         }
-
-//         array_fallible {
-//             expr: |_| ToFloatFn { value: array![].boxed() },
-//             def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
-//         }
-
-//         timestamp_infallible {
-//             expr: |_| ToFloatFn { value: Literal::from(chrono::Utc::now()).boxed() },
-//             def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
-//         }
-//     ];
-
-//     #[test]
-//     fn to_float() {
-//         let cases = vec![
-//             (Ok(Value::Float(20.5)), ToFloatFn::new(lit!(20.5).boxed())),
-//             (
-//                 Ok(Value::Float(20.0)),
-//                 ToFloatFn::new(Literal::from(value!(20)).boxed()),
-//             ),
-//         ];
-
-//         let mut state = state::Program::default();
-
-//         for (exp, func) in cases {
-//             let got = func
-//                 .execute(&mut state, &mut value!({}))
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        integer {
+            args: func_args![value: 20],
+            want: Ok(20.0),
+            tdef: TypeDef::new().infallible().float(),
+        }
+    ];
+}

@@ -61,6 +61,20 @@ pub struct DelFn {
     query: expression::Query,
 }
 
+impl DelFn {
+    #[cfg(test)]
+    fn new(path: &str) -> Self {
+        use std::str::FromStr;
+
+        Self {
+            query: expression::Query::new(
+                expression::Target::External,
+                Path::from_str(path).unwrap(),
+            ),
+        }
+    }
+}
+
 impl Expression for DelFn {
     // TODO: we're silencing the result of the `remove` call here, to make this
     // function infallible.
@@ -119,70 +133,65 @@ impl fmt::Display for DelFn {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
-    use std::str::FromStr;
+    use shared::btreemap;
 
     #[test]
     fn del() {
         let cases = vec![
             (
                 // String field exists
-                map!["exists": "value"],
+                btreemap! { "exists" => "value" },
                 Ok(value!("value")),
-                DelFn::new(Path::from("exists")),
+                DelFn::new("exists"),
             ),
             (
                 // String field doesn't exist
-                map!["exists": "value"],
+                btreemap! { "exists" => "value" },
                 Ok(value!(null)),
-                DelFn::new(Path::from("does_not_exist")),
+                DelFn::new("does_not_exist"),
             ),
             (
                 // Array field exists
-                map!["exists": value!([1, 2, 3])],
+                btreemap! { "exists" => value!([1, 2, 3]) },
                 Ok(value!([1, 2, 3])),
-                DelFn::new(Path::from("exists")),
+                DelFn::new("exists"),
             ),
             (
                 // Null field exists
-                map!["exists": value!(null)],
+                btreemap! { "exists" => value!(null) },
                 Ok(value!(null)),
-                DelFn::new(Path::from("exists")),
+                DelFn::new("exists"),
             ),
             (
                 // Map field exists
-                map!["exists": map!["foo": "bar"]],
-                Ok(value!(map!["foo": "bar"])),
-                DelFn::new(Path::from("exists")),
+                btreemap! {"exists" => btreemap! { "foo" => "bar" }},
+                Ok(value!(btreemap! {"foo" => "bar" })),
+                DelFn::new("exists"),
             ),
             (
                 // Integer field exists
-                map!["exists": 127],
+                btreemap! { "exists" => 127 },
                 Ok(value!(127)),
-                DelFn::new(Path::from("exists")),
+                DelFn::new("exists"),
             ),
             (
                 // Array field exists
-                map!["exists": value!([1, 2, 3])],
+                btreemap! {"exists" => value!([1, 2, 3]) },
                 Ok(value!(2)),
-                DelFn::new(vrl::Path::from_str(".exists[1]").unwrap().into()),
+                DelFn::new(".exists[1]"),
             ),
         ];
-
-        let mut state = state::Program::default();
-
         for (object, exp, func) in cases {
             let mut object: Value = object.into();
+            let mut runtime_state = vrl::state::Runtime::default();
+            let mut ctx = Context::new(&mut object, &mut runtime_state);
             let got = func
                 .resolve(&mut ctx)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
             assert_eq!(got, exp);
         }
     }
 }
-*/

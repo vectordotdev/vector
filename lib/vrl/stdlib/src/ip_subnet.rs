@@ -149,68 +149,46 @@ fn ipv6_mask(subnet_bits: u32) -> IpAddr {
     Ipv6Addr::from(bits).into()
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![value_string {
-//         expr: |_| IpSubnetFn {
-//             value: Literal::from("192.168.0.1").boxed(),
-//             subnet: Literal::from("/1").boxed(),
-//         },
-//         def: TypeDef {
-//             kind: value::Kind::Bytes,
-//             fallible: true,
-//             ..Default::default()
-//         },
-//     }];
+    test_function![
+        ip_subnet => IpSubnet;
 
-//     #[test]
-//     fn ip_subnet() {
-//         let cases = vec![
-//             (
-//                 map!["foo": "192.168.10.23"],
-//                 Ok(Value::from("192.168.0.0")),
-//                 IpSubnetFn::new(
-//                     Box::new(Path::from("foo")),
-//                     Box::new(Literal::from("255.255.0.0")),
-//                 ),
-//             ),
-//             (
-//                 map!["foo": "2404:6800:4003:c02::64"],
-//                 Ok(Value::from("2400::")),
-//                 IpSubnetFn::new(
-//                     Box::new(Path::from("foo")),
-//                     Box::new(Literal::from("ff00::")),
-//                 ),
-//             ),
-//             (
-//                 map!["foo": "192.168.10.23"],
-//                 Ok(Value::from("192.168.0.0")),
-//                 IpSubnetFn::new(Box::new(Path::from("foo")), Box::new(Literal::from("/16"))),
-//             ),
-//             (
-//                 map!["foo": "192.168.10.23"],
-//                 Ok(Value::from("192.160.0.0")),
-//                 IpSubnetFn::new(Box::new(Path::from("foo")), Box::new(Literal::from("/12"))),
-//             ),
-//             (
-//                 map!["foo": "2404:6800:4003:c02::64"],
-//                 Ok(Value::from("2404:6800::")),
-//                 IpSubnetFn::new(Box::new(Path::from("foo")), Box::new(Literal::from("/32"))),
-//             ),
-//         ];
+        ipv4 {
+            args: func_args![value: "192.168.10.23",
+                             subnet: "255.255.0.0"],
+            want: Ok(value!("192.168.0.0")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         let mut state = state::Program::default();
+        ipv6 {
+            args: func_args![value: "2404:6800:4003:c02::64",
+                             subnet: "ff00::"],
+            want: Ok(value!("2400::")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         for (object, exp, func) in cases {
-//             let mut object = Value::Map(object);
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+        ipv4_subnet {
+            args: func_args![value: "192.168.10.23",
+                             subnet: "/16"],
+            want: Ok(value!("192.168.0.0")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        ipv4_smaller_subnet {
+            args: func_args![value: "192.168.10.23",
+                             subnet: "/12"],
+            want: Ok(value!("192.160.0.0")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
+
+        ipv6_subnet {
+            args: func_args![value: "2404:6800:4003:c02::64",
+                             subnet: "/32"],
+            want: Ok(value!("2404:6800::")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
+    ];
+}
