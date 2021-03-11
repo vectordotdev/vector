@@ -112,7 +112,7 @@ fn kafka_source(
 
     Ok(Box::pin(async move {
         Arc::clone(&consumer)
-            .start()
+            .stream()
             .take_until(shutdown.clone())
             .then(move |message| {
                 let key_field = key_field.clone();
