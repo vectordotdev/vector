@@ -83,9 +83,10 @@ impl DiagnosticError for Error {
 
 impl From<Error> for ExpressionError {
     fn from(err: Error) -> Self {
-        ExpressionError {
+        Self::Error {
             message: err.message(),
-            ..Default::default()
+            labels: vec![],
+            notes: vec![],
         }
     }
 }
