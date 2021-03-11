@@ -53,7 +53,7 @@ impl LogEventsSubscription {
         ctx: &'a Context<'a>,
         component_names: Vec<String>,
         #[graphql(default = 500)] interval: i32,
-        #[graphql(default = 100, validator(IntRange(min = "1", max = "10_000")))] limit: i32,
+        #[graphql(default = 100, validator(IntRange(min = "1", max = "10_000")))] limit: u32,
     ) -> impl Stream<Item = Vec<LogEventResult>> + 'a {
         let control_tx = ctx.data_unchecked::<ControlSender>().clone();
         create_log_events_stream(
@@ -91,10 +91,20 @@ fn create_log_events_stream(
 
         loop {
             select! {
-                // Process `TapResults`s. A tap result could contain a `LogEvent` or an error; if
-                // we get an error, the subscription is dropped.
+                // Process `TapResults`s. A tap result could contain a `LogEvent` or a notification.
+                // Notifications are emitted immediately; log events buffer until the next `interval`.
                 Some(tap) = rx.next() => {
-                    results.push(tap.into());
+                    let tap = tap.into();
+
+                    if let LogEventResult::Notification(_) = tap {
+                        // If an error occurs when sending, the subscription has likely gone
+                        // away. Break the loop to terminate the thread.
+                        if let Err(_) = log_tx.send(vec![tap]).await {
+                            break;
+                        }
+                    } else {
+                        results.push(tap);
+                    }
                 }
                 _ = interval.tick() => {
                     // If there are any existing results after the interval tick, emit.
@@ -120,7 +130,11 @@ fn create_log_events_stream(
                             .take(limit)
                             .collect();
 
-                        let _ = log_tx.send(results).await;
+                        // If we get an error here, it likely means that the subscription has
+                        // gone has away. This is a valid/common situation.
+                        if let Err(_) = log_tx.send(results).await {
+                            break;
+                        }
                     }
                 }
             }

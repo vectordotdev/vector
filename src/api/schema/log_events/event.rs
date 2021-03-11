@@ -1,7 +1,12 @@
 use crate::event;
-use async_graphql::Object;
+use async_graphql::{Enum, Object};
 use chrono::{DateTime, Utc};
-use serde_json::json;
+
+#[derive(Enum, Copy, Clone, PartialEq, Eq)]
+pub enum LogEventEncodingType {
+    Json,
+    Yaml,
+}
 
 #[derive(Debug)]
 pub struct LogEvent {
@@ -36,13 +41,11 @@ impl LogEvent {
         self.event.get("timestamp")?.as_timestamp()
     }
 
-    /// Log event as a JSON string
-    async fn json(&self) -> String {
-        json!(self.event).to_string()
-    }
-
-    /// Log event as a YAML string
-    async fn yaml(&self) -> Option<String> {
-        serde_yaml::to_string(&self.event).ok()
+    /// Log event as an encoded string format
+    async fn string(&self, encoding: LogEventEncodingType) -> Option<String> {
+        match encoding {
+            LogEventEncodingType::Json => serde_json::to_string(&self.event).ok(),
+            LogEventEncodingType::Yaml => serde_yaml::to_string(&self.event).ok(),
+        }
     }
 }
