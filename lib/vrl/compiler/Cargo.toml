@@ -8,7 +8,6 @@ publish = false
 [dependencies]
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
-shared = { path = "../../shared", default-features = false, features = ["btreemap"] }
 
 bitflags = "1"
 bytes = "0.5.6"
@@ -22,3 +21,6 @@ regex = "1"
 serde = "1"
 thiserror = "1"
 tracing = "0.1"
+
+[dev-dependencies]
+shared = { path = "../../shared", default-features = false, features = ["btreemap"] }
