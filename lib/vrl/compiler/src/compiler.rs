@@ -1,5 +1,5 @@
 use crate::expression::*;
-use crate::{Function, Program, State};
+use crate::{Function, Program, State, Value};
 use chrono::{TimeZone, Utc};
 use diagnostic::DiagnosticError;
 use ordered_float::NotNan;
@@ -255,12 +255,22 @@ impl<'a> Compiler<'a> {
                     AssignmentOp::Assign => {
                         let expr =
                             Box::new(expr.map(|node| self.compile_expr(Node::new(span, node))));
-                        let node = Variant::Infallible { ok, err, expr };
+                        let node = Variant::Infallible {
+                            ok,
+                            err,
+                            expr,
+                            default: Value::Null,
+                        };
                         Node::new(span, node)
                     }
                     AssignmentOp::Merge => {
                         let expr = self.rewrite_to_merge(span, &ok, expr);
-                        let node = Variant::Infallible { ok, err, expr };
+                        let node = Variant::Infallible {
+                            ok,
+                            err,
+                            expr,
+                            default: Value::Null,
+                        };
 
                         Node::new(span, node)
                     }
