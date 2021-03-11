@@ -1,12 +1,12 @@
 package metadata
 
 remap: functions: to_unix_timestamp: {
-	category:    "Coerce"
+	category:    "Convert"
 	description: """
-		Coerces the `value` into a [Unix timestamp](\(urls.unix_timestamp)).
+		Converts the `value` timestamp into a [Unix timestamp](\(urls.unix_timestamp)).
 
-		By default, the number of seconds since the Unix epoch is returned, but milliseconds or nanoseconds can be
-		returned via the `unit` argument.
+		Returns the number of seconds since the Unix epoch by default, but milliseconds or nanoseconds can also be
+		specified by `unit`.
 		"""
 
 	arguments: [
@@ -18,7 +18,7 @@ remap: functions: to_unix_timestamp: {
 		},
 		{
 			name:        "unit"
-			description: "The time unit"
+			description: "The time unit."
 			type: ["string"]
 			required: false
 			enum: {

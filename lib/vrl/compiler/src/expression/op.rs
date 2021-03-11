@@ -37,7 +37,7 @@ impl Op {
 
         if let ast::Opcode::Err = opcode {
             if lhs_type_def.is_infallible() {
-                return Err(Error::ErrInfallible {
+                return Err(Error::UnnecessaryCoalesce {
                     lhs_span,
                     rhs_span,
                     op_span,
@@ -249,7 +249,7 @@ pub enum Error {
     ChainedComparison { span: Span },
 
     #[error("unnecessary error coalescing operation")]
-    ErrInfallible {
+    UnnecessaryCoalesce {
         lhs_span: Span,
         rhs_span: Span,
         op_span: Span,
@@ -271,7 +271,7 @@ impl DiagnosticError for Error {
 
         match self {
             ChainedComparison { .. } => 650,
-            ErrInfallible { .. } => 651,
+            UnnecessaryCoalesce { .. } => 651,
             MergeNonObjects { .. } => 652,
             Expr(err) => err.code(),
         }
@@ -291,7 +291,7 @@ impl DiagnosticError for Error {
 
         match self {
             ChainedComparison { span } => vec![Label::primary("", span)],
-            ErrInfallible {
+            UnnecessaryCoalesce {
                 lhs_span,
                 rhs_span,
                 op_span,

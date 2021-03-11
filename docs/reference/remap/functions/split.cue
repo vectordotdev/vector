@@ -3,7 +3,7 @@ package metadata
 remap: functions: split: {
 	category: "String"
 	description: """
-		Splits the `value` via the `pattern`.
+		Splits the `value` string via the `pattern`.
 		"""
 
 	arguments: [
@@ -30,7 +30,7 @@ remap: functions: split: {
 	return: {
 		types: ["string"]
 		rules: [
-			"If `limit` is specified, after `limit` has been reached, the remainder of the string is returned unsplit.",
+			"If `limit` is specified, the remainder of the string is returned unsplit after `limit` has been reached.",
 		]
 	}
 

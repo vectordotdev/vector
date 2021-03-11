@@ -58,54 +58,30 @@ impl Expression for IpToIpv6Fn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![value_string {
-//         expr: |_| IpToIpv6Fn {
-//             value: Literal::from("192.168.0.1").boxed()
-//         },
-//         def: TypeDef {
-//             kind: value::Kind::Bytes,
-//             fallible: true,
-//             ..Default::default()
-//         },
-//     }];
+    test_function![
+        ip_to_ipv6 => IpToIpv6;
 
-//     #[test]
-//     fn ip_to_ipv6() {
-//         let cases = vec![
-//             (
-//                 map!["foo": "i am not an ipaddress"],
-//                 Err(
-//                     "function call error: unable to parse IP address: invalid IP address syntax"
-//                         .to_string(),
-//                 ),
-//                 IpToIpv6Fn::new(Box::new(Path::from("foo"))),
-//             ),
-//             (
-//                 map!["foo": "192.168.0.1"],
-//                 Ok(Value::from("::ffff:192.168.0.1")),
-//                 IpToIpv6Fn::new(Box::new(Path::from("foo"))),
-//             ),
-//             (
-//                 map!["foo": "2404:6800:4003:c02::64"],
-//                 Ok(Value::from("2404:6800:4003:c02::64")),
-//                 IpToIpv6Fn::new(Box::new(Path::from("foo"))),
-//             ),
-//         ];
+        invalid {
+            args: func_args![value: "i am not an ipaddress"],
+            want: Err(
+                    "unable to parse IP address: invalid IP address syntax"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         let mut state = state::Program::default();
+        valid {
+            args: func_args![value: "192.168.0.1"],
+            want: Ok(value!("::ffff:192.168.0.1")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         for (object, exp, func) in cases {
-//             let mut object = Value::Map(object);
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        ipv6_passthrough {
+            args: func_args![value: "2404:6800:4003:c02::64"],
+            want: Ok(value!("2404:6800:4003:c02::64")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
+    ];
+}

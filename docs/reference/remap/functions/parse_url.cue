@@ -9,13 +9,13 @@ remap: functions: parse_url: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The text of the url."
+			description: "The text of the URL."
 			required:    true
 			type: ["string"]
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a properly formatted URL",
+		"`value` isn't a properly formatted URL",
 	]
 	return: types: ["object"]
 

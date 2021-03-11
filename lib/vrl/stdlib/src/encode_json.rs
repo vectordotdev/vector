@@ -52,7 +52,6 @@ impl Expression for EncodeJsonFn {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -65,31 +64,37 @@ mod tests {
         bytes {
             args: func_args![value: r#"hello"#],
             want: Ok(r#""hello""#),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         integer {
             args: func_args![value: 42],
             want: Ok("42"),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         float {
             args: func_args![value: 42f64],
             want: Ok("42.0"),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         boolean {
             args: func_args![value: false],
             want: Ok("false"),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         map {
             args: func_args![value: map!["field": "value"]],
             want: Ok(r#"{"field":"value"}"#),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         array {
             args: func_args![value: vec![1, 2, 3]],
             want: Ok("[1,2,3]"),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         timestamp {
@@ -98,67 +103,21 @@ mod tests {
                     .unwrap()
                     .with_timezone(&Utc)
             ],
-            want: Ok(r#""1983-04-13 12:09:14.274 UTC""#),
+            want: Ok(r#""1983-04-13T12:09:14.274Z""#),
+            tdef: TypeDef::new().infallible().bytes(),
 
         }
 
         regex {
             args: func_args![value: Regex::new("^a\\d+$").unwrap()],
             want: Ok(r#""^a\\d+$""#),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         null {
             args: func_args![value: Value::Null],
             want: Ok("null"),
-        }
-    ];
-
-    test_type_def![
-        bytes {
-            expr: |_| EncodeJsonFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-        }
-
-        integer {
-            expr: |_| EncodeJsonFn { value: Literal::from(42).boxed() },
-            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-        }
-
-        float {
-            expr: |_| EncodeJsonFn { value: Literal::from(42f64).boxed() },
-            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-        }
-
-        boolean {
-            expr: |_| EncodeJsonFn { value: Literal::from(true).boxed() },
-            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-        }
-
-        map {
-            expr: |_| EncodeJsonFn { value: map!{}.boxed() },
-            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-        }
-
-        array {
-            expr: |_| EncodeJsonFn { value: array![].boxed() },
-            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-        }
-
-        timestamp {
-            expr: |_| EncodeJsonFn { value: Literal::from(chrono::Utc::now()).boxed() },
-            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-        }
-
-        regex {
-            expr: |_| EncodeJsonFn { value: Literal::from(Regex::new("^a\\d+$").unwrap()).boxed() },
-            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-        }
-
-        null {
-            expr: |_| EncodeJsonFn { value: Literal::from(()).boxed() },
-            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
+            tdef: TypeDef::new().infallible().bytes(),
         }
     ];
 }
-
-*/

@@ -7,30 +7,31 @@ remap: functions: ip_subnet: {
 		"""
 	notices: [
 		"""
-			Works with both IPv4 and IPv6 addresses. The IP version for the mask must be the same as the supplied address.
+			Works with both IPv4 and IPv6 addresses. The IP version for the mask must be the same as the supplied
+			address.
 			""",
 	]
 
 	arguments: [
 		{
 			name:        "ip"
-			description: "The ip address - either a v4 or a v6 address."
+			description: "The IP address (v4 or v6)."
 			required:    true
 			type: ["string"]
 		},
 		{
 			name: "subnet"
 			description: #"""
-				The subnet to extract from the ip address. This can be either in the form of a prefix length,
-				eg. `/8` or as a net mask - `255.255.0.0`. The net mask can be either an IPv4 or IPv6 address.
+				The subnet to extract from the IP address. This can be either a prefix length like `/8` or a net mask
+				like `255.255.0.0`. The net mask can be either an IPv4 or IPv6 address.
 				"""#
 			required: true
 			type: ["string"]
 		},
 	]
 	internal_failure_reasons: [
-		"`ip` is not a valid IP address",
-		"`subnet` is not a valid subnet.",
+		"`ip` isn't a valid IP address",
+		"`subnet` isn't a valid subnet.",
 	]
 	return: types: ["string"]
 

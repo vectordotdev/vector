@@ -25,7 +25,7 @@ remap: functions: floor: {
 	return: {
 		types: ["integer", "float"]
 		rules: [
-			"If `precision` is `0`, then an integer is returned, otherwise a float is returned.",
+			"Returns an integer if `precision` is `0` (this is the default). Returns a float otherwise.",
 		]
 	}
 

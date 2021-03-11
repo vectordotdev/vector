@@ -284,7 +284,6 @@ impl<'a> Compiler<'a> {
 
     fn compile_query_target(&mut self, node: Node<ast::QueryTarget>) -> query::Target {
         use ast::QueryTarget::*;
-        use query::Target;
 
         let span = node.span();
 

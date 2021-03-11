@@ -3,14 +3,13 @@ package metadata
 remap: functions: parse_grok: {
 	category:    "Parse"
 	description: """
-		Parses the `value` using the [`grok` format](\(urls.grok)).
-
-		All patterns [listed here](\(urls.grok_patterns)) are supported.
+		Parses the `value` using the [`grok` format](\(urls.grok)). All patterns [listed here](\(urls.grok_patterns))
+		are supported.
 		"""
 	notices: [
 		"""
-			It is recommended to use maintained Grok patterns when possible, since they will be improved over time
-			by the community.
+			We recommend using community-maintained Grok patterns when possible, as they're more likely to be properly
+			vetted and improved over time than bespoke patterns.
 			""",
 	]
 
@@ -29,20 +28,20 @@ remap: functions: parse_grok: {
 		},
 		{
 			name:        "remove_empty"
-			description: "If set to true, any patterns that resolve to an empty value will be removed from the result."
+			description: "If set to `true`, any patterns that resolve to an empty value are removed from the result."
 			required:    false
 			default:     true
 			type: ["boolean"]
 		},
 	]
 	internal_failure_reasons: [
-		"`value` fails to parse via the provided `pattern`",
+		"`value` fails to parse using the provided `pattern`",
 	]
 	return: types: ["object"]
 
 	examples: [
 		{
-			title: "Parse via Grok"
+			title: "Parse using Grok"
 			source: #"""
 				parse_grok!(
 					"2020-10-02T23:22:12.223222Z info Hello world",

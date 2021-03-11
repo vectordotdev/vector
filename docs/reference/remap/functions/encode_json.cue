@@ -9,7 +9,7 @@ remap: functions: encode_json: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The value to return a json representation of."
+			description: "The value to convert to a JSON string."
 			required:    true
 			type: ["any"]
 		},

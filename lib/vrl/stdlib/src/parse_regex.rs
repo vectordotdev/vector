@@ -75,54 +75,10 @@ impl Expression for ParseRegexFn {
     }
 }
 
-/*
 #[cfg(test)]
 #[allow(clippy::trivial_regex)]
 mod tests {
     use super::*;
-
-    vrl::test_type_def![
-        value_string {
-            expr: |_| ParseRegexFn {
-                value: Literal::from("foo").boxed(),
-                pattern: Regex::new("^(?P<group>.*)$").unwrap(),
-            },
-            def: TypeDef { kind: Kind::Map,
-                           fallible: true,
-                           inner_type_def: Some(inner_type_def! ({ "0": Kind::Bytes,
-                                                                   "1": Kind::Bytes,
-                                                                   "group": Kind::Bytes
-                           })) },
-        }
-
-        value_non_string {
-            expr: |_| ParseRegexFn {
-                value: Literal::from(1).boxed(),
-                pattern: Regex::new("^(?P<group>.*)$").unwrap(),
-            },
-            def: TypeDef { fallible: true,
-                           kind: Kind::Map,
-                           inner_type_def: Some(inner_type_def! ({ "0": Kind::Bytes,
-                                                                   "1": Kind::Bytes,
-                                                                   "group": Kind::Bytes
-                           })),
-            },
-        }
-
-        value_optional {
-            expr: |_| ParseRegexFn {
-                value: Box::new(Noop),
-                pattern: Regex::new("^(?P<group>.*)$").unwrap(),
-            },
-            def: TypeDef { fallible: true,
-                           kind: Kind::Map,
-                           inner_type_def: Some(inner_type_def! ({ "0": Kind::Bytes,
-                                                                   "1": Kind::Bytes,
-                                                                   "group": Kind::Bytes
-                           }))
-            },
-        }
-    ];
 
     test_function![
         find => ParseRegex;
@@ -150,7 +106,28 @@ mod tests {
                              "6": "/embrace/supply-chains/dynamic/vertical",
                              "7": "201",
                              "8": "20574",
-            }))
+            })),
+            tdef: TypeDef::new()
+                .fallible()
+                .object::<&str, Kind>(map! {
+                    "bytes_in": Kind::Bytes,
+                    "host": Kind::Bytes,
+                    "user": Kind::Bytes,
+                    "timestamp": Kind::Bytes,
+                    "method": Kind::Bytes,
+                    "path": Kind::Bytes,
+                    "status": Kind::Bytes,
+                    "bytes_out": Kind::Bytes,
+                    "0": Kind::Bytes,
+                    "1": Kind::Bytes,
+                    "2": Kind::Bytes,
+                    "3": Kind::Bytes,
+                    "4": Kind::Bytes,
+                    "5": Kind::Bytes,
+                    "6": Kind::Bytes,
+                    "7": Kind::Bytes,
+                    "8": Kind::Bytes,
+                }),
         }
 
         single_match {
@@ -161,7 +138,14 @@ mod tests {
             want: Ok(value!({"number": "first",
                              "0": "first group",
                              "1": "first"
-            }))
+            })),
+            tdef: TypeDef::new()
+                .fallible()
+                .object::<&str, Kind>(map! {
+                        "number": Kind::Bytes,
+                        "0": Kind::Bytes,
+                        "1": Kind::Bytes,
+                }),
         }
 
         no_match {
@@ -170,8 +154,28 @@ mod tests {
                 pattern: Regex::new(r#"^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$"#)
                             .unwrap()
             ],
-            want: Err("function call error: unable to parse regular expression".to_string()),
+            want: Err("could not find any pattern matches"),
+            tdef: TypeDef::new()
+                .fallible()
+                .object::<&str, Kind>(map! {
+                    "host": Kind::Bytes,
+                    "user": Kind::Bytes,
+                    "bytes_in": Kind::Bytes,
+                    "timestamp": Kind::Bytes,
+                    "method": Kind::Bytes,
+                    "path": Kind::Bytes,
+                    "status": Kind::Bytes,
+                    "bytes_out": Kind::Bytes,
+                    "0": Kind::Bytes,
+                    "1": Kind::Bytes,
+                    "2": Kind::Bytes,
+                    "3": Kind::Bytes,
+                    "4": Kind::Bytes,
+                    "5": Kind::Bytes,
+                    "6": Kind::Bytes,
+                    "7": Kind::Bytes,
+                    "8": Kind::Bytes,
+                }),
         }
     ];
 }
-*/

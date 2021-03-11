@@ -61,6 +61,18 @@ configuration: {
 				}
 			}
 		}
+
+		timezone: {
+			common:      false
+			description: "The name of the time zone to apply to timestamp conversions that do not contain an explicit time zone. The time zone name may be any name in the [TZ database][urls.tz_time_zones], or `local` to indicate system local time."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "local"
+				examples: ["local", "America/NewYork", "EST5EDT"]
+				syntax: "literal"
+			}
+		}
 	}
 
 	how_it_works: {
