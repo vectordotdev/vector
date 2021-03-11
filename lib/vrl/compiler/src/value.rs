@@ -39,7 +39,9 @@ impl fmt::Display for Value {
             Value::Bytes(val) => write!(
                 f,
                 r#""{}""#,
-                String::from_utf8_lossy(val).replace(r#"""#, r#"\""#)
+                String::from_utf8_lossy(val)
+                    .replace(r#"\"#, r#"\\"#)
+                    .replace(r#"""#, r#"\""#)
             ),
             Value::Integer(val) => write!(f, "{}", val),
             Value::Float(val) => write!(f, "{}", val),
@@ -83,6 +85,14 @@ mod test {
         assert_eq!(
             Value::Bytes(Bytes::from("Hello, world!")).to_string(),
             r#""Hello, world!""#
+        );
+    }
+
+    #[test]
+    fn test_display_string_with_backslashes() {
+        assert_eq!(
+            Value::Bytes(Bytes::from(r#"foo \ bar \ baz"#)).to_string(),
+            r#""foo \\ bar \\ baz""#
         );
     }
 
