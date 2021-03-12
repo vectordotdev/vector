@@ -10,7 +10,7 @@ we release, compatibility guarantees, and more.
 
 There are a few different ways to track when there is a new release:
 
-* Following [@vectordotdev](https://twitter.com/vectordotdev) on Twitter.
+* Follow [@vectordotdev](https://twitter.com/vectordotdev) on Twitter.
 * Heading to our [Discord server](https://discord.gg/EXXRbYCq) and watching the
 	`#announcements` channel.
 * Going to our [Github repository](https://github.com/timberio/vector) and
@@ -25,7 +25,7 @@ There are a few different ways to track when there is a new release:
 We aim to:
 
 * Release a stable version of Vector every 6 weeks.
-* Release patch fixes as needed to fix high priority bugs and regressions.
+* Release patch fixes as needed to fix high-priority bugs and regressions.
 * Release daily builds representing the latest state of Vector for feedback.
 
 ### Stable releases
@@ -46,7 +46,7 @@ priority bug fixes. We evaluate at the end of every two weeks whether a patch
 should be published for the current stable release, but can release outside of
 this schedule depending on need.
 
-By default, any bug fixes that are not regression fixes, will be left for the
+By default, any bug fixes that are not regression fixes will be left for the
 next stable release.
 
 ### Nightly releases
@@ -55,27 +55,28 @@ We release a nightly version of Vector every day that represents the latest
 state of Vector. We aim to keep these as stable as possible, but they are
 inherently less stable than patch releases. We offer these to:
 
-* Allow users to beta test unreleased vector features and provide us with feedback
+* Allow users to beta test unreleased Vector features and provide us with
+  feedback
 * Run blackbox integration tests against released artifacts
 
-These can be downloaded from via our [nightly downloads
+These nightly releases can be downloaded via our [nightly downloads
 page](https://vector.dev/releases/nightly/download/) or via our our [nightly
 package
 repositories](https://cloudsmith.io/~timber/repos/vector-nightly/packages/).
 
 ## Compatibility guarantees
 
-We aim to keep Vector as backwards compatible as possible, preferring
-deprecation over breaking compatibly, but we will occasionally introduce
-backwards incompatible changes as we learn better ways of doing things .
+We aim to keep Vector as backwards-compatible as possible, preferring
+deprecation over breaking compatibility, but we will occasionally introduce
+backwards-incompatible changes as we learn better ways of doing things.
 
-While Vector is pre-1.0, we will only make backwards incompatible changes in
+While Vector is pre-1.0, we will only make backwards-incompatible changes in
 minor releases (for example from `0.11.1` to `0.12.0`). We will not make
-backwards incompatible changes in point releases (for example from `0.11.0` to
+backwards-incompatible changes in point releases (for example from `0.11.0` to
 `0.11.1`) unless there is a critical bug that must be addressed that requires
-breaking compatibility to fix (this has never happened yet).
+breaking compatibility to fix (this has never happened).
 
-When there are backwards incompatible changes in a release, they will always be
+When there are backwards-incompatible changes in a release, they will always be
 highlighted in our release notes under the "Breaking changes" heading (for
 example, the [0.12.0 release breaking
 changes](https://vector.dev/releases/0.12.0/#breaking-change-highlights)).
@@ -95,8 +96,6 @@ release](https://vector.dev/releases/nightly/download/) of Vector allows you to
 test out unreleased features and fixes and provide feedback to guide our
 development. We aim to keep nightly as stable as possible through integration
 testing, but there will occasionally be issues that slip through and are fixed
-for the next nightly release. For example, you could run choose to run the
-nightly version in your development environments and save stable for
-production.
-
+for the next nightly release. For example, you could choose to run the nightly
+version in your development environments and save stable for production.
 Otherwise, the stable release is your best bet.
