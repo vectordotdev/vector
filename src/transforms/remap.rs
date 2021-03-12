@@ -148,6 +148,7 @@ mod tests {
 "#
             .to_string(),
             drop_on_error: true,
+            drop_on_abort: false,
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -174,6 +175,7 @@ mod tests {
                 .baz = 12
             "#},
             drop_on_error: false,
+            drop_on_abort: false,
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -199,6 +201,7 @@ mod tests {
                 .baz = 12
             "#},
             drop_on_error: false,
+            drop_on_abort: false,
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -224,6 +227,7 @@ mod tests {
                        .kind = "incremental""#
                 .to_string(),
             drop_on_error: true,
+            drop_on_abort: false,
         };
         let mut tform = Remap::new(conf).unwrap();
 
