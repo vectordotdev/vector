@@ -220,18 +220,22 @@ impl FileWatcher {
         }
     }
 
+    #[inline]
     fn track_read_attempt(&mut self) {
         self.last_read_attempt = Instant::now();
     }
 
+    #[inline]
     fn track_read_success(&mut self) {
         self.last_read_success = Instant::now();
     }
 
+    #[inline]
     pub fn last_read_success(&self) -> Instant {
         self.last_read_success
     }
 
+    #[inline]
     pub fn should_read(&self) -> bool {
         self.last_read_success.elapsed() < Duration::from_secs(10)
             || self.last_read_attempt.elapsed() > Duration::from_secs(10)
@@ -247,12 +251,26 @@ fn null_reader() -> impl BufRead {
     io::Cursor::new(Vec::new())
 }
 
-// Tweak of https://github.com/rust-lang/rust/blob/bf843eb9c2d48a80a5992a5d60858e27269f9575/src/libstd/io/mod.rs#L1471
-// After more than max_size bytes are read as part of a single line, this discard the remaining bytes
-// in that line, and then starts again on the next line.
+/// Read up to `max_size` bytes from `reader`, splitting by `delim`
+///
+/// The function reads up to `max_size` bytes from `reader`, splitting the input
+/// by `delim`. If a `delim` is not found in `reader` before `max_size` bytes
+/// are read then the reader is polled until `delim` is found and the results
+/// are discarded. Else, the result is written into `buf`.
+///
+/// The return is unusual. In the Err case this function has not written into
+/// `buf` and the caller should not examine its contents. In the Ok case if the
+/// inner value is None the caller should retry the call as the buffering read
+/// hit the end of the buffer but did not find a `delim` yet, indicating that
+/// we've sheered a write or that there were no bytes available in the `reader`
+/// and the `reader` was very sure about it. If the inner value is Some the
+/// interior `usize` is the number of bytes written into `buf`.
+///
+/// Tweak of
+/// https://github.com/rust-lang/rust/blob/bf843eb9c2d48a80a5992a5d60858e27269f9575/src/libstd/io/mod.rs#L1471
 fn read_until_with_max_size<R: BufRead + ?Sized>(
-    r: &mut R,
-    p: &mut FilePosition,
+    reader: &mut R,
+    position: &mut FilePosition,
     delim: &[u8],
     buf: &mut BytesMut,
     max_size: usize,
@@ -262,7 +280,7 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
     let delim_finder = Finder::new(delim);
     let delim_len = delim.len();
     loop {
-        let available = match r.fill_buf() {
+        let available: &[u8] = match reader.fill_buf() {
             Ok(n) => n,
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
             Err(e) => return Err(e),
@@ -284,8 +302,8 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
                 }
             }
         };
-        r.consume(used);
-        *p += used as u64; // do this at exactly same time
+        reader.consume(used);
+        *position += used as u64; // do this at exactly same time
         total_read += used;
 
         if !discarding && buf.len() > max_size {
@@ -316,77 +334,139 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
 #[cfg(test)]
 mod test {
     use super::read_until_with_max_size;
-    use bytes::BytesMut;
+    use bytes::{BufMut, BytesMut};
+    use quickcheck::{QuickCheck, TestResult};
     use std::io::Cursor;
+    use std::num::NonZeroU8;
+    use std::ops::Range;
+
+    fn qc_inner(chunks: Vec<Vec<u8>>, delim: u8, max_size: NonZeroU8) -> TestResult {
+        // The `global_data` is the view of `chunks` as a single contiguous
+        // block of memory. Where `chunks` simulates what happens when bytes are
+        // fitfully available `global_data` is the view of all chunks assembled
+        // after every byte is available.
+        let mut global_data = BytesMut::new();
+
+        // `DelimDetails` describes the nature of each delimiter found in the
+        // `chunks`.
+        #[derive(Clone)]
+        struct DelimDetails {
+            /// Index in `global_data`, absolute offset
+            global_index: usize,
+            /// Index in each `chunk`, relative offset
+            interior_index: usize,
+            /// Whether this delimiter was within `max_size` of its previous
+            /// peer
+            within_max_size: bool,
+            /// Which chunk in `chunks` this delimiter was found in
+            chunk_index: usize,
+            /// The range of bytes that this delimiter bounds with its previous
+            /// peer
+            byte_range: Range<usize>,
+        }
+
+        // Move through the `chunks` and discover at what positions an instance
+        // of `delim` exists in the chunk stream and whether that `delim` is
+        // more than `max_size` bytes away from the previous `delim`. This loop
+        // constructs the `facts` vector that holds `DelimDetails` instances and
+        // also populates `global_data`.
+        let mut facts: Vec<DelimDetails> = Vec::new();
+        let mut global_index: usize = 0;
+        let mut previous_offset: usize = 0;
+        for (i, chunk) in chunks.iter().enumerate() {
+            for (interior_index, byte) in chunk.iter().enumerate() {
+                global_data.put_u8(*byte);
+                if *byte == delim {
+                    let span = global_index - previous_offset;
+                    let within_max_size = span <= max_size.get() as usize;
+                    facts.push(DelimDetails {
+                        global_index,
+                        within_max_size,
+                        chunk_index: i,
+                        interior_index,
+                        byte_range: (previous_offset..global_index),
+                    });
+                    previous_offset = global_index + 1;
+                }
+                global_index += 1;
+            }
+        }
+
+        // Our model is only concerned with the first valid delimiter in the
+        // chunk stream. As such, discover which that it and record it
+        // specially.
+        let mut first_delim: Option<DelimDetails> = None;
+        for fact in &facts {
+            if fact.within_max_size {
+                first_delim = Some(fact.clone());
+                break;
+            }
+        }
+
+        let mut position = 0;
+        let mut buffer = BytesMut::with_capacity(max_size.get() as usize);
+        // NOTE: The delimiter may be multiple bytes wide but for the purpose of
+        // this model a single byte does well enough.
+        let delimiter: [u8; 1] = [delim];
+        for (idx, chunk) in chunks.iter().enumerate() {
+            let mut reader = Cursor::new(&chunk);
+
+            match read_until_with_max_size(
+                &mut reader,
+                &mut position,
+                &delimiter,
+                &mut buffer,
+                max_size.get() as usize,
+            )
+            .unwrap()
+            {
+                None => {
+                    // Subject only returns None if this is the last chunk _and_
+                    // the chunk did not contain a delimiter _or_ the delimiter
+                    // was outside the max_size range _or_ the current chunk is empty.
+                    let has_valid_delimiter = facts.iter().fold(false, |valid, details| {
+                        valid || ((details.chunk_index == idx) && details.within_max_size)
+                    });
+                    assert!(chunk.is_empty() || !has_valid_delimiter)
+                }
+                Some(total_read) => {
+                    // Now that the function has returned we confirm that the
+                    // returned details match our `first_delim` and also that
+                    // the `buffer` is populated correctly.
+                    assert!(first_delim.is_some());
+                    assert_eq!(
+                        first_delim.clone().unwrap().global_index + 1,
+                        position as usize
+                    );
+                    assert_eq!(first_delim.clone().unwrap().interior_index + 1, total_read);
+                    assert_eq!(
+                        buffer.get(..),
+                        global_data.get(first_delim.clone().unwrap().byte_range)
+                    );
+                    break;
+                }
+            }
+        }
+
+        TestResult::passed()
+    }
 
     #[test]
-    fn test_read_until_with_max_size() {
-        let mut buf = Cursor::new(&b"12"[..]);
-        let mut pos = 0;
-        let mut v = BytesMut::new();
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"3", &mut v, 1000).unwrap();
-        assert_eq!(pos, 2);
-        assert_eq!(p, None);
-        assert_eq!(&*v, b"12");
-        let mut buf = Cursor::new(&b"34"[..]);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"3", &mut v, 1000).unwrap();
-        assert_eq!(pos, 3);
-        assert_eq!(p, Some(1));
-        assert_eq!(&*v, b"12");
-
-        let mut buf = Cursor::new(&b"1233"[..]);
-        let mut pos = 0;
-        let mut v = BytesMut::new();
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"3", &mut v, 1000).unwrap();
-        assert_eq!(pos, 3);
-        assert_eq!(p, Some(3));
-        assert_eq!(&*v, b"12");
-        v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"3", &mut v, 1000).unwrap();
-        assert_eq!(pos, 4);
-        assert_eq!(p, Some(1));
-        assert_eq!(&*v, b"");
-        v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"3", &mut v, 1000).unwrap();
-        assert_eq!(pos, 4);
-        assert_eq!(p, None);
-        assert_eq!(&*v, [0; 0]);
-
-        let mut buf = Cursor::new(&b"short\nthis is too long\nexact size\n11 eleven11\n"[..]);
-        let mut pos = 0;
-        let mut v = BytesMut::new();
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"\n", &mut v, 10).unwrap();
-        assert_eq!(pos, 6);
-        assert_eq!(p, Some(6));
-        assert_eq!(&*v, b"short");
-        v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"\n", &mut v, 10).unwrap();
-        assert_eq!(pos, 34);
-        assert_eq!(p, Some(28));
-        assert_eq!(&*v, b"exact size");
-        v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"\n", &mut v, 10).unwrap();
-        assert_eq!(pos, 46);
-        assert_eq!(p, None);
-        assert_eq!(&*v, [0; 0]);
-
-        let mut buf =
-            Cursor::new(&b"short\r\nthis is too long\r\nexact size\r\n11 eleven11\r\n"[..]);
-        let mut pos = 0;
-        let mut v = BytesMut::new();
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"\r\n", &mut v, 10).unwrap();
-        assert_eq!(pos, 7);
-        assert_eq!(p, Some(7));
-        assert_eq!(&*v, b"short");
-        v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"\r\n", &mut v, 10).unwrap();
-        assert_eq!(pos, 37);
-        assert_eq!(p, Some(30));
-        assert_eq!(&*v, b"exact size");
-        v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"\r\n", &mut v, 10).unwrap();
-        assert_eq!(pos, 50);
-        assert_eq!(p, None);
-        assert_eq!(&*v, [0; 0]);
+    fn qc_read_until_with_max_size() {
+        // The `read_until_with_max` function is intended to be called
+        // multiple times until it returns Ok(Some(usize)). The function
+        // should never return error in this test. If the return is None we
+        // will call until it is not. Once return is Some the interior value
+        // should be the position of the first delim in the buffer, unless
+        // that delim is past the max_size barrier in which case it will be
+        // the position of the first delim that is within some multiple of
+        // max_size.
+        //
+        // I think I will adjust the function to have a richer return
+        // type. This will help in the transition to async.
+        QuickCheck::new()
+            .tests(1_000)
+            .max_tests(2_000)
+            .quickcheck(qc_inner as fn(Vec<Vec<u8>>, u8, NonZeroU8) -> TestResult);
     }
 }
