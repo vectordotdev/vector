@@ -15,6 +15,7 @@ use vrl::{Program, Runtime, Terminate};
 pub struct RemapConfig {
     pub source: String,
     pub drop_on_error: bool,
+    #[serde(default = "crate::serde::default_true")]
     pub drop_on_abort: bool,
 }
 
