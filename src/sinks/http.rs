@@ -575,7 +575,7 @@ mod tests {
         // its accepting socket. The delay below ensures that the sink
         // attempts to connect at least once before creating the
         // listening socket.
-        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
         let (rx, trigger, server) = build_test_server(in_addr);
         tokio::spawn(server);
 

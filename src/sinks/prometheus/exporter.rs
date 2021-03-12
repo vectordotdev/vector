@@ -372,7 +372,7 @@ mod tests {
         let (_name, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         tx.send(event).expect("Failed to send.");
 
-        time::delay_for(time::Duration::from_millis(100)).await;
+        time::sleep(time::Duration::from_millis(100)).await;
 
         let request = Request::get(format!("https://{}/metrics", PROMETHEUS_ADDRESS_TLS))
             .body(Body::empty())
