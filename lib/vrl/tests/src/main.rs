@@ -3,7 +3,6 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use glob::glob;
 use std::str::FromStr;
 use structopt::StructOpt;
-use tracing_subscriber;
 use vrl::{diagnostic::Formatter, state, Runtime, Value};
 
 use vrl_tests::{docs, Test};
