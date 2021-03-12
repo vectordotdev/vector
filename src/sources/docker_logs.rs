@@ -605,13 +605,15 @@ impl EventStreamBuilder {
         // Create event streamer
         let mut partial_event_merge_state = None;
 
+        let core = self.core.clone();
+
         let events_stream = stream
             .map(|value| {
                 match value {
                     Ok(message) => Ok(info.new_event(
                         message,
-                        self.core.config.partial_event_marker_field.clone(),
-                        self.core.config.auto_partial_merge,
+                        core.config.partial_event_marker_field.clone(),
+                        core.config.auto_partial_merge,
                         &mut partial_event_merge_state,
                     )),
                     Err(error) => {
@@ -630,7 +632,6 @@ impl EventStreamBuilder {
                                 container_id: Some(info.id.as_str())
                             }),
                         };
-
                         Err(())
                     }
                 }
@@ -640,7 +641,7 @@ impl EventStreamBuilder {
             .take_until(self.shutdown.clone());
 
         let events_stream: Box<dyn Stream<Item = Event> + Unpin + Send> =
-            if let Some(ref line_agg_config) = self.core.line_agg_config {
+            if let Some(ref line_agg_config) = core.line_agg_config {
                 Box::new(line_agg_adapter(
                     events_stream,
                     line_agg::Logic::new(line_agg_config.clone()),

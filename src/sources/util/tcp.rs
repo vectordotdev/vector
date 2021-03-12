@@ -116,62 +116,52 @@ where
 
             listener
                 .accept_stream()
-                .take_until(shutdown.clone())
-                .for_each(|connection| {
-                    let shutdown = shutdown.clone();
-                    let tripwire = tripwire.clone();
-                    let source = self.clone();
-                    let out = out.clone();
-                    let connection_gauge = connection_gauge.clone();
-
-                    async move {
-                        let socket = match connection {
-                            Ok(socket) => socket,
-                            Err(error) => {
-                                error!(
-                                    message = "Failed to accept socket.",
-                                    %error
-                                );
-                                return;
-                            }
-                        };
-
-                        let peer_addr = socket.peer_addr().ip().to_string();
-                        let span = info_span!("connection", %peer_addr);
-                        let host = Bytes::from(peer_addr);
-
-                        let tripwire = tripwire
-                            .map(move |_| {
-                                info!(
-                                    message = "Resetting connection (still open after seconds).",
-                                    seconds = ?shutdown_timeout_secs
-                                );
-                            })
-                            .boxed();
-
-                        span.in_scope(|| {
-                            let peer_addr = socket.peer_addr();
-                            debug!(message = "Accepted a new connection.", peer_addr = %peer_addr);
-
-                            let open_token =
-                                connection_gauge.open(|count| emit!(ConnectionOpen { count }));
-
-                            let fut = handle_stream(
-                                shutdown,
-                                socket,
-                                keepalive,
-                                receive_buffer_bytes,
-                                source,
-                                tripwire,
-                                host,
-                                out,
+                .take_until(shutdown)
+                .for_each(move |connection| async move {
+                    let socket = match connection {
+                        Ok(socket) => socket,
+                        Err(error) => {
+                            error!(
+                                message = "Failed to accept socket.",
+                                %error
                             );
+                            return;
+                        }
+                    };
 
-                            tokio::spawn(
-                                fut.map(move |()| drop(open_token)).instrument(span.clone()),
+                    let peer_addr = socket.peer_addr().ip().to_string();
+                    let span = info_span!("connection", %peer_addr);
+                    let host = Bytes::from(peer_addr);
+
+                    let tripwire = tripwire
+                        .map(move |_| {
+                            info!(
+                                message = "Resetting connection (still open after seconds).",
+                                seconds = ?shutdown_timeout_secs
                             );
-                        });
-                    }
+                        })
+                        .boxed();
+
+                    span.in_scope(|| {
+                        let peer_addr = socket.peer_addr();
+                        debug!(message = "Accepted a new connection.", peer_addr = %peer_addr);
+
+                        let open_token =
+                            connection_gauge.open(|count| emit!(ConnectionOpen { count }));
+
+                        let fut = handle_stream(
+                            shutdown,
+                            socket,
+                            keepalive,
+                            receive_buffer_bytes,
+                            self,
+                            tripwire,
+                            host,
+                            out,
+                        );
+
+                        tokio::spawn(fut.map(move |()| drop(open_token)).instrument(span.clone()));
+                    });
                 })
                 .map(Ok)
                 .await
