@@ -373,7 +373,7 @@ fn start_journalctl(
     )
     .boxed();
 
-    let pid = Pid::from_raw(child.id() as i32);
+    let pid = Pid::from_raw(child.id().unwrap() as _);
     let stop = Box::new(move || {
         let _ = kill(pid, Signal::SIGTERM);
     });
