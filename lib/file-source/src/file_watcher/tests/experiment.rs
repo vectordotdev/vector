@@ -1,5 +1,5 @@
+use crate::file_watcher::tests::*;
 use crate::file_watcher::FileWatcher;
-use crate::model_tests::*;
 use crate::ReadFrom;
 use bytes::Bytes;
 use quickcheck::{QuickCheck, TestResult};

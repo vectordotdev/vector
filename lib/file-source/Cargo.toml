@@ -16,7 +16,6 @@ flate2 = "1.0.19"
 futures = { version = "0.3", default-features = false, features = ["executor"] }
 glob = "0.3.0"
 indexmap = {version = "1.6.2", features = ["serde"]}
-libc =  "0.2"
 scan_fmt = "0.2.6"
 serde = { version = "1.0.117", features = ["derive"] }
 serde_json = "1.0.33"
@@ -25,5 +24,10 @@ tracing = "0.1.15"
 winapi = { version = "0.3", features = ["winioctl"] }
 
 [dev-dependencies]
+criterion = "0.3"
 quickcheck = "1"
 tempfile = "3.1.0"
+
+[[bench]]
+name = "buffer"
+harness = false
