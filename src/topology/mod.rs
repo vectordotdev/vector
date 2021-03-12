@@ -1013,7 +1013,7 @@ mod reload_tests {
         .await;
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn topology_disk_buffer_conflict() {
         let address_0 = next_addr();
         let address_1 = next_addr();
