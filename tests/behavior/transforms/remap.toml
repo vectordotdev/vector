@@ -19,7 +19,7 @@
     extract_from = "remap_abort"
     [[tests.outputs.conditions]]
       type = "remap"
-      source = ".foo == false && .bar == true"
+      source = ".foo == true && .bar == true"
 
 [transforms.remap_abort_drop_on_abort]
   inputs = []
