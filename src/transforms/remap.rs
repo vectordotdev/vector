@@ -14,7 +14,7 @@ use vrl::{Program, Runtime};
 #[derivative(Default)]
 pub struct RemapConfig {
     pub source: String,
-    pub drop_on_err: bool,
+    pub drop_on_error: bool,
 }
 
 inventory::submit! {
@@ -46,7 +46,7 @@ impl TransformConfig for RemapConfig {
 #[derive(Debug, Clone)]
 pub struct Remap {
     program: Program,
-    drop_on_err: bool,
+    drop_on_error: bool,
 }
 
 impl Remap {
@@ -59,14 +59,14 @@ impl Remap {
 
         Ok(Remap {
             program,
-            drop_on_err: config.drop_on_err,
+            drop_on_error: config.drop_on_error,
         })
     }
 }
 
 impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        let original_event = if !self.drop_on_err && self.program.is_fallible() {
+        let original_event = if !self.drop_on_error && self.program.is_fallible() {
             // We need to clone the original event, since it might be mutated by
             // the program before it aborts, while we want to return the
             // unmodified event when an error occurs.
@@ -87,10 +87,10 @@ impl FunctionTransform for Remap {
             Err(error) => {
                 emit!(RemapMappingError {
                     error: error.to_string(),
-                    event_dropped: self.drop_on_err,
+                    event_dropped: self.drop_on_error,
                 });
 
-                if self.drop_on_err {
+                if self.drop_on_error {
                     return;
                 }
 
@@ -133,7 +133,7 @@ mod tests {
   .copy = .copy_from
 "#
             .to_string(),
-            drop_on_err: true,
+            drop_on_error: true,
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -159,7 +159,7 @@ mod tests {
                 .not_an_int = int!(.bar)
                 .baz = 12
             "#},
-            drop_on_err: false,
+            drop_on_error: false,
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -184,7 +184,7 @@ mod tests {
                 .foo = "foo"
                 .baz = 12
             "#},
-            drop_on_err: false,
+            drop_on_error: false,
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -209,7 +209,7 @@ mod tests {
                        .namespace = "zerk"
                        .kind = "incremental""#
                 .to_string(),
-            drop_on_err: true,
+            drop_on_error: true,
         };
         let mut tform = Remap::new(conf).unwrap();
 
