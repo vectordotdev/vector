@@ -79,7 +79,7 @@ where
         .unwrap_or_else(|| log_schema().host_key().to_string());
     let hostname = crate::get_hostname().ok();
 
-    let (mut sender, receiver) = mpsc::channel(1024);
+    let (sender, receiver) = mpsc::channel(1024);
 
     // Start the background thread
     thread::spawn(move || {
@@ -136,7 +136,6 @@ mod tests {
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
     use std::io::Cursor;
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {
@@ -170,23 +169,21 @@ mod tests {
             .await
             .unwrap();
 
-        let event = rx.try_recv();
+        let stream = ReceiverStream::new(rx);
 
-        assert!(event.is_ok());
+        let event = stream.next().await;
         assert_eq!(
-            Ok("hello world".into()),
+            Some("hello world".into()),
             event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
         );
 
-        let event = rx.try_recv();
-        assert!(event.is_ok());
+        let event = stream.next().await;
         assert_eq!(
-            Ok("hello world again".into()),
+            Some("hello world again".into()),
             event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
         );
 
-        let event = rx.try_recv();
-        assert!(event.is_err());
-        assert_eq!(Err(mpsc::error::TryRecvError::Closed), event);
+        let event = stream.next().await;
+        assert!(event.is_none());
     }
 }

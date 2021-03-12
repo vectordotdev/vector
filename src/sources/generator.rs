@@ -167,8 +167,10 @@ impl SourceConfig for GeneratorConfig {
 mod tests {
     use super::*;
     use crate::{config::log_schema, shutdown::ShutdownSignal, Pipeline};
+    use futures::stream::StreamExt;
     use std::time::{Duration, Instant};
     use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -212,14 +214,16 @@ mod tests {
 
         let lines = &["one", "two", "three", "four"];
 
+        let stream = ReceiverStream::new(rx);
+
         for _ in 0..5 {
-            let event = rx.try_recv().unwrap();
+            let event = stream.next().await.unwrap();
             let log = event.as_log();
             let message = log[&message_key].to_string_lossy();
             assert!(lines.contains(&&*message));
         }
 
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(stream.next().await, None);
     }
 
     #[tokio::test]
@@ -231,10 +235,12 @@ mod tests {
         )
         .await;
 
+        let stream = ReceiverStream::new(rx);
+
         for _ in 0..5 {
-            assert!(matches!(rx.try_recv(), Ok(_)));
+            assert!(stream.next().await.is_some());
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(stream.next().await, None);
     }
 
     #[tokio::test]
@@ -248,14 +254,16 @@ mod tests {
         )
         .await;
 
+        let stream = ReceiverStream::new(rx);
+
         for n in 0..5 {
-            let event = rx.try_recv().unwrap();
+            let event = stream.next().await.unwrap();
             let log = event.as_log();
             let message = log[&message_key].to_string_lossy();
             assert!(message.starts_with(&n.to_string()));
         }
 
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(stream.next().await, None);
     }
 
     #[tokio::test]
@@ -269,10 +277,12 @@ mod tests {
         )
         .await;
 
+        let stream = ReceiverStream::new(rx);
+
         for _ in 0..3 {
-            assert!(matches!(rx.try_recv(), Ok(_)));
+            assert!(stream.next().await.is_some());
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(stream.next().await, None);
 
         let duration = start.elapsed();
         assert!(duration >= Duration::from_secs(2));
@@ -286,10 +296,12 @@ mod tests {
         )
         .await;
 
+        let stream = ReceiverStream::new(rx);
+
         for _ in 0..5 {
-            assert!(matches!(rx.try_recv(), Ok(_)));
+            assert!(stream.next().await.is_some());
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(stream.next().await, None);
     }
 
     #[tokio::test]
@@ -300,10 +312,12 @@ mod tests {
         )
         .await;
 
+        let stream = ReceiverStream::new(rx);
+
         for _ in 0..5 {
-            assert!(matches!(rx.try_recv(), Ok(_)));
+            assert!(stream.next().await.is_some());
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(stream.next().await, None);
     }
 
     #[tokio::test]
@@ -314,10 +328,12 @@ mod tests {
         )
         .await;
 
+        let stream = ReceiverStream::new(rx);
+
         for _ in 0..5 {
-            assert!(matches!(rx.try_recv(), Ok(_)));
+            assert!(stream.next().await.is_some());
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(stream.next().await, None);
     }
 
     #[tokio::test]
@@ -328,10 +344,12 @@ mod tests {
         )
         .await;
 
+        let stream = ReceiverStream::new(rx);
+
         for _ in 0..5 {
-            assert!(matches!(rx.try_recv(), Ok(_)));
+            assert!(stream.next().await.is_some());
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(stream.next().await, None);
     }
 
     #[tokio::test]
@@ -343,12 +361,14 @@ mod tests {
         )
         .await;
 
+        let stream = ReceiverStream::new(rx);
+
         for _ in 0..5 {
-            let event = rx.try_recv().unwrap();
+            let event = stream.next().await.unwrap();
             let log = event.as_log();
             let message = log[&message_key].to_string_lossy();
             assert!(serde_json::from_str::<serde_json::Value>(&message).is_ok());
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(stream.next().await, None);
     }
 }
