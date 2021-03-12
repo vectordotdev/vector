@@ -111,9 +111,11 @@ fn kafka_source(
     let consumer = Arc::new(create_consumer(config)?);
 
     Ok(Box::pin(async move {
+        let shutdown = shutdown;
+
         Arc::clone(&consumer)
             .stream()
-            .take_until(shutdown.clone())
+            .take_until(shutdown)
             .then(move |message| {
                 let key_field = key_field.clone();
                 let topic_key = topic_key.clone();

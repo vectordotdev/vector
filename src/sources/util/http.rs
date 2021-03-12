@@ -290,14 +290,12 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             info!(message = "Building HTTP server.", address = %address);
 
             let listener = tls.bind(&address).await.unwrap();
-            let _ = warp::serve(routes)
+            warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
-                    shutdown.clone().map(|_| ()),
+                    shutdown.map(|_| ()),
                 )
                 .await;
-            // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
-            drop(shutdown);
             Ok(())
         }))
     }
