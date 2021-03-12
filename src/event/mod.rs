@@ -5,7 +5,6 @@ use shared::EventDataEq;
 use std::collections::{BTreeMap, HashMap};
 
 pub mod discriminant;
-pub mod merge;
 pub mod merge_state;
 pub mod metadata;
 pub mod metric;
