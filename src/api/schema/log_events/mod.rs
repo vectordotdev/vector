@@ -76,7 +76,13 @@ fn create_log_events_stream(
     interval: u64,
     limit: usize,
 ) -> impl Stream<Item = Vec<LogEventResult>> {
+    // Channel for receiving individual tap results. Since we can process at most `limit` per
+    // interval, this is capped to the same value.
     let (tx, mut rx) = mpsc::channel(limit);
+
+    // The resulting vector of `LogEventResult` sent ot the client. Only one result set will be streamed
+    // back to the client at a time. This value is set higher than `1` to prevent blocking the event
+    // pipeline on slower client connections, but low enough to apply a modest cap on mem usage.
     let (mut log_tx, log_rx) = mpsc::channel::<Vec<LogEventResult>>(10);
 
     let tap_sink = TapSink::new(&component_names, tx);
