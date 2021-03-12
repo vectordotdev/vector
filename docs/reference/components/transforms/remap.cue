@@ -65,10 +65,11 @@ components: transforms: "remap": {
 			}
 		}
 		drop_on_error: {
+			common: false
+			required: false
 			description: """
 				Drop the event if the VRL program returns an error at runtime.
 				"""
-			required: false
 			type: bool: {
 				default: false
 			}
