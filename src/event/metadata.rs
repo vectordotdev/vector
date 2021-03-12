@@ -19,6 +19,13 @@ impl EventMetadata {
     pub fn with_timestamp(timestamp: DateTime<Utc>) -> Self {
         Self { timestamp }
     }
+
+    pub fn merge(&mut self, other: &Self) {
+        // Set the timestamp to the earliest to ensure we track the
+        // first time a source event entered our system when two events
+        // are merged.
+        self.timestamp = self.timestamp.min(other.timestamp);
+    }
 }
 
 impl Equivalent for EventMetadata {

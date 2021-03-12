@@ -36,6 +36,10 @@ impl LogEvent {
         self
     }
 
+    pub fn deconstruct(self) -> (BTreeMap<String, Value>, EventMetadata) {
+        (self.fields, self.metadata)
+    }
+
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
         util::log::get(&self.fields, key.as_ref())
