@@ -3,6 +3,8 @@ use super::{
     CreateAcceptor, IncomingListener, MaybeTlsSettings, MaybeTlsStream, SslBuildError, TcpBind,
     TlsError, TlsSettings,
 };
+#[cfg(all(unix, feature = "sources-utils-tcp-socket"))]
+use crate::tcp;
 #[cfg(feature = "sources-utils-tcp-keepalive")]
 use crate::tcp::TcpKeepaliveConfig;
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
@@ -192,7 +194,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
             )
         })?;
 
-        stream.set_recv_buffer_size(bytes)?;
+        tcp::set_receive_buffer_size(stream, bytes);
 
         Ok(())
     }
