@@ -200,6 +200,7 @@ mod tests {
     };
     use tokio::sync::mpsc;
     use tokio::time::{sleep, Duration};
+    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     #[tokio::test]
     async fn fanout_writes_to_all() {
@@ -217,8 +218,14 @@ mod tests {
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
         let _ = send.await.unwrap();
 
-        assert_eq!(collect_ready(rx_a).await, recs);
-        assert_eq!(collect_ready(rx_b).await, recs);
+        assert_eq!(
+            collect_ready(UnboundedReceiverStream::new(rx_a)).await,
+            recs
+        );
+        assert_eq!(
+            collect_ready(UnboundedReceiverStream::new(rx_b)).await,
+            recs
+        );
     }
 
     #[tokio::test]
@@ -275,9 +282,18 @@ mod tests {
 
         fanout.send(recs[2].clone()).await.unwrap();
 
-        assert_eq!(collect_ready(rx_a).await, recs);
-        assert_eq!(collect_ready(rx_b).await, recs);
-        assert_eq!(collect_ready(rx_c).await, &recs[2..]);
+        assert_eq!(
+            collect_ready(UnboundedReceiverStream::new(rx_a)).await,
+            recs
+        );
+        assert_eq!(
+            collect_ready(UnboundedReceiverStream::new(rx_b)).await,
+            recs
+        );
+        assert_eq!(
+            collect_ready(UnboundedReceiverStream::new(rx_c)).await,
+            &recs[2..]
+        );
     }
 
     #[tokio::test]
@@ -303,8 +319,14 @@ mod tests {
 
         fanout.send(recs[2].clone()).await.unwrap();
 
-        assert_eq!(collect_ready(rx_a).await, recs);
-        assert_eq!(collect_ready(rx_b).await, &recs[..2]);
+        assert_eq!(
+            collect_ready(UnboundedReceiverStream::new(rx_a)).await,
+            recs
+        );
+        assert_eq!(
+            collect_ready(UnboundedReceiverStream::new(rx_b)).await,
+            &recs[..2]
+        );
     }
 
     #[tokio::test]
@@ -443,9 +465,18 @@ mod tests {
 
         fanout.send(recs[2].clone()).await.unwrap();
 
-        assert_eq!(collect_ready(rx_a1).await, &recs[..2]);
-        assert_eq!(collect_ready(rx_b).await, recs);
-        assert_eq!(collect_ready(rx_a2).await, &recs[2..]);
+        assert_eq!(
+            collect_ready(UnboundedReceiverStream::new(rx_a1)).await,
+            &recs[..2]
+        );
+        assert_eq!(
+            collect_ready(UnboundedReceiverStream::new(rx_b)).await,
+            recs
+        );
+        assert_eq!(
+            collect_ready(UnboundedReceiverStream::new(rx_a2)).await,
+            &recs[2..]
+        );
     }
 
     #[tokio::test]
@@ -477,9 +508,18 @@ mod tests {
 
         fanout.send(recs[2].clone()).await.unwrap();
 
-        assert_eq!(collect_ready(rx_a1).await, &recs[..2]);
-        assert_eq!(collect_ready(rx_b).await, recs);
-        assert_eq!(collect_ready(rx_a2).await, &recs[2..]);
+        assert_eq!(
+            collect_ready(UnboundedReceiverStream::new(rx_a1)).await,
+            &recs[..2]
+        );
+        assert_eq!(
+            collect_ready(UnboundedReceiverStream::new(rx_b)).await,
+            recs
+        );
+        assert_eq!(
+            collect_ready(UnboundedReceiverStream::new(rx_a2)).await,
+            &recs[2..]
+        );
     }
 
     #[tokio::test]

@@ -394,6 +394,7 @@ mod integration_tests {
         shutdown, test_util, Pipeline,
     };
     use tokio::time::Duration;
+    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     #[tokio::test]
     async fn scrapes_metrics() {
@@ -418,7 +419,7 @@ mod integration_tests {
         tokio::spawn(source);
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        let events = test_util::collect_ready(rx).await;
+        let events = test_util::collect_ready(UnboundedReceiverStream::new(rx)).await;
         assert!(!events.is_empty());
 
         let metrics: Vec<_> = events
