@@ -12,12 +12,12 @@ license = "MPL-2.0"
 indexmap = "1.6.2"
 nom = "6.0.1"
 num_enum = "0.5.1"
-prost = "0.6.1"
-prost-types = "0.6.1"
+prost = "0.7.0"
+prost-types = "0.7.0"
 snafu = { version = "0.6" }
 
 [build-dependencies]
-prost-build = "0.6.1"
+prost-build = "0.7.0"
 
 [dev-dependencies]
 shared = { path = "../shared", features = ["btreemap"] }
