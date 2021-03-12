@@ -159,7 +159,7 @@ jobs:
         env:
           VERSION: "5.32.0.1"
         run: |
-          curl -sSf https://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
+          curl -sSfL https://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
       - name: "Install Perl"
         shell: cmd # msiexec fails when called from bash
         run: |
