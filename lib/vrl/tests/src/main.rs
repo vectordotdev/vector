@@ -24,10 +24,19 @@ pub struct Cmd {
 
     #[structopt(long)]
     skip_functions: bool,
+
+    /// When enabled, any log output at the INFO or above level is printed
+    /// during the test run.
+    #[structopt(short, long)]
+    logging: bool,
 }
 
 fn main() {
     let cmd = Cmd::from_args();
+
+    if cmd.logging {
+        tracing_subscriber::fmt::init();
+    }
 
     let mut failed_count = 0;
     let mut category = "".to_owned();
