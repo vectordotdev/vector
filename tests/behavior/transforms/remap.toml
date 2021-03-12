@@ -1,3 +1,45 @@
+[transforms.remap_abort]
+  inputs = []
+  type = "remap"
+  drop_on_abort = false
+  source = """
+    .foo = false
+    abort
+    .bar = false
+  """
+[[tests]]
+  name = "remap_abort"
+  [tests.input]
+    insert_at = "remap_abort"
+    type = "log"
+    [tests.input.log_fields]
+      foo = true
+      bar = true
+  [[tests.outputs]]
+    extract_from = "remap_abort"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = ".foo == false && .bar == true"
+
+[transforms.remap_abort_drop_on_abort]
+  inputs = []
+  type = "remap"
+  drop_on_abort = true
+  source = """
+    .foo = false
+    abort
+    .bar = false
+  """
+[[tests]]
+  name = "remap_abort_drop_on_abort"
+  no_outputs_from = ["remap_abort_drop_on_abort"]
+  [tests.input]
+    insert_at = "remap_abort_drop_on_abort"
+    type = "log"
+    [tests.input.log_fields]
+      foo = true
+      bar = true
+
 [transforms.remap_nested]
   inputs = []
   type = "remap"

@@ -1,13 +1,13 @@
 use crate::{
     config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::RemapMappingError,
+    internal_events::{RemapMappingAbort, RemapMappingError},
     transforms::{FunctionTransform, Transform},
     Result,
 };
 use serde::{Deserialize, Serialize};
 use vrl::diagnostic::Formatter;
-use vrl::{Program, Runtime};
+use vrl::{Program, Runtime, Terminate};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -15,6 +15,7 @@ use vrl::{Program, Runtime};
 pub struct RemapConfig {
     pub source: String,
     pub drop_on_error: bool,
+    pub drop_on_abort: bool,
 }
 
 inventory::submit! {
@@ -47,6 +48,7 @@ impl TransformConfig for RemapConfig {
 pub struct Remap {
     program: Program,
     drop_on_error: bool,
+    drop_on_abort: bool,
 }
 
 impl Remap {
@@ -60,6 +62,7 @@ impl Remap {
         Ok(Remap {
             program,
             drop_on_error: config.drop_on_error,
+            drop_on_abort: config.drop_on_abort,
         })
     }
 }
@@ -84,9 +87,20 @@ impl FunctionTransform for Remap {
 
         match result {
             Ok(_) => output.push(event),
-            Err(error) => {
+            Err(Terminate::Abort) => {
+                emit!(RemapMappingAbort {
+                    event_dropped: self.drop_on_abort,
+                });
+
+                if self.drop_on_abort {
+                    return;
+                }
+
+                output.push(event)
+            }
+            Err(Terminate::Error(error)) => {
                 emit!(RemapMappingError {
-                    error: error.to_string(),
+                    error,
                     event_dropped: self.drop_on_error,
                 });
 
