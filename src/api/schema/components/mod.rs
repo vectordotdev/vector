@@ -19,7 +19,7 @@ use std::{
     cmp,
     collections::{HashMap, HashSet},
 };
-use tokio_stream::{Stream, StreamExt};
+use tokio_stream::Stream;
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(

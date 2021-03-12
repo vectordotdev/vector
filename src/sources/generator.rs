@@ -6,7 +6,7 @@ use crate::{
     Pipeline,
 };
 use fakedata::logs::*;
-use futures::{stream::StreamExt, SinkExt};
+use futures::SinkExt;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
