@@ -200,7 +200,7 @@ mod tests {
     };
     use tokio::sync::mpsc;
     use tokio::time::{sleep, Duration};
-    use tokio_stream::wrappers::UnboundedReceiverStream;
+    use tokio_stream::wrappers::{ReceiverStream, UnboundedReceiverStream};
 
     #[tokio::test]
     async fn fanout_writes_to_all() {
@@ -250,9 +250,9 @@ mod tests {
         sleep(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec1 because of b right now.
 
-        let collect_a = tokio::spawn(rx_a.collect::<Vec<_>>());
-        let collect_b = tokio::spawn(rx_b.collect::<Vec<_>>());
-        let collect_c = tokio::spawn(rx_c.collect::<Vec<_>>());
+        let collect_a = tokio::spawn(ReceiverStream::new(rx_a).collect::<Vec<_>>());
+        let collect_b = tokio::spawn(ReceiverStream::new(rx_b).collect::<Vec<_>>());
+        let collect_c = tokio::spawn(ReceiverStream::new(rx_c).collect::<Vec<_>>());
 
         assert_eq!(collect_a.await.unwrap(), recs);
         assert_eq!(collect_b.await.unwrap(), recs);
@@ -354,9 +354,9 @@ mod tests {
             .send(ControlMessage::Remove("c".to_string()))
             .unwrap();
 
-        let collect_a = tokio::spawn(rx_a.collect::<Vec<_>>());
-        let collect_b = tokio::spawn(rx_b.collect::<Vec<_>>());
-        let collect_c = tokio::spawn(rx_c.collect::<Vec<_>>());
+        let collect_a = tokio::spawn(ReceiverStream::new(rx_a).collect::<Vec<_>>());
+        let collect_b = tokio::spawn(ReceiverStream::new(rx_b).collect::<Vec<_>>());
+        let collect_c = tokio::spawn(ReceiverStream::new(rx_c).collect::<Vec<_>>());
 
         assert_eq!(collect_a.await.unwrap(), recs);
         assert_eq!(collect_b.await.unwrap(), recs);
@@ -388,9 +388,9 @@ mod tests {
             .send(ControlMessage::Remove("b".to_string()))
             .unwrap();
 
-        let collect_a = tokio::spawn(rx_a.collect::<Vec<_>>());
-        let collect_b = tokio::spawn(rx_b.collect::<Vec<_>>());
-        let collect_c = tokio::spawn(rx_c.collect::<Vec<_>>());
+        let collect_a = tokio::spawn(ReceiverStream::new(rx_a).collect::<Vec<_>>());
+        let collect_b = tokio::spawn(ReceiverStream::new(rx_b).collect::<Vec<_>>());
+        let collect_c = tokio::spawn(ReceiverStream::new(rx_c).collect::<Vec<_>>());
 
         assert_eq!(collect_a.await.unwrap(), recs);
         assert_eq!(collect_b.await.unwrap(), &recs[..1]);
@@ -423,9 +423,9 @@ mod tests {
             .send(ControlMessage::Remove("a".to_string()))
             .unwrap();
 
-        let collect_a = tokio::spawn(rx_a.collect::<Vec<_>>());
-        let collect_b = tokio::spawn(rx_b.collect::<Vec<_>>());
-        let collect_c = tokio::spawn(rx_c.collect::<Vec<_>>());
+        let collect_a = tokio::spawn(ReceiverStream::new(rx_a).collect::<Vec<_>>());
+        let collect_b = tokio::spawn(ReceiverStream::new(rx_b).collect::<Vec<_>>());
+        let collect_c = tokio::spawn(ReceiverStream::new(rx_c).collect::<Vec<_>>());
 
         assert_eq!(collect_a.await.unwrap(), &recs[..1]);
         assert_eq!(collect_b.await.unwrap(), recs);
@@ -592,7 +592,7 @@ mod tests {
         // Start collecting from all at once
         let collectors = rx_channels
             .into_iter()
-            .map(|rx| tokio::spawn(rx.collect::<Vec<_>>()))
+            .map(|rx| tokio::spawn(ReceiverStream::new(rx).collect::<Vec<_>>()))
             .collect::<Vec<_>>();
         for collect in collectors {
             assert_eq!(collect.await.unwrap(), recs);

@@ -143,6 +143,7 @@ mod test {
         net::TcpStream,
         time::{sleep, Duration},
     };
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[cfg(not(target_os = "windows"))]
     use {
@@ -196,7 +197,7 @@ mod test {
 
         sleep(Duration::from_millis(50)).await;
 
-        let output = collect_ready(rx).await;
+        let output = collect_ready(ReceiverStream::new(rx)).await;
         assert_eq!(events, output);
     }
 
@@ -263,7 +264,7 @@ mod test {
         drop(trigger_shutdown);
         shutdown_down.await;
 
-        let output = collect_ready(rx).await;
+        let output = collect_ready(ReceiverStream::new(rx)).await;
         assert_eq!(output, []);
     }
 
@@ -304,7 +305,7 @@ mod test {
         drop(trigger_shutdown);
         shutdown_down.await;
 
-        let output = collect_ready(rx).await;
+        let output = collect_ready(ReceiverStream::new(rx)).await;
         assert_eq!(Event::from(event), output[0]);
     }
 }

@@ -431,9 +431,9 @@ mod tests {
         future::Future,
         io::{Seek, Write},
     };
-
     use tempfile::tempdir;
     use tokio::time::{sleep, timeout, Duration};
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -604,7 +604,7 @@ mod tests {
 
         drop(trigger_shutdown);
 
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+        let received = wait_with_timeout(ReceiverStream::new(rx).collect::<Vec<_>>()).await;
 
         let mut hello_i = 0;
         let mut goodbye_i = 0;
@@ -669,7 +669,7 @@ mod tests {
 
         drop(trigger_shutdown);
 
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+        let received = wait_with_timeout(ReceiverStream::new(rx).collect::<Vec<_>>()).await;
 
         let mut i = 0;
         let mut pre_trunc = true;
@@ -735,7 +735,7 @@ mod tests {
 
         drop(trigger_shutdown);
 
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+        let received = wait_with_timeout(ReceiverStream::new(rx).collect::<Vec<_>>()).await;
 
         let mut i = 0;
         let mut pre_rot = true;
@@ -800,7 +800,7 @@ mod tests {
 
         drop(trigger_shutdown);
 
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+        let received = wait_with_timeout(ReceiverStream::new(rx).collect::<Vec<_>>()).await;
 
         let mut is = [0; 3];
 
@@ -956,7 +956,7 @@ mod tests {
 
             drop(trigger_shutdown);
 
-            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            let received = wait_with_timeout(ReceiverStream::new(rx).collect::<Vec<_>>()).await;
             let lines = received
                 .into_iter()
                 .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
@@ -977,7 +977,7 @@ mod tests {
 
             drop(trigger_shutdown);
 
-            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            let received = wait_with_timeout(ReceiverStream::new(rx).collect::<Vec<_>>()).await;
             let lines = received
                 .into_iter()
                 .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
@@ -1004,7 +1004,7 @@ mod tests {
 
             drop(trigger_shutdown);
 
-            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            let received = wait_with_timeout(ReceiverStream::new(rx).collect::<Vec<_>>()).await;
             let lines = received
                 .into_iter()
                 .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
@@ -1041,7 +1041,7 @@ mod tests {
 
             drop(trigger_shutdown);
 
-            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            let received = wait_with_timeout(ReceiverStream::new(rx).collect::<Vec<_>>()).await;
             let lines = received
                 .into_iter()
                 .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
@@ -1066,7 +1066,7 @@ mod tests {
 
             drop(trigger_shutdown);
 
-            let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+            let received = wait_with_timeout(ReceiverStream::new(rx).collect::<Vec<_>>()).await;
             let lines = received
                 .into_iter()
                 .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
@@ -1138,7 +1138,7 @@ mod tests {
 
         drop(trigger_shutdown);
 
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+        let received = wait_with_timeout(ReceiverStream::new(rx).collect::<Vec<_>>()).await;
         let before_lines = received
             .iter()
             .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("before"))
@@ -1720,7 +1720,7 @@ mod tests {
 
         drop(trigger_shutdown);
 
-        let received = wait_with_timeout(rx.collect::<Vec<_>>()).await;
+        let received = wait_with_timeout(ReceiverStream::new(rx).collect::<Vec<_>>()).await;
         assert_eq!(received.len(), n);
 
         match File::open(&path) {

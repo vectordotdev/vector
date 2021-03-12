@@ -192,6 +192,7 @@ mod test {
     use futures::SinkExt;
     use serde_json::json;
     use std::convert::TryFrom;
+    use tokio_stream::wrappers::ReceiverStream;
 
     const KEYS: [&str; 2] = ["booper", "swooper"];
 
@@ -220,7 +221,7 @@ mod test {
         }))?;
 
         pipeline.send(event).await?;
-        let out = collect_ready(receiver).await;
+        let out = collect_ready(ReceiverStream::new(receiver)).await;
 
         assert_eq!(out[0].as_log().get(KEYS[0]), Some(&Value::from(VALS[0])));
         assert_eq!(out[0].as_log().get(KEYS[1]), Some(&Value::from(VALS[1])));
@@ -246,7 +247,7 @@ mod test {
         }))?;
 
         pipeline.send(event).await?;
-        let out = collect_ready(receiver).await;
+        let out = collect_ready(ReceiverStream::new(receiver)).await;
 
         assert_eq!(out, vec![]);
 

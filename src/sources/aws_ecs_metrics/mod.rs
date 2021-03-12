@@ -201,6 +201,7 @@ mod test {
         {Body, Response, Server},
     };
     use tokio::time::{sleep, Duration};
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[tokio::test]
     async fn test_aws_ecs_metrics_source() {
@@ -532,7 +533,7 @@ mod test {
 
         sleep(Duration::from_secs(1)).await;
 
-        let metrics = collect_ready(rx)
+        let metrics = collect_ready(ReceiverStream::new(rx))
             .await
             .into_iter()
             .map(|e| e.into_metric())
@@ -567,6 +568,7 @@ mod integration_tests {
     use super::*;
     use crate::test_util::collect_ready;
     use tokio::time::{sleep, Duration};
+    use tokio_stream::wrappers::ReceiverStream;
 
     async fn scrape_metrics(endpoint: String, version: Version) {
         let (tx, rx) = Pipeline::new_test();
@@ -589,7 +591,7 @@ mod integration_tests {
 
         sleep(Duration::from_secs(5)).await;
 
-        let metrics = collect_ready(rx).await;
+        let metrics = collect_ready(ReceiverStream::new(rx)).await;
 
         assert!(!metrics.is_empty());
     }

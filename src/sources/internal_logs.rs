@@ -74,6 +74,7 @@ mod tests {
         sync::mpsc::Receiver,
         time::{sleep, Duration},
     };
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generates_config() {
@@ -127,7 +128,7 @@ mod tests {
 
     async fn collect_output(rx: Receiver<Event>) -> Vec<Event> {
         sleep(Duration::from_millis(1)).await;
-        collect_ready(rx).await
+        collect_ready(ReceiverStream::new(rx)).await
     }
 
     fn check_events(events: Vec<Event>, start: chrono::DateTime<chrono::Utc>) {

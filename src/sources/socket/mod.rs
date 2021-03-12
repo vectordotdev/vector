@@ -189,11 +189,11 @@ mod test {
         },
         thread,
     };
-
     use tokio::{
         task::JoinHandle,
         time::{Duration, Instant},
     };
+    use tokio_stream::wrappers::ReceiverStream;
     #[cfg(unix)]
     use {
         super::{unix::UnixConfig, Mode},
@@ -293,6 +293,8 @@ mod test {
         wait_for_tcp(addr).await;
         send_lines(addr, lines.into_iter()).await.unwrap();
 
+        let rx = ReceiverStream::new(rx);
+
         let event = rx.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().message_key()], "short".into());
 
@@ -333,6 +335,8 @@ mod test {
         send_lines_tls(addr, "localhost".into(), lines.into_iter(), None)
             .await
             .unwrap();
+
+        let rx = ReceiverStream::new(rx);
 
         let event = rx.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().message_key()], "short".into());
@@ -386,6 +390,8 @@ mod test {
         )
         .await
         .unwrap();
+
+        let rx = ReceiverStream::new(rx);
 
         let event = rx.next().await.unwrap();
         assert_eq!(

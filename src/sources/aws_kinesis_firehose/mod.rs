@@ -90,6 +90,7 @@ mod tests {
         net::SocketAddr,
     };
     use tokio::sync::mpsc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -231,7 +232,7 @@ mod tests {
         .unwrap();
         assert_eq!(200, res.status().as_u16());
 
-        let events = collect_ready(rx).await;
+        let events = collect_ready(ReceiverStream::new(rx)).await;
         assert_eq!(
             events,
             vec![log_event! {
@@ -292,7 +293,7 @@ mod tests {
         .unwrap();
         assert_eq!(200, res.status().as_u16());
 
-        let events = collect_ready(rx).await;
+        let events = collect_ready(ReceiverStream::new(rx)).await;
         assert_eq!(
             events,
             vec![log_event! {
