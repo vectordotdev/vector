@@ -6,6 +6,7 @@ use std::ops::Deref;
 pub struct Program {
     pub(crate) expressions: Vec<Box<dyn Expression>>,
     pub(crate) fallible: bool,
+    pub(crate) abortable: bool,
 }
 
 impl Program {
@@ -15,6 +16,12 @@ impl Program {
     /// (`foo!()`) is used within the source.
     pub fn is_fallible(&self) -> bool {
         self.fallible
+    }
+
+    /// Returns whether the compiled program can be aborted
+    /// (if there is an `abort` statement within the program).
+    pub fn is_abortable(&self) -> bool {
+        self.abortable
     }
 }
 

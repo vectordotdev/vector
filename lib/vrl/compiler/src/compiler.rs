@@ -13,6 +13,7 @@ pub struct Compiler<'a> {
     state: &'a mut State,
     errors: Errors,
     fallible: bool,
+    abortable: bool,
 }
 
 impl<'a> Compiler<'a> {
@@ -22,6 +23,7 @@ impl<'a> Compiler<'a> {
             state,
             errors: vec![],
             fallible: false,
+            abortable: false,
         }
     }
 
@@ -39,6 +41,7 @@ impl<'a> Compiler<'a> {
         Ok(Program {
             expressions,
             fallible: self.fallible,
+            abortable: self.abortable,
         })
     }
 
@@ -383,7 +386,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_abort(&mut self, _: Node<()>) -> Abort {
-        self.fallible = true;
+        self.abortable = true;
         Abort
     }
 
