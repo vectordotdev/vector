@@ -386,7 +386,14 @@ impl MetricData {
 
     /// Update this MetricData by adding the value from another.
     pub fn update(&mut self, other: &Self) {
-        self.value.add(&other.value)
+        self.value.add(&other.value);
+        // Update the timestamp to the latest one
+        self.timestamp = match (self.timestamp, other.timestamp) {
+            (None, None) => None,
+            (Some(t), None) => Some(t),
+            (None, Some(t)) => Some(t),
+            (Some(t1), Some(t2)) => Some(t1.max(t2)),
+        };
     }
 
     /// Add the data from the other metric to this one. The `other` must
@@ -929,6 +936,7 @@ mod test {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 3.0 },
             )
+            .with_timestamp(Some(ts()))
         )
     }
 
@@ -957,6 +965,7 @@ mod test {
                 MetricKind::Incremental,
                 MetricValue::Gauge { value: -1.0 },
             )
+            .with_timestamp(Some(ts()))
         )
     }
 
@@ -991,6 +1000,7 @@ mod test {
                     values: vec!["old".into(), "new".into()].into_iter().collect()
                 },
             )
+            .with_timestamp(Some(ts()))
         )
     }
 
@@ -1028,6 +1038,7 @@ mod test {
                     statistic: StatisticKind::Histogram
                 },
             )
+            .with_timestamp(Some(ts()))
         )
     }
 
