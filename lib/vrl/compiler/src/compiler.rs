@@ -383,6 +383,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_abort(&mut self, _: Node<()>) -> Abort {
+        self.fallible = true;
         Abort
     }
 

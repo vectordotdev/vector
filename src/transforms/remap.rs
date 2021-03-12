@@ -70,14 +70,15 @@ impl Remap {
 
 impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        let original_event = if !self.drop_on_error && self.program.is_fallible() {
-            // We need to clone the original event, since it might be mutated by
-            // the program before it aborts, while we want to return the
-            // unmodified event when an error occurs.
-            Some(event.clone())
-        } else {
-            None
-        };
+        let original_event =
+            if !(self.drop_on_error || self.drop_on_abort) && self.program.is_fallible() {
+                // We need to clone the original event, since it might be mutated by
+                // the program before it aborts, while we want to return the
+                // unmodified event when an error occurs.
+                Some(event.clone())
+            } else {
+                None
+            };
 
         let mut runtime = Runtime::default();
 
@@ -97,7 +98,7 @@ impl FunctionTransform for Remap {
                     return;
                 }
 
-                output.push(event)
+                output.push(original_event.unwrap_or(event))
             }
             Err(Terminate::Error(error)) => {
                 emit!(RemapMappingError {
