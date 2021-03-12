@@ -7,7 +7,7 @@
 #
 # result:
 #
-# error[E103]: unhandled fallible assignment
+# error[E103]: unhandled error
 #   ┌─ :2:5
 #   │
 # 2 │ . = parse_common_log(.log)
