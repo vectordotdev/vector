@@ -222,9 +222,7 @@ pub fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessag
 fn json_parse_object(value: JsonValue) -> Result<Event, ErrorMessage> {
     let mut event = Event::new_empty_log();
     let log = event.as_mut_log();
-    if !log.contains(log_schema().timestamp_key()) {
-        log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
-    }
+    log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
     match value {
         JsonValue::Object(map) => {
             for (k, v) in map {
