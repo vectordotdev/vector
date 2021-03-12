@@ -18,5 +18,7 @@ releases: "0.12.1": {
 		{sha: "b9a433476708cd313dced27129100263578fb5ce", date: "2021-03-12 21:57:39 UTC", description: "Improve the nginx log parsing ergonomics in remap", pr_number:                     6717, scopes: ["remap"], type:                    "enhancement", breaking_change: false, author: "Jean Mertz", files_count:    6, insertions_count: 95, deletions_count:  11},
 		{sha: "415c2b05c430d0f661d54d947a349596b1cccac9", date: "2021-03-12 23:27:25 UTC", description: "Do not mutate the event if the remap script fails", pr_number:                     6719, scopes: ["remap"], type:                    "enhancement", breaking_change: false, author: "Jean Mertz", files_count:    4, insertions_count: 118, deletions_count: 24},
 		{sha: "ace65b71ff564da61538d388d4e92a62437dae5f", date: "2021-03-12 20:04:46 UTC", description: "Ensure that metric timestamps are updated when values are updated", pr_number:     6738, scopes: ["prometheus_exporter sink"], type: "fix", breaking_change:         false, author: "Bruce Guenter", files_count: 2, insertions_count: 100, deletions_count: 12},
+		{sha: "9793c2fcb2b71e935edc99420a434cc8df439c2f", date: "2021-03-13 00:50:05 UTC", description: "Rename and document `drop_on_error` remap config option", pr_number:               6750, scopes: ["remap transform"], type:          "enhancement", breaking_change: false, author: "Jesse Szwedko", files_count: 5, insertions_count: 32, deletions_count:  22},
+
 	]
 }
