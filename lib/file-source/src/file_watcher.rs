@@ -424,9 +424,9 @@ mod test {
                     // Subject only returns None if this is the last chunk _and_
                     // the chunk did not contain a delimiter _or_ the delimiter
                     // was outside the max_size range _or_ the current chunk is empty.
-                    let has_valid_delimiter = facts.iter().fold(false, |valid, details| {
-                        valid || ((details.chunk_index == idx) && details.within_max_size)
-                    });
+                    let has_valid_delimiter = facts
+                        .iter()
+                        .any(|details| ((details.chunk_index == idx) && details.within_max_size));
                     assert!(chunk.is_empty() || !has_valid_delimiter)
                 }
                 Some(total_read) => {
@@ -441,7 +441,7 @@ mod test {
                     assert_eq!(first_delim.clone().unwrap().interior_index + 1, total_read);
                     assert_eq!(
                         buffer.get(..),
-                        global_data.get(first_delim.clone().unwrap().byte_range)
+                        global_data.get(first_delim.unwrap().byte_range)
                     );
                     break;
                 }
