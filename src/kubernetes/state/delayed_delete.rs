@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use futures::{future::BoxFuture, FutureExt};
 use std::{collections::VecDeque, time::Duration};
-use tokio::time::{timeout_at, Instant};
+use tokio::time::{timeout_at, sleep_until, Instant};
 
 /// A [`super::Write`] implementation that wraps another [`super::Write`] and
 /// delays the delete calls.
@@ -117,7 +117,7 @@ where
                 let fut = timeout_at(delayed_delete_deadline, downstream).map(|_| ());
                 Some(Box::pin(fut))
             }
-            (None, Some(delayed_delete_deadline)) => Some(Box::pin(delayed_delete_deadline)),
+            (None, Some(delayed_delete_deadline)) => Some(Box::pin(sleep_until(delayed_delete_deadline))),
             (Some(downstream), None) => Some(downstream),
             (None, None) => None,
         }
