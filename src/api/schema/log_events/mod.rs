@@ -10,6 +10,8 @@ use crate::api::{
 use async_graphql::{validators::IntRange, Context, Subscription, Union};
 use futures::StreamExt;
 use itertools::Itertools;
+use rand::{rngs::SmallRng, Rng, SeedableRng};
+use std::cmp::Ordering;
 use tokio::{select, stream::Stream, sync::mpsc, time};
 
 #[derive(Union)]
@@ -52,15 +54,13 @@ impl LogEventsSubscription {
         &'a self,
         ctx: &'a Context<'a>,
         component_names: Vec<String>,
-        #[graphql(default = 500)] interval: i32,
+        #[graphql(default = 500)] interval: u32,
         #[graphql(default = 100, validator(IntRange(min = "1", max = "10_000")))] limit: u32,
     ) -> impl Stream<Item = Vec<LogEventResult>> + 'a {
         let control_tx = ctx.data_unchecked::<ControlSender>().clone();
         create_log_events_stream(
             control_tx,
             &component_names,
-            // GraphQL only supports 32 bit ints out-the-box due to JSON limitations; we're
-            // casting here to separate concerns and avoid 64 bit scalar deserialization.
             interval as u64,
             limit as usize,
         )
@@ -86,8 +86,20 @@ fn create_log_events_stream(
         // message up to the signal handler to remove the ad hoc sinks from topology.
         let _control = TapController::new(control_tx, tap_sink);
 
+        // A tick interval to represent when to 'cut' the results back to the client.
         let mut interval = time::interval(time::Duration::from_millis(interval));
-        let mut results: Vec<LogEventResult> = vec![];
+
+        // Collect a vector of results, with a capacity of `limit`. As new `LogEvent`s come in,
+        // they will be sampled and added to results.
+        let mut results = Vec::<LogEventResult>::with_capacity(limit);
+
+        // Random number generator to allow for sampling. Speed trumps cryptographic security here.
+        // The RNG must be Send + Sync to use with the `select!` loop below.
+        let mut rng = SmallRng::from_entropy();
+
+        // Keep a count of the batch size, which will be used as a seed for random eviction
+        // per the sampling strategy used below.
+        let mut batch = 0;
 
         loop {
             select! {
@@ -96,6 +108,7 @@ fn create_log_events_stream(
                 Some(tap) = rx.next() => {
                     let tap = tap.into();
 
+                    // Emit notifications immediately; these don't count as a 'batch'.
                     if let LogEventResult::Notification(_) = tap {
                         // If an error occurs when sending, the subscription has likely gone
                         // away. Break the loop to terminate the thread.
@@ -103,31 +116,41 @@ fn create_log_events_stream(
                             break;
                         }
                     } else {
-                        results.push(tap);
+                        // A simple implementation of "Algorithm R" per
+                        // https://en.wikipedia.org/wiki/Reservoir_sampling. As we're unable to
+                        // pluck the nth result, this is chosen over the more optimal "Algorithm L"
+                        // since discarding results isn't an option.
+                        if limit > results.len() {
+                            results.push(tap);
+                        } else {
+                            let random_number = rng.gen_range(0..i);
+                            if random_number < results.len() {
+                                results[random_number] = tap;
+                            }
+                        }
+                        // Increment the batch count, to be used for the next Algo R loop
+                        batch += 1;
                     }
                 }
                 _ = interval.tick() => {
                     // If there are any existing results after the interval tick, emit.
                     if !results.is_empty() {
-                        let results_len = results.len();
+                        // Reset the batch count, to adjust sampling probability for the next round.
+                        batch = 0;
 
-                        // Events are 'sampled' up to the maximum 'limit', per an even
-                        // distribution of all events captured over the interval. We enumerate
-                        // chunks here to ensure the very last event is always returned when
-                        // limit > 1.
+                        // Since events will appear out of order per the random sampling
+                        // strategy, drain the existing results and sort by timestamp.
                         let results = results
                             .drain(..)
-                            .chunks(results_len.checked_div(limit).unwrap_or(1).max(1))
-                            .into_iter()
-                            .enumerate()
-                            .flat_map(|(i, chunk)| {
-                                let mut chunk = chunk.collect_vec();
-                                if matches!(i.checked_sub(1), Some(i) if i > 0 && i == results_len - 1) {
-                                    chunk = chunk.into_iter().rev().collect_vec();
+                            .sorted_by(|a, b| match (a, b) {
+                                (LogEventResult::LogEvent(a), LogEventResult::LogEvent(b)) => {
+                                    match (a.get_timestamp(), b.get_timestamp()) {
+                                        (Some(a), Some(b)) => a.cmp(b),
+                                        _ => Ordering::Equal,
+                                    }
                                 }
-                                chunk.into_iter().take(1)
+                                _ => Ordering::Equal,
                             })
-                            .take(limit)
                             .collect();
 
                         // If we get an error here, it likely means that the subscription has

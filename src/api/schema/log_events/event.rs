@@ -21,6 +21,14 @@ impl LogEvent {
             event,
         }
     }
+
+    pub fn get_message(&self) -> Option<String> {
+        Some(self.event.get("message")?.to_string_lossy())
+    }
+
+    pub fn get_timestamp(&self) -> Option<&DateTime<Utc>> {
+        self.event.get("timestamp")?.as_timestamp()
+    }
 }
 
 #[Object]
@@ -33,12 +41,12 @@ impl LogEvent {
 
     /// Log message
     async fn message(&self) -> Option<String> {
-        Some(self.event.get("message")?.to_string_lossy())
+        self.get_message()
     }
 
     /// Log timestamp
     async fn timestamp(&self) -> Option<&DateTime<Utc>> {
-        self.event.get("timestamp")?.as_timestamp()
+        self.get_timestamp()
     }
 
     /// Log event as an encoded string format
