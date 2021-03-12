@@ -1126,7 +1126,7 @@ mod integration_tests {
         },
         image::{CreateImageOptions, ListImagesOptions},
     };
-    use futures::stream::TryStreamExt;
+    use futures::{stream::TryStreamExt, FutureExt};
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
 
@@ -1349,12 +1349,8 @@ mod integration_tests {
         id
     }
 
-    async fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> Result<bool, ()> {
-        match rx.try_recv() {
-            Ok(_) => Ok(false),
-            Err(mpsc::error::TryRecvError::Empty) => Ok(true),
-            Err(mpsc::error::TryRecvError::Closed) => Err(()),
-        }
+    fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> bool {
+        rx.recv().now_or_never().is_some()
     }
 
     #[tokio::test]
@@ -1573,7 +1569,7 @@ mod integration_tests {
         let id = container_log_n(1, name, None, message, &docker).await;
         container_remove(&id, &docker).await;
 
-        assert!(is_empty(exclude_out).await.unwrap());
+        assert!(is_empty(exclude_out));
     }
 
     #[tokio::test]
@@ -1602,7 +1598,7 @@ mod integration_tests {
         let _ = container_kill(&id, &docker).await;
         container_remove(&id, &docker).await;
 
-        assert!(is_empty(exclude_out).await.unwrap());
+        assert!(is_empty(exclude_out));
     }
 
     #[tokio::test]
