@@ -12,6 +12,7 @@ pub struct Compiler<'a> {
     fns: &'a [Box<dyn Function>],
     state: &'a mut State,
     errors: Errors,
+    fallible: bool,
 }
 
 impl<'a> Compiler<'a> {
@@ -20,6 +21,7 @@ impl<'a> Compiler<'a> {
             fns,
             state,
             errors: vec![],
+            fallible: false,
         }
     }
 
@@ -34,7 +36,10 @@ impl<'a> Compiler<'a> {
             return Err(self.errors);
         }
 
-        Ok(Program(expressions))
+        Ok(Program {
+            expressions,
+            fallible: self.fallible,
+        })
     }
 
     fn compile_root_exprs(
@@ -326,6 +331,10 @@ impl<'a> Compiler<'a> {
             .into_iter()
             .map(|node| Node::new(node.span(), self.compile_function_argument(node)))
             .collect();
+
+        if abort_on_error {
+            self.fallible = true;
+        }
 
         FunctionCall::new(
             call_span,
