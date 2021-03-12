@@ -17,7 +17,7 @@ use futures::{
 };
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
-    error::{KafkaError, RDKafkaError},
+    error::{KafkaError, RDKafkaErrorCode},
     producer::{DeliveryFuture, FutureProducer, FutureRecord},
     ClientConfig,
 };
@@ -313,7 +313,7 @@ impl Sink<Event> for KafkaSink {
                     // See item 4 on GitHub: https://github.com/timberio/vector/pull/101#issue-257150924
                     // https://docs.rs/rdkafka/0.24.0/src/rdkafka/producer/future_producer.rs.html#296
                     Err((error, future_record))
-                        if error == KafkaError::MessageProduction(RDKafkaError::QueueFull) =>
+                        if error == KafkaError::MessageProduction(RDKafkaErrorCode::QueueFull) =>
                     {
                         debug!(message = "The rdkafka queue full.", %error, %seqno, internal_log_rate_secs = 1);
                         record = future_record;
