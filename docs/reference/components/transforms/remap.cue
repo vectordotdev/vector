@@ -105,6 +105,24 @@ components: transforms: "remap": {
 				[Vector Remap Language reference](\#(urls.vrl_reference)).
 				"""#
 		}
+		lazy_event_mutation: {
+			title: "Lazy Event Mutation"
+			body:  #"""
+				When you make changes to an event through VRL's path assignment syntax, the change
+				is not immediately applied to the actual event. If the program fails to run to
+				completion, any changes made until that point are dropped, and the event is kept in
+				its original state.
+
+				If you want to make sure your event is changed as expected, you have to rewrite
+				your program to never fail at runtime (the compiler will help you with this).
+
+				Alternatively, if you want to ignore/drop events that caused the program to fail,
+				you can set the `drop_on_error` configuration value to `true`.
+
+				Learn more about Runtime Errors in the [Vector Remap Language
+				reference](\#(urls.vrl_runtime_errors)).
+				"""#
+		}
 	}
 
 	telemetry: metrics: {

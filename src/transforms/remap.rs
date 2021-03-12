@@ -51,16 +51,6 @@ pub struct Remap {
 
 impl Remap {
     pub fn new(config: RemapConfig) -> crate::Result<Self> {
-        // TODO(jean): re-add this to VRL
-        // let accepts = TypeConstraint {
-        //     allow_any: true,
-        //     type_def: TypeDef {
-        //         fallible: true,
-        //         kind: value::Kind::all(),
-        //         ..Default::default()
-        //     },
-        // };
-
         let program = vrl::compile(&config.source, &vrl_stdlib::all()).map_err(|diagnostics| {
             Formatter::new(&config.source, diagnostics)
                 .colored()
@@ -76,24 +66,37 @@ impl Remap {
 
 impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+        let original_event = if !self.drop_on_err && self.program.is_fallible() {
+            // We need to clone the original event, since it might be mutated by
+            // the program before it aborts, while we want to return the
+            // unmodified event when an error occurs.
+            Some(event.clone())
+        } else {
+            None
+        };
+
         let mut runtime = Runtime::default();
+
         let result = match event {
             Event::Log(ref mut event) => runtime.resolve(event, &self.program),
             Event::Metric(ref mut event) => runtime.resolve(event, &self.program),
         };
 
-        if let Err(error) = result {
-            emit!(RemapMappingError {
-                error: error.to_string(),
-                event_dropped: self.drop_on_err,
-            });
+        match result {
+            Ok(_) => output.push(event),
+            Err(error) => {
+                emit!(RemapMappingError {
+                    error: error.to_string(),
+                    event_dropped: self.drop_on_err,
+                });
 
-            if self.drop_on_err {
-                return;
+                if self.drop_on_err {
+                    return;
+                }
+
+                output.push(original_event.unwrap_or(event))
             }
         }
-
-        output.push(event);
     }
 }
 
@@ -102,8 +105,9 @@ mod tests {
     use super::*;
     use crate::event::{
         metric::{MetricKind, MetricValue},
-        Metric,
+        Metric, Value,
     };
+    use indoc::formatdoc;
     use std::collections::BTreeMap;
 
     #[test]
@@ -139,6 +143,56 @@ mod tests {
         assert_eq!(get_field_string(&result, "foo"), "bar");
         assert_eq!(get_field_string(&result, "bar"), "baz");
         assert_eq!(get_field_string(&result, "copy"), "buz");
+    }
+
+    #[test]
+    fn check_remap_error() {
+        let event = {
+            let mut event = Event::from("augment me");
+            event.as_mut_log().insert("bar", "is a string");
+            event
+        };
+
+        let conf = RemapConfig {
+            source: formatdoc! {r#"
+                .foo = "foo"
+                .not_an_int = int!(.bar)
+                .baz = 12
+            "#},
+            drop_on_err: false,
+        };
+        let mut tform = Remap::new(conf).unwrap();
+
+        let event = tform.transform_one(event).unwrap();
+
+        assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
+
+        assert!(event.as_log().get("foo").is_none());
+        assert!(event.as_log().get("baz").is_none());
+    }
+
+    #[test]
+    fn check_remap_error_infallible() {
+        let event = {
+            let mut event = Event::from("augment me");
+            event.as_mut_log().insert("bar", "is a string");
+            event
+        };
+
+        let conf = RemapConfig {
+            source: formatdoc! {r#"
+                .foo = "foo"
+                .baz = 12
+            "#},
+            drop_on_err: false,
+        };
+        let mut tform = Remap::new(conf).unwrap();
+
+        let event = tform.transform_one(event).unwrap();
+
+        assert_eq!(event.as_log().get("foo"), Some(&Value::from("foo")));
+        assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
+        assert_eq!(event.as_log().get("baz"), Some(&Value::from(12)));
     }
 
     #[test]

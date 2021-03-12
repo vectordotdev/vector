@@ -99,7 +99,7 @@
     extract_from = "remap_arithmetic_error"
     [[tests.outputs.conditions]]
       type = "remap"
-      source = ".a == null"
+      source = ".a == 0.0"
 
 [transforms.remap_boolean_arithmetic]
   inputs = []
