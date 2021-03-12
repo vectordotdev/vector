@@ -123,7 +123,7 @@ fn create_log_events_stream(
                         if limit > results.len() {
                             results.push(tap);
                         } else {
-                            let random_number = rng.gen_range(0..i);
+                            let random_number = rng.gen_range(0..batch);
                             if random_number < results.len() {
                                 results[random_number] = tap;
                             }
