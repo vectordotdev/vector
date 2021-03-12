@@ -168,7 +168,8 @@ jobs:
         env:
           VERSION: "5.32.0.1"
         run: |
-          curl -sSf https://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
+          curl -sSfL http://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
+          echo "$SHA256SUM perl-installer.msi" | sha256sum --check --status
       - name: "Install Perl"
         shell: cmd # msiexec fails when called from bash
         run: |
