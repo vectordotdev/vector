@@ -83,7 +83,7 @@
 [transforms.remap_arithmetic_error]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     a = 10
     b = 0
@@ -319,7 +319,7 @@
 [transforms.remap_function_upcase_error]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     .a = upcase(string!(.a))
     .b = upcase(string!(.b))
@@ -337,7 +337,7 @@
 [transforms.remap_function_downcase]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     .a = downcase(string!(.a))
     .b = downcase(string!(.b))
@@ -371,7 +371,7 @@
 [transforms.remap_function_downcase_error]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     .a = downcase(string!(.a))
     .b = downcase(string!(.b))
@@ -442,7 +442,7 @@
 [transforms.remap_function_sha1_error]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     .a = sha1(string!(.a))
     .b = sha1(string!(.b))
@@ -487,7 +487,7 @@
 [transforms.remap_function_md5_error]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     .a = md5(string!(.a))
     .b = md5(string!(.b))
@@ -1331,7 +1331,7 @@
 # [transforms.remap_function_assert_pass]
 #   inputs = []
 #   type = "remap"
-#   drop_on_err = true
+#   drop_on_error = true
 #   source = """
 #     assert!(.foo, message: "assert failed")
 #     .check = "checked"
@@ -1354,7 +1354,7 @@
 # [transforms.remap_function_assert_fail]
 #   inputs = []
 #   type = "remap"
-#   drop_on_err = true
+#   drop_on_error = true
 #   source = """
 #     assert!(.foo, message: "assert failed")
 #   """
