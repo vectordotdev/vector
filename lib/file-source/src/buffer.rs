@@ -2,6 +2,7 @@ use crate::FilePosition;
 use bstr::Finder;
 use bytes::BytesMut;
 use std::io::{self, BufRead};
+use tracing::warn;
 
 /// Read up to `max_size` bytes from `reader`, splitting by `delim`
 ///

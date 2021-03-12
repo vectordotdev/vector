@@ -8,6 +8,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
+use tracing::{error, info, warn};
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
 const STABLE_FILE_NAME: &str = "checkpoints.json";

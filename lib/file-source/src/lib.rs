@@ -2,8 +2,6 @@
 
 #[macro_use]
 extern crate scan_fmt;
-#[macro_use]
-extern crate tracing;
 
 pub mod buffer;
 mod checkpointer;

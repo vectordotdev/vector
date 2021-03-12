@@ -1,3 +1,4 @@
+use crate::paths_provider::PathsProvider;
 use crate::{
     checkpointer::{Checkpointer, CheckpointsView},
     file_watcher::FileWatcher,
@@ -20,8 +21,7 @@ use std::{
     time::{self, Duration},
 };
 use tokio::time::delay_for;
-
-use crate::paths_provider::PathsProvider;
+use tracing::{debug, error, info, trace};
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures. As

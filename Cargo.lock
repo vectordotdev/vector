@@ -2163,7 +2163,7 @@ name = "file-source"
 version = "0.1.0"
 dependencies = [
  "bstr",
- "bytes 0.5.6",
+ "bytes 1.0.1",
  "chrono",
  "crc",
  "criterion",

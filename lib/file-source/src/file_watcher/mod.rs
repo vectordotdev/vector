@@ -10,6 +10,7 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
+use tracing::debug;
 #[cfg(test)]
 mod tests;
 
