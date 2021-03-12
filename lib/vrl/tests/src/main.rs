@@ -31,6 +31,20 @@ pub struct Cmd {
     logging: bool,
 }
 
+fn should_run(name: &str, pat: &Option<String>) -> bool {
+    if name == "tests/example.vrl" {
+        return false;
+    }
+
+    if let Some(pat) = pat {
+        if !name.contains(pat) {
+            return false;
+        }
+    }
+
+    true
+}
+
 fn main() {
     let cmd = Cmd::from_args();
 
@@ -46,17 +60,6 @@ fn main() {
         .into_iter()
         .filter_map(|entry| {
             let path = entry.ok()?;
-
-            if &path.to_string_lossy() == "tests/example.vrl" {
-                return None;
-            }
-
-            if let Some(pat) = &cmd.pattern {
-                if !path.to_string_lossy().contains(pat) {
-                    return None;
-                }
-            }
-
             Some(Test::from_path(&path))
         })
         .chain({
@@ -78,6 +81,7 @@ fn main() {
             tests.into_iter()
         })
         .chain(docs::tests().into_iter())
+        .filter(|test| should_run(&format!("{}/{}", test.category, test.name), &cmd.pattern))
         .collect::<Vec<_>>();
 
     for mut test in tests {
