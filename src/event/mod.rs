@@ -2,12 +2,13 @@ use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricPro
 use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
-use serde::{Deserialize, Serialize};
+use shared::Equivalent;
 use std::collections::{BTreeMap, HashMap};
 
 pub mod discriminant;
 pub mod merge;
 pub mod merge_state;
+pub mod metadata;
 pub mod metric;
 pub mod util;
 
@@ -17,6 +18,7 @@ mod value;
 
 pub use log_event::LogEvent;
 pub use lookup::Lookup;
+pub use metadata::EventMetadata;
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use std::convert::{TryFrom, TryInto};
 pub(crate) use util::log::PathComponent;
@@ -29,9 +31,6 @@ pub mod proto {
 
 pub const PARTIAL: &str = "_partial";
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-pub struct EventMetadata;
-
 #[derive(PartialEq, Debug, Clone)]
 pub enum Event {
     Log(LogEvent),
@@ -40,7 +39,7 @@ pub enum Event {
 
 impl Event {
     pub fn new_empty_log() -> Self {
-        Event::Log(LogEvent::default())
+        Event::Log(LogEvent::new_empty())
     }
 
     pub fn as_log(&self) -> &LogEvent {
@@ -87,15 +86,18 @@ impl Event {
 
     pub fn metadata(&self) -> &EventMetadata {
         match self {
-            Self::Log(log) => &log.metadata,
-            Self::Metric(metric) => &metric.metadata,
+            Self::Log(log) => log.metadata(),
+            Self::Metric(metric) => metric.metadata(),
         }
     }
+}
 
-    pub fn mut_metadata(&mut self) -> &mut EventMetadata {
-        match self {
-            Self::Log(log) => &mut log.metadata,
-            Self::Metric(metric) => &mut metric.metadata,
+impl Equivalent for Event {
+    fn equivalent(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Log(a), Self::Log(b)) => a.equivalent(b),
+            (Self::Metric(a), Self::Metric(b)) => a.equivalent(b),
+            _ => false,
         }
     }
 }
@@ -321,28 +323,24 @@ impl From<Event> for proto::EventWrapper {
 
                 proto::EventWrapper { event: Some(event) }
             }
-            Event::Metric(Metric {
-                series,
-                data,
-                metadata: _metadata,
-            }) => {
-                let name = series.name.name;
-                let namespace = series.name.namespace.unwrap_or_default();
+            Event::Metric(metric) => {
+                let name = metric.series.name.name;
+                let namespace = metric.series.name.namespace.unwrap_or_default();
 
-                let timestamp = data.timestamp.map(|ts| prost_types::Timestamp {
+                let timestamp = metric.data.timestamp.map(|ts| prost_types::Timestamp {
                     seconds: ts.timestamp(),
                     nanos: ts.timestamp_subsec_nanos() as i32,
                 });
 
-                let tags = series.tags.unwrap_or_default();
+                let tags = metric.series.tags.unwrap_or_default();
 
-                let kind = match data.kind {
+                let kind = match metric.data.kind {
                     MetricKind::Incremental => proto::metric::Kind::Incremental,
                     MetricKind::Absolute => proto::metric::Kind::Absolute,
                 }
                 .into();
 
-                let metric = match data.value {
+                let metric = match metric.data.value {
                     MetricValue::Counter { value } => {
                         MetricProto::Counter(proto::Counter { value })
                     }

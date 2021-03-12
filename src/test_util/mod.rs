@@ -58,7 +58,7 @@ macro_rules! log_event {
     ($($key:expr => $value:expr),*  $(,)?) => {
         #[allow(unused_variables)]
         {
-            let mut event = crate::event::Event::Log(crate::event::LogEvent::default());
+            let mut event = crate::event::Event::Log(crate::event::LogEvent::new_empty());
             let log = event.as_mut_log();
             $(
                 log.insert($key, $value);

@@ -192,6 +192,7 @@ fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, contain
 mod tests {
     use super::*;
     use k8s_openapi::api::core::v1::PodIP;
+    use shared::assert_equiv;
 
     #[test]
     fn test_annotate_from_metadata() {
@@ -199,7 +200,7 @@ mod tests {
             (
                 FieldsSpec::default(),
                 ObjectMeta::default(),
-                LogEvent::default(),
+                LogEvent::new_empty(),
             ),
             (
                 FieldsSpec::default(),
@@ -218,7 +219,7 @@ mod tests {
                     ..ObjectMeta::default()
                 },
                 {
-                    let mut log = LogEvent::default();
+                    let mut log = LogEvent::new_empty();
                     log.insert("kubernetes.pod_name", "sandbox0-name");
                     log.insert("kubernetes.pod_namespace", "sandbox0-ns");
                     log.insert("kubernetes.pod_uid", "sandbox0-uid");
@@ -250,7 +251,7 @@ mod tests {
                     ..ObjectMeta::default()
                 },
                 {
-                    let mut log = LogEvent::default();
+                    let mut log = LogEvent::new_empty();
                     log.insert("name", "sandbox0-name");
                     log.insert("ns", "sandbox0-ns");
                     log.insert("uid", "sandbox0-uid");
@@ -279,7 +280,7 @@ mod tests {
                     ..ObjectMeta::default()
                 },
                 {
-                    let mut log = LogEvent::default();
+                    let mut log = LogEvent::new_empty();
                     log.insert("kubernetes.pod_name", "sandbox0-name");
                     log.insert("kubernetes.pod_namespace", "sandbox0-ns");
                     log.insert("kubernetes.pod_uid", "sandbox0-uid");
@@ -293,9 +294,9 @@ mod tests {
         ];
 
         for (fields_spec, metadata, expected) in cases.into_iter() {
-            let mut log = LogEvent::default();
+            let mut log = LogEvent::new_empty();
             annotate_from_metadata(&mut log, &fields_spec, &metadata);
-            assert_eq!(log, expected);
+            assert_equiv!(log, expected);
         }
     }
 
@@ -305,7 +306,7 @@ mod tests {
             FieldsSpec::default(),
             "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
             {
-                let mut log = LogEvent::default();
+                let mut log = LogEvent::new_empty();
                 log.insert("kubernetes.container_name", "sandbox0-container0-name");
                 log
             },
@@ -316,17 +317,17 @@ mod tests {
             },
             "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
             {
-                let mut log = LogEvent::default();
+                let mut log = LogEvent::new_empty();
                 log.insert("container_name", "sandbox0-container0-name");
                 log
             },
         )];
 
         for (fields_spec, file, expected) in cases.into_iter() {
-            let mut log = LogEvent::default();
+            let mut log = LogEvent::new_empty();
             let file_info = parse_log_file_path(file).unwrap();
             annotate_from_file_info(&mut log, &fields_spec, &file_info);
-            assert_eq!(log, expected);
+            assert_equiv!(log, expected);
         }
     }
 
@@ -336,7 +337,7 @@ mod tests {
             (
                 FieldsSpec::default(),
                 PodSpec::default(),
-                LogEvent::default(),
+                LogEvent::new_empty(),
             ),
             (
                 FieldsSpec::default(),
@@ -345,7 +346,7 @@ mod tests {
                     ..Default::default()
                 },
                 {
-                    let mut log = LogEvent::default();
+                    let mut log = LogEvent::new_empty();
                     log.insert("kubernetes.pod_node_name", "sandbox0-node-name");
                     log
                 },
@@ -360,7 +361,7 @@ mod tests {
                     ..Default::default()
                 },
                 {
-                    let mut log = LogEvent::default();
+                    let mut log = LogEvent::new_empty();
                     log.insert("node_name", "sandbox0-node-name");
                     log
                 },
@@ -368,9 +369,9 @@ mod tests {
         ];
 
         for (fields_spec, pod_spec, expected) in cases.into_iter() {
-            let mut log = LogEvent::default();
+            let mut log = LogEvent::new_empty();
             annotate_from_pod_spec(&mut log, &fields_spec, &pod_spec);
-            assert_eq!(log, expected);
+            assert_equiv!(log, expected);
         }
     }
 
@@ -380,7 +381,7 @@ mod tests {
             (
                 FieldsSpec::default(),
                 PodStatus::default(),
-                LogEvent::default(),
+                LogEvent::new_empty(),
             ),
             (
                 FieldsSpec::default(),
@@ -389,7 +390,7 @@ mod tests {
                     ..Default::default()
                 },
                 {
-                    let mut log = LogEvent::default();
+                    let mut log = LogEvent::new_empty();
                     log.insert("kubernetes.pod_ip", "192.168.1.2");
                     log
                 },
@@ -403,7 +404,7 @@ mod tests {
                     ..Default::default()
                 },
                 {
-                    let mut log = LogEvent::default();
+                    let mut log = LogEvent::new_empty();
                     let mut ips_vec = Vec::new();
                     ips_vec.push("192.168.1.2");
                     log.insert("kubernetes.pod_ips", ips_vec);
@@ -429,7 +430,7 @@ mod tests {
                     ..Default::default()
                 },
                 {
-                    let mut log = LogEvent::default();
+                    let mut log = LogEvent::new_empty();
                     log.insert("kubernetes.custom_pod_ip", "192.168.1.2");
                     let mut ips_vec = Vec::new();
                     ips_vec.push("192.168.1.2");
@@ -456,7 +457,7 @@ mod tests {
                     ..Default::default()
                 },
                 {
-                    let mut log = LogEvent::default();
+                    let mut log = LogEvent::new_empty();
                     log.insert("kubernetes.pod_ip", "192.168.1.2");
                     let mut ips_vec = Vec::new();
                     ips_vec.push("192.168.1.2");
@@ -468,9 +469,9 @@ mod tests {
         ];
 
         for (fields_spec, pod_status, expected) in cases.into_iter() {
-            let mut log = LogEvent::default();
+            let mut log = LogEvent::new_empty();
             annotate_from_pod_status(&mut log, &fields_spec, &pod_status);
-            assert_eq!(log, expected);
+            assert_equiv!(log, expected);
         }
     }
 
@@ -480,7 +481,7 @@ mod tests {
             (
                 FieldsSpec::default(),
                 ContainerStatus::default(),
-                LogEvent::default(),
+                LogEvent::new_empty(),
             ),
             (
                 FieldsSpec {
@@ -491,16 +492,16 @@ mod tests {
                     ..ContainerStatus::default()
                 },
                 {
-                    let mut log = LogEvent::default();
+                    let mut log = LogEvent::new_empty();
                     log.insert("kubernetes.container_id", "container_id_foo");
                     log
                 },
             ),
         ];
         for (fields_spec, container_status, expected) in cases.into_iter() {
-            let mut log = LogEvent::default();
+            let mut log = LogEvent::new_empty();
             annotate_from_container_status(&mut log, &fields_spec, &container_status);
-            assert_eq!(log, expected);
+            assert_equiv!(log, expected);
         }
     }
 
@@ -510,7 +511,7 @@ mod tests {
             (
                 FieldsSpec::default(),
                 Container::default(),
-                LogEvent::default(),
+                LogEvent::new_empty(),
             ),
             (
                 FieldsSpec::default(),
@@ -519,7 +520,7 @@ mod tests {
                     ..Default::default()
                 },
                 {
-                    let mut log = LogEvent::default();
+                    let mut log = LogEvent::new_empty();
                     log.insert("kubernetes.container_image", "sandbox0-container-image");
                     log
                 },
@@ -534,7 +535,7 @@ mod tests {
                     ..Default::default()
                 },
                 {
-                    let mut log = LogEvent::default();
+                    let mut log = LogEvent::new_empty();
                     log.insert("container_image", "sandbox0-container-image");
                     log
                 },
@@ -542,9 +543,9 @@ mod tests {
         ];
 
         for (fields_spec, container, expected) in cases.into_iter() {
-            let mut log = LogEvent::default();
+            let mut log = LogEvent::new_empty();
             annotate_from_container(&mut log, &fields_spec, &container);
-            assert_eq!(log, expected);
+            assert_equiv!(log, expected);
         }
     }
 }

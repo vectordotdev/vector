@@ -170,12 +170,13 @@ mod test {
         );
         let log = event.as_mut_log();
         log.insert("keep", "field");
+        let orig_timestamp = event.metadata().timestamp();
 
         let mut output: Vec<Event> = Vec::new();
 
         parser.transform(&mut output, event);
 
-        assert_eq!(
+        shared::assert_equiv!(
             output,
             vec![
                 log_event! {
@@ -199,7 +200,9 @@ mod test {
                     "keep" => "field",
                 },
             ]
-        )
+        );
+        assert_eq!(output[0].metadata().timestamp(), orig_timestamp);
+        assert_eq!(output[1].metadata().timestamp(), orig_timestamp);
     }
 
     #[test]

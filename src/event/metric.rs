@@ -1,7 +1,9 @@
 use super::EventMetadata;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
+use getset::Getters;
 use serde::{Deserialize, Serialize};
+use shared::Equivalent;
 use snafu::Snafu;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -11,14 +13,15 @@ use std::{
 };
 use vrl::{path::Segment, Target};
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Getters, PartialEq, Serialize)]
 pub struct Metric {
     #[serde(flatten)]
     pub series: MetricSeries,
     #[serde(flatten)]
     pub data: MetricData,
-    #[serde(skip)]
-    pub metadata: EventMetadata,
+    #[getset(get = "pub")]
+    #[serde(skip_serializing, default = "EventMetadata::now")]
+    metadata: EventMetadata,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -229,6 +232,15 @@ pub enum StatisticKind {
 
 impl Metric {
     pub fn new<T: Into<String>>(name: T, kind: MetricKind, value: MetricValue) -> Self {
+        Self::new_with_metadata(name, kind, value, EventMetadata::now())
+    }
+
+    pub fn new_with_metadata<T: Into<String>>(
+        name: T,
+        kind: MetricKind,
+        value: MetricValue,
+        metadata: EventMetadata,
+    ) -> Self {
         Self {
             series: MetricSeries {
                 name: MetricName {
@@ -242,7 +254,7 @@ impl Metric {
                 kind,
                 value,
             },
-            metadata: EventMetadata,
+            metadata,
         }
     }
 
@@ -271,7 +283,7 @@ impl Metric {
         Self {
             series: self.series,
             data: self.data.into_absolute(),
-            metadata: EventMetadata,
+            metadata: self.metadata,
         }
     }
 
@@ -280,7 +292,7 @@ impl Metric {
         Self {
             series: self.series,
             data: self.data.into_incremental(),
-            metadata: EventMetadata,
+            metadata: self.metadata,
         }
     }
 
@@ -372,7 +384,7 @@ impl Metric {
         Self {
             series: self.series.clone(),
             data: self.data.zero(),
-            metadata: EventMetadata,
+            metadata: self.metadata.clone(),
         }
     }
 }
@@ -630,6 +642,14 @@ impl MetricValue {
             }
             _ => {}
         }
+    }
+}
+
+impl Equivalent for Metric {
+    fn equivalent(&self, other: &Self) -> bool {
+        self.series == other.series
+            && self.data == other.data
+            && self.metadata.equivalent(&other.metadata)
     }
 }
 
@@ -940,16 +960,12 @@ mod test {
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
+        let expected = counter
+            .clone()
+            .with_value(MetricValue::Counter { value: 3.0 });
+
         counter.data.add(&delta.data);
-        assert_eq!(
-            counter,
-            Metric::new(
-                "counter",
-                MetricKind::Incremental,
-                MetricValue::Counter { value: 3.0 },
-            )
-            .with_timestamp(Some(ts()))
-        )
+        assert_eq!(counter, expected);
     }
 
     #[test]
@@ -969,16 +985,10 @@ mod test {
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
+        let expected = gauge.clone().with_value(MetricValue::Gauge { value: -1.0 });
+
         gauge.data.add(&delta.data);
-        assert_eq!(
-            gauge,
-            Metric::new(
-                "gauge",
-                MetricKind::Incremental,
-                MetricValue::Gauge { value: -1.0 },
-            )
-            .with_timestamp(Some(ts()))
-        )
+        assert_eq!(gauge, expected);
     }
 
     #[test]
@@ -1002,18 +1012,12 @@ mod test {
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
+        let expected = set.clone().with_value(MetricValue::Set {
+            values: vec!["old".into(), "new".into()].into_iter().collect(),
+        });
+
         set.data.add(&delta.data);
-        assert_eq!(
-            set,
-            Metric::new(
-                "set",
-                MetricKind::Incremental,
-                MetricValue::Set {
-                    values: vec!["old".into(), "new".into()].into_iter().collect()
-                },
-            )
-            .with_timestamp(Some(ts()))
-        )
+        assert_eq!(set, expected);
     }
 
     #[test]
@@ -1039,19 +1043,13 @@ mod test {
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
+        let expected = dist.clone().with_value(MetricValue::Distribution {
+            samples: samples![1.0 => 10, 1.0 => 20],
+            statistic: StatisticKind::Histogram,
+        });
+
         dist.data.add(&delta.data);
-        assert_eq!(
-            dist,
-            Metric::new(
-                "hist",
-                MetricKind::Incremental,
-                MetricValue::Distribution {
-                    samples: samples![1.0 => 10, 1.0 => 20],
-                    statistic: StatisticKind::Histogram
-                },
-            )
-            .with_timestamp(Some(ts()))
-        )
+        assert_eq!(dist, expected);
     }
 
     #[test]

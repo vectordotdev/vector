@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 /// The implementation is shared, and therefore consistent across all
 /// the parsers.
 pub fn make_log_event(message: &str, timestamp: &str, stream: &str, is_partial: bool) -> LogEvent {
-    let mut log = LogEvent::default();
+    let mut log = LogEvent::new_empty();
 
     log.insert("message", message);
 
@@ -42,7 +42,7 @@ where
 
         let mut output = Vec::new();
         parser.transform(&mut output, input);
-        assert_eq!(
+        shared::assert_equiv!(
             expected.into_iter().map(Event::Log).collect::<Vec<_>>(),
             output,
             "expected left, actual right"

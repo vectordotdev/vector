@@ -85,7 +85,7 @@ impl FunctionTransform for MetricToLog {
             .ok()
             .and_then(|value| match value {
                 Value::Object(object) => {
-                    let mut log = LogEvent::default();
+                    let mut log = LogEvent::new_empty();
 
                     for (key, value) in object {
                         log.insert_flat(key, value);

@@ -1,5 +1,5 @@
 use super::util::{table_to_set, table_to_timestamp, timestamp_to_table, type_name};
-use crate::event::{metric, Metric, MetricKind, MetricValue, StatisticKind};
+use crate::event::{metric, EventMetadata, Metric, MetricKind, MetricValue, StatisticKind};
 use rlua::prelude::*;
 use std::collections::BTreeMap;
 
@@ -58,6 +58,13 @@ impl<'a> FromLua<'a> for StatisticKind {
 impl<'a> ToLua<'a> for Metric {
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
         let tbl = ctx.create_table()?;
+
+        let metadata = ctx.create_table()?;
+        metadata.set(
+            "timestamp",
+            timestamp_to_table(ctx, self.metadata().timestamp())?,
+        )?;
+        tbl.set("metadata", metadata)?;
 
         tbl.set("name", self.name())?;
         if let Some(namespace) = self.namespace() {
@@ -154,6 +161,14 @@ impl<'a> FromLua<'a> for Metric {
             .get::<_, Option<MetricKind>>("kind")?
             .unwrap_or(MetricKind::Absolute);
 
+        let metadata = match table.get::<_, Option<LuaTable>>("metadata")? {
+            Some(metadata) => {
+                let timestamp = table_to_timestamp(metadata.get("timestamp")?)?;
+                EventMetadata::with_timestamp(timestamp)
+            }
+            None => EventMetadata::now(),
+        };
+
         let value = if let Some(counter) = table.get::<_, Option<LuaTable>>("counter")? {
             MetricValue::Counter {
                 value: counter.get("value")?,
@@ -202,7 +217,7 @@ impl<'a> FromLua<'a> for Metric {
             });
         };
 
-        Ok(Metric::new(name, kind, value)
+        Ok(Metric::new_with_metadata(name, kind, value, metadata)
             .with_namespace(namespace)
             .with_tags(tags)
             .with_timestamp(timestamp))
@@ -213,6 +228,7 @@ impl<'a> FromLua<'a> for Metric {
 mod test {
     use super::*;
     use chrono::{offset::TimeZone, Utc};
+    use shared::assert_equiv;
 
     fn assert_metric(metric: Metric, assertions: Vec<&'static str>) {
         Lua::new().context(|ctx| {
@@ -394,7 +410,7 @@ mod test {
             MetricValue::Counter { value: 0.57721566 },
         );
         Lua::new().context(|ctx| {
-            assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
+            assert_equiv!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
     }
 
@@ -432,7 +448,7 @@ mod test {
         ))
         .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10)));
         Lua::new().context(|ctx| {
-            assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
+            assert_equiv!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
     }
 
@@ -450,7 +466,7 @@ mod test {
             MetricValue::Gauge { value: 1.6180339 },
         );
         Lua::new().context(|ctx| {
-            assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
+            assert_equiv!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
     }
 
@@ -472,7 +488,7 @@ mod test {
             },
         );
         Lua::new().context(|ctx| {
-            assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
+            assert_equiv!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
     }
 
@@ -495,7 +511,7 @@ mod test {
             },
         );
         Lua::new().context(|ctx| {
-            assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
+            assert_equiv!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
     }
 
@@ -519,7 +535,7 @@ mod test {
             },
         );
         Lua::new().context(|ctx| {
-            assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
+            assert_equiv!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
     }
 
@@ -546,7 +562,7 @@ mod test {
             },
         );
         Lua::new().context(|ctx| {
-            assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
+            assert_equiv!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
     }
 }

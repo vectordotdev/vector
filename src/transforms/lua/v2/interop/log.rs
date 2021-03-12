@@ -13,7 +13,7 @@ impl<'a> FromLua<'a> for LogEvent {
     fn from_lua(value: LuaValue<'a>, _: LuaContext<'a>) -> LuaResult<Self> {
         match value {
             LuaValue::Table(t) => {
-                let mut log = LogEvent::default();
+                let mut log = LogEvent::new_empty();
                 for pair in t.pairs() {
                     let (key, value): (String, Value) = pair?;
                     log.insert_flat(key, value);

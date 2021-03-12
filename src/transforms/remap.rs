@@ -202,6 +202,7 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.0 },
         ));
+        let metadata = metric.metadata().clone();
 
         let conf = RemapConfig {
             source: r#".tags.host = "zoobub"
@@ -217,10 +218,11 @@ mod tests {
         assert_eq!(
             result,
             Event::Metric(
-                Metric::new(
+                Metric::new_with_metadata(
                     "zork",
                     MetricKind::Incremental,
                     MetricValue::Counter { value: 1.0 },
+                    metadata,
                 )
                 .with_namespace(Some("zerk"))
                 .with_tags(Some({

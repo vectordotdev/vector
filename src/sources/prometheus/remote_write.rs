@@ -124,7 +124,6 @@ mod test {
     };
     use chrono::{SubsecRound as _, Utc};
     use futures::stream;
-    use pretty_assertions::assert_eq;
 
     #[test]
     fn genreate_config() {
@@ -180,7 +179,7 @@ mod test {
         // put them back into order before comparing.
         output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
 
-        assert_eq!(events, output);
+        shared::assert_equiv!(events, output);
     }
 
     fn make_events() -> Vec<Event> {

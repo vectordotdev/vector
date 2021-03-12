@@ -58,6 +58,8 @@ pub enum ParserError {
     RequestNoNameLabel,
 }
 
+shared::impl_equivalent_as_eq!(ParserError);
+
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct GroupKey {
     pub timestamp: Option<i64>,

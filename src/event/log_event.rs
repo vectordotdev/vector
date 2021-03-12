@@ -1,5 +1,7 @@
 use super::{lookup::Segment, util, EventMetadata, Lookup, PathComponent, Value};
+use getset::Getters;
 use serde::{Serialize, Serializer};
+use shared::Equivalent;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
@@ -7,13 +9,25 @@ use std::{
     iter::FromIterator,
 };
 
-#[derive(PartialEq, Debug, Clone, Default)]
+#[derive(Clone, Debug, Getters, PartialEq)]
 pub struct LogEvent {
     fields: BTreeMap<String, Value>,
-    pub(super) metadata: EventMetadata,
+    #[getset(get = "pub")]
+    metadata: EventMetadata,
 }
 
 impl LogEvent {
+    pub fn new_empty() -> Self {
+        Self::new_with_metadata(EventMetadata::now())
+    }
+
+    pub fn new_with_metadata(metadata: EventMetadata) -> Self {
+        Self {
+            fields: Default::default(),
+            metadata,
+        }
+    }
+
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
         util::log::get(&self.fields, key.as_ref())
@@ -138,11 +152,17 @@ impl LogEvent {
     }
 }
 
+impl Equivalent for LogEvent {
+    fn equivalent(&self, other: &Self) -> bool {
+        self.fields == other.fields && self.metadata.equivalent(&other.metadata)
+    }
+}
+
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
         LogEvent {
             fields: map,
-            metadata: EventMetadata,
+            metadata: EventMetadata::now(),
         }
     }
 }
@@ -157,7 +177,7 @@ impl From<HashMap<String, Value>> for LogEvent {
     fn from(map: HashMap<String, Value>) -> Self {
         LogEvent {
             fields: map.into_iter().collect(),
-            metadata: EventMetadata,
+            metadata: EventMetadata::now(),
         }
     }
 }
@@ -221,7 +241,7 @@ where
 // Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
 impl<K: AsRef<str>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let mut log_event = LogEvent::default();
+        let mut log_event = Self::new_empty();
         log_event.extend(iter);
         log_event
     }
@@ -579,7 +599,7 @@ mod test {
                 vrl::Target::insert(&mut event, &path, value.clone()),
                 result
             );
-            assert_eq!(event, expect);
+            shared::assert_equiv!(event, expect);
             assert_eq!(vrl::Target::get(&event, &path), Ok(Some(value)));
         }
     }

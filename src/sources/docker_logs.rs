@@ -866,7 +866,7 @@ impl ContainerLogInfo {
 
         // Prepare the log event.
         let mut log_event = {
-            let mut log_event = LogEvent::default();
+            let mut log_event = LogEvent::new_empty();
 
             // Source type
             log_event.insert(log_schema().source_type_key(), Bytes::from("docker"));

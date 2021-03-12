@@ -138,7 +138,7 @@ mod test {
 
         Lua::new().context(|ctx| {
             let event = ctx.load(lua_event).eval::<Event>().unwrap();
-            assert_eq!(event, expected);
+            shared::assert_equiv!(event, expected);
         });
     }
 
