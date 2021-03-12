@@ -207,8 +207,11 @@ impl RunningTopology {
     /// On Error, topology is in invalid state.
     /// May change componenets even if reload fails.
     pub async fn reload_config_and_respawn(&mut self, new_config: Config) -> Result<bool, ()> {
-        if self.config.global.data_dir != new_config.global.data_dir {
-            error!(message = "The data_dir cannot be changed while reloading config file; reload aborted.", data_dir = ?self.config.global.data_dir);
+        if self.config.global != new_config.global {
+            error!(
+                message =
+                    "Global options can't be changed while reloading config file; reload aborted. Please restart vector to reload the configuration file."
+            );
             return Ok(false);
         }
 

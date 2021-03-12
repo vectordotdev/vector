@@ -17,7 +17,6 @@ use crate::{
         start_topology,
         stats::{HistogramStats, LevelTimeHistogram, TimeHistogram, WeightedSumStats},
     },
-    BoolAndSome,
 };
 use core::task::Context;
 use futures::{
@@ -78,7 +77,7 @@ struct LimitParams {
 impl LimitParams {
     fn action_at_level(&self, level: usize) -> Option<Action> {
         self.limit
-            .and_then(|limit| (level > limit).and_some(self.action))
+            .and_then(|limit| (level > limit).then(|| self.action))
     }
 
     fn scale(&self, level: usize) -> f64 {

@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    internal_events::{AwsSqsEventSent, AwsSqsMessageGroupIdMissingKeys},
+    internal_events::{AwsSqsEventSent, TemplateRenderingFailed},
     rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -8,7 +8,7 @@ use crate::{
         sink::Response,
         BatchSettings, EncodedLength, TowerRequestConfig, VecBuffer,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     Event,
 };
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
@@ -34,7 +34,7 @@ enum BuildError {
     #[snafu(display("`message_group_id` is not allowed with non-FIFO queue."))]
     MessageGroupIdNotAllowed,
     #[snafu(display("invalid topic template: {}", source))]
-    TopicTemplate { source: TemplateError },
+    TopicTemplate { source: TemplateParseError },
 }
 
 #[derive(Debug, Snafu)]
@@ -258,9 +258,11 @@ fn encode_event(
     let message_group_id = match message_group_id {
         Some(tpl) => match tpl.render_string(&event) {
             Ok(value) => Some(value),
-            Err(missing_keys) => {
-                emit!(AwsSqsMessageGroupIdMissingKeys {
-                    keys: &missing_keys
+            Err(error) => {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("message_group_id"),
+                    drop_event: true
                 });
                 return None;
             }

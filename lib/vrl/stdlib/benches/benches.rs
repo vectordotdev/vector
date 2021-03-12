@@ -1,6 +1,7 @@
 use chrono::{DateTime, Local, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
+use shared::btreemap;
 use vrl::prelude::*;
 
 criterion_group!(
@@ -41,6 +42,7 @@ criterion_group!(
               merge,
               // TODO: value is dynamic so we cannot assert equality
               //now,
+              parse_apache_log,
               parse_aws_alb_log,
               parse_aws_cloudwatch_log_subscription_message,
               parse_aws_vpc_flow_log,
@@ -606,6 +608,64 @@ bench_function! {
 }
 
 bench_function! {
+    parse_apache_log => vrl_stdlib::ParseApacheLog;
+
+    common {
+        args: func_args![value: r#"127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326"#,
+                         format: "common"
+        ],
+        want: Ok(value!({
+            "host": "127.0.0.1",
+            "identity": "bob",
+            "user": "frank",
+            "timestamp": (DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().with_timezone(&Utc)),
+            "message": "GET /apache_pb.gif HTTP/1.0",
+            "method": "GET",
+            "path": "/apache_pb.gif",
+            "protocol": "HTTP/1.0",
+            "status": 200,
+            "size": 2326,
+        })),
+    }
+
+    combined {
+        args: func_args![value: r#"127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326 "http://www.seniorinfomediaries.com/vertical/channels/front-end/bandwidth" "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0""#,
+                         format: "combined"
+        ],
+        want: Ok(value!({
+            "agent": "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0",
+            "host": "127.0.0.1",
+            "identity": "bob",
+            "user": "frank",
+            "referrer": "http://www.seniorinfomediaries.com/vertical/channels/front-end/bandwidth",
+            "timestamp": (DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().with_timezone(&Utc)),
+            "message": "GET /apache_pb.gif HTTP/1.0",
+            "method": "GET",
+            "path": "/apache_pb.gif",
+            "protocol": "HTTP/1.0",
+            "status": 200,
+            "size": 2326,
+        })),
+    }
+
+    error {
+        args: func_args![value: r#"[01/Mar/2021:12:00:19 +0000] [ab:alert] [pid 4803:tid 3814] [client 147.159.108.175:24259] I will bypass the haptic COM bandwidth, that should matrix the CSS driver!"#,
+                         format: "error"
+        ],
+        want: Ok(value!({
+            "client": "147.159.108.175",
+            "message": "I will bypass the haptic COM bandwidth, that should matrix the CSS driver!",
+            "module": "ab",
+            "pid": 4803,
+            "port": 24259,
+            "severity": "alert",
+            "thread": "3814",
+            "timestamp": (DateTime::parse_from_rfc3339("2021-03-01T12:00:19Z").unwrap().with_timezone(&Utc)),
+        })),
+    }
+}
+
+bench_function! {
     parse_common_log => vrl_stdlib::ParseCommonLog;
 
     literal {
@@ -991,6 +1051,75 @@ bench_function! {
             value:" \u{3000}\u{205F}\u{202F}\u{A0}\u{9} ❤❤ hi there ❤❤  \u{9}\u{A0}\u{202F}\u{205F}\u{3000}"
         ],
         want: Ok("❤❤ hi there ❤❤")
+    }
+}
+
+bench_function! {
+    tag_types_externally => vrl_stdlib::TagTypesExternally;
+
+    tag_bytes {
+        args: func_args![value: "foo"],
+        want: Ok(btreemap! {
+            "string" => "foo",
+        }),
+    }
+
+    tag_integer {
+        args: func_args![value: 123],
+        want: Ok(btreemap! {
+            "integer" => 123
+        }),
+    }
+
+    tag_float {
+        args: func_args![value: 123.45],
+        want: Ok(btreemap! {
+            "float" => 123.45
+        }),
+    }
+
+    tag_boolean {
+        args: func_args![value: true],
+        want: Ok(btreemap! {
+            "boolean" => true
+        }),
+    }
+
+    tag_map {
+        args: func_args![value: btreemap! {"foo" => "bar"}],
+        want: Ok(btreemap! {
+            "foo" => btreemap! {
+                "string" => "bar"
+            }
+        }),
+    }
+
+    tag_array {
+        args: func_args![value: vec!["foo"]],
+        want: Ok(vec![
+            btreemap! {
+                "string" => "foo"
+            },
+        ]),
+    }
+
+    tag_timestamp {
+        args: func_args![value: Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)],
+        want: Ok(btreemap! {
+            "timestamp" => Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)
+        }),
+    }
+
+    tag_regex {
+        args: func_args![value: Regex::new(".*").unwrap()],
+        want: Ok(btreemap! {
+            "regex" => Regex::new(".*").unwrap()
+        }),
+    }
+
+    tag_null {
+        args: func_args![value: Value::Null],
+        want: Ok(Value::Null),
     }
 }
 

@@ -2,7 +2,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
     http::HttpClient,
-    internal_events::{SplunkEventEncodeError, SplunkEventSent, SplunkMissingKeys},
+    internal_events::{SplunkEventEncodeError, SplunkEventSent, TemplateRenderingFailed},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
@@ -33,7 +33,7 @@ pub struct HecSinkConfig {
     // Deprecated name
     #[serde(alias = "host")]
     pub endpoint: String,
-    #[serde(default = "default_host_key")]
+    #[serde(default = "host_key")]
     pub host_key: String,
     #[serde(default)]
     pub indexed_fields: Vec<String>,
@@ -65,8 +65,8 @@ pub enum Encoding {
     Json,
 }
 
-fn default_host_key() -> String {
-    crate::config::LogSchema::default().host_key().to_string()
+fn host_key() -> String {
+    crate::config::log_schema().host_key().to_string()
 }
 
 inventory::submit! {
@@ -78,7 +78,7 @@ impl GenerateConfig for HecSinkConfig {
         toml::Value::try_from(Self {
             token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
             endpoint: "endpoint".to_owned(),
-            host_key: default_host_key(),
+            host_key: host_key(),
             indexed_fields: vec![],
             index: None,
             sourcetype: None,
@@ -143,10 +143,11 @@ impl HttpSink for HecSinkConfig {
         let sourcetype = self.sourcetype.as_ref().and_then(|sourcetype| {
             sourcetype
                 .render_string(&event)
-                .map_err(|missing_keys| {
-                    emit!(SplunkMissingKeys {
-                        field: "sourcetype",
-                        keys: &missing_keys
+                .map_err(|error| {
+                    emit!(TemplateRenderingFailed {
+                        error,
+                        field: Some("sourcetype"),
+                        drop_event: false,
                     });
                 })
                 .ok()
@@ -155,10 +156,11 @@ impl HttpSink for HecSinkConfig {
         let source = self.source.as_ref().and_then(|source| {
             source
                 .render_string(&event)
-                .map_err(|missing_keys| {
-                    emit!(SplunkMissingKeys {
-                        field: "source",
-                        keys: &missing_keys
+                .map_err(|error| {
+                    emit!(TemplateRenderingFailed {
+                        error,
+                        field: Some("source"),
+                        drop_event: false,
                     });
                 })
                 .ok()
@@ -167,10 +169,11 @@ impl HttpSink for HecSinkConfig {
         let index = self.index.as_ref().and_then(|index| {
             index
                 .render_string(&event)
-                .map_err(|missing_keys| {
-                    emit!(SplunkMissingKeys {
-                        field: "index",
-                        keys: &missing_keys
+                .map_err(|error| {
+                    emit!(TemplateRenderingFailed {
+                        error,
+                        field: Some("index"),
+                        drop_event: false,
                     });
                 })
                 .ok()

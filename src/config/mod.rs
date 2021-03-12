@@ -35,8 +35,11 @@ pub mod watcher;
 pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
-pub use loading::{load_from_paths, load_from_str, merge_path_lists, process_paths, CONFIG_PATHS};
-pub use log_schema::{log_schema, LogSchema, LOG_SCHEMA};
+pub use loading::{
+    load_builder_from_paths, load_from_paths, load_from_str, merge_path_lists, process_paths,
+    CONFIG_PATHS,
+};
+pub use log_schema::{init_log_schema, log_schema, LogSchema};
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
 
@@ -53,7 +56,7 @@ pub struct Config {
     expansions: IndexMap<String, Vec<String>>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(default)]
 pub struct GlobalOptions {
     #[serde(default = "default_data_dir")]
@@ -519,19 +522,6 @@ impl Config {
             .cloned()
             .unwrap_or_else(|| vec![String::from(identifier)])
     }
-}
-
-fn handle_warnings(warnings: Vec<String>, deny_warnings: bool) -> Result<(), Vec<String>> {
-    if !warnings.is_empty() {
-        if deny_warnings {
-            return Err(warnings);
-        } else {
-            for warning in warnings {
-                warn!("{}", &warning);
-            }
-        }
-    }
-    Ok(())
 }
 
 #[cfg(all(

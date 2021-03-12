@@ -1,13 +1,14 @@
 use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    internal_events::TemplateRenderingFailed,
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         BatchConfig,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     Event,
 };
 use futures::{
@@ -39,7 +40,7 @@ enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
     KafkaCreateFailed { source: KafkaError },
     #[snafu(display("invalid topic template: {}", source))]
-    TopicTemplate { source: TemplateError },
+    TopicTemplate { source: TemplateParseError },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -277,8 +278,12 @@ impl Sink<Event> for KafkaSink {
             "Expected `poll_ready` to be called first."
         );
 
-        let topic = self.topic.render_string(&item).map_err(|missing_keys| {
-            error!(message = "Missing keys for topic.", missing_keys = ?missing_keys);
+        let topic = self.topic.render_string(&item).map_err(|error| {
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("topic"),
+                drop_event: true,
+            });
         })?;
 
         let timestamp_ms = match &item {
@@ -371,10 +376,10 @@ async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
         .render_string(&Event::from(""))
     {
         Ok(topic) => Some(topic),
-        Err(missing_keys) => {
+        Err(error) => {
             warn!(
                 message = "Could not generate topic for healthcheck.",
-                ?missing_keys
+                %error,
             );
             None
         }

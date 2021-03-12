@@ -3,13 +3,13 @@ package metadata
 remap: functions: append: {
 	category: "Array"
 	description: """
-		Appends the `items` to the end of the `value`.
+		Appends each item in the `items` array to the end of the `value` array.
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: "The array"
+			description: "The initial array"
 			required:    true
 			type: ["array"]
 		},
@@ -27,7 +27,7 @@ remap: functions: append: {
 		{
 			title: "Append to an array"
 			source: """
-				 append([1, 2], [3, 4])
+				append([1, 2], [3, 4])
 				"""
 			return: [1, 2, 3, 4]
 		},

@@ -37,6 +37,7 @@ pub use object::Object;
 pub use op::Op;
 pub use predicate::Predicate;
 pub use query::Query;
+pub use query::Target;
 pub use unary::Unary;
 pub use variable::Variable;
 

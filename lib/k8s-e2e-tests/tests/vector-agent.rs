@@ -562,6 +562,10 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap()
             .is_empty());
         assert_eq!(val["kubernetes"]["container_name"], "test-pod");
+        assert!(!val["kubernetes"]["container_id"]
+            .as_str()
+            .unwrap()
+            .is_empty());
         assert_eq!(val["kubernetes"]["container_image"], BUSYBOX_IMAGE);
 
         // Request to stop the flow.

@@ -62,6 +62,8 @@ mod join;
 mod length;
 #[cfg(feature = "log")]
 mod log;
+#[cfg(any(feature = "parse_common_log", feature = "parse_apache_log"))]
+mod log_util;
 #[cfg(feature = "match")]
 mod r#match;
 #[cfg(feature = "md5")]
@@ -74,6 +76,8 @@ mod now;
 mod object;
 #[cfg(feature = "only_fields")]
 mod only_fields;
+#[cfg(feature = "parse_apache_log")]
+mod parse_apache_log;
 #[cfg(feature = "parse_aws_alb_log")]
 mod parse_aws_alb_log;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
@@ -92,6 +96,8 @@ mod parse_grok;
 mod parse_json;
 #[cfg(feature = "parse_key_value")]
 mod parse_key_value;
+#[cfg(feature = "parse_logfmt")]
+mod parse_logfmt;
 #[cfg(feature = "parse_regex")]
 mod parse_regex;
 #[cfg(feature = "parse_regex_all")]
@@ -130,6 +136,8 @@ mod string;
 mod strip_ansi_escape_codes;
 #[cfg(feature = "strip_whitespace")]
 mod strip_whitespace;
+#[cfg(feature = "tag_types_externally")]
+mod tag_types_externally;
 #[cfg(feature = "timestamp")]
 mod timestamp;
 #[cfg(feature = "to_bool")]
@@ -233,6 +241,8 @@ pub use now::Now;
 pub use object::Object;
 #[cfg(feature = "only_fields")]
 pub use only_fields::OnlyFields;
+#[cfg(feature = "parse_apache_log")]
+pub use parse_apache_log::ParseApacheLog;
 #[cfg(feature = "parse_aws_alb_log")]
 pub use parse_aws_alb_log::ParseAwsAlbLog;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
@@ -251,6 +261,8 @@ pub use parse_grok::ParseGrok;
 pub use parse_json::ParseJson;
 #[cfg(feature = "parse_key_value")]
 pub use parse_key_value::ParseKeyValue;
+#[cfg(feature = "parse_logfmt")]
+pub use parse_logfmt::ParseLogFmt;
 #[cfg(feature = "parse_regex")]
 pub use parse_regex::ParseRegex;
 #[cfg(feature = "parse_regex_all")]
@@ -289,6 +301,8 @@ pub use string::String;
 pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
 #[cfg(feature = "strip_whitespace")]
 pub use strip_whitespace::StripWhitespace;
+#[cfg(feature = "tag_types_externally")]
+pub use tag_types_externally::TagTypesExternally;
 #[cfg(feature = "timestamp")]
 pub use timestamp::Timestamp;
 #[cfg(feature = "to_bool")]
@@ -408,10 +422,14 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseGrok),
         #[cfg(feature = "parse_json")]
         Box::new(ParseJson),
+        #[cfg(feature = "parse_apache_log")]
+        Box::new(ParseApacheLog),
         #[cfg(feature = "parse_common_log")]
         Box::new(ParseCommonLog),
         #[cfg(feature = "parse_key_value")]
         Box::new(ParseKeyValue),
+        #[cfg(feature = "parse_logfmt")]
+        Box::new(ParseLogFmt),
         #[cfg(feature = "parse_regex")]
         Box::new(ParseRegex),
         #[cfg(feature = "parse_regex_all")]
@@ -452,6 +470,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(StripAnsiEscapeCodes),
         #[cfg(feature = "strip_whitespace")]
         Box::new(StripWhitespace),
+        #[cfg(feature = "tag_types_externally")]
+        Box::new(TagTypesExternally),
         #[cfg(feature = "timestamp")]
         Box::new(Timestamp),
         #[cfg(feature = "to_bool")]

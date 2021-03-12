@@ -1,4 +1,4 @@
-use super::{builder::ConfigBuilder, format, handle_warnings, vars, Config, Format, FormatHint};
+use super::{builder::ConfigBuilder, format, vars, Config, Format, FormatHint};
 use glob::glob;
 use lazy_static::lazy_static;
 use std::{
@@ -76,17 +76,20 @@ pub fn process_paths(config_paths: &[(PathBuf, FormatHint)]) -> Option<Vec<(Path
     Some(paths)
 }
 
-pub fn load_from_paths(
-    config_paths: &[(PathBuf, FormatHint)],
-    deny_warnings: bool,
-) -> Result<Config, Vec<String>> {
-    load_builder_from_paths(config_paths, deny_warnings)?.build_with(deny_warnings)
+pub fn load_from_paths(config_paths: &[(PathBuf, FormatHint)]) -> Result<Config, Vec<String>> {
+    let (builder, load_warnings) = load_builder_from_paths(config_paths)?;
+    let (config, build_warnings) = builder.build_with_warnings()?;
+
+    for warning in load_warnings.into_iter().chain(build_warnings) {
+        warn!("{}", warning);
+    }
+
+    Ok(config)
 }
 
 pub fn load_builder_from_paths(
     config_paths: &[(PathBuf, FormatHint)],
-    deny_warnings: bool,
-) -> Result<ConfigBuilder, Vec<String>> {
+) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
     let mut inputs = Vec::new();
     let mut errors = Vec::new();
 
@@ -99,32 +102,42 @@ pub fn load_builder_from_paths(
     }
 
     if errors.is_empty() {
-        load_from_inputs(inputs, deny_warnings)
+        load_from_inputs(inputs)
     } else {
         Err(errors)
     }
 }
 
 pub fn load_from_str(input: &str, format: FormatHint) -> Result<Config, Vec<String>> {
-    load_from_inputs(std::iter::once((input.as_bytes(), format)), false)?.build()
+    let (builder, load_warnings) = load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
+    let (config, build_warnings) = builder.build_with_warnings()?;
+
+    for warning in load_warnings.into_iter().chain(build_warnings) {
+        warn!("{}", warning);
+    }
+
+    Ok(config)
 }
 
 fn load_from_inputs(
     inputs: impl IntoIterator<Item = (impl std::io::Read, FormatHint)>,
-    deny_warnings: bool,
-) -> Result<ConfigBuilder, Vec<String>> {
+) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
     let mut config = Config::builder();
     let mut errors = Vec::new();
+    let mut warnings = Vec::new();
 
     for (input, format) in inputs {
-        if let Err(errs) = load(input, format, deny_warnings).and_then(|n| config.append(n)) {
+        if let Err(errs) = load(input, format).and_then(|(n, mut warn)| {
+            warnings.append(&mut warn);
+            config.append(n)
+        }) {
             // TODO: add back paths
             errors.extend(errs.iter().map(|e| e.to_string()));
         }
     }
 
     if errors.is_empty() {
-        Ok(config)
+        Ok((config, warnings))
     } else {
         Err(errors)
     }
@@ -148,8 +161,7 @@ fn open_config(path: &Path) -> Option<File> {
 fn load(
     mut input: impl std::io::Read,
     format: FormatHint,
-    deny_warnings: bool,
-) -> Result<ConfigBuilder, Vec<String>> {
+) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
     let mut source_string = String::new();
     input
         .read_to_string(&mut source_string)
@@ -162,7 +174,6 @@ fn load(
         }
     }
     let (with_vars, warnings) = vars::interpolate(&source_string, &vars);
-    handle_warnings(warnings, deny_warnings)?;
 
-    format::deserialize(&with_vars, format)
+    format::deserialize(&with_vars, format).map(|builder| (builder, warnings))
 }

@@ -63,7 +63,7 @@ enum Error {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
-    #[serde(default = "default_host_key")]
+    #[serde(default = "host_key")]
     host_key: String,
     docker_host: Option<String>,
     tls: Option<DockerTlsConfig>,
@@ -88,7 +88,7 @@ pub struct DockerTlsConfig {
 impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
-            host_key: default_host_key(),
+            host_key: host_key(),
             docker_host: None,
             tls: None,
             exclude_containers: None,
@@ -103,7 +103,7 @@ impl Default for DockerLogsConfig {
     }
 }
 
-fn default_host_key() -> String {
+fn host_key() -> String {
     log_schema().host_key().to_string()
 }
 

@@ -36,29 +36,3 @@ impl Expression for GetHostnameFn {
         TypeDef::new().fallible().bytes()
     }
 }
-
-/*
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use shared::btreemap;
-
-    remap::test_type_def![static_def {
-        expr: |_| GetHostnameFn,
-        def: TypeDef {
-            fallible: true,
-            kind: value::Kind::Bytes,
-            ..Default::default()
-        },
-    }];
-
-    #[test]
-    fn get_hostname() {
-        let mut state = state::Program::default();
-        let mut object: Value = btreemap! {}.into();
-        let value = GetHostnameFn.execute(&mut state, &mut object).unwrap();
-
-        assert!(matches!(&value, Value::Bytes(_)));
-    }
-}
-*/

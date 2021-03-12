@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.12.0"
+version = "0.13.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -120,7 +120,7 @@ tower-layer = "0.3.1"
 # Serde
 serde = { version = "1.0.117", features = ["derive"] }
 serde_json = { version = "1.0.33", features = ["raw_value"] }
-serde_yaml = "0.8.13"
+serde_yaml = { version ="0.8.13" }
 
 # Prost
 prost = "0.7.0"
@@ -157,7 +157,7 @@ bytesize = { version = "1.0.0", optional = true }
 chrono = { version = "0.4.19", features = ["serde"] }
 cidr-utils = "0.5.0"
 colored = "2.0"
-dashmap = "3"
+dashmap = "4"
 db-key = "0.0.5"
 derivative = "2.1.1"
 dirs-next = { version = "2.0.0", optional = true }
@@ -175,7 +175,7 @@ hostname = "0.3.1"
 http = "0.2"
 hyper = { version = "0.14", features = ["full"] }
 hyper-openssl = "0.9.1"
-indexmap = {version = "1.5.1", features = ["serde-1"]}
+indexmap = {version = "1.6.2", features = ["serde"]}
 indoc = "1.0.3"
 inventory = "0.1.10"
 jemallocator = { version = "0.3.0", optional = true }
@@ -187,7 +187,7 @@ logfmt = { version = "0.0.2", optional = true }
 lru = { version = "0.6.3", optional = true }
 maxminddb = { version = "0.17.0", optional = true }
 mongodb = { version = "1.1.1", optional = true }
-nats = { version = "0.8.6", optional = true }
+async-nats = { version = "0.9.4", optional = true }
 nom = { version = "6.0.1", optional = true }
 notify = "4.0.14"
 num_cpus = "1.10.0"
@@ -252,7 +252,7 @@ built = { version = "0.4.4", features = ["chrono", "git2"] }
 approx = "0.4.0"
 assert_cmd = "1.0.2"
 base64 = "0.13"
-criterion = "0.3"
+criterion = { version = "0.3", features = ["html_reports"] }
 httpmock = "0.5.2"
 libc = "0.2.80"
 libz-sys = "1.1.2"
@@ -278,8 +278,6 @@ default-msvc = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sourc
 default-musl = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-all", "vrl-cli"]
 default-no-api-client = ["api", "leveldb", "rdkafka-plain", "sinks", "sources", "transforms", "unix", "vendor-all", "vrl-cli"]
 default-no-vrl-cli = ["api", "leveldb", "rdkafka-plain", "sinks", "sources", "transforms", "unix", "vendor-all"]
-# The docs feature specifies which packages are included in the Rustdoc available at https://rustdoc.vector.dev
-docs = ["api", "sinks", "sources", "transforms"]
 
 all-logs = ["sinks-logs", "sources-logs", "transforms-logs"]
 all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]
@@ -287,13 +285,13 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl"]
+target-aarch64-unknown-linux-gnu = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
+target-aarch64-unknown-linux-musl = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
 # TODO: Enable leveldb here for armv7-unknown-linux-musleabihf
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl"]
-target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl"]
-target-x86_64-unknown-linux-gnu = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-all"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
+target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka-cmake", "sinks", "sources", "transforms", "vendor-libz", "vendor-openssl", "vrl-cli"]
+target-x86_64-unknown-linux-gnu = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-all", "vrl-cli"]
+target-x86_64-unknown-linux-musl = ["api", "api-client", "leveldb", "rdkafka-cmake", "sinks", "sources", "transforms", "unix", "vendor-libz", "vendor-openssl", "vrl-cli"]
 
 # Enables `rdkafka` dependency.
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
@@ -315,7 +313,7 @@ wasm = ["lucet-runtime", "lucet-wasi", "lucetc", "vector-wasm"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
-kubernetes = ["evmap", "k8s-openapi"]
+kubernetes = ["k8s-openapi", "evmap"]
 
 # API
 api = [
@@ -540,7 +538,7 @@ sinks-influxdb = ["bytesize"]
 sinks-kafka = []
 sinks-logdna = ["bytesize"]
 sinks-loki = ["bytesize", "uuid"]
-sinks-nats = ["nats"]
+sinks-nats = ["async-nats"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-papertrail = ["syslog"]
 sinks-prometheus = ["prometheus-parser", "snap", "sources-utils-tls"]

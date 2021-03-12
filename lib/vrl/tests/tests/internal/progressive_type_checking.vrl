@@ -16,7 +16,7 @@
 # }
 
 ok, .err = to_string(.foo)
-.foo1 = upcase(ok) ?? "should be a string"
+.foo1 = upcase(ok)
 
 ok = slice!(.foo, 1)
 .foo2 = push(ok, "baz") ?? "not an array"

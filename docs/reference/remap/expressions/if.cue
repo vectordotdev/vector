@@ -40,6 +40,7 @@ remap: expressions: if: {
 			source: #"""
 				if false {
 					# not evaluated
+					null
 				}
 				"""#
 			return: null
@@ -49,6 +50,7 @@ remap: expressions: if: {
 			source: #"""
 				if false {
 					# not evaluated
+					null
 				} else {
 					"Hello, World!"
 				}
@@ -60,8 +62,10 @@ remap: expressions: if: {
 			source: #"""
 				if false {
 					# not evaluated
+					null
 				} else if false {
 					# not evaluated
+					null
 				} else {
 					"Hello, World!"
 				}

@@ -4,6 +4,7 @@ use crate::parser::{Ident, Node};
 use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
 use diagnostic::{DiagnosticError, Label, Note, Urls};
 use std::fmt;
+use tracing::{span, Level};
 
 #[derive(Clone)]
 pub struct FunctionCall {
@@ -165,16 +166,10 @@ impl FunctionCall {
             .compile(list)
             .map_err(|error| Error::Compilation { call_span, error })?;
 
-        let mut type_def = expr.type_def(state);
-
-        if maybe_fallible_arguments {
-            type_def.fallible = true;
-        }
-
         // Asking for an infallible function to abort on error makes no sense.
         // We consider this an error at compile-time, because it makes the
         // resulting program incorrectly convey this function call might fail.
-        if abort_on_error && !type_def.is_fallible() {
+        if abort_on_error && !maybe_fallible_arguments && !expr.type_def(state).is_fallible() {
             return Err(Error::AbortInfallible {
                 ident_span,
                 abort_span: Span::new(ident_span.end(), ident_span.end() + 1),
@@ -209,16 +204,18 @@ impl FunctionCall {
 
 impl Expression for FunctionCall {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        self.expr.resolve(ctx).map_err(|mut err| {
-            err.message = format!(
-                r#"function call error for "{}" at ({}:{}): {}"#,
-                self.ident,
-                self.span.start(),
-                self.span.end(),
-                err.message
-            );
+        span!(Level::ERROR, "remap", vrl_position = &self.span.start()).in_scope(|| {
+            self.expr.resolve(ctx).map_err(|mut err| {
+                err.message = format!(
+                    r#"function call error for "{}" at ({}:{}): {}"#,
+                    self.ident,
+                    self.span.start(),
+                    self.span.end(),
+                    err.message
+                );
 
-            err
+                err
+            })
         })
     }
 
