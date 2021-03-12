@@ -304,6 +304,7 @@ jobs:
       - test-linux
       - test-mac
       - test-windows
+      - test-vrl
       - check-component-features
       - checks
     runs-on: ubuntu-20.04
