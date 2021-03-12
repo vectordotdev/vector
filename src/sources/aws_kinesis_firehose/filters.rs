@@ -7,7 +7,7 @@ use crate::{
     internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
     Pipeline,
 };
-use bytes05::{buf::BufExt, Bytes};
+use bytes::{Buf, Bytes};
 use chrono::Utc;
 use flate2::read::GzDecoder;
 use snafu::ResultExt;

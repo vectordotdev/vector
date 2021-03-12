@@ -863,9 +863,6 @@ name = "bytes"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e4cec68f03f32e44924783795810fa50a7035d8c8ebe78580ad7e6c703fba38"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "bytes"
@@ -8118,7 +8115,6 @@ dependencies = [
  "bloom",
  "bollard",
  "built",
- "bytes 0.5.6",
  "bytes 1.0.1",
  "bytesize",
  "chrono",
