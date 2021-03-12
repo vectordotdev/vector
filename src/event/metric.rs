@@ -936,6 +936,7 @@ mod test {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 3.0 },
             )
+            .with_timestamp(Some(ts()))
         )
     }
 
@@ -964,6 +965,7 @@ mod test {
                 MetricKind::Incremental,
                 MetricValue::Gauge { value: -1.0 },
             )
+            .with_timestamp(Some(ts()))
         )
     }
 
@@ -998,6 +1000,7 @@ mod test {
                     values: vec!["old".into(), "new".into()].into_iter().collect()
                 },
             )
+            .with_timestamp(Some(ts()))
         )
     }
 
@@ -1035,6 +1038,7 @@ mod test {
                     statistic: StatisticKind::Histogram
                 },
             )
+            .with_timestamp(Some(ts()))
         )
     }
 
