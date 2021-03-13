@@ -817,6 +817,7 @@ mod reload_tests {
     use std::net::{SocketAddr, TcpListener};
     use std::time::Duration;
     use tokio::time::sleep;
+    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     #[tokio::test]
     async fn topology_reuse_old_port() {
@@ -1077,7 +1078,8 @@ mod reload_tests {
         old_address: SocketAddr,
         new_address: SocketAddr,
     ) {
-        let (mut topology, mut crash) = start_topology(old_config, false).await;
+        let (mut topology, crash) = start_topology(old_config, false).await;
+        let mut crash_stream = UnboundedReceiverStream::new(crash);
 
         // Wait for sink to come online
         wait_for_tcp(old_address).await;
@@ -1095,7 +1097,7 @@ mod reload_tests {
 
         tokio::select! {
             _ = wait_for_tcp(new_address) => {}//Success
-            _ = crash.next() => panic!(),
+            _ = crash_stream.next() => panic!(),
         }
     }
 }

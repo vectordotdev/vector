@@ -343,6 +343,7 @@ mod tests {
         tls::MaybeTlsSettings,
     };
     use tokio::{sync::mpsc, time};
+    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     const PROMETHEUS_ADDRESS_TLS: &str = "127.0.0.1:9102";
 
@@ -365,7 +366,7 @@ mod tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(rx)));
+        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
 
         let (_name, event) = create_metric_gauge(None, 123.4);
         tx.send(event).expect("Failed to send.");

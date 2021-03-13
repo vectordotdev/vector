@@ -9,6 +9,7 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::time::{sleep, Duration};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use vector::{
     config::{self, GlobalOptions, SinkConfig, SinkContext, SourceConfig},
     shutdown::ShutdownSignal,
@@ -97,7 +98,7 @@ async fn test_sink_panic() {
     sleep(Duration::from_millis(100)).await;
 
     let _ = std::panic::take_hook();
-    assert!(crash.next().await.is_some());
+    assert!(UnboundedReceiverStream::new(crash).next().await.is_some());
     topology.stop().await;
     sleep(Duration::from_millis(100)).await;
 
@@ -181,7 +182,7 @@ async fn test_sink_error() {
     send_lines(in_addr, input_lines.clone()).await.unwrap();
     sleep(Duration::from_millis(100)).await;
 
-    assert!(crash.next().await.is_some());
+    assert!(UnboundedReceiverStream::new(crash).next().await.is_some());
     topology.stop().await;
     sleep(Duration::from_millis(100)).await;
 
@@ -248,7 +249,7 @@ async fn test_source_error() {
     send_lines(in_addr, input_lines.clone()).await.unwrap();
     sleep(Duration::from_millis(100)).await;
 
-    assert!(crash.next().await.is_some());
+    assert!(UnboundedReceiverStream::new(crash).next().await.is_some());
     topology.stop().await;
     sleep(Duration::from_millis(100)).await;
 
@@ -317,7 +318,7 @@ async fn test_source_panic() {
     sleep(Duration::from_millis(100)).await;
     let _ = std::panic::take_hook();
 
-    assert!(crash.next().await.is_some());
+    assert!(UnboundedReceiverStream::new(crash).next().await.is_some());
     topology.stop().await;
     sleep(Duration::from_millis(100)).await;
 
