@@ -200,7 +200,7 @@ mod test {
             task::Poll,
         };
         use tokio::{
-            io::{AsyncRead, AsyncWriteExt},
+            io::{AsyncRead, AsyncWriteExt, ReadBuf},
             net::TcpStream,
             sync::mpsc,
             task::yield_now,
@@ -270,9 +270,10 @@ mod test {
                             }
                         }
 
-                        return match Pin::new(&mut stream).poll_read(cx, &mut [0u8; 11]) {
-                            Poll::Ready(Ok(n)) => {
-                                if n == 0 {
+                        let mut buf = ReadBuf::new(&mut [0u8; 11]);
+                        return match Pin::new(&mut stream).poll_read(cx, &mut buf) {
+                            Poll::Ready(Ok(())) => {
+                                if buf.filled().is_empty() {
                                     Poll::Ready(())
                                 } else {
                                     msg_counter1.fetch_add(1, Ordering::SeqCst);
