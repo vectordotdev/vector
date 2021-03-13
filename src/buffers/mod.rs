@@ -277,10 +277,10 @@ mod test {
 
             let mut rx = Box::pin(rx);
 
-            assert_eq!(rx.as_mut().poll_next(cx), Poll::Ready(Some(1)));
-            assert_eq!(rx.as_mut().poll_next(cx), Poll::Ready(Some(2)));
-            assert_eq!(rx.as_mut().poll_next(cx), Poll::Ready(Some(3)));
-            assert_eq!(rx.as_mut().poll_next(cx), Poll::Pending);
+            assert_eq!(rx.as_mut().poll_recv(cx), Poll::Ready(Some(1)));
+            assert_eq!(rx.as_mut().poll_recv(cx), Poll::Ready(Some(2)));
+            assert_eq!(rx.as_mut().poll_recv(cx), Poll::Ready(Some(3)));
+            assert_eq!(rx.as_mut().poll_recv(cx), Poll::Pending);
         })
         .await;
     }
