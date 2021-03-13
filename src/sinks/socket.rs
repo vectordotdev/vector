@@ -270,12 +270,14 @@ mod test {
                                 // for the reference to the stream could not be met.
                                 tokio::runtime::Runtime::new()
                                     .unwrap()
-                                    .block_on(stream.get_ref().unwrap().shutdown());
+                                    .block_on(stream.shutdown())
+                                    .unwrap();
                                 close_rx = None;
                             }
                         }
 
-                        let mut buf = ReadBuf::new(&mut [0u8; 11]);
+                        let mut buf = [0u8; 11];
+                        let mut buf = ReadBuf::new(&mut buf);
                         return match Pin::new(&mut stream).poll_read(cx, &mut buf) {
                             Poll::Ready(Ok(())) => {
                                 if buf.filled().is_empty() {

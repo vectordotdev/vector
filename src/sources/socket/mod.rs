@@ -295,7 +295,7 @@ mod test {
         wait_for_tcp(addr).await;
         send_lines(addr, lines.into_iter()).await.unwrap();
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
 
         let event = stream.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().message_key()], "short".into());
@@ -338,7 +338,7 @@ mod test {
             .await
             .unwrap();
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
 
         let event = stream.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().message_key()], "short".into());
@@ -393,7 +393,7 @@ mod test {
         .await
         .unwrap();
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
 
         let event = stream.next().await.unwrap();
         assert_eq!(

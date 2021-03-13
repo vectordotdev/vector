@@ -214,7 +214,7 @@ mod tests {
 
         let lines = &["one", "two", "three", "four"];
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..5 {
             let event = stream.next().await.unwrap();
@@ -235,7 +235,7 @@ mod tests {
         )
         .await;
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..5 {
             assert!(stream.next().await.is_some());
@@ -254,7 +254,7 @@ mod tests {
         )
         .await;
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
 
         for n in 0..5 {
             let event = stream.next().await.unwrap();
@@ -277,7 +277,7 @@ mod tests {
         )
         .await;
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..3 {
             assert!(stream.next().await.is_some());
@@ -296,7 +296,7 @@ mod tests {
         )
         .await;
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..5 {
             assert!(stream.next().await.is_some());
@@ -312,7 +312,7 @@ mod tests {
         )
         .await;
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..5 {
             assert!(stream.next().await.is_some());
@@ -328,7 +328,7 @@ mod tests {
         )
         .await;
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..5 {
             assert!(stream.next().await.is_some());
@@ -344,7 +344,7 @@ mod tests {
         )
         .await;
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..5 {
             assert!(stream.next().await.is_some());
@@ -361,7 +361,7 @@ mod tests {
         )
         .await;
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..5 {
             let event = stream.next().await.unwrap();

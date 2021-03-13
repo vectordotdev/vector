@@ -534,7 +534,7 @@ mod tests {
 
         sink.run(stream::iter(events)).await.unwrap();
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
         let output = stream.next().await.unwrap();
 
         let request = &output.0;
@@ -596,7 +596,7 @@ mod tests {
 
         sink.run(stream::iter(events)).await.unwrap();
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
         let output = stream.next().await.unwrap();
 
         let request = &output.0;

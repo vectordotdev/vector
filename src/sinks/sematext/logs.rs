@@ -152,7 +152,7 @@ mod tests {
         let (expected, events) = random_lines_with_stream(100, 10);
         sink.run(events).await.unwrap();
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
         let output = stream.next().await.unwrap();
 
         // A stream of `serde_json::Value`

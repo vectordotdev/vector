@@ -139,6 +139,25 @@ impl<S> MaybeTlsIncomingStream<S> {
     }
 }
 
+impl<T> MaybeTlsIncomingStream<T>
+where
+    T: tokio::io::AsyncWriteExt + Unpin,
+{
+    pub async fn shutdown(&mut self) -> io::Result<()> {
+        use super::MaybeTls;
+
+        match &mut self.state {
+            StreamState::Accepted(ref mut stream) => match stream {
+                MaybeTls::Raw(ref mut s) => s.shutdown().await,
+                MaybeTls::Tls(s) => s.get_mut().shutdown().await,
+            },
+            StreamState::Accepting(_) | StreamState::AcceptError(_) => {
+                Err(io::ErrorKind::NotConnected.into())
+            }
+        }
+    }
+}
+
 impl MaybeTlsIncomingStream<TcpStream> {
     pub(super) fn new(
         stream: TcpStream,

@@ -299,7 +299,7 @@ mod test {
         let mut sink = FramedWrite::new(stream, encoder);
         sink.send(out.into()).await.unwrap();
 
-        let stream = sink.into_inner();
+        let mut stream = sink.into_inner();
         thread::sleep(Duration::from_secs(2));
         stream.shutdown().await.unwrap();
         drop(trigger_shutdown);

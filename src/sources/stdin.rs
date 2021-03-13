@@ -169,7 +169,7 @@ mod tests {
             .await
             .unwrap();
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
 
         let event = stream.next().await;
         assert_eq!(

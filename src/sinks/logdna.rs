@@ -395,7 +395,7 @@ mod tests {
 
         sink.run(stream::iter(events)).await.unwrap();
 
-        let stream = ReceiverStream::new(rx);
+        let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..partitions.len() {
             let output = stream.next().await.unwrap();
