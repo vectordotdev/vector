@@ -846,7 +846,7 @@ mod tests {
             drop(trigger_shutdown);
             shutdown_done.await;
 
-            let received = wait_with_timeout(rx.into_future()).await.0.unwrap();
+            let received = wait_with_timeout(rx.recv()).await.unwrap();
             assert_eq!(
                 received.as_log()["file"].to_string_lossy(),
                 path.to_str().unwrap()
@@ -880,7 +880,7 @@ mod tests {
             drop(trigger_shutdown);
             shutdown_done.await;
 
-            let received = wait_with_timeout(rx.into_future()).await.0.unwrap();
+            let received = wait_with_timeout(rx.recv()).await.unwrap();
             assert_eq!(
                 received.as_log()["source"].to_string_lossy(),
                 path.to_str().unwrap()
@@ -914,7 +914,7 @@ mod tests {
             drop(trigger_shutdown);
             shutdown_done.await;
 
-            let received = wait_with_timeout(rx.into_future()).await.0.unwrap();
+            let received = wait_with_timeout(rx.recv()).await.unwrap();
             assert_eq!(
                 received.as_log().keys().collect::<HashSet<_>>(),
                 vec![

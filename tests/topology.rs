@@ -116,7 +116,7 @@ async fn topology_source_and_sink() {
 async fn topology_multiple_sources() {
     let (mut in1, source1) = source();
     let (mut in2, source2) = source();
-    let (out1, sink1) = sink(10);
+    let (mut out1, sink1) = sink(10);
 
     let mut config = Config::builder();
     config.add_source("in1", source1);
@@ -130,11 +130,11 @@ async fn topology_multiple_sources() {
 
     in1.send(event1.clone()).await.unwrap();
 
-    let (out_event1, out1) = out1.into_future().await;
+    let out_event1 = out1.recv().await;
 
     in2.send(event2.clone()).await.unwrap();
 
-    let (out_event2, _out1) = out1.into_future().await;
+    let out_event2 = out1.recv().await;
 
     topology.stop().await;
 
