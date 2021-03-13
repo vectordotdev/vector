@@ -4,19 +4,23 @@ use metrics::{counter, histogram};
 use std::time::Instant;
 
 #[derive(Debug)]
-pub struct ApacheMetricsEventReceived {
+pub struct ApacheMetricsEventReceived<'a> {
     pub byte_size: usize,
     pub count: usize,
+    pub url: &'a str,
 }
 
-impl InternalEvent for ApacheMetricsEventReceived {
+impl<'a> InternalEvent for ApacheMetricsEventReceived<'a> {
     fn emit_logs(&self) {
         debug!(message = "Scraped events.", count = ?self.count);
     }
 
     fn emit_metrics(&self) {
         counter!("processed_events_total", self.count as u64);
-        counter!("events_in_total", self.count as u64);
+        counter!(
+            "events_in_total", self.count as u64,
+            "url" => self.url.to_owned(),
+        );
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }

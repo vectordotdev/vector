@@ -258,7 +258,8 @@ impl MongoDBMetrics {
         metrics.push(self.create_metric("up", gauge!(up_value), tags!(self.tags)));
 
         emit!(MongoDBMetricsEventsReceived {
-            count: metrics.len()
+            count: metrics.len(),
+            endpoint: &self.endpoint,
         });
 
         metrics

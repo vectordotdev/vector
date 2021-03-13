@@ -182,7 +182,8 @@ impl NginxMetrics {
         metrics.push(self.create_metric("up", gauge!(up_value)));
 
         emit!(NginxMetricsEventsReceived {
-            count: metrics.len()
+            count: metrics.len(),
+            endpoint: &self.endpoint
         });
 
         metrics
