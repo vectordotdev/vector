@@ -152,8 +152,8 @@ mod test {
         }
 
         // Our model is only concerned with the first valid delimiter in the
-        // chunk stream. As such, discover which that it and record it
-        // specially.
+        // chunk stream. As such, discover that first valid delimiter and record
+        // it specially.
         let mut first_delim: Option<DelimDetails> = None;
         for fact in &facts {
             if fact.within_max_size {
