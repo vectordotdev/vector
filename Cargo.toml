@@ -81,7 +81,7 @@ futures = { version = "0.3", default-features = false, features = ["compat", "io
 futures01 = { package = "futures", version = "0.1.25" }
 tokio = { version = "1.0.1", features = ["full"] }
 tokio-openssl = "0.6.1"
-tokio-stream = "0.1.2"
+tokio-stream = { version = "0.1.2", features = ["net"] }
 tokio-util = { version = "0.6.2", features = ["codec", "time"] }
 
 # Tracing

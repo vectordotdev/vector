@@ -98,7 +98,7 @@ mod test {
         net::TcpListener,
         time::{sleep, timeout, Duration},
     };
-    use tokio_stream::wrappers::{IntervalStream, ReceiverStream};
+    use tokio_stream::wrappers::{IntervalStream, ReceiverStream, TcpListenerStream};
     use tokio_util::codec::{FramedRead, LinesCodec};
 
     #[test]
@@ -343,9 +343,7 @@ mod test {
 
         // First listener
         let mut count = 20usize;
-        TcpListener::bind(addr)
-            .await
-            .unwrap()
+        TcpListenerStream::new(TcpListener::bind(addr).await.unwrap())
             .next()
             .await
             .unwrap()
