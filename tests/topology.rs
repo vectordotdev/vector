@@ -10,8 +10,8 @@ use std::{
         Arc,
     },
 };
-
 use tokio::time::{sleep, Duration};
+use tokio_stream::wrappers::ReceiverStream;
 use vector::{config::Config, event::Event, test_util::start_topology, topology};
 
 fn basic_config() -> Config {
@@ -72,7 +72,7 @@ async fn topology_shutdown_while_active() {
 
     // Now that shutdown has begun we should be able to drain the Sink without blocking forever,
     // as the source should shut down and close its output channel.
-    let processed_events = out1.collect::<Vec<_>>().await;
+    let processed_events = ReceiverStream::new(out1).collect::<Vec<_>>().await;
     assert_eq!(
         processed_events.len(),
         source_event_total.load(Ordering::Relaxed)
@@ -107,7 +107,7 @@ async fn topology_source_and_sink() {
 
     topology.stop().await;
 
-    let res = out1.collect::<Vec<_>>().await;
+    let res = ReceiverStream::new(out1).collect::<Vec<_>>().await;
 
     assert_eq!(vec![event], res);
 }
@@ -161,8 +161,8 @@ async fn topology_multiple_sinks() {
 
     topology.stop().await;
 
-    let res1 = out1.collect::<Vec<_>>().await;
-    let res2 = out2.collect::<Vec<_>>().await;
+    let res1 = ReceiverStream::new(out1).collect::<Vec<_>>().await;
+    let res2 = ReceiverStream::new(out2).collect::<Vec<_>>().await;
 
     assert_eq!(vec![event.clone()], res1);
     assert_eq!(vec![event], res2);
@@ -189,7 +189,10 @@ async fn topology_transform_chain() {
 
     topology.stop().await;
 
-    let res = out1.map(into_message).collect::<Vec<_>>().await;
+    let res = ReceiverStream::new(out1)
+        .map(into_message)
+        .collect::<Vec<_>>()
+        .await;
 
     assert_eq!(vec!["this first second"], res);
 }
@@ -220,7 +223,7 @@ async fn topology_remove_one_source() {
 
     let event1 = Event::from("this");
     let event2 = Event::from("that");
-    let h_out1 = tokio::spawn(out1.collect::<Vec<_>>());
+    let h_out1 = tokio::spawn(ReceiverStream::new(out1).collect::<Vec<_>>());
     in1.send(event1.clone()).await.unwrap();
     in2.send(event2.clone()).await.unwrap_err();
     topology.stop().await;
@@ -257,8 +260,8 @@ async fn topology_remove_one_sink() {
 
     topology.stop().await;
 
-    let res1 = out1.collect::<Vec<_>>().await;
-    let res2 = out2.collect::<Vec<_>>().await;
+    let res1 = ReceiverStream::new(out1).collect::<Vec<_>>().await;
+    let res2 = ReceiverStream::new(out2).collect::<Vec<_>>().await;
 
     assert_eq!(vec![event], res1);
     assert_eq!(Vec::<Event>::new(), res2);
@@ -292,7 +295,11 @@ async fn topology_remove_one_transform() {
         .unwrap());
 
     let event = Event::from("this");
-    let h_out1 = tokio::spawn(out1.map(into_message).collect::<Vec<_>>());
+    let h_out1 = tokio::spawn(
+        ReceiverStream::new(out1)
+            .map(into_message)
+            .collect::<Vec<_>>(),
+    );
     in1.send(event.clone()).await.unwrap();
     topology.stop().await;
     let res = h_out1.await.unwrap();
@@ -325,8 +332,8 @@ async fn topology_swap_source() {
     let event1 = Event::from("this");
     let event2 = Event::from("that");
 
-    let h_out1v1 = tokio::spawn(out1v1.collect::<Vec<_>>());
-    let h_out1v2 = tokio::spawn(out1v2.collect::<Vec<_>>());
+    let h_out1v1 = tokio::spawn(ReceiverStream::new(out1v1).collect::<Vec<_>>());
+    let h_out1v2 = tokio::spawn(ReceiverStream::new(out1v2).collect::<Vec<_>>());
     in1.send(event1.clone()).await.unwrap_err();
     in2.send(event2.clone()).await.unwrap();
     topology.stop().await;
@@ -360,8 +367,8 @@ async fn topology_swap_sink() {
         .unwrap());
 
     let event = Event::from("this");
-    let h_out1 = tokio::spawn(out1.collect::<Vec<_>>());
-    let h_out2 = tokio::spawn(out2.collect::<Vec<_>>());
+    let h_out1 = tokio::spawn(ReceiverStream::new(out1).collect::<Vec<_>>());
+    let h_out2 = tokio::spawn(ReceiverStream::new(out2).collect::<Vec<_>>());
     in1.send(event.clone()).await.unwrap();
     topology.stop().await;
 
@@ -399,8 +406,16 @@ async fn topology_swap_transform() {
         .unwrap());
 
     let event = Event::from("this");
-    let h_out1v1 = tokio::spawn(out1v1.map(into_message).collect::<Vec<_>>());
-    let h_out1v2 = tokio::spawn(out1v2.map(into_message).collect::<Vec<_>>());
+    let h_out1v1 = tokio::spawn(
+        ReceiverStream::new(out1v1)
+            .map(into_message)
+            .collect::<Vec<_>>(),
+    );
+    let h_out1v2 = tokio::spawn(
+        ReceiverStream::new(out1v2)
+            .map(into_message)
+            .collect::<Vec<_>>(),
+    );
     in1.send(event.clone()).await.unwrap();
     topology.stop().await;
     let res1v1 = h_out1v1.await.unwrap();
@@ -438,7 +453,7 @@ async fn topology_swap_transform_is_atomic() {
         .map(Ok)
         .forward(in1.sink_map_err(|e| panic!("{:?}", e)))
         .map(|_| ());
-    let output = out1.for_each(move |_| {
+    let output = ReceiverStream::new(out1).for_each(move |_| {
         recv_counter.fetch_add(1, Ordering::Release);
         future::ready(())
     });

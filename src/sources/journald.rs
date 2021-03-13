@@ -588,6 +588,7 @@ mod tests {
         io,
         time::{sleep, timeout, Duration},
     };
+    use tokio_stream::wrappers::ReceiverStream;
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
@@ -683,7 +684,9 @@ mod tests {
         sleep(Duration::from_millis(100)).await;
         drop(trigger);
 
-        timeout(Duration::from_secs(1), rx.collect()).await.unwrap()
+        timeout(Duration::from_secs(1), ReceiverStream::new(rx).collect())
+            .await
+            .unwrap()
     }
 
     #[tokio::test]

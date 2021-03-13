@@ -250,6 +250,7 @@ mod tests {
     use http::HeaderMap;
     use indoc::indoc;
     use prometheus_parser::proto;
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -389,27 +390,28 @@ mod tests {
 
         drop(trigger);
 
-        rx.map(|(parts, body)| {
-            assert_eq!(parts.method, "POST");
-            assert_eq!(parts.uri.path(), "/write");
-            let headers = parts.headers;
-            assert_eq!(headers["x-prometheus-remote-write-version"], "0.1.0");
-            assert_eq!(headers["content-encoding"], "snappy");
-            assert_eq!(headers["content-type"], "application/x-protobuf");
+        ReceiverStream::new(rx)
+            .map(|(parts, body)| {
+                assert_eq!(parts.method, "POST");
+                assert_eq!(parts.uri.path(), "/write");
+                let headers = parts.headers;
+                assert_eq!(headers["x-prometheus-remote-write-version"], "0.1.0");
+                assert_eq!(headers["content-encoding"], "snappy");
+                assert_eq!(headers["content-type"], "application/x-protobuf");
 
-            if config.auth.is_some() {
-                assert!(headers.contains_key("authorization"));
-            }
+                if config.auth.is_some() {
+                    assert!(headers.contains_key("authorization"));
+                }
 
-            let decoded = snap::raw::Decoder::new()
-                .decompress_vec(&body)
-                .expect("Invalid snappy compressed data");
-            let request =
-                proto::WriteRequest::decode(Bytes::from(decoded)).expect("Invalid protobuf");
-            (headers, request)
-        })
-        .collect::<Vec<_>>()
-        .await
+                let decoded = snap::raw::Decoder::new()
+                    .decompress_vec(&body)
+                    .expect("Invalid snappy compressed data");
+                let request =
+                    proto::WriteRequest::decode(Bytes::from(decoded)).expect("Invalid protobuf");
+                (headers, request)
+            })
+            .collect::<Vec<_>>()
+            .await
     }
 
     pub(super) fn create_event(name: String, value: f64) -> Event {

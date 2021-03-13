@@ -513,6 +513,7 @@ mod integration_tests {
     use super::*;
     use crate::{config::GlobalOptions, event::Event, test_util::trace_init};
     use futures::{SinkExt, StreamExt};
+    use tokio_stream::wrappers::ReceiverStream;
 
     const HOST: &str = "http://localhost:8111";
 
@@ -536,7 +537,7 @@ mod integration_tests {
             .into_task();
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut rx = transform.transform(Box::pin(rx));
+        let stream = transform.transform(Box::pin(ReceiverStream::new(rx)));
 
         // We need to sleep to let the background task fetch the data.
         sleep(Duration::from_secs(1)).await;
@@ -544,7 +545,7 @@ mod integration_tests {
         let event = Event::new_empty_log();
         tx.send(event).await.unwrap();
 
-        let event = rx.next().await.unwrap();
+        let event = stream.next().await.unwrap();
         let log = event.as_log();
 
         assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
@@ -578,7 +579,7 @@ mod integration_tests {
             .into_task();
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut rx = transform.transform(Box::pin(rx));
+        let stream = transform.transform(Box::pin(ReceiverStream::new(rx)));
 
         // We need to sleep to let the background task fetch the data.
         sleep(Duration::from_secs(1)).await;
@@ -586,7 +587,7 @@ mod integration_tests {
         let event = Event::new_empty_log();
         tx.send(event).await.unwrap();
 
-        let event = rx.next().await.unwrap();
+        let event = stream.next().await.unwrap();
         let log = event.as_log();
 
         assert_eq!(log.get("availability-zone"), None);
@@ -615,7 +616,7 @@ mod integration_tests {
                 .into_task();
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut rx = transform.transform(Box::pin(rx));
+            let stream = transform.transform(Box::pin(ReceiverStream::new(rx)));
 
             // We need to sleep to let the background task fetch the data.
             sleep(Duration::from_secs(1)).await;
@@ -623,7 +624,7 @@ mod integration_tests {
             let event = Event::new_empty_log();
             tx.send(event).await.unwrap();
 
-            let event = rx.next().await.unwrap();
+            let event = stream.next().await.unwrap();
             let log = event.as_log();
 
             assert_eq!(
@@ -650,7 +651,7 @@ mod integration_tests {
                 .into_task();
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut rx = transform.transform(Box::pin(rx));
+            let stream = transform.transform(Box::pin(ReceiverStream::new(rx)));
 
             // We need to sleep to let the background task fetch the data.
             sleep(Duration::from_secs(1)).await;
@@ -658,7 +659,7 @@ mod integration_tests {
             let event = Event::new_empty_log();
             tx.send(event).await.unwrap();
 
-            let event = rx.next().await.unwrap();
+            let event = stream.next().await.unwrap();
             let log = event.as_log();
 
             assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));

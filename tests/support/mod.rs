@@ -25,6 +25,7 @@ use std::{
     task::Context,
 };
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 use tracing::{error, info};
 use vector::{
     buffers::Acker,
@@ -150,11 +151,12 @@ impl SourceConfig for MockSourceConfig {
     ) -> Result<Source, vector::Error> {
         let wrapped = self.receiver.clone();
         let event_counter = self.event_counter.clone();
-        let mut recv = wrapped.lock().unwrap().take().unwrap();
         let mut shutdown = Some(shutdown);
         let mut _token = None;
         Ok(Box::pin(async move {
             stream::poll_fn(move |cx| {
+                let mut recv = wrapped.lock().unwrap().take().unwrap();
+
                 if let Some(until) = shutdown.as_mut() {
                     match until.poll_unpin(cx) {
                         Poll::Ready(res) => {
@@ -166,7 +168,7 @@ impl SourceConfig for MockSourceConfig {
                     }
                 }
 
-                recv.poll_next_unpin(cx)
+                ReceiverStream::new(recv).poll_next_unpin(cx)
             })
             .inspect(move |_| {
                 if let Some(counter) = &event_counter {

@@ -1193,14 +1193,15 @@ mod tests {
         drop(trigger_shutdown);
 
         let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
+            ReceiverStream::new(rx)
+                .map(|event| {
+                    event
+                        .as_log()
+                        .get(log_schema().message_key())
+                        .unwrap()
+                        .clone()
+                })
+                .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1254,14 +1255,15 @@ mod tests {
         drop(trigger_shutdown);
 
         let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
+            ReceiverStream::new(rx)
+                .map(|event| {
+                    event
+                        .as_log()
+                        .get(log_schema().message_key())
+                        .unwrap()
+                        .clone()
+                })
+                .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1328,14 +1330,15 @@ mod tests {
         drop(trigger_shutdown);
 
         let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
+            ReceiverStream::new(rx)
+                .map(|event| {
+                    event
+                        .as_log()
+                        .get(log_schema().message_key())
+                        .unwrap()
+                        .clone()
+                })
+                .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1393,14 +1396,15 @@ mod tests {
         drop(trigger_shutdown);
 
         let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
+            ReceiverStream::new(rx)
+                .map(|event| {
+                    event
+                        .as_log()
+                        .get(log_schema().message_key())
+                        .unwrap()
+                        .clone()
+                })
+                .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1456,14 +1460,15 @@ mod tests {
         drop(trigger_shutdown);
 
         let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
+            ReceiverStream::new(rx)
+                .map(|event| {
+                    event
+                        .as_log()
+                        .get(log_schema().message_key())
+                        .unwrap()
+                        .clone()
+                })
+                .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1516,14 +1521,15 @@ mod tests {
         drop(trigger_shutdown);
 
         let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
+            ReceiverStream::new(rx)
+                .map(|event| {
+                    event
+                        .as_log()
+                        .get(log_schema().message_key())
+                        .unwrap()
+                        .clone()
+                })
+                .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1562,14 +1568,15 @@ mod tests {
         drop(trigger_shutdown);
 
         let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
+            ReceiverStream::new(rx)
+                .map(|event| {
+                    event
+                        .as_log()
+                        .get(log_schema().message_key())
+                        .unwrap()
+                        .clone()
+                })
+                .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1605,14 +1612,15 @@ mod tests {
         drop(trigger_shutdown);
 
         let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
+            ReceiverStream::new(rx)
+                .map(|event| {
+                    event
+                        .as_log()
+                        .get(log_schema().message_key())
+                        .unwrap()
+                        .clone()
+                })
+                .collect::<Vec<_>>(),
         )
         .await;
 
@@ -1658,14 +1666,15 @@ mod tests {
         drop(trigger_shutdown);
 
         let received = wait_with_timeout(
-            rx.map(|event| {
-                event
-                    .as_log()
-                    .get(log_schema().message_key())
-                    .unwrap()
-                    .clone()
-            })
-            .collect::<Vec<_>>(),
+            ReceiverStream::new(rx)
+                .map(|event| {
+                    event
+                        .as_log()
+                        .get(log_schema().message_key())
+                        .unwrap()
+                        .clone()
+                })
+                .collect::<Vec<_>>(),
         )
         .await;
 

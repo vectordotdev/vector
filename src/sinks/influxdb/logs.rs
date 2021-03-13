@@ -253,6 +253,7 @@ mod tests {
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
     use indoc::indoc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -533,7 +534,8 @@ mod tests {
 
         sink.run(stream::iter(events)).await.unwrap();
 
-        let output = rx.next().await.unwrap();
+        let stream = ReceiverStream::new(rx);
+        let output = stream.next().await.unwrap();
 
         let request = &output.0;
         let query = request.uri.query().unwrap();
@@ -594,7 +596,8 @@ mod tests {
 
         sink.run(stream::iter(events)).await.unwrap();
 
-        let output = rx.next().await.unwrap();
+        let stream = ReceiverStream::new(rx);
+        let output = stream.next().await.unwrap();
 
         let request = &output.0;
         let query = request.uri.query().unwrap();

@@ -293,12 +293,12 @@ mod test {
         wait_for_tcp(addr).await;
         send_lines(addr, lines.into_iter()).await.unwrap();
 
-        let rx = ReceiverStream::new(rx);
+        let stream = ReceiverStream::new(rx);
 
-        let event = rx.next().await.unwrap();
+        let event = stream.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().message_key()], "short".into());
 
-        let event = rx.next().await.unwrap();
+        let event = stream.next().await.unwrap();
         assert_eq!(
             event.as_log()[log_schema().message_key()],
             "more short".into()
@@ -336,12 +336,12 @@ mod test {
             .await
             .unwrap();
 
-        let rx = ReceiverStream::new(rx);
+        let stream = ReceiverStream::new(rx);
 
-        let event = rx.next().await.unwrap();
+        let event = stream.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().message_key()], "short".into());
 
-        let event = rx.next().await.unwrap();
+        let event = stream.next().await.unwrap();
         assert_eq!(
             event.as_log()[log_schema().message_key()],
             "more short".into()
@@ -391,15 +391,15 @@ mod test {
         .await
         .unwrap();
 
-        let rx = ReceiverStream::new(rx);
+        let stream = ReceiverStream::new(rx);
 
-        let event = rx.next().await.unwrap();
+        let event = stream.next().await.unwrap();
         assert_eq!(
             event.as_log()[crate::config::log_schema().message_key()],
             "short".into()
         );
 
-        let event = rx.next().await.unwrap();
+        let event = stream.next().await.unwrap();
         assert_eq!(
             event.as_log()[crate::config::log_schema().message_key()],
             "more short".into()

@@ -98,6 +98,7 @@ mod test {
         net::TcpListener,
         time::{sleep, timeout, Duration},
     };
+    use tokio_stream::wrappers::ReceiverStream;
     use tokio_util::codec::{FramedRead, LinesCodec};
 
     #[test]
@@ -230,7 +231,7 @@ mod test {
         let (sink, _healthcheck) = config.build(context).await.unwrap();
         let (mut sender, receiver) = mpsc::channel::<Option<Event>>(1);
         let jh1 = tokio::spawn(async move {
-            let stream = receiver
+            let stream = ReceiverStream::new(receiver)
                 .take_while(|event| ready(event.is_some()))
                 .map(|event| event.unwrap())
                 .boxed();

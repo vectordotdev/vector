@@ -313,6 +313,7 @@ mod tests {
     use futures::StreamExt;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -344,7 +345,10 @@ mod tests {
 
         let _ = sink.run(events).await.unwrap();
 
-        let output = rx.take(expected.len()).collect::<Vec<_>>().await;
+        let output = ReceiverStream::new(rx)
+            .take(expected.len())
+            .collect::<Vec<_>>()
+            .await;
 
         for (i, val) in output.iter().enumerate() {
             assert_eq!(val.0.headers.get("Content-Type").unwrap(), "text/plain");
@@ -377,7 +381,10 @@ mod tests {
 
         let _ = sink.run(events).await.unwrap();
 
-        let output = rx.take(expected.len()).collect::<Vec<_>>().await;
+        let output = ReceiverStream::new(rx)
+            .take(expected.len())
+            .collect::<Vec<_>>()
+            .await;
 
         for (i, val) in output.iter().enumerate() {
             assert_eq!(

@@ -351,6 +351,7 @@ mod tests {
     };
     use futures::stream;
     use std::convert::TryInto;
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -511,7 +512,7 @@ mod tests {
 
         let (mut tx, rx) = tokio::sync::mpsc::channel(1);
 
-        let _ = tokio::spawn(async move { sink.run(Box::pin(rx)).await });
+        let _ = tokio::spawn(async move { sink.run(Box::pin(ReceiverStream::new(rx))).await });
 
         // send initial payload
         for line in input.clone() {

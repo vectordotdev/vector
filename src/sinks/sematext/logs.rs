@@ -120,6 +120,7 @@ mod tests {
     };
     use futures::StreamExt;
     use indoc::indoc;
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -151,7 +152,8 @@ mod tests {
         let (expected, events) = random_lines_with_stream(100, 10);
         sink.run(events).await.unwrap();
 
-        let output = rx.next().await.unwrap();
+        let stream = ReceiverStream::new(rx);
+        let output = stream.next().await.unwrap();
 
         // A stream of `serde_json::Value`
         let json = serde_json::Deserializer::from_slice(&output.1[..])

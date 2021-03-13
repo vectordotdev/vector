@@ -177,6 +177,7 @@ mod tests {
     use hyper::Method;
     use serde_json::Value;
     use std::io::BufRead;
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -336,7 +337,7 @@ mod tests {
         pump.await.unwrap();
         drop(trigger);
 
-        let output_lines = rx
+        let output_lines = ReceiverStream::new(rx)
             .flat_map(|(parts, body)| {
                 assert_eq!(Method::POST, parts.method);
                 assert_eq!("/fake_nr", parts.uri.path());

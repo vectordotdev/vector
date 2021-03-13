@@ -312,6 +312,7 @@ mod tests {
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};
     use tokio::sync::mpsc::Receiver;
+    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -628,7 +629,7 @@ mod tests {
         pump.await.unwrap();
         drop(trigger);
 
-        let output_lines = rx
+        let output_lines = ReceiverStream::new(rx)
             .flat_map(|(parts, body)| {
                 assert_eq!(Method::POST, parts.method);
                 assert_eq!("/frames", parts.uri.path());
@@ -653,16 +654,17 @@ mod tests {
         rx: Receiver<(Parts, Bytes)>,
         assert_parts: impl Fn(Parts),
     ) -> Vec<String> {
-        rx.flat_map(|(parts, body)| {
-            assert_parts(parts);
-            stream::iter(BufReader::new(GzDecoder::new(body.reader())).lines())
-        })
-        .map(Result::unwrap)
-        .map(|line| {
-            let val: serde_json::Value = serde_json::from_str(&line).unwrap();
-            val.get("message").unwrap().as_str().unwrap().to_owned()
-        })
-        .collect::<Vec<_>>()
-        .await
+        ReceiverStream::new(rx)
+            .flat_map(|(parts, body)| {
+                assert_parts(parts);
+                stream::iter(BufReader::new(GzDecoder::new(body.reader())).lines())
+            })
+            .map(Result::unwrap)
+            .map(|line| {
+                let val: serde_json::Value = serde_json::from_str(&line).unwrap();
+                val.get("message").unwrap().as_str().unwrap().to_owned()
+            })
+            .collect::<Vec<_>>()
+            .await
     }
 }
