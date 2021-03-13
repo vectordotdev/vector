@@ -1153,12 +1153,14 @@ mod transient_state_tests {
     };
     use futures::{future, FutureExt};
     use serde::{Deserialize, Serialize};
+    use std::sync::Arc;
     use stream_cancel::{Trigger, Tripwire};
+    use tokio::sync::Mutex;
 
     #[derive(Debug, Deserialize, Serialize)]
     pub struct MockSourceConfig {
         #[serde(skip)]
-        tripwire: Option<Tripwire>,
+        tripwire: Arc<Mutex<Option<Tripwire>>>,
     }
 
     impl MockSourceConfig {
@@ -1167,7 +1169,7 @@ mod transient_state_tests {
             (
                 trigger,
                 Self {
-                    tripwire: Some(tripwire),
+                    tripwire: Arc::new(Mutex::new(Some(tripwire))),
                 },
             )
         }
@@ -1183,10 +1185,12 @@ mod transient_state_tests {
             shutdown: ShutdownSignal,
             out: Pipeline,
         ) -> Result<Source, Error> {
+            let tripwire = self.tripwire.lock().await;
+
             Ok(Box::pin(
                 future::select(
                     shutdown.map(|_| ()).boxed(),
-                    self.tripwire
+                    tripwire
                         .clone()
                         .unwrap()
                         .then(crate::stream::tripwire_handler)
