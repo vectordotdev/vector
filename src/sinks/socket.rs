@@ -200,7 +200,7 @@ mod test {
             task::Poll,
         };
         use tokio::{
-            io::AsyncRead,
+            io::{AsyncRead, AsyncWriteExt},
             net::TcpStream,
             sync::mpsc,
             task::yield_now,
@@ -265,7 +265,7 @@ mod test {
                     future::poll_fn(move |cx| loop {
                         if let Some(fut) = close_rx.as_mut() {
                             if let Poll::Ready(()) = fut.poll_unpin(cx) {
-                                stream.get_ref().unwrap().shutdown(Shutdown::Write).unwrap();
+                                tokio::spawn(stream.get_ref().unwrap().shutdown());
                                 close_rx = None;
                             }
                         }

@@ -189,6 +189,8 @@ mod test {
         },
         thread,
     };
+    #[cfg(unix)]
+    use tokio::io::AsyncWriteExt;
     use tokio::{
         task::JoinHandle,
         time::{Duration, Instant},
@@ -870,8 +872,8 @@ mod test {
         let lines = lines.collect::<Vec<_>>();
         sink.send_all(&mut stream::iter(lines)).await.unwrap();
 
-        let socket = sink.into_inner();
-        socket.shutdown(std::net::Shutdown::Both).unwrap();
+        let mut socket = sink.into_inner();
+        socket.shutdown().await.unwrap();
     }
 
     #[cfg(unix)]

@@ -7,6 +7,8 @@ use serde_json::Value;
 use sinks::socket::{self, SocketSinkConfig};
 use sinks::util::{encoding::EncodingConfig, tcp::TcpSinkConfig, Encoding};
 use std::{collections::HashMap, fmt, str::FromStr};
+#[cfg(unix)]
+use tokio::io::AsyncWriteExt;
 use tokio_util::codec::BytesCodec;
 use vector::{
     config, sinks,
@@ -109,8 +111,8 @@ async fn test_unix_stream_syslog() {
     let mut lines = stream::iter(lines).map(Ok);
     sink.send_all(&mut lines).await.unwrap();
 
-    let stream = sink.get_mut();
-    stream.shutdown(std::net::Shutdown::Both).unwrap();
+    let mut stream = sink.get_mut();
+    stream.shutdown().await.unwrap();
 
     // Otherwise some lines will be lost
     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;

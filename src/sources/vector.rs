@@ -260,7 +260,7 @@ mod test {
         stream.write(b"hello world \n").await.unwrap();
 
         thread::sleep(Duration::from_secs(2));
-        stream.shutdown(Shutdown::Both).unwrap();
+        stream.shutdown().await.unwrap();
         drop(trigger_shutdown);
         shutdown_down.await;
 
@@ -301,7 +301,7 @@ mod test {
 
         let stream = sink.into_inner();
         thread::sleep(Duration::from_secs(2));
-        stream.shutdown(Shutdown::Both).unwrap();
+        stream.shutdown().await.unwrap();
         drop(trigger_shutdown);
         shutdown_down.await;
 
