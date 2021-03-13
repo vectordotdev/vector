@@ -4,7 +4,9 @@ use crate::{
         SourceDescription,
     },
     event::Event,
-    internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
+    internal_events::{
+        HerokuLogplexEventReceived, HerokuLogplexRequestReadError, HerokuLogplexRequestReceived,
+    },
     shutdown::ShutdownSignal,
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
@@ -200,6 +202,10 @@ fn body_to_events(body: Bytes) -> Vec<Event> {
 }
 
 fn line_to_event(line: String) -> Event {
+    emit!(HerokuLogplexEventReceived {
+        byte_size: line.len()
+    });
+
     let parts = line.splitn(8, ' ').collect::<Vec<&str>>();
 
     let mut event = if parts.len() == 8 {

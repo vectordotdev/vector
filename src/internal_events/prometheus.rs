@@ -20,6 +20,7 @@ impl InternalEvent for PrometheusEventReceived {
 
     fn emit_metrics(&self) {
         counter!("processed_events_total", self.count as u64);
+        counter!("events_in_total", self.count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
@@ -115,11 +116,17 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
 #[derive(Debug)]
 pub struct PrometheusRemoteWriteReceived {
     pub count: usize,
+    pub byte_size: usize,
 }
 
 impl InternalEvent for PrometheusRemoteWriteReceived {
     fn emit_logs(&self) {
         debug!(message = "Received remote_write events.", count = ?self.count);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("events_in_total", self.count as u64);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
