@@ -98,7 +98,7 @@ mod test {
         net::TcpListener,
         time::{sleep, timeout, Duration},
     };
-    use tokio_stream::wrappers::ReceiverStream;
+    use tokio_stream::wrappers::{IntervalStream, ReceiverStream};
     use tokio_util::codec::{FramedRead, LinesCodec};
 
     #[test]
@@ -295,7 +295,7 @@ mod test {
         // Loop and check for 10 events, we should always get 10 events. Once,
         // we have 10 events we can tell the server to shutdown to simulate the
         // remote shutting down on an idle connection.
-        interval(Duration::from_millis(100))
+        IntervalStream::new(interval(Duration::from_millis(100)))
             .take(500)
             .take_while(|_| ready(msg_counter.load(Ordering::SeqCst) != 10))
             .for_each(|_| ready(()))

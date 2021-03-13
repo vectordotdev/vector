@@ -16,6 +16,7 @@ mod tests {
         time::{Duration, Instant},
     };
     use tokio::sync::oneshot;
+    use tokio_stream::wrappers::IntervalStream;
     use url::Url;
     use vector::{
         self,
@@ -42,7 +43,7 @@ mod tests {
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
         tokio::spawn(async move {
             let since = Instant::now();
-            tokio::time::interval(Duration::from_secs(1))
+            IntervalStream::new(tokio::time::interval(Duration::from_secs(1)))
                 .take_until(shutdown_rx)
                 .for_each(|_| async move { emit(Heartbeat { since }) })
                 .await
@@ -134,7 +135,7 @@ mod tests {
     fn emit_fake_generator_events() -> oneshot::Sender<()> {
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
         tokio::spawn(async move {
-            tokio::time::interval(Duration::from_millis(10))
+            IntervalStream::new(tokio::time::interval(Duration::from_millis(10)))
                 .take_until(shutdown_rx)
                 .for_each(|_| async { emit(GeneratorEventProcessed) })
                 .await
