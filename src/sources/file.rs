@@ -454,8 +454,8 @@ mod tests {
 
     async fn wait_with_timeout<F, R>(future: F) -> R
     where
-        F: Future<Output = R> + Send + 'static,
-        R: Send + 'static,
+        F: Future<Output = R> + Send,
+        R: Send,
     {
         timeout(Duration::from_secs(5), future)
             .await
