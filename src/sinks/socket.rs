@@ -265,7 +265,12 @@ mod test {
                     future::poll_fn(move |cx| loop {
                         if let Some(fut) = close_rx.as_mut() {
                             if let Poll::Ready(()) = fut.poll_unpin(cx) {
-                                tokio::spawn(stream.get_ref().unwrap().shutdown());
+                                // TODO: Figure out a way not to block the thread here.
+                                // Spawning the future with `tokio::spawn` didn't work because the lifetime requirements
+                                // for the reference to the stream could not be met.
+                                tokio::runtime::Runtime::new()
+                                    .unwrap()
+                                    .block_on(stream.get_ref().unwrap().shutdown());
                                 close_rx = None;
                             }
                         }
