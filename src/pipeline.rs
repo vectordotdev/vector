@@ -27,59 +27,6 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    /// This is an async/await version of `Sink::send_all`, implemented because
-    /// `tokio::sync::mpsc::Sender` no longer implements `poll_ready` and therefore can't easily be
-    /// wrapped with `futures::Sink`.
-    pub async fn send_stream(
-        &mut self,
-        stream: impl Stream<Item = Event>,
-    ) -> Result<(), ClosedError> {
-        tokio::pin!(stream);
-        while let Some(item) = stream.next().await {
-            // Note how this gets **swapped** with `new_working_set` in the loop.
-            // At the end of the loop, it will only contain finalized events.
-            let mut working_set = vec![item];
-            for inline in self.inlines.iter_mut() {
-                let mut new_working_set = Vec::with_capacity(working_set.len());
-                for event in working_set.drain(..) {
-                    inline.transform(&mut new_working_set, event);
-                }
-                core::mem::swap(&mut new_working_set, &mut working_set);
-            }
-            self.enqueued.extend(working_set);
-
-            if self.enqueued.len() >= 1000 {
-                self.do_flush().await?;
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn do_flush(&mut self) -> Result<(), ClosedError> {
-        while let Some(event) = self.enqueued.pop_front() {
-            match self.inner.send(event).await {
-                Ok(()) => {
-                    // we good, keep looping
-                }
-                Err(SendError(_item)) => {
-                    return Err(ClosedError);
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// TODO: Do not merge this.
-    ///
-    /// This is extracted and left to avoid compilation errors until the rest of the sources can be
-    /// moved to an alternative API. Once that is done, this, `try_flush,` and the `impl Sink`
-    /// below can be removed.
-    fn poll_ready(&mut self) -> Poll<Result<(), mpsc::error::SendError<()>>> {
-        unimplemented!()
-    }
-
     fn try_flush(
         &mut self,
         cx: &mut Context<'_>,
@@ -87,32 +34,18 @@ impl Pipeline {
         use mpsc::error::TrySendError::*;
 
         while let Some(event) = self.enqueued.pop_front() {
-            match self.poll_ready() {
-                Poll::Pending => {
+            let permit = match self.inner.try_reserve() {
+                Ok(permit) => permit,
+                Err(Full(_)) => {
                     self.enqueued.push_front(event);
                     return Poll::Pending;
                 }
-                Poll::Ready(Ok(())) => {
-                    // continue to send below
-                }
-                Poll::Ready(Err(_error)) => return Poll::Ready(Err(ClosedError)),
-            }
+                Err(Closed(_)) => return Poll::Ready(Err(ClosedError)),
+            };
 
-            match self.inner.try_send(event) {
-                Ok(()) => {
-                    // we good, keep looping
-                }
-                Err(Full(_item)) => {
-                    // We only try to send after a successful call to poll_ready, which reserves
-                    // space for us in the channel. That makes this branch unreachable as long as
-                    // the channel implementation fulfills its own contract.
-                    panic!("Channel was both ready and full; this is a bug.")
-                }
-                Err(Closed(_item)) => {
-                    return Poll::Ready(Err(ClosedError));
-                }
-            }
+            permit.send(event);
         }
+
         Poll::Ready(Ok(()))
     }
 }

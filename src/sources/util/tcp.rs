@@ -7,7 +7,7 @@ use crate::{
     Event, Pipeline,
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream, FutureExt, StreamExt, TryFutureExt};
+use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
@@ -89,6 +89,8 @@ where
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
+        let out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));
+
         let listenfd = ListenFd::from_env();
 
         Ok(Box::pin(async move {
@@ -188,7 +190,7 @@ async fn handle_stream<T>(
     source: T,
     tripwire: BoxFuture<'static, ()>,
     host: Bytes,
-    mut out: Pipeline,
+    out: impl Sink<Event> + Send + 'static,
 ) where
     <<T as TcpSource>::Decoder as tokio_util::codec::Decoder>::Item: std::marker::Send,
     T: TcpSource,
@@ -221,7 +223,7 @@ async fn handle_stream<T>(
     let mut _token = None;
     let mut shutdown = Some(shutdown);
     let mut reader = FramedRead::new(socket, source.decoder());
-    let mut stream = stream::poll_fn(move |cx| {
+    stream::poll_fn(move |cx| {
         if let Some(fut) = shutdown.as_mut() {
             match fut.poll_unpin(cx) {
                 Poll::Ready(token) => {
@@ -259,19 +261,18 @@ async fn handle_stream<T>(
         ready(match frame {
             Ok(frame) => {
                 let host = host.clone();
-                source.build_event(frame, host)
+                source.build_event(frame, host).map(Ok)
             }
             Err(error) => {
                 warn!(message = "Failed to read data from TCP source.", %error);
                 None
             }
         })
-    });
-
-    out.send_stream(&mut stream)
-        .map_err(|_| warn!(message = "Error received while processing TCP source."))
-        .map(|_| debug!("Connection closed."))
-        .await
+    })
+    .forward(out)
+    .map_err(|_| warn!(message = "Error received while processing TCP source."))
+    .map(|_| debug!("Connection closed."))
+    .await
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
