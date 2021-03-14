@@ -105,14 +105,19 @@ impl<T> BoundedSink<T> {
 
 impl<T> Sink<T> for BoundedSink<T> {
     type Error = ();
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // TODO: Do not merge this.
-        //
-        // `tokio::sync::mpsc::Sender` no longer implements `poll_ready` and therefore can't easily be wrapped with
-        // `futures::Sink`.
-        unimplemented!()
+    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        use mpsc::error::TrySendError;
+
+        match self.sender.try_reserve() {
+            Ok(_) => Poll::Ready(Ok(())),
+            Err(TrySendError::Full(_)) => Poll::Pending,
+            Err(TrySendError::Closed(_)) => {
+                error!(message = "Sender closed.");
+                Poll::Ready(Err(()))
+            }
+        }
     }
-    fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         self.sender
             .try_send(item)
             .map_err(|error| error!(message = "Sender error.", %error))
