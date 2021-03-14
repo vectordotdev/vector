@@ -1,4 +1,6 @@
-use crate::tcp::{self, TcpKeepaliveConfig};
+#[cfg(unix)]
+use crate::tcp;
+use crate::tcp::TcpKeepaliveConfig;
 use openssl::{
     error::ErrorStack,
     ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
