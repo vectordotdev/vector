@@ -6,7 +6,7 @@ use openssl::{
     ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
 };
 use snafu::{ResultExt, Snafu};
-use std::{fmt::Debug, net::SocketAddr, path::PathBuf};
+use std::{fmt::Debug, net::SocketAddr, path::PathBuf, time::Duration};
 use tokio::net::TcpStream;
 use tokio_openssl::SslStream;
 
@@ -130,14 +130,17 @@ impl MaybeTlsStream<TcpStream> {
         }
     }
 
-    // TODO: Fix.
-    pub fn set_keepalive(&mut self, _keepalive: TcpKeepaliveConfig) -> std::io::Result<()> {
-        // let stream = match self {
-        //     Self::Raw(raw) => raw,
-        //     Self::Tls(tls) => tls.get_ref(),
-        // };
+    pub fn set_keepalive(&mut self, keepalive: TcpKeepaliveConfig) -> std::io::Result<()> {
+        let stream = match self {
+            Self::Raw(raw) => raw,
+            Self::Tls(tls) => tls.get_ref(),
+        };
 
-        // stream.set_keepalive(keepalive.time_secs.map(Duration::from_secs))?;
+        if let Some(time_secs) = keepalive.time_secs {
+            let config = socket2::TcpKeepalive::new().with_time(Duration::from_secs(time_secs));
+
+            tcp::set_keepalive(stream, &config);
+        }
 
         Ok(())
     }
