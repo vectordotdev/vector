@@ -513,7 +513,6 @@ mod integration_tests {
     use super::*;
     use crate::{config::GlobalOptions, event::Event, test_util::trace_init};
     use futures::{SinkExt, StreamExt};
-    use tokio_stream::wrappers::ReceiverStream;
 
     const HOST: &str = "http://localhost:8111";
 
@@ -537,7 +536,7 @@ mod integration_tests {
             .into_task();
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let stream = transform.transform(Box::pin(ReceiverStream::new(rx)));
+        let mut stream = transform.transform(Box::pin(rx));
 
         // We need to sleep to let the background task fetch the data.
         sleep(Duration::from_secs(1)).await;
@@ -579,7 +578,7 @@ mod integration_tests {
             .into_task();
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let stream = transform.transform(Box::pin(ReceiverStream::new(rx)));
+        let mut stream = transform.transform(Box::pin(rx));
 
         // We need to sleep to let the background task fetch the data.
         sleep(Duration::from_secs(1)).await;
@@ -616,7 +615,7 @@ mod integration_tests {
                 .into_task();
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let stream = transform.transform(Box::pin(ReceiverStream::new(rx)));
+            let mut stream = transform.transform(Box::pin(rx));
 
             // We need to sleep to let the background task fetch the data.
             sleep(Duration::from_secs(1)).await;
@@ -651,7 +650,7 @@ mod integration_tests {
                 .into_task();
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let stream = transform.transform(Box::pin(ReceiverStream::new(rx)));
+            let mut stream = transform.transform(Box::pin(rx));
 
             // We need to sleep to let the background task fetch the data.
             sleep(Duration::from_secs(1)).await;

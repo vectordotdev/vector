@@ -436,6 +436,7 @@ mod integration_tests {
         client
             .put_bucket_notification_configuration(PutBucketNotificationConfigurationRequest {
                 bucket: bucket_name.clone(),
+                expected_bucket_owner: None,
                 notification_configuration: NotificationConfiguration {
                     queue_configurations: Some(vec![QueueConfiguration {
                         events: vec!["s3:ObjectCreated:*".to_string()],

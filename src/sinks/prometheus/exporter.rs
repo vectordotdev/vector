@@ -573,6 +573,7 @@ mod integration_tests {
     use chrono::Utc;
     use serde_json::Value;
     use tokio::{sync::mpsc, time};
+    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     const PROMETHEUS_ADDRESS: &str = "127.0.0.1:9101";
 
@@ -594,7 +595,7 @@ mod integration_tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(rx)));
+        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
 
         let (name, event) = tests::create_metric_gauge(None, 123.4);
         tx.send(event).expect("Failed to send.");
@@ -627,7 +628,7 @@ mod integration_tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(rx)));
+        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
 
         let (name1, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         tx.send(event).expect("Failed to send.");

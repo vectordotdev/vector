@@ -1037,12 +1037,14 @@ mod integration_tests {
     use crate::{test_util::trace_init, Pipeline};
     use futures::StreamExt;
     use tokio::time::{timeout, Duration};
+    use tokio_stream::wrappers::ReceiverStream;
 
     async fn test_instance(endpoint: &'static str) {
         let host = ClientOptions::parse(endpoint).await.unwrap().hosts[0].to_string();
         let namespace = "vector_mongodb";
 
-        let (sender, mut recv) = Pipeline::new_test();
+        let (sender, recv) = Pipeline::new_test();
+        let mut stream = ReceiverStream::new(recv);
 
         tokio::spawn(async move {
             MongoDBMetricsConfig {
@@ -1062,13 +1064,13 @@ mod integration_tests {
             .unwrap()
         });
 
-        let event = timeout(Duration::from_secs(3), recv.next())
+        let event = timeout(Duration::from_secs(3), stream.next())
             .await
             .expect("fetch metrics timeout")
             .expect("failed to get metrics from a stream");
         let mut events = vec![event];
         loop {
-            match timeout(Duration::from_millis(10), recv.next()).await {
+            match timeout(Duration::from_millis(10), stream.next()).await {
                 Ok(Some(event)) => events.push(event),
                 Ok(None) => break,
                 Err(_) => break,

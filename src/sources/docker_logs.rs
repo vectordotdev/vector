@@ -605,7 +605,7 @@ impl EventStreamBuilder {
         // Create event streamer
         let mut partial_event_merge_state = None;
 
-        let core = self.core.clone();
+        let core = Arc::clone(&self.core);
 
         let events_stream = stream
             .map(|value| {

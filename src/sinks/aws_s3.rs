@@ -575,7 +575,7 @@ mod integration_tests {
         assert_downcast_matches,
         test_util::{random_lines_with_stream, random_string},
     };
-    use bytes::{buf::BufExt, BytesMut};
+    use bytes::{Buf, BytesMut};
     use flate2::read::GzDecoder;
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;

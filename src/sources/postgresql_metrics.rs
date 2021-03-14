@@ -877,6 +877,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{test_util::trace_init, tls, Pipeline};
+    use tokio_stream::wrappers::ReceiverStream;
 
     async fn test_postgresql_metrics(
         endpoint: String,
@@ -894,7 +895,8 @@ mod integration_tests {
             Host::Unix(path) => path.to_string_lossy().to_string(),
         };
 
-        let (sender, mut recv) = Pipeline::new_test();
+        let (sender, recv) = Pipeline::new_test();
+        let mut stream = ReceiverStream::new(recv);
 
         tokio::spawn(async move {
             PostgresqlMetricsConfig {
@@ -916,13 +918,13 @@ mod integration_tests {
             .unwrap()
         });
 
-        let event = time::timeout(time::Duration::from_secs(3), recv.next())
+        let event = time::timeout(time::Duration::from_secs(3), stream.next())
             .await
             .expect("fetch metrics timeout")
             .expect("failed to get metrics from a stream");
         let mut events = vec![event];
         loop {
-            match time::timeout(time::Duration::from_millis(10), recv.next()).await {
+            match time::timeout(time::Duration::from_millis(10), stream.next()).await {
                 Ok(Some(event)) => events.push(event),
                 Ok(None) => break,
                 Err(_) => break,

@@ -798,7 +798,9 @@ mod integration_test {
         let _ = kafka_auth.apply(&mut client_config).unwrap();
 
         let mut tpl = TopicPartitionList::new();
-        tpl.add_partition(&topic, 0).set_offset(Offset::Beginning);
+        tpl.add_partition(&topic, 0)
+            .set_offset(Offset::Beginning)
+            .unwrap();
 
         let consumer: BaseConsumer = client_config.create().unwrap();
         consumer.assign(&tpl).unwrap();
