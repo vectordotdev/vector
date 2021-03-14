@@ -143,6 +143,8 @@ impl<T> MaybeTlsIncomingStream<T>
 where
     T: tokio::io::AsyncWriteExt + Unpin,
 {
+    // TODO: Fix caller so this isn't needed.
+    #[allow(dead_code)]
     pub async fn shutdown(&mut self) -> io::Result<()> {
         use super::MaybeTls;
 
