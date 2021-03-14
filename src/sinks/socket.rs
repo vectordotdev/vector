@@ -205,6 +205,7 @@ mod test {
             task::yield_now,
             time::{interval, Duration},
         };
+        use tokio_stream::wrappers::{IntervalStream, ReceiverStream};
 
         trace_init();
 
