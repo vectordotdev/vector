@@ -228,7 +228,7 @@ mod test {
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
-        let (mut sender, receiver) = mpsc::channel::<Option<Event>>(1);
+        let (sender, receiver) = mpsc::channel::<Option<Event>>(1);
         let jh1 = tokio::spawn(async move {
             let stream = ReceiverStream::new(receiver)
                 .take_while(|event| ready(event.is_some()))

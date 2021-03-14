@@ -251,7 +251,7 @@ mod test {
         let (sender, mut receiver) = mpsc::channel(200);
         tokio::spawn(async move {
             let bind_addr = next_addr();
-            let mut socket = UdpSocket::bind(bind_addr).await.unwrap();
+            let socket = UdpSocket::bind(bind_addr).await.unwrap();
             socket.connect(in_addr).await.unwrap();
             while let Some(bytes) = receiver.recv().await {
                 socket.send(bytes).await.unwrap();
@@ -303,7 +303,7 @@ mod test {
         statsd_config: StatsdConfig,
         // could use unbounded channel,
         // but we want to reserve the order messages.
-        mut sender: mpsc::Sender<&'static [u8]>,
+        sender: mpsc::Sender<&'static [u8]>,
     ) {
         let out_addr = next_addr();
 

@@ -34,7 +34,7 @@ pub fn build_test_server(
         let tx = tx.clone();
         async {
             Ok::<_, Error>(service_fn(move |req: Request<Body>| {
-                let mut tx = tx.clone();
+                let tx = tx.clone();
                 async {
                     let (parts, body) = req.into_parts();
                     tokio::spawn(async move {

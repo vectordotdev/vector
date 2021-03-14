@@ -205,7 +205,7 @@ mod tests {
     #[tokio::test]
     async fn shuffle_generator_copies_lines() {
         let message_key = log_schema().message_key();
-        let mut rx = runit(
+        let rx = runit(
             r#"format = "shuffle"
                lines = ["one", "two", "three", "four"]
                count = 5"#,
@@ -228,7 +228,7 @@ mod tests {
 
     #[tokio::test]
     async fn shuffle_generator_limits_count() {
-        let mut rx = runit(
+        let rx = runit(
             r#"format = "shuffle"
                lines = ["one", "two"]
                count = 5"#,
@@ -246,7 +246,7 @@ mod tests {
     #[tokio::test]
     async fn shuffle_generator_adds_sequence() {
         let message_key = log_schema().message_key();
-        let mut rx = runit(
+        let rx = runit(
             r#"format = "shuffle"
                lines = ["one", "two"]
                sequence = true
@@ -269,7 +269,7 @@ mod tests {
     #[tokio::test]
     async fn shuffle_generator_obeys_interval() {
         let start = Instant::now();
-        let mut rx = runit(
+        let rx = runit(
             r#"format = "shuffle"
                lines = ["one", "two"]
                count = 3
@@ -290,7 +290,7 @@ mod tests {
 
     #[tokio::test]
     async fn apache_common_format_generates_output() {
-        let mut rx = runit(
+        let rx = runit(
             r#"format = "apache_common"
             count = 5"#,
         )
@@ -306,7 +306,7 @@ mod tests {
 
     #[tokio::test]
     async fn apache_error_format_generates_output() {
-        let mut rx = runit(
+        let rx = runit(
             r#"format = "apache_error"
             count = 5"#,
         )
@@ -322,7 +322,7 @@ mod tests {
 
     #[tokio::test]
     async fn syslog_5424_format_generates_output() {
-        let mut rx = runit(
+        let rx = runit(
             r#"format = "syslog"
             count = 5"#,
         )
@@ -338,7 +338,7 @@ mod tests {
 
     #[tokio::test]
     async fn syslog_3164_format_generates_output() {
-        let mut rx = runit(
+        let rx = runit(
             r#"format = "bsd_syslog"
             count = 5"#,
         )
@@ -355,7 +355,7 @@ mod tests {
     #[tokio::test]
     async fn json_format_generates_output() {
         let message_key = log_schema().message_key();
-        let mut rx = runit(
+        let rx = runit(
             r#"format = "json"
             count = 5"#,
         )

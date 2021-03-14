@@ -428,7 +428,7 @@ mod test {
                 .with_namespace(Some("vector")),
             ),
         ];
-        let (mut tx, rx) = mpsc::channel(1);
+        let (tx, rx) = mpsc::channel(1);
 
         let socket = UdpSocket::bind(addr).await.unwrap();
         tokio::spawn(async move {

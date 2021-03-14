@@ -59,7 +59,7 @@ pub fn udp(
     let mut out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));
 
     Box::pin(async move {
-        let mut socket = UdpSocket::bind(&address)
+        let socket = UdpSocket::bind(&address)
             .await
             .expect("Failed to bind to udp listener socket");
 

@@ -435,7 +435,7 @@ impl<T> Future for CountReceiver<T> {
 impl CountReceiver<String> {
     pub fn receive_lines(addr: SocketAddr) -> CountReceiver<String> {
         CountReceiver::new(|count, tripwire, connected| async move {
-            let mut listener = TcpListener::bind(addr).await.unwrap();
+            let listener = TcpListener::bind(addr).await.unwrap();
             let stream = stream! {
                 loop {
                     yield listener.accept().await.map(|(stream, _addr)| stream)
@@ -451,7 +451,7 @@ impl CountReceiver<String> {
         P: AsRef<Path> + Send + 'static,
     {
         CountReceiver::new(|count, tripwire, connected| async move {
-            let mut listener = tokio::net::UnixListener::bind(path).unwrap();
+            let listener = tokio::net::UnixListener::bind(path).unwrap();
             let stream = stream! {
                 loop {
                     yield listener.accept().await.map(|(stream, _addr)| stream)

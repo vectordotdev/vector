@@ -269,7 +269,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_continue_after_long_line() {
-        let (tx, mut rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test();
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
@@ -309,7 +309,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_with_tls() {
-        let (tx, mut rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test();
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
@@ -352,7 +352,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_with_tls_intermediate_ca() {
-        let (tx, mut rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test();
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
@@ -828,7 +828,7 @@ mod test {
     ////////////// UNIX DATAGRAM TESTS //////////////
     #[cfg(unix)]
     async fn send_lines_unix_datagram(path: PathBuf, lines: &[&str]) {
-        let mut socket = UnixDatagram::unbound().unwrap();
+        let socket = UnixDatagram::unbound().unwrap();
         socket.connect(path).unwrap();
 
         for line in lines {

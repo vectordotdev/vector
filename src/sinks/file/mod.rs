@@ -510,7 +510,7 @@ mod tests {
         let mut sink = FileSink::new(&config, Acker::Null);
         let (mut input, _events) = random_lines_with_stream(10, 64);
 
-        let (mut tx, rx) = tokio::sync::mpsc::channel(1);
+        let (tx, rx) = tokio::sync::mpsc::channel(1);
 
         let _ = tokio::spawn(async move { sink.run(Box::pin(ReceiverStream::new(rx))).await });
 

@@ -35,12 +35,11 @@ where
     let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
 
     Box::pin(async move {
-        let mut listener =
-            UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
+        let listener = UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
         info!(message = "Listening.", path = ?listen_path, r#type = "unix");
 
         let connection_open = OpenGauge::new();
-        let mut stream = stream! {
+        let stream = stream! {
             loop {
                 yield listener.accept().await.map(|(stream, _addr)| stream)
             }

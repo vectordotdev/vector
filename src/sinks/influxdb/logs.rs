@@ -509,7 +509,7 @@ mod tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
 
-        let (mut rx, _trigger, server) = build_test_server(addr);
+        let (rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
         let lines = std::iter::repeat(())
@@ -571,7 +571,7 @@ mod tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
 
-        let (mut rx, _trigger, server) = build_test_server(addr);
+        let (rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
         let lines = std::iter::repeat(())

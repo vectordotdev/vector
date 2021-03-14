@@ -94,7 +94,7 @@ impl Application {
             }
         }
 
-        let mut rt = {
+        let rt = {
             let threads = root_opts.threads.unwrap_or_else(|| max(1, num_cpus::get()));
             runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -186,7 +186,7 @@ impl Application {
     }
 
     pub fn run(self) {
-        let mut rt = self.runtime;
+        let rt = self.runtime;
 
         let mut graceful_crash = UnboundedReceiverStream::new(self.config.graceful_crash);
         let mut topology = self.config.topology;

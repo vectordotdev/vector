@@ -111,7 +111,7 @@ async fn test_unix_stream_syslog() {
     let mut lines = stream::iter(lines).map(Ok);
     sink.send_all(&mut lines).await.unwrap();
 
-    let mut stream = sink.get_mut();
+    let stream = sink.get_mut();
     stream.shutdown().await.unwrap();
 
     // Otherwise some lines will be lost

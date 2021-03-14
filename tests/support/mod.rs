@@ -428,7 +428,7 @@ pub fn fork_test<T: std::future::Future<Output = ()>>(test_name: &'static str, f
             }
         },
         || {
-            let mut rt = runtime();
+            let rt = runtime();
             rt.block_on(fut);
         },
     )
