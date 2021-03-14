@@ -12,6 +12,7 @@ use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
 use tokio::{
+    io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
     time::sleep,
 };
@@ -86,7 +87,7 @@ where
         shutdown_timeout_secs: u64,
         tls: MaybeTlsSettings,
         receive_buffer_bytes: Option<usize>,
-        shutdown: ShutdownSignal,
+        shutdown_signal: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
         let out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));
@@ -107,7 +108,7 @@ where
                     .unwrap_or(addr)
             );
 
-            let tripwire = shutdown.clone();
+            let tripwire = shutdown_signal.clone();
             let tripwire = async move {
                 let _ = tripwire.await;
                 sleep(Duration::from_secs(shutdown_timeout_secs)).await;
@@ -115,13 +116,13 @@ where
             .shared();
 
             let connection_gauge = OpenGauge::new();
-            let shutdown_clone = shutdown.clone();
+            let shutdown_clone = shutdown_signal.clone();
 
             listener
                 .accept_stream()
                 .take_until(shutdown_clone)
                 .for_each(move |connection| {
-                    let shutdown = shutdown.clone();
+                    let shutdown_signal = shutdown_signal.clone();
                     let tripwire = tripwire.clone();
                     let source = self.clone();
                     let out = out.clone();
@@ -160,7 +161,7 @@ where
                                 connection_gauge.open(|count| emit!(ConnectionOpen { count }));
 
                             let fut = handle_stream(
-                                shutdown,
+                                shutdown_signal,
                                 socket,
                                 keepalive,
                                 receive_buffer_bytes,
@@ -183,7 +184,7 @@ where
 }
 
 async fn handle_stream<T>(
-    mut shutdown: ShutdownSignal,
+    mut shutdown_signal: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
@@ -202,7 +203,7 @@ async fn handle_stream<T>(
                 return;
             }
         },
-        _ = &mut shutdown => {
+        _ = &mut shutdown_signal => {
             return;
         }
     };
@@ -221,31 +222,36 @@ async fn handle_stream<T>(
     }
 
     let mut _token = None;
-    let mut shutdown = Some(shutdown);
+    let mut shutdown_signal = Some(shutdown_signal);
+    let mut shutdown: Option<BoxFuture<io::Result<()>>> = None;
     let mut reader = FramedRead::new(socket, source.decoder());
     stream::poll_fn(move |cx| {
-        if let Some(fut) = shutdown.as_mut() {
+        if let Some(fut) = shutdown_signal.as_mut() {
             match fut.poll_unpin(cx) {
                 Poll::Ready(token) => {
                     debug!("Start graceful shutdown.");
+                    let socket = reader.get_mut();
+
+                    // TODO: Make the shutdown work. Currently conflicts on mutably borring `reader` twice.
+                    /*
                     // Close our write part of TCP socket to signal the other side
                     // that it should stop writing and close the channel.
-                    let socket: Option<&TcpStream> = reader.get_ref().get_ref();
-                    if let Some(socket) = socket {
-                        // if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
-                        //     warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
-                        // }
-                    } else {
-                        // Connection hasn't yet been established so we are done here.
-                        debug!("Closing connection that hasn't yet been fully established.");
-                        return Poll::Ready(None);
-                    }
+                    shutdown = Some(Box::pin(socket.shutdown()));
+                     */
 
                     _token = Some(token);
-                    shutdown = None;
+                    shutdown_signal = None;
                 }
                 Poll::Pending => {}
             }
+        }
+
+        if let Some(fut) = shutdown.as_mut() {
+            if fut.poll_unpin(cx).is_pending() {
+                return Poll::Pending;
+            }
+
+            shutdown = None;
         }
 
         reader.poll_next_unpin(cx)
