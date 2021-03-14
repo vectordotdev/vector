@@ -1,7 +1,7 @@
 use crate::{internal_events::EventOut, transforms::FunctionTransform, Event};
-use futures::{task::Poll, Sink, Stream, StreamExt};
+use futures::{task::Poll, Sink};
 use std::{collections::VecDeque, fmt, pin::Pin, task::Context};
-use tokio::sync::mpsc::{self, error::SendError};
+use tokio::sync::mpsc;
 
 #[derive(Debug)]
 pub struct ClosedError;

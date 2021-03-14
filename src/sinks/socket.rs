@@ -191,7 +191,6 @@ mod test {
         use crate::tls::{self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
         use futures::{future, FutureExt, StreamExt};
         use std::{
-            net::Shutdown,
             pin::Pin,
             sync::{
                 atomic::{AtomicUsize, Ordering},
@@ -200,7 +199,7 @@ mod test {
             task::Poll,
         };
         use tokio::{
-            io::{AsyncRead, AsyncWriteExt, ReadBuf},
+            io::{AsyncRead, ReadBuf},
             net::TcpStream,
             sync::mpsc,
             task::yield_now,

@@ -250,7 +250,7 @@ impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
 mod test {
     use super::{Acker, BufferConfig, DropWhenFull, WhenFull};
     use crate::sink::BoundedSink;
-    use futures::{future, Sink, Stream};
+    use futures::{future, Sink};
     use futures01::task::AtomicTask;
     use std::{
         sync::{atomic::AtomicUsize, Arc},

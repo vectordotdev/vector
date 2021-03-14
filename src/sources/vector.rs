@@ -134,10 +134,7 @@ mod test {
         Event, Pipeline,
     };
     use futures::stream;
-    use std::{
-        net::{Shutdown, SocketAddr},
-        thread,
-    };
+    use std::{net::SocketAddr, thread};
     use tokio::{
         io::AsyncWriteExt,
         net::TcpStream,

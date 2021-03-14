@@ -12,7 +12,6 @@ use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
 use tokio::{
-    io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
     time::sleep,
 };
