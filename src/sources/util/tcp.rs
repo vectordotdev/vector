@@ -229,10 +229,11 @@ async fn handle_stream<T>(
             match fut.poll_unpin(cx) {
                 Poll::Ready(token) => {
                     debug!("Start graceful shutdown.");
-                    let socket = reader.get_mut();
 
                     // TODO: Make the shutdown work. Currently conflicts on mutably borring `reader` twice.
                     /*
+                    let socket = reader.get_mut();
+
                     // Close our write part of TCP socket to signal the other side
                     // that it should stop writing and close the channel.
                     shutdown = Some(Box::pin(socket.shutdown()));

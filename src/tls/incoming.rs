@@ -190,14 +190,15 @@ impl MaybeTlsIncomingStream<TcpStream> {
         Ok(())
     }
 
+    // TODO: Fix.
     #[cfg(feature = "sources-utils-tcp-keepalive")]
-    pub(crate) fn set_keepalive(&mut self, keepalive: TcpKeepaliveConfig) -> io::Result<()> {
-        let stream = self.get_ref().ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::NotConnected,
-                "Can't set keepalive on connection that has not been accepted yet.",
-            )
-        })?;
+    pub(crate) fn set_keepalive(&mut self, _keepalive: TcpKeepaliveConfig) -> io::Result<()> {
+        // let stream = self.get_ref().ok_or_else(|| {
+        //     io::Error::new(
+        //         io::ErrorKind::NotConnected,
+        //         "Can't set keepalive on connection that has not been accepted yet.",
+        //     )
+        // })?;
 
         // stream.set_keepalive(keepalive.time_secs.map(std::time::Duration::from_secs))?;
 

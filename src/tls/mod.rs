@@ -128,11 +128,12 @@ impl MaybeTlsStream<TcpStream> {
         }
     }
 
-    pub fn set_keepalive(&mut self, keepalive: TcpKeepaliveConfig) -> std::io::Result<()> {
-        let stream = match self {
-            Self::Raw(raw) => raw,
-            Self::Tls(tls) => tls.get_ref(),
-        };
+    // TODO: Fix.
+    pub fn set_keepalive(&mut self, _keepalive: TcpKeepaliveConfig) -> std::io::Result<()> {
+        // let stream = match self {
+        //     Self::Raw(raw) => raw,
+        //     Self::Tls(tls) => tls.get_ref(),
+        // };
 
         // stream.set_keepalive(keepalive.time_secs.map(Duration::from_secs))?;
 

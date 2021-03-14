@@ -27,10 +27,7 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    fn try_flush(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<Result<(), <Self as Sink<Event>>::Error>> {
+    fn try_flush(&mut self) -> Poll<Result<(), <Self as Sink<Event>>::Error>> {
         use mpsc::error::TrySendError::*;
 
         while let Some(event) = self.enqueued.pop_front() {
@@ -53,11 +50,14 @@ impl Pipeline {
 impl Sink<Event> for Pipeline {
     type Error = ClosedError;
 
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(
+        mut self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
         if self.enqueued.len() < MAX_ENQUEUED {
             Poll::Ready(Ok(()))
         } else {
-            self.try_flush(cx)
+            self.try_flush()
         }
     }
 
@@ -77,8 +77,11 @@ impl Sink<Event> for Pipeline {
         Ok(())
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.try_flush(cx)
+    fn poll_flush(
+        mut self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        self.try_flush()
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
