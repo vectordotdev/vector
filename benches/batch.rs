@@ -61,7 +61,7 @@ fn benchmark_batching(c: &mut Criterion) {
                             batch_sink,
                         )
                     },
-                    |(mut rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
+                    |(rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
                     criterion::BatchSize::LargeInput,
                 )
             },
@@ -86,7 +86,7 @@ fn benchmark_batching(c: &mut Criterion) {
 
                     (rt, stream::iter(input.clone()).map(Ok), batch_sink)
                 },
-                |(mut rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
+                |(rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
                 criterion::BatchSize::LargeInput,
             )
         });

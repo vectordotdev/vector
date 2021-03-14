@@ -3,7 +3,6 @@ use futures::{stream, SinkExt, Stream, StreamExt};
 use indexmap::IndexMap;
 use indoc::indoc;
 use std::pin::Pin;
-use tokio_stream::wrappers::UnboundedReceiverStream;
 use transforms::lua::v2::LuaConfig;
 use vector::{
     config::{GlobalOptions, TransformConfig},
@@ -101,7 +100,7 @@ fn bench_field_filter(c: &mut Criterion) {
 
     let benchmarks: Vec<(&str, Transform)> = vec![
         ("native", {
-            let mut rt = runtime();
+            let rt = runtime();
             rt.block_on(async move {
                 transforms::field_filter::FieldFilterConfig {
                     field: "the_field".to_string(),
@@ -160,9 +159,7 @@ fn bench_field_filter(c: &mut Criterion) {
                         futures::executor::block_on(tx.send_all(&mut stream::iter(events).map(Ok)))
                             .unwrap();
 
-                    let output = futures::executor::block_on(collect_ready(
-                        UnboundedReceiverstream::new(rx),
-                    ));
+                    let output = futures::executor::block_on(collect_ready(&mut rx));
 
                     let num = output.len();
 

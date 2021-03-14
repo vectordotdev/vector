@@ -25,7 +25,7 @@ criterion_group!(
 criterion_main!(benches);
 
 fn benchmark_remap(c: &mut Criterion) {
-    let mut rt = runtime();
+    let rt = runtime();
     let add_fields_runner = |tform: &mut Box<dyn FunctionTransform>, event: Event| {
         let mut result = Vec::with_capacity(1);
         tform.transform(&mut result, event);
