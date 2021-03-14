@@ -1,4 +1,3 @@
-#[cfg(feature = "listenfd")]
 use super::{
     CreateAcceptor, IncomingListener, MaybeTlsSettings, MaybeTlsStream, SslBuildError, TcpBind,
     TlsError, TlsSettings,
