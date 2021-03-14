@@ -98,7 +98,7 @@ mod test {
         net::TcpListener,
         time::{sleep, timeout, Duration},
     };
-    use tokio_stream::wrappers::{IntervalStream, ReceiverStream, TcpListenerStream};
+    use tokio_stream::wrappers::TcpListenerStream;
     use tokio_util::codec::{FramedRead, LinesCodec};
 
     #[test]
