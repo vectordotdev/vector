@@ -262,18 +262,22 @@ mod test {
                     let msg_counter1 = Arc::clone(&msg_counter1);
 
                     let mut stream: MaybeTlsIncomingStream<TcpStream> = connection.unwrap();
+                    let mut shutdown = None;
+
                     future::poll_fn(move |cx| loop {
                         if let Some(fut) = close_rx.as_mut() {
                             if let Poll::Ready(()) = fut.poll_unpin(cx) {
-                                // TODO: Figure out a way not to block the thread here.
-                                // Spawning the future with `tokio::spawn` didn't work because the lifetime requirements
-                                // for the reference to the stream could not be met.
-                                tokio::runtime::Runtime::new()
-                                    .unwrap()
-                                    .block_on(stream.shutdown())
-                                    .unwrap();
+                                shutdown = Some(stream.shutdown());
                                 close_rx = None;
                             }
+                        }
+
+                        if let Some(shutdown) = shutdown {
+                            if shutdown.poll(cx).is_pending() {
+                                return Poll::Pending;
+                            }
+
+                            shutdown = None;
                         }
 
                         let mut buf = [0u8; 11];
