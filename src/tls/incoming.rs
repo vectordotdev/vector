@@ -169,7 +169,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
                 async move {
                     let ssl = Ssl::new(acceptor.context()).context(SslBuildError)?;
                     let mut stream = SslStream::new(ssl, stream).context(SslBuildError)?;
-                    Pin::new(&mut stream).accept().await;
+                    Pin::new(&mut stream).accept().await.unwrap();
                     Ok(stream)
                 }
                 .boxed(),
