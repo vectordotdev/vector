@@ -262,18 +262,19 @@ mod test {
                     let msg_counter1 = Arc::clone(&msg_counter1);
 
                     let mut stream: MaybeTlsIncomingStream<TcpStream> = connection.unwrap();
-                    let mut shutdown = None;
+                    let mut shutdown: Option<future::BoxFuture<std::io::Result<()>>> = None;
 
                     future::poll_fn(move |cx| loop {
                         if let Some(fut) = close_rx.as_mut() {
                             if let Poll::Ready(()) = fut.poll_unpin(cx) {
-                                shutdown = Some(stream.shutdown());
+                                // TODO: Make the shutdown work. Currently conflicts on mutably borring `stream` twice.
+                                // shutdown = Some(Box::pin(stream.shutdown()));
                                 close_rx = None;
                             }
                         }
 
-                        if let Some(shutdown) = shutdown {
-                            if shutdown.poll(cx).is_pending() {
+                        if let Some(fut) = shutdown.as_mut() {
+                            if fut.poll_unpin(cx).is_pending() {
                                 return Poll::Pending;
                             }
 
