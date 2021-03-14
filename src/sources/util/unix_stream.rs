@@ -11,7 +11,8 @@ use async_stream::stream;
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt, StreamExt};
 use std::{future::ready, path::PathBuf};
-use tokio::net::UnixListener;
+use tokio::io::AsyncWriteExt;
+use tokio::net::{UnixListener, UnixStream};
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::field;
 use tracing_futures::Instrument;
@@ -96,9 +97,10 @@ where
                     let _ = out.send_all(&mut stream).await;
                     info!("Finished sending.");
 
-                    // TODO: Fix shutdown.
-                    // let socket: &UnixStream = stream.get_ref().get_ref().get_ref();
-                    // let _ = socket.shutdown(std::net::Shutdown::Both);
+                    let socket: &mut UnixStream = stream.get_mut().get_mut().get_mut();
+                    if let Err(error) = socket.shutdown().await {
+                        error!(message = "Failed shutting down socket.", %error);
+                    }
                 }
                 .instrument(span),
             );

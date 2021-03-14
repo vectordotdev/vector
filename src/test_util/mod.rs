@@ -29,7 +29,7 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::{
-    io::{AsyncRead, AsyncWrite, Result as IoResult},
+    io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
     net::{TcpListener, TcpStream},
     runtime,
     sync::{mpsc, oneshot},
@@ -128,9 +128,8 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     let mut lines = stream::iter(lines.into_iter()).map(Ok);
     sink.send_all(&mut lines).await.unwrap();
 
-    // TODO: Fix shutdown.
-    // let stream = sink.get_mut();
-    // stream.shutdown(Shutdown::Both).unwrap();
+    let stream = sink.get_mut();
+    stream.shutdown().await.unwrap();
 
     Ok(())
 }
@@ -164,9 +163,8 @@ pub async fn send_lines_tls(
     let mut lines = stream::iter(lines).map(Ok);
     sink.send_all(&mut lines).await.unwrap();
 
-    // TODO: Fix shutdown.
-    // let stream = sink.get_mut().get_mut();
-    // stream.shutdown(Shutdown::Both).unwrap();
+    let stream = sink.get_mut().get_mut();
+    stream.shutdown().await.unwrap();
 
     Ok(())
 }

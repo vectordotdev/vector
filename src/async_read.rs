@@ -36,6 +36,10 @@ impl<S, F> AllowReadUntil<S, F> {
     pub fn get_ref(&self) -> &S {
         &self.reader
     }
+
+    pub fn get_mut(&mut self) -> &mut S {
+        &mut self.reader
+    }
 }
 
 impl<S, F> AsyncRead for AllowReadUntil<S, F>
