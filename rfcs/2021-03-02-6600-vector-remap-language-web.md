@@ -113,7 +113,7 @@ only need to have a single endpoint, something like `/compile` or `/resolve`, fo
 
 The [wasm-pack] tool makes it trivial to publish Wasm artifacts to [npm]. We should provide an npm
 module called `vrl-wasm` or something similar with versions that correspond to versions of VRL
-(e.g. 0.12.* instead of 0.1.*). This would largely be for internal use in creating the
+(e.g. `0.12.*` instead of `0.1.*`). This would largely be for internal use in creating the
 [web app][web_app],
 though it's not inconceivable that others outside the project might use it as well at some point in
 the future by simply running `npm install vrl-wasm`.
