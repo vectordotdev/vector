@@ -256,7 +256,7 @@ httpmock = "0.5.2"
 libc = "0.2.80"
 libz-sys = "1.1.2"
 matches = "0.1.8"
-pretty_assertions = "0.6.1"
+pretty_assertions = "0.7.1"
 reqwest = { version = "0.10.9", features = ["json"] }
 rusty-fork = "0.3.0"
 tempfile = "3.0.6"
