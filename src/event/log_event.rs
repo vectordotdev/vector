@@ -290,16 +290,6 @@ impl<K: AsRef<str>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     }
 }
 
-/// Converts event into an iterator over top-level key/value pairs.
-impl IntoIterator for LogEvent {
-    type Item = (String, Value);
-    type IntoIter = std::collections::btree_map::IntoIter<String, Value>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.fields.into_iter()
-    }
-}
-
 impl Serialize for LogEvent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
