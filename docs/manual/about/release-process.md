@@ -12,13 +12,13 @@ There are a few different ways to track when there is a new release:
 
 * Follow [@vectordotdev](https://twitter.com/vectordotdev) on Twitter.
 * Heading to our [Discord server](https://discord.gg/EXXRbYCq) and watching the
-	`#announcements` channel.
+  `#announcements` channel.
 * Going to our [Github repository](https://github.com/timberio/vector) and
-	using the "watch" feature. Click "Custom" and then "Releases" to only be
-	notified for new releases.
+  using the "watch" feature. Click "Custom" and then "Releases" to only be
+  notified for new releases.
 * If you are using [one of our package
-	repositories](https://cloudsmith.io/~timber/repos/vector/packages/) you should
-	be able to see the update available when updating your package lists.
+  repositories](https://cloudsmith.io/~timber/repos/vector/packages/) you should
+  be able to see the update available when updating your package lists.
 
 ## Release cadence
 
