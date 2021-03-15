@@ -106,10 +106,9 @@ impl HttpSource for RemoteWriteSource {
         {
             body = decode(&Some("snappy".to_string()), body)?;
         }
-        let byte_size = body.len();
         let result = self.decode_body(body)?;
         let count = result.len();
-        emit!(PrometheusRemoteWriteReceived { count, byte_size });
+        emit!(PrometheusRemoteWriteReceived { count });
         Ok(result)
     }
 }

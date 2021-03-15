@@ -2,18 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub(crate) struct HerokuLogplexEventReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for HerokuLogplexEventReceived {
-    fn emit_metrics(&self) {
-        counter!("events_in_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
-    }
-}
-
-#[derive(Debug)]
 pub struct HerokuLogplexRequestReceived<'a> {
     pub msg_count: usize,
     pub frame_id: &'a str,
