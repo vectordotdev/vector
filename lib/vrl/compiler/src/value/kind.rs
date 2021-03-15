@@ -1,6 +1,9 @@
 #![allow(non_upper_case_globals)]
 
 use super::Value;
+use crate::value;
+use chrono::{TimeZone, Utc};
+use regex::Regex;
 use std::fmt;
 use std::ops::Deref;
 
@@ -99,6 +102,30 @@ impl Kind {
                 | Kind::Regex
                 | Kind::Null
         )
+    }
+
+    /// Returns the default [`Value`] for a given [`Kind`].
+    ///
+    /// If the kind is unknown (or inexact), `null` is returned as the default
+    /// value.
+    ///
+    /// These are (somewhat) arbitrary values that mostly shouldn't be used, but
+    /// are particularly useful for the "infallible assignment" expression,
+    /// where the `ok` value is set to the default value kind if the expression
+    /// results in an error.
+    pub fn default_value(self) -> Value {
+        match self {
+            Kind::Bytes => value!(""),
+            Kind::Integer => value!(0),
+            Kind::Float => value!(0.0),
+            Kind::Boolean => value!(false),
+            Kind::Object => value!({}),
+            Kind::Array => value!([]),
+            Kind::Timestamp => Utc.timestamp(0, 0).into(),
+            #[allow(clippy::trivial_regex)]
+            Kind::Regex => Regex::new("").unwrap().into(),
+            _ => Value::Null,
+        }
     }
 }
 

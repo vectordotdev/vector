@@ -127,88 +127,32 @@ impl Expression for ToIntFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use chrono::{DateTime, Utc};
-//
-//     vrl::test_type_def![
-//         boolean_infallible {
-//             expr: |_| ToIntFn { value: lit!(true).boxed() },
-//             def: TypeDef { kind: Kind::Integer, ..Default::default() },
-//         }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{DateTime, Utc};
 
-//         integer_infallible {
-//             expr: |_| ToIntFn { value: lit!(1).boxed() },
-//             def: TypeDef { kind: Kind::Integer, ..Default::default() },
-//         }
+    test_function![
+        to_int => ToInt;
 
-//         float_infallible {
-//             expr: |_| ToIntFn { value: lit!(1.0).boxed() },
-//             def: TypeDef { kind: Kind::Integer, ..Default::default() },
-//         }
+        string {
+             args: func_args![value: "20"],
+             want: Ok(20),
+             tdef: TypeDef::new().fallible().integer(),
+        }
 
-//         null_infallible {
-//             expr: |_| ToIntFn { value: lit!(null).boxed() },
-//             def: TypeDef { kind: Kind::Integer, ..Default::default() },
-//         }
+        float {
+             args: func_args![value: 20.5],
+             want: Ok(21),
+             tdef: TypeDef::new().infallible().integer(),
+        }
 
-//         string_fallible {
-//             expr: |_| ToIntFn { value: lit!("foo").boxed() },
-//             def: TypeDef { kind: Kind::Integer, ..Default::default() },
-//         }
-
-//         map_fallible {
-//             expr: |_| ToIntFn { value: map!{}.boxed() },
-//             def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
-//         }
-
-//         array_fallible {
-//             expr: |_| ToIntFn { value: array![].boxed() },
-//             def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
-//         }
-
-//         timestamp_infallible {
-//             expr: |_| ToIntFn { value: Literal::from(chrono::Utc::now()).boxed() },
-//             def: TypeDef { kind: Kind::Integer, ..Default::default() },
-//         }
-//     ];
-
-//     #[test]
-//     fn to_int() {
-//         use crate::map;
-
-//         let cases = vec![
-//             (
-//                 map!["foo": "20"],
-//                 Ok(Value::Integer(20)),
-//                 ToIntFn::new(Box::new(Path::from("foo"))),
-//             ),
-//             (
-//                 map!["foo": 20.5],
-//                 Ok(Value::Integer(20)),
-//                 ToIntFn::new(Box::new(Path::from("foo"))),
-//             ),
-//             (
-//                 map![
-//                     "foo": DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
-//                             .unwrap()
-//                             .with_timezone(&Utc),
-//                 ],
-//                 Ok(Value::Integer(1571227200)),
-//                 ToIntFn::new(Box::new(Path::from("foo"))),
-//             ),
-//         ];
-
-//         let mut state = state::Program::default();
-
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        timezone {
+             args: func_args![value: DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
+                            .unwrap()
+                            .with_timezone(&Utc)],
+             want: Ok(1571227200),
+             tdef: TypeDef::new().infallible().integer(),
+         }
+    ];
+}

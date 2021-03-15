@@ -81,44 +81,9 @@ impl Expression for DecodeBase64Fn {
     }
 }
 
-/*
 #[cfg(test)]
 mod test {
     use super::*;
-
-    test_type_def![
-        valid_charset_fallible {
-            expr: |_| DecodeBase64Fn {
-                value: lit!("foo").boxed(),
-                charset: Some(lit!("standard").boxed()),
-            },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-        }
-
-        invalid_charset_fallible {
-            expr: |_| DecodeBase64Fn {
-                value: lit!("foo").boxed(),
-                charset: Some(lit!("other").boxed()),
-            },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-        }
-
-        value_non_string_fallible {
-            expr: |_| DecodeBase64Fn {
-                value: Literal::from(127).boxed(),
-                charset: None,
-            },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-        }
-
-        all_types_wrong_fallible {
-            expr: |_| DecodeBase64Fn {
-                value: Literal::from(127).boxed(),
-                charset: Some(lit!(127).boxed()),
-            },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-        }
-    ];
 
     test_function![
         decode_base64 => DecodeBase64;
@@ -126,27 +91,31 @@ mod test {
         with_defaults {
             args: func_args![value: value!("c29tZSs9c3RyaW5nL3ZhbHVl")],
             want: Ok(value!("some+=string/value")),
+            tdef: TypeDef::new().bytes().fallible(),
         }
 
         with_standard_charset {
             args: func_args![value: value!("c29tZSs9c3RyaW5nL3ZhbHVl"), charset: value!["standard"]],
             want: Ok(value!("some+=string/value")),
+            tdef: TypeDef::new().bytes().fallible(),
         }
 
         with_urlsafe_charset {
             args: func_args![value: value!("c29tZSs9c3RyaW5nL3ZhbHVl"), charset: value!("url_safe")],
             want: Ok(value!("some+=string/value")),
+            tdef: TypeDef::new().bytes().fallible(),
         }
 
         empty_string_standard_charset {
             args: func_args![value: value!(""), charset: value!("standard")],
             want: Ok(value!("")),
+            tdef: TypeDef::new().bytes().fallible(),
         }
 
         empty_string_urlsafe_charset {
             args: func_args![value: value!(""), charset: value!("url_safe")],
             want: Ok(value!("")),
+            tdef: TypeDef::new().bytes().fallible(),
         }
     ];
 }
-*/

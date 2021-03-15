@@ -67,65 +67,27 @@ impl Expression for MatchFn {
     }
 }
 
-// #[cfg(test)]
-// #[allow(clippy::trivial_regex)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
+#[cfg(test)]
+#[allow(clippy::trivial_regex)]
+mod tests {
+    use super::*;
+    use regex::Regex;
 
-//     vrl::test_type_def![
-//         value_string {
-//             expr: |_| MatchFn {
-//                 value: Literal::from("foo").boxed(),
-//                 pattern: Regex::new("").unwrap(),
-//             },
-//             def: TypeDef { kind: Kind::Boolean, ..Default::default() },
-//         }
+    test_function![
+        r#match => Match;
 
-//         value_non_string {
-//             expr: |_| MatchFn {
-//                 value: Literal::from(1).boxed(),
-//                 pattern: Regex::new("").unwrap(),
-//             },
-//             def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
-//         }
+        yes {
+            args: func_args![value: "foobar",
+                             pattern: Value::Regex(Regex::new("\\s\\w+").unwrap().into())],
+            want: Ok(value!(false)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//         value_optional {
-//             expr: |_| MatchFn {
-//                 value: Box::new(Noop),
-//                 pattern: Regex::new("").unwrap(),
-//             },
-//             def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
-//         }
-//     ];
-
-//     #[test]
-//     fn r#match() {
-//         let cases = vec![
-//             (
-//                 map!["foo": "foobar"],
-//                 Ok(false.into()),
-//                 MatchFn::new(Box::new(Path::from("foo")), Regex::new("\\s\\w+").unwrap()),
-//             ),
-//             (
-//                 map!["foo": "foo 2 bar"],
-//                 Ok(true.into()),
-//                 MatchFn::new(
-//                     Box::new(Path::from("foo")),
-//                     Regex::new("foo \\d bar").unwrap(),
-//                 ),
-//             ),
-//         ];
-
-//         let mut state = state::Program::default();
-
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        no {
+            args: func_args![value: "foo 2 bar",
+                             pattern: Value::Regex(Regex::new("foo \\d bar").unwrap().into())],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
+    ];
+}

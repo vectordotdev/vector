@@ -46,15 +46,6 @@ struct CeilFn {
     precision: Option<Box<dyn Expression>>,
 }
 
-impl CeilFn {
-    /*
-    #[cfg(test)]
-    fn new(value: Box<dyn Expression>, precision: Option<Box<dyn Expression>>) -> Self {
-        Self { value, precision }
-    }
-    */
-}
-
 impl Expression for CeilFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let precision = match &self.precision {
@@ -81,102 +72,53 @@ impl Expression for CeilFn {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
 
-    vrl::test_type_def![
-        value_float {
-            expr: |_| CeilFn {
-                value: Literal::from(1.0).boxed(),
-                precision: None,
-            },
-            def: TypeDef { kind: Kind::Float, ..Default::default() },
+    test_function![
+        ceil => Ceil;
+
+        lower {
+            args: func_args![value: value!(1234.2)],
+            want: Ok(value!(1235.0)),
+            tdef: TypeDef::new().float(),
         }
 
-        value_integer {
-            expr: |_| CeilFn {
-                value: Literal::from(1).boxed(),
-                precision: None,
-            },
-            def: TypeDef { kind: Kind::Integer, ..Default::default() },
+        higher {
+            args: func_args![value: value!(1234.8)],
+            want: Ok(value!(1235.0)),
+            tdef: TypeDef::new().float(),
         }
 
-        value_float_or_integer {
-            expr: |_| CeilFn {
-                value: Variable::new("foo".to_owned(), None).boxed(),
-                precision: None,
-            },
-            def: TypeDef { fallible: true, kind: Kind::Integer | Kind::Float, ..Default::default() },
+        integer {
+            args: func_args![value: value!(1234)],
+            want: Ok(value!(1234)),
+            tdef: TypeDef::new().integer(),
         }
 
-        fallible_precision {
-            expr: |_| CeilFn {
-                value: Literal::from(1).boxed(),
-                precision: Some(Variable::new("foo".to_owned(), None).boxed()),
-            },
-            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+        precision {
+            args: func_args![value: value!(1234.39429),
+                             precision: value!(1)
+            ],
+            want: Ok(value!(1234.4)),
+            tdef: TypeDef::new().float(),
+        }
+
+        bigger_precision {
+            args: func_args![value: value!(1234.56725),
+                             precision: value!(4)
+            ],
+            want: Ok(value!(1234.5673)),
+            tdef: TypeDef::new().float(),
+        }
+
+        huge_number {
+             args: func_args![value: value!(9876543210123456789098765432101234567890987654321.987654321),
+                             precision: value!(5)
+            ],
+            want: Ok(value!(9876543210123456789098765432101234567890987654321.98766)),
+            tdef: TypeDef::new().float(),
         }
     ];
-
-    #[test]
-    fn ceil() {
-        let cases = vec![
-            (
-                btreemap! { "foo" => 1234.2 },
-                Ok(1235.0.into()),
-                CeilFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                btreemap! {},
-                Ok(1235.0.into()),
-                CeilFn::new(Box::new(Literal::from(Value::Float(1234.8))), None),
-            ),
-            (
-                btreemap! {},
-                Ok(1234.into()),
-                CeilFn::new(Box::new(Literal::from(Value::Integer(1234))), None),
-            ),
-            (
-                btreemap! {},
-                Ok(1234.4.into()),
-                CeilFn::new(
-                    Box::new(Literal::from(Value::Float(1234.39429))),
-                    Some(Box::new(Literal::from(1))),
-                ),
-            ),
-            (
-                btreemap! {},
-                Ok(1234.5673.into()),
-                CeilFn::new(
-                    Box::new(Literal::from(Value::Float(1234.56725))),
-                    Some(Box::new(Literal::from(4))),
-                ),
-            ),
-            (
-                btreemap! {},
-                Ok(9876543210123456789098765432101234567890987654321.98766.into()),
-                CeilFn::new(
-                    Box::new(Literal::from(
-                        9876543210123456789098765432101234567890987654321.987654321,
-                    )),
-                    Some(Box::new(Literal::from(5))),
-                ),
-            ),
-        ];
-
-        let mut state = state::Program::default();
-
-        for (object, exp, func) in cases {
-            let mut object: Value = object.into();
-            let got = func
-                .resolve(&mut ctx)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
-        }
-    }
 }
-*/

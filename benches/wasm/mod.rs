@@ -83,7 +83,7 @@ pub fn add_fields(criterion: &mut Criterion) {
                         .test_key2 = "test_value2"
                     "#}
                     .to_string(),
-                    drop_on_err: false,
+                    drop_on_error: false,
                 })
                 .unwrap(),
             ),

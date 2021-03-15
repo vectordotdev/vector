@@ -122,78 +122,23 @@ impl Expression for ToStringFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//
-//     vrl::test_type_def![
-//         boolean_infallible {
-//             expr: |_| ToStringFn { value: lit!(true).boxed() },
-//             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-//         }
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//         integer_infallible {
-//             expr: |_| ToStringFn { value: lit!(1).boxed() },
-//             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-//         }
+    test_function![
+        to_string => ToString;
 
-//         float_infallible {
-//             expr: |_| ToStringFn { value: lit!(1.0).boxed() },
-//             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-//         }
+        integer {
+            args: func_args![value: 20],
+            want: Ok("20"),
+            tdef: TypeDef::new().bytes(),
+        }
 
-//         null_infallible {
-//             expr: |_| ToStringFn { value: lit!(null).boxed() },
-//             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-//         }
-
-//         string_infallible {
-//             expr: |_| ToStringFn { value: lit!("foo").boxed() },
-//             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-//         }
-
-//         timestamp_infallible {
-//             expr: |_| ToStringFn { value: Literal::from(chrono::Utc::now()).boxed() },
-//             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-//         }
-
-//         map_fallible {
-//             expr: |_| ToStringFn { value: map!{}.boxed() },
-//             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-//         }
-
-//         array_fallible {
-//             expr: |_| ToStringFn { value: array![].boxed() },
-//             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-//         }
-//     ];
-
-//     #[test]
-//     fn to_string() {
-//         use crate::map;
-
-//         let cases = vec![
-//             (
-//                 map!["foo": 20],
-//                 Ok(Value::from("20")),
-//                 ToStringFn::new(Box::new(Path::from("foo"))),
-//             ),
-//             (
-//                 map!["foo": 20.5],
-//                 Ok(Value::from("20.5")),
-//                 ToStringFn::new(Box::new(Path::from("foo"))),
-//             ),
-//         ];
-
-//         let mut state = state::Program::default();
-
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        float {
+            args: func_args![value: 20.5],
+            want: Ok("20.5"),
+            tdef: TypeDef::new().bytes(),
+        }
+    ];
+}
