@@ -17,8 +17,9 @@ path = "src/api/schema/gen.rs"
 required-features = ["default-no-api-client"]
 
 [profile.release]
-lto = true
-codegen-units = 1
+lto = true        # Optimize our binary at link stage.
+codegen-units = 1 # Increases compile time but improves optmization alternatives.
+debug = false     # Do not include debug symbols in the executable.
 
 [profile.bench]
 debug = true

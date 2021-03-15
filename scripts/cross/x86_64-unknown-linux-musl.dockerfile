@@ -1,1 +1,1 @@
-FROM rustembedded/cross:x86_64-unknown-linux-musl
+FROM docker.io/rustembedded/cross:x86_64-unknown-linux-musl
