@@ -202,7 +202,7 @@ mod test {
 
         assert!(merge.transform_one(partial_event_1.into()).is_none());
         assert!(merge.transform_one(partial_event_2.into()).is_none());
-        let merged_event = merge.transform_one(non_partial_event.into()).unwrap();
+        let merged_event = merge.transform_one(non_partial_event).unwrap();
         assert_eq!(merged_event.into_log(), expected);
     }
 
