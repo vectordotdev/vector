@@ -1,7 +1,6 @@
 use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
-#[cfg(unix)]
 use crate::udp;
 use crate::{
     config::{

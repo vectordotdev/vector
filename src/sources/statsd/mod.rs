@@ -1,4 +1,3 @@
-#[cfg(unix)]
 use crate::udp;
 use crate::{
     config::{self, GenerateConfig, GlobalOptions, Resource, SourceConfig, SourceDescription},

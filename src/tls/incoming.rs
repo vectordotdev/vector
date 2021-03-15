@@ -210,7 +210,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
         Ok(())
     }
 
-    #[cfg(all(unix, feature = "sources-utils-tcp-socket"))]
+    #[cfg(feature = "sources-utils-tcp-socket")]
     pub(crate) fn set_receive_buffer_bytes(&mut self, bytes: usize) -> std::io::Result<()> {
         let stream = self.get_ref().ok_or_else(|| {
             io::Error::new(
