@@ -37,7 +37,6 @@ enum StatsdConfig {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct UdpConfig {
     address: SocketAddr,
-    #[cfg(unix)]
     receive_buffer_bytes: Option<usize>,
 }
 
@@ -45,7 +44,6 @@ impl UdpConfig {
     pub fn from_address(address: SocketAddr) -> Self {
         Self {
             address,
-            #[cfg(unix)]
             receive_buffer_bytes: None,
         }
     }
@@ -163,9 +161,10 @@ async fn statsd_udp(
         .map_err(|error| emit!(StatsdSocketError::bind(error)))
         .await?;
 
-    #[cfg(unix)]
     if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
-        udp::set_receive_buffer_size(&socket, receive_buffer_bytes);
+        if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+            warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
+        }
     }
 
     info!(

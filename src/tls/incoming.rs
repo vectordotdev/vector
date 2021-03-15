@@ -204,7 +204,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
             let config =
                 socket2::TcpKeepalive::new().with_time(std::time::Duration::from_secs(time_secs));
 
-            tcp::set_keepalive(stream, &config);
+            tcp::set_keepalive(stream, &config)?;
         }
 
         Ok(())
@@ -219,9 +219,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
             )
         })?;
 
-        tcp::set_receive_buffer_size(stream, bytes);
-
-        Ok(())
+        tcp::set_receive_buffer_size(stream, bytes)
     }
 
     fn poll_io<T, F>(self: Pin<&mut Self>, cx: &mut Context, poll_fn: F) -> Poll<io::Result<T>>

@@ -213,7 +213,6 @@ async fn handle_stream<T>(
         }
     }
 
-    #[cfg(unix)]
     if let Some(receive_buffer_bytes) = receive_buffer_bytes {
         if let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes) {
             warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);

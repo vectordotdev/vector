@@ -27,7 +27,7 @@ components: sources: syslog: {
 			}
 			receive_buffer_bytes: {
 				enabled:       true
-				relevant_when: "mode = `tcp` or mode = `udp` && os = `unix`"
+				relevant_when: "mode = `tcp` or mode = `udp`"
 			}
 			keepalive: enabled: true
 			tls: sources.socket.features.receive.tls

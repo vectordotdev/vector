@@ -137,34 +137,28 @@ impl MaybeTlsStream<TcpStream> {
         if let Some(time_secs) = keepalive.time_secs {
             let config = socket2::TcpKeepalive::new().with_time(Duration::from_secs(time_secs));
 
-            tcp::set_keepalive(stream, &config);
+            tcp::set_keepalive(stream, &config)?;
         }
 
         Ok(())
     }
 
-    #[cfg(unix)]
     pub fn set_send_buffer_bytes(&mut self, bytes: usize) -> std::io::Result<()> {
         let stream = match self {
             Self::Raw(raw) => raw,
             Self::Tls(tls) => tls.get_ref(),
         };
 
-        tcp::set_send_buffer_size(stream, bytes);
-
-        Ok(())
+        tcp::set_send_buffer_size(stream, bytes)
     }
 
-    #[cfg(unix)]
     pub fn set_receive_buffer_bytes(&mut self, bytes: usize) -> std::io::Result<()> {
         let stream = match self {
             Self::Raw(raw) => raw,
             Self::Tls(tls) => tls.get_ref(),
         };
 
-        tcp::set_receive_buffer_size(stream, bytes);
-
-        Ok(())
+        tcp::set_receive_buffer_size(stream, bytes)
     }
 }
 
