@@ -4,7 +4,7 @@ components: transforms: lua: {
 	title: "Lua"
 
 	description: """
-		Transform events with a full embedded [Lua](\(urls.lua)) 5.3.5 engine.
+		Transform events with a full embedded [Lua](\(urls.lua)) 5.4 engine.
 		"""
 
 	classes: {
@@ -19,7 +19,7 @@ components: transforms: lua: {
 			runtime: {
 				name:    "Lua"
 				url:     urls.lua
-				version: "5.3"
+				version: "5.4"
 			}
 		}
 	}

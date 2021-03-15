@@ -1,4 +1,4 @@
-use super::util::{table_to_set, table_to_timestamp, timestamp_to_table};
+use super::util::{table_to_set, table_to_timestamp, timestamp_to_table, type_name};
 use crate::event::{metric, Metric, MetricKind, MetricValue, StatisticKind};
 use rlua::prelude::*;
 use std::collections::BTreeMap;
@@ -19,7 +19,7 @@ impl<'a> FromLua<'a> for MetricKind {
             LuaValue::String(s) if s == "absolute" => Ok(MetricKind::Absolute),
             LuaValue::String(s) if s == "incremental" => Ok(MetricKind::Incremental),
             _ => Err(LuaError::FromLuaConversionError {
-                from: value.type_name(),
+                from: type_name(&value),
                 to: "MetricKind",
                 message: Some(
                     "Metric kind should be either \"incremental\" or \"absolute\"".to_string(),
@@ -45,7 +45,7 @@ impl<'a> FromLua<'a> for StatisticKind {
             LuaValue::String(s) if s == "summary" => Ok(StatisticKind::Summary),
             LuaValue::String(s) if s == "histogram" => Ok(StatisticKind::Histogram),
             _ => Err(LuaError::FromLuaConversionError {
-                from: value.type_name(),
+                from: type_name(&value),
                 to: "StatisticKind",
                 message: Some(
                     "Statistic kind should be either \"summary\" or \"histogram\"".to_string(),
@@ -136,7 +136,7 @@ impl<'a> FromLua<'a> for Metric {
             LuaValue::Table(table) => table,
             other => {
                 return Err(LuaError::FromLuaConversionError {
-                    from: other.type_name(),
+                    from: type_name(&other),
                     to: "Metric",
                     message: Some("Metric should be a Lua table".to_string()),
                 })
@@ -196,7 +196,7 @@ impl<'a> FromLua<'a> for Metric {
             }
         } else {
             return Err(LuaError::FromLuaConversionError {
-                from: value.type_name(),
+                from: type_name(&value),
                 to: "Metric",
                 message: Some("Cannot find metric value, expected presence one of \"counter\", \"gauge\", \"set\", \"distribution\", \"aggregated_histogram\", \"aggregated_summary\"".to_string()),
             });
