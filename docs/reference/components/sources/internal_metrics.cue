@@ -286,7 +286,7 @@ components: sources: internal_metrics: {
 		}
 		events_in_total: {
 			description: """
-				The number of events accepted by this component either from tagged 
+				The number of events accepted by this component either from tagged
 				origin like file and uri, or cumulatively from other origins.
 				"""
 			type:              "counter"
