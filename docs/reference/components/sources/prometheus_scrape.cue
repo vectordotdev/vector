@@ -95,7 +95,6 @@ components: sources: prometheus_scrape: {
 		summary:   output._passthrough_summary
 	}
 
-
 	telemetry: metrics: {
 		events_in_total:              components.sources.internal_metrics.output.metrics.events_in_total
 		http_error_response_total:    components.sources.internal_metrics.output.metrics.http_error_response_total
