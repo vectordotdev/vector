@@ -12,6 +12,7 @@ use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
 use tokio::{
+    io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
     time::sleep,
 };
@@ -221,7 +222,6 @@ async fn handle_stream<T>(
 
     let mut _token = None;
     let mut shutdown_signal = Some(shutdown_signal);
-    let mut shutdown: Option<BoxFuture<io::Result<()>>> = None;
     let mut reader = FramedRead::new(socket, source.decoder());
     stream::poll_fn(move |cx| {
         if let Some(fut) = shutdown_signal.as_mut() {
@@ -229,28 +229,23 @@ async fn handle_stream<T>(
                 Poll::Ready(token) => {
                     debug!("Start graceful shutdown.");
 
-                    // TODO: Make the shutdown work. Currently conflicts on mutably borring `reader` twice.
-                    /*
                     let socket = reader.get_mut();
 
                     // Close our write part of TCP socket to signal the other side
                     // that it should stop writing and close the channel.
-                    shutdown = Some(Box::pin(socket.shutdown()));
-                     */
+                    match socket.shutdown().now_or_never() {
+                        None => error!(message = "Failed shutting down TCP socket immediately."),
+                        Some(Err(error)) => {
+                            error!(message = "Failed shutting down TCP socket.", %error)
+                        }
+                        _ => (),
+                    }
 
                     _token = Some(token);
                     shutdown_signal = None;
                 }
                 Poll::Pending => {}
             }
-        }
-
-        if let Some(fut) = shutdown.as_mut() {
-            if fut.poll_unpin(cx).is_pending() {
-                return Poll::Pending;
-            }
-
-            shutdown = None;
         }
 
         reader.poll_next_unpin(cx)

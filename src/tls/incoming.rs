@@ -136,25 +136,18 @@ impl<S> MaybeTlsIncomingStream<S> {
             StreamState::AcceptError(_) => None,
         }
     }
-}
 
-impl<T> MaybeTlsIncomingStream<T>
-where
-    T: tokio::io::AsyncWriteExt + Unpin,
-{
-    // TODO: Fix caller so this isn't needed.
-    #[allow(dead_code)]
-    pub async fn shutdown(&mut self) -> io::Result<()> {
+    #[cfg(test)]
+    pub fn get_mut(&mut self) -> Option<&mut S> {
         use super::MaybeTls;
 
         match &mut self.state {
-            StreamState::Accepted(ref mut stream) => match stream {
-                MaybeTls::Raw(ref mut s) => s.shutdown().await,
-                MaybeTls::Tls(s) => s.get_mut().shutdown().await,
-            },
-            StreamState::Accepting(_) | StreamState::AcceptError(_) => {
-                Err(io::ErrorKind::NotConnected.into())
-            }
+            StreamState::Accepted(ref mut stream) => Some(match stream {
+                MaybeTls::Raw(ref mut s) => s,
+                MaybeTls::Tls(s) => s.get_mut(),
+            }),
+            StreamState::Accepting(_) => None,
+            StreamState::AcceptError(_) => None,
         }
     }
 }
