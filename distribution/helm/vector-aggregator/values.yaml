@@ -54,6 +54,9 @@ podAnnotations: {}
 # Labels to add to the `Pod`s managed by `StatefulSet`.
 podLabels: {}
 
+# Priority class name to add to the `Pod`s managed by `StatefulSet`.
+podPriorityClassName: ""
+
 # PodSecurityContext to set at the `Pod`s managed by `StatefulSet`.
 podSecurityContext: {}
   # fsGroup: 2000
