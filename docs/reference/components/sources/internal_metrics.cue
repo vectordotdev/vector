@@ -285,10 +285,38 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		events_in_total: {
-			description:       "The total number of events accepted by this component."
+			description:       """
+				The number of events accepted by this component either from tagged 
+				origin like file and uri, or cumulatively from other origins.
+				"""
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {
+				file: {
+					description: "The file from which the event originates."
+					required:    false
+				}
+				uri: {
+					description: "The sanitized uri from which the event originates."
+					required:    false
+				}
+				container_name: {
+					description: "The name of the container from which the event originates."
+					required:    false
+				}
+				pod_name: {
+					description: "The name of the pod from which the event originates."
+					required:    false
+				}
+				peer_addr: {
+					description: "The ip from which the event originates."
+					required:    false
+				}
+				peer_path: {
+					description: "The pathname from which the event originates."
+					required:    false
+				}
+			}
 		}
 		events_out_total: {
 			description:       "The total number of events emitted by this component."

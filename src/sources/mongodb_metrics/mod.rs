@@ -259,7 +259,7 @@ impl MongoDBMetrics {
 
         emit!(MongoDBMetricsEventsReceived {
             count: metrics.len(),
-            endpoint: &self.endpoint,
+            uri: &self.endpoint,
         });
 
         metrics

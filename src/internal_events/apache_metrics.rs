@@ -7,7 +7,7 @@ use std::time::Instant;
 pub struct ApacheMetricsEventReceived<'a> {
     pub byte_size: usize,
     pub count: usize,
-    pub url: &'a str,
+    pub uri: &'a str,
 }
 
 impl<'a> InternalEvent for ApacheMetricsEventReceived<'a> {
@@ -19,7 +19,7 @@ impl<'a> InternalEvent for ApacheMetricsEventReceived<'a> {
         counter!("processed_events_total", self.count as u64);
         counter!(
             "events_in_total", self.count as u64,
-            "url" => self.url.to_owned(),
+            "uri" => self.uri.to_owned(),
         );
         counter!("processed_bytes_total", self.byte_size as u64);
     }

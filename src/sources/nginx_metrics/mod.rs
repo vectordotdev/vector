@@ -183,7 +183,7 @@ impl NginxMetrics {
 
         emit!(NginxMetricsEventsReceived {
             count: metrics.len(),
-            endpoint: &self.endpoint
+            uri: &self.endpoint
         });
 
         metrics

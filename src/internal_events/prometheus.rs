@@ -11,7 +11,7 @@ use std::time::Instant;
 pub struct PrometheusEventReceived {
     pub byte_size: usize,
     pub count: usize,
-    pub url: http::Uri,
+    pub uri: http::Uri,
 }
 
 impl InternalEvent for PrometheusEventReceived {
@@ -23,7 +23,7 @@ impl InternalEvent for PrometheusEventReceived {
         counter!("processed_events_total", self.count as u64);
         counter!(
             "events_in_total", self.count as u64,
-            "url" => format!("{}",self.url),
+            "uri" => format!("{}",self.uri),
         );
         counter!("processed_bytes_total", self.byte_size as u64);
     }
