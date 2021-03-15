@@ -21,19 +21,20 @@ the release process is dependent on the version change.
       - [Patch Releases](#patch-releases)
       - [Major/Minor Releases](#majorminor-releases)
     - [Fixing Up a Release](#fixing-up-a-release)
+
 <!-- /MarkdownTOC -->
 
 ## How to track releases
 
 There are a few different ways to track when there is a new release:
 
-* Follow [@vectordotdev](https://twitter.com/vectordotdev) on Twitter.
-* Heading to our [Discord server](https://discord.gg/EXXRbYCq) and watching the
+- Follow [@vectordotdev](https://twitter.com/vectordotdev) on Twitter.
+- Heading to our [Discord server](https://discord.gg/EXXRbYCq) and watching the
   `#announcements` channel.
-* Going to our [Github repository](https://github.com/timberio/vector) and
+- Going to our [Github repository](https://github.com/timberio/vector) and
   using the "watch" feature. Click "Custom" and then "Releases" to only be
   notified for new releases.
-* If you are using [one of our package
+- If you are using [one of our package
   repositories](https://cloudsmith.io/~timber/repos/vector/packages/) you should
   be able to see the update available when updating your package lists.
 
@@ -41,9 +42,9 @@ There are a few different ways to track when there is a new release:
 
 We aim to:
 
-* Release a stable version of Vector every 6 weeks.
-* Release patch fixes as needed to fix high-priority bugs and regressions.
-* Release daily builds representing the latest state of Vector for feedback.
+- Release a stable version of Vector every 6 weeks.
+- Release patch fixes as needed to fix high-priority bugs and regressions.
+- Release daily builds representing the latest state of Vector for feedback.
 
 ### Stable releases
 
@@ -72,9 +73,9 @@ We release a nightly version of Vector every day that represents the latest
 state of Vector. We aim to keep these as stable as possible, but they are
 inherently less stable than patch releases. We offer these to:
 
-* Allow users to beta test unreleased Vector features and provide us with
+- Allow users to beta test unreleased Vector features and provide us with
   feedback
-* Run blackbox integration tests against released artifacts
+- Run blackbox integration tests against released artifacts
 
 These nightly releases can be downloaded via our [nightly downloads
 page](https://vector.dev/releases/nightly/download/) or via our our [nightly
