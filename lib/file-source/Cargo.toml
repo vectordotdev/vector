@@ -7,6 +7,7 @@ publish = false
 license = "MIT"
 
 [target.'cfg(windows)'.dependencies]
+libc = "0.2"
 winapi = { version = "0.3", features = ["winioctl"] }
 
 [dependencies]
