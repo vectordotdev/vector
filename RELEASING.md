@@ -15,11 +15,11 @@ the release process is dependent on the version change.
     - [Patch releases](#patch-releases)
     - [Nightly releases](#nightly-releases)
   - [Compatibility guarantees](#compatibility-guarantees)
-  - [Which version should I be using?](#which-version-should-i-be-using-)
+  - [Which version should I be using?](#which-version-should-i-be-using)
   - [How to release Vector](#how-to-release-vector)
     - [Quick Start](#quick-start)
       - [Patch Releases](#patch-releases)
-      - [Major/Minor Releases](#major-minor-releases)
+      - [Major/Minor Releases](#majorminor-releases)
     - [Fixing Up a Release](#fixing-up-a-release)
 <!-- /MarkdownTOC -->
 
