@@ -12,6 +12,7 @@ spec:
   volumes:
     - 'hostPath'
     - 'configMap'
+    - 'emptyDir'
     - 'secret'
     - 'projected'
   allowedHostPaths:
@@ -21,6 +22,10 @@ spec:
       readOnly: true
     - pathPrefix: "/var/lib/vector"
       readOnly: false
+    - pathPrefix: "/sys"
+      readOnly: true
+    - pathPrefix: "/proc"
+      readOnly: true
     {{- range .Values.extraVolumes }}
     {{- if .hostPath }}
     - pathPrefix: {{ .hostPath.path }}
