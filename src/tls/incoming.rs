@@ -137,7 +137,7 @@ impl<S> MaybeTlsIncomingStream<S> {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "sources-utils-tls", feature = "listenfd"))]
     pub fn get_mut(&mut self) -> Option<&mut S> {
         use super::MaybeTls;
 
