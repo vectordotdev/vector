@@ -10,7 +10,7 @@ criterion_group!(
     // encapsulates CI noise we saw in
     // https://github.com/timberio/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
-    targets = benchmark_add_fields, benchmark_parse_json, benchmark_parse_syslog
+    targets = benchmark_add_fields, benchmark_multifaceted, benchmark_parse_json, benchmark_parse_syslog
 );
 criterion_main!(benches);
 
@@ -204,9 +204,107 @@ fn benchmark_parse_syslog(c: &mut Criterion) {
     let input = r#"<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet"#;
     // intentionally leaves out facility and severity as the native implementation, using
     // `regex_parser`, is not able to capture this
-    let output = serde_json::from_str(r#"{ "appname": "su", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "2020-12-19T21:48:09.004Z" }"#).unwrap();
+    let output = serde_json::from_str(r#"{ "appname": "su", "hostname": "initech.io", "message": "TPS report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "2020-12-19T21:48:09.004Z", "version": 3 }"#).unwrap();
 
     benchmark_configs(c, "parse_syslog", configs, "in", "last", input, &output);
+}
+
+fn benchmark_multifaceted(c: &mut Criterion) {
+    let configs: Vec<(&str, &str)> = vec![
+        (
+            "remap",
+            indoc! {r#"
+                [transforms.last]
+                  type = "remap"
+                  inputs = ["in"]
+                  source = """
+                  . = parse_syslog!(string!(.message))
+                  .timestamp = format_timestamp!(to_timestamp!(.timestamp), format: "%c")
+                  del(.hostname)
+                  .message = downcase(string!(.message))
+                  """
+            "#},
+        ),
+        (
+            "lua",
+            indoc! {r#"
+                [transforms.last]
+                  type = "lua"
+                  inputs = ["in"]
+                  version = "2"
+                  source = """
+                  local severities = { "emerg", "alert", "crit", "error", "warning", "notice", "info", "debug" }
+                  local facilities = {
+                    "kern",
+                    "user",
+                    "mail",
+                    "daemon",
+                    "auth",
+                    "syslog",
+                    "lpr",
+                    "news",
+                    "uucp",
+                    "cron",
+                    "authpriv",
+                    "ftp",
+                    "ntp",
+                    "security",
+                    "console",
+                    "solaris-cron",
+                    "local0",
+                    "local1",
+                    "local2",
+                    "local3",
+                    "local4",
+                    "local5",
+                    "local6",
+                    "local7"
+                  };
+
+                  local function parse_and_transform(message)
+                    local pattern = "^<(%d+)>(%d+) (%S+) (%S+) (%S+) (%S+) (%S+) (%S+) (.+)$"
+                    local priority, version, timestamp, _host, appname, procid, msgid, _sdata, message = string.match(message, pattern)
+
+                    priority = tonumber(priority)
+
+                    local facility = priority // 8
+                    local severity = priority - (facility * 8)
+
+                    facility = facilities[facility + 1]
+                    severity = severities[severity + 1]
+
+                    local year, month, day, hour, minute, second, tz = string.match(timestamp, '(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+).(%d+)(%a)')
+
+                    timestamp = os.date('%c', os.time({year=year, month=month, day=day, hour=hour, min=minute, sec=second}))
+                    message = string.lower(message)
+
+                    return {priority = priority, facility = facility, severity = severity, version = tonumber(version), timestamp = timestamp, appname = appname, procid = tonumber(procid), msgid = msgid, message = message}
+                  end
+
+                  function process(event, emit)
+                    event.log = parse_and_transform(event.log.message)
+                    emit(event)
+                  end
+                  """
+                  hooks.process = "process"
+            "#},
+        ),
+        (
+            "wasm",
+            indoc! {r#"
+                [transforms.last]
+                  type = "wasm"
+                  inputs = ["in"]
+                  module = "tests/data/wasm/multifaceted/target/wasm32-wasi/release/multifaceted.wasm"
+                  artifact_cache = "target/artifacts/"
+            "#},
+        ),
+    ];
+
+    let input = r#"<12>3 2020-12-19T21:48:09.004Z initech.io su 4015 ID81 - TPS report missing cover sheet"#;
+    let output = serde_json::from_str(r#"{ "appname": "su", "facility": "user", "severity": "warning", "message": "tps report missing cover sheet", "msgid": "ID81", "procid": 4015, "timestamp": "Sat Dec 19 21:48:09 2020", "version": 3 }"#).unwrap();
+
+    benchmark_configs(c, "multifaceted", configs, "in", "last", input, &output);
 }
 
 /// Benches a set of transform configs for comparison
