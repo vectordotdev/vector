@@ -2,7 +2,7 @@ use super::{
     CreateAcceptor, IncomingListener, MaybeTlsSettings, MaybeTlsStream, SslBuildError, TcpBind,
     TlsError, TlsSettings,
 };
-#[cfg(all(unix, feature = "sources-utils-tcp-socket"))]
+#[cfg(feature = "sources-utils-tcp-socket")]
 use crate::tcp;
 #[cfg(feature = "sources-utils-tcp-keepalive")]
 use crate::tcp::TcpKeepaliveConfig;
