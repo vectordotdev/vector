@@ -31,7 +31,6 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::sync::mpsc;
 
 impl<T: ?Sized, Item> VecSinkExt<Item> for T where T: Sink<Item> {}
 
@@ -89,43 +88,5 @@ where
                 }
             }
         }
-    }
-}
-
-/// Wrapper for mpsc::Sender to turn it into a Sink.
-pub struct BoundedSink<T> {
-    sender: mpsc::Sender<T>,
-}
-
-impl<T> BoundedSink<T> {
-    pub fn new(sender: mpsc::Sender<T>) -> Self {
-        Self { sender }
-    }
-}
-
-impl<T> Sink<T> for BoundedSink<T> {
-    type Error = ();
-    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        use mpsc::error::TrySendError;
-
-        match self.sender.try_reserve() {
-            Ok(_) => Poll::Ready(Ok(())),
-            Err(TrySendError::Full(_)) => Poll::Pending,
-            Err(TrySendError::Closed(_)) => {
-                error!(message = "Sender closed.");
-                Poll::Ready(Err(()))
-            }
-        }
-    }
-    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        self.sender
-            .try_send(item)
-            .map_err(|error| error!(message = "Sender error.", %error))
-    }
-    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-    fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
     }
 }

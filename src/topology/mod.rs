@@ -21,7 +21,7 @@ use crate::{
     },
     trigger::DisabledTrigger,
 };
-use futures::{future, Future, FutureExt, Stream};
+use futures::{future, Future, FutureExt, SinkExt, Stream};
 use std::{
     collections::{HashMap, HashSet},
     panic::AssertUnwindSafe,
@@ -360,7 +360,7 @@ impl RunningTopology {
             let previous = self.tasks.remove(name).unwrap();
             drop(previous); // detach and forget
 
-            self.remove_inputs(&name);
+            self.remove_inputs(&name).await;
             self.remove_outputs(&name);
         }
 
@@ -418,7 +418,7 @@ impl RunningTopology {
         // Detach removed sinks
         for name in &diff.sinks.to_remove {
             info!(message = "Removing sink.", name = ?name);
-            self.remove_inputs(&name);
+            self.remove_inputs(&name).await;
         }
 
         // Detach changed sinks
@@ -430,7 +430,7 @@ impl RunningTopology {
                     .into_inner()
                     .cancel();
             } else if wait_for_sinks.contains(name) {
-                self.detach_inputs(name);
+                self.detach_inputs(name).await;
             }
         }
 
@@ -474,31 +474,31 @@ impl RunningTopology {
     async fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
         // Sources
         for name in diff.sources.changed_and_added() {
-            self.setup_outputs(&name, new_pieces);
+            self.setup_outputs(&name, new_pieces).await;
         }
 
         // Transforms
         // Make sure all transform outputs are set up before another transform might try use
         // it as an input
         for name in diff.transforms.changed_and_added() {
-            self.setup_outputs(&name, new_pieces);
+            self.setup_outputs(&name, new_pieces).await;
         }
 
         for name in &diff.transforms.to_change {
-            self.replace_inputs(&name, new_pieces);
+            self.replace_inputs(&name, new_pieces).await;
         }
 
         for name in &diff.transforms.to_add {
-            self.setup_inputs(&name, new_pieces);
+            self.setup_inputs(&name, new_pieces).await;
         }
 
         // Sinks
         for name in &diff.sinks.to_change {
-            self.replace_inputs(&name, new_pieces);
+            self.replace_inputs(&name, new_pieces).await;
         }
 
         for name in &diff.sinks.to_add {
-            self.setup_inputs(&name, new_pieces);
+            self.setup_inputs(&name, new_pieces).await;
         }
     }
 
@@ -595,7 +595,7 @@ impl RunningTopology {
         self.outputs.remove(name);
     }
 
-    fn remove_inputs(&mut self, name: &str) {
+    async fn remove_inputs(&mut self, name: &str) {
         self.inputs.remove(name);
         self.detach_triggers.remove(name);
 
@@ -606,24 +606,26 @@ impl RunningTopology {
 
         if let Some(inputs) = inputs {
             for input in inputs {
-                if let Some(output) = self.outputs.get(input) {
+                if let Some(output) = self.outputs.get_mut(input) {
                     // This can only fail if we are disconnected, which is a valid situation.
-                    let _ = output.send(fanout::ControlMessage::Remove(name.to_string()));
+                    let _ = output
+                        .send(fanout::ControlMessage::Remove(name.to_string()))
+                        .await;
                 }
             }
         }
     }
 
-    fn setup_outputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
-        let output = new_pieces.outputs.remove(name).unwrap();
+    async fn setup_outputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
+        let mut output = new_pieces.outputs.remove(name).unwrap();
 
         for (sink_name, sink) in &self.config.sinks {
             if sink.inputs.iter().any(|i| i == name) {
                 // Sink may have been removed with the new config so it may not be present.
                 if let Some(input) = self.inputs.get(sink_name) {
-                    output
+                    let _ = output
                         .send(fanout::ControlMessage::Add(sink_name.clone(), input.get()))
-                        .expect("Components shouldn't be spawned before connecting them together.");
+                        .await;
                 }
             }
         }
@@ -631,12 +633,12 @@ impl RunningTopology {
             if transform.inputs.iter().any(|i| i == name) {
                 // Transform may have been removed with the new config so it may not be present.
                 if let Some(input) = self.inputs.get(transform_name) {
-                    output
+                    let _ = output
                         .send(fanout::ControlMessage::Add(
                             transform_name.clone(),
                             input.get(),
                         ))
-                        .expect("Components shouldn't be spawned before connecting them together.");
+                        .await;
                 }
             }
         }
@@ -644,13 +646,17 @@ impl RunningTopology {
         self.outputs.insert(name.to_string(), output);
     }
 
-    fn setup_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
+    async fn setup_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(name).unwrap();
 
         for input in inputs {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ =
-                self.outputs[&input].send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
+            let _ = self
+                .outputs
+                .get_mut(&input)
+                .unwrap()
+                .send(fanout::ControlMessage::Add(name.to_string(), tx.get()))
+                .await;
         }
 
         self.inputs.insert(name.to_string(), tx);
@@ -660,7 +666,7 @@ impl RunningTopology {
         });
     }
 
-    fn replace_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
+    async fn replace_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(name).unwrap();
 
         let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
@@ -678,24 +684,35 @@ impl RunningTopology {
         let inputs_to_replace = old_inputs.intersection(&new_inputs);
 
         for input in inputs_to_remove {
-            if let Some(output) = self.outputs.get(input) {
+            if let Some(output) = self.outputs.get_mut(input) {
                 // This can only fail if we are disconnected, which is a valid situation.
-                let _ = output.send(fanout::ControlMessage::Remove(name.to_string()));
+                let _ = output
+                    .send(fanout::ControlMessage::Remove(name.to_string()))
+                    .await;
             }
         }
 
         for input in inputs_to_add {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ =
-                self.outputs[input].send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
+            let _ = self
+                .outputs
+                .get_mut(input)
+                .unwrap()
+                .send(fanout::ControlMessage::Add(name.to_string(), tx.get()))
+                .await;
         }
 
         for &input in inputs_to_replace {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[input].send(fanout::ControlMessage::Replace(
-                name.to_string(),
-                Some(tx.get()),
-            ));
+            let _ = self
+                .outputs
+                .get_mut(input)
+                .unwrap()
+                .send(fanout::ControlMessage::Replace(
+                    name.to_string(),
+                    Some(tx.get()),
+                ))
+                .await;
         }
 
         self.inputs.insert(name.to_string(), tx);
@@ -705,7 +722,7 @@ impl RunningTopology {
         });
     }
 
-    fn detach_inputs(&mut self, name: &str) {
+    async fn detach_inputs(&mut self, name: &str) {
         self.inputs.remove(name);
         self.detach_triggers.remove(name);
 
@@ -715,8 +732,12 @@ impl RunningTopology {
 
         for input in old_inputs {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ =
-                self.outputs[input].send(fanout::ControlMessage::Replace(name.to_string(), None));
+            let _ = self
+                .outputs
+                .get_mut(input)
+                .unwrap()
+                .send(fanout::ControlMessage::Replace(name.to_string(), None))
+                .await;
         }
     }
 
