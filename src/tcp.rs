@@ -14,7 +14,6 @@ pub struct TcpKeepaliveConfig {
     pub time_secs: Option<u64>,
 }
 
-#[cfg(unix)]
 // This function will be obsolete after tokio/mio internally use `socket2` and expose the methods to
 // apply options to a socket. Until then, use of `unsafe` is necessary here.
 pub fn set_keepalive(socket: &TcpStream, params: &socket2::TcpKeepalive) {
