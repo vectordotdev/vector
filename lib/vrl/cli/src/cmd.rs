@@ -1,4 +1,4 @@
-use super::{repl, tutorial::tutorial, Error};
+use super::{repl, tutorial::vrl_tutorial, Error};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{self, Read};
@@ -46,7 +46,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
 fn run(opts: &Opts) -> Result<(), Error> {
     if opts.tutorial {
-        return tutorial();
+        return vrl_tutorial();
     }
 
     // Run the REPL if no program or program file is specified
