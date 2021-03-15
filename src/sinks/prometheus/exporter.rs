@@ -339,7 +339,7 @@ mod tests {
     use crate::{
         event::metric::{Metric, MetricData, MetricSeries, MetricValue},
         http::HttpClient,
-        test_util::{random_string, trace_init},
+        test_util::{next_addr, random_string, trace_init},
         tls::MaybeTlsSettings,
     };
     use chrono::Duration;
@@ -399,7 +399,7 @@ mod tests {
             None => "http",
         };
 
-        let address = crate::test_util::next_addr();
+        let address = next_addr();
         let config = PrometheusExporterConfig {
             address,
             tls: tls_config,
@@ -486,7 +486,7 @@ mod tests {
     #[tokio::test]
     async fn sink_absolute() {
         let config = PrometheusExporterConfig {
-            address: "127.0.0.1:9105".parse().unwrap(),
+            address: next_addr(), // Not actually bound, just needed to fill config
             tls: None,
             ..Default::default()
         };
