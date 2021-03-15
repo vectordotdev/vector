@@ -155,7 +155,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// # let mut rt = tokio::runtime::Runtime::new().unwrap();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
     /// use vector::expiring_hash_map::ExpiringHashMap;
     /// use std::time::Duration;
