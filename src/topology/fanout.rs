@@ -207,7 +207,7 @@ mod tests {
         let (tx_b, rx_b) = mpsc::unbounded();
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
 
-        let mut fanout = Fanout::new().0;
+        let (mut fanout, _fanout_control) = Fanout::new();
 
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
@@ -229,7 +229,7 @@ mod tests {
         let (tx_c, rx_c) = mpsc::channel(2);
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
 
-        let mut fanout = Fanout::new().0;
+        let (mut fanout, _fanout_control) = Fanout::new();
 
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
@@ -258,7 +258,7 @@ mod tests {
         let (tx_b, rx_b) = mpsc::unbounded();
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
 
-        let mut fanout = Fanout::new().0;
+        let (mut fanout, _fanout_control) = Fanout::new();
 
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
@@ -415,7 +415,7 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_no_sinks() {
-        let mut fanout = Fanout::new().0;
+        let (mut fanout, _fanout_control) = Fanout::new();
 
         let recs = make_events(2);
 
@@ -430,7 +430,7 @@ mod tests {
         let (tx_b, rx_b) = mpsc::unbounded();
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
 
-        let mut fanout = Fanout::new().0;
+        let (mut fanout, _fanout_control) = Fanout::new();
 
         fanout.add("a".to_string(), tx_a1);
         fanout.add("b".to_string(), tx_b);
@@ -528,7 +528,7 @@ mod tests {
     }
 
     async fn fanout_error(modes: &[Option<ErrorWhen>]) {
-        let mut fanout = Fanout::new().0;
+        let (mut fanout, _fanout_control) = Fanout::new();
         let mut rx_channels = vec![];
 
         for (i, mode) in modes.iter().enumerate() {
