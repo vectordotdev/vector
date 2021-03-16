@@ -21,7 +21,9 @@ use azure_sdk_storage_core::{key_client::KeyClient, prelude::client::from_connec
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
+use http::StatusCode;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::{
     convert::TryFrom,
     result::Result as StdResult,
@@ -63,6 +65,16 @@ struct AzureBlobSinkRequest {
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
     Json,
+}
+
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("Invalid connection string specified"))]
+    InvalidCredentials,
+    #[snafu(display("Container: {:?} not found", container))]
+    UnknownContainer { container: String },
+    #[snafu(display("Unknown status code: {}", status))]
+    Unknown { status: StatusCode },
 }
 
 impl GenerateConfig for AzureBlobSinkConfig {
@@ -141,10 +153,19 @@ impl AzureBlobSinkConfig {
             .with_container_name(container_name.as_str())
             .finalize();
 
-        // todo: map error to health check error
         match request.await {
             Ok(_) => Ok(()),
-            Err(error) => Err(Box::new(error)),
+            Err(reason) => Err(match reason {
+                AzureError::UnexpectedHTTPResult(result) => match result.status_code() {
+                    StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
+                    StatusCode::NOT_FOUND => HealthcheckError::UnknownContainer {
+                        container: container_name,
+                    }
+                    .into(),
+                    status => HealthcheckError::Unknown { status }.into(),
+                },
+                error => error.into(),
+            }),
         }
     }
 
@@ -166,6 +187,7 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
     }
 
     fn call(&mut self, request: AzureBlobSinkRequest) -> Self::Future {
+        // todo: add instrumentation
         let client = self.client.clone();
         let container_name = request.container_name.clone();
         let blob_name = request.blob_name.clone();
