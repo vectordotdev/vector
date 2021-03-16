@@ -3,7 +3,7 @@ use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::fs;
 use std::process::Command;
-use vrl_structures::Map;
+use vrl_structures::Map as VrlMap;
 
 use crate::Test;
 
@@ -118,7 +118,7 @@ impl Test {
             Some(event) => {
                 serde_json::from_value::<Value>(serde_json::Value::Object(event.log)).unwrap()
             }
-            None => Value::Object(Map::default()),
+            None => Value::Object(VrlMap::default()),
         };
 
         if returns.is_some() && output.is_some() {

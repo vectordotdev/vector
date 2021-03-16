@@ -37,13 +37,7 @@ where
             (None, Some(omap)) => omap.is_empty(),
             (Some(smap), None) => smap.is_empty(),
             (None, None) => true,
-            (Some(smap), Some(omap)) => {
-                if smap.len() != other.len() {
-                    return false;
-                }
-
-                self.iter().zip(omap).all(|(a, b)| a == b)
-            }
+            (Some(smap), Some(omap)) => smap.eq(omap),
         }
     }
 }
@@ -328,13 +322,5 @@ impl<'a, K, V> Iterator for Values<'a, K, V> {
         } else {
             None
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn fail() {
-        assert!(false);
     }
 }

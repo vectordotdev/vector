@@ -8519,6 +8519,7 @@ dependencies = [
  "vrl",
  "vrl-parser",
  "vrl-stdlib",
+ "vrl-structures",
 ]
 
 [[package]]
