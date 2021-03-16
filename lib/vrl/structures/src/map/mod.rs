@@ -1,30 +1,24 @@
 use std::borrow::Borrow;
 use std::cmp::Ordering;
-use std::collections::btree_map;
 use std::collections::BTreeMap;
-use std::iter::FromIterator;
 
-#[macro_export]
-macro_rules! map {
-    () => (::vrl_structures::map::Map::new());
+mod iter;
+mod macros;
+#[cfg(test)]
+mod tests;
 
-    // trailing comma case
-    ($($key:expr => $value:expr,)+) => (map!($($key => $value),+));
-
-    ($($key:expr => $value:expr),*) => {
-        {
-            let mut _map = ::vrl_structures::map::Map::new();
-            $(
-                let _ = _map.insert($key.into(), $value.into());
-            )*
-            _map
-        }
-    };
-}
+pub use iter::*;
+pub use macros::*;
 
 #[derive(Debug, Clone)]
 pub struct Map<K, V> {
-    inner: Option<BTreeMap<K, V>>,
+    pub(crate) inner: Option<BTreeMap<K, V>>,
+}
+
+impl<K, V> Default for Map<K, V> {
+    fn default() -> Self {
+        Self { inner: None }
+    }
 }
 
 impl<K, V> PartialEq for Map<K, V>
@@ -40,26 +34,6 @@ where
             (Some(smap), Some(omap)) => smap.eq(omap),
         }
     }
-}
-
-pub struct Iter<'a, K, V> {
-    inner: Option<btree_map::Iter<'a, K, V>>,
-}
-
-pub struct IterMut<'a, K, V> {
-    inner: Option<btree_map::IterMut<'a, K, V>>,
-}
-
-pub struct IntoIter<K, V> {
-    inner: Option<btree_map::IntoIter<K, V>>,
-}
-
-pub struct Keys<'a, K: 'a, V: 'a> {
-    inner: Option<btree_map::Keys<'a, K, V>>,
-}
-
-pub struct Values<'a, K: 'a, V: 'a> {
-    inner: Option<btree_map::Values<'a, K, V>>,
 }
 
 impl<K: Ord, V> From<BTreeMap<K, V>> for Map<K, V> {
@@ -129,7 +103,7 @@ impl<K, V> Map<K, V> {
         if let Some(map) = &self.inner {
             map.is_empty()
         } else {
-            false
+            true
         }
     }
 
@@ -210,116 +184,6 @@ impl<K: Ord, V> Map<K, V> {
             let mut map = BTreeMap::default();
             map.insert(key, value);
             self.inner = Some(map);
-            None
-        }
-    }
-}
-
-impl<K, V> Iterator for IntoIter<K, V> {
-    type Item = (K, V);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(inner) = &mut self.inner {
-            inner.next()
-        } else {
-            None
-        }
-    }
-}
-
-impl<'a, K, V> Iterator for Iter<'a, K, V> {
-    type Item = (&'a K, &'a V);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(inner) = &mut self.inner {
-            inner.next()
-        } else {
-            None
-        }
-    }
-}
-
-impl<'a, K, V> Iterator for IterMut<'a, K, V> {
-    type Item = (&'a K, &'a mut V);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(inner) = &mut self.inner {
-            inner.next()
-        } else {
-            None
-        }
-    }
-}
-
-impl<K, V> Default for Map<K, V> {
-    fn default() -> Self {
-        Self { inner: None }
-    }
-}
-
-impl<K: Ord, V> FromIterator<(K, V)> for Map<K, V> {
-    fn from_iter<T>(iter: T) -> Self
-    where
-        T: IntoIterator<Item = (K, V)>,
-    {
-        let mut map = BTreeMap::new();
-        map.extend(iter);
-        Self { inner: Some(map) }
-    }
-}
-
-impl<K, V> IntoIterator for Map<K, V> {
-    type Item = (K, V);
-    type IntoIter = IntoIter<K, V>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        IntoIter {
-            inner: self.inner.map(|x| x.into_iter()),
-        }
-    }
-}
-
-impl<'a, K, V> IntoIterator for &'a Map<K, V> {
-    type Item = (&'a K, &'a V);
-    type IntoIter = Iter<'a, K, V>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        Iter {
-            inner: self.inner.as_ref().map(|x| x.iter()),
-        }
-    }
-}
-
-impl<'a, K, V> IntoIterator for &'a mut Map<K, V> {
-    type Item = (&'a K, &'a mut V);
-    type IntoIter = IterMut<'a, K, V>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        IterMut {
-            inner: self.inner.as_mut().map(|x| x.iter_mut()),
-        }
-    }
-}
-
-impl<'a, K, V> Iterator for Keys<'a, K, V> {
-    type Item = &'a K;
-
-    fn next(&mut self) -> Option<&'a K> {
-        if let Some(keys) = &mut self.inner {
-            keys.next()
-        } else {
-            None
-        }
-    }
-}
-
-impl<'a, K, V> Iterator for Values<'a, K, V> {
-    type Item = &'a V;
-
-    fn next(&mut self) -> Option<&'a V> {
-        if let Some(values) = &mut self.inner {
-            values.next()
-        } else {
             None
         }
     }

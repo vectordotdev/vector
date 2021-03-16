@@ -6,3 +6,11 @@ edition = "2018"
 publish = false
 
 [dependencies]
+
+[dev-dependencies]
+quickcheck = "1.0"
+criterion = "0.3"
+
+[[bench]]
+name = "map"
+harness = false

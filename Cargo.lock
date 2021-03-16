@@ -8502,6 +8502,10 @@ dependencies = [
 [[package]]
 name = "vrl-structures"
 version = "0.1.0"
+dependencies = [
+ "criterion",
+ "quickcheck",
+]
 
 [[package]]
 name = "vrl-tests"
