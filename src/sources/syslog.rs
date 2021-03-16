@@ -20,6 +20,7 @@ use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use std::cmp;
 use std::io;
 use std::net::SocketAddr;
 #[cfg(unix)]
@@ -200,16 +201,20 @@ impl TcpSource for SyslogTcpSource {
 #[derive(Clone, Debug)]
 struct SyslogDecoder {
     other: LinesCodec,
+    is_discarding: bool,
+    in_octet: bool,
 }
 
 impl SyslogDecoder {
     fn new(max_length: usize) -> Self {
         Self {
             other: LinesCodec::new_with_max_length(max_length),
+            is_discarding: false,
+            in_octet: false,
         }
     }
 
-    fn octet_decode(&self, src: &mut BytesMut) -> Result<Option<String>, LinesCodecError> {
+    fn octet_decode(&mut self, src: &mut BytesMut) -> Result<Option<String>, LinesCodecError> {
         // Encoding scheme:
         //
         // len ' ' data
@@ -219,48 +224,89 @@ impl SyslogDecoder {
         // |
         // | ASCII decimal number of unknown length
 
-        if let Some(i) = src.iter().position(|&b| b == b' ') {
-            let len: usize = std::str::from_utf8(&src[..i])
-                .map_err(|_| ())
-                .and_then(|num| num.parse().map_err(|_| ()))
-                .map_err(|_| {
-                    LinesCodecError::Io(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unable to decode message len as number",
-                    ))
-                })?;
+        loop {
+            let read_to = cmp::min(self.other.max_length().saturating_add(1), src.len());
+            let space_pos = src.iter().position(|&b| b == b' ');
 
-            let from = i + 1;
-            let to = from + len;
+            // If we are discarding, discard to the next newline.
+            let newline_pos = src.iter().position(|&b| b == b'\n');
 
-            if let Some(msg) = src.get(from..to) {
-                let s = std::str::from_utf8(msg)
-                    .map_err(|_| {
-                        LinesCodecError::Io(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unable to decode message as UTF8",
-                        ))
-                    })?
-                    .to_string();
-                src.advance(to);
-                Ok(Some(s))
-            } else {
-                Ok(None)
+            match (self.is_discarding, newline_pos, space_pos) {
+                (true, Some(offset), _) => {
+                    // When discarding we keep discarding to the next newline.
+                    src.advance(offset + 1);
+                    self.is_discarding = false;
+                    self.in_octet = false;
+                    return Err(LinesCodecError::Io(io::Error::new(
+                        io::ErrorKind::Other,
+                        "Frame length limit exceeded",
+                    )));
+                }
+                (true, None, _) => {
+                    // There is no newline in this frame. Advance as far as we can to
+                    // discard the entire frame.
+                    src.advance(read_to);
+                    if src.is_empty() {
+                        return Ok(None);
+                    }
+                }
+                (false, _, Some(i)) => {
+                    let len: usize = match std::str::from_utf8(&src[..i])
+                        .map_err(|_| ())
+                        .and_then(|num| num.parse().map_err(|_| ()))
+                    {
+                        Ok(len) => len,
+                        Err(_) => {
+                            // Advance the buffer past the erroneous bytes
+                            // to prevent us getting stuck in an infinite loop.
+                            src.advance(i + 1);
+                            self.in_octet = false;
+                            return Err(LinesCodecError::Io(io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                "Unable to decode message len as number",
+                            )));
+                        }
+                    };
+
+                    let from = i + 1;
+                    let to = from + len;
+
+                    if let Some(msg) = src.get(from..to) {
+                        let s = match std::str::from_utf8(msg) {
+                            Ok(s) => s.to_string(),
+                            Err(_) => {
+                                // Advance the buffer past the erroneous bytes
+                                // to prevent us getting stuck in an infinite loop.
+                                src.advance(to);
+                                self.in_octet = false;
+                                return Err(LinesCodecError::Io(io::Error::new(
+                                    io::ErrorKind::InvalidData,
+                                    "Unable to decode message as UTF8",
+                                )));
+                            }
+                        };
+
+                        src.advance(to);
+                        self.in_octet = false;
+                        return Ok(Some(s));
+                    } else {
+                        return Ok(None);
+                    }
+                }
+
+                (false, None, _) if src.len() < self.other.max_length() => return Ok(None),
+
+                _ => {
+                    self.is_discarding = true;
+                    src.advance(src.len());
+                }
             }
-        } else if src.len() < self.other.max_length() {
-            Ok(None)
-        } else {
-            // This is certainly malformed, and there is no recovering from this.
-            Err(LinesCodecError::Io(io::Error::new(
-                io::ErrorKind::Other,
-                "Frame length limit exceeded",
-            )))
         }
     }
 
     /// None if this is not octet counting encoded
     fn checked_decode(
-        &self,
+        &mut self,
         src: &mut BytesMut,
     ) -> Option<Result<Option<String>, LinesCodecError>> {
         if let Some(&first_byte) = src.get(0) {
@@ -268,10 +314,15 @@ impl SyslogDecoder {
                 // First character is non zero number so we can assume that
                 // octet count framing is used.
                 trace!("Octet counting encoded event detected.");
-                return Some(self.octet_decode(src));
+                self.in_octet = true;
             }
         }
-        None
+
+        if self.in_octet {
+            Some(self.octet_decode(src))
+        } else {
+            None
+        }
     }
 }
 
@@ -452,8 +503,9 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
 
 #[cfg(test)]
 mod test {
-    use super::{event_from_str, Mode, SyslogConfig};
+    use super::*;
     use crate::{config::log_schema, event::Event};
+    use bytes::BufMut;
     use chrono::prelude::*;
 
     #[test]
@@ -807,5 +859,80 @@ mod test {
         }
 
         assert_eq!(event_from_str(&"host".to_string(), None, &raw), expected);
+    }
+
+    #[test]
+    fn octet_decode_works_with_multiple_frames() {
+        let mut decoder = SyslogDecoder::new(16);
+        let mut buffer = BytesMut::with_capacity(16);
+
+        buffer.put(&b"28 abcdefghijklm"[..]);
+        let result = decoder.checked_decode(&mut buffer);
+        assert_eq!(Some(Ok(None)), result.map(|r| r.map_err(|_| false)));
+
+        // Sending another frame starting with a number should not cause it to
+        // try to decode a new message.
+        buffer.put(&b"3 nopqrstuvwxyz"[..]);
+        let result = decoder.checked_decode(&mut buffer);
+        assert_eq!(
+            Some(Ok(Some("abcdefghijklm3 nopqrstuvwxyz".to_string()))),
+            result.map(|r| r.map_err(|_| false))
+        );
+    }
+
+    #[test]
+    fn octet_decode_moves_past_invalid_length() {
+        let mut decoder = SyslogDecoder::new(16);
+        let mut buffer = BytesMut::with_capacity(16);
+
+        // An invalid syslog message that starts with a digit so we think it is starting with the len.
+        buffer.put(&b"232>1 zork"[..]);
+        let result = decoder.checked_decode(&mut buffer);
+
+        assert!(result.unwrap().is_err());
+        assert_eq!(b"zork"[..], buffer);
+    }
+
+    #[test]
+    fn octet_decode_moves_past_invalid_utf8() {
+        let mut decoder = SyslogDecoder::new(16);
+        let mut buffer = BytesMut::with_capacity(16);
+
+        // An invalid syslog message containing invalid utf8 bytes.
+        buffer.put(&[b'4', b' ', 0xf0, 0x28, 0x8c, 0xbc][..]);
+        let result = decoder.checked_decode(&mut buffer);
+
+        assert!(result.unwrap().is_err());
+        assert_eq!(b""[..], buffer);
+    }
+
+    #[test]
+    fn octet_decode_moves_past_exceeded_frame_length() {
+        let mut decoder = SyslogDecoder::new(16);
+        let mut buffer = BytesMut::with_capacity(32);
+
+        // An invalid syslog message containing invalid utf8 bytes.
+        buffer.put(&b"32thisshouldbelongerthanthmaxframeasizewhichmeansthesyslogparserwillnotbeabletodecodeit"[..]);
+        let result = decoder.checked_decode(&mut buffer);
+
+        assert!(result.unwrap().is_err());
+        assert_eq!(b""[..], buffer);
+    }
+
+    #[test]
+    fn octet_decode_moves_past_exceeded_frame_length_multiple_frames() {
+        let mut decoder = SyslogDecoder::new(16);
+        let mut buffer = BytesMut::with_capacity(32);
+
+        // An invalid syslog message containing invalid utf8 bytes.
+        buffer.put(&b"32thisshouldbelongerthanthmaxframeasizewhichmeansthesyslogparserwillnotbeabletodecodeit"[..]);
+        let _ = decoder.checked_decode(&mut buffer);
+
+        assert_eq!(true, decoder.in_octet);
+        buffer.put(&b"wemustcontinuetodiscard\n32 something valid"[..]);
+        let result = decoder.checked_decode(&mut buffer);
+
+        assert!(result.unwrap().is_err());
+        assert_eq!(b"32 something valid"[..], buffer);
     }
 }
