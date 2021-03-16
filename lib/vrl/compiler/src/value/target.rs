@@ -2,7 +2,7 @@ use crate::{
     path::{Field, Segment, Segment::*},
     Path, Target, Value,
 };
-use std::collections::BTreeMap;
+use vrl_structures::Map;
 
 impl Target for Value {
     fn insert(&mut self, path: &Path, value: Value) -> Result<(), String> {
@@ -63,10 +63,10 @@ impl Value {
     ///    ```rust
     ///    # use vrl_compiler::{Path, Value};
     ///    # use std::str::FromStr;
-    ///    # use std::collections::BTreeMap;
+    ///    # use vrl_structures::Map;
     ///    # use std::iter::FromIterator;
     ///
-    ///    let map = BTreeMap::from_iter(vec![("foo".to_owned(), true.into())].into_iter());
+    ///    let map = Map::from_iter(vec![("foo".to_owned(), true.into())].into_iter());
     ///    let value = Value::Object(map);
     ///    let path = Path::from_str(".foo").unwrap();
     ///
@@ -92,11 +92,11 @@ impl Value {
     /// ```
     /// # use vrl_compiler::{Path, Value};
     /// # use std::str::FromStr;
-    /// # use std::collections::BTreeMap;
+    /// # use vrl_structures::Map;
     /// # use std::iter::FromIterator;
     ///
     /// let fields = vec![("foo".to_owned(), Value::from("bar"))];
-    /// let map = BTreeMap::from_iter(fields.into_iter());
+    /// let map = Map::from_iter(fields.into_iter());
     ///
     /// let mut value = Value::Object(map);
     /// let path = Path::from_str(".foo").unwrap();
@@ -114,7 +114,7 @@ impl Value {
     /// ```
     /// # use vrl_compiler::{value, Path, Value};
     /// # use std::str::FromStr;
-    /// # use std::collections::BTreeMap;
+    /// # use vrl_structures::Map;
     /// # use std::iter::FromIterator;
     ///
     /// let mut value = value!([false, true]);
@@ -296,7 +296,7 @@ impl Value {
             // `handle_field` is used to update map values, if the current value
             // isn't a map, we need to make it one.
             if !matches!(self, Value::Object(_)) {
-                *self = BTreeMap::default().into()
+                *self = Map::default().into()
             }
 
             let map = match self {
@@ -316,7 +316,7 @@ impl Value {
                 // to add the next segment.
                 Some(next) => match next {
                     Index(_) => map.insert(key, Value::Array(vec![])),
-                    _ => map.insert(key, BTreeMap::default().into()),
+                    _ => map.insert(key, Map::default().into()),
                 },
             };
 
@@ -370,7 +370,7 @@ impl Value {
                         }
                         Some(next) => match next {
                             Index(_) => array.insert(0, Value::Array(vec![])),
-                            _ => array.insert(0, BTreeMap::default().into()),
+                            _ => array.insert(0, Map::default().into()),
                         },
                     };
 
@@ -393,7 +393,7 @@ impl Value {
                         }
                         Some(next) => match next {
                             Index(_) => array.push(Value::Array(vec![])),
-                            _ => array.push(BTreeMap::default().into()),
+                            _ => array.push(Map::default().into()),
                         },
                     }
 

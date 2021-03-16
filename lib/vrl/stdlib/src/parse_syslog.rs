@@ -1,7 +1,7 @@
 use chrono::{DateTime, Datelike, Utc};
-use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use vrl::prelude::*;
+use vrl_structures::Map;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseSyslog;
@@ -81,7 +81,7 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
 
 /// Create a Value::Map from the fields of the given syslog message.
 fn message_to_value(message: Message<&str>) -> Value {
-    let mut result = BTreeMap::new();
+    let mut result = Map::new();
 
     result.insert("message".to_string(), message.msg.to_string().into());
 
@@ -132,7 +132,7 @@ fn message_to_value(message: Message<&str>) -> Value {
     result.into()
 }
 
-fn type_def() -> BTreeMap<&'static str, TypeDef> {
+fn type_def() -> Map<&'static str, TypeDef> {
     map! {
         "message": Kind::Bytes,
         "hostname": Kind::Bytes | Kind::Null,

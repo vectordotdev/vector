@@ -1,5 +1,5 @@
-use std::collections::BTreeMap;
 use vrl::prelude::*;
+use vrl_structures::Map;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsVpcFlowLog;
@@ -102,7 +102,7 @@ impl Expression for ParseAwsVpcFlowLogFn {
     }
 }
 
-fn inner_type_def() -> BTreeMap<&'static str, Kind> {
+fn inner_type_def() -> Map<&'static str, Kind> {
     map! {
         "account_id": Kind::Integer | Kind::Null,
         "action": Kind::Bytes | Kind::Null,
@@ -163,7 +163,7 @@ macro_rules! create_match {
 }
 
 fn parse_log(input: &str, format: Option<&str>) -> ParseResult<Value> {
-    let mut log = BTreeMap::new();
+    let mut log = Map::new();
 
     let mut input = input.split(' ');
     let mut format = format

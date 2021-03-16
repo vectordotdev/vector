@@ -6,8 +6,8 @@ use nom::{
     sequence::{delimited, preceded},
     IResult,
 };
-use std::collections::BTreeMap;
 use vrl::prelude::*;
+use vrl_structures::Map;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsAlbLog;
@@ -67,7 +67,7 @@ impl Expression for ParseAwsAlbLogFn {
     }
 }
 
-fn inner_type_def() -> BTreeMap<&'static str, Kind> {
+fn inner_type_def() -> Map<&'static str, Kind> {
     map! {
         "actions_executed": Kind::Bytes | Kind::Null,
         "chosen_cert_arn": Kind::Bytes | Kind::Null,
@@ -104,7 +104,7 @@ fn inner_type_def() -> BTreeMap<&'static str, Kind> {
 }
 
 fn parse_log(mut input: &str) -> Result<Value> {
-    let mut log = BTreeMap::new();
+    let mut log = Map::new();
 
     macro_rules! get_value {
         ($name:expr, $parser:expr) => {{

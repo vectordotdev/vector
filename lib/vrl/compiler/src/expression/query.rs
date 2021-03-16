@@ -1,8 +1,8 @@
 use crate::expression::{Container, FunctionCall, Resolved, Variable};
 use crate::parser::ast::Ident;
 use crate::{Context, Expression, Path, State, TypeDef, Value};
-use std::collections::BTreeMap;
 use std::fmt;
+use vrl_structures::Map;
 
 #[derive(Clone, PartialEq)]
 pub struct Query {
@@ -76,7 +76,7 @@ impl Expression for Query {
                 // TODO: make sure to enforce this
                 if self.path.is_root() {
                     return TypeDef::new()
-                        .object::<String, TypeDef>(BTreeMap::default())
+                        .object::<String, TypeDef>(Map::default())
                         .infallible();
                 }
 

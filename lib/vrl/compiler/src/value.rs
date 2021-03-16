@@ -11,8 +11,8 @@ mod target;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 use ordered_float::NotNan;
-use std::collections::BTreeMap;
 use std::fmt;
+use vrl_structures::Map;
 
 pub use self::regex::Regex;
 pub use error::Error;
@@ -24,7 +24,7 @@ pub enum Value {
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
-    Object(BTreeMap<String, Value>),
+    Object(Map<String, Value>),
     Array(Vec<Value>),
     Timestamp(DateTime<Utc>),
     Regex(Regex),

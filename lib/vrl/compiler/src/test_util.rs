@@ -52,7 +52,7 @@ macro_rules! bench_function {
                     let expression = expression.unwrap();
                     let mut compiler_state = $crate::state::Compiler::default();
                     let mut runtime_state = $crate::state::Runtime::default();
-                    let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
+                    let mut target: $crate::Value = ::vrl_structures::Map::default().into();
                     let mut ctx = $crate::Context::new(&mut target, &mut runtime_state);
 
                     b.iter(|| {
@@ -83,7 +83,7 @@ macro_rules! test_function {
                     Ok(expression) => {
                         let mut compiler_state = $crate::state::Compiler::default();
                         let mut runtime_state = $crate::state::Runtime::default();
-                        let mut target: $crate::Value = ::std::collections::BTreeMap::default().into();
+                        let mut target: $crate::Value = ::vrl_structures::Map::default().into();
                         let mut ctx = $crate::Context::new(&mut target, &mut runtime_state);
 
                         let got_value = expression.resolve(&mut ctx)
@@ -119,11 +119,11 @@ macro_rules! __prep_bench_or_test {
 #[macro_export]
 macro_rules! map {
     () => (
-        ::std::collections::BTreeMap::new()
+        Map::new()
     );
     ($($k:tt: $v:expr),+ $(,)?) => {
         vec![$(($k.into(), $v.into())),+]
             .into_iter()
-            .collect::<::std::collections::BTreeMap<_, _>>()
+            .collect::<::vrl_structures::Map<_, _>>()
     };
 }

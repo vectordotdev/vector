@@ -1,8 +1,8 @@
 use chrono::prelude::*;
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
-use std::collections::BTreeMap;
 use vrl::prelude::*;
+use vrl_structures::Map;
 
 lazy_static! {
     // Information about the common log format taken from the
@@ -135,6 +135,6 @@ pub fn log_fields(
                 })
             })
         })
-        .collect::<std::result::Result<BTreeMap<String, Value>, String>>()?
+        .collect::<std::result::Result<Map<String, Value>, String>>()?
         .into())
 }

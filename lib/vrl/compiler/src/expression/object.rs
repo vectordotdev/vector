@@ -1,15 +1,15 @@
 use crate::expression::{Expr, Resolved};
 use crate::{Context, Expression, State, TypeDef, Value};
-use std::collections::BTreeMap;
 use std::fmt;
+use vrl_structures::Map;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Object {
-    inner: BTreeMap<String, Expr>,
+    inner: Map<String, Expr>,
 }
 
 impl Object {
-    pub fn new(inner: BTreeMap<String, Expr>) -> Self {
+    pub fn new(inner: Map<String, Expr>) -> Self {
         Self { inner }
     }
 }
@@ -19,7 +19,7 @@ impl Expression for Object {
         self.inner
             .iter()
             .map(|(key, expr)| expr.resolve(ctx).map(|v| (key.to_owned(), v)))
-            .collect::<Result<BTreeMap<_, _>, _>>()
+            .collect::<Result<Map<_, _>, _>>()
             .map(Value::Object)
     }
 
@@ -28,7 +28,7 @@ impl Expression for Object {
             .inner
             .iter()
             .map(|(k, expr)| (k.to_owned(), expr.type_def(state)))
-            .collect::<BTreeMap<_, _>>();
+            .collect::<Map<_, _>>();
 
         // If any of the stored expressions is fallible, the entire object is
         // fallible.
@@ -51,8 +51,8 @@ impl fmt::Display for Object {
     }
 }
 
-impl From<BTreeMap<String, Expr>> for Object {
-    fn from(inner: BTreeMap<String, Expr>) -> Self {
+impl From<Map<String, Expr>> for Object {
+    fn from(inner: Map<String, Expr>) -> Self {
         Self { inner }
     }
 }

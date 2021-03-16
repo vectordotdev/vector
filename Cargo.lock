@@ -8420,6 +8420,7 @@ dependencies = [
  "thiserror",
  "vrl",
  "vrl-stdlib",
+ "vrl-structures",
  "webbrowser",
 ]
 
@@ -8441,6 +8442,7 @@ dependencies = [
  "tracing 0.1.23",
  "vrl-diagnostic",
  "vrl-parser",
+ "vrl-structures",
 ]
 
 [[package]]
@@ -8462,6 +8464,7 @@ dependencies = [
  "test-case",
  "thiserror",
  "vrl-diagnostic",
+ "vrl-structures",
 ]
 
 [[package]]
@@ -8493,7 +8496,12 @@ dependencies = [
  "url",
  "uuid 0.8.2",
  "vrl",
+ "vrl-structures",
 ]
+
+[[package]]
+name = "vrl-structures"
+version = "0.1.0"
 
 [[package]]
 name = "vrl-tests"

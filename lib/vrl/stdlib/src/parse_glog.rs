@@ -1,8 +1,8 @@
 use chrono::{offset::TimeZone, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::collections::BTreeMap;
 use vrl::prelude::*;
+use vrl_structures::Map;
 
 lazy_static! {
     static ref REGEX_GLOG: Regex = Regex::new(
@@ -69,7 +69,7 @@ impl Expression for ParseGlogFn {
         let bytes = self.value.resolve(ctx)?.try_bytes()?;
         let message = String::from_utf8_lossy(&bytes);
 
-        let mut log: BTreeMap<String, Value> = BTreeMap::new();
+        let mut log: Map<String, Value> = Map::new();
 
         let captures = REGEX_GLOG
             .captures(&message)
@@ -129,7 +129,7 @@ impl Expression for ParseGlogFn {
     }
 }
 
-fn type_def() -> BTreeMap<&'static str, Kind> {
+fn type_def() -> Map<&'static str, Kind> {
     map! {
         "level": Kind::Bytes,
         "timestamp": Kind::Timestamp,

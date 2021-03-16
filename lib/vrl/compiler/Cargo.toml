@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
+vrl-structures = { path = "../structures" }
 
 bitflags = "1"
 bytes = "0.5.6"

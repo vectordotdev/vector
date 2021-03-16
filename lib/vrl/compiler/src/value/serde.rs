@@ -3,9 +3,9 @@ use bytes::Bytes;
 use chrono::SecondsFormat;
 use serde::de::{Error, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize, Serializer};
-use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
+use vrl_structures::Map;
 
 impl Serialize for Value {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -117,7 +117,7 @@ impl<'de> Deserialize<'de> for Value {
             where
                 V: MapAccess<'de>,
             {
-                let mut map = BTreeMap::new();
+                let mut map = Map::new();
                 while let Some((key, value)) = visitor.next_entry()? {
                     map.insert(key, value);
                 }

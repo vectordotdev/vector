@@ -1,6 +1,6 @@
 use crate::log_util;
-use std::collections::BTreeMap;
 use vrl::prelude::*;
+use vrl_structures::Map;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseCommonLog;
@@ -92,7 +92,7 @@ impl Expression for ParseCommonLogFn {
     }
 }
 
-fn type_def() -> BTreeMap<&'static str, TypeDef> {
+fn type_def() -> Map<&'static str, TypeDef> {
     map! {
         "host": Kind::Bytes | Kind::Null,
         "identity": Kind::Bytes | Kind::Null,

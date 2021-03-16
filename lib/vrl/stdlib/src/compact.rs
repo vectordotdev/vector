@@ -1,6 +1,6 @@
 use crate::util;
-use std::collections::BTreeMap;
 use vrl::prelude::*;
+use vrl_structures::Map;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Compact;
@@ -202,7 +202,7 @@ fn recurse_compact(value: Value, options: &CompactOptions) -> Value {
     }
 }
 
-fn compact_map(map: BTreeMap<String, Value>, options: &CompactOptions) -> BTreeMap<String, Value> {
+fn compact_map(map: Map<String, Value>, options: &CompactOptions) -> Map<String, Value> {
     map.into_iter()
         .filter_map(|(key, value)| {
             let value = recurse_compact(value, options);

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use vrl_structures::Map;
 
 use vrl::prelude::*;
 
@@ -79,7 +79,7 @@ impl Expression for MergeFn {
     }
 }
 
-/// Merges two BTreeMaps of Symbol’s value as variable is void: Values. The
+/// Merges two Maps of Symbol’s value as variable is void: Values. The
 /// second map is merged into the first one.
 ///
 /// If Symbol’s value as variable is void: deep is true, only the top level
@@ -96,7 +96,7 @@ impl Expression for MergeFn {
 /// merge maps with a depth of 3,500 before encountering issues. So I think that
 /// is likely to be within acceptable limits. If it becomes a problem, we can
 /// unroll this function, but that will come at a cost of extra code complexity.
-fn merge_maps<K>(map1: &mut BTreeMap<K, Value>, map2: &BTreeMap<K, Value>, deep: bool)
+fn merge_maps<K>(map1: &mut Map<K, Value>, map2: &Map<K, Value>, deep: bool)
 where
     K: std::cmp::Ord + Clone,
 {

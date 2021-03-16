@@ -1,11 +1,11 @@
 use super::{repl, Error};
-use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{self, Read};
 use std::iter::IntoIterator;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
+use vrl_structures::Map;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "VRL", about = "Vector Remap Language CLI")]
@@ -111,7 +111,7 @@ fn read_into_objects(input: Option<&PathBuf>) -> Result<Vec<Value>, Error> {
     }?;
 
     match input.as_str() {
-        "" => Ok(vec![Value::Object(BTreeMap::default())]),
+        "" => Ok(vec![Value::Object(Map::default())]),
         _ => input
             .lines()
             .map(|line| Ok(serde_to_vrl(serde_json::from_str(&line)?)))
@@ -127,7 +127,7 @@ fn serde_to_vrl(value: serde_json::Value) -> Value {
         Value::Object(v) => v
             .into_iter()
             .map(|(k, v)| (k, serde_to_vrl(v)))
-            .collect::<BTreeMap<_, _>>()
+            .collect::<Map<_, _>>()
             .into(),
         Value::Bool(v) => v.into(),
         Value::Number(v) if v.is_f64() => v.as_f64().unwrap().into(),
@@ -149,5 +149,5 @@ fn should_open_repl(opts: &Opts) -> bool {
 }
 
 fn default_objects() -> Vec<Value> {
-    vec![Value::Object(BTreeMap::new())]
+    vec![Value::Object(Map::new())]
 }

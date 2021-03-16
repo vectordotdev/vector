@@ -1,7 +1,7 @@
 use super::Value;
 use crate::path::Segment::*;
 use crate::Path;
-use std::collections::BTreeMap;
+use vrl_structures::Map;
 
 impl Value {
     /// Insert the current value into a given path.
@@ -12,13 +12,13 @@ impl Value {
         for segment in path.segments().iter().rev() {
             match segment {
                 Field(field) => {
-                    let mut map = BTreeMap::default();
+                    let mut map = Map::default();
                     map.insert(field.as_str().to_owned(), self);
                     self = Value::Object(map);
                 }
                 Coalesce(fields) => {
                     let field = fields.last().unwrap();
-                    let mut map = BTreeMap::default();
+                    let mut map = Map::default();
                     map.insert(field.as_str().to_owned(), self);
                     self = Value::Object(map);
                 }

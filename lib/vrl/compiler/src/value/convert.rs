@@ -5,9 +5,9 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use std::borrow::Cow;
-use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
+use vrl_structures::Map;
 
 impl Value {
     /// Convert a given [`Value`] into a [`Expression`] trait object.
@@ -31,7 +31,7 @@ impl Value {
                 let object = crate::expression::Object::from(
                     v.into_iter()
                         .map(|(k, v)| (k, v.into_expr()))
-                        .collect::<BTreeMap<_, _>>(),
+                        .collect::<Map<_, _>>(),
                 );
 
                 Container::new(container::Variant::from(object)).into()
@@ -427,21 +427,21 @@ impl Value {
         matches!(self, Value::Object(_))
     }
 
-    pub fn as_object(&self) -> Option<&BTreeMap<String, Value>> {
+    pub fn as_object(&self) -> Option<&Map<String, Value>> {
         match self {
             Value::Object(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn as_object_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
+    pub fn as_object_mut(&mut self) -> Option<&mut Map<String, Value>> {
         match self {
             Value::Object(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn try_object(self) -> Result<BTreeMap<String, Value>, Error> {
+    pub fn try_object(self) -> Result<Map<String, Value>, Error> {
         match self {
             Value::Object(v) => Ok(v),
             _ => Err(Error::Expected {
@@ -452,15 +452,19 @@ impl Value {
     }
 }
 
-impl From<BTreeMap<String, Value>> for Value {
-    fn from(value: BTreeMap<String, Value>) -> Self {
+impl From<Map<String, Value>> for Value {
+    fn from(value: Map<String, Value>) -> Self {
         Value::Object(value)
     }
 }
 
+// TODO outer code uses BTreeMap, unsure if ordering is actually used or
+// not. Consider making a From to convert here. Else, push CoW map into
+// sub-crate and make independent from VRL.
+
 impl FromIterator<(String, Value)> for Value {
     fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {
-        Value::Object(iter.into_iter().collect::<BTreeMap<_, _>>())
+        Value::Object(iter.into_iter().collect::<Map<_, _>>())
     }
 }
 

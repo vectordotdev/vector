@@ -1,9 +1,7 @@
 use crate::value::Kind;
 use crate::{map, path, Path};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    ops::Sub,
-};
+use std::{collections::BTreeSet, ops::Sub};
+use vrl_structures::Map;
 
 /// Properties for a given expression that express the expected outcome of the
 /// expression.
@@ -76,12 +74,12 @@ impl From<Kind> for KindInfo {
             set.insert(TypeKind::Null);
         }
         if kind.contains_array() {
-            let mut map = BTreeMap::default();
+            let mut map = Map::default();
             map.insert(Index::Any, Self::Unknown);
             set.insert(TypeKind::Array(map));
         }
         if kind.contains_object() {
-            let mut map = BTreeMap::default();
+            let mut map = Map::default();
             map.insert(Field::Any, Self::Unknown);
             set.insert(TypeKind::Object(map));
         }
@@ -103,7 +101,7 @@ impl KindInfo {
         }
     }
 
-    fn object(&self) -> Option<&BTreeMap<Field, KindInfo>> {
+    fn object(&self) -> Option<&Map<Field, KindInfo>> {
         match self {
             KindInfo::Unknown => None,
             KindInfo::Known(set) => set.iter().find_map(|k| match k {
@@ -113,7 +111,7 @@ impl KindInfo {
         }
     }
 
-    fn array(&self) -> Option<&BTreeMap<Index, KindInfo>> {
+    fn array(&self) -> Option<&Map<Index, KindInfo>> {
         match self {
             KindInfo::Unknown => None,
             KindInfo::Known(set) => set.iter().find_map(|k| match k {
@@ -157,7 +155,7 @@ impl KindInfo {
         for segment in path.segments().iter().rev() {
             match segment {
                 Segment::Field(field) => {
-                    let mut map = BTreeMap::default();
+                    let mut map = Map::default();
                     map.insert(Field::Field(field.as_str().to_owned()), self);
 
                     let mut set = BTreeSet::new();
@@ -167,7 +165,7 @@ impl KindInfo {
                 }
                 Segment::Coalesce(fields) => {
                     let field = fields.last().unwrap();
-                    let mut map = BTreeMap::default();
+                    let mut map = Map::default();
                     map.insert(Field::Field(field.as_str().to_owned()), self);
 
                     let mut set = BTreeSet::new();
@@ -184,7 +182,7 @@ impl KindInfo {
                         (Index::Index(*index as usize), self)
                     };
 
-                    let mut map = BTreeMap::default();
+                    let mut map = Map::default();
                     map.insert(index, info);
 
                     let mut set = BTreeSet::new();
@@ -330,7 +328,7 @@ impl KindInfo {
                             r = r
                                 .into_iter()
                                 .map(|(i, v)| (i.shift(r_start), v))
-                                .collect::<BTreeMap<_, _>>();
+                                .collect::<Map<_, _>>();
                         };
 
                         l.append(&mut r);
@@ -415,8 +413,8 @@ enum TypeKind {
     Timestamp,
     Regex,
     Null,
-    Array(BTreeMap<Index, KindInfo>),
-    Object(BTreeMap<Field, KindInfo>),
+    Array(Map<Index, KindInfo>),
+    Object(Map<Field, KindInfo>),
 }
 
 impl TypeKind {
@@ -653,13 +651,14 @@ impl TypeDef {
     where
         V: Into<Self>,
     {
-        let map = inner.into_iter().enumerate().fold(
-            BTreeMap::<Index, _>::default(),
-            |mut acc, (i, td)| {
-                acc.insert(i.into(), td.into());
-                acc
-            },
-        );
+        let map =
+            inner
+                .into_iter()
+                .enumerate()
+                .fold(Map::<Index, _>::default(), |mut acc, (i, td)| {
+                    acc.insert(i.into(), td.into());
+                    acc
+                });
 
         self.add_array_mapped(map)
     }
@@ -680,7 +679,7 @@ impl TypeDef {
     }
 
     #[inline]
-    pub fn array_mapped<I, V>(self, map: BTreeMap<I, V>) -> Self
+    pub fn array_mapped<I, V>(self, map: Map<I, V>) -> Self
     where
         I: Into<Index>,
         V: Into<Self>,
@@ -689,7 +688,7 @@ impl TypeDef {
     }
 
     #[inline]
-    pub fn add_array_mapped<I, V>(mut self, map: BTreeMap<I, V>) -> Self
+    pub fn add_array_mapped<I, V>(mut self, map: Map<I, V>) -> Self
     where
         I: Into<Index>,
         V: Into<Self>,
@@ -700,13 +699,13 @@ impl TypeDef {
         let map = map
             .into_iter()
             .map(|(i, td)| (i.into(), td.into().kind))
-            .collect::<BTreeMap<_, _>>();
+            .collect::<Map<_, _>>();
 
         self.add_container(TypeKind::Array(map))
     }
 
     #[inline]
-    pub fn object<K, V>(self, inner: BTreeMap<K, V>) -> Self
+    pub fn object<K, V>(self, inner: Map<K, V>) -> Self
     where
         K: Into<Field>,
         V: Into<Self>,
@@ -715,7 +714,7 @@ impl TypeDef {
     }
 
     #[inline]
-    pub fn add_object<K, V>(mut self, inner: BTreeMap<K, V>) -> Self
+    pub fn add_object<K, V>(mut self, inner: Map<K, V>) -> Self
     where
         K: Into<Field>,
         V: Into<Self>,
@@ -723,12 +722,10 @@ impl TypeDef {
         // must not have multiple objects in list
         self = self.remove_object();
 
-        let map = inner
-            .into_iter()
-            .fold(BTreeMap::default(), |mut acc, (k, td)| {
-                acc.insert(k.into(), td.into().kind);
-                acc
-            });
+        let map = inner.into_iter().fold(Map::default(), |mut acc, (k, td)| {
+            acc.insert(k.into(), td.into().kind);
+            acc
+        });
 
         self.add_container(TypeKind::Object(map))
     }
@@ -951,7 +948,7 @@ mod tests {
                     info: KindInfo::Unknown,
                     path: vec![Segment::Index(0)],
                     want: KindInfo::Known({
-                        let mut map = BTreeMap::new();
+                        let mut map = Map::new();
                         map.insert(Index::Index(0), KindInfo::Unknown);
 
                         let mut set = BTreeSet::new();
@@ -986,7 +983,7 @@ mod tests {
                             let mut set = BTreeSet::new();
                             set.insert(TypeKind::Integer);
 
-                            let mut map = BTreeMap::new();
+                            let mut map = Map::new();
                             map.insert(Field::Field("foo".to_owned()), KindInfo::Known(set));
                             map
                         };
@@ -1009,7 +1006,7 @@ mod tests {
                             let mut set = BTreeSet::new();
                             set.insert(TypeKind::Integer);
 
-                            let mut map = BTreeMap::new();
+                            let mut map = Map::new();
                             map.insert(Index::Index(1), KindInfo::Known(set));
                             map
                         };
@@ -1030,7 +1027,7 @@ mod tests {
                     want: KindInfo::Known({
                         let mut set = BTreeSet::new();
                         set.insert(TypeKind::Array({
-                            let mut map = BTreeMap::new();
+                            let mut map = Map::new();
                             map.insert(Index::Any, KindInfo::Unknown);
                             map
                         }));

@@ -144,13 +144,13 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_object(&mut self, node: Node<ast::Object>) -> Object {
-        use std::collections::BTreeMap;
+        use vrl_structures::Map;
 
         let exprs = node
             .into_inner()
             .into_iter()
             .map(|(k, expr)| (k.into_inner(), self.compile_expr(expr)))
-            .collect::<BTreeMap<_, _>>();
+            .collect::<Map<_, _>>();
 
         Object::new(exprs)
     }

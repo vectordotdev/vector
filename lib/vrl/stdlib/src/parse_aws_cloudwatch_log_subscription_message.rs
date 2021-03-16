@@ -1,6 +1,6 @@
 use shared::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
-use std::collections::BTreeMap;
 use vrl::prelude::*;
+use vrl_structures::Map;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsCloudWatchLogSubscriptionMessage;
@@ -97,7 +97,7 @@ impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
     }
 }
 
-fn inner_type_def() -> BTreeMap<&'static str, TypeDef> {
+fn inner_type_def() -> Map<&'static str, TypeDef> {
     map! {
         "owner": Kind::Bytes,
         "message_type": Kind::Bytes,

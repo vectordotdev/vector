@@ -1,7 +1,7 @@
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use vrl::{function::Example, Value};
+use vrl_structures::Map;
 
 #[derive(Debug)]
 pub struct Test {
@@ -76,7 +76,7 @@ impl Test {
 
         let mut error = None;
         let object = if object.is_empty() {
-            Value::Object(BTreeMap::default())
+            Value::Object(Map::default())
         } else {
             match serde_json::from_str::<'_, Value>(&object) {
                 Ok(value) => value,
@@ -102,7 +102,7 @@ impl Test {
     }
 
     pub fn from_example(func: &'static str, example: &Example) -> Self {
-        let object = Value::Object(BTreeMap::default());
+        let object = Value::Object(Map::default());
         let result = match example.result {
             Ok(string) => string.to_owned(),
             Err(err) => err.to_string(),

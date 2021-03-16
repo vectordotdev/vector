@@ -1,7 +1,7 @@
-#[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
-use std::collections::BTreeMap;
 use std::str::FromStr;
 use vrl::{value::Kind, Value};
+#[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
+use vrl_structures::Map;
 
 /// Rounds the given number to the given precision.
 /// Takes a function parameter so the exact rounding function (ceil, floor or round)
@@ -17,7 +17,7 @@ where
 }
 
 /// Takes a set of captures that have resulted from matching a regular expression
-/// against some text and fills a BTreeMap with the result.
+/// against some text and fills a Map with the result.
 ///
 /// All captures are inserted with a key as the numeric index of that capture
 /// "0" is the overall match.
@@ -27,7 +27,7 @@ where
 pub(crate) fn capture_regex_to_map(
     regex: &regex::Regex,
     capture: regex::Captures,
-) -> std::collections::BTreeMap<String, Value> {
+) -> Map<String, Value> {
     let indexed = capture
         .iter()
         .filter_map(std::convert::identity)
@@ -48,8 +48,8 @@ pub(crate) fn capture_regex_to_map(
 }
 
 #[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
-pub(crate) fn regex_type_def(regex: &regex::Regex) -> BTreeMap<String, Kind> {
-    let mut inner_type = BTreeMap::new();
+pub(crate) fn regex_type_def(regex: &regex::Regex) -> Map<String, Kind> {
+    let mut inner_type = Map::new();
 
     // Add typedefs for each capture by numerical index.
     for num in 0..regex.captures_len() {

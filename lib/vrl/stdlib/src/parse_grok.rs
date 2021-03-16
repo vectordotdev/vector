@@ -1,10 +1,10 @@
-use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,
 };
+use vrl_structures::Map;
 
 #[derive(Debug)]
 pub enum Error {
@@ -130,7 +130,7 @@ impl Expression for ParseGrokFn {
 
         match self.pattern.match_against(&bytes) {
             Some(matches) => {
-                let mut result = BTreeMap::new();
+                let mut result = Map::new();
 
                 for (name, value) in matches.iter() {
                     if !remove_empty || !value.is_empty() {

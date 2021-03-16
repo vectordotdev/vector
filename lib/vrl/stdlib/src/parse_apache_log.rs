@@ -1,6 +1,6 @@
 use crate::log_util;
-use std::collections::BTreeMap;
 use vrl::prelude::*;
+use vrl_structures::Map;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseApacheLog;
@@ -120,7 +120,7 @@ impl Expression for ParseApacheLogFn {
     }
 }
 
-fn type_def_common() -> BTreeMap<&'static str, TypeDef> {
+fn type_def_common() -> Map<&'static str, TypeDef> {
     map! {
          "host": Kind::Bytes | Kind::Null,
          "identity": Kind::Bytes | Kind::Null,
@@ -135,7 +135,7 @@ fn type_def_common() -> BTreeMap<&'static str, TypeDef> {
     }
 }
 
-fn type_def_combined() -> BTreeMap<&'static str, TypeDef> {
+fn type_def_combined() -> Map<&'static str, TypeDef> {
     map! {
         "host": Kind::Bytes | Kind::Null,
         "identity": Kind::Bytes | Kind::Null,
@@ -152,7 +152,7 @@ fn type_def_combined() -> BTreeMap<&'static str, TypeDef> {
     }
 }
 
-fn type_def_error() -> BTreeMap<&'static str, TypeDef> {
+fn type_def_error() -> Map<&'static str, TypeDef> {
     map! {
          "timestamp": Kind::Timestamp | Kind::Null,
          "module": Kind::Bytes | Kind::Null,

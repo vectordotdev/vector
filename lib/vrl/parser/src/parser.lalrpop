@@ -2,7 +2,7 @@ use std::str::FromStr;
 use crate::ast::*;
 use crate::lex::*;
 use diagnostic::span;
-use std::collections::BTreeMap;
+use vrl_structures::Map;
 use lalrpop_util::ErrorRecovery;
 use ordered_float::NotNan;
 
@@ -469,9 +469,9 @@ Array: Array = {
 };
 
 Object: Object = {
-    "{" NonterminalNewline* "}" => Object(BTreeMap::default()),
+    "{" NonterminalNewline* "}" => Object(Map::default()),
     "{" NonterminalNewline* <CommaMultiline<(<Sp<String>> ":" <ArithmeticExpr>)>> "}" => {
-        let object =<>.into_iter().collect::<BTreeMap<_, _>>();
+        let object =<>.into_iter().collect::<Map<_, _>>();
         Object(object)
     },
 };

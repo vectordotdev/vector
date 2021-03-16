@@ -1,7 +1,7 @@
-use std::collections::BTreeMap;
 use std::iter::FromIterator;
 use url::Url;
 use vrl::prelude::*;
+use vrl_structures::Map;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseUrl;
@@ -66,7 +66,7 @@ impl Expression for ParseUrlFn {
 }
 
 fn url_to_value(url: Url) -> Value {
-    let mut map = BTreeMap::<&str, Value>::new();
+    let mut map = Map::<&str, Value>::new();
 
     map.insert("scheme", url.scheme().to_owned().into());
     map.insert("username", url.username().to_owned().into());
@@ -86,14 +86,14 @@ fn url_to_value(url: Url) -> Value {
         url.query_pairs()
             .into_owned()
             .map(|(k, v)| (k, v.into()))
-            .collect::<BTreeMap<String, Value>>()
+            .collect::<Map<String, Value>>()
             .into(),
     );
 
     Value::from_iter(map.into_iter().map(|(k, v)| (k.to_owned(), v)))
 }
 
-fn type_def() -> BTreeMap<&'static str, TypeDef> {
+fn type_def() -> Map<&'static str, TypeDef> {
     map! {
         "scheme": Kind::Bytes,
         "username": Kind::Bytes,
