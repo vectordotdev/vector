@@ -133,6 +133,11 @@ rusoto_signature = { version = "0.46.0", optional = true }
 rusoto_sqs = { version = "0.46.0", optional = true }
 rusoto_sts = { version = "0.46.0", optional = true }
 
+# Azure
+azure_sdk_core = { version = "0.43.7", optional = true }
+azure_sdk_storage_blob = { version = "0.45.3", optional = true }
+azure_sdk_storage_core = { version = "0.44.4", optional = true }
+
 # Tower
 tower = { version = "0.4.7", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
 tower-layer = { version = "0.3.1", default-features = false }
@@ -507,6 +512,7 @@ sinks-logs = [
   "sinks-aws_kinesis_streams",
   "sinks-aws_s3",
   "sinks-aws_sqs",
+  "sinks-azure_blob",
   "sinks-azure_monitor_logs",
   "sinks-blackhole",
   "sinks-clickhouse",
@@ -551,6 +557,7 @@ sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
 sinks-aws_s3 = ["bytesize", "rusoto", "rusoto_s3", "uuid"]
 sinks-aws_sqs = ["rusoto", "rusoto_sqs"]
+sinks-azure_blob = ["bytesize", "azure_sdk_core", "azure_sdk_storage_blob", "azure_sdk_storage_core"]
 sinks-azure_monitor_logs = ["bytesize"]
 sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
