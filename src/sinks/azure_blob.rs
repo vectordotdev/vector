@@ -56,6 +56,7 @@ struct AzureBlobSinkRequest {
     blob_name: String,
     blob_data: Vec<u8>,
     content_encoding: Option<&'static str>,
+    content_type: Option<&'static str>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -177,11 +178,19 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
                 .with_blob_name(blob_name.as_str())
                 .with_body(blob_data.as_slice())
                 .with_content_encoding(request.content_encoding.unwrap())
-                // todo: remove hardcoded value
-                .with_content_type("text/x-log")
+                .with_content_type(request.content_type.unwrap())
                 .finalize()
                 .await
         })
+    }
+}
+
+impl Compression {
+    pub fn content_type(&self) -> Option<&'static str> {
+        match self {
+            Self::None => Some("text/x-log"),
+            Self::Gzip(_) => Some("application/octet-stream"),
+        }
     }
 }
 
@@ -238,5 +247,6 @@ fn build_request(
         blob_data: inner,
         blob_name: blob,
         content_encoding: compression.content_encoding(),
+        content_type: compression.content_type(),
     }
 }
