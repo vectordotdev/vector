@@ -9,7 +9,7 @@ use std::collections::HashSet;
 use tokio::sync::{mpsc as tokio_mpsc, mpsc::error::SendError, oneshot};
 use uuid::Uuid;
 
-type TapSender = tokio_mpsc::Sender<TapResult>;
+type TapSender = tokio_mpsc::Sender<TapPayload>;
 
 /// Clients can supply glob patterns to find matched topology components.
 trait GlobMatcher<T> {
@@ -31,14 +31,14 @@ pub enum TapNotification {
     NotMatched,
 }
 
-/// A tap result can either contain a log event (payload), or a notification that's intended
+/// A tap payload can either contain a log event (payload), or a notification that's intended
 /// to be communicated back to the client to alert them about the status of the tap request.
-pub enum TapResult {
+pub enum TapPayload {
     LogEvent(String, LogEvent),
     Notification(String, TapNotification),
 }
 
-impl TapResult {
+impl TapPayload {
     pub fn matched(input_name: &str) -> Self {
         Self::Notification(input_name.to_string(), TapNotification::Matched)
     }
@@ -81,17 +81,17 @@ fn matched_patterns(patterns: &HashSet<String>, component_names: &[&String]) -> 
         .collect()
 }
 
-/// Sends a 'matched' tap result.
-async fn send_matched(tx: &mut TapSender, pattern: &str) -> Result<(), SendError<TapResult>> {
-    tx.send(TapResult::matched(pattern)).await
+/// Sends a 'matched' tap payload.
+async fn send_matched(tx: &mut TapSender, pattern: &str) -> Result<(), SendError<TapPayload>> {
+    tx.send(TapPayload::matched(pattern)).await
 }
 
-/// Sends a 'not matched' tap result.
-async fn send_not_matched(tx: &mut TapSender, pattern: &str) -> Result<(), SendError<TapResult>> {
-    tx.send(TapResult::not_matched(pattern)).await
+/// Sends a 'not matched' tap payload.
+async fn send_not_matched(tx: &mut TapSender, pattern: &str) -> Result<(), SendError<TapPayload>> {
+    tx.send(TapPayload::not_matched(pattern)).await
 }
 
-/// Makes a `RouterSink` that relays `LogEvent` as `TapResult::LogEvent` to a client.
+/// Makes a `RouterSink` that relays `LogEvent` as `TapPayload::LogEvent` to a client.
 fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
     let (event_tx, mut event_rx) = futures_mpsc::unbounded();
     let component_name = component_name.to_string();
@@ -100,7 +100,7 @@ fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
         while let Some(ev) = event_rx.next().await {
             if let Event::Log(ev) = ev {
                 let _ = tx
-                    .send(TapResult::LogEvent(component_name.clone(), ev))
+                    .send(TapPayload::LogEvent(component_name.clone(), ev))
                     .await;
             }
         }

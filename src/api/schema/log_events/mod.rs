@@ -4,7 +4,7 @@ mod notification;
 use event::LogEvent;
 
 use crate::{
-    api::tap::{TapNotification, TapResult, TapSink},
+    api::tap::{TapNotification, TapPayload, TapSink},
     topology::WatchRx,
 };
 
@@ -24,14 +24,14 @@ pub enum LogEventResult {
     Notification(notification::LogEventNotification),
 }
 
-/// Convert an `api::TapResult` to the equivalent GraphQL type.
-impl From<TapResult> for LogEventResult {
-    fn from(t: TapResult) -> Self {
+/// Convert an `api::TapPayload` to the equivalent GraphQL type.
+impl From<TapPayload> for LogEventResult {
+    fn from(t: TapPayload) -> Self {
         use notification::{LogEventNotification, LogEventNotificationType};
 
         match t {
-            TapResult::LogEvent(name, ev) => Self::LogEvent(LogEvent::new(&name, ev)),
-            TapResult::Notification(name, n) => match n {
+            TapPayload::LogEvent(name, ev) => Self::LogEvent(LogEvent::new(&name, ev)),
+            TapPayload::Notification(name, n) => match n {
                 TapNotification::Matched => Self::Notification(LogEventNotification::new(
                     &name,
                     LogEventNotificationType::Matched,
@@ -73,7 +73,7 @@ fn create_log_events_stream(
     interval: u64,
     limit: usize,
 ) -> impl Stream<Item = Vec<LogEventResult>> {
-    // Channel for receiving individual tap results. Since we can process at most `limit` per
+    // Channel for receiving individual tap payloads. Since we can process at most `limit` per
     // interval, this is capped to the same value.
     let (tap_tx, mut tap_rx) = mpsc::channel(limit);
 
@@ -103,7 +103,7 @@ fn create_log_events_stream(
 
         loop {
             select! {
-                // Process `TapResults`s. A tap result could contain a `LogEvent` or a notification.
+                // Process `TapPayload`s. A tap payload could contain a `LogEvent` or a notification.
                 // Notifications are emitted immediately; log events buffer until the next `interval`.
                 Some(tap) = tap_rx.next() => {
                     let tap = tap.into();
