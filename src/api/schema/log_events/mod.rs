@@ -75,7 +75,7 @@ fn create_log_events_stream(
 ) -> impl Stream<Item = Vec<LogEventResult>> {
     // Channel for receiving individual tap results. Since we can process at most `limit` per
     // interval, this is capped to the same value.
-    let (tx, mut rx) = mpsc::channel(limit);
+    let (tap_tx, mut tap_rx) = mpsc::channel(limit);
 
     // The resulting vector of `LogEventResult` sent ot the client. Only one result set will be streamed
     // back to the client at a time. This value is set higher than `1` to prevent blocking the event
@@ -84,7 +84,7 @@ fn create_log_events_stream(
 
     tokio::spawn(async move {
         // Create a tap sink. When this drops out of scope, clean up will be performed.
-        let _tap_sink = TapSink::new(&component_names, tx, watch_rx);
+        let _tap_sink = TapSink::new(watch_rx, tap_tx, &component_names);
 
         // A tick interval to represent when to 'cut' the results back to the client.
         let mut interval = time::interval(time::Duration::from_millis(interval));
@@ -105,7 +105,7 @@ fn create_log_events_stream(
             select! {
                 // Process `TapResults`s. A tap result could contain a `LogEvent` or a notification.
                 // Notifications are emitted immediately; log events buffer until the next `interval`.
-                Some(tap) = rx.next() => {
+                Some(tap) = tap_rx.next() => {
                     let tap = tap.into();
 
                     // Emit notifications immediately; these don't count as a 'batch'.

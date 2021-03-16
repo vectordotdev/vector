@@ -132,8 +132,6 @@ smpl_jwt = { version = "0.6.1", optional = true }
 async-graphql = { version = "=2.4.11", optional = true }
 async-graphql-warp = { version = "=2.4.11", optional = true }
 itertools = { version = "0.10.0", optional = true }
-weak-table = { version = "0.3.0", optional = true }
-parking_lot = { version = "0.11.1", optional = true }
 
 # API client
 crossterm = { version = "0.19.0", optional = true }
@@ -322,8 +320,6 @@ api = [
   "async-graphql-warp",
   "base64",
   "itertools",
-  "weak-table",
-  "parking_lot",
 ]
 
 # API client

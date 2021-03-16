@@ -48,16 +48,18 @@ impl TapResult {
     }
 }
 
+/// A tap sink spawns a process for listening to topology changes, and re-wiring sinks to
+/// observe `LogEvent`s that match the provided pattern.
 pub struct TapSink {
     _shutdown: ShutdownTx,
 }
 
 impl TapSink {
-    pub fn new(patterns: &[String], tx: TapSender, watch_rx: WatchRx) -> Self {
+    pub fn new(watch_rx: WatchRx, tap_tx: TapSender, patterns: &[String]) -> Self {
         let (_shutdown, shutdown_rx) = oneshot::channel();
         tokio::spawn(tap_handler(
             patterns.iter().cloned().collect(),
-            tx,
+            tap_tx,
             watch_rx,
             shutdown_rx,
         ));
@@ -66,6 +68,7 @@ impl TapSink {
     }
 }
 
+/// Returns a hashset of the patterns that component names match against.
 fn matched_patterns(patterns: &HashSet<String>, component_names: &[&String]) -> HashSet<String> {
     patterns
         .iter()
@@ -78,14 +81,17 @@ fn matched_patterns(patterns: &HashSet<String>, component_names: &[&String]) -> 
         .collect()
 }
 
+/// Sends a 'matched' tap result.
 async fn send_matched(tx: &mut TapSender, pattern: &str) -> Result<(), SendError<TapResult>> {
     tx.send(TapResult::matched(pattern)).await
 }
 
+/// Sends a 'not matched' tap result.
 async fn send_not_matched(tx: &mut TapSender, pattern: &str) -> Result<(), SendError<TapResult>> {
     tx.send(TapResult::not_matched(pattern)).await
 }
 
+/// Makes a `RouterSink` that relays `LogEvent` as `TapResult::LogEvent` to a client.
 fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
     let (event_tx, mut event_rx) = futures_mpsc::unbounded();
     let component_name = component_name.to_string();
@@ -103,6 +109,8 @@ fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
     Box::new(event_tx.sink_map_err(|_| ()))
 }
 
+/// Returns a tap handler that listens for topology changes, and connects sinks to observe
+/// `LogEvent`s` when a component matches one of more of the provided patterns.
 async fn tap_handler(
     patterns: HashSet<String>,
     mut tx: TapSender,

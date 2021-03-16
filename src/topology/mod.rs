@@ -44,6 +44,9 @@ type BuiltBuffer = (
 
 type Outputs = HashMap<String, fanout::ControlChannel>;
 
+// Watcher types for topology changes. These are currently specific to receiving
+// `Outputs`. This could be expanded in the future to send an enum of types if, for example,
+// this included a new 'Inputs' type.
 type WatchTx = watch::Sender<Outputs>;
 pub type WatchRx = watch::Receiver<Outputs>;
 
@@ -508,7 +511,8 @@ impl RunningTopology {
             self.setup_inputs(&name, new_pieces);
         }
 
-        // Broadcast changes.
+        // Broadcast changes. When tokio 1.x lands, we can wrap this is an `.is_closed()`
+        // check to avoid premature cloning.
         self.watch
             .0
             .broadcast(self.outputs.clone())
@@ -738,8 +742,10 @@ impl RunningTopology {
         &self.config
     }
 
-    /// Subscribe to output changes.
-    pub fn watch_outputs(&self) -> watch::Receiver<Outputs> {
+    /// Subscribe to topology changes. This will receive an `Outputs` currently, but may be
+    /// expanded in the future to accommodate `Inputs`. This is used by the 'tap' API to observe
+    /// config changes, and re-wire tap sinks.
+    pub fn watch(&self) -> watch::Receiver<Outputs> {
         self.watch.1.clone()
     }
 }

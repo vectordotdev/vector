@@ -217,7 +217,7 @@ impl Application {
                             playground: api_config.playground
                         });
 
-                        Some(api::Server::start(topology.config(), topology.watch_outputs()))
+                        Some(api::Server::start(topology.config(), topology.watch()))
                     } else {
                         info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
                         None
