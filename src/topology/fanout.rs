@@ -221,11 +221,11 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_notready() {
-        let (tx_a, rx_a) = mpsc::channel(2);
+        let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = mpsc::channel(1);
+        let (tx_b, rx_b) = mpsc::channel(0);
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
-        let (tx_c, rx_c) = mpsc::channel(2);
+        let (tx_c, rx_c) = mpsc::channel(1);
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
 
         let (mut fanout, _fanout_control) = Fanout::new();
@@ -308,11 +308,11 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_shrink_after_notready() {
-        let (tx_a, rx_a) = mpsc::channel(2);
+        let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = mpsc::channel(1);
+        let (tx_b, rx_b) = mpsc::channel(0);
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
-        let (tx_c, rx_c) = mpsc::channel(2);
+        let (tx_c, rx_c) = mpsc::channel(1);
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
 
         let (mut fanout, mut fanout_control) = Fanout::new();
@@ -343,11 +343,11 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_shrink_at_notready() {
-        let (tx_a, rx_a) = mpsc::channel(2);
+        let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = mpsc::channel(1);
+        let (tx_b, rx_b) = mpsc::channel(0);
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
-        let (tx_c, rx_c) = mpsc::channel(2);
+        let (tx_c, rx_c) = mpsc::channel(1);
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
 
         let (mut fanout, mut fanout_control) = Fanout::new();
@@ -378,11 +378,11 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_shrink_before_notready() {
-        let (tx_a, rx_a) = mpsc::channel(2);
+        let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = mpsc::channel(1);
+        let (tx_b, rx_b) = mpsc::channel(0);
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
-        let (tx_c, rx_c) = mpsc::channel(2);
+        let (tx_c, rx_c) = mpsc::channel(1);
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
 
         let (mut fanout, mut fanout_control) = Fanout::new();
@@ -540,7 +540,7 @@ mod tests {
                     fanout.add(name, tx);
                 }
                 None => {
-                    let (tx, rx) = mpsc::channel(1);
+                    let (tx, rx) = mpsc::channel(0);
                     let tx = Box::new(tx.sink_map_err(|_| unreachable!()));
                     fanout.add(name, tx);
                     rx_channels.push(rx);

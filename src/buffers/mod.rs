@@ -261,7 +261,7 @@ mod test {
     #[tokio::test]
     async fn drop_when_full() {
         future::lazy(|cx| {
-            let (tx, rx) = mpsc::channel(3);
+            let (tx, rx) = mpsc::channel(2);
 
             let mut tx = Box::pin(DropWhenFull::new(tx));
 
