@@ -192,8 +192,7 @@ impl Sink<Event> for Fanout {
 mod tests {
     use super::{ControlMessage, Fanout};
     use crate::{test_util::collect_ready, Event};
-    use futures::channel::mpsc;
-    use futures::{stream, Sink, SinkExt, StreamExt};
+    use futures::{channel::mpsc, stream, FutureExt, Sink, SinkExt, StreamExt};
     use std::{
         pin::Pin,
         task::{Context, Poll},
@@ -472,15 +471,16 @@ mod tests {
         let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
         fanout.replace("a".to_string(), None);
 
-        tokio::spawn(async move {
-            sleep(Duration::from_millis(100)).await;
-            fanout_control
-                .send(ControlMessage::Replace("a".to_string(), Some(tx_a2)))
-                .await
-                .unwrap();
-        });
-
-        fanout.send(recs[2].clone()).await.unwrap();
+        futures::join!(
+            async {
+                sleep(Duration::from_millis(100)).await;
+                fanout_control
+                    .send(ControlMessage::Replace("a".to_string(), Some(tx_a2)))
+                    .await
+                    .unwrap();
+            },
+            fanout.send(recs[2].clone()).map(|_| ())
+        );
 
         assert_eq!(collect_ready(rx_a1).await, &recs[..2]);
         assert_eq!(collect_ready(rx_b).await, recs);
