@@ -6,24 +6,75 @@ edition = "2018"
 publish = false
 license = "MIT"
 
-[dependencies]
-bstr = "0.2"
-bytes = "0.5"
-chrono = { version = "0.4.19", features = ["serde"] }
-crc = "1.8.1"
-dashmap = "4.0.2"
-flate2 = "1.0.19"
-futures = { version = "0.3", default-features = false, features = ["executor"] }
-glob = "0.3.0"
-indexmap = {version = "1.6.2", features = ["serde"]}
-libc =  "0.2"
-scan_fmt = "0.2.6"
-serde = { version = "1.0.117", features = ["derive"] }
-serde_json = "1.0.33"
-tokio = { version = "0.2.13", features = ["rt-core", "blocking", "time"] }
-tracing = "0.1.15"
+[target.'cfg(windows)'.dependencies]
+libc = "0.2"
 winapi = { version = "0.3", features = ["winioctl"] }
 
+[dependencies]
+crc = "1.8.1"
+glob = "0.3.0"
+scan_fmt = "0.2.6"
+
+[dependencies.bstr]
+version = "0.2"
+default-features = false
+features = []
+
+[dependencies.bytes]
+version = "0.5"
+default-features = false
+features = []
+
+[dependencies.chrono]
+version = "0.4"
+default-features = false
+features = ["clock", "serde"]
+
+[dependencies.dashmap]
+version = "4.0"
+default-features = false
+features = []
+
+[dependencies.indexmap]
+version = "1.6"
+default-features = false
+features = ["serde"]
+
+[dependencies.flate2]
+version = "1.0"
+default-features = false
+features = ["rust_backend"]
+
+[dependencies.futures]
+version = "0.3"
+default-features = false
+features = ["executor"]
+
+[dependencies.serde]
+version = "1.0"
+default-features = false
+features = ["derive"]
+
+[dependencies.serde_json]
+version = "1.0"
+default-features = false
+features = []
+
+[dependencies.tracing]
+version = "0.1"
+default-features = false
+features = []
+
+[dependencies.tokio]
+version = "0.2"
+default-features = false
+features = ["rt-core", "blocking", "time"]
+
 [dev-dependencies]
+criterion = "0.3"
 quickcheck = "1"
 tempfile = "3.1.0"
+
+[[bench]]
+name = "buffer"
+harness = false
