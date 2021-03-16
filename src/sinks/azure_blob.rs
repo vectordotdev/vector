@@ -30,6 +30,7 @@ use std::{
     task::{Context, Poll},
 };
 use tower::{Service, ServiceBuilder};
+use tracing_futures::Instrument;
 
 #[derive(Clone)]
 pub struct AzureBlobSink {
@@ -122,6 +123,7 @@ impl AzureBlobSinkConfig {
         let container_name = self.container_name.clone().unwrap();
         let blob_time_format = self.blob_time_format.clone().unwrap();
         let blob = AzureBlobSink { client };
+        // todo: implement retries
         let svc = ServiceBuilder::new()
             .map(move |request| {
                 build_request(
@@ -135,11 +137,11 @@ impl AzureBlobSinkConfig {
 
         let encoding = self.encoding.clone();
         let blob_prefix = self.blob_prefix.as_deref().unwrap();
-        let blob_prefix_template = Template::try_from(blob_prefix)?;
+        let blob_prefix = Template::try_from(blob_prefix)?;
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, compression));
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .with_flat_map(move |event| {
-                stream::iter(encode_event(event, &blob_prefix_template, &encoding)).map(Ok)
+                stream::iter(encode_event(event, &blob_prefix, &encoding)).map(Ok)
             })
             .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
 
@@ -187,7 +189,6 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
     }
 
     fn call(&mut self, request: AzureBlobSinkRequest) -> Self::Future {
-        // todo: add instrumentation
         let client = self.client.clone();
         let container_name = request.container_name.clone();
         let blob_name = request.blob_name.clone();
@@ -202,6 +203,7 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
                 .with_content_encoding(request.content_encoding.unwrap())
                 .with_content_type(request.content_type.unwrap())
                 .finalize()
+                .instrument(info_span!("request"))
                 .await
         })
     }
@@ -236,6 +238,7 @@ fn encode_event(
 
     encoding.apply_rules(&mut event);
 
+    // todo: implement text-plain encoding
     let log = event.into_log();
     let bytes = match encoding.codec() {
         Encoding::Json => {
