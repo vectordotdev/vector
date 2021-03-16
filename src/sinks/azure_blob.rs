@@ -4,7 +4,8 @@ use crate::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
             sink::Response,
-            BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
+            retries::RetryLogic,
+            BatchConfig, BatchSettings, Buffer, Compression, Concurrency, PartitionBatchSink, PartitionBuffer,
             PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -21,6 +22,7 @@ use azure_sdk_storage_core::{key_client::KeyClient, prelude::client::from_connec
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
+use lazy_static::lazy_static;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -54,6 +56,9 @@ pub struct AzureBlobSinkConfig {
 }
 
 #[derive(Debug, Clone)]
+struct AzureBlobRetryLogic;
+
+#[derive(Debug, Clone)]
 struct AzureBlobSinkRequest {
     container_name: String,
     blob_name: String,
@@ -76,6 +81,14 @@ enum HealthcheckError {
     UnknownContainer { container: String },
     #[snafu(display("Unknown status code: {}", status))]
     Unknown { status: StatusCode },
+}
+
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        concurrency: Concurrency::Fixed(50),
+        rate_limit_num: Some(250),
+        ..Default::default()
+    };
 }
 
 impl GenerateConfig for AzureBlobSinkConfig {
@@ -115,6 +128,7 @@ impl SinkConfig for AzureBlobSinkConfig {
 
 impl AzureBlobSinkConfig {
     pub fn new(&self, client: KeyClient, cx: SinkContext) -> Result<VectorSink> {
+        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let batch = BatchSettings::default()
             .bytes(10 * 1024 * 1024)
             .timeout(300)
@@ -123,16 +137,16 @@ impl AzureBlobSinkConfig {
         let container_name = self.container_name.clone().unwrap();
         let blob_time_format = self.blob_time_format.clone().unwrap();
         let blob = AzureBlobSink { client };
-        // todo: implement retries
         let svc = ServiceBuilder::new()
-            .map(move |request| {
+            .map(move |partition| {
                 build_request(
-                    request,
+                    partition,
                     compression,
                     container_name.clone(),
                     blob_time_format.clone(),
                 )
             })
+            .settings(request, AzureBlobRetryLogic)
             .service(blob);
 
         let encoding = self.encoding.clone();
@@ -220,6 +234,21 @@ impl Compression {
 
 impl Response for PutBlockBlobResponse {}
 
+impl RetryLogic for AzureBlobRetryLogic {
+    type Error = AzureError;
+    type Response = PutBlockBlobResponse;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        match error {
+            AzureError::UnexpectedHTTPResult(result) => {
+                let status_code = result.status_code();
+                status_code.is_server_error() || status_code == StatusCode::TOO_MANY_REQUESTS
+            }
+            _ => false,
+        }
+    }
+}
+
 fn encode_event(
     mut event: Event,
     blob_prefix: &Template,
@@ -250,12 +279,12 @@ fn encode_event(
 }
 
 fn build_request(
-    request: PartitionInnerBuffer<Vec<u8>, Bytes>,
+    partition: PartitionInnerBuffer<Vec<u8>, Bytes>,
     compression: Compression,
     container_name: String,
     blob_time_format: String,
 ) -> AzureBlobSinkRequest {
-    let (inner, key) = request.into_parts();
+    let (inner, key) = partition.into_parts();
     let filename = Utc::now().format(&blob_time_format).to_string();
     let blob = String::from_utf8_lossy(&key[..]).into_owned();
     let blob = format!("{}{}.{}", blob, filename, compression.extension());
