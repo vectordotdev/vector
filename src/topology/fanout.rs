@@ -557,10 +557,11 @@ mod tests {
         // Start collecting from all at once
         let collectors = rx_channels
             .into_iter()
-            .map(|rx| rx.collect::<Vec<_>>())
+            .map(|rx| tokio::spawn(rx.collect::<Vec<_>>()))
             .collect::<Vec<_>>();
+
         for collect in collectors {
-            assert_eq!(collect.await, recs);
+            assert_eq!(collect.await.unwrap(), recs);
         }
     }
 
