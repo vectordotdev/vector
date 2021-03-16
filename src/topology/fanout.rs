@@ -106,8 +106,6 @@ impl Fanout {
     where
         F: Fn(&mut Pin<RouterSink>, &mut Context<'_>) -> Poll<Result<(), ()>>,
     {
-        self.process_control_messages(cx);
-
         let mut poll_result = Poll::Ready(Ok(()));
 
         let mut i = 0;
@@ -180,6 +178,8 @@ impl Sink<Event> for Fanout {
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), ()>> {
+        self.process_control_messages(cx);
+
         self.poll_sinks(cx, |sink, cx| sink.as_mut().poll_flush(cx))
     }
 
