@@ -3,10 +3,11 @@ mod notification;
 
 use event::LogEvent;
 
-use crate::api::{
-    tap::{TapController, TapNotification, TapResult, TapSink},
-    ControlSender,
+use crate::{
+    api::tap::{TapNotification, TapResult, TapSink},
+    topology::WatchRx,
 };
+
 use async_graphql::{validators::IntRange, Context, Subscription, Union};
 use futures::StreamExt;
 use itertools::Itertools;
@@ -57,13 +58,9 @@ impl LogEventsSubscription {
         #[graphql(default = 500)] interval: u32,
         #[graphql(default = 100, validator(IntRange(min = "1", max = "10_000")))] limit: u32,
     ) -> impl Stream<Item = Vec<LogEventResult>> + 'a {
-        let control_tx = ctx.data_unchecked::<ControlSender>().clone();
-        create_log_events_stream(
-            control_tx,
-            &component_names,
-            interval as u64,
-            limit as usize,
-        )
+        let watch_rx = ctx.data_unchecked::<WatchRx>().clone();
+
+        create_log_events_stream(watch_rx, component_names, interval as u64, limit as usize)
     }
 }
 
@@ -71,8 +68,8 @@ impl LogEventsSubscription {
 /// control messages that bubble up the application if the sink goes away. The stream contains
 /// all matching events; filtering should be done at the caller level.
 fn create_log_events_stream(
-    control_tx: ControlSender,
-    component_names: &[String],
+    watch_rx: WatchRx,
+    component_names: Vec<String>,
     interval: u64,
     limit: usize,
 ) -> impl Stream<Item = Vec<LogEventResult>> {
@@ -85,12 +82,9 @@ fn create_log_events_stream(
     // pipeline on slower client connections, but low enough to apply a modest cap on mem usage.
     let (mut log_tx, log_rx) = mpsc::channel::<Vec<LogEventResult>>(10);
 
-    let tap_sink = TapSink::new(&component_names, tx);
-
     tokio::spawn(async move {
-        // The tap controller is scoped to the stream. When it's dropped, it bubbles a control
-        // message up to the signal handler to remove the ad hoc sinks from topology.
-        let _control = TapController::new(control_tx, tap_sink);
+        // Create a tap sink. When this drops out of scope, clean up will be performed.
+        let _tap_sink = TapSink::new(&component_names, tx, watch_rx);
 
         // A tick interval to represent when to 'cut' the results back to the client.
         let mut interval = time::interval(time::Duration::from_millis(interval));

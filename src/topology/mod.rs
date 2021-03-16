@@ -29,7 +29,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tokio::{
-    sync::mpsc,
+    sync::{mpsc, watch},
     time::{delay_until, interval, Duration, Instant},
 };
 use tracing_futures::Instrument;
@@ -42,16 +42,22 @@ type BuiltBuffer = (
     buffers::Acker,
 );
 
+type Outputs = HashMap<String, fanout::ControlChannel>;
+
+type WatchTx = watch::Sender<Outputs>;
+pub type WatchRx = watch::Receiver<Outputs>;
+
 #[allow(dead_code)]
 pub struct RunningTopology {
     inputs: HashMap<String, buffers::BufferInputCloner>,
-    pub outputs: HashMap<String, fanout::ControlChannel>,
+    pub outputs: Outputs,
     source_tasks: HashMap<String, TaskHandle>,
     tasks: HashMap<String, TaskHandle>,
     shutdown_coordinator: SourceShutdownCoordinator,
     detach_triggers: HashMap<String, DisabledTrigger>,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
+    watch: (WatchTx, WatchRx),
 }
 
 pub async fn start_validated(
@@ -70,6 +76,7 @@ pub async fn start_validated(
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
         abort_tx,
+        watch: watch::channel(HashMap::new()),
     };
 
     if !running_topology
@@ -500,6 +507,12 @@ impl RunningTopology {
         for name in &diff.sinks.to_add {
             self.setup_inputs(&name, new_pieces);
         }
+
+        // Broadcast changes.
+        self.watch
+            .0
+            .broadcast(self.outputs.clone())
+            .expect("Couldn't broadcast config changes.");
     }
 
     /// Starts new and changed pieces of topology.
@@ -723,6 +736,11 @@ impl RunningTopology {
     /// Borrows the Config.
     pub fn config(&self) -> &Config {
         &self.config
+    }
+
+    /// Subscribe to output changes.
+    pub fn watch_outputs(&self) -> watch::Receiver<Outputs> {
+        self.watch.1.clone()
     }
 }
 
