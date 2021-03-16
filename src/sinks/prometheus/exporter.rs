@@ -2,7 +2,9 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
     event::metric::MetricKind,
-    internal_events::PrometheusServerRequestComplete,
+    internal_events::{
+        PrometheusEventsProcessed, PrometheusInvalidRequestPath, PrometheusServerRequestComplete,
+    },
     sinks::{
         util::{statistic::validate_quantiles, MetricEntry, StreamSink},
         Healthcheck, VectorSink,
@@ -175,19 +177,24 @@ fn handle(
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/metrics") => {
             let mut s = collector::StringCollector::new();
+            let count = metrics.len();
 
             for (MetricEntry(metric), _) in metrics {
                 s.encode_metric(default_namespace, &buckets, quantiles, expired, metric);
             }
 
-            *response.body_mut() = s.finish().into();
+            let body = s.finish();
+            let byte_size = body.len();
+            *response.body_mut() = body.into();
+            emit!(PrometheusEventsProcessed { count, byte_size });
 
             response.headers_mut().insert(
                 "Content-Type",
                 HeaderValue::from_static("text/plain; version=0.0.4"),
             );
         }
-        _ => {
+        (_, path) => {
+            emit!(PrometheusInvalidRequestPath { path });
             *response.status_mut() = StatusCode::NOT_FOUND;
         }
     }

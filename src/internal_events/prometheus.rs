@@ -158,3 +158,33 @@ impl InternalEvent for PrometheusServerRequestComplete {
         counter!("requests_received_total", 1);
     }
 }
+
+#[derive(Debug)]
+pub struct PrometheusEventsProcessed {
+    pub count: usize,
+    pub byte_size: usize,
+}
+
+impl InternalEvent for PrometheusEventsProcessed {
+    fn emit_metrics(&self) {
+        counter!("processed_events_total", self.count as u64);
+        counter!("processed_bytes_total", self.byte_size as u64);
+    }
+}
+
+#[derive(Debug)]
+pub struct PrometheusInvalidRequestPath<'a> {
+    pub path: &'a str,
+}
+
+impl<'a> InternalEvent for PrometheusInvalidRequestPath<'a> {
+    fn emit_logs(&self) {
+        error!(message = "Invalid request path.", path = %self.path);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("request_errors_total", 1,
+                 "error_type" => "invalid_request_path",
+                 "path" => self.path.to_owned());
+    }
+}
