@@ -1,4 +1,3 @@
-use shared::btreemap;
 use vrl::prelude::*;
 use vrl_structures::Map;
 

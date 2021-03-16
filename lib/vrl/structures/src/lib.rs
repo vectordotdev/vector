@@ -22,9 +22,30 @@ macro_rules! map {
     };
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Map<K, V> {
     inner: Option<BTreeMap<K, V>>,
+}
+
+impl<K, V> PartialEq for Map<K, V>
+where
+    K: PartialEq<K>,
+    V: PartialEq<V>,
+{
+    fn eq(&self, other: &Map<K, V>) -> bool {
+        match (&self.inner, &other.inner) {
+            (None, Some(omap)) => omap.is_empty(),
+            (Some(smap), None) => smap.is_empty(),
+            (None, None) => true,
+            (Some(smap), Some(omap)) => {
+                if smap.len() != other.len() {
+                    return false;
+                }
+
+                self.iter().zip(omap).all(|(a, b)| a == b)
+            }
+        }
+    }
 }
 
 pub struct Iter<'a, K, V> {

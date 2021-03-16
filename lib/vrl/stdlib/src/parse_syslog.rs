@@ -149,15 +149,15 @@ fn type_def() -> Map<&'static str, TypeDef> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::prelude::*;
-    use shared::btreemap;
+    use chrono::TimeZone;
+    use vrl_structures::map;
 
     test_function![
         parse_syslog => ParseSyslog;
 
         valid {
             args: func_args![value: r#"<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!"#],
-            want: Ok(btreemap! {
+            want: Ok(map! {
                 "severity" => "notice",
                 "facility" => "user",
                 "timestamp" => chrono::Utc.ymd(2020, 3, 13).and_hms_milli(20, 45, 38, 119),
@@ -169,7 +169,7 @@ mod tests {
                 "exampleSDID@32473.eventSource" => "Application",
                 "exampleSDID@32473.eventID" => "1011",
                 "message" => "Try to override the THX port, maybe it will reboot the neural interface!",
-                "version" => 1,
+                "version" => 1
             }),
             tdef: TypeDef::new().fallible().object(type_def()),
         }
@@ -182,31 +182,31 @@ mod tests {
 
         haproxy {
             args: func_args![value: r#"<133>Jun 13 16:33:35 haproxy[73411]: Proxy sticky-servers started."#],
-            want: Ok(btreemap! {
+            want: Ok(map! {
                     "facility" => "local0",
                     "severity" => "notice",
                     "message" => "Proxy sticky-servers started.",
                     "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
                     "appname" => "haproxy",
-                    "procid" => 73411,
+                    "procid" => 73411
             }),
             tdef: TypeDef::new().fallible().object(type_def()),
         }
 
         missing_pri {
             args: func_args![value: r#"Jun 13 16:33:35 haproxy[73411]: I am missing a pri."#],
-            want: Ok(btreemap! {
+            want: Ok(map! {
                 "message" => "I am missing a pri.",
                 "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
                 "appname" => "haproxy",
-                "procid" => 73411,
+                "procid" => 73411
             }),
             tdef: TypeDef::new().fallible().object(type_def()),
         }
 
         empty_sd_element {
             args: func_args![value: r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [empty] qwerty"#],
-            want: Ok(btreemap!{
+            want: Ok(map!{
                 "message" => "qwerty",
                 "appname" => "root",
                 "facility" => "user",
@@ -215,14 +215,14 @@ mod tests {
                 "procid" => 8449,
                 "severity" => "notice",
                 "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(2019, 2, 13).and_hms_milli(19, 48, 34, 0)),
-                "version" => 1,
+                "version" => 1
             }),
             tdef: TypeDef::new().fallible().object(type_def()),
         }
 
         non_empty_sd_element {
             args: func_args![value: r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [non_empty x="1"][empty] qwerty"#],
-            want: Ok(btreemap!{
+            want: Ok(map!{
                 "message" => "qwerty",
                 "appname" => "root",
                 "facility" => "user",
@@ -232,7 +232,7 @@ mod tests {
                 "severity" => "notice",
                 "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(2019, 2, 13).and_hms_milli(19, 48, 34, 0)),
                 "version" => 1,
-                "non_empty.x" => "1",
+                "non_empty.x" => "1"
             }),
             tdef: TypeDef::new().fallible().object(type_def()),
         }
