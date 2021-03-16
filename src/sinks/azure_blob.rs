@@ -1,12 +1,12 @@
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext},
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
-            sink::Response,
             retries::RetryLogic,
-            BatchConfig, BatchSettings, Buffer, Compression, Concurrency, PartitionBatchSink, PartitionBuffer,
-            PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
+            sink::Response,
+            BatchConfig, BatchSettings, Buffer, Compression, Concurrency, PartitionBatchSink,
+            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -22,8 +22,8 @@ use azure_sdk_storage_core::{key_client::KeyClient, prelude::client::from_connec
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
-use lazy_static::lazy_static;
 use http::StatusCode;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
@@ -71,6 +71,7 @@ struct AzureBlobSinkRequest {
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
     Json,
+    Text,
 }
 
 #[derive(Debug, Snafu)]
@@ -267,11 +268,18 @@ fn encode_event(
 
     encoding.apply_rules(&mut event);
 
-    // todo: implement text-plain encoding
     let log = event.into_log();
     let bytes = match encoding.codec() {
         Encoding::Json => {
             serde_json::to_vec(&log).expect("Failed to encode event as json, this is a bug!")
+        }
+        Encoding::Text => {
+            let mut bytes = log
+                .get(log_schema().message_key())
+                .map(|v| v.as_bytes().to_vec())
+                .expect("Failed to encode event as text");
+            bytes.push(b'\n');
+            bytes
         }
     };
 
