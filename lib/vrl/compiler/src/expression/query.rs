@@ -2,7 +2,7 @@ use crate::expression::{Container, FunctionCall, Resolved, Variable};
 use crate::parser::ast::Ident;
 use crate::{Context, Expression, Path, State, TypeDef, Value};
 use std::fmt;
-use vrl_structures::Map;
+use vrl_structures::map::Map;
 
 #[derive(Clone, PartialEq)]
 pub struct Query {

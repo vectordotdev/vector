@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use vrl::{value::Kind, Value};
 #[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
-use vrl_structures::Map;
+use vrl_structures::map::Map;
 
 /// Rounds the given number to the given precision.
 /// Takes a function parameter so the exact rounding function (ceil, floor or round)

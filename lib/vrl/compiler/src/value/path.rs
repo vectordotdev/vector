@@ -1,7 +1,7 @@
 use super::Value;
 use crate::path::Segment::*;
 use crate::Path;
-use vrl_structures::Map;
+use vrl_structures::map::Map;
 
 impl Value {
     /// Insert the current value into a given path.

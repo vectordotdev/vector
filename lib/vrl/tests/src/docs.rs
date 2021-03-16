@@ -3,7 +3,7 @@ use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::fs;
 use std::process::Command;
-use vrl_structures::Map as VrlMap;
+use vrl_structures::map::Map as VrlMap;
 
 use crate::Test;
 

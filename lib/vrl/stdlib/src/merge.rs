@@ -1,4 +1,4 @@
-use vrl_structures::Map;
+use vrl_structures::map::Map;
 
 use vrl::prelude::*;
 

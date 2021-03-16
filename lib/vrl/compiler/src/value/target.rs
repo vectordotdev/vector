@@ -2,7 +2,7 @@ use crate::{
     path::{Field, Segment, Segment::*},
     Path, Target, Value,
 };
-use vrl_structures::Map;
+use vrl_structures::map::Map;
 
 impl Target for Value {
     fn insert(&mut self, path: &Path, value: Value) -> Result<(), String> {
@@ -63,7 +63,7 @@ impl Value {
     ///    ```rust
     ///    # use vrl_compiler::{Path, Value};
     ///    # use std::str::FromStr;
-    ///    # use vrl_structures::Map;
+    ///    # use vrl_structures::map::Map;
     ///    # use std::iter::FromIterator;
     ///
     ///    let map = Map::from_iter(vec![("foo".to_owned(), true.into())].into_iter());
@@ -92,7 +92,7 @@ impl Value {
     /// ```
     /// # use vrl_compiler::{Path, Value};
     /// # use std::str::FromStr;
-    /// # use vrl_structures::Map;
+    /// # use vrl_structures::map::Map;
     /// # use std::iter::FromIterator;
     ///
     /// let fields = vec![("foo".to_owned(), Value::from("bar"))];
@@ -114,7 +114,7 @@ impl Value {
     /// ```
     /// # use vrl_compiler::{value, Path, Value};
     /// # use std::str::FromStr;
-    /// # use vrl_structures::Map;
+    /// # use vrl_structures::map::Map;
     /// # use std::iter::FromIterator;
     ///
     /// let mut value = value!([false, true]);

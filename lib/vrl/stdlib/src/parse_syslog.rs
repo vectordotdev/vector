@@ -1,7 +1,7 @@
 use chrono::{DateTime, Datelike, Utc};
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use vrl::prelude::*;
-use vrl_structures::Map;
+use vrl_structures::map::Map;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseSyslog;

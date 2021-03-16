@@ -4,7 +4,7 @@ use vrl::{
     diagnostic::{Label, Span},
     prelude::*,
 };
-use vrl_structures::Map;
+use vrl_structures::map::Map;
 
 #[derive(Debug)]
 pub enum Error {

@@ -12,7 +12,7 @@ use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 use ordered_float::NotNan;
 use std::fmt;
-use vrl_structures::Map;
+use vrl_structures::map::Map;
 
 pub use self::regex::Regex;
 pub use error::Error;

@@ -7,7 +7,7 @@ use nom::{
     IResult,
 };
 use vrl::prelude::*;
-use vrl_structures::Map;
+use vrl_structures::map::Map;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseAwsAlbLog;
