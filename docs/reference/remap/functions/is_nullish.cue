@@ -3,9 +3,8 @@ package metadata
 remap: functions: is_nullish: {
 	category: "Type"
 	description: """
-		Determines whether the `value` is "nullish".
-
-		Nullish indicates the absence of a meaningful value.
+		Determines whether the `value` is "nullish," where nullish denotes the absence of a
+		meaningful value.
 		"""
 
 	arguments: [
@@ -20,9 +19,10 @@ remap: functions: is_nullish: {
 	return: {
 		types: ["boolean"]
 		rules: [
-			#"If `value` is `null`, then `true` is returned."#,
-			#"If `value` is `"-"`, then `true` is returned."#,
-			#"If `value` is whitespace, as defined by [Unicode `White_Space` property](\#(urls.unicode_whitespace)), then `true` is returned."#,
+			#"Returns `true` if `value` is `null`."#,
+			#"Returns `true` if `value` is `"-"`."#,
+			#"Returns `true` if `value` is whitespace as defined by [Unicode `White_Space` property](\#(urls.unicode_whitespace))."#,
+			#"Returns `false` if `value` is anything else."#,
 		]
 	}
 

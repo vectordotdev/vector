@@ -18,9 +18,9 @@ remap: functions: length: {
 	return: {
 		types: ["integer"]
 		rules: [
-			"If `value` is an array, the size of the array is returned.",
-			"If `value` is a string, the size of the string is returned.",
-			"If `value` is a map, the number of map keys is returned (nested keys are ignored)",
+			"Returns the size of the array if `value` is an array.",
+			"Returns the size of the string if `value` is a string.",
+			"Returns the number of map keys if `value` is a map (nested keys are ignored)",
 		]
 	}
 

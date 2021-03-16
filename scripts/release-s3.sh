@@ -66,7 +66,7 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   echo "Uploaded archives"
 
   echo "Redirecting old artifact names"
-  find "$td_nightly" -maxdepth 1 -type f -print0 | while read -r -d $'\0' file  ; do
+  for file in $(aws s3api list-objects-v2 --bucket packages.timber.io --prefix "vector/$i/" --query 'Contents[*].Key' --output text  | tr "\t" "\n" | grep '\-nightly'); do
     file=$(basename "$file")
     # vector-nightly-amd64.deb -> vector-amd64.deb
     echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/nightly/$DATE/${file/-nightly/}" --website-redirect "/vector/nightly/$DATE/$file" --acl public-read
@@ -93,31 +93,25 @@ elif [[ "$CHANNEL" == "latest" ]]; then
   # shellcheck disable=SC2001
   VERSION_MAJOR_X="$(echo "$VERSION" | sed 's/\.[0-9]*\.[0-9]*$/.X/g')"
 
-  for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X"; do
+  for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X" "latest"; do
     # Upload the specific version
     echo "Uploading artifacts to s3://packages.timber.io/vector/$i/"
     aws s3 cp "$td" "s3://packages.timber.io/vector/$i/" --recursive --sse --acl public-read
-  done
 
-  for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X"; do
     # Delete anything that isn't the current version
     echo "Deleting old artifacts from s3://packages.timber.io/vector/$i/"
-    aws s3 rm "s3://packages.timber.io/vector/$i/" --exclude "*$VERSION_EXACT*"
+    aws s3 rm "s3://packages.timber.io/vector/$i/" --recursive --exclude "*$VERSION_EXACT*"
     echo "Deleted old versioned artifacts"
-  done
 
-  echo "Uploading artifacts to s3://packages.timber.io/vector/latest/"
-  aws s3 cp "$td_latest" "s3://packages.timber.io/vector/latest/" --recursive --sse --acl public-read
-  echo "Uploaded latest archives"
-
-  echo "Redirecting old artifact names"
-  find "$td" -maxdepth 1 -type f -print0 | while read -r -d $'\0' file  ; do
-    file=$(basename "$file")
-    # vector-$version-amd64.deb -> vector-amd64.deb
-    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/$i/${file/-$i/}" --website-redirect "/vector/$i/$file" --acl public-read
-    echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/latest/${file/-$i/}" --website-redirect "/vector/latest/$file" --acl public-read
+    echo "Redirecting old artifact names in s3://packages.timber.io/vector/$i/"
+    for file in $(aws s3api list-objects-v2 --bucket packages.timber.io --prefix "vector/$i/" --query 'Contents[*].Key' --output text  | tr "\t" "\n" | grep "\-$VERSION_EXACT"); do
+      file=$(basename "$file")
+      # vector-$version-amd64.deb -> vector-amd64.deb
+      echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/$i/${file/-$VERSION_EXACT/}" --website-redirect "/vector/$i/$file" --acl public-read
+      echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/latest/${file/-$VERSION_EXACT/}" --website-redirect "/vector/latest/$file" --acl public-read
+    done
+    echo "Redirected old artifact names"
   done
-  echo "Redirected old artifact names"
 
   # Verify that the files exist and can be downloaded
   sleep "$VERIFY_TIMEOUT"

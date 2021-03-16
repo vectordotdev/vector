@@ -117,96 +117,79 @@ impl Expression for ParseDurationFn {
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
-    // use crate::map;
+    use super::*;
 
-    // vrl::test_type_def![
-    //     value_string {
-    //         expr: |_| ParseDurationFn {
-    //             value: Literal::from("foo").boxed(),
-    //             unit: Literal::from("foo").boxed(),
-    //         },
-    //         def: TypeDef { fallible: true, kind: value::Kind::Float, ..Default::default() },
-    //     }
+    test_function![
+        parse_duration => ParseDuration;
 
-    //     optional_expression {
-    //         expr: |_| ParseDurationFn {
-    //             value: Box::new(Noop),
-    //             unit: Literal::from("foo").boxed(),
-    //         },
-    //         def: TypeDef { fallible: true, kind: value::Kind::Float, ..Default::default() },
-    //     }
-    // ];
+        s_m {
+            args: func_args![value: "30s",
+                             unit: "m"],
+            want: Ok(value!(0.5)),
+            tdef: TypeDef::new().fallible().float(),
+        }
 
-    // #[test]
-    // fn parse_duration() {
-    //     let cases = vec![
-    //         (
-    //             map![],
-    //             Ok(0.5.into()),
-    //             ParseDurationFn::new(Box::new(Literal::from("30s")), "m"),
-    //         ),
-    //         (
-    //             map![],
-    //             Ok(1.2.into()),
-    //             ParseDurationFn::new(Box::new(Literal::from("1200ms")), "s"),
-    //         ),
-    //         (
-    //             map![],
-    //             Ok(100.0.into()),
-    //             ParseDurationFn::new(Box::new(Literal::from("100ms")), "ms"),
-    //         ),
-    //         (
-    //             map![],
-    //             Ok(1.005.into()),
-    //             ParseDurationFn::new(Box::new(Literal::from("1005ms")), "s"),
-    //         ),
-    //         (
-    //             map![],
-    //             Ok(0.0001.into()),
-    //             ParseDurationFn::new(Box::new(Literal::from("100ns")), "ms"),
-    //         ),
-    //         (
-    //             map![],
-    //             Ok(86400.0.into()),
-    //             ParseDurationFn::new(Box::new(Literal::from("1d")), "s"),
-    //         ),
-    //         (
-    //             map![],
-    //             Ok(1000000000.0.into()),
-    //             ParseDurationFn::new(Box::new(Literal::from("1 s")), "ns"),
-    //         ),
-    //         (
-    //             map![],
-    //             Err("function call error: unable to parse duration: 'foo'".into()),
-    //             ParseDurationFn::new(Box::new(Literal::from("foo")), "µs"),
-    //         ),
-    //         (
-    //             map![],
-    //             Err("function call error: unable to parse duration: '1'".into()),
-    //             ParseDurationFn::new(Box::new(Literal::from("1")), "ns"),
-    //         ),
-    //         (
-    //             map![],
-    //             Err("function call error: unknown duration unit: 'w'".into()),
-    //             ParseDurationFn::new(Box::new(Literal::from("1w")), "ns"),
-    //         ),
-    //         (
-    //             map![],
-    //             Err("function call error: unknown unit format: 'w'".into()),
-    //             ParseDurationFn::new(Box::new(Literal::from("1s")), "w"),
-    //         ),
-    //     ];
+        ms_ms {
+            args: func_args![value: "100ms",
+                             unit: "ms"],
+            want: Ok(100.0),
+            tdef: TypeDef::new().fallible().float(),
+        }
 
-    //     let mut state = state::Program::default();
+        ms_s {
+            args: func_args![value: "1005ms",
+                             unit: "s"],
+            want: Ok(1.005),
+            tdef: TypeDef::new().fallible().float(),
+        }
 
-    //     for (object, exp, func) in cases {
-    //         let mut object: Value = object.into();
-    //         let got = func
-    //             .resolve(&mut ctx)
-    //             .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+        ns_ms {
+            args: func_args![value: "100ns",
+                             unit: "ms"],
+            want: Ok(0.0001),
+            tdef: TypeDef::new().fallible().float(),
+        }
 
-    //         assert_eq!(got, exp);
-    //     }
-    // }
+        d_s {
+            args: func_args![value: "1d",
+                             unit: "s"],
+            want: Ok(86400.0),
+            tdef: TypeDef::new().fallible().float(),
+        }
+
+        s_ns {
+            args: func_args![value: "1 s",
+                             unit: "ns"],
+            want: Ok(1000000000.0),
+            tdef: TypeDef::new().fallible().float(),
+        }
+
+        error_us {
+            args: func_args![value: "foo",
+                             unit: "µs"],
+            want: Err("unable to parse duration: 'foo'"),
+            tdef: TypeDef::new().fallible().float(),
+        }
+
+        error_ns {
+            args: func_args![value: "1",
+                             unit: "ns"],
+            want: Err("unable to parse duration: '1'"),
+            tdef: TypeDef::new().fallible().float(),
+        }
+
+        error_unit {
+            args: func_args![value: "1w",
+                             unit: "ns"],
+            want: Err("unknown duration unit: 'w'"),
+            tdef: TypeDef::new().fallible().float(),
+        }
+
+        error_format {
+            args: func_args![value: "1s",
+                             unit: "w"],
+            want: Err("unknown unit format: 'w'"),
+            tdef: TypeDef::new().fallible().float(),
+        }
+    ];
 }

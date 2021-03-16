@@ -17,13 +17,13 @@ remap: functions: del: {
 	internal_failure_reasons: []
 	notices: [
 		"""
-			The `del` function _modifies the current event in-place_ and returns the value of the deleted field.
+			The `del` function _modifies the current event in place_ and returns the value of the deleted field.
 			""",
 	]
 	return: {
 		types: ["any"]
 		rules: [
-			"The return is the value of the field being deleted. If the field does not exist, `null` is returned.",
+			"Returns the value of the field being deleted. Returns `null` if the field doesn't exist.",
 		]
 	}
 

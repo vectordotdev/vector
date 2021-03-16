@@ -63,22 +63,6 @@ struct ContainsFn {
     case_sensitive: Option<Box<dyn Expression>>,
 }
 
-/*
-impl ContainsFn {
-    #[cfg(test)]
-    fn new(value: Box<dyn Expression>, substring: &str, case_sensitive: bool) -> Self {
-        let substring = Box::new(Literal::from(substring));
-        let case_sensitive = Some(Box::new(Literal::from(case_sensitive)) as _);
-
-        Self {
-            value,
-            substring,
-            case_sensitive,
-        }
-    }
-}
-*/
-
 impl Expression for ContainsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let case_sensitive = match &self.case_sensitive {
@@ -114,72 +98,89 @@ impl Expression for ContainsFn {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::btreemap;
 
-    #[test]
-    fn contains() {
-        let cases = vec![
-            (
-                btreemap! {},
-                Ok(false.into()),
-                ContainsFn::new(Box::new(Literal::from("foo")), "bar", false),
-            ),
-            (
-                btreemap! {},
-                Ok(false.into()),
-                ContainsFn::new(Box::new(Literal::from("foo")), "foobar", false),
-            ),
-            (
-                btreemap! {},
-                Ok(true.into()),
-                ContainsFn::new(Box::new(Literal::from("foo")), "foo", false),
-            ),
-            (
-                btreemap! {},
-                Ok(true.into()),
-                ContainsFn::new(Box::new(Literal::from("foobar")), "oba", false),
-            ),
-            (
-                btreemap! {},
-                Ok(true.into()),
-                ContainsFn::new(Box::new(Literal::from("foobar")), "foo", false),
-            ),
-            (
-                btreemap! {},
-                Ok(true.into()),
-                ContainsFn::new(Box::new(Literal::from("foobar")), "bar", false),
-            ),
-            (
-                btreemap! {},
-                Ok(true.into()),
-                ContainsFn::new(Box::new(Literal::from("fooBAR")), "BAR", true),
-            ),
-            (
-                btreemap! {},
-                Ok(false.into()),
-                ContainsFn::new(Box::new(Literal::from("foobar")), "BAR", true),
-            ),
-            (
-                btreemap! {},
-                Ok(true.into()),
-                ContainsFn::new(Box::new(Literal::from("foobar")), "BAR", false),
-            ),
-        ];
+    test_function![
+        contains => Contains;
 
-        let mut state = state::Program::default();
-
-        for (object, exp, func) in cases {
-            let mut object: Value = object.into();
-            let got = func
-                .resolve(&mut ctx)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
+        no {
+            args: func_args![value: value!("foo"),
+                             substring: value!("bar")],
+            want: Ok(value!(false)),
+            tdef: TypeDef::new().boolean().infallible(),
         }
-    }
+
+        yes {
+            args: func_args![value: value!("foobar"),
+                             substring: value!("foo")],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().boolean().infallible(),
+        }
+
+        entirely {
+            args: func_args![value: value!("foo"),
+                             substring: value!("foo")],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().boolean().infallible(),
+        }
+
+        middle {
+            args: func_args![value: value!("foobar"),
+                             substring: value!("oba")],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().boolean().infallible(),
+        }
+
+        start {
+            args: func_args![value: value!("foobar"),
+                             substring: value!("foo")],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().boolean().infallible(),
+        }
+
+        end {
+            args: func_args![value: value!("foobar"),
+                             substring: value!("bar")],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().boolean().infallible(),
+        }
+
+        case_sensitive_yes {
+            args: func_args![value: value!("fooBAR"),
+                             substring: value!("BAR"),
+                             case_sensitive: true
+            ],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().boolean().infallible(),
+        }
+
+         case_sensitive_yes_lowercase {
+            args: func_args![value: value!("fooBAR"),
+                             substring: value!("bar"),
+                             case_sensitive: true
+            ],
+            want: Ok(value!(false)),
+            tdef: TypeDef::new().boolean().infallible(),
+        }
+
+        case_sensitive_no_uppercase {
+            args: func_args![value: value!("foobar"),
+                             substring: value!("BAR"),
+                             case_sensitive: true
+            ],
+            want: Ok(value!(false)),
+            tdef: TypeDef::new().boolean().infallible(),
+        }
+
+        case_insensitive_yes_uppercase {
+            args: func_args![value: value!("foobar"),
+                             substring: value!("BAR"),
+                             case_sensitive: false
+            ],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().boolean().infallible(),
+        }
+    ];
 }
-*/

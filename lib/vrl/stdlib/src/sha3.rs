@@ -89,76 +89,47 @@ fn encode<T: Digest>(value: &[u8]) -> String {
     hex::encode(T::digest(value))
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![
-//         value_string {
-//             expr: |_| Sha3Fn {
-//                 value: Literal::from("foo").boxed(),
-//                 variant: None,
-//             },
-//             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-//         }
+    test_function![
+        sha3 => Sha3;
 
-//         value_non_string {
-//             expr: |_| Sha3Fn {
-//                 value: Literal::from(1).boxed(),
-//                 variant: None,
-//             },
-//             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-//         }
+        sha3 {
+             args: func_args![value: "foo"],
+             want: Ok("4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//         value_optional {
-//             expr: |_| Sha3Fn {
-//                 value: Box::new(Noop),
-//                 variant: None,
-//             },
-//             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-//         }
-//     ];
+        sha3_224  {
+            args: func_args![value: "foo"],
+            want: Ok("4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7"),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
 
-//     #[test]
-//     fn sha3() {
-//         let cases = vec![
-//             (
-//                 map!["foo": "foo"],
-//                 Ok("4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7".into()),
-//                 Sha3Fn::new(Box::new(Path::from("foo")), None),
-//             ),
-//             (
-//                 map![],
-//                 Ok("f4f6779e153c391bbd29c95e72b0708e39d9166c7cea51d1f10ef58a".into()),
-//                 Sha3Fn::new(Box::new(Literal::from("foo")), Some("SHA3-224")),
-//             ),
-//             (
-//                 map![],
-//                 Ok("76d3bc41c9f588f7fcd0d5bf4718f8f84b1c41b20882703100b9eb9413807c01".into()),
-//                 Sha3Fn::new(Box::new(Literal::from("foo")), Some("SHA3-256")),
-//             ),
-//             (
-//                 map![],
-//                 Ok("665551928d13b7d84ee02734502b018d896a0fb87eed5adb4c87ba91bbd6489410e11b0fbcc06ed7d0ebad559e5d3bb5".into()),
-//                 Sha3Fn::new(Box::new(Literal::from("foo")), Some("SHA3-384")),
-//             ),
-//             (
-//                 map![],
-//                 Ok("4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7".into()),
-//                 Sha3Fn::new(Box::new(Literal::from("foo")), Some("SHA3-512")),
-//             ),
-//         ];
+        sha3_256 {
+             args: func_args![value: "foo",
+                              variant: "SHA3-256"
+             ],
+             want: Ok("76d3bc41c9f588f7fcd0d5bf4718f8f84b1c41b20882703100b9eb9413807c01"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//         let mut state = state::Program::default();
+        sha3_384 {
+             args: func_args![value: "foo",
+                              variant: "SHA3-384"
+             ],
+             want: Ok("665551928d13b7d84ee02734502b018d896a0fb87eed5adb4c87ba91bbd6489410e11b0fbcc06ed7d0ebad559e5d3bb5"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        sha3_512 {
+             args: func_args![value: "foo",
+                              variant: "SHA3-512"
+             ],
+             want: Ok("4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7"),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
+    ];
+}

@@ -148,7 +148,7 @@ components: sinks: loki: {
 		}
 		remove_timestamp: {
 			common:      false
-			description: "If this is set to `true` then the timestamp will be removed from the event. This is useful because Loki uses the timestamp to index the event."
+			description: "If this is set to `true` then the timestamp will be removed from the event payload. Note the event timestamp will still be sent as metadata to Loki for indexing."
 			required:    false
 			warnings: []
 			type: bool: default: true

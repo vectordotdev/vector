@@ -3,7 +3,7 @@ package metadata
 remap: functions: get_hostname: {
 	category: "System"
 	description: """
-		Gets the local system's hostname.
+		Returns the local system's hostname.
 		"""
 
 	arguments: []

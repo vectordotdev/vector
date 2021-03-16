@@ -9,7 +9,7 @@ remap: functions: to_string: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The value to return a string representation of."
+			description: "The value to convert to a string."
 			required:    true
 			type: ["any"]
 		},
@@ -18,18 +18,16 @@ remap: functions: to_string: {
 	return: {
 		types: ["string"]
 		rules: [
-			#"If `value` is an integer then its string representation is returned."#,
-			#"If `value` is an float then its string representation is returned."#,
-			#"If `value` is an boolean then `"true"` or `"false"` is returned."#,
-			#"If `value` is an timestamp then its RFC3339 representation is returned."#,
-			#"If `value` is an object then it is encoded into JSON."#,
-			#"If `value` is a list then it is encoded into JSON."#,
+			#"If `value` is an integer or float, returns the string representation."#,
+			#"If `value` is a Boolean, returns `"true"` or `"false"`."#,
+			#"If `value` is a timestamp, returns an [RFC 3339](\(urls.rfc3339)) representation."#,
+			#"If `value` is an object or array, returns a JSON-encoded string."#,
 		]
 	}
 
 	examples: [
 		{
-			title: "Coerce to a string (boolean)"
+			title: "Coerce to a string (Boolean)"
 			source: #"""
 				to_string(true)
 				"""#

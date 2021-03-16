@@ -3,14 +3,14 @@ package metadata
 remap: functions: assert: {
 	category: "Debug"
 	description: """
-		Asserts the `condition`.
-
-		If the `condition` evaluates to `false` the program is aborted with the `message`.
+		Asserts the `condition`, which must be a Boolean expression. The program is aborted with the `message` if the
+		condition evaluates to `false`.
 		"""
 	notices: [
 		"""
-			This function is designed to be used in a standalone fashion, aborting the script if it fails. It should
-			not be used in logical expressions.
+			The `assert` function should be used in a standalone fashion and only when you want to abort the program. You
+			should avoid it in logical expressions and other situations in which you want the program to continue if the
+			condition evalues to `false`.
 			""",
 	]
 
@@ -23,7 +23,7 @@ remap: functions: assert: {
 		},
 		{
 			name:        "message"
-			description: "Should condition be false, message will be reported as the failure message."
+			description: "The failure message that's reported if `condition` evalues to `false`."
 			required:    true
 			type: ["string"]
 		},

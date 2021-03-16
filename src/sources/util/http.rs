@@ -15,7 +15,7 @@ use snap::raw::Decoder as SnappyDecoder;
 use std::{collections::HashMap, convert::TryFrom, error::Error, fmt, io::Read, net::SocketAddr};
 use tracing_futures::Instrument;
 use warp::{
-    filters::BoxedFilter,
+    filters::{path::FullPath, path::Tail, BoxedFilter},
     http::{HeaderMap, StatusCode},
     reject::Rejection,
     Filter,
@@ -180,12 +180,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         body: Bytes,
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
+        path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
     fn run(
         self,
         address: SocketAddr,
-        path: &'static str,
+        path: &str,
+        strict_path: bool,
         tls: &Option<TlsConfig>,
         auth: &Option<HttpSourceAuthConfig>,
         out: Pipeline,
@@ -193,24 +195,35 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
+        let path = path.to_owned();
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
-
             let mut filter: BoxedFilter<()> = warp::post().boxed();
-            if !path.is_empty() && path != "/" {
-                for s in path.split('/') {
-                    filter = filter.and(warp::path(s)).boxed();
-                }
+            for s in path.split('/').filter(|&x| !x.is_empty()) {
+                filter = filter.and(warp::path(s.to_string())).boxed()
             }
             let svc = filter
-                .and(warp::path::end())
+                .and(warp::path::tail())
+                .and_then(move |tail: Tail| async move {
+                    if !strict_path || tail.as_str().is_empty() {
+                        Ok(())
+                    } else {
+                        debug!(message = "Path rejected.");
+                        Err(warp::reject::custom(
+                            ErrorMessage::new(StatusCode::NOT_FOUND,
+                            "Not found".to_string())
+                        ))
+                    }
+                }).untuple_one()
+                .and(warp::path::full())
                 .and(warp::header::optional::<String>("authorization"))
                 .and(warp::header::optional::<String>("content-encoding"))
                 .and(warp::header::headers_cloned())
                 .and(warp::body::bytes())
                 .and(warp::query::<HashMap<String, String>>())
                 .and_then(
-                    move |auth_header,
+                    move |path: FullPath,
+                          auth_header,
                           encoding_header,
                           headers: HeaderMap,
                           body: Bytes,
@@ -219,13 +232,12 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
 
                         let mut out = out.clone();
-
                         let events = auth
                             .is_valid(&auth_header)
                             .and_then(|()| decode(&encoding_header, body))
                             .and_then(|body| {
                                 let body_len=body.len();
-                                self.build_event(body, headers, query_parameters)
+                                self.build_event(body, headers, query_parameters, path.as_str())
                                     .map(|events| (events, body_len))
                             });
 

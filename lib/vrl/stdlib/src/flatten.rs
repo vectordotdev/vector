@@ -178,7 +178,6 @@ impl<'a> std::iter::Iterator for ArrayFlatten<'a> {
     }
 }
 
-/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -189,36 +188,43 @@ mod test {
         array {
             args: func_args![value: value!([42])],
             want: Ok(value!([42])),
+            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
         }
 
         nested_array {
             args: func_args![value: value!([42, [43, 44]])],
             want: Ok(value!([42, 43, 44])),
+            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
         }
 
         nested_empty_array {
             args: func_args![value: value!([42, [], 43])],
             want: Ok(value!([42, 43])),
+            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
         }
 
         double_nested_array {
             args: func_args![value: value!([42, [43, 44, [45, 46]]])],
             want: Ok(value!([42, 43, 44, 45, 46])),
+            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
         }
 
         two_arrays {
             args: func_args![value: value!([[42, 43], [44, 45]])],
             want: Ok(value!([42, 43, 44, 45])),
+            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
         }
 
         map {
             args: func_args![value: value!({parent: "child"})],
             want: Ok(value!({parent: "child"})),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
         nested_map {
             args: func_args![value: value!({parent: {child1: 1, child2: 2}, key: "val"})],
             want: Ok(value!({"parent.child1": 1, "parent.child2": 2, key: "val"})),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
         double_nested_map {
@@ -235,6 +241,7 @@ mod test {
                 "parent.child2.grandchild2": 2,
                 key: "val",
             })),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
         map_and_array {
@@ -251,6 +258,7 @@ mod test {
                 "parent.child2.grandchild2": [1, [2, 3], 4],
                 key: "val",
             })),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
         // If the root object is an array, child maps are not flattened.
@@ -267,6 +275,7 @@ mod test {
                 { parent2: { child3: 3, child4: 4 } },
                 { parent3: { child5: 5 } },
             ])),
+            tdef: TypeDef::new().array_mapped::<(), Kind>(map! { (): Kind::all() }),
         }
 
         triple_nested_map {
@@ -283,7 +292,7 @@ mod test {
                 "parent1.child2.grandchild3": 3,
                 parent2: 4,
             })),
+            tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
     ];
 }
-*/

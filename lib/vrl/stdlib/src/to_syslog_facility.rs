@@ -86,157 +86,173 @@ impl Expression for ToSyslogFacilityFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     test_type_def![value_non_integer_fallible {
-//         expr: |_| ToSyslogFacilityFn {
-//             value: Literal::from("foo").boxed(),
-//         },
-//         def: TypeDef {
-//             fallible: true,
-//             kind: Kind::Bytes,
-//             ..Default::default()
-//         },
-//     }];
+    test_function![
+        to_syslog_facility => ToSyslogFacility;
 
-//     test_function![
-//         to_syslog_facility => ToSyslogFacility;
+        kern {
+            args: func_args![value: value!(0)],
+            want: Ok(value!("kern")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         kern {
-//             args: func_args![value: value!(0)],
-//             want: Ok(value!("kern")),
-//         }
+        user {
+            args: func_args![value: value!(1)],
+            want: Ok(value!("user")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         user {
-//             args: func_args![value: value!(1)],
-//             want: Ok(value!("user")),
-//         }
+        mail {
+            args: func_args![value: value!(2)],
+            want: Ok(value!("mail")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         mail {
-//             args: func_args![value: value!(2)],
-//             want: Ok(value!("mail")),
-//         }
+        daemon {
+            args: func_args![value: value!(3)],
+            want: Ok(value!("daemon")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         daemon {
-//             args: func_args![value: value!(3)],
-//             want: Ok(value!("daemon")),
-//         }
+        auth {
+            args: func_args![value: value!(4)],
+            want: Ok(value!("auth")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         auth {
-//             args: func_args![value: value!(4)],
-//             want: Ok(value!("auth")),
-//         }
+        syslog {
+            args: func_args![value: value!(5)],
+            want: Ok(value!("syslog")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         syslog {
-//             args: func_args![value: value!(5)],
-//             want: Ok(value!("syslog")),
-//         }
+        lpr {
+            args: func_args![value: value!(6)],
+            want: Ok(value!("lpr")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         lpr {
-//             args: func_args![value: value!(6)],
-//             want: Ok(value!("lpr")),
-//         }
+        news {
+            args: func_args![value: value!(7)],
+            want: Ok(value!("news")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         news {
-//             args: func_args![value: value!(7)],
-//             want: Ok(value!("news")),
-//         }
+        uucp {
+            args: func_args![value: value!(8)],
+            want: Ok(value!("uucp")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         uucp {
-//             args: func_args![value: value!(8)],
-//             want: Ok(value!("uucp")),
-//         }
+        cron {
+            args: func_args![value: value!(9)],
+            want: Ok(value!("cron")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         cron {
-//             args: func_args![value: value!(9)],
-//             want: Ok(value!("cron")),
-//         }
+        authpriv {
+            args: func_args![value: value!(10)],
+            want: Ok(value!("authpriv")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         authpriv {
-//             args: func_args![value: value!(10)],
-//             want: Ok(value!("authpriv")),
-//         }
+        ftp {
+            args: func_args![value: value!(11)],
+            want: Ok(value!("ftp")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         ftp {
-//             args: func_args![value: value!(11)],
-//             want: Ok(value!("ftp")),
-//         }
+        ntp {
+            args: func_args![value: value!(12)],
+            want: Ok(value!("ntp")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         ntp {
-//             args: func_args![value: value!(12)],
-//             want: Ok(value!("ntp")),
-//         }
+        security {
+            args: func_args![value: value!(13)],
+            want: Ok(value!("security")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         security {
-//             args: func_args![value: value!(13)],
-//             want: Ok(value!("security")),
-//         }
+        console {
+            args: func_args![value: value!(14)],
+            want: Ok(value!("console")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         console {
-//             args: func_args![value: value!(14)],
-//             want: Ok(value!("console")),
-//         }
+        solaris_cron {
+            args: func_args![value: value!(15)],
+            want: Ok(value!("solaris-cron")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         solaris_cron {
-//             args: func_args![value: value!(15)],
-//             want: Ok(value!("solaris-cron")),
-//         }
+        local0 {
+            args: func_args![value: value!(16)],
+            want: Ok(value!("local0")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         local0 {
-//             args: func_args![value: value!(16)],
-//             want: Ok(value!("local0")),
-//         }
+        local1 {
+            args: func_args![value: value!(17)],
+            want: Ok(value!("local1")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         local1 {
-//             args: func_args![value: value!(17)],
-//             want: Ok(value!("local1")),
-//         }
+        local2 {
+            args: func_args![value: value!(18)],
+            want: Ok(value!("local2")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         local2 {
-//             args: func_args![value: value!(18)],
-//             want: Ok(value!("local2")),
-//         }
+        local3 {
+            args: func_args![value: value!(19)],
+            want: Ok(value!("local3")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         local3 {
-//             args: func_args![value: value!(19)],
-//             want: Ok(value!("local3")),
-//         }
+        local4 {
+            args: func_args![value: value!(20)],
+            want: Ok(value!("local4")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         local4 {
-//             args: func_args![value: value!(20)],
-//             want: Ok(value!("local4")),
-//         }
+        local5 {
+            args: func_args![value: value!(21)],
+            want: Ok(value!("local5")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         local5 {
-//             args: func_args![value: value!(21)],
-//             want: Ok(value!("local5")),
-//         }
+        local6 {
+            args: func_args![value: value!(22)],
+            want: Ok(value!("local6")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         local6 {
-//             args: func_args![value: value!(22)],
-//             want: Ok(value!("local6")),
-//         }
+        local7 {
+            args: func_args![value: value!(23)],
+            want: Ok(value!("local7")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         local7 {
-//             args: func_args![value: value!(23)],
-//             want: Ok(value!("local7")),
-//         }
+        invalid_facility_larger_int {
+            args: func_args![value: value!(475)],
+            want: Err("facility code 475 not valid"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         invalid_facility_larger_int {
-//             args: func_args![value: value!(475)],
-//             want: Err("function call error: facility code 475 not valid"),
-//         }
+        invalid_facility_negative_int {
+            args: func_args![value: value!(-1)],
+            want: Err("facility code -1 not valid"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         invalid_facility_negative_int {
-//             args: func_args![value: value!(-1)],
-//             want: Err("function call error: facility code -1 not valid"),
-//         }
-
-//         invalid_facility_non_int {
-//             args: func_args![value: value!("nope")],
-//             want: Err(r#"value error: expected "integer", got "string""#),
-//         }
-//     ];
-// }
+        invalid_facility_non_int {
+            args: func_args![value: value!("nope")],
+            want: Err(r#"expected "integer", got "string""#),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
+    ];
+}

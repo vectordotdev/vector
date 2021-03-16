@@ -117,14 +117,12 @@ fn add_paths(watcher: &mut RecommendedWatcher, config_paths: &[PathBuf]) -> Resu
     Ok(())
 }
 
-#[cfg(unix)]
-#[cfg(test)]
+#[cfg(all(test, unix, not(target_os = "macos")))] // https://github.com/timberio/vector/issues/5000
 mod tests {
     use super::*;
     use crate::test_util::{temp_file, trace_init};
     use std::time::Duration;
     use std::{fs::File, io::Write};
-    #[cfg(unix)]
     use tokio::signal::unix::{signal, SignalKind};
 
     async fn test(file: &mut File, timeout: Duration) -> bool {

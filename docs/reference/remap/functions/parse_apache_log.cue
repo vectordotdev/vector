@@ -3,13 +3,12 @@ package metadata
 remap: functions: parse_apache_log: {
 	category:    "Parse"
 	description: """
-		Parses apache access and error log lines. Lines can be either in [`common`](\(urls.apache_common)) format,
-		[`combined`](\(urls.apache_combined)) format, or default
-		[`error`](\(urls.apache_error)) format.
+		Parses Apache access and error log lines. Lines can be in [`common`](\(urls.apache_common)),
+		[`combined`](\(urls.apache_combined)), or default [`error`](\(urls.apache_error)) format.
 		"""
 	notices: [
 		"""
-				Missing information in the log message may be indicated by `-`. These fields will not be present in the result.
+			Missing information in the log message may be indicated by `-`. These fields are omitted in the result.
 			""",
 	]
 
@@ -21,15 +20,18 @@ remap: functions: parse_apache_log: {
 			type: ["string"]
 		},
 		{
-			name:        "timestamp_format"
-			description: "The [date/time format](https://docs.rs/chrono/latest/chrono/format/strftime/index.html) the log message timestamp is encoded in. If the timestamp does not specify a timezone, the time will be parsed in local time."
-			required:    false
-			default:     "%d/%b/%Y:%T %z"
+			name: "timestamp_format"
+			description: """
+				The [date/time format](https://docs.rs/chrono/latest/chrono/format/strftime/index.html) to use for
+				encoding the timestamp. The time is parsed in local time if the timestamp doesn't specify a timezone.
+				"""
+			required: false
+			default:  "%d/%b/%Y:%T %z"
 			type: ["string"]
 		},
 		{
 			name:        "format"
-			description: "The format the log line is to be parsed as."
+			description: "The format to use for parsing the log."
 			required:    true
 			enum: {
 				"common":   "Common format"
@@ -41,9 +43,9 @@ remap: functions: parse_apache_log: {
 	]
 
 	internal_failure_reasons: [
-		"`value` does not match the specified format",
-		"`timestamp_format` is not a valid format string",
-		"timestamp in `value` fails to parse via the provided `timestamp_format`",
+		"`value` doesn't match the specified format",
+		"`timestamp_format` isn't a valid format string",
+		"The timestamp in `value` fails to parse using the provided `timestamp_format`",
 	]
 	return: types: ["object"]
 

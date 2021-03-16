@@ -8,20 +8,22 @@ remap: functions: to_float: {
 
 	arguments: [
 		{
-			name:        "value"
-			description: "The string that is to be converted to a float. Must be the string representation of a `float`, otherwise an `ArgumentError` will be raised."
-			required:    true
+			name: "value"
+			description: """
+				The value to convert to a float. Must be convertible to a float, otherwise an error is raised.
+				"""
+			required: true
 			type: ["float", "integer", "boolean", "string"]
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a supported float representation",
+		"`value` isn't a supported float representation",
 	]
 	return: {
 		types: ["float"]
 		rules: [
 			"If `value` is a string, it must be the string representation of an float or else an error is raised.",
-			"If `value` is a boolean, `0.0` will be returned for `false` and `1.0` will be returned for `true`.",
+			"If `value` is a boolean, `0.0` is returned for `false` and `1.0` is returned for `true`.",
 		]
 	}
 

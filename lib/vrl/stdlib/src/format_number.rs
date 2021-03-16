@@ -65,29 +65,6 @@ struct FormatNumberFn {
     grouping_separator: Option<Box<dyn Expression>>,
 }
 
-/*
-impl FormatNumberFn {
-    #[cfg(test)]
-    fn new(
-        value: Box<dyn Expression>,
-        scale: Option<usize>,
-        decimal_separator: Option<&str>,
-        grouping_separator: Option<&str>,
-    ) -> Self {
-        let scale = scale.map(|v| Box::new(Literal::from(v as i64)) as _);
-        let decimal_separator = decimal_separator.map(|v| Box::new(Literal::from(v)) as _);
-        let grouping_separator = grouping_separator.map(|v| Box::new(Literal::from(v)) as _);
-
-        Self {
-            value,
-            scale,
-            grouping_separator,
-            decimal_separator,
-        }
-    }
-}
-*/
-
 impl Expression for FormatNumberFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value: Decimal = match self.value.resolve(ctx)? {
@@ -176,116 +153,78 @@ impl Expression for FormatNumberFn {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
 
-    vrl::test_type_def![
-        value_integer {
-            expr: |_| FormatNumberFn {
-                value: Literal::from(1).boxed(),
-                scale: None,
-                decimal_separator: None,
-                grouping_separator: None,
-            },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+    test_function![
+        format_number => FormatNumber;
+
+        number {
+            args: func_args![value: 1234.567],
+            want: Ok(value!("1234.567")),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
-        value_float {
-            expr: |_| FormatNumberFn {
-                value: Literal::from(1.0).boxed(),
-                scale: None,
-                decimal_separator: None,
-                grouping_separator: None,
-            },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+        precision {
+            args: func_args![value: 1234.567,
+                             scale: 2],
+            want: Ok(value!("1234.56")),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
-        // TODO(jean): we should update the function to ignore `None` values,
-        // instead of aborting.
-        optional_scale {
-            expr: |_| FormatNumberFn {
-                value: Literal::from(1.0).boxed(),
-                scale: Some(Box::new(Noop)),
-                decimal_separator: None,
-                grouping_separator: None,
-            },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+
+        separator {
+            args: func_args![value: 1234.567,
+                             scale: 2,
+                             decimal_separator: ","],
+            want: Ok(value!("1234,56")),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
+
+        more_separators {
+            args: func_args![value: 1234.567,
+                             scale: 2,
+                             decimal_separator: ",",
+                             grouping_separator: " "],
+            want: Ok(value!("1 234,56")),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
+
+        big_number {
+            args: func_args![value: 11222333444.56789,
+                             scale: 3,
+                             decimal_separator: ",",
+                             grouping_separator: "."],
+            want: Ok(value!("11.222.333.444,567")),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
+
+        integer {
+            args: func_args![value: 100.0],
+            want: Ok(value!("100")),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
+
+        integer_decimals {
+            args: func_args![value: 100.0,
+                             scale: 2],
+            want: Ok(value!("100.00")),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
+
+        float_no_decimals {
+            args: func_args![value: 123.45,
+                             scale: 0],
+            want: Ok(value!("123")),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
+
+        integer_no_decimals {
+            args: func_args![value: 12345,
+                             scale: 2],
+            want: Ok(value!("12345.00")),
+            tdef: TypeDef::new().infallible().bytes(),
         }
     ];
-
-    #[test]
-    fn format_number() {
-        let cases = vec![
-            (
-                btreemap! {},
-                Ok("1234.567".into()),
-                FormatNumberFn::new(Box::new(Literal::from(1234.567)), None, None, None),
-            ),
-            (
-                btreemap! {},
-                Ok("1234.56".into()),
-                FormatNumberFn::new(Box::new(Literal::from(1234.567)), Some(2), None, None),
-            ),
-            (
-                btreemap! {},
-                Ok("1234,56".into()),
-                FormatNumberFn::new(Box::new(Literal::from(1234.567)), Some(2), Some(","), None),
-            ),
-            (
-                btreemap! {},
-                Ok("1 234,56".into()),
-                FormatNumberFn::new(
-                    Box::new(Literal::from(1234.567)),
-                    Some(2),
-                    Some(","),
-                    Some(" "),
-                ),
-            ),
-            (
-                btreemap! {},
-                Ok("11.222.333.444,567".into()),
-                FormatNumberFn::new(
-                    Box::new(Literal::from(11222333444.56789)),
-                    Some(3),
-                    Some(","),
-                    Some("."),
-                ),
-            ),
-            (
-                btreemap! {},
-                Ok("100".into()),
-                FormatNumberFn::new(Box::new(Literal::from(100.0)), None, None, None),
-            ),
-            (
-                btreemap! {},
-                Ok("100.00".into()),
-                FormatNumberFn::new(Box::new(Literal::from(100.0)), Some(2), None, None),
-            ),
-            (
-                btreemap! {},
-                Ok("123".into()),
-                FormatNumberFn::new(Box::new(Literal::from(123.45)), Some(0), None, None),
-            ),
-            (
-                btreemap! {},
-                Ok("12345.00".into()),
-                FormatNumberFn::new(Box::new(Literal::from(12345)), Some(2), None, None),
-            ),
-        ];
-
-        let mut state = state::Program::default();
-
-        for (object, exp, func) in cases {
-            let mut object: Value = object.into();
-            let got = func
-                .resolve(&mut ctx)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
-        }
-    }
 }
-*/

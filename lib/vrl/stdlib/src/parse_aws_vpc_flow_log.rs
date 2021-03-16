@@ -98,33 +98,37 @@ impl Expression for ParseAwsVpcFlowLogFn {
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef::new()
             .fallible() // Log parsing error
-            .object::<&str, Kind>(map! {
-                "account_id": Kind::Integer | Kind::Null,
-                "action": Kind::Bytes | Kind::Null,
-                "az_id": Kind::Bytes | Kind::Null,
-                "bytes": Kind::Integer | Kind::Null,
-                "dstaddr": Kind::Bytes | Kind::Null,
-                "dstport": Kind::Integer | Kind::Null,
-                "end": Kind::Integer | Kind::Null,
-                "instance_id": Kind::Bytes | Kind::Null,
-                "interface_id": Kind::Bytes | Kind::Null,
-                "log_status": Kind::Bytes | Kind::Null,
-                "packets": Kind::Integer | Kind::Null,
-                "pkt_dstaddr": Kind::Bytes | Kind::Null,
-                "pkt_srcaddr": Kind::Bytes | Kind::Null,
-                "protocol": Kind::Integer | Kind::Null,
-                "region": Kind::Bytes | Kind::Null,
-                "srcaddr": Kind::Bytes | Kind::Null,
-                "srcport": Kind::Integer | Kind::Null,
-                "start": Kind::Integer | Kind::Null,
-                "sublocation_id": Kind::Bytes | Kind::Null,
-                "sublocation_type": Kind::Bytes | Kind::Null,
-                "subnet_id": Kind::Bytes | Kind::Null,
-                "tcp_flags": Kind::Integer | Kind::Null,
-                "type": Kind::Bytes | Kind::Null,
-                "version": Kind::Integer | Kind::Null,
-                "vpc_id": Kind::Bytes | Kind::Null,
-            })
+            .object::<&str, Kind>(inner_type_def())
+    }
+}
+
+fn inner_type_def() -> BTreeMap<&'static str, Kind> {
+    map! {
+        "account_id": Kind::Integer | Kind::Null,
+        "action": Kind::Bytes | Kind::Null,
+        "az_id": Kind::Bytes | Kind::Null,
+        "bytes": Kind::Integer | Kind::Null,
+        "dstaddr": Kind::Bytes | Kind::Null,
+        "dstport": Kind::Integer | Kind::Null,
+        "end": Kind::Integer | Kind::Null,
+        "instance_id": Kind::Bytes | Kind::Null,
+        "interface_id": Kind::Bytes | Kind::Null,
+        "log_status": Kind::Bytes | Kind::Null,
+        "packets": Kind::Integer | Kind::Null,
+        "pkt_dstaddr": Kind::Bytes | Kind::Null,
+        "pkt_srcaddr": Kind::Bytes | Kind::Null,
+        "protocol": Kind::Integer | Kind::Null,
+        "region": Kind::Bytes | Kind::Null,
+        "srcaddr": Kind::Bytes | Kind::Null,
+        "srcport": Kind::Integer | Kind::Null,
+        "start": Kind::Integer | Kind::Null,
+        "sublocation_id": Kind::Bytes | Kind::Null,
+        "sublocation_type": Kind::Bytes | Kind::Null,
+        "subnet_id": Kind::Bytes | Kind::Null,
+        "tcp_flags": Kind::Integer | Kind::Null,
+        "type": Kind::Bytes | Kind::Null,
+        "version": Kind::Integer | Kind::Null,
+        "vpc_id": Kind::Bytes | Kind::Null,
     }
 }
 
@@ -209,80 +213,112 @@ fn parse_log(input: &str, format: Option<&str>) -> ParseResult<Value> {
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
+    use super::*;
 
-    // vrl::test_type_def![
-    //     value_noop {
-    //         expr: |_| ParseAwsVpcFlowLogFn::new(Box::new(Noop), None),
-    //         def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
-    //     }
+    #[test]
+    fn parse_aws_vpc_flow_log() {
+        // Examples from https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs-records-examples.html
+        let logs = vec![(
+             None,
+             vec![
+                 "2 123456789010 eni-1235b8ca123456789 172.31.16.139 172.31.16.21 20641 22 6 20 4249 1418530010 1418530070 ACCEPT OK",
+                 "2 123456789010 eni-1235b8ca123456789 172.31.9.69 172.31.9.12 49761 3389 6 20 4249 1418530010 1418530070 REJECT OK",
+                 "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA",
+                 "2 123456789010 eni-11111111aaaaaaaaa - - - - - - - 1431280876 1431280934 - SKIPDATA",
+                 "2 123456789010 eni-1235b8ca123456789 203.0.113.12 172.31.16.139 0 0 1 4 336 1432917027 1432917142 ACCEPT OK",
+                 "2 123456789010 eni-1235b8ca123456789 172.31.16.139 203.0.113.12 0 0 1 4 336 1432917094 1432917142 REJECT OK",
+                 "2 123456789010 eni-1235b8ca123456789 2001:db8:1234:a100:8d6e:3477:df66:f105 2001:db8:1234:a102:3304:8879:34cf:4071 34892 22 6 54 8855 1477913708 1477913820 ACCEPT OK",
+             ]
+         ), (
+             Some("version vpc_id subnet_id instance_id interface_id account_id type srcaddr dstaddr srcport dstport pkt_srcaddr pkt_dstaddr protocol bytes packets start end action tcp_flags log_status"),
+             vec![
+                 "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 52.213.180.42 10.0.0.62 43416 5001 52.213.180.42 10.0.0.62 6 568 8 1566848875 1566848933 ACCEPT 2 OK",
+                 "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 10.0.0.62 52.213.180.42 5001 43416 10.0.0.62 52.213.180.42 6 376 7 1566848875 1566848933 ACCEPT 18 OK",
+                 "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 52.213.180.42 10.0.0.62 43418 5001 52.213.180.42 10.0.0.62 6 100701 70 1566848875 1566848933 ACCEPT 2 OK",
+                 "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 10.0.0.62 52.213.180.42 5001 43418 10.0.0.62 52.213.180.42 6 632 12 1566848875 1566848933 ACCEPT 18 OK",
+                 "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 10.0.0.62 52.213.180.42 5001 43418 10.0.0.62 52.213.180.42 6 63388 1219 1566848933 1566849113 ACCEPT 1 OK",
+                 "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 52.213.180.42 10.0.0.62 43418 5001 52.213.180.42 10.0.0.62 6 23294588 15774 1566848933 1566849113 ACCEPT 1 OK",
+                 "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 52.213.180.42 10.0.0.62 43638 5001 52.213.180.42 10.0.0.62 6 1260 17 1566933133 1566933193 ACCEPT 3 OK",
+                 "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 10.0.0.62 52.213.180.42 5001 43638 10.0.0.62 52.213.180.42 6 967 14 1566933133 1566933193 ACCEPT 19 OK",
+             ]
+         ), (
+             Some("instance_id interface_id srcaddr dstaddr pkt_srcaddr pkt_dstaddr"),
+             vec![
+                 "- eni-1235b8ca123456789 10.0.1.5 10.0.0.220 10.0.1.5 203.0.113.5",
+                 "- eni-1235b8ca123456789 10.0.0.220 203.0.113.5 10.0.0.220 203.0.113.5",
+                 "- eni-1235b8ca123456789 203.0.113.5 10.0.0.220 203.0.113.5 10.0.0.220",
+                 "- eni-1235b8ca123456789 10.0.0.220 10.0.1.5 203.0.113.5 10.0.1.5",
+                 "i-01234567890123456 eni-1111aaaa2222bbbb3 10.0.1.5 203.0.113.5 10.0.1.5 203.0.113.5",
+                 "i-01234567890123456 eni-1111aaaa2222bbbb3 203.0.113.5 10.0.1.5 203.0.113.5 10.0.1.5",
+             ]
+         ), (
+             Some("version interface_id account_id vpc_id subnet_id instance_id srcaddr dstaddr srcport dstport protocol tcp_flags type pkt_srcaddr pkt_dstaddr action log_status"),
+             vec![
+                 "3 eni-33333333333333333 123456789010 vpc-abcdefab012345678 subnet-22222222bbbbbbbbb i-01234567890123456 10.20.33.164 10.40.2.236 39812 80 6 3 IPv4 10.20.33.164 10.40.2.236 ACCEPT OK",
+                 "3 eni-33333333333333333 123456789010 vpc-abcdefab012345678 subnet-22222222bbbbbbbbb i-01234567890123456 10.40.2.236 10.20.33.164 80 39812 6 19 IPv4 10.40.2.236 10.20.33.164 ACCEPT OK",
+                 "3 eni-11111111111111111 123456789010 vpc-abcdefab012345678 subnet-11111111aaaaaaaaa - 10.40.1.175 10.40.2.236 39812 80 6 3 IPv4 10.20.33.164 10.40.2.236 ACCEPT OK",
+                 "3 eni-22222222222222222 123456789010 vpc-abcdefab012345678 subnet-22222222bbbbbbbbb - 10.40.2.236 10.40.2.31 80 39812 6 19 IPv4 10.40.2.236 10.20.33.164 ACCEPT OK",
+             ]
+         )];
 
-    //     value_non_string {
-    //         expr: |_| ParseAwsVpcFlowLogFn::new(Literal::from(1).boxed(), None),
-    //         def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
-    //     }
+        for (format, logs) in logs {
+            for log in logs {
+                assert!(parse_log(&log, format).is_ok());
+            }
+        }
+    }
 
-    //     value_string {
-    //         expr: |_| ParseAwsVpcFlowLogFn::new(Literal::from("foo").boxed(), None),
-    //         def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
-    //     }
+    test_function![
+        parse_aws_vpc_flow_log => ParseAwsVpcFlowLog;
 
-    //     format_non_string {
-    //         expr: |_| ParseAwsVpcFlowLogFn::new(Literal::from("foo").boxed(), Some(Literal::from(1).boxed())),
-    //         def: TypeDef { fallible: true, kind: Kind::Map, ..Default::default() },
-    //     }
-    // ];
+        default {
+             args: func_args![value: "2 123456789010 eni-1235b8ca123456789 172.31.16.139 172.31.16.21 20641 22 6 20 4249 1418530010 1418530070 ACCEPT OK"],
+             want: Ok(value!({
+                 "account_id": 123456789010_i64,
+                 "action": "ACCEPT",
+                 "bytes": 4249,
+                 "dstaddr": "172.31.16.21",
+                 "dstport": 22,
+                 "end": 1418530070,
+                 "interface_id": "eni-1235b8ca123456789",
+                 "log_status": "OK",
+                 "packets": 20,
+                 "protocol": 6,
+                 "srcaddr": "172.31.16.139",
+                 "srcport": 20641,
+                 "start": 1418530010,
+                 "version": 2
+             })),
+             tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+         }
 
-    // #[test]
-    // fn parse_aws_vpc_flow_log() {
-    //     // Examples from https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs-records-examples.html
-    //     let logs = vec![(
-    //         None,
-    //         vec![
-    //             "2 123456789010 eni-1235b8ca123456789 172.31.16.139 172.31.16.21 20641 22 6 20 4249 1418530010 1418530070 ACCEPT OK",
-    //             "2 123456789010 eni-1235b8ca123456789 172.31.9.69 172.31.9.12 49761 3389 6 20 4249 1418530010 1418530070 REJECT OK",
-    //             "2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA",
-    //             "2 123456789010 eni-11111111aaaaaaaaa - - - - - - - 1431280876 1431280934 - SKIPDATA",
-    //             "2 123456789010 eni-1235b8ca123456789 203.0.113.12 172.31.16.139 0 0 1 4 336 1432917027 1432917142 ACCEPT OK",
-    //             "2 123456789010 eni-1235b8ca123456789 172.31.16.139 203.0.113.12 0 0 1 4 336 1432917094 1432917142 REJECT OK",
-    //             "2 123456789010 eni-1235b8ca123456789 2001:db8:1234:a100:8d6e:3477:df66:f105 2001:db8:1234:a102:3304:8879:34cf:4071 34892 22 6 54 8855 1477913708 1477913820 ACCEPT OK",
-    //         ]
-    //     ), (
-    //         Some("version vpc_id subnet_id instance_id interface_id account_id type srcaddr dstaddr srcport dstport pkt_srcaddr pkt_dstaddr protocol bytes packets start end action tcp_flags log_status"),
-    //         vec![
-    //             "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 52.213.180.42 10.0.0.62 43416 5001 52.213.180.42 10.0.0.62 6 568 8 1566848875 1566848933 ACCEPT 2 OK",
-    //             "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 10.0.0.62 52.213.180.42 5001 43416 10.0.0.62 52.213.180.42 6 376 7 1566848875 1566848933 ACCEPT 18 OK",
-    //             "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 52.213.180.42 10.0.0.62 43418 5001 52.213.180.42 10.0.0.62 6 100701 70 1566848875 1566848933 ACCEPT 2 OK",
-    //             "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 10.0.0.62 52.213.180.42 5001 43418 10.0.0.62 52.213.180.42 6 632 12 1566848875 1566848933 ACCEPT 18 OK",
-    //             "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 10.0.0.62 52.213.180.42 5001 43418 10.0.0.62 52.213.180.42 6 63388 1219 1566848933 1566849113 ACCEPT 1 OK",
-    //             "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 52.213.180.42 10.0.0.62 43418 5001 52.213.180.42 10.0.0.62 6 23294588 15774 1566848933 1566849113 ACCEPT 1 OK",
-    //             "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 52.213.180.42 10.0.0.62 43638 5001 52.213.180.42 10.0.0.62 6 1260 17 1566933133 1566933193 ACCEPT 3 OK",
-    //             "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 10.0.0.62 52.213.180.42 5001 43638 10.0.0.62 52.213.180.42 6 967 14 1566933133 1566933193 ACCEPT 19 OK",
-    //         ]
-    //     ), (
-    //         Some("instance_id interface_id srcaddr dstaddr pkt_srcaddr pkt_dstaddr"),
-    //         vec![
-    //             "- eni-1235b8ca123456789 10.0.1.5 10.0.0.220 10.0.1.5 203.0.113.5",
-    //             "- eni-1235b8ca123456789 10.0.0.220 203.0.113.5 10.0.0.220 203.0.113.5",
-    //             "- eni-1235b8ca123456789 203.0.113.5 10.0.0.220 203.0.113.5 10.0.0.220",
-    //             "- eni-1235b8ca123456789 10.0.0.220 10.0.1.5 203.0.113.5 10.0.1.5",
-    //             "i-01234567890123456 eni-1111aaaa2222bbbb3 10.0.1.5 203.0.113.5 10.0.1.5 203.0.113.5",
-    //             "i-01234567890123456 eni-1111aaaa2222bbbb3 203.0.113.5 10.0.1.5 203.0.113.5 10.0.1.5",
-    //         ]
-    //     ), (
-    //         Some("version interface_id account_id vpc_id subnet_id instance_id srcaddr dstaddr srcport dstport protocol tcp_flags type pkt_srcaddr pkt_dstaddr action log_status"),
-    //         vec![
-    //             "3 eni-33333333333333333 123456789010 vpc-abcdefab012345678 subnet-22222222bbbbbbbbb i-01234567890123456 10.20.33.164 10.40.2.236 39812 80 6 3 IPv4 10.20.33.164 10.40.2.236 ACCEPT OK",
-    //             "3 eni-33333333333333333 123456789010 vpc-abcdefab012345678 subnet-22222222bbbbbbbbb i-01234567890123456 10.40.2.236 10.20.33.164 80 39812 6 19 IPv4 10.40.2.236 10.20.33.164 ACCEPT OK",
-    //             "3 eni-11111111111111111 123456789010 vpc-abcdefab012345678 subnet-11111111aaaaaaaaa - 10.40.1.175 10.40.2.236 39812 80 6 3 IPv4 10.20.33.164 10.40.2.236 ACCEPT OK",
-    //             "3 eni-22222222222222222 123456789010 vpc-abcdefab012345678 subnet-22222222bbbbbbbbb - 10.40.2.236 10.40.2.31 80 39812 6 19 IPv4 10.40.2.236 10.20.33.164 ACCEPT OK",
-    //         ]
-    //     )];
-
-    //     for (format, logs) in logs {
-    //         for log in logs {
-    //             assert!(parse_log(&log, format).is_ok());
-    //         }
-    //     }
-    // }
+        fields {
+             args: func_args![value: "3 vpc-abcdefab012345678 subnet-aaaaaaaa012345678 i-01234567890123456 eni-1235b8ca123456789 123456789010 IPv4 52.213.180.42 10.0.0.62 43416 5001 52.213.180.42 10.0.0.62 6 568 8 1566848875 1566848933 ACCEPT 2 OK",
+                              format: "version vpc_id subnet_id instance_id interface_id account_id type srcaddr dstaddr srcport dstport pkt_srcaddr pkt_dstaddr protocol bytes packets start end action tcp_flags log_status"],
+             want: Ok(value!({
+                 "account_id": 123456789010_i64,
+                 "action": "ACCEPT",
+                 "bytes": 568,
+                 "dstaddr": "10.0.0.62",
+                 "dstport": 5001,
+                 "end": 1566848933,
+                 "instance_id": "i-01234567890123456",
+                 "interface_id": "eni-1235b8ca123456789",
+                 "log_status": "OK",
+                 "packets": 8,
+                 "pkt_dstaddr": "10.0.0.62",
+                 "pkt_srcaddr": "52.213.180.42",
+                 "protocol": 6,
+                 "srcaddr": "52.213.180.42",
+                 "srcport": 43416,
+                 "start": 1566848875,
+                 "subnet_id": "subnet-aaaaaaaa012345678",
+                 "tcp_flags": 2,
+                 "type": "IPv4",
+                 "version": 3,
+                 "vpc_id": "vpc-abcdefab012345678"
+             })),
+             tdef: TypeDef::new().fallible().object::<&str, Kind>(inner_type_def()),
+         }
+    ];
 }

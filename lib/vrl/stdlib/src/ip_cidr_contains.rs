@@ -93,65 +93,43 @@ impl Expression for IpCidrContainsFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![value_string {
-//         expr: |_| IpCidrContainsFn {
-//             value: Literal::from("192.168.0.1").boxed(),
-//             cidr: Literal::from("192.168.0.0/16").boxed()
-//         },
-//         def: TypeDef {
-//             kind: value::Kind::Boolean,
-//             fallible: true,
-//             ..Default::default()
-//         },
-//     }];
+    test_function! [
+        ip_cidr_contains => IpCidrContains;
 
-//     #[test]
-//     fn ip_cidr_contains() {
-//         let cases = vec![
-//             (
-//                 map!["foo": "192.168.10.32",
-//                      "cidr": "192.168.0.0/16",
-//                 ],
-//                 Ok(Value::from(true)),
-//                 IpCidrContainsFn::new(Box::new(Path::from("cidr")), Box::new(Path::from("foo"))),
-//             ),
-//             (
-//                 map!["foo": "192.168.10.32",
-//                      "cidr": "192.168.0.0/24",
-//                 ],
-//                 Ok(Value::from(false)),
-//                 IpCidrContainsFn::new(Box::new(Path::from("cidr")), Box::new(Path::from("foo"))),
-//             ),
-//             (
-//                 map!["foo": "2001:4f8:3:ba:2e0:81ff:fe22:d1f1",
-//                      "cidr": "2001:4f8:3:ba::/64",
-//                 ],
-//                 Ok(Value::from(true)),
-//                 IpCidrContainsFn::new(Box::new(Path::from("cidr")), Box::new(Path::from("foo"))),
-//             ),
-//             (
-//                 map!["foo": "2001:4f8:3:ba:2e0:81ff:fe22:d1f1",
-//                      "cidr": "2001:4f8:4:ba::/64",
-//                 ],
-//                 Ok(Value::from(false)),
-//                 IpCidrContainsFn::new(Box::new(Path::from("cidr")), Box::new(Path::from("foo"))),
-//             ),
-//         ];
+        ipv4_yes {
+            args: func_args![value: "192.168.10.32",
+                             cidr: "192.168.0.0/16",
+            ],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().fallible().boolean(),
+        }
 
-//         let mut state = state::Program::default();
+        ipv4_no {
+            args: func_args![value: "192.168.10.32",
+                             cidr: "192.168.0.0/24",
+            ],
+            want: Ok(value!(false)),
+            tdef: TypeDef::new().fallible().boolean(),
+        }
 
-//         for (object, exp, func) in cases {
-//             let mut object = Value::Map(object);
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+        ipv6_yes {
+            args: func_args![value: "2001:4f8:3:ba:2e0:81ff:fe22:d1f1",
+                             cidr: "2001:4f8:3:ba::/64",
+            ],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().fallible().boolean(),
+        }
 
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        ipv6_no {
+            args: func_args![value: "2001:4f8:3:ba:2e0:81ff:fe22:d1f1",
+                             cidr: "2001:4f8:4:ba::/64",
+            ],
+            want: Ok(value!(false)),
+            tdef: TypeDef::new().fallible().boolean(),
+        }
+    ];
+}

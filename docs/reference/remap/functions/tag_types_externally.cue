@@ -5,13 +5,13 @@ remap: functions: tag_types_externally: {
 	description: """
 		Adds type information to all (nested) scalar values in the provided `value`.
 
-		The type information is added externally, meaning that `value` will have the shape of `"type": value` after this
+		The type information is added externally, meaning that `value` has the shape of `"type": value` after this
 		transformation.
 		"""
 	arguments: [
 		{
 			name:        "value"
-			description: "The value that should be tagged with types externally."
+			description: "The value to tag with types."
 			required:    true
 			type: ["any"]
 		},

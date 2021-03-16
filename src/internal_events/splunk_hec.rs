@@ -36,27 +36,6 @@ impl InternalEvent for SplunkEventEncodeError {
     }
 }
 
-#[derive(Debug)]
-pub struct SplunkMissingKeys<'a> {
-    pub field: &'static str,
-    pub keys: &'a [String],
-}
-
-impl<'a> InternalEvent for SplunkMissingKeys<'a> {
-    fn emit_logs(&self) {
-        warn!(
-            message = "Failed to render template for {}, leaving empty.",
-            self.field,
-            missing_keys = ?self.keys,
-            internal_log_rate_secs = 30,
-        )
-    }
-
-    fn emit_metrics(&self) {
-        counter!("missing_keys_total", 1);
-    }
-}
-
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
     use super::InternalEvent;

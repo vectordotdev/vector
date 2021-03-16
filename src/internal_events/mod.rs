@@ -29,6 +29,8 @@ mod coercer;
 mod concat;
 #[cfg(feature = "sinks-console")]
 mod console;
+#[cfg(feature = "sinks-datadog")]
+mod datadog_logs;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
 #[cfg(feature = "sources-docker_logs")]
@@ -107,6 +109,7 @@ mod syslog;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 mod tag_cardinality_limit;
 mod tcp;
+mod template;
 #[cfg(feature = "transforms-tokenizer")]
 mod tokenizer;
 mod topology;
@@ -145,6 +148,8 @@ pub(crate) use self::coercer::*;
 pub use self::concat::*;
 #[cfg(feature = "sinks-console")]
 pub use self::console::*;
+#[cfg(feature = "sinks-datadog")]
+pub use self::datadog_logs::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-docker_logs")]
@@ -227,6 +232,7 @@ pub use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub(crate) use self::tag_cardinality_limit::*;
 pub use self::tcp::*;
+pub use self::template::*;
 #[cfg(feature = "transforms-tokenizer")]
 pub(crate) use self::tokenizer::*;
 pub use self::topology::*;

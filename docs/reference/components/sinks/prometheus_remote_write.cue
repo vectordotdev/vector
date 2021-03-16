@@ -158,4 +158,8 @@ components: sinks: prometheus_remote_write: {
 			summary:      true
 		}
 	}
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+	}
 }

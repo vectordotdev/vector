@@ -3,7 +3,7 @@ package metadata
 remap: functions: parse_duration: {
 	category: "Parse"
 	description: """
-		Parses the `value` in a human duration format specified by `unit`.
+		Parses the `value` into a human-readable duration format specified by `unit`.
 		"""
 
 	arguments: [
@@ -15,7 +15,7 @@ remap: functions: parse_duration: {
 		},
 		{
 			name:        "unit"
-			description: "The string of the duration unit the number should be output as."
+			description: "The output units for the duration."
 			required:    true
 			type: ["string"]
 			enum: {
@@ -33,7 +33,7 @@ remap: functions: parse_duration: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a properly formatted duration",
+		"`value` isn't a properly formatted duration",
 	]
 	return: types: ["float"]
 

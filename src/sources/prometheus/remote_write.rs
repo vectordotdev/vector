@@ -54,7 +54,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         out: Pipeline,
     ) -> crate::Result<sources::Source> {
         let source = RemoteWriteSource;
-        source.run(self.address, "", &self.tls, &self.auth, out, shutdown)
+        source.run(self.address, "", true, &self.tls, &self.auth, out, shutdown)
     }
 
     fn output_type(&self) -> crate::config::DataType {
@@ -95,6 +95,7 @@ impl HttpSource for RemoteWriteSource {
         mut body: Bytes,
         header_map: HeaderMap,
         _query_parameters: HashMap<String, String>,
+        _full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
         // If `Content-Encoding` header isn't `snappy` HttpSource won't decode it for us
         // se we need to.
