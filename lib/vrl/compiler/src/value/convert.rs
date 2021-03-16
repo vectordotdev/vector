@@ -5,6 +5,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
 use vrl_structures::Map;
@@ -455,6 +456,12 @@ impl Value {
 impl From<Map<String, Value>> for Value {
     fn from(value: Map<String, Value>) -> Self {
         Value::Object(value)
+    }
+}
+
+impl From<BTreeMap<String, Value>> for Value {
+    fn from(value: BTreeMap<String, Value>) -> Self {
+        Value::Object(value.into())
     }
 }
 
