@@ -2101,6 +2101,7 @@ dependencies = [
  "bytes 1.0.1",
  "chrono",
  "crc",
+ "criterion",
  "dashmap 4.0.2",
  "flate2",
  "futures 0.3.13",
