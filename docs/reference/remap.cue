@@ -230,9 +230,10 @@ remap: #Remap & {
 		event_data_model: {
 			title: "Event Data Model"
 			body:  """
-				The `remap` transform works with both log and metric events. The data model for log events matches
-				exactly to the Vector's [log schem](\(urls.vector_log)). The data model for metric events is limited
-				to tag access only.
+				You can use the `remap` transform with both log and metric events. Log events in the `remap` transform
+				correspond directly to Vector's [log schem](\(urls.vector_log)), which means that the transform has
+				access to the whole event. With metric events, however, the remap transform only has access to the
+				event's tags.
 				"""
 		}
 	}
