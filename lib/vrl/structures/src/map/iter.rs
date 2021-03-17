@@ -25,6 +25,7 @@ pub struct Values<'a, K: 'a, V: 'a> {
 impl<K, V> Iterator for IntoIter<K, V> {
     type Item = (K, V);
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
@@ -33,6 +34,7 @@ impl<K, V> Iterator for IntoIter<K, V> {
 impl<'a, K, V> Iterator for Iter<'a, K, V> {
     type Item = (&'a K, &'a V);
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
@@ -41,6 +43,7 @@ impl<'a, K, V> Iterator for Iter<'a, K, V> {
 impl<'a, K, V> Iterator for IterMut<'a, K, V> {
     type Item = (&'a K, &'a mut V);
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
@@ -49,6 +52,7 @@ impl<'a, K, V> Iterator for IterMut<'a, K, V> {
 impl<'a, K, V> Iterator for Keys<'a, K, V> {
     type Item = &'a K;
 
+    #[inline]
     fn next(&mut self) -> Option<&'a K> {
         self.inner.next()
     }
@@ -57,6 +61,7 @@ impl<'a, K, V> Iterator for Keys<'a, K, V> {
 impl<'a, K, V> Iterator for Values<'a, K, V> {
     type Item = &'a V;
 
+    #[inline]
     fn next(&mut self) -> Option<&'a V> {
         self.inner.next()
     }

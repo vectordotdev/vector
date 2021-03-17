@@ -76,46 +76,55 @@ where
     K: Ord + Clone,
     V: Clone,
 {
+    #[inline]
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.inner.len()
     }
 
+    #[inline]
     pub fn iter(&self) -> Iter<'_, K, V> {
         Iter {
             inner: self.inner.iter(),
         }
     }
 
+    #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
         IterMut {
             inner: Arc::make_mut(&mut self.inner).iter_mut(),
         }
     }
 
+    #[inline]
     pub fn keys(&self) -> Keys<K, V> {
         Keys {
             inner: self.inner.keys(),
         }
     }
 
+    #[inline]
     pub fn values(&self) -> Values<K, V> {
         Values {
             inner: self.inner.values(),
         }
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
+    #[inline]
     pub fn clear(&mut self) {
         Arc::make_mut(&mut self.inner).clear()
     }
 
+    #[inline]
     pub fn append(&mut self, other: &mut Map<K, V>) {
         let omap = Arc::make_mut(&mut other.inner);
         let smap = Arc::make_mut(&mut self.inner);
@@ -123,6 +132,7 @@ where
         smap.append(omap);
     }
 
+    #[inline]
     pub fn contains_key<Q>(&self, key: &Q) -> bool
     where
         K: Borrow<Q>,
@@ -131,6 +141,7 @@ where
         self.inner.contains_key(key.borrow())
     }
 
+    #[inline]
     pub fn get<Q>(&self, key: &Q) -> Option<&V>
     where
         K: Borrow<Q>,
@@ -139,6 +150,7 @@ where
         self.inner.get(key.borrow())
     }
 
+    #[inline]
     pub fn get_mut<Q>(&mut self, key: &Q) -> Option<&mut V>
     where
         K: Borrow<Q>,
@@ -147,6 +159,7 @@ where
         Arc::make_mut(&mut self.inner).get_mut(key.borrow())
     }
 
+    #[inline]
     pub fn remove<Q>(&mut self, key: &Q) -> Option<V>
     where
         K: Borrow<Q>,
@@ -155,6 +168,7 @@ where
         Arc::make_mut(&mut self.inner).remove(key.borrow())
     }
 
+    #[inline]
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         Arc::make_mut(&mut self.inner).insert(key, value)
     }
