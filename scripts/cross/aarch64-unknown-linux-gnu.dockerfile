@@ -1,1 +1,1 @@
-FROM rustembedded/cross:aarch64-unknown-linux-gnu
+FROM docker.io/rustembedded/cross:aarch64-unknown-linux-gnu
