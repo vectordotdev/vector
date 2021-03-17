@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use url::form_urlencoded;
 use vrl::prelude::*;
 
@@ -12,7 +13,7 @@ impl Function for ParseQueryString {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "parse query string",
-            source: r#"parse_query_string({"query": "foo=1&bar=2"}.query)"#,
+            source: r#"parse_query_string!("foo=1&bar=2")"#,
             result: Ok(r#"
                 {
                     "foo": "1",
@@ -23,13 +24,13 @@ impl Function for ParseQueryString {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
-        let target = arguments.required_query("target")?;
-        Ok(Box::new(ParseQueryStringFn { target }))
+        let value = arguments.required("value");
+        Ok(Box::new(ParseQueryStringFn { value }))
     }
 
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
-            keyword: "target",
+            keyword: "value",
             kind: kind::ANY,
             required: true,
         }]
@@ -38,26 +39,12 @@ impl Function for ParseQueryString {
 
 #[derive(Debug, Clone)]
 struct ParseQueryStringFn {
-    target: expression::Query,
-}
-
-impl ParseQueryStringFn {
-    #[cfg(test)]
-    fn new(path: &str) -> Self {
-        use std::str::FromStr;
-
-        Self {
-            target: expression::Query::new(
-                expression::Target::External,
-                Path::from_str(path).unwrap(),
-            ),
-        }
-    }
+    value: Box<dyn Expression>,
 }
 
 impl Expression for ParseQueryStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let query_string = self.target.resolve(ctx)?.try_bytes()?;
+        let query_string = self.value.resolve(ctx)?.try_bytes()?;
         let result = form_urlencoded::parse(query_string.as_ref())
             .map(|(k, v)| (k.to_string(), v.into()))
             .collect();
@@ -65,33 +52,30 @@ impl Expression for ParseQueryStringFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().object::<(), Kind>(map! {
-            (): Kind::Bytes,
-        })
+        TypeDef::new().fallible().object::<(), Kind>(type_def())
+    }
+}
+
+fn type_def() -> BTreeMap<(), Kind> {
+    map! {
+        (): Kind::Bytes,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shared::btreemap;
 
-    #[test]
-    fn parse_query_string() {
-        let cases = vec![(
-            btreemap! { "query" => "foo=%2B1&bar=2" },
-            Ok(value!({"foo" : "+1", "bar" : "2"})),
-            ParseQueryStringFn::new(".query"),
-        )];
+    test_function![
+        parse_query_string => ParseQueryString;
 
-        for (object, exp, func) in cases {
-            let mut object: Value = object.into();
-            let mut runtime_state = vrl::state::Runtime::default();
-            let mut ctx = Context::new(&mut object, &mut runtime_state);
-            let got = func
-                .resolve(&mut ctx)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-            assert_eq!(got, exp);
+        type_def {
+            args: func_args![value: value!("foo=%2B1&bar=2")],
+            want: Ok(value!({
+                foo: "+1",
+                bar: "2",
+            })),
+            tdef: TypeDef::new().fallible().object::<(), Kind>(type_def()),
         }
-    }
+    ];
 }
