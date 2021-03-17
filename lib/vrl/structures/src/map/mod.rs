@@ -2,11 +2,13 @@ use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
+mod convert;
 mod iter;
 mod macros;
 #[cfg(test)]
 mod tests;
 
+pub use convert::*;
 pub use iter::*;
 pub use macros::*;
 
@@ -33,16 +35,6 @@ where
             (None, None) => true,
             (Some(smap), Some(omap)) => smap.eq(omap),
         }
-    }
-}
-
-impl<K: Ord, V> From<BTreeMap<K, V>> for Map<K, V> {
-    fn from(value: BTreeMap<K, V>) -> Self {
-        let mut map = Map::new();
-        for (k, v) in value {
-            map.insert(k, v);
-        }
-        map
     }
 }
 

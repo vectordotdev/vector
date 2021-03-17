@@ -1,7 +1,5 @@
 use crate::map::Map;
 use std::collections::btree_map;
-use std::collections::BTreeMap;
-use std::iter::FromIterator;
 
 pub struct Iter<'a, K, V> {
     pub(crate) inner: Option<btree_map::Iter<'a, K, V>>,
@@ -58,17 +56,6 @@ impl<'a, K, V> Iterator for IterMut<'a, K, V> {
         } else {
             None
         }
-    }
-}
-
-impl<K: Ord, V> FromIterator<(K, V)> for Map<K, V> {
-    fn from_iter<T>(iter: T) -> Self
-    where
-        T: IntoIterator<Item = (K, V)>,
-    {
-        let mut map = BTreeMap::new();
-        map.extend(iter);
-        Self { inner: Some(map) }
     }
 }
 
