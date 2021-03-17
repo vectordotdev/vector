@@ -309,7 +309,7 @@ components: sources: internal_metrics: {
 					required:    false
 				}
 				peer_addr: {
-					description: "The ip from which the event originates."
+					description: "The IP from which the event originates."
 					required:    false
 				}
 				peer_path: {
