@@ -7,10 +7,10 @@ use crate::{
     Event, Pipeline,
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
+use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, time::Duration};
+use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -228,29 +228,32 @@ async fn handle_stream<T>(
             debug!("Start forceful shutdown.");
         },
         _ = async {
-            let stream = (&mut reader)
-                .take_until(shutdown_signal.map(|token| {
-                    debug!("Start graceful shutdown.");
-                    _token = Some(token);
+            let stream = stream::poll_fn(|cx| {
+                match shutdown_signal.poll_unpin(cx) {
+                    Poll::Ready(token) => {
+                        debug!("Start graceful shutdown.");
+                        _token = Some(token);
+                        return Poll::Ready(None);
+                    }
+                    Poll::Pending => ()
+                };
+
+                (&mut reader).poll_next_unpin(cx)
+            })
+                .take_while(move |frame| ready(match frame {
+                    Ok(_) => true,
+                    Err(_) => !<<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal(),
                 }))
-                .take_while(move |frame| {
-                    ready(match frame {
-                        Ok(_) => true,
-                        Err(_) => !<<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal(),
-                    })
-                })
-                .filter_map(move |frame| {
-                    ready(match frame {
-                        Ok(frame) => {
-                            let host = host.clone();
-                            source.build_event(frame, host).map(Ok)
-                        }
-                        Err(error) => {
-                            warn!(message = "Failed to read data from TCP source.", %error);
-                            None
-                        }
-                    })
-                })
+                .filter_map(move |frame| ready(match frame {
+                    Ok(frame) => {
+                        let host = host.clone();
+                        source.build_event(frame, host).map(Ok)
+                    }
+                    Err(error) => {
+                        warn!("Failed to read data from TCP source. {}", error);
+                        None
+                    }
+                }))
                 .forward(out)
                 .await;
 
