@@ -7,10 +7,10 @@ use crate::{
     Event, Pipeline,
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
+use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
+use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, time::Duration};
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -221,58 +221,50 @@ async fn handle_stream<T>(
     }
 
     let mut _token = None;
-    let mut shutdown_signal = Some(shutdown_signal);
     let mut reader = FramedRead::new(socket, source.decoder());
-    stream::poll_fn(move |cx| {
-        if let Some(fut) = shutdown_signal.as_mut() {
-            match fut.poll_unpin(cx) {
-                Poll::Ready(token) => {
+
+    tokio::select!(
+        _ = tripwire => {
+            debug!("Start forceful shutdown.");
+        },
+        _ = async {
+            let stream = (&mut reader)
+                .take_until(shutdown_signal.map(|token| {
                     debug!("Start graceful shutdown.");
-
-                    let socket = reader.get_mut();
-
-                    // Close our write part of TCP socket to signal the other side
-                    // that it should stop writing and close the channel.
-                    match socket.shutdown().now_or_never() {
-                        None => error!(message = "Failed shutting down TCP socket immediately."),
-                        Some(Err(error)) => {
-                            error!(message = "Failed shutting down TCP socket.", %error)
-                        }
-                        _ => (),
-                    }
-
                     _token = Some(token);
-                    shutdown_signal = None;
-                }
-                Poll::Pending => {}
-            }
-        }
+                }))
+                .take_while(move |frame| {
+                    ready(match frame {
+                        Ok(_) => true,
+                        Err(_) => !<<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal(),
+                    })
+                })
+                .filter_map(move |frame| {
+                    ready(match frame {
+                        Ok(frame) => {
+                            let host = host.clone();
+                            source.build_event(frame, host).map(Ok)
+                        }
+                        Err(error) => {
+                            warn!(message = "Failed to read data from TCP source.", %error);
+                            None
+                        }
+                    })
+                })
+                .forward(out)
+                .await;
 
-        reader.poll_next_unpin(cx)
-    })
-    .take_until(tripwire)
-    .take_while(move |frame| {
-        ready(match frame {
-            Ok(_) => true,
-            Err(_) => !<<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal(),
-        })
-    })
-    .filter_map(move |frame| {
-        ready(match frame {
-            Ok(frame) => {
-                let host = host.clone();
-                source.build_event(frame, host).map(Ok)
+            if stream.is_err() {
+                warn!(message = "Error received while processing TCP source.");
             }
-            Err(error) => {
-                warn!(message = "Failed to read data from TCP source.", %error);
-                None
+
+            if let Err(error) = reader.into_inner().shutdown().await {
+                warn!(message = "Error received while shutting down TCP source.", %error);
+            } else {
+                debug!("Connection closed gracefully.");
             }
-        })
-    })
-    .forward(out)
-    .map_err(|_| warn!(message = "Error received while processing TCP source."))
-    .map(|_| debug!("Connection closed."))
-    .await
+        } => {}
+    );
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]

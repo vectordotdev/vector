@@ -110,6 +110,7 @@ enum StreamState<S> {
     Accepted(MaybeTlsStream<S>),
     Accepting(BoxFuture<'static, Result<SslStream<S>, TlsError>>),
     AcceptError(String),
+    Closed,
 }
 
 impl<S> MaybeTlsIncomingStream<S> {
@@ -134,6 +135,7 @@ impl<S> MaybeTlsIncomingStream<S> {
             }),
             StreamState::Accepting(_) => None,
             StreamState::AcceptError(_) => None,
+            StreamState::Closed => None,
         }
     }
 
@@ -153,6 +155,7 @@ impl<S> MaybeTlsIncomingStream<S> {
             }),
             StreamState::Accepting(_) => None,
             StreamState::AcceptError(_) => None,
+            StreamState::Closed => None,
         }
     }
 }
@@ -242,6 +245,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
                 StreamState::AcceptError(error) => {
                     Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, error.to_owned())))
                 }
+                StreamState::Closed => Poll::Ready(Err(io::ErrorKind::BrokenPipe.into())),
             };
         }
     }
@@ -267,6 +271,30 @@ impl AsyncWrite for MaybeTlsIncomingStream<TcpStream> {
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
-        self.poll_io(cx, |s, cx| s.poll_shutdown(cx))
+        let mut this = self.get_mut();
+        match &mut this.state {
+            StreamState::Accepted(stream) => match Pin::new(stream).poll_shutdown(cx) {
+                Poll::Ready(Ok(())) => {
+                    this.state = StreamState::Closed;
+                    Poll::Ready(Ok(()))
+                }
+                result => result,
+            },
+            StreamState::Accepting(fut) => match futures::ready!(fut.as_mut().poll(cx)) {
+                Ok(stream) => {
+                    this.state = StreamState::Accepted(MaybeTlsStream::Tls(stream));
+                    Poll::Pending
+                }
+                Err(error) => {
+                    let error = io::Error::new(io::ErrorKind::Other, error);
+                    this.state = StreamState::AcceptError(error.to_string());
+                    Poll::Ready(Err(error))
+                }
+            },
+            StreamState::AcceptError(error) => {
+                Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, error.to_owned())))
+            }
+            StreamState::Closed => Poll::Ready(Ok(())),
+        }
     }
 }
