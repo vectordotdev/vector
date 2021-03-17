@@ -316,6 +316,7 @@ components: sources: internal_metrics: {
 					description: "The pathname from which the event originates."
 					required:    false
 				}
+				mode: _mode
 			}
 		}
 		events_out_total: {
@@ -472,10 +473,36 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		processed_bytes_total: {
-			description:       "The total number of bytes processed by the component."
+			description:       "The number of bytes processed by the component."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {
+				file: {
+					description: "The file from which the bytes originate."
+					required:    false
+				}
+				uri: {
+					description: "The sanitized uri from which the bytes originate."
+					required:    false
+				}
+				container_name: {
+					description: "The name of the container from which the bytes originate."
+					required:    false
+				}
+				pod_name: {
+					description: "The name of the pod from which the bytes originate."
+					required:    false
+				}
+				peer_addr: {
+					description: "The IP from which the bytes originate."
+					required:    false
+				}
+				peer_path: {
+					description: "The pathname from which the bytes originate."
+					required:    false
+				}
+				mode: _mode
+			}
 		}
 		processing_errors_total: {
 			description:       "The total number of processing errors encountered by this component."
@@ -767,6 +794,15 @@ components: sources: internal_metrics: {
 			description: "The name of the job producing Vector metrics."
 			required:    true
 			default:     "vector"
+		}
+		_mode: {
+			description: "The connection mode used by the component."
+			required:    false
+			enum: {
+				udp: "User Datagram Protocol"
+				tcp: "Transmission Control Protocol"
+				unix: "Unix domain socket"
+			}
 		}
 		_path: {
 			description: "The path that produced the error."
