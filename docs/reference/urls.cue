@@ -462,6 +462,7 @@ urls: {
 	vector_regex_parser:                                      "\(vector_website)/docs/reference/transforms/regex_parser/"
 	vector_releases:                                          "\(vector_website)/releases/latest/"
 	vector_reduce_transform:                                  "\(vector_website)/docs/reference/transforms/reduce/"
+	vector_release_policy:                                    "https://github.com/timberio/vector/blob/master/RELEASING.md"
 	vector_remap_transform:                                   "\(vector_website)/docs/reference/transforms/remap/"
 	vector_repo:                                              "\(github)/timberio/vector"
 	vector_roadmap:                                           "https://roadmap.vector.dev"
