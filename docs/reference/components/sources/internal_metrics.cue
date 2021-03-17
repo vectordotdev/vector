@@ -799,8 +799,8 @@ components: sources: internal_metrics: {
 			description: "The connection mode used by the component."
 			required:    false
 			enum: {
-				udp: "User Datagram Protocol"
-				tcp: "Transmission Control Protocol"
+				udp:  "User Datagram Protocol"
+				tcp:  "Transmission Control Protocol"
 				unix: "Unix domain socket"
 			}
 		}
