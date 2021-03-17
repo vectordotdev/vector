@@ -1,5 +1,5 @@
 use crate::Event;
-use futures::{channel::mpsc, future, Sink, Stream};
+use futures::{channel::mpsc, future, stream::Fuse, Sink, Stream, StreamExt};
 use std::{
     fmt,
     pin::Pin,
@@ -31,8 +31,7 @@ pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 pub struct Fanout {
     sinks: Vec<(String, Option<Pin<RouterSink>>)>,
     i: usize,
-    control_channel: mpsc::UnboundedReceiver<ControlMessage>,
-    control_channel_closed: bool,
+    control_channel: Fuse<mpsc::UnboundedReceiver<ControlMessage>>,
 }
 
 impl Fanout {
@@ -42,8 +41,7 @@ impl Fanout {
         let fanout = Self {
             sinks: vec![],
             i: 0,
-            control_channel: control_rx,
-            control_channel_closed: false,
+            control_channel: control_rx.fuse(),
         };
 
         (fanout, control_tx)
@@ -82,19 +80,11 @@ impl Fanout {
     }
 
     pub fn process_control_messages(&mut self, cx: &mut Context<'_>) {
-        if self.control_channel_closed {
-            return;
-        }
-
-        while let Poll::Ready(message) = Pin::new(&mut self.control_channel).poll_next(cx) {
+        while let Poll::Ready(Some(message)) = Pin::new(&mut self.control_channel).poll_next(cx) {
             match message {
-                Some(ControlMessage::Add(name, sink)) => self.add(name, sink),
-                Some(ControlMessage::Remove(name)) => self.remove(&name),
-                Some(ControlMessage::Replace(name, sink)) => self.replace(name, sink),
-                None => {
-                    self.control_channel_closed = true;
-                    break;
-                }
+                ControlMessage::Add(name, sink) => self.add(name, sink),
+                ControlMessage::Remove(name) => self.remove(&name),
+                ControlMessage::Replace(name, sink) => self.replace(name, sink),
             }
         }
     }
