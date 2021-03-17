@@ -32,6 +32,7 @@ pub struct Fanout {
     sinks: Vec<(String, Option<Pin<RouterSink>>)>,
     i: usize,
     control_channel: mpsc::UnboundedReceiver<ControlMessage>,
+    control_channel_closed: bool,
 }
 
 impl Fanout {
@@ -42,6 +43,7 @@ impl Fanout {
             sinks: vec![],
             i: 0,
             control_channel: control_rx,
+            control_channel_closed: false,
         };
 
         (fanout, control_tx)
@@ -80,11 +82,19 @@ impl Fanout {
     }
 
     pub fn process_control_messages(&mut self, cx: &mut Context<'_>) {
-        while let Poll::Ready(Some(message)) = Pin::new(&mut self.control_channel).poll_next(cx) {
+        if self.control_channel_closed {
+            return;
+        }
+
+        while let Poll::Ready(message) = Pin::new(&mut self.control_channel).poll_next(cx) {
             match message {
-                ControlMessage::Add(name, sink) => self.add(name, sink),
-                ControlMessage::Remove(name) => self.remove(&name),
-                ControlMessage::Replace(name, sink) => self.replace(name, sink),
+                Some(ControlMessage::Add(name, sink)) => self.add(name, sink),
+                Some(ControlMessage::Remove(name)) => self.remove(&name),
+                Some(ControlMessage::Replace(name, sink)) => self.replace(name, sink),
+                None => {
+                    self.control_channel_closed = true;
+                    break;
+                }
             }
         }
     }
@@ -106,6 +116,8 @@ impl Fanout {
     where
         F: Fn(&mut Pin<RouterSink>, &mut Context<'_>) -> Poll<Result<(), ()>>,
     {
+        self.process_control_messages(cx);
+
         let mut poll_result = Poll::Ready(Ok(()));
 
         let mut i = 0;
