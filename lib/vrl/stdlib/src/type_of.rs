@@ -79,7 +79,7 @@ mod tests {
         }
 
         float {
-            args: func_args![value: value!(3.141592654)],
+            args: func_args![value: value!(0.577215664)],
             want: Ok(value!("float")),
             tdef: TypeDef::new().infallible().bytes(),
         }
