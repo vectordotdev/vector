@@ -681,25 +681,28 @@ impl TypeDef {
     #[inline]
     pub fn array_mapped<I, V>(self, map: Map<I, V>) -> Self
     where
-        I: Into<Index>,
-        V: Into<Self>,
+        I: Ord + Clone + Into<Index>,
+        V: Clone + Into<Self>,
     {
         self.unknown().add_array_mapped(map)
     }
 
     #[inline]
-    pub fn add_array_mapped<I, V>(mut self, map: Map<I, V>) -> Self
+    pub fn add_array_mapped<I, V>(mut self, inner: Map<I, V>) -> Self
     where
-        I: Into<Index>,
-        V: Into<Self>,
+        I: Ord + Clone + Into<Index>,
+        V: Clone + Into<Self>,
     {
         // must not have multiple arrays in list
         self = self.remove_array();
 
-        let map = map
-            .into_iter()
-            .map(|(i, td)| (i.into(), td.into().kind))
-            .collect::<Map<_, _>>();
+        let map: Map<Index, KindInfo> =
+            inner.into_iter().fold(Map::default(), |mut acc, (k, td)| {
+                let index: Index = k.into();
+                let type_def: Self = td.into();
+                acc.insert(index, type_def.kind);
+                acc
+            });
 
         self.add_container(TypeKind::Array(map))
     }
@@ -707,8 +710,8 @@ impl TypeDef {
     #[inline]
     pub fn object<K, V>(self, inner: Map<K, V>) -> Self
     where
-        K: Into<Field>,
-        V: Into<Self>,
+        K: Ord + Clone + Into<Field>,
+        V: Clone + Into<Self>,
     {
         self.unknown().add_object(inner)
     }
@@ -716,16 +719,19 @@ impl TypeDef {
     #[inline]
     pub fn add_object<K, V>(mut self, inner: Map<K, V>) -> Self
     where
-        K: Into<Field>,
-        V: Into<Self>,
+        K: Ord + Clone + Into<Field>,
+        V: Clone + Into<Self>,
     {
         // must not have multiple objects in list
         self = self.remove_object();
 
-        let map = inner.into_iter().fold(Map::default(), |mut acc, (k, td)| {
-            acc.insert(k.into(), td.into().kind);
-            acc
-        });
+        let map: Map<Field, KindInfo> =
+            inner.into_iter().fold(Map::default(), |mut acc, (k, td)| {
+                let field: Field = k.into();
+                let type_def: Self = td.into();
+                acc.insert(field, type_def.kind);
+                acc
+            });
 
         self.add_container(TypeKind::Object(map))
     }
