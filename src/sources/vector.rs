@@ -129,12 +129,12 @@ mod test {
             Metric,
         },
         sinks::vector::VectorSinkConfig,
-        test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
+        test_util::{collect_all, collect_ready, next_addr, trace_init, wait_for_tcp},
         tls::{TlsConfig, TlsOptions},
         Event, Pipeline,
     };
     use futures::stream;
-    use std::{net::SocketAddr, thread};
+    use std::net::SocketAddr;
     use tokio::{
         io::AsyncWriteExt,
         net::TcpStream,
@@ -256,12 +256,12 @@ mod test {
         let mut stream = TcpStream::connect(&addr).await.unwrap();
         stream.write(b"hello world \n").await.unwrap();
 
-        thread::sleep(Duration::from_secs(2));
+        tokio::time::sleep(Duration::from_secs(2)).await;
         stream.shutdown().await.unwrap();
         drop(trigger_shutdown);
         shutdown_down.await;
 
-        let output = collect_ready(ReceiverStream::new(rx)).await;
+        let output = collect_all(ReceiverStream::new(rx)).await;
         assert_eq!(output, []);
     }
 
@@ -297,12 +297,12 @@ mod test {
         sink.send(out.into()).await.unwrap();
 
         let mut stream = sink.into_inner();
-        thread::sleep(Duration::from_secs(2));
+        tokio::time::sleep(Duration::from_secs(2)).await;
         stream.shutdown().await.unwrap();
         drop(trigger_shutdown);
         shutdown_down.await;
 
-        let output = collect_ready(ReceiverStream::new(rx)).await;
-        assert_eq!(Event::from(event), output[0]);
+        let output = collect_all(ReceiverStream::new(rx)).await;
+        assert_eq!(vec![Event::from(event)], output);
     }
 }

@@ -7,10 +7,10 @@ use crate::{
     Event, Pipeline,
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt};
+use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
+use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, time::Duration};
 use tokio::{
     io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
@@ -220,7 +220,7 @@ async fn handle_stream<T>(
         }
     }
 
-    let mut _token = None;
+    let mut _shutdown_token = None;
     let mut reader = FramedRead::new(socket, source.decoder());
 
     tokio::select!(
@@ -228,18 +228,12 @@ async fn handle_stream<T>(
             debug!("Start forceful shutdown.");
         },
         _ = async {
-            let stream = stream::poll_fn(|cx| {
-                match shutdown_signal.poll_unpin(cx) {
-                    Poll::Ready(token) => {
-                        debug!("Start graceful shutdown.");
-                        _token = Some(token);
-                        return Poll::Ready(None);
-                    }
-                    Poll::Pending => ()
-                };
-
-                (&mut reader).poll_next_unpin(cx)
-            })
+            let stream = (&mut reader)
+                .take_until(async {
+                    let shutdown_token = shutdown_signal.await;
+                    debug!("Start graceful shutdown.");
+                    _shutdown_token = Some(shutdown_token);
+                })
                 .take_while(move |frame| ready(match frame {
                     Ok(_) => true,
                     Err(_) => !<<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal(),
