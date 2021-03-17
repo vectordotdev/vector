@@ -43,6 +43,16 @@ impl<'a> FileSourceMetricFile<'a> {
     async fn processed_bytes_total(&self) -> Option<metrics::ProcessedBytesTotal> {
         self.metrics.processed_bytes_total()
     }
+
+    /// Metric indicating events inputted for the current file
+    async fn events_in_total(&self) -> Option<metrics::EventsInTotal> {
+        self.metrics.events_in_total()
+    }
+
+    /// Metric indicating events outputted for the current file
+    async fn events_out_total(&self) -> Option<metrics::EventsOutTotal> {
+        self.metrics.events_out_total()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -72,6 +82,8 @@ pub enum FileSourceMetricFilesSortFieldName {
     Name,
     ProcessedBytesTotal,
     ProcessedEventsTotal,
+    EventsInTotal,
+    EventsOutTotal,
 }
 
 impl sort::SortableByField<FileSourceMetricFilesSortFieldName> for FileSourceMetricFile<'_> {
@@ -98,6 +110,28 @@ impl sort::SortableByField<FileSourceMetricFilesSortFieldName> for FileSourceMet
                 &rhs.metrics
                     .processed_events_total()
                     .map(|m| m.get_processed_events_total() as i64)
+                    .unwrap_or(0),
+            ),
+            FileSourceMetricFilesSortFieldName::EventsInTotal => Ord::cmp(
+                &self
+                    .metrics
+                    .events_in_total()
+                    .map(|m| m.get_events_in_total() as i64)
+                    .unwrap_or(0),
+                &rhs.metrics
+                    .events_in_total()
+                    .map(|m| m.get_events_in_total() as i64)
+                    .unwrap_or(0),
+            ),
+            FileSourceMetricFilesSortFieldName::EventsOutTotal => Ord::cmp(
+                &self
+                    .metrics
+                    .events_out_total()
+                    .map(|m| m.get_events_out_total() as i64)
+                    .unwrap_or(0),
+                &rhs.metrics
+                    .events_out_total()
+                    .map(|m| m.get_events_out_total() as i64)
                     .unwrap_or(0),
             ),
         }
@@ -159,6 +193,16 @@ impl FileSourceMetrics {
     /// Bytes processed for the current file source
     pub async fn processed_bytes_total(&self) -> Option<metrics::ProcessedBytesTotal> {
         self.0.processed_bytes_total()
+    }
+
+    /// Events inputted for the current file source
+    pub async fn events_in_total(&self) -> Option<metrics::EventsInTotal> {
+        self.0.events_in_total()
+    }
+
+    /// Events outputted for the current file source
+    pub async fn events_out_total(&self) -> Option<metrics::EventsOutTotal> {
+        self.0.events_out_total()
     }
 }
 

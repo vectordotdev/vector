@@ -1,14 +1,16 @@
 pub mod file;
 mod generic;
 
-use super::{ProcessedBytesTotal, ProcessedEventsTotal};
+use super::{EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal};
 use crate::event::Metric;
 use async_graphql::Interface;
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(
     field(name = "processed_events_total", type = "Option<ProcessedEventsTotal>"),
-    field(name = "processed_bytes_total", type = "Option<ProcessedBytesTotal>")
+    field(name = "processed_bytes_total", type = "Option<ProcessedBytesTotal>"),
+    field(name = "events_in_total", type = "Option<EventsInTotal>"),
+    field(name = "events_out_total", type = "Option<EventsOutTotal>")
 )]
 pub enum SourceMetrics {
     GenericSourceMetrics(generic::GenericSourceMetrics),
