@@ -44,7 +44,7 @@ impl Expression for TypeOfFn {
             Value::Integer(_) => Ok(value!("integer")),
             Value::Float(_) => Ok(value!("float")),
             Value::Boolean(_) => Ok(value!("boolean")),
-            Value::Object(_) => Ok(value!("timestamp")),
+            Value::Object(_) => Ok(value!("object")),
             Value::Array(_) => Ok(value!("array")),
             Value::Timestamp(_) => Ok(value!("timestamp")),
             Value::Regex(_) => Ok(value!("regex")),
@@ -57,72 +57,75 @@ impl Expression for TypeOfFn {
     }
 }
 
-/*#[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{DateTime, Utc};
+    use regex::Regex;
+
     test_function![
-        is_nullish => IsNullish;
+        type_of => TypeOf;
 
-        empty_string {
-            args: func_args![value: value!("")],
-            want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+        bytes {
+            args: func_args![value: value!("foobar")],
+            want: Ok(value!("bytes")),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
-        single_space_string {
-            args: func_args![value: value!(" ")],
-            want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+        integer {
+            args: func_args![value: value!(1789)],
+            want: Ok(value!("integer")),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
-        multi_space_string {
-            args: func_args![value: value!("     ")],
-            want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+        float {
+            args: func_args![value: value!(3.141592654)],
+            want: Ok(value!("float")),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
-        newline_string {
-            args: func_args![value: value!("\n")],
-            want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+        boolean {
+            args: func_args![value: value!(true)],
+            want: Ok(value!("boolean")),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
-        carriage_return_string {
-            args: func_args![value: value!("\r")],
-            want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+        object {
+            args: func_args![value: value!({"foo": "bar"})],
+            want: Ok(value!("object")),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
-        dash_string {
-            args: func_args![value: value!("-")],
-            want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+        array {
+            args: func_args![value: value!([1, 5, 1, 5])],
+            want: Ok(value!("array")),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
+
+        timestamp {
+            args: func_args![value: value!(DateTime::parse_from_rfc2822("Wed, 17 Mar 2021 12:00:00 +0000")
+                .unwrap()
+                .with_timezone(&Utc))],
+            want: Ok(value!("timestamp")),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
+
+        regex {
+            args: func_args![value: value!(Regex::new(r"\d+").unwrap())],
+            want: Ok(value!("regex")),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
         null {
             args: func_args![value: value!(null)],
-            want: Ok(value!(true)),
-            tdef: TypeDef::new().infallible().boolean(),
+            want: Ok(Value::Bytes(bytes::Bytes::from("null"))),
+            tdef: TypeDef::new().infallible().bytes(),
         }
 
-        non_empty_string {
-            args: func_args![value: value!("hello world")],
-            want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
-        }
-
-        // Shows that a non-string/null literal returns false
-        integer {
-            args: func_args![value: value!(427)],
-            want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
-        }
-
-        // Shows that a non-literal type returns false
-        array {
-            args: func_args![value: value!([1, 2, 3])],
-            want: Ok(value!(false)),
-            tdef: TypeDef::new().infallible().boolean(),
+        empty_string {
+            args: func_args![value: value!("")],
+            want: Ok(value!("bytes")),
+            tdef: TypeDef::new().infallible().bytes(),
         }
     ];
-}*/
+}
