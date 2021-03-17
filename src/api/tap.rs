@@ -57,6 +57,7 @@ pub struct TapSink {
 impl TapSink {
     pub fn new(watch_rx: WatchRx, tap_tx: TapSender, patterns: &[String]) -> Self {
         let (_shutdown, shutdown_rx) = oneshot::channel();
+
         tokio::spawn(tap_handler(
             patterns.iter().cloned().collect(),
             tap_tx,
@@ -97,6 +98,8 @@ fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
     let component_name = component_name.to_string();
 
     tokio::spawn(async move {
+        debug!(message = "Spawned tap event handler.", component_name = ?component_name);
+
         while let Some(ev) = event_rx.next().await {
             if let Event::Log(ev) = ev {
                 let _ = tx
@@ -104,6 +107,8 @@ fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
                     .await;
             }
         }
+
+        debug!(message = "Stopped tap event handler.", component_name = ?component_name);
     });
 
     Box::new(event_tx.sink_map_err(|_| ()))
@@ -117,6 +122,8 @@ async fn tap_handler(
     mut watch_rx: WatchRx,
     mut shutdown_rx: ShutdownRx,
 ) {
+    debug!(message = "Started tap.", patterns = ?patterns);
+
     let mut current = HashSet::new();
 
     loop {
@@ -146,9 +153,12 @@ async fn tap_handler(
                     .filter(|name| patterns.iter().any(|p| name.matches_glob(p)))
                 {
                     if let Some(output) = outputs.get(component_name) {
+                        let id = Uuid::new_v4().to_string();
+                        debug!(message="Connecting tap sink.", id = ?id, component_name = ?component_name);
+
                         let sink = make_router(tx.clone(), component_name);
                         let _ = output.send(fanout::ControlMessage::Add(
-                            Uuid::new_v4().to_string(),
+                            id,
                             sink,
                         ));
                     }
@@ -158,4 +168,6 @@ async fn tap_handler(
             }
         }
     }
+
+    debug!(message = "Stopped tap.", patterns = ?patterns);
 }
