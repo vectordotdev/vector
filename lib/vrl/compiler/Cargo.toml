@@ -13,6 +13,8 @@ bitflags = "1"
 bytes = "0.5.6"
 chrono = "0.4"
 lalrpop-util = "0.19"
+
+# ngrammatic = { path = "/home/plertrood/src/rust/ngrammatic/" }
 ngrammatic = "0.3"
 ordered-float = "2"
 paste = "1"

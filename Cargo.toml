@@ -42,6 +42,7 @@ depends = "libc6 (>= 2.17)"
 members = [
   ".",
   "lib/codec",
+  "lib/corpus-groove",
   "lib/derive_is_enum_variant",
   "lib/fakedata",
   "lib/file-source",
@@ -53,6 +54,7 @@ members = [
   "lib/tracing-limit",
   "lib/vector-api-client",
   "lib/vector-wasm",
+  "lib/vrl/breakit",
   "lib/vrl/cli",
   "lib/vrl/compiler",
   "lib/vrl/core",

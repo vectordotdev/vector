@@ -44,7 +44,7 @@ impl FunctionCall {
             None => {
                 let idents = funcs
                     .iter()
-                    .map(|func| func.identifier())
+                    .map(|func| func.identifier().to_string())
                     .collect::<Vec<_>>();
 
                 return Err(Error::Undefined {
@@ -343,7 +343,7 @@ pub enum Error {
     Undefined {
         ident_span: Span,
         ident: Ident,
-        idents: Vec<&'static str>,
+        idents: Vec<String>,
     },
 
     #[error("wrong number of function arguments")]
@@ -387,6 +387,8 @@ pub enum Error {
     FallibleArgument { expr_span: Span },
 }
 
+
+
 impl DiagnosticError for Error {
     fn code(&self) -> usize {
         use Error::*;
@@ -420,16 +422,15 @@ impl DiagnosticError for Error {
                     .finish();
 
                 for func in idents {
-                    corpus.add_text(func);
+                    corpus.add_text(&func.to_string());
                 }
 
-                if let Some(guess) = corpus.search(ident.as_ref(), 0.25).first() {
+                if let Some(guess) = corpus.search(&ident.as_ref().to_string(), 0.25).first() {
                     vec.push(Label::context(
                         format!(r#"did you mean "{}"?"#, guess.text),
                         ident_span,
                     ));
                 }
-
                 vec
             }
 

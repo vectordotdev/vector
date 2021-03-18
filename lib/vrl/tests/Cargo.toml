@@ -9,6 +9,7 @@ publish = false
 parser = { package = "vrl-parser", path = "../parser" }
 stdlib = { package = "vrl-stdlib", path = "../stdlib" }
 vrl = { path = "../core" }
+jemallocator = { version = "0.3.0" }
 
 ansi_term = "0.12"
 chrono = "0.4"

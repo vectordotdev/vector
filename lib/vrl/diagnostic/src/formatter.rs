@@ -35,7 +35,8 @@ impl<'a> fmt::Display for Formatter<'a> {
         use termcolor::Buffer;
 
         let file = SimpleFile::new("", self.source);
-        let config = term::Config::default();
+        let mut config = term::Config::default();
+        config.display_style = term::DisplayStyle::Short;
         let mut buffer = if self.color {
             Buffer::ansi()
         } else {
@@ -45,10 +46,16 @@ impl<'a> fmt::Display for Formatter<'a> {
         f.write_str("\n")?;
 
         for diagnostic in self.diagnostics.iter() {
+            //let nook: codespan_reporting::diagnostic::Diagnostic<_> = diagnostic.to_owned().into();
+            //println!("{:?}", nook);
+
             term::emit(&mut buffer, &config, &file, &diagnostic.to_owned().into())
                 .map_err(|_| fmt::Error)?;
         }
 
+        Ok(())
+
+        /*
         // Diagnostic messages can contain whitespace at the end of some lines.
         // This causes problems when used in our UI testing, as editors often
         // strip end-of-line whitespace. Removing this has no actual visual
@@ -61,5 +68,6 @@ impl<'a> fmt::Display for Formatter<'a> {
             .join("\n");
 
         f.write_str(&string)
+        */
     }
 }

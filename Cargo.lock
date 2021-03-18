@@ -790,6 +790,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "breakit"
+version = "0.1.0"
+dependencies = [
+ "codespan-reporting",
+ "jemallocator",
+ "ngrammatic",
+ "termcolor",
+ "thiserror",
+]
+
+[[package]]
 name = "bson"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1155,6 +1166,15 @@ name = "core-foundation-sys"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea221b5284a47e40033bf9b66f35f984ec0ea2931eb03505246cd27a963f981b"
+
+[[package]]
+name = "corpus-groove"
+version = "0.1.0"
+dependencies = [
+ "jemallocator",
+ "ngrammatic",
+ "rand 0.8.3",
+]
 
 [[package]]
 name = "cpu-time"
@@ -2172,6 +2192,7 @@ dependencies = [
  "futures 0.3.13",
  "glob 0.3.0",
  "indexmap",
+ "libc",
  "quickcheck",
  "scan_fmt",
  "serde",
@@ -8502,6 +8523,7 @@ dependencies = [
  "ansi_term 0.12.1",
  "chrono",
  "glob 0.3.0",
+ "jemallocator",
  "prettydiff",
  "regex",
  "serde",
