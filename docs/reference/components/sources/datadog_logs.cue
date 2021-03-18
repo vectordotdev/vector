@@ -3,7 +3,7 @@ package metadata
 components: sources: datadog_logs: {
 	_port: 8080
 
-	title: "Heroku Logplex"
+	title: "Datadog Logs"
 
 	description: """
 		Receives logs from a local Datadog Agent.
