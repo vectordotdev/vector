@@ -19,20 +19,19 @@ remap: functions: parse_query_string: {
 			type: ["string"]
 		},
 	]
-	internal_failure_reasons: [
-		"`value` isn't a properly formatted query string",
-	]
+	internal_failure_reasons: []
 	return: types: ["object"]
 
 	examples: [
 		{
 			title: "Parse query string"
 			source: #"""
-				parse_query_string!("foo=%2B1&bar=2")
+				parse_query_string("foo=%2B1&bar=2&xyz")
 				"""#
 			return: {
 				foo: "+1"
 				bar: "2"
+				xyz: ""
 			}
 		},
 	]
