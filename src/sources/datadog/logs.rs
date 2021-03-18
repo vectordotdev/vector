@@ -97,26 +97,24 @@ impl HttpSource for DatadogLogsSource {
     ) -> Result<Vec<Event>, ErrorMessage> {
         if body.is_empty() {
             // The datadog agent may sent empty payload as keep alive
-            debug!(message = "Empty payload ignored.");
+            debug!(
+                message = "Empty payload ignored.",
+                internal_log_rate_secs = 30
+            );
             return Ok(Vec::new());
         }
 
-        let api_key = extract_api_key(&header_map, request_path).map(|mut k| {
-            if k.len() > 5 {
-                k.replace_range(0..k.len() - 5, "***************************");
-            }
-            k
-        });
+        let api_key = extract_api_key(&header_map, request_path);
 
         decode_body(body, Encoding::Json).map(|mut events| {
-            // Add source type & dd api key
+            // Add source type & Datadog API key
             let key = log_schema().source_type_key();
             for event in events.iter_mut() {
                 let log = event.as_mut_log();
                 log.try_insert(key, Bytes::from("datadog_logs"));
-                api_key
-                    .clone()
-                    .map(|k| event.as_mut_log().insert("dd-api-key", k));
+                if let Some(k) = &api_key {
+                    log.insert("dd_api_key", k.clone());
+                }
             }
             events
         })
@@ -124,20 +122,18 @@ impl HttpSource for DatadogLogsSource {
 }
 
 fn extract_api_key<'a>(headers: &'a HeaderMap, path: &'a str) -> Option<String> {
-    // Grab from url first
-    if let Some(k) = API_KEY_MATCHER
+    // Grab from URL first
+    API_KEY_MATCHER
         .captures(path)
         .and_then(|cap| cap.name("api_key").map(|key| key.as_str()))
-    {
-        return Some(k.to_owned());
-    }
-
-    // Try from header next
-    if let Some(key) = headers.get("dd-api-key") {
-        return key.to_str().ok().map(str::to_owned);
-    }
-
-    None
+        .map(|k| k.to_owned())
+        // Try from header next
+        .or_else(|| {
+            headers
+                .get("dd-api-key")
+                .and_then(|key| key.to_str().ok())
+                .map(str::to_owned)
+        })
 }
 
 #[cfg(test)]
@@ -224,7 +220,7 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["message"], "foo".into());
             assert_eq!(log["timestamp"], 123.into());
-            assert!(log.get("dd-api-key").is_none());
+            assert!(log.get("dd_api_key").is_none());
             assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
         }
     }
@@ -251,7 +247,7 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["message"], "bar".into());
             assert_eq!(log["timestamp"], 456.into());
-            assert_eq!(log["dd-api-key"], "***************************defgh".into());
+            assert_eq!(log["dd_api_key"], "12345678abcdefgh12345678abcdefgh".into());
             assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
         }
     }
@@ -284,7 +280,7 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
             assert_eq!(log["timestamp"], 789.into());
-            assert_eq!(log["dd-api-key"], "***************************defgh".into());
+            assert_eq!(log["dd_api_key"], "12345678abcdefgh12345678abcdefgh".into());
             assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
         }
     }

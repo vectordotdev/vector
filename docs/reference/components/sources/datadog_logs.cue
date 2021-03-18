@@ -6,13 +6,13 @@ components: sources: datadog_logs: {
 	title: "Datadog Logs"
 
 	description: """
-		Receives logs from a local Datadog Agent.
+		Receives logs from a Datadog Agent over HTTP or HTTPS.
 		"""
 
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		deployment_roles: ["aggregator"]
+		deployment_roles: ["aggregator", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
 		stateful:      false
@@ -87,10 +87,21 @@ components: sources: datadog_logs: {
 			timestamp: fields._current_timestamp
 			hostname: fields._local_host
 			service: {
-				description: "The status field extracted from the event."
+				description: "The service field extracted from the event."
 				required:    true
 				type: string: {
 					examples: ["backend"]
+					syntax: "literal"
+				}
+			}
+			dd_api_key: {
+				description: """
+					The Datadog API key extracted from the event. This sensitive field may be removed
+					or obfuscated using the `remap` transform.
+					"""
+				required: false
+				type: string: {
+					examples: ["abcdefgh13245678abcdefgh13245678"]
 					syntax: "literal"
 				}
 			}
