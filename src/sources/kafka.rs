@@ -323,7 +323,7 @@ mod integration_test {
         util::Timeout,
     };
 
-    const BOOTSTRAP_SERVER: &str = "localhost:9092";
+    const BOOTSTRAP_SERVER: &str = "localhost:9091";
 
     async fn send_event(
         topic: String,
