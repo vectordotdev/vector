@@ -1,7 +1,6 @@
 use crate::{internal_events::EventOut, transforms::FunctionTransform, Event};
-use futures::{task::Poll, Sink};
+use futures::{channel::mpsc, task::Poll, Sink};
 use std::{collections::VecDeque, fmt, pin::Pin, task::Context};
-use tokio::sync::mpsc;
 
 #[derive(Debug)]
 pub struct ClosedError;
@@ -27,22 +26,38 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    fn try_flush(&mut self) -> Poll<Result<(), <Self as Sink<Event>>::Error>> {
-        use mpsc::error::TrySendError::*;
-
+    fn try_flush(
+        &mut self,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), <Self as Sink<Event>>::Error>> {
         while let Some(event) = self.enqueued.pop_front() {
-            let permit = match self.inner.try_reserve() {
-                Ok(permit) => permit,
-                Err(Full(_)) => {
+            match self.inner.poll_ready(cx) {
+                Poll::Pending => {
                     self.enqueued.push_front(event);
                     return Poll::Pending;
                 }
-                Err(Closed(_)) => return Poll::Ready(Err(ClosedError)),
-            };
+                Poll::Ready(Ok(())) => {
+                    // continue to send below
+                }
+                Poll::Ready(Err(_error)) => return Poll::Ready(Err(ClosedError)),
+            }
 
-            permit.send(event);
+            match self.inner.try_send(event) {
+                Ok(()) => {
+                    // we good, keep looping
+                }
+                Err(error) if error.is_full() => {
+                    // We only try to send after a successful call to poll_ready, which reserves
+                    // space for us in the channel. That makes this branch unreachable as long as
+                    // the channel implementation fulfills its own contract.
+                    panic!("Channel was both ready and full; this is a bug.")
+                }
+                Err(error) if error.is_disconnected() => {
+                    return Poll::Ready(Err(ClosedError));
+                }
+                Err(_) => unreachable!(),
+            }
         }
-
         Poll::Ready(Ok(()))
     }
 }
@@ -50,14 +65,11 @@ impl Pipeline {
 impl Sink<Event> for Pipeline {
     type Error = ClosedError;
 
-    fn poll_ready(
-        mut self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.enqueued.len() < MAX_ENQUEUED {
             Poll::Ready(Ok(()))
         } else {
-            self.try_flush()
+            self.try_flush(cx)
         }
     }
 
@@ -77,11 +89,8 @@ impl Sink<Event> for Pipeline {
         Ok(())
     }
 
-    fn poll_flush(
-        mut self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
-        self.try_flush()
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.try_flush(cx)
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -128,7 +137,6 @@ mod test {
     use futures::SinkExt;
     use serde_json::json;
     use std::convert::TryFrom;
-    use tokio_stream::wrappers::ReceiverStream;
 
     const KEYS: [&str; 2] = ["booper", "swooper"];
 
@@ -157,7 +165,7 @@ mod test {
         }))?;
 
         pipeline.send(event).await?;
-        let out = collect_ready(ReceiverStream::new(receiver)).await;
+        let out = collect_ready(receiver).await;
 
         assert_eq!(out[0].as_log().get(KEYS[0]), Some(&Value::from(VALS[0])));
         assert_eq!(out[0].as_log().get(KEYS[1]), Some(&Value::from(VALS[1])));
@@ -183,7 +191,7 @@ mod test {
         }))?;
 
         pipeline.send(event).await?;
-        let out = collect_ready(ReceiverStream::new(receiver)).await;
+        let out = collect_ready(receiver).await;
 
         assert_eq!(out, vec![]);
 

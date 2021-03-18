@@ -115,7 +115,6 @@ mod tests {
     use chrono::{offset::TimeZone, Utc};
     use indoc::indoc;
     use pretty_assertions::assert_eq;
-    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -200,7 +199,7 @@ mod tests {
         let len = metrics.len();
         let _ = sink.run(stream::iter(metrics)).await.unwrap();
 
-        let output = ReceiverStream::new(rx).take(len).collect::<Vec<_>>().await;
+        let output = rx.take(len).collect::<Vec<_>>().await;
         assert_eq!(
             r#"{"event":{"counter":{"value":42.0},"kind":"incremental","name":"metric1","tags":{"os.host":"somehost"}},"fields":{},"time":1597784401.0}"#,
             output[0].1

@@ -755,9 +755,8 @@ mod tests {
         Pipeline,
     };
     use chrono::{TimeZone, Utc};
-    use futures::{stream, StreamExt};
+    use futures::{channel::mpsc, stream, StreamExt};
     use std::{future::ready, net::SocketAddr};
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {

@@ -169,8 +169,6 @@ mod tests {
     use crate::{config::log_schema, shutdown::ShutdownSignal, Pipeline};
     use futures::{channel::mpsc, poll, StreamExt};
     use std::time::{Duration, Instant};
-    use tokio::sync::mpsc;
-    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -205,7 +203,7 @@ mod tests {
     #[tokio::test]
     async fn shuffle_generator_copies_lines() {
         let message_key = log_schema().message_key();
-        let rx = runit(
+        let mut rx = runit(
             r#"format = "shuffle"
                lines = ["one", "two", "three", "four"]
                count = 5"#,
@@ -214,10 +212,8 @@ mod tests {
 
         let lines = &["one", "two", "three", "four"];
 
-        let mut stream = ReceiverStream::new(rx);
-
         for _ in 0..5 {
-            let event = match poll!(stream.next()) {
+            let event = match poll!(rx.next()) {
                 Poll::Ready(event) => event.unwrap(),
                 _ => unreachable!(),
             };
@@ -226,30 +222,28 @@ mod tests {
             assert!(lines.contains(&&*message));
         }
 
-        assert_eq!(poll!(stream.next()), Poll::Ready(None));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
     async fn shuffle_generator_limits_count() {
-        let rx = runit(
+        let mut rx = runit(
             r#"format = "shuffle"
                lines = ["one", "two"]
                count = 5"#,
         )
         .await;
 
-        let mut stream = ReceiverStream::new(rx);
-
         for _ in 0..5 {
-            assert!(poll!(stream.next()).is_ready());
+            assert!(poll!(rx.next()).is_ready());
         }
-        assert_eq!(poll!(stream.next()), Poll::Ready(None));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
     async fn shuffle_generator_adds_sequence() {
         let message_key = log_schema().message_key();
-        let rx = runit(
+        let mut rx = runit(
             r#"format = "shuffle"
                lines = ["one", "two"]
                sequence = true
@@ -257,10 +251,8 @@ mod tests {
         )
         .await;
 
-        let mut stream = ReceiverStream::new(rx);
-
         for n in 0..5 {
-            let event = match poll!(stream.next()) {
+            let event = match poll!(rx.next()) {
                 Poll::Ready(event) => event.unwrap(),
                 _ => unreachable!(),
             };
@@ -269,13 +261,13 @@ mod tests {
             assert!(message.starts_with(&n.to_string()));
         }
 
-        assert_eq!(poll!(stream.next()), Poll::Ready(None));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
     async fn shuffle_generator_obeys_interval() {
         let start = Instant::now();
-        let rx = runit(
+        let mut rx = runit(
             r#"format = "shuffle"
                lines = ["one", "two"]
                count = 3
@@ -283,12 +275,10 @@ mod tests {
         )
         .await;
 
-        let mut stream = ReceiverStream::new(rx);
-
         for _ in 0..3 {
-            assert!(poll!(stream.next()).is_ready());
+            assert!(poll!(rx.next()).is_ready());
         }
-        assert_eq!(poll!(stream.next()), Poll::Ready(None));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
 
         let duration = start.elapsed();
         assert!(duration >= Duration::from_secs(2));
@@ -296,81 +286,71 @@ mod tests {
 
     #[tokio::test]
     async fn apache_common_format_generates_output() {
-        let rx = runit(
+        let mut rx = runit(
             r#"format = "apache_common"
             count = 5"#,
         )
         .await;
 
-        let mut stream = ReceiverStream::new(rx);
-
         for _ in 0..5 {
-            assert!(poll!(stream.next()).is_ready());
+            assert!(poll!(rx.next()).is_ready());
         }
-        assert_eq!(poll!(stream.next()), Poll::Ready(None));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
     async fn apache_error_format_generates_output() {
-        let rx = runit(
+        let mut rx = runit(
             r#"format = "apache_error"
             count = 5"#,
         )
         .await;
 
-        let mut stream = ReceiverStream::new(rx);
-
         for _ in 0..5 {
-            assert!(poll!(stream.next()).is_ready());
+            assert!(poll!(rx.next()).is_ready());
         }
-        assert_eq!(poll!(stream.next()), Poll::Ready(None));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
     async fn syslog_5424_format_generates_output() {
-        let rx = runit(
+        let mut rx = runit(
             r#"format = "syslog"
             count = 5"#,
         )
         .await;
 
-        let mut stream = ReceiverStream::new(rx);
-
         for _ in 0..5 {
-            assert!(poll!(stream.next()).is_ready());
+            assert!(poll!(rx.next()).is_ready());
         }
-        assert_eq!(poll!(stream.next()), Poll::Ready(None));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
     async fn syslog_3164_format_generates_output() {
-        let rx = runit(
+        let mut rx = runit(
             r#"format = "bsd_syslog"
             count = 5"#,
         )
         .await;
 
-        let mut stream = ReceiverStream::new(rx);
-
         for _ in 0..5 {
-            assert!(poll!(stream.next()).is_ready());
+            assert!(poll!(rx.next()).is_ready());
         }
-        assert_eq!(poll!(stream.next()), Poll::Ready(None));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
     async fn json_format_generates_output() {
         let message_key = log_schema().message_key();
-        let rx = runit(
+        let mut rx = runit(
             r#"format = "json"
             count = 5"#,
         )
         .await;
 
-        let mut stream = ReceiverStream::new(rx);
-
         for _ in 0..5 {
-            let event = match poll!(stream.next()) {
+            let event = match poll!(rx.next()) {
                 Poll::Ready(event) => event.unwrap(),
                 _ => unreachable!(),
             };
@@ -378,6 +358,6 @@ mod tests {
             let message = log[&message_key].to_string_lossy();
             assert!(serde_json::from_str::<serde_json::Value>(&message).is_ok());
         }
-        assert_eq!(poll!(stream.next()), Poll::Ready(None));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 }

@@ -302,7 +302,6 @@ mod tests {
     use crate::test_util;
     use crate::Event;
     use futures::StreamExt;
-    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -409,7 +408,7 @@ mod tests {
             .await
             .expect("healthcheck failed");
 
-        let output = ReceiverStream::new(rx).take(1).collect::<Vec<_>>().await;
+        let output = rx.take(1).collect::<Vec<_>>().await;
         assert_eq!(
             Some(&http::header::HeaderValue::from_static(
                 "Basic dXNlcm5hbWU6c29tZV9wYXNzd29yZA=="

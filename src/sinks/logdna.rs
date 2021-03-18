@@ -301,7 +301,6 @@ mod tests {
     };
     use futures::{stream, StreamExt};
     use serde_json::json;
-    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -374,7 +373,7 @@ mod tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr);
+        let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
         let lines = random_lines(100).take(10).collect::<Vec<_>>();
@@ -395,10 +394,8 @@ mod tests {
 
         sink.run(stream::iter(events)).await.unwrap();
 
-        let mut stream = ReceiverStream::new(rx);
-
         for _ in 0..partitions.len() {
-            let output = stream.next().await.unwrap();
+            let output = rx.next().await.unwrap();
 
             let request = &output.0;
             let body: serde_json::Value = serde_json::from_slice(&output.1[..]).unwrap();

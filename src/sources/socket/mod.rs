@@ -194,7 +194,6 @@ mod test {
         task::JoinHandle,
         time::{Duration, Instant},
     };
-    use tokio_stream::wrappers::ReceiverStream;
     #[cfg(unix)]
     use {
         super::{unix::UnixConfig, Mode},
@@ -234,7 +233,7 @@ mod test {
             .await
             .unwrap();
 
-        let event = rx.recv().await.unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().host_key()], "127.0.0.1".into());
     }
 
@@ -259,7 +258,7 @@ mod test {
             .await
             .unwrap();
 
-        let event = rx.recv().await.unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "socket".into()
@@ -268,7 +267,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_continue_after_long_line() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
@@ -294,12 +293,10 @@ mod test {
         wait_for_tcp(addr).await;
         send_lines(addr, lines.into_iter()).await.unwrap();
 
-        let mut stream = ReceiverStream::new(rx);
-
-        let event = stream.next().await.unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().message_key()], "short".into());
 
-        let event = stream.next().await.unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[log_schema().message_key()],
             "more short".into()
@@ -308,7 +305,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_with_tls() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
@@ -337,12 +334,10 @@ mod test {
             .await
             .unwrap();
 
-        let mut stream = ReceiverStream::new(rx);
-
-        let event = stream.next().await.unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().message_key()], "short".into());
 
-        let event = stream.next().await.unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[log_schema().message_key()],
             "more short".into()
@@ -351,7 +346,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_with_tls_intermediate_ca() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
         let mut config = TcpConfig::from_address(addr.into());
@@ -392,15 +387,13 @@ mod test {
         .await
         .unwrap();
 
-        let mut stream = ReceiverStream::new(rx);
-
-        let event = stream.next().await.unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[crate::config::log_schema().message_key()],
             "short".into()
         );
 
-        let event = stream.next().await.unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[crate::config::log_schema().message_key()],
             "more short".into()
@@ -429,7 +422,7 @@ mod test {
             .await
             .unwrap();
 
-        let event = rx.recv().await.unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().message_key()], "test".into());
 
         // Now signal to the Source to shut down.

@@ -272,7 +272,6 @@ fn json_value_to_type_string(value: &JsonValue) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{Encoding, SimpleHttpConfig};
-
     use crate::shutdown::ShutdownSignal;
     use crate::{
         config::{log_schema, GlobalOptions, SourceConfig},
@@ -284,12 +283,12 @@ mod tests {
         write::{DeflateEncoder, GzEncoder},
         Compression,
     };
+    use futures::channel::mpsc;
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
     use std::io::Write;
     use std::net::SocketAddr;
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {

@@ -278,7 +278,6 @@ mod test {
     };
     use pretty_assertions::assert_eq;
     use tokio::time::{sleep, Duration};
-    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -361,7 +360,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         sleep(Duration::from_secs(1)).await;
 
-        let metrics = collect_ready(ReceiverStream::new(rx))
+        let metrics = collect_ready(rx)
             .await
             .into_iter()
             .map(|e| e.into_metric())
@@ -427,7 +426,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         sleep(Duration::from_secs(1)).await;
 
-        let metrics = collect_ready(ReceiverStream::new(rx))
+        let metrics = collect_ready(rx)
             .await
             .into_iter()
             .map(|e| e.into_metric())
@@ -466,7 +465,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         sleep(Duration::from_secs(1)).await;
 
-        let metrics = collect_ready(ReceiverStream::new(rx))
+        let metrics = collect_ready(rx)
             .await
             .into_iter()
             .map(|e| e.into_metric())

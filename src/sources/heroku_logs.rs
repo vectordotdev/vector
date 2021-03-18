@@ -250,9 +250,9 @@ mod tests {
         Pipeline,
     };
     use chrono::{DateTime, Utc};
+    use futures::channel::mpsc;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {

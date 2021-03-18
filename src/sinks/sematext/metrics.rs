@@ -266,7 +266,6 @@ mod tests {
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
     use indoc::indoc;
-    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -388,10 +387,7 @@ mod tests {
 
         let _ = sink.run(stream::iter(events)).await.unwrap();
 
-        let output = ReceiverStream::new(rx)
-            .take(metrics.len())
-            .collect::<Vec<_>>()
-            .await;
+        let output = rx.take(metrics.len()).collect::<Vec<_>>().await;
         assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken swap.size=324292 1597784400000000000", output[0].1);
         assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken network.tx=42000 1597784400000000001", output[1].1);
         assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken network.rx=54293 1597784400000000002", output[2].1);

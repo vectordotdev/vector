@@ -125,7 +125,6 @@ mod test {
     use chrono::{SubsecRound as _, Utc};
     use futures::stream;
     use pretty_assertions::assert_eq;
-    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn genreate_config() {
@@ -176,7 +175,7 @@ mod test {
         let events = make_events();
         sink.run(stream::iter(events.clone())).await.unwrap();
 
-        let mut output = test_util::collect_ready(ReceiverStream::new(rx)).await;
+        let mut output = test_util::collect_ready(rx).await;
         // The MetricBuffer used by the sink may reorder the metrics, so
         // put them back into order before comparing.
         output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
@@ -232,7 +231,6 @@ mod integration_tests {
     use super::*;
     use crate::{shutdown, test_util, Pipeline};
     use tokio::time::Duration;
-    use tokio_stream::wrappers::ReceiverStream;
 
     const PROMETHEUS_RECEIVE_ADDRESS: &str = "127.0.0.1:9093";
 
@@ -259,7 +257,7 @@ mod integration_tests {
 
         tokio::time::sleep(Duration::from_secs(2)).await;
 
-        let events = test_util::collect_ready(ReceiverStream::new(rx)).await;
+        let events = test_util::collect_ready(rx).await;
         assert!(!events.is_empty());
     }
 }

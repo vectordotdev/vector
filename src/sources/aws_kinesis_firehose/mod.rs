@@ -84,13 +84,12 @@ mod tests {
     };
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::{read::GzEncoder, Compression};
+    use futures::channel::mpsc;
     use pretty_assertions::assert_eq;
     use std::{
         io::{Cursor, Read},
         net::SocketAddr,
     };
-    use tokio::sync::mpsc;
-    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -232,7 +231,7 @@ mod tests {
         .unwrap();
         assert_eq!(200, res.status().as_u16());
 
-        let events = collect_ready(ReceiverStream::new(rx)).await;
+        let events = collect_ready(rx).await;
         assert_eq!(
             events,
             vec![log_event! {
@@ -293,7 +292,7 @@ mod tests {
         .unwrap();
         assert_eq!(200, res.status().as_u16());
 
-        let events = collect_ready(ReceiverStream::new(rx)).await;
+        let events = collect_ready(rx).await;
         assert_eq!(
             events,
             vec![log_event! {

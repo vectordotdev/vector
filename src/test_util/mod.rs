@@ -33,11 +33,10 @@ use tokio::{
     io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
     net::{TcpListener, TcpStream},
     runtime,
-    sync::{mpsc, oneshot},
+    sync::oneshot,
     task::JoinHandle,
     time::{sleep, Duration, Instant},
 };
-use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
 
 const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
@@ -237,8 +236,11 @@ pub fn random_maps(
     iter::repeat(()).map(move |_| random_map(max_size, field_len))
 }
 
-pub async fn collect_n<T>(rx: mpsc::Receiver<T>, n: usize) -> Vec<T> {
-    ReceiverStream::new(rx).take(n).collect().await
+pub async fn collect_n<S>(rx: S, n: usize) -> Vec<S::Item>
+where
+    S: Stream + Unpin,
+{
+    rx.take(n).collect().await
 }
 
 pub async fn collect_all<S>(mut rx: S) -> Vec<S::Item>

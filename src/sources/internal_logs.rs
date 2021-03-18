@@ -70,11 +70,8 @@ async fn run(out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
 mod tests {
     use super::*;
     use crate::{config::GlobalOptions, test_util::collect_ready, trace, Event};
-    use tokio::{
-        sync::mpsc::Receiver,
-        time::{sleep, Duration},
-    };
-    use tokio_stream::wrappers::ReceiverStream;
+    use futures::channel::mpsc;
+    use tokio::time::{sleep, Duration};
 
     #[test]
     fn generates_config() {
@@ -108,7 +105,7 @@ mod tests {
         check_events(logs, start);
     }
 
-    async fn start_source() -> Receiver<Event> {
+    async fn start_source() -> mpsc::Receiver<Event> {
         let (tx, rx) = Pipeline::new_test();
 
         let source = InternalLogsConfig {}
@@ -126,9 +123,9 @@ mod tests {
         rx
     }
 
-    async fn collect_output(rx: Receiver<Event>) -> Vec<Event> {
+    async fn collect_output(rx: mpsc::Receiver<Event>) -> Vec<Event> {
         sleep(Duration::from_millis(1)).await;
-        collect_ready(ReceiverStream::new(rx)).await
+        collect_ready(rx).await
     }
 
     fn check_events(events: Vec<Event>, start: chrono::DateTime<chrono::Utc>) {

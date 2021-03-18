@@ -222,9 +222,9 @@ mod test {
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{next_addr, start_topology},
     };
+    use futures::channel::mpsc;
     use hyper::body::to_bytes as body_to_bytes;
     use tokio::io::AsyncWriteExt;
-    use tokio::sync::mpsc;
     use tokio::time::{sleep, Duration};
 
     #[test]
@@ -251,7 +251,7 @@ mod test {
             let bind_addr = next_addr();
             let socket = UdpSocket::bind(bind_addr).await.unwrap();
             socket.connect(in_addr).await.unwrap();
-            while let Some(bytes) = receiver.recv().await {
+            while let Some(bytes) = receiver.next().await {
                 socket.send(bytes).await.unwrap();
             }
         });
@@ -264,7 +264,7 @@ mod test {
         let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
         let (sender, mut receiver) = mpsc::channel(200);
         tokio::spawn(async move {
-            while let Some(bytes) = receiver.recv().await {
+            while let Some(bytes) = receiver.next().await {
                 tokio::net::TcpStream::connect(in_addr)
                     .await
                     .unwrap()
@@ -285,7 +285,7 @@ mod test {
         });
         let (sender, mut receiver) = mpsc::channel(200);
         tokio::spawn(async move {
-            while let Some(bytes) = receiver.recv().await {
+            while let Some(bytes) = receiver.next().await {
                 tokio::net::UnixStream::connect(&in_path)
                     .await
                     .unwrap()
@@ -301,7 +301,7 @@ mod test {
         statsd_config: StatsdConfig,
         // could use unbounded channel,
         // but we want to reserve the order messages.
-        sender: mpsc::Sender<&'static [u8]>,
+        mut sender: mpsc::Sender<&'static [u8]>,
     ) {
         let out_addr = next_addr();
 

@@ -253,7 +253,6 @@ mod tests {
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
     use indoc::indoc;
-    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -509,7 +508,7 @@ mod tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr);
+        let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
         let lines = std::iter::repeat(())
@@ -534,8 +533,7 @@ mod tests {
 
         sink.run(stream::iter(events)).await.unwrap();
 
-        let mut stream = ReceiverStream::new(rx);
-        let output = stream.next().await.unwrap();
+        let output = rx.next().await.unwrap();
 
         let request = &output.0;
         let query = request.uri.query().unwrap();
@@ -571,7 +569,7 @@ mod tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr);
+        let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
         let lines = std::iter::repeat(())
@@ -596,8 +594,7 @@ mod tests {
 
         sink.run(stream::iter(events)).await.unwrap();
 
-        let mut stream = ReceiverStream::new(rx);
-        let output = stream.next().await.unwrap();
+        let output = rx.next().await.unwrap();
 
         let request = &output.0;
         let query = request.uri.query().unwrap();

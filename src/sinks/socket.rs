@@ -189,7 +189,7 @@ mod test {
     #[tokio::test]
     async fn tcp_stream_detects_disconnect() {
         use crate::tls::{self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
-        use futures::{future, FutureExt, StreamExt};
+        use futures::{channel::mpsc, future, FutureExt, SinkExt, StreamExt};
         use std::{
             pin::Pin,
             sync::{
@@ -201,11 +201,10 @@ mod test {
         use tokio::{
             io::{AsyncRead, AsyncWriteExt, ReadBuf},
             net::TcpStream,
-            sync::mpsc,
             task::yield_now,
             time::{interval, Duration},
         };
-        use tokio_stream::wrappers::{IntervalStream, ReceiverStream};
+        use tokio_stream::wrappers::IntervalStream;
 
         trace_init();
 
@@ -229,9 +228,9 @@ mod test {
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
-        let (sender, receiver) = mpsc::channel::<Option<Event>>(1);
+        let (mut sender, receiver) = mpsc::channel::<Option<Event>>(0);
         let jh1 = tokio::spawn(async move {
-            let stream = ReceiverStream::new(receiver)
+            let stream = receiver
                 .take_while(|event| ready(event.is_some()))
                 .map(|event| event.unwrap())
                 .boxed();

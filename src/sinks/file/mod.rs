@@ -349,9 +349,8 @@ mod tests {
         lines_from_file, lines_from_gzip_file, random_events_with_stream, random_lines_with_stream,
         temp_dir, temp_file, trace_init,
     };
-    use futures::stream;
+    use futures::{stream, SinkExt};
     use std::convert::TryInto;
-    use tokio_stream::wrappers::ReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -510,9 +509,9 @@ mod tests {
         let mut sink = FileSink::new(&config, Acker::Null);
         let (mut input, _events) = random_lines_with_stream(10, 64);
 
-        let (tx, rx) = tokio::sync::mpsc::channel(1);
+        let (mut tx, rx) = futures::channel::mpsc::channel(0);
 
-        let _ = tokio::spawn(async move { sink.run(Box::pin(ReceiverStream::new(rx))).await });
+        let _ = tokio::spawn(async move { sink.run(Box::pin(rx)).await });
 
         // send initial payload
         for line in input.clone() {
