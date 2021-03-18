@@ -4,6 +4,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::FileOpen,
+    internal_events::TemplateRenderingFailed,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
@@ -170,11 +171,12 @@ impl FileSink {
     fn partition_event(&mut self, event: &Event) -> Option<bytes::Bytes> {
         let bytes = match self.path.render(event) {
             Ok(b) => b,
-            Err(missing_keys) => {
-                warn!(
-                    message = "Keys do not exist on the event; dropping event.",
-                    ?missing_keys
-                );
+            Err(error) => {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("path"),
+                    drop_event: true,
+                });
                 return None;
             }
         };

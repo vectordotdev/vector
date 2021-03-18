@@ -96,6 +96,8 @@ mod parse_grok;
 mod parse_json;
 #[cfg(feature = "parse_key_value")]
 mod parse_key_value;
+#[cfg(feature = "parse_logfmt")]
+mod parse_logfmt;
 #[cfg(feature = "parse_regex")]
 mod parse_regex;
 #[cfg(feature = "parse_regex_all")]
@@ -134,6 +136,8 @@ mod string;
 mod strip_ansi_escape_codes;
 #[cfg(feature = "strip_whitespace")]
 mod strip_whitespace;
+#[cfg(feature = "tag_types_externally")]
+mod tag_types_externally;
 #[cfg(feature = "timestamp")]
 mod timestamp;
 #[cfg(feature = "to_bool")]
@@ -257,6 +261,8 @@ pub use parse_grok::ParseGrok;
 pub use parse_json::ParseJson;
 #[cfg(feature = "parse_key_value")]
 pub use parse_key_value::ParseKeyValue;
+#[cfg(feature = "parse_logfmt")]
+pub use parse_logfmt::ParseLogFmt;
 #[cfg(feature = "parse_regex")]
 pub use parse_regex::ParseRegex;
 #[cfg(feature = "parse_regex_all")]
@@ -295,6 +301,8 @@ pub use string::String;
 pub use strip_ansi_escape_codes::StripAnsiEscapeCodes;
 #[cfg(feature = "strip_whitespace")]
 pub use strip_whitespace::StripWhitespace;
+#[cfg(feature = "tag_types_externally")]
+pub use tag_types_externally::TagTypesExternally;
 #[cfg(feature = "timestamp")]
 pub use timestamp::Timestamp;
 #[cfg(feature = "to_bool")]
@@ -420,6 +428,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseCommonLog),
         #[cfg(feature = "parse_key_value")]
         Box::new(ParseKeyValue),
+        #[cfg(feature = "parse_logfmt")]
+        Box::new(ParseLogFmt),
         #[cfg(feature = "parse_regex")]
         Box::new(ParseRegex),
         #[cfg(feature = "parse_regex_all")]
@@ -460,6 +470,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(StripAnsiEscapeCodes),
         #[cfg(feature = "strip_whitespace")]
         Box::new(StripWhitespace),
+        #[cfg(feature = "tag_types_externally")]
+        Box::new(TagTypesExternally),
         #[cfg(feature = "timestamp")]
         Box::new(Timestamp),
         #[cfg(feature = "to_bool")]

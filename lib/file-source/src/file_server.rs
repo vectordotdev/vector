@@ -1,3 +1,4 @@
+use crate::paths_provider::PathsProvider;
 use crate::{
     checkpointer::{Checkpointer, CheckpointsView},
     file_watcher::FileWatcher,
@@ -13,6 +14,7 @@ use futures::{
 };
 use indexmap::IndexMap;
 use std::{
+    cmp,
     collections::{BTreeMap, HashSet},
     fs::{self, remove_file},
     path::PathBuf,
@@ -20,8 +22,7 @@ use std::{
     time::{self, Duration},
 };
 use tokio::time::delay_for;
-
-use crate::paths_provider::PathsProvider;
+use tracing::{debug, error, info, trace};
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
 /// converting the lines of said files into `LogLine` structures. As
@@ -136,8 +137,9 @@ where
 
         // Spawn the checkpoint writer task
         //
-        // We have to do a lot of cloning here to convince the compiler that we aren't going to get
-        // away with anything, but none of it should have any perf impact.
+        // We have to do a lot of cloning here to convince the compiler that we
+        // aren't going to get away with anything, but none of it should have
+        // any perf impact.
         let mut shutdown = shutdown.shared();
         let shutdown2 = shutdown.clone();
         let emitter = self.emitter.clone();
@@ -354,12 +356,7 @@ where
             // minimum on the assumption that next time through there will be
             // more lines to read promptly.
             if global_bytes_read == 0 {
-                let lim = backoff_cap.saturating_mul(2);
-                if lim > 2_048 {
-                    backoff_cap = 2_048;
-                } else {
-                    backoff_cap = lim;
-                }
+                backoff_cap = cmp::min(2_048, backoff_cap.saturating_mul(2));
             } else {
                 backoff_cap = 1;
             }

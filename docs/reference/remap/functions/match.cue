@@ -3,7 +3,7 @@ package metadata
 remap: functions: match: {
 	category: "String"
 	description: """
-		Determines if the `value` matches the `pattern`.
+		Determines whether the `value` matches the `pattern`.
 		"""
 
 	arguments: [

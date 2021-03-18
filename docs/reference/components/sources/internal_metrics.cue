@@ -431,12 +431,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		missing_keys_total: {
-			description:       "The total number of failed template renders due to missed keys from the event."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
 		open_connections: {
 			description:       "The number of current open connections to Vector."
 			type:              "gauge"

@@ -59,6 +59,7 @@ wasm_compatible = [
   "ends_with",
   "exists",
   "flatten",
+  "float",
   "floor",
   "format_number",
   "format_timestamp",
@@ -87,8 +88,9 @@ wasm_compatible = [
   "parse_glog",
   "parse_json",
   "parse_key_value",
-  "parse_regex_all",
+  "parse_logfmt",
   "parse_regex",
+  "parse_regex_all",
   "parse_syslog",
   "parse_timestamp",
   "parse_tokens",
@@ -106,6 +108,8 @@ wasm_compatible = [
   "string",
   "strip_ansi_escape_codes",
   "strip_whitespace",
+  "tag_types_externally",
+  "timestamp",
   "to_bool",
   "to_float",
   "to_int",
@@ -115,14 +119,13 @@ wasm_compatible = [
   "to_syslog_severity",
   "to_timestamp",
   "to_unix_timestamp",
-  "timestamp",
   "truncate",
   "upcase",
   "uuid_v4",
 ]
 
-array = []
 append = []
+array = []
 assert = []
 boolean = []
 ceil = []
@@ -167,6 +170,7 @@ parse_glog = ["chrono"]
 parse_grok = ["grok"]
 parse_json = ["serde_json"]
 parse_key_value = ["nom"]
+parse_logfmt = ["parse_key_value"]
 parse_regex = ["regex"]
 parse_regex_all = ["regex"]
 parse_syslog = ["syslog_loose"]
@@ -186,6 +190,8 @@ starts_with = []
 string = []
 strip_ansi_escape_codes = ["bytes", "strip-ansi-escapes"]
 strip_whitespace = []
+tag_types_externally = []
+timestamp = []
 to_bool = ["shared/conversion"]
 to_float = ["shared/conversion"]
 to_int = ["shared/conversion"]
@@ -195,7 +201,6 @@ to_syslog_level = []
 to_syslog_severity = []
 to_timestamp = ["shared/conversion", "chrono"]
 to_unix_timestamp = ["chrono"]
-timestamp = []
 truncate = []
 upcase = []
 uuid_v4 = ["bytes", "uuid"]

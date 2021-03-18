@@ -1,6 +1,6 @@
 use super::util::{
     table_is_array, table_is_timestamp, table_to_array, table_to_map, table_to_timestamp,
-    timestamp_to_table,
+    timestamp_to_table, type_name,
 };
 use crate::event::Value;
 use rlua::prelude::*;
@@ -39,7 +39,7 @@ impl<'a> FromLua<'a> for Value {
                 }
             }
             other => Err(rlua::Error::FromLuaConversionError {
-                from: other.type_name(),
+                from: type_name(&other),
                 to: "Value",
                 message: Some("Unsupported Lua type".to_string()),
             }),

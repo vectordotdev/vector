@@ -52,57 +52,35 @@ impl Expression for StripAnsiEscapeCodesFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![
-//         value_string {
-//             expr: |_| StripAnsiEscapeCodesFn { value: Literal::from("foo").boxed() },
-//             def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
-//         }
+    test_function![
+        strip_ansi_escape_codes => StripAnsiEscapeCodes;
 
-//         fallible_expression {
-//             expr: |_| StripAnsiEscapeCodesFn { value: Literal::from(10).boxed() },
-//             def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
-//         }
-//     ];
+        no_codes {
+            args: func_args![value: "foo bar"],
+            want: Ok("foo bar"),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
 
-//     #[test]
-//     fn strip_ansi_escape_codes() {
-//         let cases = vec![
-//             (
-//                 map![],
-//                 Ok("foo bar".into()),
-//                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("foo bar"))),
-//             ),
-//             (
-//                 map![],
-//                 Ok("foo bar".into()),
-//                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("\x1b[3;4Hfoo bar"))),
-//             ),
-//             (
-//                 map![],
-//                 Ok("foo bar".into()),
-//                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("\x1b[46mfoo\x1b[0m bar"))),
-//             ),
-//             (
-//                 map![],
-//                 Ok("foo bar".into()),
-//                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("\x1b[=3lfoo bar"))),
-//             ),
-//         ];
+        strip_1 {
+            args: func_args![value: "\x1b[3;4Hfoo bar"],
+            want: Ok("foo bar"),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
 
-//         let mut state = state::Program::default();
+        strip_2 {
+            args: func_args![value: "\x1b[46mfoo\x1b[0m bar"],
+            want: Ok("foo bar"),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
 
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        strip_3 {
+            args: func_args![value: "\x1b[=3lfoo bar"],
+            want: Ok("foo bar"),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
+    ];
+}

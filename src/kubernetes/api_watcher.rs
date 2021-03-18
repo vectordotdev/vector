@@ -251,7 +251,7 @@ mod tests {
 
             let config = client::Config {
                 base: server.base_url().parse().unwrap(),
-                token: "SOMEGARBAGETOKEN".to_string(),
+                token: Some("SOMEGARBAGETOKEN".to_string()),
                 tls_options: TlsOptions::default(),
             };
             let client = Client::new(config).unwrap();
@@ -641,7 +641,7 @@ mod tests {
 
             let config = client::Config {
                 base: server.base_url().parse().unwrap(),
-                token: "SOMEGARBAGETOKEN".to_string(),
+                token: Some("SOMEGARBAGETOKEN".to_string()),
                 tls_options: TlsOptions::default(),
             };
             let client = Client::new(config).unwrap();
