@@ -1126,9 +1126,7 @@ mod integration_tests {
         },
         image::{CreateImageOptions, ListImagesOptions},
     };
-    use futures::{stream::TryStreamExt, FutureExt};
-    use tokio::sync::mpsc;
-    use tokio_stream::wrappers::ReceiverStream;
+    use futures::{channel::mpsc, stream::TryStreamExt, FutureExt};
 
     /// None if docker is not present on the system
     fn source_with<'a, L: Into<Option<&'a str>>>(
@@ -1350,7 +1348,7 @@ mod integration_tests {
     }
 
     fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> bool {
-        rx.recv().now_or_never().is_some()
+        rx.next().now_or_never().is_none()
     }
 
     #[tokio::test]
@@ -1454,7 +1452,7 @@ mod integration_tests {
         let id1 = container_log_n(1, &included0, None, will_be_read, &docker).await;
         let id2 = container_log_n(1, &included1, None, will_be_read, &docker).await;
         tokio::time::sleep(Duration::from_secs(1)).await;
-        let events = collect_ready(ReceiverStream::new(out)).await;
+        let events = collect_ready(out).await;
         container_remove(&id0, &docker).await;
         container_remove(&id1, &docker).await;
         container_remove(&id2, &docker).await;
