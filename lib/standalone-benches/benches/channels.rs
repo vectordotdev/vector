@@ -36,8 +36,7 @@ fn benchmark(c: &mut Criterion) {
                     |((mut tx, mut rx), input)| async move {
                         for item in input {
                             tx.send(item).await.unwrap();
-                            let data = rx.recv().await.unwrap();
-                            process_data(data.into_iter());
+                            black_box(rx.recv().await.unwrap());
                         }
                     },
                 );
@@ -57,8 +56,7 @@ fn benchmark(c: &mut Criterion) {
                     |((tx, mut rx), input)| async move {
                         for item in input {
                             tx.send(item).await.unwrap();
-                            let data = rx.recv().await.unwrap();
-                            process_data(data.into_iter());
+                            black_box(rx.recv().await.unwrap());
                         }
                     },
                 );
@@ -78,8 +76,7 @@ fn benchmark(c: &mut Criterion) {
                     |((mut tx, mut rx), input)| async move {
                         for item in input {
                             tx.send(item).await.unwrap();
-                            let data = rx.next().await.unwrap();
-                            process_data(data.into_iter());
+                            black_box(rx.next().await.unwrap());
                         }
                     },
                 );
@@ -99,8 +96,7 @@ fn benchmark(c: &mut Criterion) {
                     |((tx, mut rx), input)| async move {
                         for item in input {
                             tx.send(item).await.unwrap();
-                            let data = rx.next().await.unwrap();
-                            process_data(data.into_iter());
+                            black_box(rx.next().await.unwrap());
                         }
                     },
                 );
@@ -114,8 +110,4 @@ fn make_data(batches: usize, batch_size: usize) -> Vec<Vec<usize>> {
     (0..batches)
         .map(|_| black_box(vec![0; batch_size]))
         .collect()
-}
-
-fn process_data(data: impl Iterator<Item = usize>) -> usize {
-    data.sum()
 }
