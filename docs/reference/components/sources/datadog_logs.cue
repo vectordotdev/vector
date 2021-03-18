@@ -62,7 +62,7 @@ components: sources: datadog_logs: {
 	}
 
 	configuration: {
-		address:          sources.http.configuration.address
+		address: sources.http.configuration.address
 	}
 
 	output: logs: line: {
@@ -85,7 +85,7 @@ components: sources: datadog_logs: {
 				}
 			}
 			timestamp: fields._current_timestamp
-			hostname: fields._local_host
+			hostname:  fields._local_host
 			service: {
 				description: "The service field extracted from the event."
 				required:    true
@@ -94,12 +94,13 @@ components: sources: datadog_logs: {
 					syntax: "literal"
 				}
 			}
+
 			dd_api_key: {
 				description: """
 					The Datadog API key extracted from the event. This sensitive field may be removed
 					or obfuscated using the `remap` transform.
 					"""
-				required: false
+				required: true
 				type: string: {
 					examples: ["abcdefgh13245678abcdefgh13245678"]
 					syntax: "literal"
