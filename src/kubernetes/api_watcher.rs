@@ -64,11 +64,20 @@ where
         emit!(internal_events::RequestPrepared { request: &request });
 
         // Send request, get response.
-        let response = self
-            .client
-            .send(request)
-            .await
-            .context(invocation::Request)?;
+        let response = match self.client.send(request).await {
+            Ok(response) => response,
+            Err(source @ crate::http::HttpError::CallRequest { .. }) => {
+                return Err(watcher::invocation::Error::recoverable(
+                    invocation::Error::Request { source },
+                ))
+            }
+            Err(source) => {
+                return Err(watcher::invocation::Error::other(
+                    invocation::Error::Request { source },
+                ))
+            }
+        };
+
         emit!(internal_events::ResponseReceived {
             response: &response
         });
@@ -77,12 +86,7 @@ where
         let status = response.status();
         if status != StatusCode::OK {
             let source = invocation::Error::BadStatus { status };
-            let err = if status == StatusCode::GONE {
-                watcher::invocation::Error::desync(source)
-            } else {
-                watcher::invocation::Error::other(source)
-            };
-            return Err(err);
+            return Err(watcher::invocation::Error::other(source));
         }
 
         // Stream response body.
@@ -221,17 +225,6 @@ mod tests {
     #[tokio::test]
     async fn test_invocation_errors() {
         let cases: Vec<(Box<dyn FnOnce(When, Then)>, _, _)> = vec![
-            // Desync.
-            (
-                Box::new(|when, then| {
-                    when.method(GET).path("/api/v1/pods");
-                    then.status(410)
-                        .header("Content-Type", "application/json")
-                        .body("body");
-                }),
-                Some(StatusCode::GONE),
-                true,
-            ),
             // Other error.
             (
                 Box::new(|when, then| {
@@ -270,14 +263,14 @@ mod tests {
                 .expect("expected an invocation error here");
 
             let (actual_status, actual_is_desync) = match error {
-                watcher::invocation::Error::Desync {
+                watcher::invocation::Error::Recoverable {
                     source: invocation::Error::BadStatus { status },
-                } => (Some(status), true),
+                } => (Some(status), false),
                 watcher::invocation::Error::Other {
                     source: invocation::Error::BadStatus { status },
                 } => (Some(status), false),
-                watcher::invocation::Error::Desync { .. } => (None, true),
                 watcher::invocation::Error::Other { .. } => (None, false),
+                watcher::invocation::Error::Recoverable { .. } => (None, false),
             };
 
             assert_eq!(

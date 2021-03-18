@@ -82,15 +82,11 @@ where
             let invocation_result = self.issue_request().await;
             let stream = match invocation_result {
                 Ok(val) => val,
-                Err(watcher::invocation::Error::Desync { source }) => {
-                    emit!(internal_events::InvocationDesyncReceived { error: source });
-                    // We got desynced, reset the state and retry fetching.
-                    self.resource_version.reset();
-                    self.state_writer.resync().await;
+                Err(watcher::invocation::Error::Recoverable { source }) => {
+                    emit!(internal_events::InvocationHttpErrorReceived { error: source });
                     continue;
                 }
                 Err(watcher::invocation::Error::Other { source }) => {
-                    // Not a desync, fail everything.
                     error!(message = "Watcher error.", error = ?source);
                     return Err(Error::Invocation { source });
                 }
@@ -292,7 +288,7 @@ mod tests {
     // A helper enum to encode expected mock watcher invocation.
     enum ExpInvRes {
         Stream(Vec<ExpStmRes>),
-        Desync,
+        Recoverable,
     }
 
     // A helper enum to encode expected mock watcher stream.
@@ -405,9 +401,9 @@ mod tests {
         run_flow_test(invocations, expected_resulting_state).await;
     }
 
-    // Test the properies of the flow with desync during invocation.
+    // Test
     #[tokio::test]
-    async fn invocation_desync_test() {
+    async fn invocation_recoverable_test() {
         trace_init();
 
         let invocations = vec![
@@ -422,25 +418,67 @@ mod tests {
             (
                 vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
                 Some("15".to_owned()),
-                ExpInvRes::Desync,
+                ExpInvRes::Recoverable,
             ),
             (
                 vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
-                None,
+                Some("15".to_owned()),
                 ExpInvRes::Stream(vec![
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid20", "1000"))),
                     ExpStmRes::Item(WatchEvent::Added(make_pod("uid21", "1005"))),
                 ]),
             ),
+        ];
+        let expected_resulting_state = vec![
+            make_pod("uid0", "10"),
+            make_pod("uid1", "15"),
+            make_pod("uid20", "1000"),
+            make_pod("uid21", "1005"),
+        ];
+
+        // Use standard flow test logic.
+        run_flow_test(invocations, expected_resulting_state).await;
+    }
+
+    // Test
+    #[tokio::test]
+    async fn consecutive_invocation_recoverable_test() {
+        trace_init();
+
+        let invocations = vec![
             (
-                vec![make_pod("uid20", "1000"), make_pod("uid21", "1005")],
-                Some("1005".to_owned()),
-                ExpInvRes::Stream(vec![ExpStmRes::Item(WatchEvent::Modified(make_pod(
-                    "uid21", "1010",
-                )))]),
+                vec![],
+                None,
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid0", "10"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid1", "15"))),
+                ]),
+            ),
+            (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
+                Some("15".to_owned()),
+                ExpInvRes::Recoverable,
+            ),
+            (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
+                Some("15".to_owned()),
+                ExpInvRes::Recoverable,
+            ),
+            (
+                vec![make_pod("uid0", "10"), make_pod("uid1", "15")],
+                Some("15".to_owned()),
+                ExpInvRes::Stream(vec![
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid20", "1000"))),
+                    ExpStmRes::Item(WatchEvent::Added(make_pod("uid21", "1005"))),
+                ]),
             ),
         ];
-        let expected_resulting_state = vec![make_pod("uid20", "1000"), make_pod("uid21", "1010")];
+        let expected_resulting_state = vec![
+            make_pod("uid0", "10"),
+            make_pod("uid1", "15"),
+            make_pod("uid20", "1000"),
+            make_pod("uid21", "1005"),
+        ];
 
         // Use standard flow test logic.
         run_flow_test(invocations, expected_resulting_state).await;
@@ -1036,10 +1074,10 @@ mod tests {
                     // Stream is requested, continue with the current flow.
                     ExpInvRes::Stream(actions) => actions,
                     // Desync is requested, complete the invocation with the desync.
-                    ExpInvRes::Desync => {
-                        // Send the desync action to mock watcher.
+                    ExpInvRes::Recoverable => {
+                        // Send the recoverable error to mock watcher.
                         watcher_invocations_tx
-                            .send(mock_watcher::ScenarioActionInvocation::ErrDesync)
+                            .send(mock_watcher::ScenarioActionInvocation::ErrRecoverable)
                             .await
                             .unwrap();
                         continue;
