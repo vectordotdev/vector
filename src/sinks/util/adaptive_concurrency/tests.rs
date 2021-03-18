@@ -382,7 +382,7 @@ async fn run_test(params: TestParams) -> TestResults {
     // This is crude and dumb, but it works, and the tests run fast and
     // the results are highly repeatable.
     while stats.lock().expect("Poisoned stats lock").completed < params.requests {
-        time::advance(Duration::from_millis(1)).await;
+        time::advance(Duration::from_millis(0)).await;
     }
     topology.stop().await;
 
