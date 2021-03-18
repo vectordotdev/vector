@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{Event, Value},
@@ -13,6 +14,8 @@ use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
     message::Message,
+    message::Headers,
+    message::OwnedHeaders,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -46,6 +49,7 @@ pub struct KafkaSourceConfig {
     topic_key: Option<String>,
     partition_key: Option<String>,
     offset_key: Option<String>,
+    headers_key: Option<String>,
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
@@ -108,6 +112,7 @@ fn kafka_source(
     let topic_key = config.topic_key.clone();
     let partition_key = config.partition_key.clone();
     let offset_key = config.offset_key.clone();
+    let headers_key = config.headers_key.clone();
     let consumer = Arc::new(create_consumer(config)?);
 
     Ok(Box::pin(async move {
@@ -119,6 +124,7 @@ fn kafka_source(
                 let topic_key = topic_key.clone();
                 let partition_key = partition_key.clone();
                 let offset_key = offset_key.clone();
+                let headers_key = headers_key.clone();
                 let consumer = Arc::clone(&consumer);
 
                 async move {
@@ -177,6 +183,17 @@ fn kafka_source(
 
                             if let Some(offset_key) = &offset_key {
                                 log.insert(offset_key, Value::from(msg.offset()));
+                            }
+
+                            if let Some(headers_key) = &headers_key {
+                                let mut headers_map = BTreeMap::new();
+                                if let Some(headers) = msg.headers() {
+                                    for i in 0..headers.count() {
+                                        let header = headers.get(i).unwrap();
+                                        headers_map.insert(header.0.to_string(), Value::from(String::from_utf8_lossy(header.1).to_string()));
+                                    }
+                                }
+                                log.insert(headers_key, Value::from(headers_map));
                             }
 
                             consumer.store_offset(&msg).map_err(|error| {
@@ -264,6 +281,7 @@ mod test {
             topic_key: Some("topic".to_string()),
             partition_key: Some("partition".to_string()),
             offset_key: Some("offset".to_string()),
+            headers_key: Some("headers".to_string()),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             ..Default::default()
@@ -302,9 +320,9 @@ mod integration_test {
         util::Timeout,
     };
 
-    const BOOTSTRAP_SERVER: &str = "localhost:9091";
+    const BOOTSTRAP_SERVER: &str = "localhost:9092";
 
-    async fn send_event(topic: String, key: &str, text: &str, timestamp: i64) {
+    async fn send_event(topic: String, key: &str, text: &str, timestamp: i64, header_key: &str, header_value: &str) {
         let producer: FutureProducer = ClientConfig::new()
             .set("bootstrap.servers", BOOTSTRAP_SERVER)
             .set("produce.offset.report", "true")
@@ -315,7 +333,8 @@ mod integration_test {
         let record = FutureRecord::to(&topic)
             .payload(text)
             .key(key)
-            .timestamp(timestamp);
+            .timestamp(timestamp)
+            .headers(OwnedHeaders::new().add(header_key, header_value));
 
         if let Err(error) = producer.send(record, Timeout::Never).await {
             panic!("Cannot send event to Kafka: {:?}", error);
@@ -340,6 +359,7 @@ mod integration_test {
             topic_key: Some("topic".to_string()),
             partition_key: Some("partition".to_string()),
             offset_key: Some("offset".to_string()),
+            headers_key: Some("headers".to_string()),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             ..Default::default()
@@ -351,6 +371,8 @@ mod integration_test {
             "my key",
             "my message",
             now.timestamp_millis(),
+            "my header",
+            "my header value",
         )
         .await;
 
@@ -375,5 +397,6 @@ mod integration_test {
         assert_eq!(events[0].as_log()["topic"], topic.into());
         assert!(events[0].as_log().contains("partition"));
         assert!(events[0].as_log().contains("offset"));
+        assert!(events[0].as_log().contains("headers"));
     }
 }
