@@ -7,8 +7,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::{
         self,
-        http::{decode_body, Encoding},
-        util::{ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsConfig,
     Pipeline,
