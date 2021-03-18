@@ -33,7 +33,13 @@ fn benchmark(c: &mut Criterion) {
                             make_data(batches, batch_size),
                         )
                     },
-                    |((tx, rx), input)| run_tokio02(tx, rx, input),
+                    |((mut tx, mut rx), input)| async move {
+                        for item in input {
+                            tx.send(item).await.unwrap();
+                            let data = rx.recv().await.unwrap();
+                            process_data(data.into_iter());
+                        }
+                    },
                 );
             },
         );
@@ -48,7 +54,13 @@ fn benchmark(c: &mut Criterion) {
                             make_data(batches, batch_size),
                         )
                     },
-                    |((tx, rx), input)| run_tokio11(tx, rx, input),
+                    |((tx, mut rx), input)| async move {
+                        for item in input {
+                            tx.send(item).await.unwrap();
+                            let data = rx.recv().await.unwrap();
+                            process_data(data.into_iter());
+                        }
+                    },
                 );
             },
         );
@@ -63,7 +75,13 @@ fn benchmark(c: &mut Criterion) {
                             make_data(batches, batch_size),
                         )
                     },
-                    |((tx, rx), input)| run_futures03(tx, rx, input),
+                    |((mut tx, mut rx), input)| async move {
+                        for item in input {
+                            tx.send(item).await.unwrap();
+                            let data = rx.next().await.unwrap();
+                            process_data(data.into_iter());
+                        }
+                    },
                 );
             },
         );
@@ -78,7 +96,13 @@ fn benchmark(c: &mut Criterion) {
                             make_data(batches, batch_size),
                         )
                     },
-                    |((tx, rx), input)| run_async_std19(tx, rx, input),
+                    |((tx, mut rx), input)| async move {
+                        for item in input {
+                            tx.send(item).await.unwrap();
+                            let data = rx.next().await.unwrap();
+                            process_data(data.into_iter());
+                        }
+                    },
                 );
             },
         );
@@ -94,54 +118,4 @@ fn make_data(batches: usize, batch_size: usize) -> Vec<Vec<usize>> {
 
 fn process_data(data: impl Iterator<Item = usize>) -> usize {
     data.sum()
-}
-
-// TODO: move the functions below inline when async closures are stabilized.
-
-async fn run_tokio02(
-    mut tx: tokio02::sync::mpsc::Sender<Vec<usize>>,
-    mut rx: tokio02::sync::mpsc::Receiver<Vec<usize>>,
-    input: Vec<Vec<usize>>,
-) {
-    for item in input {
-        tx.send(item).await.unwrap();
-        let data = rx.recv().await.unwrap();
-        process_data(data.into_iter());
-    }
-}
-
-async fn run_tokio11(
-    tx: tokio11::sync::mpsc::Sender<Vec<usize>>,
-    mut rx: tokio11::sync::mpsc::Receiver<Vec<usize>>,
-    input: Vec<Vec<usize>>,
-) {
-    for item in input {
-        tx.send(item).await.unwrap();
-        let data = rx.recv().await.unwrap();
-        process_data(data.into_iter());
-    }
-}
-
-async fn run_futures03(
-    mut tx: futures03::channel::mpsc::Sender<Vec<usize>>,
-    mut rx: futures03::channel::mpsc::Receiver<Vec<usize>>,
-    input: Vec<Vec<usize>>,
-) {
-    for item in input {
-        tx.send(item).await.unwrap();
-        let data = rx.next().await.unwrap();
-        process_data(data.into_iter());
-    }
-}
-
-async fn run_async_std19(
-    tx: async_std19::channel::Sender<Vec<usize>>,
-    mut rx: async_std19::channel::Receiver<Vec<usize>>,
-    input: Vec<Vec<usize>>,
-) {
-    for item in input {
-        tx.send(item).await.unwrap();
-        let data = rx.next().await.unwrap();
-        process_data(data.into_iter());
-    }
 }
