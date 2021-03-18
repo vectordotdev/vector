@@ -196,6 +196,7 @@ fn prometheus(
                                     emit!(PrometheusEventReceived {
                                         byte_size,
                                         count: metrics.len(),
+                                        uri: url.clone()
                                     });
                                     Some(stream::iter(metrics).map(Ok))
                                 }

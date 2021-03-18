@@ -43,6 +43,10 @@ mod source {
                 "file" => self.file.to_owned(),
             );
             counter!(
+                "events_in_total", 1,
+                "file" => self.file.to_owned(),
+            );
+            counter!(
                 "processed_bytes_total", self.byte_size as u64,
                 "file" => self.file.to_owned(),
             );

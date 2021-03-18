@@ -2,6 +2,18 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
+pub(crate) struct AwsKinesisFirehoseEventReceived {
+    pub byte_size: usize,
+}
+
+impl InternalEvent for AwsKinesisFirehoseEventReceived {
+    fn emit_metrics(&self) {
+        counter!("events_in_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
+    }
+}
+
+#[derive(Debug)]
 pub struct AwsKinesisFirehoseRequestReceived<'a> {
     pub request_id: Option<&'a str>,
     pub source_arn: Option<&'a str>,

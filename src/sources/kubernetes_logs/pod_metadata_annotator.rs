@@ -69,7 +69,7 @@ impl PodMetadataAnnotator {
     /// Annotates an event with the information from the [`Pod::metadata`].
     /// The event has to be obtained from kubernetes log file, and have a
     /// [`FILE_KEY`] field set with a file that the line came from.
-    pub fn annotate(&self, event: &mut Event, file: &str) -> Option<()> {
+    pub fn annotate<'a>(&self, event: &mut Event, file: &'a str) -> Option<LogFileInfo<'a>> {
         let log = event.as_mut_log();
         let file_info = parse_log_file_path(file)?;
         let guard = self.pods_state_reader.get(file_info.pod_uid)?;
@@ -103,7 +103,7 @@ impl PodMetadataAnnotator {
                 }
             }
         }
-        Some(())
+        Some(file_info)
     }
 }
 
