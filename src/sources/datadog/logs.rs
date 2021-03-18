@@ -125,14 +125,9 @@ fn extract_api_key<'a>(headers: &'a HeaderMap, path: &'a str) -> Option<String> 
     API_KEY_MATCHER
         .captures(path)
         .and_then(|cap| cap.name("api_key").map(|key| key.as_str()))
-        .map(|k| k.to_owned())
         // Try from header next
-        .or_else(|| {
-            headers
-                .get("dd-api-key")
-                .and_then(|key| key.to_str().ok())
-                .map(str::to_owned)
-        })
+        .or_else(|| headers.get("dd-api-key").and_then(|key| key.to_str().ok()))
+        .map(str::to_owned)
 }
 
 #[cfg(test)]
