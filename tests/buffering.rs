@@ -3,7 +3,6 @@
 use futures::{SinkExt, StreamExt};
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
-use tokio_stream::wrappers::ReceiverStream;
 use tracing::trace;
 use vector::{
     buffers::BufferConfig,
@@ -120,7 +119,7 @@ fn test_buffering() {
             .await
             .unwrap();
 
-        let output_events = CountReceiver::receive_events(ReceiverStream::new(out_rx));
+        let output_events = CountReceiver::receive_events(out_rx);
 
         topology.stop().await;
 

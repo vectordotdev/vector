@@ -6,6 +6,7 @@
 
 use async_trait::async_trait;
 use futures::{
+    channel::mpsc,
     future,
     stream::{self, BoxStream},
     task::Poll,
@@ -24,8 +25,6 @@ use std::{
     },
     task::Context,
 };
-use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
 use tracing::{error, info};
 use vector::{
     buffers::Acker,
@@ -168,7 +167,7 @@ impl SourceConfig for MockSourceConfig {
                     }
                 }
 
-                ReceiverStream::new(recv).poll_next_unpin(cx)
+                recv.poll_next_unpin(cx)
             })
             .inspect(move |_| {
                 if let Some(counter) = &event_counter {
