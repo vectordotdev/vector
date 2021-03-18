@@ -13,7 +13,7 @@ impl Function for ParseQueryString {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "parse query string",
-            source: r#"parse_query_string!("foo=1&bar=2")"#,
+            source: r#"parse_query_string("foo=1&bar=2")"#,
             result: Ok(r#"
                 {
                     "foo": "1",
@@ -31,7 +31,7 @@ impl Function for ParseQueryString {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kind: kind::ANY,
+            kind: kind::BYTES,
             required: true,
         }]
     }
@@ -52,7 +52,7 @@ impl Expression for ParseQueryStringFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().object::<(), Kind>(type_def())
+        TypeDef::new().infallible().object::<(), Kind>(type_def())
     }
 }
 
@@ -69,13 +69,29 @@ mod tests {
     test_function![
         parse_query_string => ParseQueryString;
 
-        type_def {
-            args: func_args![value: value!("foo=%2B1&bar=2")],
+        complete {
+            args: func_args![value: value!("foo=%2B1&bar=2&xyz=&abc")],
             want: Ok(value!({
                 foo: "+1",
                 bar: "2",
+                xyz: "",
+                abc: "",
             })),
-            tdef: TypeDef::new().fallible().object::<(), Kind>(type_def()),
+            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+        }
+
+        single_key {
+            args: func_args![value: value!("foo")],
+            want: Ok(value!({
+                foo: "",
+            })),
+            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+        }
+
+        empty {
+            args: func_args![value: value!("")],
+            want: Ok(value!({})),
+            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
         }
     ];
 }
