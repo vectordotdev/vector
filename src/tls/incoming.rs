@@ -1,6 +1,6 @@
 use super::{
-    CreateAcceptor, IncomingListener, MaybeTlsSettings, MaybeTlsStream, SslBuildError, TcpBind,
-    TlsError, TlsSettings,
+    CreateAcceptor, Handshake, IncomingListener, MaybeTlsSettings, MaybeTlsStream, SslBuildError,
+    TcpBind, TlsError, TlsSettings,
 };
 #[cfg(feature = "sources-utils-tcp-socket")]
 use crate::tcp;
@@ -171,7 +171,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
                 async move {
                     let ssl = Ssl::new(acceptor.context()).context(SslBuildError)?;
                     let mut stream = SslStream::new(ssl, stream).context(SslBuildError)?;
-                    Pin::new(&mut stream).accept().await.unwrap();
+                    Pin::new(&mut stream).accept().await.context(Handshake)?;
                     Ok(stream)
                 }
                 .boxed(),
