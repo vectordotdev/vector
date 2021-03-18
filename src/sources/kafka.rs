@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{Event, Value},
@@ -13,13 +12,12 @@ use futures::{SinkExt, StreamExt};
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
-    message::Message,
     message::Headers,
-    message::OwnedHeaders,
+    message::Message,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::BTreeMap, collections::HashMap, sync::Arc};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -190,7 +188,12 @@ fn kafka_source(
                                 if let Some(headers) = msg.headers() {
                                     for i in 0..headers.count() {
                                         let header = headers.get(i).unwrap();
-                                        headers_map.insert(header.0.to_string(), Value::from(String::from_utf8_lossy(header.1).to_string()));
+                                        headers_map.insert(
+                                            header.0.to_string(),
+                                            Value::from(
+                                                String::from_utf8_lossy(header.1).to_string(),
+                                            ),
+                                        );
                                     }
                                 }
                                 log.insert(headers_key, Value::from(headers_map));
@@ -322,7 +325,14 @@ mod integration_test {
 
     const BOOTSTRAP_SERVER: &str = "localhost:9092";
 
-    async fn send_event(topic: String, key: &str, text: &str, timestamp: i64, header_key: &str, header_value: &str) {
+    async fn send_event(
+        topic: String,
+        key: &str,
+        text: &str,
+        timestamp: i64,
+        header_key: &str,
+        header_value: &str,
+    ) {
         let producer: FutureProducer = ClientConfig::new()
             .set("bootstrap.servers", BOOTSTRAP_SERVER)
             .set("produce.offset.report", "true")
@@ -380,6 +390,7 @@ mod integration_test {
         let (tx, rx) = Pipeline::new_test();
         tokio::spawn(kafka_source(&config, ShutdownSignal::noop(), tx).unwrap());
         let events = collect_n(rx, 1).await;
+        println!("Received event  {:?}", events[0].as_log());
 
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],
