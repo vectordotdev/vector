@@ -114,8 +114,7 @@ impl HttpSink for ClickhouseConfig {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
 
-        let mut body =
-            serde_json::to_vec(&event.as_log().all_fields()).expect("Events should be valid json!");
+        let mut body = serde_json::to_vec(&event.as_log()).expect("Events should be valid json!");
         body.push(b'\n');
 
         Some(body)
@@ -181,7 +180,7 @@ fn set_uri_query(uri: &Uri, database: &str, table: &str) -> crate::Result<Uri> {
     if !uri.ends_with('/') {
         uri.push('/');
     }
-    uri.push('?');
+    uri.push_str("?input_format_import_nested_json=1&");
     uri.push_str(query.as_str());
 
     uri.parse::<Uri>()
@@ -245,7 +244,7 @@ mod tests {
             "my_table",
         )
         .unwrap();
-        assert_eq!(uri, "http://localhost:80/?query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow");
+        assert_eq!(uri.to_string(), "http://localhost:80/?input_format_import_nested_json=1&query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow");
 
         let uri = set_uri_query(
             &"http://localhost:80".parse().unwrap(),
@@ -253,7 +252,7 @@ mod tests {
             "my_\"table\"",
         )
         .unwrap();
-        assert_eq!(uri, "http://localhost:80/?query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow");
+        assert_eq!(uri.to_string(), "http://localhost:80/?input_format_import_nested_json=1&query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow");
     }
 
     #[test]
