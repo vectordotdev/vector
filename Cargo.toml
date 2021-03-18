@@ -36,7 +36,24 @@ assets = [
 ]
 license-file = ["target/debian-license.txt"]
 extended-description-file = "target/debian-extended-description.txt"
-depends = "libc6 (>= 2.17)"
+
+# libc requirements are defined by `cross`
+# https://github.com/rust-embedded/cross#supported-targets
+# Though, it seems like aarch64 libc is actually 2.18 and not 2.19
+[package.metadata.deb.variants.armv7-unknown-linux-gnueabihf]
+depends = "libc6 (>= 2.15)"
+
+[package.metadata.deb.variants.x86_64-unknown-linux-gnu]
+depends = "libc6 (>= 2.15)"
+
+[package.metadata.deb.variants.x86_64-unknown-linux-musl]
+depends = ""
+
+[package.metadata.deb.variants.aarch64-unknown-linux-gnu]
+depends = "libc6 (>= 2.18)"
+
+[package.metadata.deb.variants.aarch64-unknown-linux-musl]
+depends = ""
 
 [workspace]
 members = [
