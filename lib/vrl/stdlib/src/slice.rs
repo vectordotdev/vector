@@ -122,198 +122,155 @@ impl Expression for SliceFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![
-//         value_string {
-//             expr: |_| SliceFn {
-//                 value: Literal::from("foo").boxed(),
-//                 start: Literal::from(0).boxed(),
-//                 end: None,
-//             },
-//             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-//         }
+    test_function![
+        slice => Slice;
 
-//         value_array {
-//             expr: |_| SliceFn {
-//                 value: array!["foo"].boxed(),
-//                 start: Literal::from(0).boxed(),
-//                 end: None,
-//             },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Array,
-//                 inner_type_def: Some(TypeDef { kind: Kind::Bytes, ..Default::default() }.boxed()),
-//             },
-//         }
+        bytes_0 {
+            args: func_args![value: "foo",
+                             start: 0
+            ],
+            want: Ok("foo"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         value_unknown {
-//             expr: |_| SliceFn {
-//                 value: Variable::new("foo".to_owned(), None).boxed(),
-//                 start: Literal::from(0).boxed(),
-//                 end: None,
-//             },
-//             def: TypeDef { fallible: true, kind: Kind::Bytes | Kind::Array, ..Default::default() },
-//         }
-//     ];
+        bytes_1 {
+            args: func_args![value: "foo",
+                             start: 1
+            ],
+            want: Ok("oo"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//     #[test]
-//     fn bytes() {
-//         let cases = vec![
-//             (
-//                 map![],
-//                 Ok("foo".into()),
-//                 SliceFn::new(Box::new(Literal::from("foo")), 0, None),
-//             ),
-//             (
-//                 map![],
-//                 Ok("oo".into()),
-//                 SliceFn::new(Box::new(Literal::from("foo")), 1, None),
-//             ),
-//             (
-//                 map![],
-//                 Ok("o".into()),
-//                 SliceFn::new(Box::new(Literal::from("foo")), 2, None),
-//             ),
-//             (
-//                 map![],
-//                 Ok("oo".into()),
-//                 SliceFn::new(Box::new(Literal::from("foo")), -2, None),
-//             ),
-//             (
-//                 map![],
-//                 Ok("".into()),
-//                 SliceFn::new(Box::new(Literal::from("foo")), 3, None),
-//             ),
-//             (
-//                 map![],
-//                 Ok("".into()),
-//                 SliceFn::new(Box::new(Literal::from("foo")), 2, Some(2)),
-//             ),
-//             (
-//                 map![],
-//                 Ok("foo".into()),
-//                 SliceFn::new(Box::new(Literal::from("foo")), 0, Some(4)),
-//             ),
-//             (
-//                 map![],
-//                 Ok("oo".into()),
-//                 SliceFn::new(Box::new(Literal::from("foo")), 1, Some(5)),
-//             ),
-//             (
-//                 map![],
-//                 Ok("docious".into()),
-//                 SliceFn::new(
-//                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
-//                     -7,
-//                     None,
-//                 ),
-//             ),
-//             (
-//                 map![],
-//                 Ok("cali".into()),
-//                 SliceFn::new(
-//                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
-//                     5,
-//                     Some(9),
-//                 ),
-//             ),
-//         ];
+        bytes_2 {
+            args: func_args![value: "foo",
+                             start: 2
+            ],
+            want: Ok("o"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         let mut state = state::Program::default();
+        bytes_minus_2 {
+            args: func_args![value: "foo",
+                             start: -2
+            ],
+            want: Ok("oo"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+        bytes_empty {
+            args: func_args![value: "foo",
+                             start: 3
+            ],
+            want: Ok(""),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//             assert_eq!(got, exp);
-//         }
-//     }
+        bytes_empty_start_end {
+            args: func_args![value: "foo",
+                             start: 2,
+                             end: 2
+            ],
+            want: Ok(""),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//     #[test]
-//     fn array() {
-//         let cases = vec![
-//             (
-//                 map![],
-//                 Ok(vec![0, 1, 2].into()),
-//                 SliceFn::new(Array::from(vec![0, 1, 2]).boxed(), 0, None),
-//             ),
-//             (
-//                 map![],
-//                 Ok(vec![1, 2].into()),
-//                 SliceFn::new(Array::from(vec![0, 1, 2]).boxed(), 1, None),
-//             ),
-//             (
-//                 map![],
-//                 Ok(vec![1, 2].into()),
-//                 SliceFn::new(Array::from(vec![0, 1, 2]).boxed(), -2, None),
-//             ),
-//             (
-//                 map![],
-//                 Ok("docious".into()),
-//                 SliceFn::new(
-//                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
-//                     -7,
-//                     None,
-//                 ),
-//             ),
-//             (
-//                 map![],
-//                 Ok("cali".into()),
-//                 SliceFn::new(
-//                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
-//                     5,
-//                     Some(9),
-//                 ),
-//             ),
-//         ];
+        bytes_overrun {
+            args: func_args![value: "foo",
+                             start: 0,
+                             end: 4
+            ],
+            want: Ok("foo"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         let mut state = state::Program::default();
+        bytes_start_overrun {
+            args: func_args![value: "foo",
+                             start: 1,
+                             end: 5
+            ],
+            want: Ok("oo"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+        bytes_negative  {
+            args: func_args![value: "Supercalifragilisticexpialidocious",
+                             start: -7
+            ],
+            want: Ok("docious"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//             assert_eq!(got, exp);
-//         }
-//     }
+        bytes_middle {
+            args: func_args![value: "Supercalifragilisticexpialidocious",
+                             start: 5,
+                             end: 9
+            ],
+            want: Ok("cali"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//     #[test]
-//     fn errors() {
-//         let cases = vec![
-//             (
-//                 map![],
-//                 Err(r#"function call error: "start" must be between "-3" and "3""#.into()),
-//                 SliceFn::new(Box::new(Literal::from("foo")), 4, None),
-//             ),
-//             (
-//                 map![],
-//                 Err(r#"function call error: "start" must be between "-3" and "3""#.into()),
-//                 SliceFn::new(Box::new(Literal::from("foo")), -4, None),
-//             ),
-//             (
-//                 map![],
-//                 Err(r#"function call error: "end" must be greater or equal to "start""#.into()),
-//                 SliceFn::new(Box::new(Literal::from("foo")), 2, Some(1)),
-//             ),
-//         ];
+        array_0 {
+            args: func_args![value: vec![0, 1, 2],
+                             start: 0
+            ],
+            want: Ok(vec![0, 1, 2]),
+            tdef: TypeDef::new().fallible().array_mapped::<i32, Kind>(map! { 0: Kind::Integer,
+                                                                             1: Kind::Integer,
+                                                                             2: Kind::Integer
+            }),
+        }
 
-//         let mut state = state::Program::default();
+        array_1 {
+            args: func_args![value: vec![0, 1, 2],
+                             start: 1
+            ],
+            want: Ok(vec![1, 2]),
+            // TODO: This is wrong! See https://github.com/timberio/vector/issues/6676
+            tdef: TypeDef::new().fallible().array_mapped::<i32, Kind>(map! { 0: Kind::Integer,
+                                                                             1: Kind::Integer,
+                                                                             2: Kind::Integer
+            }),
+        }
 
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+        array_minus_2 {
+            args: func_args![value: vec![0, 1, 2],
+                             start: -2
+            ],
+            want: Ok(vec![1, 2]),
+            // TODO: This is wrong! See https://github.com/timberio/vector/issues/6676
+            tdef: TypeDef::new().fallible().array_mapped::<i32, Kind>(map! { 0: Kind::Integer,
+                                                                             1: Kind::Integer,
+                                                                             2: Kind::Integer
+            }),
+        }
 
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        error_after_end {
+            args: func_args![value: "foo",
+                             start: 4
+            ],
+            want: Err(r#""start" must be between "-3" and "3""#),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
+
+        error_minus_before_start {
+            args: func_args![value: "foo",
+                             start: -4
+            ],
+            want: Err(r#""start" must be between "-3" and "3""#),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
+
+        error_start_end {
+            args: func_args![value: "foo",
+                             start: 2,
+                             end: 1
+            ],
+            want: Err(r#""end" must be greater or equal to "start""#),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
+    ];
+}

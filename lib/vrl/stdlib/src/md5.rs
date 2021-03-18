@@ -49,45 +49,17 @@ impl Expression for Md5Fn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![
-//         value_string {
-//             expr: |_| Md5Fn { value: Literal::from("foo").boxed() },
-//             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-//         }
+    test_function![
+        md5 => Md5;
 
-//         value_non_string {
-//             expr: |_| Md5Fn { value: Literal::from(1).boxed() },
-//             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-//         }
-
-//         value_optional {
-//             expr: |_| Md5Fn { value: Box::new(Noop) },
-//             def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-//         }
-//     ];
-
-//     #[test]
-//     fn md5() {
-//         let cases = vec![(
-//             map!["foo": "foo"],
-//             Ok(Value::from("acbd18db4cc2f85cedef654fccc4a4d8")),
-//             Md5Fn::new(Box::new(Path::from("foo"))),
-//         )];
-
-//         let mut state = state::Program::default();
-
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        md5 {
+            args: func_args![value: "foo"],
+            want: Ok(value!("acbd18db4cc2f85cedef654fccc4a4d8")),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
+    ];
+}

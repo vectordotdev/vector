@@ -11,12 +11,9 @@ use std::{collections::HashMap, path::PathBuf};
 pub async fn build_unit_tests_main(
     paths: &[(PathBuf, config::FormatHint)],
 ) -> Result<Vec<UnitTest>, Vec<String>> {
-    let config = super::loading::load_builder_from_paths(paths, false)?;
+    config::init_log_schema(paths, false)?;
 
-    // Ignore failures on calls other than the first
-    crate::config::LOG_SCHEMA
-        .set(config.global.log_schema.clone())
-        .ok();
+    let (config, _) = super::loading::load_builder_from_paths(paths)?;
 
     build_unit_tests(config).await
 }

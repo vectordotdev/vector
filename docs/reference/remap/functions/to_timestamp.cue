@@ -30,7 +30,7 @@ remap: functions: to_timestamp: {
 		{
 			title: "Coerce to a timestamp"
 			source: """
-				to_timestamp("2020-10-21T16:00:00Z")
+				to_timestamp!("2020-10-21T16:00:00Z")
 				"""
 			return: "2020-10-21T16:00:00Z"
 		},

@@ -51,43 +51,45 @@ impl Expression for GetEnvVarFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![
-//         value_string {
-//             expr: |_| GetEnvVarFn { name: Literal::from("foo").boxed() },
-//             def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
-//         }
+    test_function![
+        get_env_var => GetEnvVar;
 
-//         fallible_expression {
-//             expr: |_| GetEnvVarFn { name: Literal::from(10).boxed() },
-//             def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
-//         }
-//     ];
+        before_each => {
+            std::env::set_var("VAR2", "var");
+        }
 
-//     #[test]
-//     fn get_env_var() {
-//         let mut state = state::Program::default();
-//         let func = GetEnvVarFn {
-//             name: Box::new(Path::from("foo")),
-//         };
-//         std::env::set_var("VAR2", "var");
+        doesnt_exist {
+            args: func_args![name: "VAR1"],
+            want: Err("environment variable not found"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         let cases = vec![
-//             (map!["foo": "VAR1"], Err(())),
-//             (map!["foo": "VAR2"], Ok("var".into())),
-//             (map!["foo": "="], Err(())),
-//             (map!["foo": ""], Err(())),
-//             (map!["foo": "a=b"], Err(())),
-//         ];
+        exists {
+            args: func_args![name: "VAR2"],
+            want: Ok(value!("var")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         for (object, expected) in cases {
-//             let mut object: Value = object.into();
-//             let got = func.resolve(&mut ctx).map_err(|_| ());
-//             assert_eq!(got, expected);
-//         }
-//     }
-// }
+        invalid1 {
+            args: func_args![name: "="],
+            want: Err("environment variable not found"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
+
+        invalid2 {
+            args: func_args![name: ""],
+            want: Err("environment variable not found"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
+
+        invalid3 {
+            args: func_args![name: "a=b"],
+            want: Err("environment variable not found"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
+    ];
+}

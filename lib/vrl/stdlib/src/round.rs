@@ -78,100 +78,53 @@ impl Expression for RoundFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![
-//         value_float {
-//             expr: |_| RoundFn {
-//                 value: Literal::from(1.0).boxed(),
-//                 precision: None,
-//             },
-//             def: TypeDef { kind: Kind::Float, ..Default::default() },
-//         }
+    test_function![
+        round => Round;
 
-//         value_integer {
-//             expr: |_| RoundFn {
-//                 value: Literal::from(1).boxed(),
-//                 precision: None,
-//             },
-//             def: TypeDef { kind: Kind::Integer, ..Default::default() },
-//         }
+        down {
+             args: func_args![value: 1234.2],
+             want: Ok(1234.0),
+             tdef: TypeDef::new().infallible().integer(),
+         }
 
-//         value_float_or_integer {
-//             expr: |_| RoundFn {
-//                 value: Variable::new("foo".to_owned(), None).boxed(),
-//                 precision: None,
-//             },
-//             def: TypeDef { fallible: true, kind: Kind::Integer | Kind::Float, ..Default::default() },
-//         }
+        up {
+             args: func_args![value: 1234.8],
+             want: Ok(1235.0),
+             tdef: TypeDef::new().infallible().integer(),
+         }
 
-//         fallible_precision {
-//             expr: |_| RoundFn {
-//                 value: Literal::from(1).boxed(),
-//                 precision: Some(Variable::new("foo".to_owned(), None).boxed()),
-//             },
-//             def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
-//         }
-//     ];
+        integer {
+             args: func_args![value: 1234],
+             want: Ok(1234),
+             tdef: TypeDef::new().infallible().integer(),
+         }
 
-//     #[test]
-//     fn round() {
-//         let cases = vec![
-//             (
-//                 map!["foo": 1234.2],
-//                 Ok(1234.0.into()),
-//                 RoundFn::new(Box::new(Path::from("foo")), None),
-//             ),
-//             (
-//                 map![],
-//                 Ok(1235.0.into()),
-//                 RoundFn::new(Box::new(Literal::from(Value::Float(1234.8))), None),
-//             ),
-//             (
-//                 map![],
-//                 Ok(1234.into()),
-//                 RoundFn::new(Box::new(Literal::from(Value::Integer(1234))), None),
-//             ),
-//             (
-//                 map![],
-//                 Ok(1234.4.into()),
-//                 RoundFn::new(
-//                     Box::new(Literal::from(Value::Float(1234.39429))),
-//                     Some(Box::new(Literal::from(1))),
-//                 ),
-//             ),
-//             (
-//                 map![],
-//                 Ok(1234.5679.into()),
-//                 RoundFn::new(
-//                     Box::new(Literal::from(Value::Float(1234.56789))),
-//                     Some(Box::new(Literal::from(4))),
-//                 ),
-//             ),
-//             (
-//                 map![],
-//                 Ok(9876543210123456789098765432101234567890987654321.98765.into()),
-//                 RoundFn::new(
-//                     Box::new(Literal::from(
-//                         9876543210123456789098765432101234567890987654321.987654321,
-//                     )),
-//                     Some(Box::new(Literal::from(5))),
-//                 ),
-//             ),
-//         ];
+        precision {
+             args: func_args![value: 1234.39429,
+                              precision: 1
+             ],
+             want: Ok(1234.4),
+             tdef: TypeDef::new().infallible().integer(),
+         }
 
-//         let mut state = state::Program::default();
+        bigger_precision  {
+            args: func_args![value: 1234.56789,
+                             precision: 4
+            ],
+            want: Ok(1234.5679),
+            tdef: TypeDef::new().infallible().integer(),
+        }
 
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        huge {
+             args: func_args![value: 9876543210123456789098765432101234567890987654321.987654321,
+                              precision: 5
+             ],
+             want: Ok(9876543210123456789098765432101234567890987654321.98765),
+             tdef: TypeDef::new().infallible().integer(),
+         }
+    ];
+}

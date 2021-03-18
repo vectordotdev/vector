@@ -1,4 +1,4 @@
-use super::util::{table_to_set, table_to_timestamp, timestamp_to_table};
+use super::util::{table_to_set, table_to_timestamp, timestamp_to_table, type_name};
 use crate::event::{metric, Metric, MetricKind, MetricValue, StatisticKind};
 use rlua::prelude::*;
 use std::collections::BTreeMap;
@@ -19,7 +19,7 @@ impl<'a> FromLua<'a> for MetricKind {
             LuaValue::String(s) if s == "absolute" => Ok(MetricKind::Absolute),
             LuaValue::String(s) if s == "incremental" => Ok(MetricKind::Incremental),
             _ => Err(LuaError::FromLuaConversionError {
-                from: value.type_name(),
+                from: type_name(&value),
                 to: "MetricKind",
                 message: Some(
                     "Metric kind should be either \"incremental\" or \"absolute\"".to_string(),
@@ -45,7 +45,7 @@ impl<'a> FromLua<'a> for StatisticKind {
             LuaValue::String(s) if s == "summary" => Ok(StatisticKind::Summary),
             LuaValue::String(s) if s == "histogram" => Ok(StatisticKind::Histogram),
             _ => Err(LuaError::FromLuaConversionError {
-                from: value.type_name(),
+                from: type_name(&value),
                 to: "StatisticKind",
                 message: Some(
                     "Statistic kind should be either \"summary\" or \"histogram\"".to_string(),
@@ -60,6 +60,9 @@ impl<'a> ToLua<'a> for Metric {
         let tbl = ctx.create_table()?;
 
         tbl.set("name", self.name())?;
+        if let Some(namespace) = self.namespace() {
+            tbl.set("namespace", namespace)?;
+        }
         if let Some(ts) = self.data.timestamp {
             tbl.set("timestamp", timestamp_to_table(ctx, ts)?)?;
         }
@@ -133,7 +136,7 @@ impl<'a> FromLua<'a> for Metric {
             LuaValue::Table(table) => table,
             other => {
                 return Err(LuaError::FromLuaConversionError {
-                    from: other.type_name(),
+                    from: type_name(&other),
                     to: "Metric",
                     message: Some("Metric should be a Lua table".to_string()),
                 })
@@ -145,6 +148,7 @@ impl<'a> FromLua<'a> for Metric {
             .get::<_, Option<LuaTable>>("timestamp")?
             .map(table_to_timestamp)
             .transpose()?;
+        let namespace: Option<String> = table.get("namespace")?;
         let tags: Option<BTreeMap<String, String>> = table.get("tags")?;
         let kind = table
             .get::<_, Option<MetricKind>>("kind")?
@@ -192,13 +196,14 @@ impl<'a> FromLua<'a> for Metric {
             }
         } else {
             return Err(LuaError::FromLuaConversionError {
-                from: value.type_name(),
+                from: type_name(&value),
                 to: "Metric",
                 message: Some("Cannot find metric value, expected presence one of \"counter\", \"gauge\", \"set\", \"distribution\", \"aggregated_histogram\", \"aggregated_summary\"".to_string()),
             });
         };
 
         Ok(Metric::new(name, kind, value)
+            .with_namespace(namespace)
             .with_tags(tags)
             .with_timestamp(timestamp))
     }
@@ -228,6 +233,7 @@ mod test {
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
         )
+        .with_namespace(Some("namespace_example"))
         .with_tags(Some(
             vec![("example tag".to_string(), "example value".to_string())]
                 .into_iter()
@@ -237,6 +243,7 @@ mod test {
         let assertions = vec![
             "type(metric) == 'table'",
             "metric.name == 'example counter'",
+            "metric.namespace == 'namespace_example'",
             "type(metric.timestamp) == 'table'",
             "metric.timestamp.year == 2018",
             "metric.timestamp.month == 11",
@@ -395,6 +402,7 @@ mod test {
     fn from_lua_counter_full() {
         let value = r#"{
             name = "example counter",
+            namespace = "example_namespace",
             timestamp = {
                 year = 2018,
                 month = 11,
@@ -416,6 +424,7 @@ mod test {
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
         )
+        .with_namespace(Some("example_namespace"))
         .with_tags(Some(
             vec![("example tag".to_string(), "example value".to_string())]
                 .into_iter()

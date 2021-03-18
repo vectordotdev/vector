@@ -204,6 +204,8 @@ components: sources: aws_kinesis_firehose: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:           components.sources.internal_metrics.output.metrics.events_in_total
+		processed_bytes_total:     components.sources.internal_metrics.output.metrics.processed_bytes_total
 		request_read_errors_total: components.sources.internal_metrics.output.metrics.request_read_errors_total
 		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
 	}

@@ -3,7 +3,7 @@ use crate::{
     emit,
     event::Event,
     http::{Auth, HttpClient, HttpError, MaybeAuth},
-    internal_events::{ElasticSearchEventEncoded, ElasticSearchMissingKeys},
+    internal_events::{ElasticSearchEventEncoded, TemplateRenderingFailed},
     rusoto::{self, region_from_endpoint, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -11,7 +11,7 @@ use crate::{
         retries::{RetryAction, RetryLogic},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
@@ -187,7 +187,7 @@ enum ParseError {
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
     AWSCredentialsGenerateFailed { source: CredentialsError },
     #[snafu(display("Index template parse error: {}", source))]
-    IndexTemplate { source: TemplateError },
+    IndexTemplate { source: TemplateParseError },
 }
 
 #[async_trait::async_trait]
@@ -199,9 +199,11 @@ impl HttpSink for ElasticSearchCommon {
         let index = self
             .index
             .render_string(&event)
-            .map_err(|missing_keys| {
-                emit!(ElasticSearchMissingKeys {
-                    keys: &missing_keys
+            .map_err(|error| {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("index"),
+                    drop_event: true,
                 });
             })
             .ok()?;
@@ -453,6 +455,7 @@ impl ElasticSearchCommon {
 
     fn signed_request(&self, method: &str, uri: &Uri, use_params: bool) -> SignedRequest {
         let mut request = SignedRequest::new(method, "es", &self.region, uri.path());
+        request.set_hostname(uri.host().map(|host| host.into()));
         if use_params {
             for (key, value) in &self.query_params {
                 request.add_param(key, value);
@@ -666,6 +669,34 @@ mod tests {
 {"foo":"bar","message":"hello there"}
 "#;
         assert_eq!(std::str::from_utf8(&encoded).unwrap(), &expected[..]);
+    }
+
+    #[test]
+    fn validate_host_header_on_aws_requests() {
+        let config = ElasticSearchConfig {
+            auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default {})),
+            endpoint: "http://abc-123.us-east-1.es.amazonaws.com".into(),
+            batch: BatchConfig {
+                max_events: Some(1),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+
+        let signed_request = common.signed_request(
+            "POST",
+            &"http://abc-123.us-east-1.es.amazonaws.com"
+                .parse::<Uri>()
+                .unwrap(),
+            true,
+        );
+
+        assert_eq!(
+            signed_request.hostname(),
+            "abc-123.us-east-1.es.amazonaws.com".to_string()
+        );
     }
 }
 

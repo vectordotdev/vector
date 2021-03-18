@@ -36,7 +36,7 @@ remap: functions: sha2: {
 		{
 			title: "Calculate sha2 hash"
 			source: #"""
-				sha2("foo", variant = "SHA-512/224")
+				sha2("foo", variant: "SHA-512/224")
 				"""#
 			return: "d68f258d37d670cfc1ec1001a0394784233f88f056994f9a7e5e99be"
 		},

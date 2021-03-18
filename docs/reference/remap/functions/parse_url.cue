@@ -9,13 +9,13 @@ remap: functions: parse_url: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The text of the url."
+			description: "The text of the URL."
 			required:    true
 			type: ["string"]
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a properly formatted URL",
+		"`value` isn't a properly formatted URL",
 	]
 	return: types: ["object"]
 
@@ -23,7 +23,7 @@ remap: functions: parse_url: {
 		{
 			title: "Parse URL"
 			source: #"""
-				parse_url("ftp://foo:bar@vector.dev:4343/foobar?hello=world#123")
+				parse_url!("ftp://foo:bar@vector.dev:4343/foobar?hello=world#123")
 				"""#
 			return: {
 				scheme:   "ftp"

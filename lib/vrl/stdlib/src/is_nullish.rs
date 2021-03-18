@@ -48,107 +48,72 @@ impl Expression for IsNullishFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    test_function![
+        is_nullish => IsNullish;
 
-//     test_type_def![
-//         string_infallible {
-//             expr: |_| IsNullishFn {
-//                 value: Literal::from("some string").boxed(),
-//             },
-//             def: TypeDef {
-//                 kind: Kind::Boolean,
-//                 ..Default::default()
-//             },
-//         }
+        empty_string {
+            args: func_args![value: value!("")],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//         null_infallible {
-//             expr: |_| IsNullishFn {
-//                 value: Literal::from(()).boxed(),
-//             },
-//             def: TypeDef {
-//                 kind: Kind::Boolean,
-//                 ..Default::default()
-//             },
-//         }
+        single_space_string {
+            args: func_args![value: value!(" ")],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//         // Show that non-string/null literal is infallible
-//         integer_fallible {
-//             expr: |_| IsNullishFn {
-//                 value: lit!(42).boxed(),
-//             },
-//             def: TypeDef {
-//                 kind: Kind::Boolean,
-//                 ..Default::default()
-//             },
-//         }
+        multi_space_string {
+            args: func_args![value: value!("     ")],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//         // Show that non-literal is infallible
-//         array_fallible {
-//             expr: |_| IsNullishFn {
-//                 value: array!["foo"].boxed(),
-//             },
-//             def: TypeDef {
-//                 kind: Kind::Boolean,
-//                 ..Default::default()
-//             },
-//         }
-//     ];
+        newline_string {
+            args: func_args![value: value!("\n")],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//     test_function![
-//         is_nullish => IsNullish;
+        carriage_return_string {
+            args: func_args![value: value!("\r")],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//         empty_string {
-//             args: func_args![value: value!("")],
-//             want: Ok(value!(true)),
-//         }
+        dash_string {
+            args: func_args![value: value!("-")],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//         single_space_string {
-//             args: func_args![value: value!(" ")],
-//             want: Ok(value!(true)),
-//         }
+        null {
+            args: func_args![value: value!(null)],
+            want: Ok(value!(true)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//         multi_space_string {
-//             args: func_args![value: value!("     ")],
-//             want: Ok(value!(true)),
-//         }
+        non_empty_string {
+            args: func_args![value: value!("hello world")],
+            want: Ok(value!(false)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//         newline_string {
-//             args: func_args![value: value!("\n")],
-//             want: Ok(value!(true)),
-//         }
+        // Shows that a non-string/null literal returns false
+        integer {
+            args: func_args![value: value!(427)],
+            want: Ok(value!(false)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//         carriage_return_string {
-//             args: func_args![value: value!("\r")],
-//             want: Ok(value!(true)),
-//         }
-
-//         dash_string {
-//             args: func_args![value: value!("-")],
-//             want: Ok(value!(true)),
-//         }
-
-//         null {
-//             args: func_args![value: value!(null)],
-//             want: Ok(value!(true)),
-//         }
-
-//         non_empty_string {
-//             args: func_args![value: value!("hello world")],
-//             want: Ok(value!(false)),
-//         }
-
-//         // Shows that a non-string/null literal returns false
-//         integer {
-//             args: func_args![value: value!(427)],
-//             want: Ok(value!(false)),
-//         }
-
-//         // Shows that a non-literal type returns false
-//         array {
-//             args: func_args![value: array![1, 2, 3]],
-//             want: Ok(value!(false)),
-//         }
-//     ];
-// }
+        // Shows that a non-literal type returns false
+        array {
+            args: func_args![value: value!([1, 2, 3])],
+            want: Ok(value!(false)),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
+    ];
+}
