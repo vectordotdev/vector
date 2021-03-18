@@ -167,7 +167,7 @@ impl SourceConfig for GeneratorConfig {
 mod tests {
     use super::*;
     use crate::{config::log_schema, shutdown::ShutdownSignal, Pipeline};
-    use futures::stream::StreamExt;
+    use futures::{channel::mpsc, poll, StreamExt};
     use std::time::{Duration, Instant};
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
@@ -217,13 +217,16 @@ mod tests {
         let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..5 {
-            let event = stream.next().await.unwrap();
+            let event = match poll!(stream.next()) {
+                Poll::Ready(event) => event.unwrap(),
+                _ => unreachable!(),
+            };
             let log = event.as_log();
             let message = log[&message_key].to_string_lossy();
             assert!(lines.contains(&&*message));
         }
 
-        assert_eq!(stream.next().await, None);
+        assert_eq!(poll!(stream.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
@@ -238,9 +241,9 @@ mod tests {
         let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..5 {
-            assert!(stream.next().await.is_some());
+            assert!(poll!(stream.next()).is_ready());
         }
-        assert_eq!(stream.next().await, None);
+        assert_eq!(poll!(stream.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
@@ -257,13 +260,16 @@ mod tests {
         let mut stream = ReceiverStream::new(rx);
 
         for n in 0..5 {
-            let event = stream.next().await.unwrap();
+            let event = match poll!(stream.next()) {
+                Poll::Ready(event) => event.unwrap(),
+                _ => unreachable!(),
+            };
             let log = event.as_log();
             let message = log[&message_key].to_string_lossy();
             assert!(message.starts_with(&n.to_string()));
         }
 
-        assert_eq!(stream.next().await, None);
+        assert_eq!(poll!(stream.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
@@ -280,9 +286,9 @@ mod tests {
         let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..3 {
-            assert!(stream.next().await.is_some());
+            assert!(poll!(stream.next()).is_ready());
         }
-        assert_eq!(stream.next().await, None);
+        assert_eq!(poll!(stream.next()), Poll::Ready(None));
 
         let duration = start.elapsed();
         assert!(duration >= Duration::from_secs(2));
@@ -299,9 +305,9 @@ mod tests {
         let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..5 {
-            assert!(stream.next().await.is_some());
+            assert!(poll!(stream.next()).is_ready());
         }
-        assert_eq!(stream.next().await, None);
+        assert_eq!(poll!(stream.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
@@ -315,9 +321,9 @@ mod tests {
         let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..5 {
-            assert!(stream.next().await.is_some());
+            assert!(poll!(stream.next()).is_ready());
         }
-        assert_eq!(stream.next().await, None);
+        assert_eq!(poll!(stream.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
@@ -331,9 +337,9 @@ mod tests {
         let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..5 {
-            assert!(stream.next().await.is_some());
+            assert!(poll!(stream.next()).is_ready());
         }
-        assert_eq!(stream.next().await, None);
+        assert_eq!(poll!(stream.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
@@ -347,9 +353,9 @@ mod tests {
         let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..5 {
-            assert!(stream.next().await.is_some());
+            assert!(poll!(stream.next()).is_ready());
         }
-        assert_eq!(stream.next().await, None);
+        assert_eq!(poll!(stream.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
@@ -364,11 +370,14 @@ mod tests {
         let mut stream = ReceiverStream::new(rx);
 
         for _ in 0..5 {
-            let event = stream.next().await.unwrap();
+            let event = match poll!(stream.next()) {
+                Poll::Ready(event) => event.unwrap(),
+                _ => unreachable!(),
+            };
             let log = event.as_log();
             let message = log[&message_key].to_string_lossy();
             assert!(serde_json::from_str::<serde_json::Value>(&message).is_ok());
         }
-        assert_eq!(stream.next().await, None);
+        assert_eq!(poll!(stream.next()), Poll::Ready(None));
     }
 }
