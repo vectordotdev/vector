@@ -1,8 +1,3 @@
-use std::borrow::Borrow;
-use std::cmp::Ordering;
-use std::collections::BTreeMap;
-use std::sync::Arc;
-
 mod convert;
 mod iter;
 mod macros;
@@ -12,20 +7,71 @@ mod tests;
 pub use convert::*;
 pub use iter::*;
 pub use macros::*;
+use std::borrow::Borrow;
+use std::cmp::Ordering;
+use std::mem;
+
+#[derive(Debug, Clone)]
+struct Pair<K, V> {
+    key: K,
+    value: Option<V>,
+}
+
+impl<K, V> PartialEq for Pair<K, V>
+where
+    K: PartialEq,
+    V: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key && self.value == other.value
+    }
+}
+
+impl<K, V> Eq for Pair<K, V>
+where
+    K: PartialEq,
+    V: PartialEq,
+{
+}
+
+impl<K, V> PartialOrd for Pair<K, V>
+where
+    K: PartialOrd,
+    V: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match self.key.partial_cmp(&other.key) {
+            Some(Ordering::Equal) => self.value.partial_cmp(&other.value),
+            Some(ord) => Some(ord),
+            None => None,
+        }
+    }
+}
+
+impl<K, V> Ord for Pair<K, V>
+where
+    K: Ord,
+    V: Ord,
+{
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.key.cmp(&other.key).then(self.value.cmp(&other.value))
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Map<K, V> {
-    pub(crate) inner: Arc<BTreeMap<K, V>>,
+    inner: Vec<Pair<K, V>>,
+    length: usize,
 }
 
 impl<K, V> Default for Map<K, V>
 where
-    K: Ord + Clone,
-    V: Clone,
+    K: Ord,
 {
     fn default() -> Self {
         Self {
-            inner: Arc::new(BTreeMap::new()),
+            length: 0,
+            inner: Vec::with_capacity(128),
         }
     }
 }
@@ -49,8 +95,8 @@ where
 
 impl<K, V> PartialOrd for Map<K, V>
 where
-    K: Ord + PartialOrd + Clone,
-    V: PartialOrd + Clone,
+    K: Ord + PartialOrd,
+    V: PartialOrd,
 {
     #[inline]
     fn partial_cmp(&self, other: &Map<K, V>) -> Option<Ordering> {
@@ -60,8 +106,8 @@ where
 
 impl<K, V> Ord for Map<K, V>
 where
-    K: Ord + Clone,
-    V: Ord + Clone,
+    K: Ord,
+    V: Ord,
 {
     #[inline]
     fn cmp(&self, other: &Map<K, V>) -> Ordering {
@@ -69,21 +115,25 @@ where
     }
 }
 
-impl<K, V> Map<K, V> where K: Ord {}
-
-impl<K, V> Map<K, V>
-where
-    K: Ord + Clone,
-    V: Clone,
-{
+impl<K, V> Map<K, V> {
     #[inline]
-    pub fn new() -> Self {
-        Self::default()
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.length
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
-        self.inner.len()
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.length == 0
+    }
+
+    #[inline]
+    pub fn clear(&mut self) {
+        for pair in self.inner.iter_mut() {
+            pair.value = None
+        }
+        self.length = 0
     }
 
     #[inline]
@@ -96,40 +146,74 @@ where
     #[inline]
     pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
         IterMut {
-            inner: Arc::make_mut(&mut self.inner).iter_mut(),
+            inner: self.inner.iter_mut(),
         }
     }
 
     #[inline]
     pub fn keys(&self) -> Keys<K, V> {
         Keys {
-            inner: self.inner.keys(),
+            inner: self.inner.iter(),
         }
     }
 
     #[inline]
     pub fn values(&self) -> Values<K, V> {
         Values {
-            inner: self.inner.values(),
+            inner: self.inner.iter(),
         }
     }
+}
 
+impl<K, V> Map<K, V>
+where
+    K: Ord,
+{
     #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
-    }
-
-    #[inline]
-    pub fn clear(&mut self) {
-        Arc::make_mut(&mut self.inner).clear()
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
     }
 
     #[inline]
     pub fn append(&mut self, other: &mut Map<K, V>) {
-        let omap = Arc::make_mut(&mut other.inner);
-        let smap = Arc::make_mut(&mut self.inner);
+        for pair in other.inner.drain(..) {
+            self.insert_pair(pair);
+        }
+    }
 
-        smap.append(omap);
+    #[inline]
+    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+        let kv = Pair {
+            key,
+            value: Some(value),
+        };
+        if let Some(pair) = self.insert_pair(kv) {
+            pair.value
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn insert_pair(&mut self, pair: Pair<K, V>) -> Option<Pair<K, V>> {
+        match self
+            .inner
+            .binary_search_by(|probe| probe.key.cmp(&pair.key))
+        {
+            Ok(idx) => {
+                let old_pair = mem::replace(&mut self.inner[idx], pair);
+                if old_pair.value.is_none() {
+                    self.length += 1;
+                }
+                Some(old_pair)
+            }
+            Err(idx) => {
+                self.inner.insert(idx, pair);
+                self.length += 1;
+                None
+            }
+        }
     }
 
     #[inline]
@@ -138,25 +222,37 @@ where
         K: Borrow<Q>,
         Q: Ord + ?Sized,
     {
-        self.inner.contains_key(key.borrow())
+        self.get(key).is_some()
     }
 
     #[inline]
-    pub fn get<Q>(&self, key: &Q) -> Option<&V>
+    pub fn get<Q: ?Sized>(&self, key: &Q) -> Option<&V>
     where
         K: Borrow<Q>,
-        Q: Ord + ?Sized,
+        Q: Ord,
     {
-        self.inner.get(key.borrow())
+        match self
+            .inner
+            .binary_search_by_key(&key, |pair| pair.key.borrow())
+        {
+            Ok(idx) => self.inner[idx].value.as_ref(),
+            Err(_) => None,
+        }
     }
 
     #[inline]
-    pub fn get_mut<Q>(&mut self, key: &Q) -> Option<&mut V>
+    pub fn get_mut<Q: ?Sized>(&mut self, key: &Q) -> Option<&mut V>
     where
         K: Borrow<Q>,
-        Q: Ord + ?Sized,
+        Q: Ord,
     {
-        Arc::make_mut(&mut self.inner).get_mut(key.borrow())
+        match self
+            .inner
+            .binary_search_by_key(&key, |pair| pair.key.borrow())
+        {
+            Ok(idx) => self.inner[idx].value.as_mut(),
+            Err(_) => None,
+        }
     }
 
     #[inline]
@@ -165,11 +261,18 @@ where
         K: Borrow<Q>,
         Q: Ord + ?Sized,
     {
-        Arc::make_mut(&mut self.inner).remove(key.borrow())
-    }
-
-    #[inline]
-    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        Arc::make_mut(&mut self.inner).insert(key, value)
+        match self
+            .inner
+            .binary_search_by_key(&key, |pair| pair.key.borrow())
+        {
+            Ok(idx) => {
+                let res = mem::replace(&mut self.inner[idx].value, None);
+                if res.is_some() {
+                    self.length -= 1;
+                }
+                res
+            }
+            Err(_) => None,
+        }
     }
 }

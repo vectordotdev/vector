@@ -12,12 +12,16 @@ enum Operation {
     GetIsEmpty,
     Clear,
     ContainsKey(u16),
+    Iter,
+    IterMut,
+    Keys,
+    Values,
 }
 
 impl Arbitrary for Operation {
     fn arbitrary(gen: &mut Gen) -> Self {
         let variant: u8 = u8::arbitrary(gen);
-        match variant % 8 {
+        match variant % 12 {
             0 => Operation::Insert(u16::arbitrary(gen), u8::arbitrary(gen)),
             1 => Operation::Remove(u16::arbitrary(gen)),
             2 => Operation::Get(u16::arbitrary(gen)),
@@ -26,6 +30,10 @@ impl Arbitrary for Operation {
             5 => Operation::Clear,
             6 => Operation::ContainsKey(u16::arbitrary(gen)),
             7 => Operation::GetMut(u16::arbitrary(gen)),
+            8 => Operation::Iter,
+            9 => Operation::IterMut,
+            10 => Operation::Keys,
+            11 => Operation::Values,
             _ => unreachable!(),
         }
     }
@@ -47,6 +55,38 @@ fn model_check() {
                 Operation::Clear => assert_eq!(model.clear(), sut.clear()),
                 Operation::ContainsKey(k) => assert_eq!(model.contains_key(k), sut.contains_key(k)),
                 Operation::GetMut(k) => assert_eq!(model.get_mut(k), sut.get_mut(k)),
+                Operation::Iter => {
+                    let mut model_iter = model.iter();
+                    let mut sut_iter = sut.iter();
+                    while let Some(model_kv) = model_iter.next() {
+                        assert_eq!(Some(model_kv), sut_iter.next());
+                    }
+                    assert!(sut_iter.next().is_none())
+                }
+                Operation::IterMut => {
+                    let mut model_iter = model.iter_mut();
+                    let mut sut_iter = sut.iter_mut();
+                    while let Some(model_kv) = model_iter.next() {
+                        assert_eq!(Some(model_kv), sut_iter.next());
+                    }
+                    assert!(sut_iter.next().is_none())
+                }
+                Operation::Keys => {
+                    let mut model_iter = model.keys();
+                    let mut sut_iter = sut.keys();
+                    while let Some(model_key) = model_iter.next() {
+                        assert_eq!(Some(model_key), sut_iter.next());
+                    }
+                    assert!(sut_iter.next().is_none())
+                }
+                Operation::Values => {
+                    let mut model_iter = model.values();
+                    let mut sut_iter = sut.values();
+                    while let Some(model_value) = model_iter.next() {
+                        assert_eq!(Some(model_value), sut_iter.next());
+                    }
+                    assert!(sut_iter.next().is_none())
+                }
             }
         }
 

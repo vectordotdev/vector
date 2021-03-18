@@ -1,8 +1,6 @@
 use crate::map::{IntoIter, Iter, IterMut, Map};
-use std::collections::btree_map;
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
-use std::sync::Arc;
 
 impl<K, V> From<BTreeMap<K, V>> for Map<K, V>
 where
@@ -20,32 +18,28 @@ where
 
 impl<K, V> FromIterator<(K, V)> for Map<K, V>
 where
-    K: Ord + Clone,
-    V: Clone,
+    K: Ord,
 {
     fn from_iter<T>(iter: T) -> Self
     where
         T: IntoIterator<Item = (K, V)>,
     {
-        let mut map = BTreeMap::new();
-        map.extend(iter);
-        Self {
-            inner: Arc::new(map),
+        let mut map = Map::default();
+        for (k, v) in iter {
+            map.insert(k, v);
         }
+        map
     }
 }
 
-impl<K, V> IntoIterator for Map<K, V>
-where
-    K: Clone,
-    V: Clone,
-{
+impl<K, V> IntoIterator for Map<K, V> {
     type Item = (K, V);
     type IntoIter = IntoIter<K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let inner: btree_map::IntoIter<K, V> = (*self.inner).clone().into_iter();
-        IntoIter { inner }
+        IntoIter {
+            inner: self.inner.into_iter(),
+        }
     }
 }
 
@@ -54,8 +48,9 @@ impl<'a, K, V> IntoIterator for &'a Map<K, V> {
     type IntoIter = Iter<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let inner: btree_map::Iter<'_, K, V> = (*self.inner).iter();
-        Iter { inner }
+        Iter {
+            inner: self.inner.iter(),
+        }
     }
 }
 
@@ -68,7 +63,8 @@ where
     type IntoIter = IterMut<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let inner: btree_map::IterMut<'_, K, V> = Arc::make_mut(&mut self.inner).iter_mut();
-        IterMut { inner }
+        IterMut {
+            inner: self.inner.iter_mut(),
+        }
     }
 }

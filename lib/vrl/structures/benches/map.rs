@@ -13,11 +13,10 @@ impl fmt::Display for Parameters {
     }
 }
 
-static PARAMETERS: [Parameters; 4] = [
-    Parameters { loops: 100 },
-    Parameters { loops: 1_000 },
-    Parameters { loops: 10_000 },
-    Parameters { loops: 100_000 },
+static PARAMETERS: [Parameters; 3] = [
+    Parameters { loops: 8 },
+    Parameters { loops: 128 },
+    Parameters { loops: 256 },
 ];
 
 fn benchmark_insert(c: &mut Criterion) {

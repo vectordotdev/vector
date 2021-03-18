@@ -370,7 +370,7 @@ impl KindInfo {
                     .map(|(mut l, mut r)| {
                         // merge nested keys, if requested
                         if !shallow {
-                            for (k1, v1) in l.iter_mut() {
+                            for (k1, v1) in l.iter() {
                                 for (k2, v2) in r.iter_mut() {
                                     if k1 == k2 {
                                         *v2 = v1.clone().merge(v2.clone(), false, false);
