@@ -499,7 +499,7 @@ urls: {
 	vrl_parsing_functions:                                    "\(vrl_functions)#parse-functions"
 	vrl_path_expressions:                                     "\(vrl_expressions)#path"
 	vrl_performance:                                          "\(vrl_reference)#performance"
-	vrl_reference:                                            "\(vector_website)/docs/reference/configuration/vrl/"
+	vrl_reference:                                            "\(vector_website)/docs/reference/vrl/"
 	vrl_runtime_errors:                                       "\(vrl_errors_reference)#runtime-errors"
 	vrl_safety:                                               "\(vrl_reference)#safety"
 	vrl_type_safety:                                          "\(vrl_reference)#type-safety"
