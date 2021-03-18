@@ -82,7 +82,7 @@ where
     V: PartialEq<V>,
 {
     fn eq(&self, other: &Map<K, V>) -> bool {
-        self.inner.eq(&other.inner)
+        self.length == other.length && self.iter().eq(other.iter())
     }
 }
 
@@ -130,13 +130,14 @@ impl<K, V> Map<K, V> {
 
     #[inline]
     pub fn clear(&mut self) {
-        for pair in self.inner.iter_mut() {
+        for pair in &mut self.inner {
             pair.value = None
         }
         self.length = 0
     }
 
     #[inline]
+    #[must_use]
     pub fn iter(&self) -> Iter<'_, K, V> {
         Iter {
             inner: self.inner.iter(),
@@ -151,6 +152,7 @@ impl<K, V> Map<K, V> {
     }
 
     #[inline]
+    #[must_use]
     pub fn keys(&self) -> Keys<K, V> {
         Keys {
             inner: self.inner.iter(),
@@ -158,6 +160,7 @@ impl<K, V> Map<K, V> {
     }
 
     #[inline]
+    #[must_use]
     pub fn values(&self) -> Values<K, V> {
         Values {
             inner: self.inner.iter(),
@@ -188,11 +191,7 @@ where
             key,
             value: Some(value),
         };
-        if let Some(pair) = self.insert_pair(kv) {
-            pair.value
-        } else {
-            None
-        }
+        self.insert_pair(kv).and_then(|pair| pair.value)
     }
 
     #[inline]

@@ -1,6 +1,6 @@
 // #![deny(missing_docs)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
-// #![deny(clippy::cargo)]
+#![allow(clippy::module_name_repetitions)]
 
 pub mod map;
