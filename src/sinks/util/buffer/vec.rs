@@ -9,7 +9,7 @@ pub trait EncodedLength {
 
 #[derive(Clone)]
 pub struct VecBuffer<T> {
-    batch: Vec<T>,
+    batch: Option<Vec<T>>,
     bytes: usize,
     settings: BatchSize<Self>,
 }
@@ -21,7 +21,7 @@ impl<T> VecBuffer<T> {
 
     fn new_with_settings(settings: BatchSize<Self>) -> Self {
         Self {
-            batch: Vec::with_capacity(settings.events),
+            batch: None,
             bytes: 0,
             settings,
         }
@@ -45,19 +45,19 @@ impl<T: EncodedLength> Batch for VecBuffer<T> {
         let new_bytes = self.bytes + item.encoded_length();
         if self.is_empty() && item.encoded_length() > self.settings.bytes {
             err_event_too_large(item.encoded_length())
-        } else if self.batch.len() >= self.settings.events || new_bytes > self.settings.bytes {
+        } else if self.num_items() >= self.settings.events || new_bytes > self.settings.bytes {
             PushResult::Overflow(item)
         } else {
-            self.batch.push(item);
+            let events = self.settings.events;
+            let batch = self.batch.get_or_insert_with(|| Vec::with_capacity(events));
+            batch.push(item);
             self.bytes = new_bytes;
-            PushResult::Ok(
-                self.batch.len() >= self.settings.events || new_bytes >= self.settings.bytes,
-            )
+            PushResult::Ok(batch.len() >= self.settings.events || new_bytes >= self.settings.bytes)
         }
     }
 
     fn is_empty(&self) -> bool {
-        self.batch.is_empty()
+        self.batch.as_ref().map(Vec::is_empty).unwrap_or(true)
     }
 
     fn fresh(&self) -> Self {
@@ -65,11 +65,11 @@ impl<T: EncodedLength> Batch for VecBuffer<T> {
     }
 
     fn finish(self) -> Self::Output {
-        self.batch
+        self.batch.unwrap_or_else(Vec::new)
     }
 
     fn num_items(&self) -> usize {
-        self.batch.len()
+        self.batch.as_ref().map(Vec::len).unwrap_or(0)
     }
 }
 
