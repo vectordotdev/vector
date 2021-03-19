@@ -880,25 +880,32 @@ mod test {
         let exp = r##"
             # HELP nginx_server_bytes request/response bytes
             # TYPE nginx_server_bytes counter
-            nginx_server_bytes{direction="in",host="*"} 263719 1612411506789
-            nginx_server_bytes{direction="in",host="_"} 255061 1612411506789
-            nginx_server_bytes{direction="in",host="nginx-vts-status"} 8658 1612411506789
-            nginx_server_bytes{direction="out",host="*"} 944199 1612411506789
-            nginx_server_bytes{direction="out",host="_"} 360775 1612411506789
-            nginx_server_bytes{direction="out",host="nginx-vts-status"} 583424 1612411506789
+            nginx_server_bytes{direction="in",host="*"} 263719
+            nginx_server_bytes{direction="in",host="_"} 255061
+            nginx_server_bytes{direction="in",host="nginx-vts-status"} 8658
+            nginx_server_bytes{direction="out",host="*"} 944199
+            nginx_server_bytes{direction="out",host="_"} 360775
+            nginx_server_bytes{direction="out",host="nginx-vts-status"} 583424
             # HELP nginx_server_cache cache counter
             # TYPE nginx_server_cache counter
-            nginx_server_cache{host="*",status="bypass"} 0 1612411506789
-            nginx_server_cache{host="*",status="expired"} 0 1612411506789
-            nginx_server_cache{host="*",status="hit"} 0 1612411506789
-            nginx_server_cache{host="*",status="miss"} 0 1612411506789
-            nginx_server_cache{host="*",status="revalidated"} 0 1612411506789
-            nginx_server_cache{host="*",status="scarce"} 0 1612411506789
+            nginx_server_cache{host="*",status="bypass"} 0
+            nginx_server_cache{host="*",status="expired"} 0
+            nginx_server_cache{host="*",status="hit"} 0
+            nginx_server_cache{host="*",status="miss"} 0
+            nginx_server_cache{host="*",status="revalidated"} 0
+            nginx_server_cache{host="*",status="scarce"} 0
             "##;
 
+        let now = Utc::now();
+        let mut result = parse_text(exp).expect("Parsing failed");
+        for metric in &mut result {
+            assert!(metric.data.timestamp.expect("Missing timestamp") >= now);
+            metric.data.timestamp = Some(*TIMESTAMP);
+        }
+
         assert_eq!(
-            parse_text(exp),
-            Ok(vec![
+            result,
+            vec![
                 Metric::new(
                     "nginx_server_bytes",
                     MetricKind::Absolute,
@@ -987,7 +994,7 @@ mod test {
                 )
                 .with_tags(Some(btreemap! { "host" => "*", "status" => "scarce" }))
                 .with_timestamp(Some(*TIMESTAMP))
-            ])
+            ]
         );
     }
 }
