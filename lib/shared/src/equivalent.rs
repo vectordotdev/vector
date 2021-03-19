@@ -52,6 +52,16 @@ impl<T: Equivalent> Equivalent for Vec<T> {
     }
 }
 
+impl<T: Equivalent> Equivalent for &[T] {
+    fn equivalent(&self, other: &Self) -> bool {
+        if self.len() == other.len() {
+            self.iter().zip(other.iter()).all(|(a, b)| a.equivalent(b))
+        } else {
+            false
+        }
+    }
+}
+
 impl<T: Equivalent> Equivalent for Option<T> {
     fn equivalent(&self, other: &Self) -> bool {
         match (self, other) {
