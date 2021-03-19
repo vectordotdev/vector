@@ -90,7 +90,7 @@ components: sources: kafka: {
 		}
 		topic_key: {
 			common:      false
-			description: "The log field name to use for the Kafka topic. If unspecified, the key would not be added to the log event."
+			description: "The log field name to use for the Kafka topic. If unspecified, the topic would not be added to the log event."
 			required:    false
 			warnings: []
 			type: string: {
@@ -101,7 +101,7 @@ components: sources: kafka: {
 		}
 		partition_key: {
 			common:      false
-			description: "The log field name to use for the Kafka partition name. If unspecified, the key would not be added to the log event."
+			description: "The log field name to use for the Kafka partition name. If unspecified, the partition would not be added to the log event."
 			required:    false
 			warnings: []
 			type: string: {
@@ -112,12 +112,23 @@ components: sources: kafka: {
 		}
 		offset_key: {
 			common:      false
-			description: "The log field name to use for the Kafka offset. If unspecified, the key would not be added to the log event."
+			description: "The log field name to use for the Kafka offset. If unspecified, the offset would not be added to the log event."
 			required:    false
 			warnings: []
 			type: string: {
 				default: null
 				examples: ["offset"]
+				syntax: "literal"
+			}
+		}
+		headers_key: {
+			common:      false
+			description: "The log field name to use for the Kafka headers. If unspecified, the headers would not be added to the log event."
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["headers"]
 				syntax: "literal"
 			}
 		}

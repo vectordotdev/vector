@@ -14,6 +14,7 @@ use rdkafka::{
     consumer::{Consumer, StreamConsumer},
     message::Headers,
     message::Message,
+    message::OwnedHeaders,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -187,12 +188,11 @@ fn kafka_source(
                                 let mut headers_map = BTreeMap::new();
                                 if let Some(headers) = msg.headers() {
                                     for i in 0..headers.count() {
-                                        let header = headers.get(i).unwrap();
+                                        let header =
+                                            headers.get(i).expect("header index is out of bounds");
                                         headers_map.insert(
                                             header.0.to_string(),
-                                            Value::from(
-                                                String::from_utf8_lossy(header.1).to_string(),
-                                            ),
+                                            Bytes::from(header.1.to_owned()).into(),
                                         );
                                     }
                                 }
@@ -408,6 +408,8 @@ mod integration_test {
         assert_eq!(events[0].as_log()["topic"], topic.into());
         assert!(events[0].as_log().contains("partition"));
         assert!(events[0].as_log().contains("offset"));
-        assert!(events[0].as_log().contains("headers"));
+        let mut expected_headers = BTreeMap::new();
+        expected_headers.insert("my header".to_string(), Value::from("my header value"));
+        assert_eq!(events[0].as_log()["headers"], Value::from(expected_headers));
     }
 }
