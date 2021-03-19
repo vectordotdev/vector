@@ -17,11 +17,23 @@ impl Function for TypeOf {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
-            title: "null",
-            source: r#"type_of(null)"#,
-            result: Ok("null"),
-        }]
+        &[
+            Example {
+                title: "string",
+                source: r#"type_of("foobar")"#,
+                result: Ok("bytes"),
+            },
+            Example {
+                title: "boolean",
+                source: r#"type_of(true)"#,
+                result: Ok("boolean"),
+            },
+            Example {
+                title: "null",
+                source: r#"type_of(null)"#,
+                result: Ok("\"null\""),
+            },
+        ]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {

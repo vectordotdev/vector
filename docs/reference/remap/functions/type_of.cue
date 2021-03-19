@@ -54,7 +54,7 @@ remap: functions: type_of: {
 			source: """
 				type_of(r'pattern')
 				"""
-			return: "object"
+			return: "regex"
 		},
 	]
 }
