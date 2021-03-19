@@ -286,6 +286,7 @@ mod tests {
 
         // First two events should contain a notification that one pattern matched, and
         // one that didn't.
+        #[allow(clippy::eval_order_dependence)]
         let notifications = vec![sink_rx.recv().await, sink_rx.recv().await];
 
         for notification in notifications.into_iter() {
