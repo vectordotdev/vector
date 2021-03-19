@@ -144,7 +144,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_object(&mut self, node: Node<ast::Object>) -> Object {
-        use vrl_structures::map::Map;
+        use structures::map::Map;
 
         let exprs = node
             .into_inner()

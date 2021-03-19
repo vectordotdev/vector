@@ -1,7 +1,7 @@
 use chrono::{DateTime, Datelike, Utc};
+use structures::map::Map;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use vrl::prelude::*;
-use vrl_structures::map::Map;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseSyslog;
@@ -150,7 +150,7 @@ fn type_def() -> Map<&'static str, TypeDef> {
 mod tests {
     use super::*;
     use chrono::TimeZone;
-    use vrl_structures::map;
+    use structures::map;
 
     test_function![
         parse_syslog => ParseSyslog;

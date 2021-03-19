@@ -74,13 +74,13 @@ impl Expression for FlattenFn {
 
 /// An iterator to walk over maps allowing us to flatten nested maps to a single level.
 struct MapFlatten<'a> {
-    values: vrl_structures::map::Iter<'a, String, Value>,
+    values: structures::map::Iter<'a, String, Value>,
     inner: Option<Box<MapFlatten<'a>>>,
     parent: Option<String>,
 }
 
 impl<'a> MapFlatten<'a> {
-    fn new(values: vrl_structures::map::Iter<'a, String, Value>) -> Self {
+    fn new(values: structures::map::Iter<'a, String, Value>) -> Self {
         Self {
             values,
             inner: None,
@@ -88,10 +88,7 @@ impl<'a> MapFlatten<'a> {
         }
     }
 
-    fn new_from_parent(
-        parent: String,
-        values: vrl_structures::map::Iter<'a, String, Value>,
-    ) -> Self {
+    fn new_from_parent(parent: String, values: structures::map::Iter<'a, String, Value>) -> Self {
         Self {
             values,
             inner: None,

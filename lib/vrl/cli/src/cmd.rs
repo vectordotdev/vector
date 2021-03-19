@@ -4,8 +4,8 @@ use std::io::{self, Read};
 use std::iter::IntoIterator;
 use std::path::PathBuf;
 use structopt::StructOpt;
+use structures::map::Map;
 use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
-use vrl_structures::map::Map;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "VRL", about = "Vector Remap Language CLI")]

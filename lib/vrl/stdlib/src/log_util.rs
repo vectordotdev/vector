@@ -1,8 +1,8 @@
 use chrono::prelude::*;
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
+use structures::map::Map;
 use vrl::prelude::*;
-use vrl_structures::map::Map;
 
 lazy_static! {
     // Information about the common log format taken from the

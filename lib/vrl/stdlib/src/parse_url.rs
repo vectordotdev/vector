@@ -1,7 +1,7 @@
 use std::iter::FromIterator;
+use structures::map::Map;
 use url::Url;
 use vrl::prelude::*;
-use vrl_structures::map::Map;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseUrl;

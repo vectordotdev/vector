@@ -1,8 +1,8 @@
 use chrono::{offset::TimeZone, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
+use structures::map::Map;
 use vrl::prelude::*;
-use vrl_structures::map::Map;
 
 lazy_static! {
     static ref REGEX_GLOG: Regex = Regex::new(

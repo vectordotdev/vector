@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
+use structures::map::Map;
 use vrl::{function::Example, Value};
-use vrl_structures::map::Map;
 
 #[derive(Debug)]
 pub struct Test {

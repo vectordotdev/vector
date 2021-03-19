@@ -67,6 +67,7 @@ members = [
   "lib/portpicker",
   "lib/prometheus-parser",
   "lib/shared",
+  "lib/structures",
   "lib/tracing-limit",
   "lib/vector-api-client",
   "lib/vector-wasm",
@@ -76,7 +77,6 @@ members = [
   "lib/vrl/diagnostic",
   "lib/vrl/parser",
   "lib/vrl/stdlib",
-  "lib/vrl/structures",
   "lib/vrl/tests",
   "lib/vrl/proptests",
 ]

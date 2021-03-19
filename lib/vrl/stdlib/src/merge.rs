@@ -1,5 +1,4 @@
-use vrl_structures::map::Map;
-
+use structures::map::Map;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]

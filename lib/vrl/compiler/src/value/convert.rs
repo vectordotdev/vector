@@ -8,7 +8,7 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
-use vrl_structures::map::Map;
+use structures::map::Map;
 
 impl Value {
     /// Convert a given [`Value`] into a [`Expression`] trait object.

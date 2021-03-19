@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::fmt;
 use std::mem;
-use vrl_structures::map::Map;
+use structures::map::Map;
 
 struct Parameters {
     loops: usize,

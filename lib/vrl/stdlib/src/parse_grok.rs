@@ -1,10 +1,10 @@
 use std::fmt;
 use std::sync::Arc;
+use structures::map::Map;
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,
 };
-use vrl_structures::map::Map;
 
 #[derive(Debug)]
 pub enum Error {

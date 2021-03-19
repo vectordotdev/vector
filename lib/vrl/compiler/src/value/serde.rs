@@ -5,7 +5,7 @@ use serde::de::{Error, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize, Serializer};
 use std::convert::TryFrom;
 use std::fmt;
-use vrl_structures::map::Map;
+use structures::map::Map;
 
 impl Serialize for Value {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

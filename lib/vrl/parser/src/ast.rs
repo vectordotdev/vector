@@ -6,7 +6,7 @@ use std::hash::{Hash, Hasher};
 use std::iter::IntoIterator;
 use std::ops::Deref;
 use std::str::FromStr;
-use vrl_structures::map::Map;
+use structures::map::Map;
 
 // -----------------------------------------------------------------------------
 // node
@@ -519,7 +519,7 @@ impl fmt::Debug for Object {
 
 impl IntoIterator for Object {
     type Item = (Node<String>, Node<Expr>);
-    type IntoIter = vrl_structures::map::IntoIter<Node<String>, Node<Expr>>;
+    type IntoIter = structures::map::IntoIter<Node<String>, Node<Expr>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()

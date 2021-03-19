@@ -52,7 +52,7 @@ macro_rules! bench_function {
                     let expression = expression.unwrap();
                     let mut compiler_state = $crate::state::Compiler::default();
                     let mut runtime_state = $crate::state::Runtime::default();
-                    let mut target: $crate::Value = ::vrl_structures::map::Map::default().into();
+                    let mut target: $crate::Value = ::structures::map::Map::default().into();
                     let mut ctx = $crate::Context::new(&mut target, &mut runtime_state);
 
                     b.iter(|| {
@@ -83,7 +83,7 @@ macro_rules! test_function {
                     Ok(expression) => {
                         let mut compiler_state = $crate::state::Compiler::default();
                         let mut runtime_state = $crate::state::Runtime::default();
-                        let mut target: $crate::Value = ::vrl_structures::map::Map::default().into();
+                        let mut target: $crate::Value = ::structures::map::Map::default().into();
                         let mut ctx = $crate::Context::new(&mut target, &mut runtime_state);
 
                         let got_value = expression.resolve(&mut ctx)
@@ -124,6 +124,6 @@ macro_rules! map {
     ($($k:tt: $v:expr),+ $(,)?) => {
         vec![$(($k.into(), $v.into())),+]
             .into_iter()
-            .collect::<::vrl_structures::map::Map<_, _>>()
+            .collect::<::structures::map::Map<_, _>>()
     };
 }

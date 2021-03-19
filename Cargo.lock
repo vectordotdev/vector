@@ -7071,6 +7071,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "structures"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "quickcheck",
+]
+
+[[package]]
 name = "strum"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8417,10 +8425,10 @@ dependencies = [
  "rustyline",
  "serde_json",
  "structopt 0.3.21",
+ "structures",
  "thiserror",
  "vrl",
  "vrl-stdlib",
- "vrl-structures",
  "webbrowser",
 ]
 
@@ -8438,11 +8446,11 @@ dependencies = [
  "paste",
  "regex",
  "serde",
+ "structures",
  "thiserror",
  "tracing 0.1.23",
  "vrl-diagnostic",
  "vrl-parser",
- "vrl-structures",
 ]
 
 [[package]]
@@ -8461,10 +8469,10 @@ dependencies = [
  "lalrpop-util",
  "ordered-float",
  "paste",
+ "structures",
  "test-case",
  "thiserror",
  "vrl-diagnostic",
- "vrl-structures",
 ]
 
 [[package]]
@@ -8491,20 +8499,12 @@ dependencies = [
  "sha3",
  "shared",
  "strip-ansi-escapes",
+ "structures",
  "syslog_loose",
  "tracing 0.1.23",
  "url",
  "uuid 0.8.2",
  "vrl",
- "vrl-structures",
-]
-
-[[package]]
-name = "vrl-structures"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "quickcheck",
 ]
 
 [[package]]
@@ -8519,11 +8519,11 @@ dependencies = [
  "serde",
  "serde_json",
  "structopt 0.3.21",
+ "structures",
  "tracing-subscriber",
  "vrl",
  "vrl-parser",
  "vrl-stdlib",
- "vrl-structures",
 ]
 
 [[package]]

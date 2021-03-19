@@ -1,6 +1,6 @@
 use crate::log_util;
+use structures::map::Map;
 use vrl::prelude::*;
-use vrl_structures::map::Map;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseApacheLog;

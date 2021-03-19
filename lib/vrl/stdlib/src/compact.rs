@@ -1,6 +1,6 @@
 use crate::util;
+use structures::map::Map;
 use vrl::prelude::*;
-use vrl_structures::map::Map;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Compact;
@@ -288,11 +288,11 @@ mod test {
     fn test_compacted_map() {
         let cases: Vec<(Map<String, Value>, Map<String, Value>, CompactOptions)> = vec![
             (
-                ::vrl_structures::map! {
+                ::structures::map! {
                     "key1" => "",
                     "key3" => ""
                 }, // expected
-                ::vrl_structures::map! {
+                ::structures::map! {
                     "key1" => "",
                     "key2" => Value::Null,
                     "key3" => ""
@@ -303,11 +303,11 @@ mod test {
                 },
             ),
             (
-                ::vrl_structures::map! {
+                ::structures::map! {
                     "key1" => Value::from(1),
                     "key3" => Value::from(2)
                 },
-                ::vrl_structures::map! {
+                ::structures::map! {
                     "key1" => Value::from(1),
                     "key2" => Value::Array(vec![]),
                     "key3" => Value::from(2)
@@ -355,12 +355,12 @@ mod test {
                 Default::default(),
             ),
             (
-                ::vrl_structures::map! {
+                ::structures::map! {
                     "key1" => Value::from(1),
                     "key2" => Value::Array(vec![2.into()]),
                     "key3" => Value::from(2)
                 },
-                ::vrl_structures::map! {
+                ::structures::map! {
                     "key1" => Value::from(1),
                     "key2" => Value::Array(vec![Value::Null, 2.into(), Value::Null]),
                     "key3" => Value::from(2)
@@ -394,7 +394,7 @@ mod test {
 
         nullish {
             args: func_args![
-                value: ::vrl_structures::map! {
+                value: ::structures::map! {
                     "key1" => "-",
                     "key2" => 1,
                     "key3" => " "
