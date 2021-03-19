@@ -88,7 +88,10 @@ impl<'a> MapFlatten<'a> {
         }
     }
 
-    fn new_from_parent(parent: String, values: structures::map::ord::Iter<'a, String, Value>) -> Self {
+    fn new_from_parent(
+        parent: String,
+        values: structures::map::ord::Iter<'a, String, Value>,
+    ) -> Self {
         Self {
             values,
             inner: None,
