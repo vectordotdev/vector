@@ -17,7 +17,7 @@ mod variable;
 
 pub(crate) mod assignment;
 pub(crate) mod container;
-pub mod function_call;
+pub(crate) mod function_call;
 pub(crate) mod literal;
 pub(crate) mod predicate;
 pub(crate) mod query;

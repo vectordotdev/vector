@@ -35,12 +35,26 @@ fn display(diagnostic: &diagnostic::Diagnostic<()>) {
 }
 
 fn main() {
-    let _o = ngrammatic::CorpusBuilder::new()
-        .arity(2)
-        .pad_full(ngrammatic::Pad::Auto)
-        .finish()
-        .search("ook", 0.25)
-        .first();
+    /*
+    let corpus = ngrammatic::Corpus {
+            arity: 2,
+            ngrams: std::collections::HashMap::new(),
+            pad_left: ngrammatic::Pad::Auto,
+            pad_right: ngrammatic::Pad::Auto,
+            key_trans: Box::new(|x| x.into()),
+        };
+
+    let _o = corpus
+        .search("ook", 0.25);
+    */
+
+    use std::collections::HashMap;
+    let mut grams: HashMap<String, usize> = HashMap::new();
+
+    for window in " ohno ".chars().collect::<Vec<_>>().windows(2) {
+        let count = grams.entry(window.iter().collect()).or_insert(0);
+        *count += 1;
+    }
 
     display(&diag());
 }
