@@ -318,9 +318,9 @@ mod integration_test {
     use chrono::{SubsecRound, Utc};
     use rdkafka::{
         config::ClientConfig,
+        message::OwnedHeaders,
         producer::{FutureProducer, FutureRecord},
         util::Timeout,
-        message::OwnedHeaders,
     };
 
     const BOOTSTRAP_SERVER: &str = "localhost:9091";
