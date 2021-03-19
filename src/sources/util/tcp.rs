@@ -7,12 +7,12 @@ use crate::{
     Event, Pipeline,
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, FutureExt, Sink, SinkExt, StreamExt};
+use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, time::Duration};
+use socket2::SockRef;
+use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
 use tokio::{
-    io::AsyncWriteExt,
     net::{TcpListener, TcpStream},
     time::sleep,
 };
@@ -220,48 +220,59 @@ async fn handle_stream<T>(
         }
     }
 
-    let mut _shutdown_token = None;
+    let mut shutdown_token = None;
     let mut reader = FramedRead::new(socket, source.decoder());
 
-    tokio::select!(
-        _ = tripwire => {
-            debug!("Start forceful shutdown.");
-        },
-        _ = async {
-            let stream = (&mut reader)
-                .take_until(async {
-                    let shutdown_token = shutdown_signal.await;
+    stream::poll_fn(|cx| {
+        if shutdown_token.is_none() {
+            match shutdown_signal.poll_unpin(cx) {
+                Poll::Ready(token) => {
                     debug!("Start graceful shutdown.");
-                    _shutdown_token = Some(shutdown_token);
-                })
-                .take_while(move |frame| ready(match frame {
-                    Ok(_) => true,
-                    Err(_) => !<<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal(),
-                }))
-                .filter_map(move |frame| ready(match frame {
-                    Ok(frame) => {
-                        let host = host.clone();
-                        source.build_event(frame, host).map(Ok)
+                    // Close our write part of TCP socket to signal the other side
+                    // that it should stop writing and close the channel.
+                    let socket = reader.get_ref().get_ref();
+                    if let Some(stream) = socket {
+                        let socket = SockRef::from(stream);
+                        if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
+                            warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
+                        }
+                    } else {
+                        // Connection hasn't yet been established so we are done here.
+                        debug!("Closing connection that hasn't yet been fully established.");
+                        return Poll::Ready(None);
                     }
-                    Err(error) => {
-                        warn!("Failed to read data from TCP source. {}", error);
-                        None
-                    }
-                }))
-                .forward(out)
-                .await;
 
-            if stream.is_err() {
-                warn!(message = "Error received while processing TCP source.");
+                    shutdown_token = Some(token);
+                }
+                Poll::Pending => {}
             }
+        }
 
-            if let Err(error) = reader.into_inner().shutdown().await {
-                warn!(message = "Error received while shutting down TCP source.", %error);
-            } else {
-                debug!("Connection closed gracefully.");
+        reader.poll_next_unpin(cx)
+    })
+    .take_until(tripwire)
+    .take_while(move |frame| ready(
+        match frame {
+            Ok(_) => true,
+            Err(_) => {
+                !<<T as TcpSource>::Error as IsErrorFatal>::is_error_fatal()
             }
-        } => {}
-    );
+        }
+    ))
+    .filter_map(move |frame| ready(match frame {
+        Ok(frame) => {
+            let host = host.clone();
+            source.build_event(frame, host).map(Ok)
+        }
+        Err(error) => {
+            warn!(message = "Failed to read data from TCP source.", %error);
+            None
+        }
+    }))
+    .forward(out)
+    .map_err(|_| warn!(message = "Error received while processing TCP source."))
+    .map(|_| debug!("Connection closed."))
+    .await
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
