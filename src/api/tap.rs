@@ -52,16 +52,16 @@ impl TapPayload {
     }
 }
 
-/// A tap sink spawns a process for listening to topology changes, and rewiring sinks to
-/// observe `LogEvent`s that match the provided pattern.
+/// A tap sink spawns a process for listening for topology changes. If topology changes,
+/// sinks are rewired to accommodate matched/unmatched patterns.
 pub struct TapSink {
     _shutdown: ShutdownTx,
 }
 
 impl TapSink {
-    /// Creates a new tap sink, and spawns a handler for watching for topology changes,
-    /// and relaying `LogEvent`s to the client. Uses a oneshot channel to trigger shutdown
-    /// of handlers when the `TapSink` drops from scope.
+    /// Creates a new tap sink, and spawns a handler for watching for topology changes
+    /// and a separate inner handler for events. Uses a oneshot channel to trigger shutdown
+    /// of handlers when the `TapSink` drops out of scope.
     pub fn new(watch_rx: WatchRx, tap_tx: TapSender, patterns: &[String]) -> Self {
         let (_shutdown, shutdown_rx) = oneshot::channel();
 
@@ -111,7 +111,7 @@ fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
 }
 
 /// Returns a tap handler that listens for topology changes, and connects sinks to observe
-/// `LogEvent`s` when a component matches one of more of the provided patterns.
+/// `LogEvent`s` when a component matches one or more of the provided patterns.
 async fn tap_handler(
     patterns: HashSet<String>,
     tx: TapSender,
@@ -120,14 +120,17 @@ async fn tap_handler(
 ) {
     debug!(message = "Started tap.", patterns = ?patterns);
 
+    // Sinks register for the current tap. Will be updated as new components match.
     let mut sinks = HashMap::new();
+
+    // Keep a copy of the last topology snapshot, for later clean-up.
     let mut last_outputs = None;
 
     loop {
         tokio::select! {
             _ = &mut shutdown_rx => break,
             Some(outputs) = watch_rx.recv() => {
-                // Get the patterns that were matched on the last sinks, to compare with the latest
+                // Get the patterns that matched on the last iteration, to compare with the latest
                 // round of matches when sending notifications.
                 let last_matches = patterns
                     .iter()
@@ -149,7 +152,7 @@ async fn tap_handler(
                                     component_name = ?name, patterns = ?patterns, matched = ?matched
                                 );
 
-                                // Add sink, if it's not already there.
+                                // Add sink, if it's not already known to this tap.
                                 if !sinks.contains_key(name) {
                                     let id = Uuid::new_v4().to_string();
                                     let sink = make_router(tx.clone(), name);
@@ -164,7 +167,7 @@ async fn tap_handler(
                                         sinks.insert(name.to_string(), id);
                                     } else {
                                         error!(
-                                            message = "Couldn't connect tap.",
+                                            message = "Couldn't connect component.",
                                             component_name = ?name, id = ?id
                                         );
                                     }
@@ -201,7 +204,7 @@ async fn tap_handler(
                 last_outputs = Some(outputs);
 
                 // Send notifications to the client. The # of notifications will always be
-                // exactly equal to the number of patterns, so we can pre-alloate capacity.
+                // exactly equal to the number of patterns, so we can pre-allocate capacity.
                 let mut notifications = Vec::with_capacity(patterns.len());
 
                 // Matched notifications.
@@ -281,19 +284,25 @@ mod tests {
             &[pattern_matched.to_string(), pattern_not_matched.to_string()],
         );
 
-        // 1st payload should be a notification that the pattern matched.
-        assert!(matches!(
-            sink_rx.recv().await,
-            Some(TapPayload::Notification(returned_name, TapNotification::Matched))
-                if returned_name == pattern_matched
-        ));
+        // First two events should contain a notification that one pattern matched, and
+        // one that didn't.
+        let notifications = vec![sink_rx.recv().await, sink_rx.recv().await];
 
-        // 2nd payload should be a notification that the pattern did not match matched.
-        assert!(matches!(
-            sink_rx.recv().await,
-            Some(TapPayload::Notification(returned_name, TapNotification::NotMatched))
-                if returned_name == pattern_not_matched
-        ));
+        for notification in notifications.into_iter() {
+            match notification {
+                Some(TapPayload::Notification(returned_name, TapNotification::Matched))
+                    if returned_name == pattern_matched =>
+                {
+                    continue
+                }
+                Some(TapPayload::Notification(returned_name, TapNotification::NotMatched))
+                    if returned_name == pattern_not_matched =>
+                {
+                    continue
+                }
+                _ => panic!("unexpected payload"),
+            }
+        }
 
         // Send some events down the wire. Waiting until the first notifications are in
         // to ensure the event handler has been initialized.
