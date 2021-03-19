@@ -271,6 +271,7 @@ type Labels = Vec<proto::Label>;
 pub(super) struct TimeSeries {
     buffer: IndexMap<Labels, Vec<proto::Sample>>,
     metadata: IndexMap<String, proto::MetricMetadata>,
+    now: Option<i64>,
 }
 
 impl TimeSeries {
@@ -299,6 +300,12 @@ impl TimeSeries {
         labels.sort();
         labels
     }
+
+    fn now(&mut self) -> i64 {
+        *self
+            .now
+            .get_or_insert_with(|| Utc::now().timestamp_millis())
+    }
 }
 
 impl MetricCollector for TimeSeries {
@@ -308,6 +315,7 @@ impl MetricCollector for TimeSeries {
         Self {
             buffer: Default::default(),
             metadata: Default::default(),
+            now: None,
         }
     }
 
@@ -333,13 +341,11 @@ impl MetricCollector for TimeSeries {
         tags: Option<&BTreeMap<String, String>>,
         extra: Option<(&str, String)>,
     ) {
+        let timestamp = timestamp_millis.unwrap_or_else(|| self.now());
         self.buffer
             .entry(Self::make_labels(tags, name, suffix, extra))
             .or_default()
-            .push(proto::Sample {
-                value,
-                timestamp: timestamp_millis.unwrap_or_else(|| Utc::now().timestamp_millis()),
-            });
+            .push(proto::Sample { value, timestamp });
     }
 
     fn finish(self) -> proto::WriteRequest {
