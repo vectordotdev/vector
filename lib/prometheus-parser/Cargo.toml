@@ -20,4 +20,5 @@ snafu = { version = "0.6" }
 prost-build = "0.6.1"
 
 [dev-dependencies]
+structures = { path = "../structures" }
 shared = { path = "../shared", features = ["btreemap"] }

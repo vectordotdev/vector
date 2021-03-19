@@ -93,6 +93,7 @@ shared = { path = "lib/shared" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
+structures = { path = "lib/structures" }
 
 # Tokio / Futures
 async-trait = "0.1"

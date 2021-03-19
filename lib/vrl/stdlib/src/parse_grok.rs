@@ -154,7 +154,7 @@ impl Expression for ParseGrokFn {
 #[cfg(test)]
 mod test {
     use super::*;
-    use shared::btreemap;
+    use structures::ordmap;
 
     test_function![
         parse_grok => ParseGrok;
@@ -189,7 +189,7 @@ mod test {
         parsed {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z info Hello world",
                               pattern: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"],
-            want: Ok(Value::from(btreemap! {
+            want: Ok(Value::from(ordmap! {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "info",
                 "message" => "Hello world",
@@ -202,7 +202,7 @@ mod test {
         parsed2 {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z",
                               pattern: "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})"],
-            want: Ok(Value::from(btreemap! {
+            want: Ok(Value::from(ordmap! {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "",
             })),
@@ -217,7 +217,7 @@ mod test {
                               remove_empty: true,
             ],
             want: Ok(Value::from(
-                btreemap! { "timestamp" => "2020-10-02T23:22:12.223222Z" },
+                ordmap! { "timestamp" => "2020-10-02T23:22:12.223222Z" },
             )),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all(),

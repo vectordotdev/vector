@@ -167,7 +167,7 @@ fn type_def_error() -> Map<&'static str, TypeDef> {
 mod tests {
     use super::*;
     use chrono::prelude::*;
-    use shared::btreemap;
+    use structures::ordmap;
 
     test_function![
         parse_common_log => ParseApacheLog;
@@ -176,7 +176,7 @@ mod tests {
             args: func_args![value: r#"127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326"#,
                              format: "common"
             ],
-            want: Ok(btreemap! {
+            want: Ok(ordmap! {
                 "host" => "127.0.0.1",
                 "identity" => "bob",
                 "user" => "frank",
@@ -186,7 +186,7 @@ mod tests {
                 "path" => "/apache_pb.gif",
                 "protocol" => "HTTP/1.0",
                 "status" => 200,
-                "size" => 2326,
+                "size" => 2326
             }),
             tdef: TypeDef::new().fallible().object(type_def_common()),
         }
@@ -195,7 +195,7 @@ mod tests {
             args: func_args![value: r#"224.92.49.50 bob frank [25/Feb/2021:12:44:08 +0000] "PATCH /one-to-one HTTP/1.1" 401 84170 "http://www.seniorinfomediaries.com/vertical/channels/front-end/bandwidth" "Mozilla/5.0 (X11; Linux i686; rv:5.0) Gecko/1945-10-12 Firefox/37.0""#,
                              format: "combined"
                              ],
-            want: Ok(btreemap! {
+            want: Ok(ordmap! {
                 "host" => "224.92.49.50",
                 "identity" => "bob",
                 "user" => "frank",
@@ -216,7 +216,7 @@ mod tests {
             args: func_args![value: r#"224.92.49.50 bob frank [25/Feb/2021:12:44:08 +0000] "PATCH /one-to-one HTTP/1.1" 401 84170 - -"#,
                              format: "combined"
                              ],
-            want: Ok(btreemap! {
+            want: Ok(ordmap! {
                 "host" => "224.92.49.50",
                 "identity" => "bob",
                 "user" => "frank",
@@ -235,7 +235,7 @@ mod tests {
             args: func_args![value: r#"[01/Mar/2021:12:00:19 +0000] [ab:alert] [pid 4803:tid 3814] [client 147.159.108.175:24259] I'll bypass the haptic COM bandwidth, that should matrix the CSS driver!"#,
                              format: "error"
                              ],
-            want: Ok(btreemap! {
+            want: Ok(ordmap! {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-03-01T12:00:19Z").unwrap().into()),
                 "message" => "I'll bypass the haptic COM bandwidth, that should matrix the CSS driver!",
                 "module" => "ab",
@@ -252,7 +252,7 @@ mod tests {
             args: func_args![value: "- - - - - - -",
                              format: "common",
             ],
-            want: Ok(btreemap! {}),
+            want: Ok(ordmap! {}),
             tdef: TypeDef::new().fallible().object(type_def_common()),
         }
 
@@ -260,7 +260,7 @@ mod tests {
             args: func_args![value: r#"- - - [-] "-" - -"#,
                              format: "common",
             ],
-            want: Ok(btreemap! {}),
+            want: Ok(ordmap! {}),
             tdef: TypeDef::new().fallible().object(type_def_common()),
         }
 
@@ -273,7 +273,7 @@ mod tests {
                              timestamp_format: "%a %b %d %H:%M:%S %Y",
                              format: "error",
             ],
-            want: Ok(btreemap! {
+            want: Ok(ordmap! {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().into()),
             }),
             tdef: TypeDef::new().fallible().object(type_def_error()),

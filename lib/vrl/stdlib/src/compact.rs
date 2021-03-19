@@ -232,6 +232,7 @@ fn compact_array(array: Vec<Value>, options: &CompactOptions) -> Vec<Value> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use structures::ordmap;
 
     #[test]
     fn test_compacted_array() {
@@ -288,11 +289,11 @@ mod test {
     fn test_compacted_map() {
         let cases: Vec<(Map<String, Value>, Map<String, Value>, CompactOptions)> = vec![
             (
-                ::structures::map! {
+                ordmap! {
                     "key1" => "",
                     "key3" => ""
                 }, // expected
-                ::structures::map! {
+                ordmap! {
                     "key1" => "",
                     "key2" => Value::Null,
                     "key3" => ""
@@ -303,11 +304,11 @@ mod test {
                 },
             ),
             (
-                ::structures::map! {
+                ordmap! {
                     "key1" => Value::from(1),
                     "key3" => Value::from(2)
                 },
-                ::structures::map! {
+                ordmap! {
                     "key1" => Value::from(1),
                     "key2" => Value::Array(vec![]),
                     "key3" => Value::from(2)
@@ -355,12 +356,12 @@ mod test {
                 Default::default(),
             ),
             (
-                ::structures::map! {
+                ordmap! {
                     "key1" => Value::from(1),
                     "key2" => Value::Array(vec![2.into()]),
                     "key3" => Value::from(2)
                 },
-                ::structures::map! {
+                ordmap! {
                     "key1" => Value::from(1),
                     "key2" => Value::Array(vec![Value::Null, 2.into(), Value::Null]),
                     "key3" => Value::from(2)
@@ -394,7 +395,7 @@ mod test {
 
         nullish {
             args: func_args![
-                value: ::structures::map! {
+                value: ordmap! {
                     "key1" => "-",
                     "key2" => 1,
                     "key3" => " "

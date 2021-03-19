@@ -893,8 +893,8 @@ fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
 mod test {
     use super::*;
     use chrono::{offset::TimeZone, DateTime, Utc};
-    use shared::btreemap;
     use std::str::FromStr;
+    use structures::ordmap;
     use vrl::{Path, Value};
 
     fn ts() -> DateTime<Utc> {
@@ -1174,11 +1174,11 @@ mod test {
 
         assert_eq!(
             Ok(Some(
-                btreemap! {
+                ordmap! {
                     "name" => "zub",
                     "namespace" => "zoob",
                     "timestamp" => Utc.ymd(2020, 12, 10).and_hms(12, 0, 0),
-                    "tags" => btreemap! { "tig" => "tog" },
+                    "tags" => ordmap! { "tig" => "tog" },
                     "kind" => "absolute",
                     "type" => "counter",
                 }

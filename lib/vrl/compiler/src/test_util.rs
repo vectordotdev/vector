@@ -83,7 +83,7 @@ macro_rules! test_function {
                     Ok(expression) => {
                         let mut compiler_state = $crate::state::Compiler::default();
                         let mut runtime_state = $crate::state::Runtime::default();
-                        let mut target: $crate::Value = ::structures::map::Map::default().into();
+                        let mut target: $crate::Value = ::structures::map::ord::OrdMap::default().into();
                         let mut ctx = $crate::Context::new(&mut target, &mut runtime_state);
 
                         let got_value = expression.resolve(&mut ctx)

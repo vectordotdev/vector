@@ -318,6 +318,7 @@ mod test {
     use crate::test_util::open_fixture;
     use serde_json::json;
     use std::str::FromStr;
+    use structures::ordmap;
     use tracing::trace;
 
     // This test iterates over the `tests/data/fixtures/log_event` folder and:
@@ -419,28 +420,28 @@ mod test {
 
     #[test]
     fn object_get() {
-        use shared::btreemap;
+        use structures::ordmap;
         use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
-            (btreemap! {}, vec![], Ok(Some(btreemap! {}.into()))),
+            (ordmap! {}, vec![], Ok(Some(ordmap! {}.into()))),
             (
-                btreemap! { "foo" => "bar" },
+                ordmap! { "foo" => "bar" },
                 vec![],
-                Ok(Some(btreemap! { "foo" => "bar" }.into())),
+                Ok(Some(ordmap! { "foo" => "bar" }.into())),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                ordmap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned()))],
                 Ok(Some("bar".into())),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                ordmap! { "foo" => "bar" },
                 vec![Field(Regular("bar".to_owned()))],
                 Ok(None),
             ),
             (
-                btreemap! { "foo" => vec![btreemap! { "bar" => true }] },
+                ordmap! { "foo" => vec![ordmap! { "bar" => true }] },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Index(0),
@@ -449,7 +450,7 @@ mod test {
                 Ok(Some(true.into())),
             ),
             (
-                btreemap! { "foo" => btreemap! { "bar baz" => btreemap! { "baz" => 2 } } },
+                ordmap! { "foo" => ordmap! { "bar baz" => ordmap! { "baz" => 2 } } },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Coalesce(vec![
@@ -473,26 +474,26 @@ mod test {
 
     #[test]
     fn object_insert() {
-        use shared::btreemap;
+        use structures::ordmap;
         use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
             (
-                btreemap! { "foo" => "bar" },
+                ordmap! { "foo" => "bar" },
                 vec![],
-                btreemap! { "baz" => "qux" }.into(),
-                btreemap! { "baz" => "qux" },
+                ordmap! { "baz" => "qux" }.into(),
+                ordmap! { "baz" => "qux" },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                ordmap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned()))],
                 "baz".into(),
-                btreemap! { "foo" => "baz" },
+                ordmap! { "foo" => "baz" },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                ordmap! { "foo" => "bar" },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Index(2),
@@ -501,22 +502,22 @@ mod test {
                     Field(Regular("b".to_owned())),
                 ],
                 true.into(),
-                btreemap! {
+                ordmap! {
                     "foo" => vec![
                         Value::Null,
                         Value::Null,
-                        btreemap! {
-                            "bar baz" => btreemap! { "a" => btreemap! { "b" => true } },
+                        ordmap! {
+                            "bar baz" => ordmap! { "a" => ordmap! { "b" => true } },
                         }.into()
                     ]
                 },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => vec![0, 1, 2] },
+                ordmap! { "foo" => vec![0, 1, 2] },
                 vec![Field(Regular("foo".to_owned())), Index(5)],
                 "baz".into(),
-                btreemap! {
+                ordmap! {
                     "foo" => vec![
                         0.into(),
                         1.into(),
@@ -529,38 +530,38 @@ mod test {
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                ordmap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                btreemap! { "foo" => vec!["baz"] },
+                ordmap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![]) },
+                ordmap! { "foo" => Value::Array(vec![]) },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                btreemap! { "foo" => vec!["baz"] },
+                ordmap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![0.into()]) },
+                ordmap! { "foo" => Value::Array(vec![0.into()]) },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                btreemap! { "foo" => vec!["baz"] },
+                ordmap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
+                ordmap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                btreemap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
+                ordmap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
                 Ok(()),
             ),
             (
-                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
+                ordmap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
                 vec![Field(Regular("foo".to_owned())), Index(1)],
                 "baz".into(),
-                btreemap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
+                ordmap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
                 Ok(()),
             ),
         ];
@@ -583,52 +584,52 @@ mod test {
 
     #[test]
     fn object_remove() {
-        use shared::btreemap;
+        use structures::ordmap;
         use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
             (
-                btreemap! { "foo" => "bar" },
+                ordmap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned()))],
                 false,
-                Some(btreemap! {}.into()),
+                Some(ordmap! {}.into()),
             ),
             (
-                btreemap! { "foo" => "bar" },
+                ordmap! { "foo" => "bar" },
                 vec![Coalesce(vec![
                     Quoted("foo bar".to_owned()),
                     Regular("foo".to_owned()),
                 ])],
                 false,
-                Some(btreemap! {}.into()),
+                Some(ordmap! {}.into()),
             ),
             (
-                btreemap! { "foo" => "bar", "baz" => "qux" },
+                ordmap! { "foo" => "bar", "baz" => "qux" },
                 vec![],
                 false,
-                Some(btreemap! {}.into()),
+                Some(ordmap! {}.into()),
             ),
             (
-                btreemap! { "foo" => "bar", "baz" => "qux" },
+                ordmap! { "foo" => "bar", "baz" => "qux" },
                 vec![],
                 true,
-                Some(btreemap! {}.into()),
+                Some(ordmap! {}.into()),
             ),
             (
-                btreemap! { "foo" => vec![0] },
+                ordmap! { "foo" => vec![0] },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 false,
-                Some(btreemap! { "foo" => Value::Array(vec![]) }.into()),
+                Some(ordmap! { "foo" => Value::Array(vec![]) }.into()),
             ),
             (
-                btreemap! { "foo" => vec![0] },
+                ordmap! { "foo" => vec![0] },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 true,
-                Some(btreemap! {}.into()),
+                Some(ordmap! {}.into()),
             ),
             (
-                btreemap! {
-                    "foo" => btreemap! { "bar baz" => vec![0] },
+                ordmap! {
+                    "foo" => ordmap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
                 vec![
@@ -638,16 +639,16 @@ mod test {
                 ],
                 false,
                 Some(
-                    btreemap! {
-                        "foo" => btreemap! { "bar baz" => Value::Array(vec![]) },
+                    ordmap! {
+                        "foo" => ordmap! { "bar baz" => Value::Array(vec![]) },
                         "bar" => "baz",
                     }
                     .into(),
                 ),
             ),
             (
-                btreemap! {
-                    "foo" => btreemap! { "bar baz" => vec![0] },
+                ordmap! {
+                    "foo" => ordmap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
                 vec![
@@ -656,7 +657,7 @@ mod test {
                     Index(0),
                 ],
                 true,
-                Some(btreemap! { "bar" => "baz" }.into()),
+                Some(ordmap! { "bar" => "baz" }.into()),
             ),
         ];
 

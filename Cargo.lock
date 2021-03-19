@@ -5203,6 +5203,7 @@ dependencies = [
  "prost-types 0.6.1",
  "shared",
  "snafu",
+ "structures",
 ]
 
 [[package]]
@@ -8318,6 +8319,7 @@ dependencies = [
  "stream-cancel",
  "strip-ansi-escapes",
  "structopt 0.3.21",
+ "structures",
  "syslog",
  "syslog_loose",
  "tempfile",

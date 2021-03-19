@@ -391,7 +391,7 @@ fn match_char(c: char) -> impl Fn(&str) -> IResult<char> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use shared::btreemap;
+    use structures::ordmap;
 
     #[test]
     fn test_parse_escaped_string() {
@@ -577,30 +577,30 @@ mod test {
         let input = wrap("{}");
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, btreemap! {});
+        assert_eq!(r, ordmap! {});
 
         let input = wrap(r#"{name="value"}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, btreemap! { "name" => "value" });
+        assert_eq!(r, ordmap! { "name" => "value" });
 
         let input = wrap(r#"{name="value",}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, btreemap! { "name" => "value" });
+        assert_eq!(r, ordmap! { "name" => "value" });
 
         let input = wrap(r#"{ name = "" ,b="a=b" , a="},", _c = "\""}"#);
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(
             r,
-            btreemap! {"name" => "", "a" => "},", "b" => "a=b", "_c" => "\""}
+            ordmap! {"name" => "", "a" => "},", "b" => "a=b", "_c" => "\""}
         );
         assert_eq!(left, tail);
 
         let input = wrap("100");
         let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, "100".to_owned() + tail);
-        assert_eq!(r, btreemap! {});
+        assert_eq!(r, ordmap! {});
 
         // We don't allow these values
 

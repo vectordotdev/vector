@@ -1,7 +1,7 @@
 use chrono::{DateTime, Local, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
-use shared::btreemap;
+use structures::ordmap;
 use vrl::prelude::*;
 
 criterion_group!(
@@ -1059,36 +1059,36 @@ bench_function! {
 
     tag_bytes {
         args: func_args![value: "foo"],
-        want: Ok(btreemap! {
+        want: Ok(ordmap! {
             "string" => "foo",
         }),
     }
 
     tag_integer {
         args: func_args![value: 123],
-        want: Ok(btreemap! {
+        want: Ok(ordmap! {
             "integer" => 123
         }),
     }
 
     tag_float {
         args: func_args![value: 123.45],
-        want: Ok(btreemap! {
+        want: Ok(ordmap! {
             "float" => 123.45
         }),
     }
 
     tag_boolean {
         args: func_args![value: true],
-        want: Ok(btreemap! {
+        want: Ok(ordmap! {
             "boolean" => true
         }),
     }
 
     tag_map {
-        args: func_args![value: btreemap! {"foo" => "bar"}],
-        want: Ok(btreemap! {
-            "foo" => btreemap! {
+        args: func_args![value: ordmap! {"foo" => "bar"}],
+        want: Ok(ordmap! {
+            "foo" => ordmap! {
                 "string" => "bar"
             }
         }),
@@ -1097,7 +1097,7 @@ bench_function! {
     tag_array {
         args: func_args![value: vec!["foo"]],
         want: Ok(vec![
-            btreemap! {
+            ordmap! {
                 "string" => "foo"
             },
         ]),
@@ -1105,14 +1105,14 @@ bench_function! {
 
     tag_timestamp {
         args: func_args![value: Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)],
-        want: Ok(btreemap! {
+        want: Ok(ordmap! {
             "timestamp" => Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)
         }),
     }
 
     tag_regex {
         args: func_args![value: Regex::new(".*").unwrap()],
-        want: Ok(btreemap! {
+        want: Ok(ordmap! {
             "regex" => Regex::new(".*").unwrap()
         }),
     }

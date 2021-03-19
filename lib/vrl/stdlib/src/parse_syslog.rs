@@ -150,14 +150,14 @@ fn type_def() -> Map<&'static str, TypeDef> {
 mod tests {
     use super::*;
     use chrono::TimeZone;
-    use structures::map;
+    use structures::ordmap;
 
     test_function![
         parse_syslog => ParseSyslog;
 
         valid {
             args: func_args![value: r#"<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!"#],
-            want: Ok(map! {
+            want: Ok(ordmap! {
                 "severity" => "notice",
                 "facility" => "user",
                 "timestamp" => chrono::Utc.ymd(2020, 3, 13).and_hms_milli(20, 45, 38, 119),
@@ -182,7 +182,7 @@ mod tests {
 
         haproxy {
             args: func_args![value: r#"<133>Jun 13 16:33:35 haproxy[73411]: Proxy sticky-servers started."#],
-            want: Ok(map! {
+            want: Ok(ordmap! {
                     "facility" => "local0",
                     "severity" => "notice",
                     "message" => "Proxy sticky-servers started.",
@@ -195,7 +195,7 @@ mod tests {
 
         missing_pri {
             args: func_args![value: r#"Jun 13 16:33:35 haproxy[73411]: I am missing a pri."#],
-            want: Ok(map! {
+            want: Ok(ordmap! {
                 "message" => "I am missing a pri.",
                 "timestamp" => DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
                 "appname" => "haproxy",
@@ -206,7 +206,7 @@ mod tests {
 
         empty_sd_element {
             args: func_args![value: r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [empty] qwerty"#],
-            want: Ok(map!{
+            want: Ok(ordmap!{
                 "message" => "qwerty",
                 "appname" => "root",
                 "facility" => "user",
@@ -222,7 +222,7 @@ mod tests {
 
         non_empty_sd_element {
             args: func_args![value: r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [non_empty x="1"][empty] qwerty"#],
-            want: Ok(map!{
+            want: Ok(ordmap!{
                 "message" => "qwerty",
                 "appname" => "root",
                 "facility" => "user",
