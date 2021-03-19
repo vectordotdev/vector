@@ -53,12 +53,11 @@ components: transforms: "remap": {
 			type: string: {
 				examples: [
 					"""
-						. = parse_json(.message)
+						. = parse_json!(.message)
 						.new_field = "new value"
-						.status = to_int(.status)
-						.duration = parse_duration(.duration, "s")
-						.new_name = .old_name
-						del(.old_name)
+						.status = to_int!(.status)
+						.duration = parse_duration!(.duration, "s")
+						.new_name = del(.old_name)
 						""",
 				]
 				syntax: "remap_program"
