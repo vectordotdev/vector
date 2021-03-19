@@ -952,7 +952,8 @@ impl ContainerLogInfo {
 
         emit!(DockerLogsEventReceived {
             byte_size,
-            container_id: self.id.as_str()
+            container_id: self.id.as_str(),
+            container_name: &self.metadata.name_str
         });
 
         Some(event)
@@ -964,6 +965,8 @@ struct ContainerMetadata {
     labels: Vec<(String, Value)>,
     /// name -> String
     name: Value,
+    /// name
+    name_str: String,
     /// image -> String
     image: Value,
     /// created_at
@@ -991,6 +994,7 @@ impl ContainerMetadata {
         Ok(ContainerMetadata {
             labels,
             name: name.as_str().trim_start_matches('/').to_owned().into(),
+            name_str: name,
             image: config.image.unwrap().into(),
             created_at: DateTime::parse_from_rfc3339(created.as_str())?.with_timezone(&Utc),
         })

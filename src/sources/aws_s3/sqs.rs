@@ -4,7 +4,7 @@ use crate::{
     internal_events::aws_s3::source::{
         SqsMessageDeleteFailed, SqsMessageDeleteSucceeded, SqsMessageProcessingFailed,
         SqsMessageProcessingSucceeded, SqsMessageReceiveFailed, SqsMessageReceiveSucceeded,
-        SqsS3EventRecordInvalidEventIgnored,
+        SqsS3EventReceived, SqsS3EventRecordInvalidEventIgnored,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -352,6 +352,10 @@ impl Ingestor {
                 };
 
                 let stream = lines.filter_map(|line| {
+                    emit!(SqsS3EventReceived {
+                        byte_size: line.len()
+                    });
+
                     let mut event = Event::from(line);
 
                     let log = event.as_mut_log();

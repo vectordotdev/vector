@@ -274,6 +274,8 @@ components: sources: aws_s3: components._aws & {
 	]
 
 	telemetry: metrics: {
+		events_in_total:                        components.sources.internal_metrics.output.metrics.events_in_total
+		processed_bytes_total:                  components.sources.internal_metrics.output.metrics.processed_bytes_total
 		sqs_message_delete_failed_total:        components.sources.internal_metrics.output.metrics.sqs_message_delete_failed_total
 		sqs_message_delete_succeeded_total:     components.sources.internal_metrics.output.metrics.sqs_message_delete_succeeded_total
 		sqs_message_processing_failed_total:    components.sources.internal_metrics.output.metrics.sqs_message_processing_failed_total

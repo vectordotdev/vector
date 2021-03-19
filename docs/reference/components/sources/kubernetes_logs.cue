@@ -556,6 +556,7 @@ components: sources: kubernetes_logs: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:                        components.sources.internal_metrics.output.metrics.events_in_total
 		k8s_format_picker_edge_cases_total:     components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
 		k8s_docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
 		k8s_event_annotation_failures_total:    components.sources.internal_metrics.output.metrics.k8s_event_annotation_failures_total
