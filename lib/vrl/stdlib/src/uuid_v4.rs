@@ -57,6 +57,6 @@ mod tests {
                 uuid::Uuid::parse_str(&val).expect("valid UUID V4");
             }
             _ => unreachable!(),
-
+        }
     }
 }
