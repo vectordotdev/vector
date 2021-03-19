@@ -327,7 +327,7 @@ mod tests {
             severity_key: Some("anumber".into()),
         };
 
-        let mut log = LogEvent::new_empty();
+        let mut log = LogEvent::new();
         log.insert("message", Value::Bytes("hello world".into()));
         log.insert("anumber", Value::Bytes("100".into()));
         log.insert(

@@ -541,7 +541,7 @@ mod integration_tests {
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
 
-        let log = LogEvent::new_empty();
+        let log = LogEvent::new();
         let mut expected = log.clone();
         tx.send(log.into()).await.unwrap();
 
@@ -582,7 +582,7 @@ mod integration_tests {
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
 
-        let log = LogEvent::new_empty();
+        let log = LogEvent::new();
         let mut expected = log.clone();
         tx.send(log.into()).await.unwrap();
 
@@ -613,7 +613,7 @@ mod integration_tests {
             // We need to sleep to let the background task fetch the data.
             delay_for(Duration::from_secs(1)).await;
 
-            let log = LogEvent::new_empty();
+            let log = LogEvent::new();
             let mut expected = log.clone();
             tx.send(log.into()).await.unwrap();
 
@@ -643,7 +643,7 @@ mod integration_tests {
             // We need to sleep to let the background task fetch the data.
             delay_for(Duration::from_secs(1)).await;
 
-            let log = LogEvent::new_empty();
+            let log = LogEvent::new();
             let mut expected = log.clone();
             tx.send(log.into()).await.unwrap();
 

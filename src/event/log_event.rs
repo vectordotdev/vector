@@ -20,7 +20,11 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
-    pub fn new_empty() -> Self {
+    // We want to use the term "new" instead of "default", despite it
+    // taking no arguments, as the former makes explicit that this is a
+    // unique log as opposed to something identical to other empty ones.
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
         Self::new_with_metadata(EventMetadata::now())
     }
 
@@ -189,7 +193,7 @@ impl Equivalent for LogEvent {
 
 impl From<Bytes> for LogEvent {
     fn from(message: Bytes) -> Self {
-        let mut log = LogEvent::new_empty();
+        let mut log = LogEvent::new();
 
         log.insert(log_schema().message_key(), message);
         log.insert(log_schema().timestamp_key(), Utc::now());
@@ -293,7 +297,7 @@ where
 // Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
 impl<K: AsRef<str>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let mut log_event = Self::new_empty();
+        let mut log_event = Self::new();
         log_event.extend(iter);
         log_event
     }
@@ -771,7 +775,7 @@ mod test {
         ];
 
         let current = {
-            let mut log = LogEvent::new_empty();
+            let mut log = LogEvent::new();
 
             log.insert("merge", "hello "); // will be concatenated with the `merged` from `incoming`.
             log.insert("do_not_merge", "my_first_value"); // will remain as is, since it's not selected for merging.
@@ -789,7 +793,7 @@ mod test {
         };
 
         let incoming = {
-            let mut log = LogEvent::new_empty();
+            let mut log = LogEvent::new();
 
             log.insert("merge", "world"); // will be concatenated to the `merge` from `current`.
             log.insert("do_not_merge", "my_second_value"); // will be ignored, since it's not selected for merge.
@@ -809,7 +813,7 @@ mod test {
         merged.merge(incoming, &fields_to_merge);
 
         let expected = {
-            let mut log = LogEvent::new_empty();
+            let mut log = LogEvent::new();
             log.insert("merge", "hello world");
             log.insert("do_not_merge", "my_first_value");
             log.insert("a", true);

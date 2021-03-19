@@ -427,7 +427,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut log = LogEvent::new_empty();
+        let mut log = LogEvent::new();
         log.insert("name", "Bob");
         let mut expected = log.clone();
         expected.remove("name");
@@ -454,7 +454,7 @@ mod tests {
         )
         .unwrap();
 
-        let log = LogEvent::new_empty();
+        let log = LogEvent::new();
         let in_stream = Box::pin(stream::iter(vec![log.into()]));
         let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await;
@@ -478,7 +478,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut log = LogEvent::new_empty();
+        let mut log = LogEvent::new();
         log.insert("host", "127.0.0.1");
         let input = Box::pin(stream::iter(vec![log.into()]));
         let output = transform.transform(input);
@@ -508,7 +508,7 @@ mod tests {
         )
         .unwrap();
 
-        let log = LogEvent::new_empty();
+        let log = LogEvent::new();
         let mut expected = log.clone();
         expected.insert("result", "empty");
 
@@ -535,7 +535,7 @@ mod tests {
         )
         .unwrap();
 
-        let log = LogEvent::new_empty();
+        let log = LogEvent::new();
         let mut expected = log.clone();
         expected.insert("number", 3);
 
@@ -562,7 +562,7 @@ mod tests {
         )
         .unwrap();
 
-        let log = LogEvent::new_empty();
+        let log = LogEvent::new();
         let mut expected = log.clone();
         expected.insert("number", 3.14159);
 
@@ -589,7 +589,7 @@ mod tests {
         )
         .unwrap();
 
-        let log = LogEvent::new_empty();
+        let log = LogEvent::new();
         let mut expected = log.clone();
         expected.insert("bool", true);
 
@@ -616,7 +616,7 @@ mod tests {
         )
         .unwrap();
 
-        let log = LogEvent::new_empty();
+        let log = LogEvent::new();
         let mut expected = log.clone();
         expected.remove("junk");
 
@@ -666,7 +666,7 @@ mod tests {
         )
         .unwrap();
 
-        let log = LogEvent::new_empty();
+        let log = LogEvent::new();
         let mut expected = log.clone();
         expected.remove("result");
 
@@ -756,7 +756,7 @@ mod tests {
         );
         let transform = from_config(&config).unwrap();
 
-        let log = LogEvent::new_empty();
+        let log = LogEvent::new();
         let mut expected = log.clone();
         expected.insert("new field", "new value");
 
@@ -785,7 +785,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut log = LogEvent::new_empty();
+        let mut log = LogEvent::new();
         log.insert("name", "Bob");
         log.insert("friend", "Alice");
         let mut expected = log.clone();

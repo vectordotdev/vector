@@ -196,7 +196,7 @@ impl<S: Subscriber + 'static> Subscriber for BroadcastSubscriber<S> {
 impl From<&tracing::Event<'_>> for Event {
     fn from(event: &tracing::Event<'_>) -> Self {
         let now = chrono::Utc::now();
-        let mut maker = MakeLogEvent(LogEvent::new_empty());
+        let mut maker = MakeLogEvent(LogEvent::new());
         event.record(&mut maker);
 
         let mut log = maker.0;

@@ -37,7 +37,7 @@ pub enum Event {
 
 impl Event {
     pub fn new_empty_log() -> Self {
-        Event::Log(LogEvent::new_empty())
+        Event::Log(LogEvent::new())
     }
 
     pub fn as_log(&self) -> &LogEvent {
