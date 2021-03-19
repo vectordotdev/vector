@@ -236,3 +236,81 @@ async fn tap_handler(
 
     debug!(message = "Stopped tap.", patterns = ?patterns);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::event::{Metric, MetricKind, MetricValue};
+    use tokio::sync::watch;
+
+    #[test]
+    /// Patterns should accept globbing.
+    fn matches() {
+        let patterns = ["ab*", "12?", "xy?"];
+
+        // Should find.
+        for name in &["abc", "123", "xyz"] {
+            assert!(patterns.iter().any(|p| p.to_string().matches_glob(name)));
+        }
+
+        // Should not find.
+        for name in &["xzy", "ad*", "1234"] {
+            assert!(!patterns.iter().any(|p| p.to_string().matches_glob(name)));
+        }
+    }
+
+    #[tokio::test]
+    /// A tap sink should match a pattern, receive the correct notifications, and
+    /// discard non `LogEvent` events.
+    async fn sink_log_events() {
+        let pattern_matched = "tes*";
+        let pattern_not_matched = "xyz";
+        let name = "test";
+
+        let (mut fanout, control_tx) = fanout::Fanout::new();
+        let mut outputs = HashMap::new();
+        outputs.insert(name.to_string(), control_tx);
+
+        let (_watch_tx, watch_rx) = watch::channel(outputs);
+        let (sink_tx, mut sink_rx) = tokio_mpsc::channel(10);
+
+        let _sink = TapSink::new(
+            watch_rx,
+            sink_tx,
+            &[pattern_matched.to_string(), pattern_not_matched.to_string()],
+        );
+
+        // 1st payload should be a notification that the pattern matched.
+        assert!(matches!(
+            sink_rx.recv().await,
+            Some(TapPayload::Notification(returned_name, TapNotification::Matched))
+                if returned_name == pattern_matched
+        ));
+
+        // 2nd payload should be a notification that the pattern did not match matched.
+        assert!(matches!(
+            sink_rx.recv().await,
+            Some(TapPayload::Notification(returned_name, TapNotification::NotMatched))
+                if returned_name == pattern_not_matched
+        ));
+
+        // Send some events down the wire. Waiting until the first notifications are in
+        // to ensure the event handler has been initialized.
+        let log_event = Event::new_empty_log();
+        let metric_event = Event::from(Metric::new(
+            name,
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        ));
+
+        let _ = fanout.send(metric_event).await.unwrap();
+        let _ = fanout.send(log_event).await.unwrap();
+
+        // 3rd payload should be the log event
+        assert!(matches!(
+            sink_rx.recv().await,
+            Some(TapPayload::LogEvent(returned_name, _)) if returned_name == name
+        ));
+    }
+}

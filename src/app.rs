@@ -245,6 +245,7 @@ impl Application {
                                     .await
                                 {
                                     Ok(true) => {
+                                        #[cfg(feature = "api")]
                                         // Pass the new config to the API server.
                                         if let Some(ref api_server) = api_server {
                                             api_server.update_config(topology.config());
