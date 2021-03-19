@@ -2,6 +2,7 @@ use crate::{
     event::metric::{Metric, MetricValue, StatisticKind},
     sinks::util::{encode_namespace, statistic::DistributionStatistic},
 };
+use chrono::Utc;
 use indexmap::map::IndexMap;
 use prometheus_parser::{proto, METRIC_NAME_LABEL};
 use std::collections::BTreeMap;
@@ -337,7 +338,7 @@ impl MetricCollector for TimeSeries {
             .or_default()
             .push(proto::Sample {
                 value,
-                timestamp: timestamp_millis.unwrap_or(0),
+                timestamp: timestamp_millis.unwrap_or_else(|| Utc::now().timestamp_millis()),
             });
     }
 
@@ -384,6 +385,7 @@ mod tests {
     use super::super::default_summary_quantiles;
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+    use chrono::{DateTime, TimeZone};
     use indoc::indoc;
     use pretty_assertions::assert_eq;
 
@@ -452,7 +454,7 @@ mod tests {
             indoc! { r#"
                 # HELP vector_hits hits
                 # TYPE vector_hits counter
-                vector_hits{code="200"} 10
+                vector_hits{code="200"} 10 1612325106789
             "#}
         );
     }
@@ -461,7 +463,7 @@ mod tests {
     fn encodes_counter_request() {
         assert_eq!(
             encode_counter::<TimeSeries>(),
-            write_request!("vector_hits", "hits", Counter ["" @ 0 = 10.0 ["code" => "200"]])
+            write_request!("vector_hits", "hits", Counter ["" @ 1612325106789 = 10.0 ["code" => "200"]])
         );
     }
 
@@ -471,7 +473,8 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Counter { value: 10.0 },
         )
-        .with_tags(Some(tags()));
+        .with_tags(Some(tags()))
+        .with_timestamp(Some(timestamp()));
         encode_one::<T>(Some("vector"), &[], &[], false, &metric)
     }
 
@@ -482,7 +485,7 @@ mod tests {
             indoc! { r#"
                 # HELP vector_temperature temperature
                 # TYPE vector_temperature gauge
-                vector_temperature{code="200"} -1.1
+                vector_temperature{code="200"} -1.1 1612325106789
             "#}
         );
     }
@@ -491,7 +494,7 @@ mod tests {
     fn encodes_gauge_request() {
         assert_eq!(
             encode_gauge::<TimeSeries>(),
-            write_request!("vector_temperature", "temperature", Gauge ["" @ 0 = -1.1 ["code" => "200"]])
+            write_request!("vector_temperature", "temperature", Gauge ["" @ 1612325106789 = -1.1 ["code" => "200"]])
         );
     }
 
@@ -501,7 +504,8 @@ mod tests {
             MetricKind::Absolute,
             MetricValue::Gauge { value: -1.1 },
         )
-        .with_tags(Some(tags()));
+        .with_tags(Some(tags()))
+        .with_timestamp(Some(timestamp()));
         encode_one::<T>(Some("vector"), &[], &[], false, &metric)
     }
 
@@ -512,7 +516,7 @@ mod tests {
             indoc! { r#"
                 # HELP vector_users users
                 # TYPE vector_users gauge
-                vector_users 1
+                vector_users 1 1612325106789
             "#}
         );
     }
@@ -521,7 +525,7 @@ mod tests {
     fn encodes_set_request() {
         assert_eq!(
             encode_set::<TimeSeries>(),
-            write_request!("vector_users", "users", Gauge [ "" @ 0 = 1.0 []])
+            write_request!("vector_users", "users", Gauge [ "" @ 1612325106789 = 1.0 []])
         );
     }
 
@@ -532,7 +536,8 @@ mod tests {
             MetricValue::Set {
                 values: vec!["foo".into()].into_iter().collect(),
             },
-        );
+        )
+        .with_timestamp(Some(timestamp()));
         encode_one::<T>(Some("vector"), &[], &[], false, &metric)
     }
 
@@ -543,7 +548,7 @@ mod tests {
             indoc! {r#"
                 # HELP vector_users users
                 # TYPE vector_users gauge
-                vector_users 0
+                vector_users 0 1612325106789
             "#}
         );
     }
@@ -552,7 +557,7 @@ mod tests {
     fn encodes_expired_set_request() {
         assert_eq!(
             encode_expired_set::<TimeSeries>(),
-            write_request!("vector_users", "users", Gauge ["" @ 0 = 0.0 []])
+            write_request!("vector_users", "users", Gauge ["" @ 1612325106789 = 0.0 []])
         );
     }
 
@@ -563,7 +568,8 @@ mod tests {
             MetricValue::Set {
                 values: vec!["foo".into()].into_iter().collect(),
             },
-        );
+        )
+        .with_timestamp(Some(timestamp()));
         encode_one::<T>(Some("vector"), &[], &[], true, &metric)
     }
 
@@ -574,12 +580,12 @@ mod tests {
             indoc! {r#"
                 # HELP vector_requests requests
                 # TYPE vector_requests histogram
-                vector_requests_bucket{le="0"} 0
-                vector_requests_bucket{le="2.5"} 6
-                vector_requests_bucket{le="5"} 8
-                vector_requests_bucket{le="+Inf"} 8
-                vector_requests_sum 15
-                vector_requests_count 8
+                vector_requests_bucket{le="0"} 0 1612325106789
+                vector_requests_bucket{le="2.5"} 6 1612325106789
+                vector_requests_bucket{le="5"} 8 1612325106789
+                vector_requests_bucket{le="+Inf"} 8 1612325106789
+                vector_requests_sum 15 1612325106789
+                vector_requests_count 8 1612325106789
             "#}
         );
     }
@@ -590,12 +596,12 @@ mod tests {
             encode_distribution::<TimeSeries>(),
             write_request!(
                 "vector_requests", "requests", Histogram [
-                        "_bucket" @ 0 = 0.0 ["le" => "0"],
-                        "_bucket" @ 0 = 6.0 ["le" => "2.5"],
-                        "_bucket" @ 0 = 8.0 ["le" => "5"],
-                        "_bucket" @ 0 = 8.0 ["le" => "+Inf"],
-                        "_sum" @ 0 = 15.0 [],
-                        "_count" @ 0 = 8.0 []
+                        "_bucket" @ 1612325106789 = 0.0 ["le" => "0"],
+                        "_bucket" @ 1612325106789 = 6.0 ["le" => "2.5"],
+                        "_bucket" @ 1612325106789 = 8.0 ["le" => "5"],
+                        "_bucket" @ 1612325106789 = 8.0 ["le" => "+Inf"],
+                        "_sum" @ 1612325106789 = 15.0 [],
+                        "_count" @ 1612325106789 = 8.0 []
                 ]
             )
         );
@@ -609,7 +615,8 @@ mod tests {
                 samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Histogram,
             },
-        );
+        )
+        .with_timestamp(Some(timestamp()));
         encode_one::<T>(Some("vector"), &[0.0, 2.5, 5.0], &[], false, &metric)
     }
 
@@ -620,12 +627,12 @@ mod tests {
             indoc! {r#"
                 # HELP vector_requests requests
                 # TYPE vector_requests histogram
-                vector_requests_bucket{le="1"} 1
-                vector_requests_bucket{le="2.1"} 3
-                vector_requests_bucket{le="3"} 6
-                vector_requests_bucket{le="+Inf"} 6
-                vector_requests_sum 12.5
-                vector_requests_count 6
+                vector_requests_bucket{le="1"} 1 1612325106789
+                vector_requests_bucket{le="2.1"} 3 1612325106789
+                vector_requests_bucket{le="3"} 6 1612325106789
+                vector_requests_bucket{le="+Inf"} 6 1612325106789
+                vector_requests_sum 12.5 1612325106789
+                vector_requests_count 6 1612325106789
             "#}
         );
     }
@@ -636,12 +643,12 @@ mod tests {
             encode_histogram::<TimeSeries>(),
             write_request!(
                 "vector_requests", "requests", Histogram [
-                        "_bucket" @ 0 = 1.0 ["le" => "1"],
-                        "_bucket" @ 0 = 3.0 ["le" => "2.1"],
-                        "_bucket" @ 0 = 6.0 ["le" => "3"],
-                        "_bucket" @ 0 = 6.0 ["le" => "+Inf"],
-                        "_sum" @ 0 = 12.5 [],
-                        "_count" @ 0 = 6.0 []
+                        "_bucket" @ 1612325106789 = 1.0 ["le" => "1"],
+                        "_bucket" @ 1612325106789 = 3.0 ["le" => "2.1"],
+                        "_bucket" @ 1612325106789 = 6.0 ["le" => "3"],
+                        "_bucket" @ 1612325106789 = 6.0 ["le" => "+Inf"],
+                        "_sum" @ 1612325106789 = 12.5 [],
+                        "_count" @ 1612325106789 = 6.0 []
                     ]
             )
         );
@@ -656,7 +663,8 @@ mod tests {
                 count: 6,
                 sum: 12.5,
             },
-        );
+        )
+        .with_timestamp(Some(timestamp()));
         encode_one::<T>(Some("vector"), &[], &[], false, &metric)
     }
 
@@ -666,11 +674,11 @@ mod tests {
             encode_summary::<StringCollector>(),
             indoc! {r#"# HELP ns_requests requests
                 # TYPE ns_requests summary
-                ns_requests{code="200",quantile="0.01"} 1.5
-                ns_requests{code="200",quantile="0.5"} 2
-                ns_requests{code="200",quantile="0.99"} 3
-                ns_requests_sum{code="200"} 12
-                ns_requests_count{code="200"} 6
+                ns_requests{code="200",quantile="0.01"} 1.5 1612325106789
+                ns_requests{code="200",quantile="0.5"} 2 1612325106789
+                ns_requests{code="200",quantile="0.99"} 3 1612325106789
+                ns_requests_sum{code="200"} 12 1612325106789
+                ns_requests_count{code="200"} 6 1612325106789
             "#}
         );
     }
@@ -681,11 +689,11 @@ mod tests {
             encode_summary::<TimeSeries>(),
             write_request!(
                 "ns_requests", "requests", Summary [
-                    "" @ 0 = 1.5 ["code" => "200", "quantile" => "0.01"],
-                    "" @ 0 = 2.0 ["code" => "200", "quantile" => "0.5"],
-                    "" @ 0 = 3.0 ["code" => "200", "quantile" => "0.99"],
-                    "_sum" @ 0 = 12.0 ["code" => "200"],
-                    "_count" @ 0 = 6.0 ["code" => "200"]
+                    "" @ 1612325106789 = 1.5 ["code" => "200", "quantile" => "0.01"],
+                    "" @ 1612325106789 = 2.0 ["code" => "200", "quantile" => "0.5"],
+                    "" @ 1612325106789 = 3.0 ["code" => "200", "quantile" => "0.99"],
+                    "_sum" @ 1612325106789 = 12.0 ["code" => "200"],
+                    "_count" @ 1612325106789 = 6.0 ["code" => "200"]
                 ]
             )
         );
@@ -701,7 +709,8 @@ mod tests {
                 sum: 12.0,
             },
         )
-        .with_tags(Some(tags()));
+        .with_tags(Some(tags()))
+        .with_timestamp(Some(timestamp()));
         encode_one::<T>(Some("ns"), &[], &[], false, &metric)
     }
 
@@ -712,16 +721,16 @@ mod tests {
             indoc! {r#"
                 # HELP ns_requests requests
                 # TYPE ns_requests summary
-                ns_requests{code="200",quantile="0.5"} 2
-                ns_requests{code="200",quantile="0.75"} 2
-                ns_requests{code="200",quantile="0.9"} 3
-                ns_requests{code="200",quantile="0.95"} 3
-                ns_requests{code="200",quantile="0.99"} 3
-                ns_requests_sum{code="200"} 15
-                ns_requests_count{code="200"} 8
-                ns_requests_min{code="200"} 1
-                ns_requests_max{code="200"} 3
-                ns_requests_avg{code="200"} 1.875
+                ns_requests{code="200",quantile="0.5"} 2 1612325106789
+                ns_requests{code="200",quantile="0.75"} 2 1612325106789
+                ns_requests{code="200",quantile="0.9"} 3 1612325106789
+                ns_requests{code="200",quantile="0.95"} 3 1612325106789
+                ns_requests{code="200",quantile="0.99"} 3 1612325106789
+                ns_requests_sum{code="200"} 15 1612325106789
+                ns_requests_count{code="200"} 8 1612325106789
+                ns_requests_min{code="200"} 1 1612325106789
+                ns_requests_max{code="200"} 3 1612325106789
+                ns_requests_avg{code="200"} 1.875 1612325106789
             "#}
         );
     }
@@ -732,16 +741,16 @@ mod tests {
             encode_distribution_summary::<TimeSeries>(),
             write_request!(
                 "ns_requests", "requests", Summary [
-                    "" @ 0 = 2.0 ["code" => "200", "quantile" => "0.5"],
-                    "" @ 0 = 2.0 ["code" => "200", "quantile" => "0.75"],
-                    "" @ 0 = 3.0 ["code" => "200", "quantile" => "0.9"],
-                    "" @ 0 = 3.0 ["code" => "200", "quantile" => "0.95"],
-                    "" @ 0 = 3.0 ["code" => "200", "quantile" => "0.99"],
-                    "_sum" @ 0 = 15.0 ["code" => "200"],
-                    "_count" @ 0 = 8.0 ["code" => "200"],
-                    "_min" @ 0 = 1.0 ["code" => "200"],
-                    "_max" @ 0 = 3.0 ["code" => "200"],
-                    "_avg" @ 0 = 1.875 ["code" => "200"]
+                    "" @ 1612325106789 = 2.0 ["code" => "200", "quantile" => "0.5"],
+                    "" @ 1612325106789 = 2.0 ["code" => "200", "quantile" => "0.75"],
+                    "" @ 1612325106789 = 3.0 ["code" => "200", "quantile" => "0.9"],
+                    "" @ 1612325106789 = 3.0 ["code" => "200", "quantile" => "0.95"],
+                    "" @ 1612325106789 = 3.0 ["code" => "200", "quantile" => "0.99"],
+                    "_sum" @ 1612325106789 = 15.0 ["code" => "200"],
+                    "_count" @ 1612325106789 = 8.0 ["code" => "200"],
+                    "_min" @ 1612325106789 = 1.0 ["code" => "200"],
+                    "_max" @ 1612325106789 = 3.0 ["code" => "200"],
+                    "_avg" @ 1612325106789 = 1.875 ["code" => "200"]
                 ]
             )
         );
@@ -756,7 +765,8 @@ mod tests {
                 statistic: StatisticKind::Summary,
             },
         )
-        .with_tags(Some(tags()));
+        .with_tags(Some(tags()))
+        .with_timestamp(Some(timestamp()));
         encode_one::<T>(
             Some("ns"),
             &[],
@@ -773,7 +783,7 @@ mod tests {
             indoc! {r#"
                 # HELP temperature temperature
                 # TYPE temperature counter
-                temperature 2 1234567890123
+                temperature 2 1612325106789
             "#}
         );
     }
@@ -782,21 +792,33 @@ mod tests {
     fn encodes_timestamp_request() {
         assert_eq!(
             encode_timestamp::<TimeSeries>(),
-            write_request!("temperature", "temperature", Counter ["" @ 1234567890123 = 2.0 []])
+            write_request!("temperature", "temperature", Counter ["" @ 1612325106789 = 2.0 []])
         );
     }
 
     fn encode_timestamp<T: MetricCollector>() -> T::Output {
-        use chrono::{DateTime, NaiveDateTime, Utc};
         let metric = Metric::new(
             "temperature".to_owned(),
             MetricKind::Absolute,
             MetricValue::Counter { value: 2.0 },
         )
-        .with_timestamp(Some(DateTime::<Utc>::from_utc(
-            NaiveDateTime::from_timestamp(1234567890, 123456789),
-            Utc,
-        )));
+        .with_timestamp(Some(timestamp()));
         encode_one::<T>(None, &[], &[], false, &metric)
+    }
+
+    #[test]
+    fn adds_timestamp_request() {
+        let now = Utc::now().timestamp_millis();
+        let metric = Metric::new(
+            "something".to_owned(),
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+        );
+        let encoded = encode_one::<TimeSeries>(None, &[], &[], false, &metric);
+        assert!(encoded.timeseries[0].samples[0].timestamp >= now);
+    }
+
+    fn timestamp() -> DateTime<Utc> {
+        Utc.ymd(2021, 2, 3).and_hms_milli(4, 5, 6, 789)
     }
 }
