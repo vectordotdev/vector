@@ -42,6 +42,11 @@ impl Expression for UuidV4Fn {
 mod tests {
     use super::*;
 
+    test_type_def![default {
+        expr: |_| { UuidV4Fn },
+        want: TypeDef::new().infallible().bytes(),
+    }];
+
     #[test]
     fn uuid_v4() {
         let mut state = vrl::state::Runtime::default();
