@@ -1,6 +1,6 @@
 use std::fmt;
 use std::sync::Arc;
-use structures::map::Map;
+use structures::map::ord::OrdMap as Map;
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,

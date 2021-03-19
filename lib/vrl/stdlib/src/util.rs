@@ -1,6 +1,6 @@
 use std::str::FromStr;
 #[cfg(any(feature = "parse_regex", feature = "parse_regex_all"))]
-use structures::map::Map;
+use structures::map::ord::OrdMap as Map;
 use vrl::{value::Kind, Value};
 
 /// Rounds the given number to the given precision.

@@ -5,10 +5,9 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use std::borrow::Cow;
-use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
-use structures::map::Map;
+use structures::map::ord::OrdMap as Map;
 
 impl Value {
     /// Convert a given [`Value`] into a [`Expression`] trait object.
@@ -458,16 +457,6 @@ impl From<Map<String, Value>> for Value {
         Value::Object(value)
     }
 }
-
-impl From<BTreeMap<String, Value>> for Value {
-    fn from(value: BTreeMap<String, Value>) -> Self {
-        Value::Object(value.into())
-    }
-}
-
-// TODO outer code uses BTreeMap, unsure if ordering is actually used or
-// not. Consider making a From to convert here. Else, push CoW map into
-// sub-crate and make independent from VRL.
 
 impl FromIterator<(String, Value)> for Value {
     fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {

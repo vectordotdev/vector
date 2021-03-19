@@ -1,5 +1,5 @@
 use shared::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
-use structures::map::Map;
+use structures::map::ord::OrdMap as Map;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]

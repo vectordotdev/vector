@@ -1,5 +1,5 @@
 use chrono::{DateTime, Datelike, Utc};
-use structures::map::Map;
+use structures::map::ord::OrdMap as Map;
 use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
 use vrl::prelude::*;
 

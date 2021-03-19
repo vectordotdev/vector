@@ -1,7 +1,7 @@
 use chrono::{offset::TimeZone, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
-use structures::map::Map;
+use structures::map::ord::OrdMap as Map;
 use vrl::prelude::*;
 
 lazy_static! {

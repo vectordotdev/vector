@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::Path;
-use structures::map::Map;
+use structures::map::ord::OrdMap as Map;
 use vrl::{function::Example, Value};
 
 #[derive(Debug)]

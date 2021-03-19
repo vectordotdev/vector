@@ -1,5 +1,5 @@
 use std::iter::FromIterator;
-use structures::map::Map;
+use structures::map::ord::OrdMap as Map;
 use url::Url;
 use vrl::prelude::*;
 

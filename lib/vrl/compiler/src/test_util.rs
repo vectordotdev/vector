@@ -124,6 +124,6 @@ macro_rules! map {
     ($($k:tt: $v:expr),+ $(,)?) => {
         vec![$(($k.into(), $v.into())),+]
             .into_iter()
-            .collect::<::structures::map::Map<_, _>>()
+            .collect::<::structures::map::ord::OrdMap<_, _>>()
     };
 }

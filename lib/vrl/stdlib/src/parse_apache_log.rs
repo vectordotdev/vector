@@ -1,5 +1,5 @@
 use crate::log_util;
-use structures::map::Map;
+use structures::map::ord::OrdMap as Map;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]

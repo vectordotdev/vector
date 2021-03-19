@@ -6,7 +6,7 @@ use nom::{
     sequence::{delimited, preceded},
     IResult,
 };
-use structures::map::Map;
+use structures::map::ord::OrdMap as Map;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
