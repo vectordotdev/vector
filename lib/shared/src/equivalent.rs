@@ -44,10 +44,10 @@ macro_rules! impl_equivalent_as_eq {
 
 impl<T: Equivalent> Equivalent for Vec<T> {
     fn equivalent(&self, other: &Self) -> bool {
-        if self.len() != other.len() {
-            false
+        if self.len() == other.len() {
+            self.iter().zip(other.iter()).all(|(a, b)| a.equivalent(b))
         } else {
-            !self.iter().zip(other.iter()).any(|(a, b)| !a.equivalent(b))
+            false
         }
     }
 }
