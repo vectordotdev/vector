@@ -930,6 +930,7 @@ fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
 mod test {
     use super::*;
     use chrono::{offset::TimeZone, DateTime, Utc};
+    use pretty_assertions::assert_eq;
     use shared::btreemap;
     use std::str::FromStr;
     use vrl::{Path, Value};
@@ -967,7 +968,8 @@ mod test {
 
         let expected = counter
             .clone()
-            .with_value(MetricValue::Counter { value: 3.0 });
+            .with_value(MetricValue::Counter { value: 3.0 })
+            .with_timestamp(Some(ts()));
 
         counter.data.add(&delta.data);
         assert_eq!(counter, expected);
@@ -990,7 +992,10 @@ mod test {
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
-        let expected = gauge.clone().with_value(MetricValue::Gauge { value: -1.0 });
+        let expected = gauge
+            .clone()
+            .with_value(MetricValue::Gauge { value: -1.0 })
+            .with_timestamp(Some(ts()));
 
         gauge.data.add(&delta.data);
         assert_eq!(gauge, expected);
@@ -1017,9 +1022,12 @@ mod test {
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
-        let expected = set.clone().with_value(MetricValue::Set {
-            values: vec!["old".into(), "new".into()].into_iter().collect(),
-        });
+        let expected = set
+            .clone()
+            .with_value(MetricValue::Set {
+                values: vec!["old".into(), "new".into()].into_iter().collect(),
+            })
+            .with_timestamp(Some(ts()));
 
         set.data.add(&delta.data);
         assert_eq!(set, expected);
@@ -1048,10 +1056,13 @@ mod test {
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
-        let expected = dist.clone().with_value(MetricValue::Distribution {
-            samples: samples![1.0 => 10, 1.0 => 20],
-            statistic: StatisticKind::Histogram,
-        });
+        let expected = dist
+            .clone()
+            .with_value(MetricValue::Distribution {
+                samples: samples![1.0 => 10, 1.0 => 20],
+                statistic: StatisticKind::Histogram,
+            })
+            .with_timestamp(Some(ts()));
 
         dist.data.add(&delta.data);
         assert_eq!(dist, expected);
