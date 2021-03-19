@@ -14,7 +14,6 @@ use rdkafka::{
     consumer::{Consumer, StreamConsumer},
     message::Headers,
     message::Message,
-    message::OwnedHeaders,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -321,6 +320,7 @@ mod integration_test {
         config::ClientConfig,
         producer::{FutureProducer, FutureRecord},
         util::Timeout,
+        message::OwnedHeaders,
     };
 
     const BOOTSTRAP_SERVER: &str = "localhost:9091";
