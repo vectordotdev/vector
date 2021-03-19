@@ -28,15 +28,8 @@ impl<'a> FromLua<'a> for Event {
             }
         };
         let metadata = match table.get("metadata")? {
-            metadata @ LuaValue::Table(_) => EventMetadata::from_lua(metadata, ctx)?,
             LuaValue::Nil => EventMetadata::now(),
-            _ => {
-                return Err(LuaError::FromLuaConversionError {
-                    from: type_name(&value),
-                    to: "EventMetadata",
-                    message: Some("EventMetadata should be a table".to_string()),
-                })
-            }
+            metadata => EventMetadata::from_lua(metadata, ctx)?,
         };
         match (table.get("log")?, table.get("metric")?) {
             // This is less than ideal. The log or metric below is
