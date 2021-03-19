@@ -7,7 +7,7 @@ remap: functions: parse_query_string: {
 		"""#
 	notices: [
 		"""
-			All values are returned as strings. We recommend manually coercing values to desired types as you see fit.
+			All values are returned as strings. We recommend manually coercing values to desired types as you see fit. Empty keys and values are allowed.
 			""",
 	]
 
@@ -26,11 +26,11 @@ remap: functions: parse_query_string: {
 		{
 			title: "Parse query string"
 			source: #"""
-				parse_query_string("foo=%2B1&bar=2&xyz")
+				parse_query_string("foo=%2B1&bar=2&bar=3&xyz")
 				"""#
 			return: {
 				foo: "+1"
-				bar: "2"
+				bar: ["2", "3"]
 				xyz: ""
 			}
 		},
