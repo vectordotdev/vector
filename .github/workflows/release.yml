@@ -533,7 +533,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - build-x86_64-unknown-linux-gnu-packages
-      - build-aarch64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-gnu-packages
       - build-armv7-unknown-linux-gnueabihf-packages
       - deb-verify
       - rpm-verify
