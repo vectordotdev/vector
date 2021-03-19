@@ -6,8 +6,7 @@ use crate::{
 use async_stream::stream;
 use flate2::read::GzDecoder;
 use futures::{
-    future, ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt,
-    TryStreamExt,
+    ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
 };
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use portpicker::pick_unused_port;
@@ -241,23 +240,6 @@ where
     S: Stream + Unpin,
 {
     rx.take(n).collect().await
-}
-
-pub async fn collect_all<S>(mut rx: S) -> Vec<S::Item>
-where
-    S: Stream + Unpin,
-{
-    let mut vec = Vec::new();
-    future::poll_fn(|cx| match rx.poll_next_unpin(cx) {
-        Poll::Ready(Some(item)) => {
-            vec.push(item);
-            Poll::Pending
-        }
-        Poll::Ready(None) => Poll::Ready(()),
-        Poll::Pending => Poll::Pending,
-    })
-    .await;
-    vec
 }
 
 pub async fn collect_ready<S>(mut rx: S) -> Vec<S::Item>

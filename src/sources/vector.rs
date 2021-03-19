@@ -129,7 +129,7 @@ mod test {
             Metric,
         },
         sinks::vector::VectorSinkConfig,
-        test_util::{collect_all, collect_ready, next_addr, trace_init, wait_for_tcp},
+        test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
         tls::{TlsConfig, TlsOptions},
         Event, Pipeline,
     };
@@ -260,7 +260,7 @@ mod test {
         drop(trigger_shutdown);
         shutdown_down.await;
 
-        let output = collect_all(rx).await;
+        let output = collect_ready(rx).await;
         assert_eq!(output, []);
     }
 
@@ -301,7 +301,7 @@ mod test {
         drop(trigger_shutdown);
         shutdown_down.await;
 
-        let output = collect_all(rx).await;
+        let output = collect_ready(rx).await;
         assert_eq!(vec![Event::from(event)], output);
     }
 }
