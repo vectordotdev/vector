@@ -1023,8 +1023,18 @@ fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<D
     let host = host.or_else(|| env::var("DOCKER_HOST").ok());
 
     match host {
-        None => Docker::connect_with_local_defaults().map_err(Into::into),
-
+        None => {
+            // TODO: Use `connect_with_local_defaults` on all platforms.
+            //
+            // Using `connect_with_local_defaults` defers to `connect_with_named_pipe_defaults` on Windows. However,
+            // named pipes are currently disabled in Tokio. Tracking issue:
+            // https://github.com/fussybeaver/bollard/pull/138
+            if cfg!(windows) {
+                Docker::connect_with_http_defaults().map_err(Into::into)
+            } else {
+                Docker::connect_with_local_defaults().map_err(Into::into)
+            }
+        }
         Some(host) => {
             let scheme = host
                 .parse::<Uri>()
@@ -1053,8 +1063,17 @@ fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<D
                     .map_err(Into::into)
                 }
                 Some("unix") | Some("npipe") | None => {
-                    Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
-                        .map_err(Into::into)
+                    // TODO: Use `connect_with_local` on all platforms.
+                    //
+                    // Named pipes are currently disabled in Tokio. Tracking issue:
+                    // https://github.com/fussybeaver/bollard/pull/138
+                    if cfg!(windows) {
+                        warn!("Named pipes are currently not available on Windows, trying to connecting to Docker with default HTTP settings instead.");
+                        Docker::connect_with_http_defaults().map_err(Into::into)
+                    } else {
+                        Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
+                            .map_err(Into::into)
+                    }
                 }
                 Some(scheme) => Err(format!("Unknown scheme: {}", scheme).into()),
             }
