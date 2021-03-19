@@ -35,7 +35,6 @@ fn display(diagnostic: &diagnostic::Diagnostic<()>) {
 }
 
 fn main() {
-    /*
     let corpus = ngrammatic::Corpus {
             arity: 2,
             ngrams: std::collections::HashMap::new(),
@@ -46,15 +45,6 @@ fn main() {
 
     let _o = corpus
         .search("ook", 0.25);
-    */
-
-    use std::collections::HashMap;
-    let mut grams: HashMap<String, usize> = HashMap::new();
-
-    for window in " ohno ".chars().collect::<Vec<_>>().windows(2) {
-        let count = grams.entry(window.iter().collect()).or_insert(0);
-        *count += 1;
-    }
 
     display(&diag());
 }
