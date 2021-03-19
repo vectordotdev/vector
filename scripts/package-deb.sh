@@ -14,11 +14,6 @@ set -x
 
 TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
 
-# The arch is the first part of the target
-# For some architectures, like armv7hl it doesn't match the arch
-# from Rust target triple and needs to be specified manually.
-ARCH="${ARCH:-"$(echo "$TARGET" | cut -d'-' -f1)"}"
-
 #
 # Local vars
 #
@@ -78,6 +73,17 @@ cat LICENSE NOTICE > "$PROJECT_ROOT/target/debian-license.txt"
 
 cargo deb --target "$TARGET" --deb-version "$PACKAGE_VERSION" --variant "$TARGET" --no-build --no-strip
 
-# Rename the resulting .deb file to use - instead of _ and remove the debian
-# target triple to be consistent with our package naming scheme.
-mv -v "target/${TARGET}/debian/vector-${TARGET}_${PACKAGE_VERSION}_${ARCH}.deb"  "target/artifacts/vector-${PACKAGE_VERSION}-${ARCH}.deb"
+# Rename the resulting .deb file to remove TARGET from name and use - instead of
+# _ since this is consistent with our package naming scheme.
+for file in target/"${TARGET}"/debian/*.deb; do
+  base=$(basename "${file}")
+  nbase=${base//_/-}
+  nbase=${nbase//${TARGET}/}
+  mv "${file}" target/"${TARGET}"/debian/"${nbase}";
+done
+
+#
+# Move the deb into the artifacts dir
+#
+
+mv -v "target/$TARGET/debian"/*.deb target/artifacts
