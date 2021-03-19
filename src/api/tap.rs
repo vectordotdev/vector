@@ -3,12 +3,16 @@ use crate::{
     event::{Event, LogEvent},
     topology::{fanout, WatchRx},
 };
-use futures::{channel::mpsc as futures_mpsc, SinkExt, StreamExt};
+use futures::{channel::mpsc as futures_mpsc, future::try_join_all, FutureExt, SinkExt, StreamExt};
 use itertools::Itertools;
-use std::collections::HashSet;
+use std::{
+    collections::{HashMap, HashSet},
+    iter::FromIterator,
+};
 use tokio::sync::{mpsc as tokio_mpsc, mpsc::error::SendError, oneshot};
 use uuid::Uuid;
 
+/// A tap sender is the control channel used to surface tap payloads to a client.
 type TapSender = tokio_mpsc::Sender<TapPayload>;
 
 /// Clients can supply glob patterns to find matched topology components.
@@ -31,7 +35,7 @@ pub enum TapNotification {
     NotMatched,
 }
 
-/// A tap payload can either contain a log event (payload), or a notification that's intended
+/// A tap payload can either contain a log event or a notification that's intended
 /// to be communicated back to the client to alert them about the status of the tap request.
 pub enum TapPayload {
     LogEvent(String, LogEvent),
@@ -48,13 +52,16 @@ impl TapPayload {
     }
 }
 
-/// A tap sink spawns a process for listening to topology changes, and re-wiring sinks to
+/// A tap sink spawns a process for listening to topology changes, and rewiring sinks to
 /// observe `LogEvent`s that match the provided pattern.
 pub struct TapSink {
     _shutdown: ShutdownTx,
 }
 
 impl TapSink {
+    /// Creates a new tap sink, and spawns a handler for watching for topology changes,
+    /// and relaying `LogEvent`s to the client. Uses a oneshot channel to trigger shutdown
+    /// of handlers when the `TapSink` drops from scope.
     pub fn new(watch_rx: WatchRx, tap_tx: TapSender, patterns: &[String]) -> Self {
         let (_shutdown, shutdown_rx) = oneshot::channel();
 
@@ -69,26 +76,15 @@ impl TapSink {
     }
 }
 
-/// Returns a hashset of the patterns that component names match against.
-fn matched_patterns(patterns: &HashSet<String>, component_names: &[&String]) -> HashSet<String> {
-    patterns
-        .iter()
-        .filter(|pattern| {
-            component_names
-                .iter()
-                .any(|component_name| pattern.matches_glob(component_name))
-        })
-        .map(|pattern| pattern.to_string())
-        .collect()
-}
-
 /// Sends a 'matched' tap payload.
-async fn send_matched(tx: &mut TapSender, pattern: &str) -> Result<(), SendError<TapPayload>> {
+async fn send_matched(mut tx: TapSender, pattern: &str) -> Result<(), SendError<TapPayload>> {
+    debug!(message = "Sending matched notification.", pattern = ?pattern);
     tx.send(TapPayload::matched(pattern)).await
 }
 
 /// Sends a 'not matched' tap payload.
-async fn send_not_matched(tx: &mut TapSender, pattern: &str) -> Result<(), SendError<TapPayload>> {
+async fn send_not_matched(mut tx: TapSender, pattern: &str) -> Result<(), SendError<TapPayload>> {
+    debug!(message = "Sending not matched notification.", pattern = ?pattern);
     tx.send(TapPayload::not_matched(pattern)).await
 }
 
@@ -98,7 +94,7 @@ fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
     let component_name = component_name.to_string();
 
     tokio::spawn(async move {
-        debug!(message = "Spawned tap event handler.", component_name = ?component_name);
+        debug!(message = "Spawned event handler.", component_name = ?component_name);
 
         while let Some(ev) = event_rx.next().await {
             if let Event::Log(ev) = ev {
@@ -108,7 +104,7 @@ fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
             }
         }
 
-        debug!(message = "Stopped tap event handler.", component_name = ?component_name);
+        debug!(message = "Stopped event handler.", component_name = ?component_name);
     });
 
     Box::new(event_tx.sink_map_err(|_| ()))
@@ -118,53 +114,122 @@ fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
 /// `LogEvent`s` when a component matches one of more of the provided patterns.
 async fn tap_handler(
     patterns: HashSet<String>,
-    mut tx: TapSender,
+    tx: TapSender,
     mut watch_rx: WatchRx,
     mut shutdown_rx: ShutdownRx,
 ) {
     debug!(message = "Started tap.", patterns = ?patterns);
 
-    let mut current = HashSet::new();
+    let mut sinks = HashMap::new();
+    let mut last_outputs = None;
 
     loop {
         tokio::select! {
             _ = &mut shutdown_rx => break,
             Some(outputs) = watch_rx.recv() => {
-                let component_names = outputs.keys().collect_vec();
-                let matched = matched_patterns(&patterns, &component_names);
+                // Get the patterns that were matched on the last sinks, to compare with the latest
+                // round of matches when sending notifications.
+                let last_matches = patterns
+                    .iter()
+                    .filter(|pattern| sinks.keys().any(|name: &String| pattern.matches_glob(name)))
+                    .collect::<HashSet<_>>();
 
-                // Remove components that don't match.
-                for pattern in patterns.difference(&matched) {
-                    if send_not_matched(&mut tx, &pattern).await.is_err() {
-                        break;
+                // Iterate over outputs, returning a set of matched patterns from this latest round.
+                let matched = outputs
+                    .iter()
+                    .filter_map(|(name, control_tx)| {
+                        match patterns
+                            .iter()
+                            .filter(|pattern| pattern.matches_glob(name))
+                            .collect_vec()
+                        {
+                            matched if !matched.is_empty() => {
+                                debug!(
+                                    message="Component matched.",
+                                    component_name = ?name, patterns = ?patterns, matched = ?matched
+                                );
+
+                                // Add sink, if it's not already there.
+                                if !sinks.contains_key(name) {
+                                    let id = Uuid::new_v4().to_string();
+                                    let sink = make_router(tx.clone(), name);
+                                    if control_tx
+                                        .send(fanout::ControlMessage::Add(id.to_string(), sink))
+                                        .is_ok()
+                                    {
+                                        debug!(
+                                            message = "Component connected.",
+                                            component_name = ?name, id = ?id
+                                        );
+                                        sinks.insert(name.to_string(), id);
+                                    } else {
+                                        error!(
+                                            message = "Couldn't connect tap.",
+                                            component_name = ?name, id = ?id
+                                        );
+                                    }
+                                } else {
+                                    debug!(
+                                        message="Component already connected; skipping.",
+                                        component_name = ?name
+                                    );
+                                }
+
+                                Some(matched)
+                            }
+                            _ => {
+                                debug!(
+                                    message="Component not matched.",
+                                    component_name = ?name, patterns = ?patterns
+                                );
+                                None
+                            },
+                        }
+                    })
+                    .flatten()
+                    .collect::<HashSet<_>>();
+
+                // Remove components that have gone away.
+                sinks.retain(|name, _| {
+                    outputs.contains_key(name) || {
+                        debug!(message = "Removing component.", component_name = ?name);
+                        false
                     }
+                });
+
+                // Keep the outputs for later clean-up when a shutdown is triggered.
+                last_outputs = Some(outputs);
+
+                // Send notifications to the client. The # of notifications will always be
+                // exactly equal to the number of patterns, so we can pre-alloate capacity.
+                let mut notifications = Vec::with_capacity(patterns.len());
+
+                // Matched notifications.
+                for pattern in matched.difference(&last_matches) {
+                    notifications.push(send_matched(tx.clone(), pattern).boxed());
                 }
 
-                // Add new components.
-                for pattern in matched.difference(&current) {
-                    if send_matched(&mut tx, &pattern).await.is_err() {
-                        break;
-                    }
+                // Not matched notifications.
+                for pattern in HashSet::from_iter(&patterns).difference(&matched) {
+                    notifications.push(send_not_matched(tx.clone(), pattern).boxed());
                 }
 
-                // Make a router for each.
-                for component_name in component_names
-                    .into_iter()
-                    .filter(|name| patterns.iter().any(|p| name.matches_glob(p)))
-                {
-                    if let Some(output) = outputs.get(component_name) {
-                        let id = Uuid::new_v4().to_string();
-                        debug!(message="Connecting tap sink.", id = ?id, component_name = ?component_name);
-
-                        let sink = make_router(tx.clone(), component_name);
-                        let _ = output.send(fanout::ControlMessage::Add(
-                            id,
-                            sink,
-                        ));
-                    }
+                // Send all events. If any event returns an error, this means the client
+                // channel has gone away, so we can break out the loop.
+                if try_join_all(notifications).await.is_err() {
+                    debug!("Couldn't send notification(s); tap gone away.");
+                    break;
                 }
+            }
+        }
+    }
 
-                current = matched;
+    // At this point, the tap handler is being shut down due to the client/subscription
+    // going away. Clean up tap sinks by disconnecting them from the components being observed.
+    if let Some(outputs) = last_outputs {
+        for (name, id) in sinks {
+            if let Some(control_tx) = outputs.get(&name) {
+                let _ = control_tx.send(fanout::ControlMessage::Remove(id));
             }
         }
     }

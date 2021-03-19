@@ -16,8 +16,8 @@ use std::cmp::Ordering;
 use tokio::{select, stream::Stream, sync::mpsc, time};
 
 #[derive(Union)]
-/// Log event result which can be a log event or notification
-pub enum LogEventResult {
+/// Log event payload which can be a log event or notification
+pub enum LogEventPayload {
     /// Log event
     LogEvent(event::LogEvent),
     /// Notification
@@ -25,7 +25,7 @@ pub enum LogEventResult {
 }
 
 /// Convert an `api::TapPayload` to the equivalent GraphQL type.
-impl From<TapPayload> for LogEventResult {
+impl From<TapPayload> for LogEventPayload {
     fn from(t: TapPayload) -> Self {
         use notification::{LogEventNotification, LogEventNotificationType};
 
@@ -57,9 +57,10 @@ impl LogEventsSubscription {
         component_names: Vec<String>,
         #[graphql(default = 500)] interval: u32,
         #[graphql(default = 100, validator(IntRange(min = "1", max = "10_000")))] limit: u32,
-    ) -> impl Stream<Item = Vec<LogEventResult>> + 'a {
+    ) -> impl Stream<Item = Vec<LogEventPayload>> + 'a {
         let watch_rx = ctx.data_unchecked::<WatchRx>().clone();
 
+        // Client input is confined to `u32` to provide sensible bounds.
         create_log_events_stream(watch_rx, component_names, interval as u64, limit as usize)
     }
 }
@@ -72,18 +73,19 @@ fn create_log_events_stream(
     component_names: Vec<String>,
     interval: u64,
     limit: usize,
-) -> impl Stream<Item = Vec<LogEventResult>> {
+) -> impl Stream<Item = Vec<LogEventPayload>> {
     // Channel for receiving individual tap payloads. Since we can process at most `limit` per
     // interval, this is capped to the same value.
     let (tap_tx, mut tap_rx) = mpsc::channel(limit);
 
-    // The resulting vector of `LogEventResult` sent ot the client. Only one result set will be streamed
+    // The resulting vector of `LogEventPayload` sent ot the client. Only one result set will be streamed
     // back to the client at a time. This value is set higher than `1` to prevent blocking the event
     // pipeline on slower client connections, but low enough to apply a modest cap on mem usage.
-    let (mut log_tx, log_rx) = mpsc::channel::<Vec<LogEventResult>>(10);
+    let (mut log_tx, log_rx) = mpsc::channel::<Vec<LogEventPayload>>(10);
 
     tokio::spawn(async move {
-        // Create a tap sink. When this drops out of scope, clean up will be performed.
+        // Create a tap sink. When this drops out of scope, clean up will be performed on the
+        // event handlers and topology observation that the tap sink provides.
         let _tap_sink = TapSink::new(watch_rx, tap_tx, &component_names);
 
         // A tick interval to represent when to 'cut' the results back to the client.
@@ -91,7 +93,7 @@ fn create_log_events_stream(
 
         // Collect a vector of results, with a capacity of `limit`. As new `LogEvent`s come in,
         // they will be sampled and added to results.
-        let mut results = Vec::<LogEventResult>::with_capacity(limit);
+        let mut results = Vec::<LogEventPayload>::with_capacity(limit);
 
         // Random number generator to allow for sampling. Speed trumps cryptographic security here.
         // The RNG must be Send + Sync to use with the `select!` loop below.
@@ -109,7 +111,7 @@ fn create_log_events_stream(
                     let tap = tap.into();
 
                     // Emit notifications immediately; these don't count as a 'batch'.
-                    if let LogEventResult::Notification(_) = tap {
+                    if let LogEventPayload::Notification(_) = tap {
                         // If an error occurs when sending, the subscription has likely gone
                         // away. Break the loop to terminate the thread.
                         if log_tx.send(vec![tap]).await.is_err() {
@@ -143,7 +145,7 @@ fn create_log_events_stream(
                         let results = results
                             .drain(..)
                             .sorted_by(|a, b| match (a, b) {
-                                (LogEventResult::LogEvent(a), LogEventResult::LogEvent(b)) => {
+                                (LogEventPayload::LogEvent(a), LogEventPayload::LogEvent(b)) => {
                                     match (a.get_timestamp(), b.get_timestamp()) {
                                         (Some(a), Some(b)) => a.cmp(b),
                                         _ => Ordering::Equal,
