@@ -85,8 +85,14 @@ lazy_static! {
 #[derivative(Default)]
 pub enum HttpMethod {
     #[derivative(Default)]
+    Get,
+    Head,
     Post,
     Put,
+    Delete,
+    Options,
+    Trace,
+    Patch,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -214,8 +220,14 @@ impl HttpSink for HttpSinkConfig {
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let method = match &self.method.clone().unwrap_or(HttpMethod::Post) {
+            HttpMethod::Get => Method::GET,
+            HttpMethod::Head => Method::HEAD,
             HttpMethod::Post => Method::POST,
             HttpMethod::Put => Method::PUT,
+            HttpMethod::Delete => Method::DELETE,
+            HttpMethod::Options => Method::OPTIONS,
+            HttpMethod::Trace => Method::TRACE,
+            HttpMethod::Patch => Method::PATCH,
         };
         let uri: Uri = self.uri.uri.clone();
 
