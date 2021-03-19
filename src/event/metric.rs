@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use getset::Getters;
 use serde::{Deserialize, Serialize};
-use shared::Equivalent;
+use shared::EventDataEq;
 use snafu::Snafu;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -650,11 +650,11 @@ impl MetricValue {
     }
 }
 
-impl Equivalent for Metric {
-    fn equivalent(&self, other: &Self) -> bool {
+impl EventDataEq for Metric {
+    fn event_data_eq(&self, other: &Self) -> bool {
         self.series == other.series
             && self.data == other.data
-            && self.metadata.equivalent(&other.metadata)
+            && self.metadata.event_data_eq(&other.metadata)
     }
 }
 

@@ -4,7 +4,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use getset::Getters;
 use serde::{Serialize, Serializer};
-use shared::Equivalent;
+use shared::EventDataEq;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
@@ -185,9 +185,9 @@ impl LogEvent {
     }
 }
 
-impl Equivalent for LogEvent {
-    fn equivalent(&self, other: &Self) -> bool {
-        self.fields == other.fields && self.metadata.equivalent(&other.metadata)
+impl EventDataEq for LogEvent {
+    fn event_data_eq(&self, other: &Self) -> bool {
+        self.fields == other.fields && self.metadata.event_data_eq(&other.metadata)
     }
 }
 
@@ -645,7 +645,7 @@ mod test {
                 vrl::Target::insert(&mut event, &path, value.clone()),
                 result
             );
-            shared::assert_equiv!(event, expect);
+            shared::assert_event_data_eq!(event, expect);
             assert_eq!(vrl::Target::get(&event, &path), Ok(Some(value)));
         }
     }
@@ -824,6 +824,6 @@ mod test {
             log
         };
 
-        shared::assert_equiv!(merged, expected);
+        shared::assert_event_data_eq!(merged, expected);
     }
 }

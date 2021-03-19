@@ -1,4 +1,4 @@
-use super::Equivalent;
+use super::EventDataEq;
 use chrono::{DateTime, Utc};
 use getset::CopyGetters;
 use serde::{Deserialize, Serialize};
@@ -28,8 +28,8 @@ impl EventMetadata {
     }
 }
 
-impl Equivalent for EventMetadata {
-    fn equivalent(&self, _other: &Self) -> bool {
+impl EventDataEq for EventMetadata {
+    fn event_data_eq(&self, _other: &Self) -> bool {
         true
     }
 }

@@ -166,6 +166,6 @@ mod tests {
         expected.as_mut_log().insert("bool", true);
         expected.as_mut_log().insert("number", 1234);
 
-        shared::assert_equiv!(log, expected.into_log());
+        shared::assert_event_data_eq!(log, expected.into_log());
     }
 }

@@ -42,7 +42,7 @@ where
 
         let mut output = Vec::new();
         parser.transform(&mut output, input);
-        shared::assert_equiv!(
+        shared::assert_event_data_eq!(
             expected.into_iter().map(Event::Log).collect::<Vec<_>>(),
             output,
             "expected left, actual right"

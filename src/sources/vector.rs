@@ -134,7 +134,7 @@ mod test {
         Event, Pipeline,
     };
     use futures::stream;
-    use shared::assert_equiv;
+    use shared::assert_event_data_eq;
     use std::{
         net::{Shutdown, SocketAddr},
         thread,
@@ -198,7 +198,7 @@ mod test {
         delay_for(Duration::from_millis(50)).await;
 
         let output = collect_ready(rx).await;
-        assert_equiv!(events, output);
+        assert_event_data_eq!(events, output);
     }
 
     #[tokio::test]
@@ -306,6 +306,6 @@ mod test {
         shutdown_down.await;
 
         let output = collect_ready(rx).await;
-        assert_equiv!(Event::from(event), output[0]);
+        assert_event_data_eq!(Event::from(event), output[0]);
     }
 }

@@ -241,7 +241,7 @@ mod test {
     use crate::{event::Metric, test_util::*};
     use bytes::Bytes;
     use futures::TryStreamExt;
-    use shared::assert_equiv;
+    use shared::assert_event_data_eq;
     use tokio::net::UdpSocket;
     use tokio::sync::mpsc;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
@@ -303,7 +303,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        assert_equiv!(metric1, metric2);
+        assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -333,7 +333,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        assert_equiv!(metric1, metric2);
+        assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -348,7 +348,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        assert_equiv!(metric1, metric2);
+        assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -366,7 +366,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        assert_equiv!(metric1, metric2);
+        assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -383,7 +383,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        assert_equiv!(metric1, metric2);
+        assert_event_data_eq!(metric1, metric2);
     }
 
     #[tokio::test]

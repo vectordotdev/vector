@@ -136,7 +136,7 @@ mod test {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::{TimeZone, Utc};
-    use shared::{assert_equiv, btreemap};
+    use shared::{assert_event_data_eq, btreemap};
 
     fn parse_text(text: &str) -> Result<Vec<Metric>, ParserError> {
         super::parse_text(text).map(|events| events.into_iter().map(Event::into_metric).collect())
@@ -150,7 +150,7 @@ mod test {
             uptime 123.0
             "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
                 "uptime",
@@ -167,7 +167,7 @@ mod test {
             # TYPE hidden counter
             "##;
 
-        assert_equiv!(parse_text(exp), Ok(vec![]));
+        assert_event_data_eq!(parse_text(exp), Ok(vec![]));
     }
 
     #[test]
@@ -199,7 +199,7 @@ mod test {
             name2{ labelname = "val1" , }-Inf
             "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![
                 Metric::new(
@@ -255,7 +255,7 @@ mod test {
             http_requests_total{method="post",code="400"}    3 1395066363000
             "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![
                 Metric::new(
@@ -298,7 +298,7 @@ mod test {
             latency 123.0
             "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
                 "latency",
@@ -314,7 +314,7 @@ mod test {
             metric_without_timestamp_and_labels 12.47
             "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
                 "metric_without_timestamp_and_labels",
@@ -330,7 +330,7 @@ mod test {
             no_labels{} 3
             "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
                 "no_labels",
@@ -346,7 +346,7 @@ mod test {
             msdos_file_access_time_seconds{path="C:\\DIR\\FILE.TXT",error="Cannot find file:\n\"FILE.TXT\""} 1.458255915e9
             "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
                 "msdos_file_access_time_seconds",
@@ -373,7 +373,7 @@ mod test {
             # TYPE name counter
             name{tag="}"} 0
             "##;
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
                 "name",
@@ -391,7 +391,7 @@ mod test {
             # TYPE name counter
             name{tag="a,b"} 0
             "##;
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
                 "name",
@@ -409,7 +409,7 @@ mod test {
             # TYPE name counter
             name{tag="\\n"} 0
             "##;
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
                 "name",
@@ -427,7 +427,7 @@ mod test {
             # TYPE name counter
             name{tag=" * "} 0
             "##;
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
                 "name",
@@ -444,7 +444,7 @@ mod test {
             telemetry_scrape_size_bytes_count{registry="default",content_type="text/plain; version=0.0.4"} 1890
             "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
                 "telemetry_scrape_size_bytes_count",
@@ -486,7 +486,7 @@ mod test {
             something_weird{problem="division by zero"} +Inf -3982045000
             "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
                 "something_weird",
@@ -512,7 +512,7 @@ mod test {
             latency{env="testing"}		2.0		1395066363000
             "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![
                 Metric::new(
@@ -550,7 +550,7 @@ mod test {
             launch_count 10.0
             "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![
                 Metric::new(
@@ -603,7 +603,7 @@ mod test {
             temperature_7_days_average 0.1
             "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![
                 Metric::new(
@@ -645,7 +645,7 @@ mod test {
             http_request_duration_seconds_count 144320
             "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![Metric::new(
                 "http_request_duration_seconds",
@@ -707,7 +707,7 @@ mod test {
             gitlab_runner_job_duration_seconds_count{runner="y"} 3255
         "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![
                 Metric::new(
@@ -783,7 +783,7 @@ mod test {
             go_gc_duration_seconds_count 602767
             "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![
                 Metric::new(
@@ -845,7 +845,7 @@ mod test {
             nginx_server_cache{host="*",status="scarce"} 0
             "##;
 
-        assert_equiv!(
+        assert_event_data_eq!(
             parse_text(exp),
             Ok(vec![
                 Metric::new(

@@ -192,7 +192,7 @@ fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, contain
 mod tests {
     use super::*;
     use k8s_openapi::api::core::v1::PodIP;
-    use shared::assert_equiv;
+    use shared::assert_event_data_eq;
 
     #[test]
     fn test_annotate_from_metadata() {
@@ -296,7 +296,7 @@ mod tests {
         for (fields_spec, metadata, expected) in cases.into_iter() {
             let mut log = LogEvent::new();
             annotate_from_metadata(&mut log, &fields_spec, &metadata);
-            assert_equiv!(log, expected);
+            assert_event_data_eq!(log, expected);
         }
     }
 
@@ -327,7 +327,7 @@ mod tests {
             let mut log = LogEvent::new();
             let file_info = parse_log_file_path(file).unwrap();
             annotate_from_file_info(&mut log, &fields_spec, &file_info);
-            assert_equiv!(log, expected);
+            assert_event_data_eq!(log, expected);
         }
     }
 
@@ -367,7 +367,7 @@ mod tests {
         for (fields_spec, pod_spec, expected) in cases.into_iter() {
             let mut log = LogEvent::new();
             annotate_from_pod_spec(&mut log, &fields_spec, &pod_spec);
-            assert_equiv!(log, expected);
+            assert_event_data_eq!(log, expected);
         }
     }
 
@@ -463,7 +463,7 @@ mod tests {
         for (fields_spec, pod_status, expected) in cases.into_iter() {
             let mut log = LogEvent::new();
             annotate_from_pod_status(&mut log, &fields_spec, &pod_status);
-            assert_equiv!(log, expected);
+            assert_event_data_eq!(log, expected);
         }
     }
 
@@ -493,7 +493,7 @@ mod tests {
         for (fields_spec, container_status, expected) in cases.into_iter() {
             let mut log = LogEvent::new();
             annotate_from_container_status(&mut log, &fields_spec, &container_status);
-            assert_equiv!(log, expected);
+            assert_event_data_eq!(log, expected);
         }
     }
 
@@ -533,7 +533,7 @@ mod tests {
         for (fields_spec, container, expected) in cases.into_iter() {
             let mut log = LogEvent::new();
             annotate_from_container(&mut log, &fields_spec, &container);
-            assert_equiv!(log, expected);
+            assert_event_data_eq!(log, expected);
         }
     }
 }

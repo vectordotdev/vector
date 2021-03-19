@@ -1,7 +1,7 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
-use shared::Equivalent;
+use shared::EventDataEq;
 use std::collections::{BTreeMap, HashMap};
 
 pub mod discriminant;
@@ -90,11 +90,11 @@ impl Event {
     }
 }
 
-impl Equivalent for Event {
-    fn equivalent(&self, other: &Self) -> bool {
+impl EventDataEq for Event {
+    fn event_data_eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Log(a), Self::Log(b)) => a.equivalent(b),
-            (Self::Metric(a), Self::Metric(b)) => a.equivalent(b),
+            (Self::Log(a), Self::Log(b)) => a.event_data_eq(b),
+            (Self::Metric(a), Self::Metric(b)) => a.event_data_eq(b),
             _ => false,
         }
     }

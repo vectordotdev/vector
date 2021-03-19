@@ -176,7 +176,7 @@ mod test {
 
         parser.transform(&mut output, event);
 
-        shared::assert_equiv!(
+        shared::assert_event_data_eq!(
             output,
             vec![
                 log_event! {
