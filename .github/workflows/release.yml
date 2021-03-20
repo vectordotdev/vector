@@ -293,6 +293,7 @@ jobs:
   release-docker:
     runs-on: ubuntu-20.04
     needs:
+      - build-aarch64-unknown-linux-gnu-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
