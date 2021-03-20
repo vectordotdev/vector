@@ -36,7 +36,7 @@ use vector::{
     shutdown::ShutdownSignal,
     sinks::{util::StreamSink, Healthcheck, VectorSink},
     sources::Source,
-    test_util::{runtime_with_worker_threads, temp_dir, temp_file},
+    test_util::{runtime_constrained, temp_dir, temp_file},
     transforms::{FunctionTransform, Transform},
     Event, Pipeline,
 };
@@ -429,7 +429,7 @@ pub fn fork_test<T: std::future::Future<Output = ()>>(test_name: &'static str, f
             // Since we are spawning the runtime from within a forked process, use one worker less
             // to account for the additional process.
             // This adjustment mainly serves to not overload CI workers with low resources.
-            let rt = runtime_with_worker_threads(std::cmp::max(1, num_cpus::get() - 1));
+            let rt = runtime_constrained(std::cmp::max(1, num_cpus::get() - 1));
             rt.block_on(fut);
         },
     )
