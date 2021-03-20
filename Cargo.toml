@@ -25,6 +25,7 @@ debug = false     # Do not include debug symbols in the executable.
 debug = true
 
 [package.metadata.deb]
+name = "vector"
 maintainer-scripts = "distribution/debian/scripts/"
 conf-files = ["/etc/vector/vector.toml"]
 assets = [
