@@ -306,7 +306,7 @@ mod tests {
     use crate::sinks::util::{http::HttpSink, test::load_sink};
     use chrono::Utc;
     use serde::Deserialize;
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
 
     #[test]
     fn generate_config() {
@@ -316,8 +316,8 @@ mod tests {
     #[derive(Deserialize, Debug)]
     struct HecEventJson {
         time: f64,
-        event: BTreeMap<String, String>,
-        fields: BTreeMap<String, String>,
+        event: Map<String, String>,
+        fields: Map<String, String>,
         source: Option<String>,
     }
 
@@ -325,7 +325,7 @@ mod tests {
     struct HecEventText {
         time: f64,
         event: String,
-        fields: BTreeMap<String, String>,
+        fields: Map<String, String>,
     }
 
     #[test]

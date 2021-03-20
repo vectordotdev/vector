@@ -1,21 +1,19 @@
 use super::Value;
 use serde::{Serialize, Serializer};
-use std::{
-    collections::{btree_map, BTreeMap},
-    iter, slice,
-};
+use std::{iter, slice};
+use structures::map::hash::{self, Map};
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
 pub fn all_fields(
-    fields: &BTreeMap<String, Value>,
+    fields: &Map<String, Value>,
 ) -> impl Iterator<Item = (String, &Value)> + Serialize {
     FieldsIter::new(fields)
 }
 
 #[derive(Clone)]
 enum LeafIter<'a> {
-    Map(btree_map::Iter<'a, String, Value>),
+    Map(hash::Iter<'a, String, Value>),
     Array(iter::Enumerate<slice::Iter<'a, Value>>),
 }
 
@@ -35,7 +33,7 @@ struct FieldsIter<'a> {
 }
 
 impl<'a> FieldsIter<'a> {
-    fn new(fields: &'a BTreeMap<String, Value>) -> FieldsIter<'a> {
+    fn new(fields: &'a Map<String, Value>) -> FieldsIter<'a> {
         FieldsIter {
             stack: vec![LeafIter::Map(fields.iter())],
             path: vec![],

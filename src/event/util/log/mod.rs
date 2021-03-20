@@ -23,9 +23,9 @@ pub use remove::remove;
 pub(self) mod test {
     use super::Value;
     use serde_json::Value as JsonValue;
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
 
-    pub fn fields_from_json(json_value: JsonValue) -> BTreeMap<String, Value> {
+    pub fn fields_from_json(json_value: JsonValue) -> Map<String, Value> {
         match Value::from(json_value) {
             Value::Map(map) => map,
             something => panic!("Expected a map, got {:?}", something),

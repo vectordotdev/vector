@@ -3,7 +3,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::{Serialize, Serializer};
-use std::collections::BTreeMap;
+use structures::map::hash::Map;
 use std::convert::{TryFrom, TryInto};
 use std::iter::FromIterator;
 use toml::value::Value as TomlValue;
@@ -15,7 +15,7 @@ pub enum Value {
     Float(f64),
     Boolean(bool),
     Timestamp(DateTime<Utc>),
-    Map(BTreeMap<String, Value>),
+    Map(Map<String, Value>),
     Array(Vec<Value>),
     Null,
 }
@@ -72,7 +72,7 @@ impl TryFrom<TomlValue> for Value {
             TomlValue::Table(t) => Self::from(
                 t.into_iter()
                     .map(|(k, v)| Value::try_from(v).map(|v| (k, v)))
-                    .collect::<Result<BTreeMap<_, _>>>()?,
+                    .collect::<Result<Map<_, _>>>()?,
             ),
             TomlValue::Datetime(dt) => Self::from(dt.to_string().parse::<DateTime<Utc>>()?),
             TomlValue::Boolean(b) => Self::from(b),
@@ -118,8 +118,8 @@ impl From<f64> for Value {
     }
 }
 
-impl From<BTreeMap<String, Value>> for Value {
-    fn from(value: BTreeMap<String, Value>) -> Self {
+impl From<Map<String, Value>> for Value {
+    fn from(value: Map<String, Value>) -> Self {
         Value::Map(value)
     }
 }
@@ -132,7 +132,7 @@ impl FromIterator<Value> for Value {
 
 impl FromIterator<(String, Value)> for Value {
     fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {
-        Value::Map(iter.into_iter().collect::<BTreeMap<String, Value>>())
+        Value::Map(iter.into_iter().collect::<Map<String, Value>>())
     }
 }
 

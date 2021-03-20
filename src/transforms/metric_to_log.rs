@@ -122,7 +122,7 @@ mod tests {
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
 
     #[test]
     fn generate_config() {
@@ -142,7 +142,7 @@ mod tests {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
 
-    fn tags() -> BTreeMap<String, String> {
+    fn tags() -> Map<String, String> {
         vec![
             ("host".to_owned(), "localhost".to_owned()),
             ("some_tag".to_owned(), "some_value".to_owned()),

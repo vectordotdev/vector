@@ -15,10 +15,10 @@ num_enum = "0.5.1"
 prost = "0.6.1"
 prost-types = "0.6.1"
 snafu = { version = "0.6" }
+structures = { path = "../structures" }
 
 [build-dependencies]
 prost-build = "0.6.1"
 
 [dev-dependencies]
-structures = { path = "../structures" }
-shared = { path = "../shared", features = ["btreemap"] }
+shared = { path = "../shared" }

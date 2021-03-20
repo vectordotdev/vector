@@ -1,15 +1,16 @@
 use crate::event::{lookup::Segment, util, Lookup, PathComponent, Value};
 use serde::{Serialize, Serializer};
+use std::collections::BTreeMap;
 use std::{
-    collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
     fmt::{Debug, Display},
     iter::FromIterator,
 };
+use structures::map::hash::{Entry, Map};
 
 #[derive(PartialEq, Debug, Clone, Default)]
 pub struct LogEvent {
-    fields: BTreeMap<String, Value>,
+    fields: Map<String, Value>,
 }
 
 impl LogEvent {
@@ -93,7 +94,7 @@ impl LogEvent {
     }
 
     #[instrument(level = "trace", skip(self))]
-    pub fn as_map(&self) -> &BTreeMap<String, Value> {
+    pub fn as_map(&self) -> &Map<String, Value> {
         &self.fields
     }
 
@@ -137,30 +138,26 @@ impl LogEvent {
     }
 }
 
-impl From<BTreeMap<String, Value>> for LogEvent {
-    fn from(map: BTreeMap<String, Value>) -> Self {
+impl From<Map<String, Value>> for LogEvent {
+    fn from(map: Map<String, Value>) -> Self {
         LogEvent { fields: map }
     }
 }
 
-impl Into<BTreeMap<String, Value>> for LogEvent {
-    fn into(self) -> BTreeMap<String, Value> {
+impl From<BTreeMap<String, Value>> for LogEvent {
+    fn from(map: BTreeMap<String, Value>) -> Self {
+        let mut fields = Map::new();
+        for (k, v) in map.into_iter() {
+            fields.insert(k, v);
+        }
+        LogEvent { fields }
+    }
+}
+
+impl Into<Map<String, Value>> for LogEvent {
+    fn into(self) -> Map<String, Value> {
         let Self { fields } = self;
         fields
-    }
-}
-
-impl From<HashMap<String, Value>> for LogEvent {
-    fn from(map: HashMap<String, Value>) -> Self {
-        LogEvent {
-            fields: map.into_iter().collect(),
-        }
-    }
-}
-
-impl Into<HashMap<String, Value>> for LogEvent {
-    fn into(self) -> HashMap<String, Value> {
-        self.fields.into_iter().collect()
     }
 }
 
@@ -173,7 +170,7 @@ impl TryFrom<serde_json::Value> for LogEvent {
                 fields
                     .into_iter()
                     .map(|(k, v)| (k, v.into()))
-                    .collect::<BTreeMap<_, _>>(),
+                    .collect::<Map<_, _>>(),
             )),
             _ => Err(crate::Error::from(
                 "Attempted to convert non-Object JSON into a LogEvent.",
@@ -227,7 +224,7 @@ impl<K: AsRef<str>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
 /// Converts event into an iterator over top-level key/value pairs.
 impl IntoIterator for LogEvent {
     type Item = (String, Value);
-    type IntoIter = std::collections::btree_map::IntoIter<String, Value>;
+    type IntoIter = structures::map::hash::IntoIter<String, Value>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.fields.into_iter()
@@ -267,13 +264,10 @@ impl vrl::Target for LogEvent {
 
     fn remove(&mut self, path: &vrl::Path, compact: bool) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
-            return Ok(Some(
-                std::mem::take(&mut self.fields)
-                    .into_iter()
-                    .map(|(key, value)| (key, value.into()))
-                    .collect::<BTreeMap<_, _>>()
-                    .into(),
-            ));
+            let fields: Map<String, Value> = std::mem::take(&mut self.fields);
+            let values: Map<String, vrl::Value> =
+                fields.into_iter().map(|(k, v)| (k, v.into())).collect();
+            return Ok(Some(values.into()));
         }
 
         // loop until we find a path that exists.
@@ -295,7 +289,7 @@ impl vrl::Target for LogEvent {
                     *self = map
                         .into_iter()
                         .map(|(k, v)| (k, v.into()))
-                        .collect::<BTreeMap<_, _>>()
+                        .collect::<Map<_, _>>()
                         .into();
 
                     return Ok(());
@@ -464,7 +458,7 @@ mod test {
         ];
 
         for (value, segments, expect) in cases {
-            let value: BTreeMap<String, Value> = value;
+            let value: Map<String, Value> = value;
             let event = LogEvent::from(value);
             let path = vrl::Path::new_unchecked(segments);
 
@@ -567,7 +561,7 @@ mod test {
         ];
 
         for (object, segments, value, expect, result) in cases {
-            let object: BTreeMap<String, Value> = object;
+            let object: Map<String, Value> = object;
             let mut event = LogEvent::from(object);
             let expect = LogEvent::from(expect);
             let value: vrl::Value = value;

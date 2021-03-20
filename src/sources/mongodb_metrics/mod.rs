@@ -21,7 +21,8 @@ use mongodb::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::BTreeMap, time::Instant};
+use std::time::Instant;
+use structures::map::hash::Map;
 use tokio::time;
 
 mod types;
@@ -85,7 +86,7 @@ struct MongoDBMetrics {
     client: Client,
     endpoint: String,
     namespace: Option<String>,
-    tags: BTreeMap<String, String>,
+    tags: Map<String, String>,
 }
 
 pub fn default_scrape_interval_secs() -> u64 {
@@ -160,7 +161,7 @@ impl MongoDBMetrics {
     /// Works only with Standalone connection-string. Collect metrics only from specified instance.
     /// https://docs.mongodb.com/manual/reference/connection-string/#standard-connection-string-format
     async fn new(endpoint: &str, namespace: Option<String>) -> Result<MongoDBMetrics, BuildError> {
-        let mut tags: BTreeMap<String, String> = BTreeMap::new();
+        let mut tags: Map<String, String> = Map::new();
 
         let mut client_options = ClientOptions::parse(endpoint)
             .await
@@ -223,12 +224,7 @@ impl MongoDBMetrics {
         Ok(())
     }
 
-    fn create_metric(
-        &self,
-        name: &str,
-        value: MetricValue,
-        tags: BTreeMap<String, String>,
-    ) -> Metric {
+    fn create_metric(&self, name: &str, value: MetricValue, tags: Map<String, String>) -> Metric {
         Metric::new(name, MetricKind::Absolute, value)
             .with_namespace(self.namespace.clone())
             .with_tags(Some(tags))

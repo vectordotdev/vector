@@ -108,7 +108,7 @@ impl Condition for Remap {
 
 #[cfg(test)]
 mod test {
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
 
     use super::*;
     use crate::{event::Metric, event::MetricKind, event::MetricValue, log_event};
@@ -167,7 +167,7 @@ mod test {
                     )
                     .with_namespace(Some("zerk"))
                     .with_tags(Some({
-                        let mut tags = BTreeMap::new();
+                        let mut tags = Map::new();
                         tags.insert("host".into(), "zoobub".into());
                         tags
                     })),

@@ -1,13 +1,14 @@
 use super::{PathComponent, PathIter, Value};
-use std::{collections::BTreeMap, iter::Peekable};
+use std::iter::Peekable;
+use structures::map::hash::Map;
 
 /// Inserts field value using a path specified using `a.b[1].c` notation.
-pub fn insert(fields: &mut BTreeMap<String, Value>, path: &str, value: Value) -> Option<Value> {
+pub fn insert(fields: &mut Map<String, Value>, path: &str, value: Value) -> Option<Value> {
     map_insert(fields, PathIter::new(path).peekable(), value)
 }
 
 pub fn insert_path(
-    fields: &mut BTreeMap<String, Value>,
+    fields: &mut Map<String, Value>,
     path: Vec<PathComponent>,
     value: Value,
 ) -> Option<Value> {
@@ -15,7 +16,7 @@ pub fn insert_path(
 }
 
 fn map_insert<I>(
-    fields: &mut BTreeMap<String, Value>,
+    fields: &mut Map<String, Value>,
     mut path_iter: Peekable<I>,
     value: Value,
 ) -> Option<Value>
@@ -28,7 +29,7 @@ where
             if let Some(Value::Map(map)) = fields.get_mut(&current) {
                 map_insert(map, path_iter, value)
             } else {
-                let mut map = BTreeMap::new();
+                let mut map = Map::new();
                 map_insert(&mut map, path_iter, value);
                 fields.insert(current, Value::Map(map))
             }
@@ -65,7 +66,7 @@ where
             if let Some(Value::Map(map)) = values.get_mut(current) {
                 map_insert(map, path_iter, value)
             } else {
-                let mut map = BTreeMap::new();
+                let mut map = Map::new();
                 map_insert(&mut map, path_iter, value);
                 while values.len() <= current {
                     values.push(Value::Null);
@@ -94,11 +95,11 @@ mod test {
     use super::super::test::fields_from_json;
     use super::*;
     use serde_json::json;
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
 
     #[test]
     fn test_insert_nested() {
-        let mut fields = BTreeMap::new();
+        let mut fields = Map::new();
         insert(&mut fields, "a.b.c", Value::Integer(3));
 
         let expected = fields_from_json(json!({
@@ -113,7 +114,7 @@ mod test {
 
     #[test]
     fn test_insert_array() {
-        let mut fields = BTreeMap::new();
+        let mut fields = Map::new();
         insert(&mut fields, "a.b[0].c[2]", Value::Integer(10));
         insert(&mut fields, "a.b[0].c[0]", Value::Integer(5));
 

@@ -1,9 +1,9 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::{error, fmt, iter, num};
+use structures::map::hash::Map;
 
 lazy_static! {
     static ref SCOREBOARD: HashMap<char, &'static str> = vec![
@@ -112,7 +112,7 @@ pub fn parse(
     payload: &str,
     namespace: Option<&str>,
     now: DateTime<Utc>,
-    tags: Option<&BTreeMap<String, String>>,
+    tags: Option<&Map<String, String>>,
 ) -> impl Iterator<Item = Result<Metric, ParseError>> {
     // We use a HashMap rather than a Vector as mod_status has
     // BusyWorkers/IdleWorkers repeated
@@ -148,7 +148,7 @@ fn line_to_metrics<'a>(
     value: &str,
     namespace: Option<&'a str>,
     now: DateTime<Utc>,
-    tags: Option<&'a BTreeMap<String, String>>,
+    tags: Option<&'a Map<String, String>>,
 ) -> Option<Result<Box<dyn Iterator<Item = Metric> + 'a>, ParseError>> {
     StatusFieldStatistic::from_key_value(key, value).map(move |result| {
         result.map(move |statistic| match statistic {
@@ -401,7 +401,7 @@ where
 fn score_to_metric(
     namespace: Option<&str>,
     now: DateTime<Utc>,
-    tags: Option<&BTreeMap<String, String>>,
+    tags: Option<&Map<String, String>>,
     state: &str,
     count: u32,
 ) -> Metric {
@@ -526,156 +526,157 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 (metrics, errors)
             },
         );
-        metrics.sort_by(|a, b| (a.name(), a.tags()).cmp(&(b.name(), b.tags())));
 
-        assert_eq!(
-            metrics,
-            vec![
-                Metric::new(
-                    "connections",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 0.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "closing" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "connections",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 0.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "keepalive" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "connections",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "total" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "connections",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 0.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "writing" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "closing" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "dnslookup" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "finishing" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 2.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "idle_cleanup" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 2.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "keepalive" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "logging" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 325.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "open" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "reading" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "sending" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "starting" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 64.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "waiting" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "uptime_seconds_total",
-                    MetricKind::Absolute,
-                    MetricValue::Counter { value: 12.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "workers",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "busy" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "workers",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 74.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "idle" }))
-                .with_timestamp(Some(now)),
-            ]
-        );
+        let expected = vec![
+            Metric::new(
+                "connections",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 0.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "closing" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "connections",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 0.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "keepalive" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "connections",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "total" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "connections",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 0.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "writing" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "closing" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "dnslookup" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "finishing" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 2.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "idle_cleanup" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 2.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "keepalive" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "logging" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 325.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "open" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "reading" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "sending" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "starting" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 64.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "waiting" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "uptime_seconds_total",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 12.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "workers",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "busy" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "workers",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 74.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "idle" }))
+            .with_timestamp(Some(now)),
+        ];
+
+        assert_eq!(metrics.len(), expected.len());
+        for metric in &expected {
+            assert!(metrics.contains(&metric))
+        }
         assert_eq!(errors.len(), 0);
     }
 
@@ -735,216 +736,217 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 (metrics, errors)
             },
         );
-        metrics.sort_by(|a, b| (a.name(), a.tags()).cmp(&(b.name(), b.tags())));
 
-        assert_eq!(
-            metrics,
-            vec![
-                Metric::new(
-                    "access_total",
-                    MetricKind::Absolute,
-                    MetricValue::Counter { value: 30.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "connections",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 0.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "closing" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "connections",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 0.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "keepalive" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "connections",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "total" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "connections",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 0.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "writing" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "cpu_load",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 0.846154 },
-                )
-                .with_namespace(Some("apache"))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "cpu_seconds_total",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 0.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "type" => "children_system" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "cpu_seconds_total",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 0.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "type" => "children_user" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "cpu_seconds_total",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 0.02 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "type" => "system" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "cpu_seconds_total",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 0.2 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "type" => "user" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "duration_seconds_total",
-                    MetricKind::Absolute,
-                    MetricValue::Counter { value: 11.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "closing" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "dnslookup" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "finishing" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 2.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "idle_cleanup" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 2.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "keepalive" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "logging" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 325.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "open" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "reading" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "sending" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "starting" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "scoreboard",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 64.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "waiting" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "sent_bytes_total",
-                    MetricKind::Absolute,
-                    MetricValue::Counter { value: 222208.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "uptime_seconds_total",
-                    MetricKind::Absolute,
-                    MetricValue::Counter { value: 26.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "workers",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 1.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "busy" }))
-                .with_timestamp(Some(now)),
-                Metric::new(
-                    "workers",
-                    MetricKind::Absolute,
-                    MetricValue::Gauge { value: 74.0 },
-                )
-                .with_namespace(Some("apache"))
-                .with_tags(Some(hashmap! { "state" => "idle" }))
-                .with_timestamp(Some(now)),
-            ]
-        );
+        let expected = vec![
+            Metric::new(
+                "access_total",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 30.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "connections",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 0.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "closing" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "connections",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 0.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "keepalive" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "connections",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "total" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "connections",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 0.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "writing" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "cpu_load",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 0.846154 },
+            )
+            .with_namespace(Some("apache"))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "cpu_seconds_total",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 0.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "type" => "children_system" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "cpu_seconds_total",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 0.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "type" => "children_user" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "cpu_seconds_total",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 0.02 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "type" => "system" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "cpu_seconds_total",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 0.2 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "type" => "user" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "duration_seconds_total",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 11.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "closing" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "dnslookup" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "finishing" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 2.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "idle_cleanup" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 2.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "keepalive" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "logging" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 325.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "open" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "reading" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "sending" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "starting" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "scoreboard",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 64.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "waiting" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "sent_bytes_total",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 222208.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "uptime_seconds_total",
+                MetricKind::Absolute,
+                MetricValue::Counter { value: 26.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "workers",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 1.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "busy" }))
+            .with_timestamp(Some(now)),
+            Metric::new(
+                "workers",
+                MetricKind::Absolute,
+                MetricValue::Gauge { value: 74.0 },
+            )
+            .with_namespace(Some("apache"))
+            .with_tags(Some(hashmap! { "state" => "idle" }))
+            .with_timestamp(Some(now)),
+        ];
+
+        assert_eq!(metrics.len(), expected.len());
+        for metric in &expected {
+            assert!(metrics.contains(&metric))
+        }
         assert_eq!(errors.len(), 0);
     }
 
@@ -967,19 +969,20 @@ ConnsTotal: 1
                 (metrics, errors)
             },
         );
-        metrics.sort_by(|a, b| (a.name(), a.tags()).cmp(&(b.name(), b.tags())));
 
-        assert_eq!(
-            metrics,
-            vec![Metric::new(
-                "connections",
-                MetricKind::Absolute,
-                MetricValue::Gauge { value: 1.0 },
-            )
-            .with_namespace(Some("apache"))
-            .with_tags(Some(hashmap! { "state" => "total" }))
-            .with_timestamp(Some(now)),]
-        );
+        let expected = vec![Metric::new(
+            "connections",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+        )
+        .with_namespace(Some("apache"))
+        .with_tags(Some(hashmap! { "state" => "total" }))
+        .with_timestamp(Some(now))];
+
+        assert_eq!(metrics.len(), expected.len());
+        for metric in &expected {
+            assert!(metrics.contains(&metric))
+        }
         assert_eq!(errors.len(), 1);
     }
 }

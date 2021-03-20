@@ -286,7 +286,7 @@ mod tests {
     };
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
     use std::io::Write;
     use std::net::SocketAddr;
     use tokio::sync::mpsc;
@@ -525,7 +525,7 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            let mut map = BTreeMap::new();
+            let mut map = Map::new();
             map.insert("dotted.key2".to_string(), Value::from("value2"));
             assert_eq!(log["nested"], map.into());
         }

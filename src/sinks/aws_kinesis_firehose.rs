@@ -260,7 +260,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Record
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
 
     #[test]
     fn generate_config() {
@@ -282,7 +282,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
         let event = encode_event(event, &Encoding::Json.into());
 
-        let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
+        let map: Map<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
         assert_eq!(
             map[&crate::config::log_schema().message_key().to_string()],

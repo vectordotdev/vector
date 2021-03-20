@@ -2,25 +2,24 @@ use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricPro
 use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
-use std::collections::{BTreeMap, HashMap};
+pub use log_event::LogEvent;
+pub use lookup::Lookup;
+pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
+use std::collections::BTreeMap;
+use std::convert::{TryFrom, TryInto};
+use structures::map::hash::Map;
+pub(crate) use util::log::PathComponent;
+pub(crate) use util::log::PathIter;
+pub use value::Value;
 
 pub mod discriminant;
+mod log_event;
+mod lookup;
 pub mod merge;
 pub mod merge_state;
 pub mod metric;
 pub mod util;
-
-mod log_event;
-mod lookup;
 mod value;
-
-pub use log_event::LogEvent;
-pub use lookup::Lookup;
-pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
-use std::convert::{TryFrom, TryInto};
-pub(crate) use util::log::PathComponent;
-pub(crate) use util::log::PathIter;
-pub use value::Value;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
@@ -87,7 +86,7 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
 }
 
 fn decode_map(fields: BTreeMap<String, proto::Value>) -> Option<Value> {
-    let mut accum: BTreeMap<String, Value> = BTreeMap::new();
+    let mut accum: Map<String, Value> = Map::new();
     for (key, value) in fields {
         match decode_value(value) {
             Some(value) => {
@@ -129,14 +128,8 @@ fn decode_value(input: proto::Value) -> Option<Value> {
     }
 }
 
-impl From<BTreeMap<String, Value>> for Event {
-    fn from(map: BTreeMap<String, Value>) -> Self {
-        Self::Log(LogEvent::from(map))
-    }
-}
-
-impl From<HashMap<String, Value>> for Event {
-    fn from(map: HashMap<String, Value>) -> Self {
+impl From<Map<String, Value>> for Event {
+    fn from(map: Map<String, Value>) -> Self {
         Self::Log(LogEvent::from(map))
     }
 }
@@ -150,7 +143,7 @@ impl TryFrom<serde_json::Value> for Event {
                 fields
                     .into_iter()
                     .map(|(k, v)| (k, v.into()))
-                    .collect::<BTreeMap<_, _>>(),
+                    .collect::<Map<_, _>>(),
             )),
             _ => Err(crate::Error::from(
                 "Attempted to convert non-Object JSON into an Event.",
@@ -180,7 +173,7 @@ impl From<proto::EventWrapper> for Event {
                     .fields
                     .into_iter()
                     .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
-                    .collect::<BTreeMap<_, _>>();
+                    .collect::<Map<_, _>>();
 
                 Event::Log(LogEvent::from(fields))
             }
@@ -202,10 +195,10 @@ impl From<proto::EventWrapper> for Event {
                     .timestamp
                     .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
 
-                let tags = if !proto.tags.is_empty() {
-                    Some(proto.tags)
-                } else {
+                let tags: Option<Map<String, String>> = if proto.tags.is_empty() {
                     None
+                } else {
+                    Some(from_btree(proto.tags))
                 };
 
                 let value = match proto.value.unwrap() {
@@ -257,6 +250,22 @@ impl From<proto::EventWrapper> for Event {
     }
 }
 
+fn from_btree(btree: BTreeMap<String, String>) -> Map<String, String> {
+    let mut map = Map::new();
+    for (k, v) in btree.into_iter() {
+        map.insert(k, v);
+    }
+    map
+}
+
+fn to_btree(map: Map<String, String>) -> BTreeMap<String, String> {
+    let mut btree = BTreeMap::new();
+    for (k, v) in map.into_iter() {
+        btree.insert(k, v);
+    }
+    btree
+}
+
 fn encode_value(value: Value) -> proto::Value {
     proto::Value {
         kind: match value {
@@ -275,7 +284,7 @@ fn encode_value(value: Value) -> proto::Value {
     }
 }
 
-fn encode_map(fields: BTreeMap<String, Value>) -> proto::ValueMap {
+fn encode_map(fields: Map<String, Value>) -> proto::ValueMap {
     proto::ValueMap {
         fields: fields
             .into_iter()
@@ -362,7 +371,7 @@ impl From<Event> for proto::EventWrapper {
                     name,
                     namespace,
                     timestamp,
-                    tags,
+                    tags: to_btree(tags),
                     kind,
                     value: Some(metric),
                 });
@@ -438,7 +447,7 @@ impl From<proto::SummaryQuantile> for metric::Quantile {
 
 impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
-        let mut event = Event::Log(LogEvent::from(BTreeMap::new()));
+        let mut event = Event::Log(LogEvent::from(Map::new()));
 
         event
             .as_mut_log()

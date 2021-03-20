@@ -15,7 +15,7 @@ use crate::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use structures::map::hash::Map;
 use std::convert::TryFrom;
 use std::num::ParseFloatError;
 
@@ -153,11 +153,11 @@ fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
 fn render_tags(
     tags: &Option<IndexMap<String, String>>,
     event: &Event,
-) -> Result<Option<BTreeMap<String, String>>, TransformError> {
+) -> Result<Option<Map<String, String>>, TransformError> {
     Ok(match tags {
         None => None,
         Some(tags) => {
-            let mut map = BTreeMap::new();
+            let mut map = Map::new();
             for (name, value) in tags {
                 match render_template(value, event) {
                     Ok(tag) => {

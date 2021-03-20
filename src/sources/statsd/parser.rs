@@ -2,10 +2,10 @@ use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
-    collections::BTreeMap,
     error, fmt,
     num::{ParseFloatError, ParseIntError},
 };
+use structures::map::hash::Map;
 
 lazy_static! {
     static ref WHITESPACE: Regex = Regex::new(r"\s+").unwrap();
@@ -127,14 +127,14 @@ fn parse_sampling(input: &str) -> Result<f64, ParseError> {
     }
 }
 
-fn parse_tags(input: &str) -> Result<BTreeMap<String, String>, ParseError> {
+fn parse_tags(input: &str) -> Result<Map<String, String>, ParseError> {
     if !input.starts_with('#') || input.len() < 2 {
         return Err(ParseError::Malformed(
             "expected non empty '#'-prefixed tags component",
         ));
     }
 
-    let mut result = BTreeMap::new();
+    let mut result = Map::new();
 
     let chunks = input[1..].split(',').collect::<Vec<_>>();
     for chunk in chunks {

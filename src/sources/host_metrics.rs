@@ -31,7 +31,7 @@ use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
-use std::collections::BTreeMap;
+use structures::map::hash::Map;
 use std::fmt;
 use std::path::Path;
 use structures::hashmap;
@@ -421,7 +421,7 @@ impl HostMetricsConfig {
                     "uptime",
                     timestamp,
                     time.get::<second>() as f64,
-                    BTreeMap::default(),
+                    Map::default(),
                 ));
             }
             Err(error) => {
@@ -436,7 +436,7 @@ impl HostMetricsConfig {
                     "boot_time",
                     timestamp,
                     time.get::<second>() as f64,
-                    BTreeMap::default(),
+                    Map::default(),
                 ));
             }
             Err(error) => {
@@ -688,7 +688,7 @@ impl HostMetricsConfig {
         name: &str,
         timestamp: DateTime<Utc>,
         value: f64,
-        tags: BTreeMap<String, String>,
+        tags: Map<String, String>,
     ) -> Metric {
         Metric::new(name, MetricKind::Absolute, MetricValue::Counter { value })
             .with_namespace(self.namespace.0.clone())
@@ -701,7 +701,7 @@ impl HostMetricsConfig {
         name: &str,
         timestamp: DateTime<Utc>,
         value: f64,
-        tags: BTreeMap<String, String>,
+        tags: Map<String, String>,
     ) -> Metric {
         Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
             .with_namespace(self.namespace.0.clone())

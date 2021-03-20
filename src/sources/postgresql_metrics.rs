@@ -17,12 +17,8 @@ use openssl::{
 use postgres_openssl::MakeTlsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{
-    collections::{BTreeMap, HashSet},
-    future::ready,
-    path::PathBuf,
-    time::Instant,
-};
+use std::{collections::HashSet, future::ready, path::PathBuf, time::Instant};
+use structures::map::hash::Map;
 use tokio::time;
 use tokio_postgres::{
     config::{ChannelBinding, Host, SslMode, TargetSessionAttrs},
@@ -422,7 +418,7 @@ impl DatnameFilter {
 struct PostgresqlMetrics {
     client: PostgresqlClient,
     namespace: Option<String>,
-    tags: BTreeMap<String, String>,
+    tags: Map<String, String>,
     datname_filter: DatnameFilter,
 }
 
@@ -450,7 +446,7 @@ impl PostgresqlMetrics {
             }
         };
 
-        let mut tags = BTreeMap::new();
+        let mut tags = Map::new();
         tags.insert("endpoint".into(), config_to_endpoint(&config));
         tags.insert("host".into(), host);
 
@@ -748,12 +744,7 @@ impl PostgresqlMetrics {
         ])
     }
 
-    fn create_metric(
-        &self,
-        name: &str,
-        value: MetricValue,
-        tags: BTreeMap<String, String>,
-    ) -> Metric {
+    fn create_metric(&self, name: &str, value: MetricValue, tags: Map<String, String>) -> Metric {
         Metric::new(name, MetricKind::Absolute, value)
             .with_namespace(self.namespace.clone())
             .with_tags(Some(tags))

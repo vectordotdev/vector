@@ -7,7 +7,7 @@ use ordered_float::NotNan;
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
-use structures::map::ord::Map;
+use structures::map::{hash, ord};
 
 impl Value {
     /// Convert a given [`Value`] into a [`Expression`] trait object.
@@ -31,7 +31,7 @@ impl Value {
                 let object = crate::expression::Object::from(
                     v.into_iter()
                         .map(|(k, v)| (k, v.into_expr()))
-                        .collect::<Map<_, _>>(),
+                        .collect::<ord::Map<_, _>>(),
                 );
 
                 Container::new(container::Variant::from(object)).into()
@@ -427,21 +427,21 @@ impl Value {
         matches!(self, Value::Object(_))
     }
 
-    pub fn as_object(&self) -> Option<&Map<String, Value>> {
+    pub fn as_object(&self) -> Option<&ord::Map<String, Value>> {
         match self {
             Value::Object(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn as_object_mut(&mut self) -> Option<&mut Map<String, Value>> {
+    pub fn as_object_mut(&mut self) -> Option<&mut ord::Map<String, Value>> {
         match self {
             Value::Object(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn try_object(self) -> Result<Map<String, Value>, Error> {
+    pub fn try_object(self) -> Result<ord::Map<String, Value>, Error> {
         match self {
             Value::Object(v) => Ok(v),
             _ => Err(Error::Expected {
@@ -452,15 +452,25 @@ impl Value {
     }
 }
 
-impl From<Map<String, Value>> for Value {
-    fn from(value: Map<String, Value>) -> Self {
+impl From<ord::Map<String, Value>> for Value {
+    fn from(value: ord::Map<String, Value>) -> Self {
+        Value::Object(value)
+    }
+}
+
+impl From<hash::Map<String, Value>> for Value {
+    fn from(map: hash::Map<String, Value>) -> Self {
+        let mut value = ord::Map::new();
+        for (k, v) in map.into_iter() {
+            value.insert(k, v);
+        }
         Value::Object(value)
     }
 }
 
 impl FromIterator<(String, Value)> for Value {
     fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {
-        Value::Object(iter.into_iter().collect::<Map<_, _>>())
+        Value::Object(iter.into_iter().collect::<ord::Map<_, _>>())
     }
 }
 

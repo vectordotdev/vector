@@ -22,7 +22,8 @@ use http::{Request, Uri};
 use indoc::indoc;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::HashSet;
+use structures::map::hash::Map;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -176,8 +177,8 @@ impl HttpSink for InfluxDBLogsSink {
         });
 
         // Tags + Fields
-        let mut tags: BTreeMap<String, String> = BTreeMap::new();
-        let mut fields: HashMap<String, Field> = HashMap::new();
+        let mut tags: Map<String, String> = Map::new();
+        let mut fields: Map<String, Field> = Map::new();
         event.all_fields().for_each(|(key, value)| {
             if self.tags.contains(&key) {
                 tags.insert(key, value.to_string_lossy());
@@ -704,7 +705,7 @@ mod integration_tests {
 
         sink.run(stream::iter(events)).await.unwrap();
 
-        let mut body = std::collections::HashMap::new();
+        let mut body = Map::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{}.vector\")", ns.clone()));
         body.insert("type", "flux".to_owned());
 

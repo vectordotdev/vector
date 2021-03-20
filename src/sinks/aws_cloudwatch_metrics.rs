@@ -21,10 +21,10 @@ use rusoto_cloudwatch::{
 use rusoto_core::{Region, RusotoError};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
     convert::TryInto,
     task::{Context, Poll},
 };
+use structures::map::hash::Map;
 use tower::Service;
 
 #[derive(Clone)]
@@ -269,7 +269,7 @@ fn timestamp_to_string(timestamp: DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-fn tags_to_dimensions(tags: BTreeMap<String, String>) -> Vec<Dimension> {
+fn tags_to_dimensions(tags: Map<String, String>) -> Vec<Dimension> {
     // according to the API, up to 10 dimensions per metric can be provided
     tags.iter()
         .take(10)

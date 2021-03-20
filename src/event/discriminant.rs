@@ -1,8 +1,6 @@
 use super::{LogEvent, Value};
-use std::{
-    collections::BTreeMap,
-    hash::{Hash, Hasher},
-};
+use std::hash::{Hash, Hasher};
+use structures::map::hash::Map;
 
 // TODO: if we had `Value` implement `Eq` and `Hash`, the implementation here
 // would be much easier. The issue is with `f64` type. We should consider using
@@ -91,7 +89,7 @@ fn array_eq(this: &[Value], other: &[Value]) -> bool {
         .all(|(first, second)| value_eq(first, second))
 }
 
-fn map_eq(this: &BTreeMap<String, Value>, other: &BTreeMap<String, Value>) -> bool {
+fn map_eq(this: &Map<String, Value>, other: &Map<String, Value>) -> bool {
     if this.len() != other.len() {
         return false;
     }
@@ -142,7 +140,7 @@ fn hash_array<H: Hasher>(hasher: &mut H, array: &[Value]) {
     }
 }
 
-fn hash_map<H: Hasher>(hasher: &mut H, map: &BTreeMap<String, Value>) {
+fn hash_map<H: Hasher>(hasher: &mut H, map: &Map<String, Value>) {
     for (key, val) in map.iter() {
         hasher.write(key.as_bytes());
         hash_value(hasher, val);

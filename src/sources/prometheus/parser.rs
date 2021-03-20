@@ -3,11 +3,11 @@ use crate::event::{
     Event,
 };
 use chrono::{DateTime, TimeZone, Utc};
-use std::collections::BTreeMap;
+use structures::map::hash::Map;
 
 pub use prometheus_parser::*;
 
-fn has_values_or_none(tags: BTreeMap<String, String>) -> Option<BTreeMap<String, String>> {
+fn has_values_or_none(tags: Map<String, String>) -> Option<Map<String, String>> {
     if tags.is_empty() {
         None
     } else {

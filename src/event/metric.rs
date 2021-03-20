@@ -2,12 +2,14 @@ use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use std::hash::{Hash, Hasher};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeSet,
     convert::TryFrom,
     fmt::{self, Display, Formatter},
     iter::FromIterator,
 };
+use structures::map::hash::Map;
 use vrl::{path::Segment, Target};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -18,7 +20,7 @@ pub struct Metric {
     pub data: MetricData,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct MetricSeries {
     #[serde(flatten)]
     pub name: MetricName,
@@ -26,7 +28,19 @@ pub struct MetricSeries {
     pub tags: Option<MetricTags>,
 }
 
-pub type MetricTags = BTreeMap<String, String>;
+pub type MetricTags = Map<String, String>;
+
+impl Hash for MetricSeries {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        if let Some(tags) = &self.tags {
+            for (k, v) in tags.iter() {
+                k.hash(state);
+                v.hash(state);
+            }
+        }
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct MetricName {
@@ -778,7 +792,7 @@ impl Target for Metric {
 
     fn get(&self, path: &vrl::Path) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
-            let mut map = BTreeMap::<String, vrl::Value>::new();
+            let mut map = Map::<String, vrl::Value>::new();
             map.insert("name".to_string(), self.series.name.name.clone().into());
             if let Some(ref namespace) = self.series.name.namespace {
                 map.insert("namespace".to_string(), namespace.clone().into());
@@ -792,7 +806,7 @@ impl Target for Metric {
                     "tags".to_string(),
                     tags.iter()
                         .map(|(tag, value)| (tag.clone(), value.clone().into()))
-                        .collect::<BTreeMap<_, _>>()
+                        .collect::<Map<_, _>>()
                         .into(),
                 );
             }

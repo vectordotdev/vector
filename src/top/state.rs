@@ -1,4 +1,4 @@
-use std::collections::btree_map::BTreeMap;
+use structures::map::hash::Map;
 use tokio::sync::mpsc;
 
 type NamedMetric = (String, i64);
@@ -15,7 +15,7 @@ pub enum EventType {
     ComponentRemoved(String),
 }
 
-pub type State = BTreeMap<String, ComponentRow>;
+pub type State = Map<String, ComponentRow>;
 pub type EventTx = mpsc::Sender<EventType>;
 pub type EventRx = mpsc::Receiver<EventType>;
 pub type StateRx = mpsc::Receiver<State>;

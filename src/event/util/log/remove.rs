@@ -1,11 +1,12 @@
 use super::{PathComponent, PathIter, Value};
-use std::{cmp::Ordering, collections::BTreeMap, iter::Peekable, mem};
+use std::{cmp::Ordering, iter::Peekable, mem};
+use structures::map::hash::Map;
 
 /// Removes field value specified by the given path and return its value.
 ///
 /// A special case worth mentioning: if there is a nested array and an item is removed
 /// from the middle of this array, then it is just replaced by `Value::Null`.
-pub fn remove(fields: &mut BTreeMap<String, Value>, path: &str, prune: bool) -> Option<Value> {
+pub fn remove(fields: &mut Map<String, Value>, path: &str, prune: bool) -> Option<Value> {
     remove_map(fields, PathIter::new(path).peekable(), prune).map(|(value, _)| value)
 }
 
@@ -37,7 +38,7 @@ fn remove_array(
 }
 
 fn remove_map(
-    fields: &mut BTreeMap<String, Value>,
+    fields: &mut Map<String, Value>,
     mut path: Peekable<PathIter>,
     prune: bool,
 ) -> Option<(Value, bool)> {

@@ -25,10 +25,10 @@ use rusoto_s3::{
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
-    collections::BTreeMap,
     convert::{TryFrom, TryInto},
     task::{Context, Poll},
 };
+use structures::map::hash::Map;
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
 use uuid::Uuid;
@@ -73,7 +73,7 @@ struct S3Options {
     server_side_encryption: Option<S3ServerSideEncryption>,
     ssekms_key_id: Option<String>,
     storage_class: Option<S3StorageClass>,
-    tags: Option<BTreeMap<String, String>>,
+    tags: Option<Map<String, String>>,
     content_encoding: Option<String>, // inherit from compression value
     content_type: Option<String>,     // default `text/x-log`
 }
@@ -465,7 +465,7 @@ mod tests {
         let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
 
         let (bytes, _) = bytes.into_parts();
-        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        let map: Map<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
@@ -490,7 +490,7 @@ mod tests {
         let bytes = encode_event(event, &key_prefix, &encoding_config).unwrap();
 
         let (bytes, _) = bytes.into_parts();
-        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        let map: Map<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(map[&log_schema().message_key().to_string()], message);
         // assert_eq!(map["key"], "value".to_string());

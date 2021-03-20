@@ -1,7 +1,7 @@
 use super::util::{table_to_set, table_to_timestamp, timestamp_to_table, type_name};
 use crate::event::{metric, Metric, MetricKind, MetricValue, StatisticKind};
 use rlua::prelude::*;
-use std::collections::BTreeMap;
+use structures::map::hash::Map;
 
 impl<'a> ToLua<'a> for MetricKind {
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
@@ -149,7 +149,7 @@ impl<'a> FromLua<'a> for Metric {
             .map(table_to_timestamp)
             .transpose()?;
         let namespace: Option<String> = table.get("namespace")?;
-        let tags: Option<BTreeMap<String, String>> = table.get("tags")?;
+        let tags: Option<Map<String, String>> = table.get("tags")?;
         let kind = table
             .get::<_, Option<MetricKind>>("kind")?
             .unwrap_or(MetricKind::Absolute);

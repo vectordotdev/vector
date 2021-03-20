@@ -5,7 +5,8 @@ use crate::{
 };
 use async_stream::stream;
 use lazy_static::lazy_static;
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
+use structures::map::hash::Map;
 use tokio::{
     stream::{Stream, StreamExt},
     time::Duration,
@@ -124,7 +125,7 @@ pub fn component_counter_metrics(
     interval: i32,
     filter_fn: &'static MetricFilterFn,
 ) -> impl Stream<Item = Vec<Metric>> {
-    let mut cache = BTreeMap::new();
+    let mut cache = Map::new();
 
     get_all_metrics(interval).map(move |m| {
         m.into_iter()
@@ -133,7 +134,7 @@ pub fn component_counter_metrics(
                 Some(name) => Some((name, m)),
                 _ => None,
             })
-            .fold(BTreeMap::new(), |mut map, (name, m)| {
+            .fold(Map::new(), |mut map, (name, m)| {
                 map.entry(name).or_insert_with(Vec::new).push(m);
                 map
             })
@@ -187,7 +188,7 @@ pub fn component_counter_throughputs(
     interval: i32,
     filter_fn: &'static MetricFilterFn,
 ) -> impl Stream<Item = Vec<(Metric, f64)>> {
-    let mut cache = BTreeMap::new();
+    let mut cache = Map::new();
 
     get_all_metrics(interval)
         .map(move |m| {
@@ -197,7 +198,7 @@ pub fn component_counter_throughputs(
                     Some(name) => Some((name, m)),
                     _ => None,
                 })
-                .fold(BTreeMap::new(), |mut map, (name, m)| {
+                .fold(Map::new(), |mut map, (name, m)| {
                     map.entry(name).or_insert_with(Vec::new).push(m);
                     map
                 })

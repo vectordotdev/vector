@@ -143,7 +143,7 @@ fn encode_tags(tags: &MetricTags) -> String {
             }
         })
         .collect();
-    // `parts` is already sorted by key because of BTreeMap
+    // `parts` is already sorted by key because of Map
     parts.join(",")
 }
 

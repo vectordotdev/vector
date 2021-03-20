@@ -1,6 +1,8 @@
 use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 use rlua::prelude::*;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
+use std::hash::Hash;
+use structures::map::hash::Map;
 
 pub fn timestamp_to_table(ctx: LuaContext<'_>, ts: DateTime<Utc>) -> LuaResult<LuaTable> {
     let table = ctx.create_table()?;
@@ -38,12 +40,12 @@ pub fn table_to_timestamp(t: LuaTable<'_>) -> LuaResult<DateTime<Utc>> {
     Ok(Utc.ymd(year, month, day).and_hms_nano(hour, min, sec, nano))
 }
 
-pub fn table_to_map<'a, K, V>(t: LuaTable<'a>) -> LuaResult<BTreeMap<K, V>>
+pub fn table_to_map<'a, K, V>(t: LuaTable<'a>) -> LuaResult<Map<K, V>>
 where
-    K: From<String> + Ord,
+    K: From<String> + Ord + Hash,
     V: FromLua<'a>,
 {
-    let mut map = BTreeMap::new();
+    let mut map = Map::new();
     for pair in t.pairs() {
         let (k, v): (String, V) = pair?;
         map.insert(k.into(), v);

@@ -17,7 +17,8 @@ use http::{Request, StatusCode};
 use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::BTreeMap, convert::TryFrom, time::Instant};
+use std::{convert::TryFrom, time::Instant};
+use structures::map::hash::Map;
 use tokio::time;
 
 pub mod parser;
@@ -142,7 +143,7 @@ struct NginxMetrics {
     endpoint: String,
     auth: Option<Auth>,
     namespace: Option<String>,
-    tags: BTreeMap<String, String>,
+    tags: Map<String, String>,
 }
 
 impl NginxMetrics {
@@ -152,7 +153,7 @@ impl NginxMetrics {
         auth: Option<Auth>,
         namespace: Option<String>,
     ) -> crate::Result<Self> {
-        let mut tags = BTreeMap::new();
+        let mut tags = Map::new();
         tags.insert("endpoint".into(), endpoint.clone());
         tags.insert("host".into(), Self::get_endpoint_host(&endpoint)?);
 

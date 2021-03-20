@@ -22,10 +22,10 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
     cmp::Ordering,
-    collections::{BTreeMap, HashMap},
     future::ready,
     sync::atomic::{AtomicI64, Ordering::SeqCst},
 };
+use structures::map::hash::Map;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -57,7 +57,7 @@ pub struct DatadogConfig {
 struct DatadogSink {
     config: DatadogConfig,
     /// Endpoint -> (uri_path, last_sent_timestamp)
-    endpoint_data: HashMap<DatadogEndpoint, (Uri, AtomicI64)>,
+    endpoint_data: Map<DatadogEndpoint, (Uri, AtomicI64)>,
 }
 
 lazy_static! {
@@ -276,7 +276,7 @@ async fn healthcheck(config: DatadogConfig, client: HttpClient) -> crate::Result
     }
 }
 
-fn encode_tags(tags: &BTreeMap<String, String>) -> Vec<String> {
+fn encode_tags(tags: &Map<String, String>) -> Vec<String> {
     let mut pairs: Vec<_> = tags
         .iter()
         .map(|(name, value)| format!("{}:{}", name, value))
@@ -518,7 +518,7 @@ mod tests {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
 
-    fn tags() -> BTreeMap<String, String> {
+    fn tags() -> Map<String, String> {
         vec![
             ("normal_tag".to_owned(), "value".to_owned()),
             ("true_tag".to_owned(), "true".to_owned()),

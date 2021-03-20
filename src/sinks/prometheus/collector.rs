@@ -4,7 +4,7 @@ use crate::{
 };
 use indexmap::map::IndexMap;
 use prometheus_parser::{proto, METRIC_NAME_LABEL};
-use std::collections::BTreeMap;
+use structures::map::hash::Map;
 use std::fmt::Write as _;
 
 pub(super) trait MetricCollector {
@@ -20,7 +20,7 @@ pub(super) trait MetricCollector {
         name: &str,
         suffix: &str,
         value: f64,
-        tags: Option<&BTreeMap<String, String>>,
+        tags: Option<&Map<String, String>>,
         extra: Option<(&str, String)>,
     );
 
@@ -183,15 +183,15 @@ pub(super) trait MetricCollector {
 }
 
 pub(super) struct StringCollector {
-    // BTreeMap ensures we get sorted output, which whilst not required is preferable
-    processed: BTreeMap<String, String>,
+    // Map ensures we get sorted output, which whilst not required is preferable
+    processed: Map<String, String>,
 }
 
 impl MetricCollector for StringCollector {
     type Output = String;
 
     fn new() -> Self {
-        let processed = BTreeMap::new();
+        let processed = Map::new();
         Self { processed }
     }
 
@@ -208,7 +208,7 @@ impl MetricCollector for StringCollector {
         name: &str,
         suffix: &str,
         value: f64,
-        tags: Option<&BTreeMap<String, String>>,
+        tags: Option<&Map<String, String>>,
         extra: Option<(&str, String)>,
     ) {
         let result = self
@@ -233,7 +233,7 @@ impl MetricCollector for StringCollector {
 impl StringCollector {
     fn encode_tags(
         result: &mut String,
-        tags: Option<&BTreeMap<String, String>>,
+        tags: Option<&Map<String, String>>,
         extra: Option<(&str, String)>,
     ) {
         match (tags, extra) {
@@ -274,7 +274,7 @@ pub(super) struct TimeSeries {
 
 impl TimeSeries {
     fn make_labels(
-        tags: Option<&BTreeMap<String, String>>,
+        tags: Option<&Map<String, String>>,
         name: &str,
         suffix: &str,
         extra: Option<(&str, String)>,
@@ -329,7 +329,7 @@ impl MetricCollector for TimeSeries {
         name: &str,
         suffix: &str,
         value: f64,
-        tags: Option<&BTreeMap<String, String>>,
+        tags: Option<&Map<String, String>>,
         extra: Option<(&str, String)>,
     ) {
         self.buffer
@@ -399,7 +399,7 @@ mod tests {
         s.finish()
     }
 
-    fn tags() -> BTreeMap<String, String> {
+    fn tags() -> Map<String, String> {
         vec![("code".to_owned(), "200".to_owned())]
             .into_iter()
             .collect()

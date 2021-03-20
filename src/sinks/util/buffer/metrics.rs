@@ -344,7 +344,7 @@ mod test {
     use super::*;
     use crate::event::metric::{MetricKind::*, MetricValue, StatisticKind};
     use pretty_assertions::assert_eq;
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
 
     type Buffer = Vec<Vec<Metric>>;
 
@@ -364,7 +364,7 @@ mod test {
         }
     }
 
-    fn tag(name: &str) -> BTreeMap<String, String> {
+    fn tag(name: &str) -> Map<String, String> {
         vec![(name.to_owned(), "true".to_owned())]
             .into_iter()
             .collect()

@@ -8,7 +8,7 @@ use http::{StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use snafu::Snafu;
-use std::collections::{BTreeMap, HashMap};
+use structures::map::hash::Map;
 use tower::Service;
 
 pub(in crate::sinks) enum Field {
@@ -172,13 +172,13 @@ pub(in crate::sinks) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: String,
     metric_type: &str,
-    tags: Option<BTreeMap<String, String>>,
-    fields: Option<HashMap<String, Field>>,
+    tags: Option<Map<String, String>>,
+    fields: Option<Map<String, Field>>,
     timestamp: i64,
     line_protocol: &mut String,
 ) -> Result<(), &'static str> {
     // Fields
-    let unwrapped_fields = fields.unwrap_or_else(HashMap::new);
+    let unwrapped_fields = fields.unwrap_or_else(Map::new);
     // LineProtocol should have a field
     if unwrapped_fields.is_empty() {
         return Err("fields must not be empty");
@@ -188,7 +188,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     line_protocol.push(',');
 
     // Tags
-    let mut unwrapped_tags = tags.unwrap_or_else(BTreeMap::new);
+    let mut unwrapped_tags = tags.unwrap_or_else(Map::new);
     unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
     encode_tags(unwrapped_tags, line_protocol);
     line_protocol.push(' ');
@@ -203,7 +203,7 @@ pub(in crate::sinks) fn influx_line_protocol(
     Ok(())
 }
 
-fn encode_tags(tags: BTreeMap<String, String>, output: &mut String) {
+fn encode_tags(tags: Map<String, String>, output: &mut String) {
     // `tags` is already sorted
     for (key, value) in tags {
         if key.is_empty() || value.is_empty() {
@@ -221,7 +221,7 @@ fn encode_tags(tags: BTreeMap<String, String>, output: &mut String) {
 
 fn encode_fields(
     protocol_version: ProtocolVersion,
-    fields: HashMap<String, Field>,
+    fields: Map<String, Field>,
     output: &mut String,
 ) {
     for (key, value) in fields.into_iter() {
@@ -326,7 +326,7 @@ pub mod test_util {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
 
-    pub(crate) fn tags() -> BTreeMap<String, String> {
+    pub(crate) fn tags() -> Map<String, String> {
         vec![
             ("normal_tag".to_owned(), "value".to_owned()),
             ("true_tag".to_owned(), "true".to_owned()),
@@ -431,7 +431,7 @@ pub mod test_util {
     }
 
     pub(crate) async fn onboarding_v2() {
-        let mut body = std::collections::HashMap::new();
+        let mut body = Map::new();
         body.insert("username", "my-user");
         body.insert("password", "my-password");
         body.insert("org", ORG);

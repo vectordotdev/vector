@@ -437,7 +437,7 @@ fn encode_event(
 mod tests {
     use super::*;
     use crate::event::{Metric, MetricKind, MetricValue};
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
 
     #[test]
     fn generate_config() {
@@ -473,7 +473,7 @@ mod tests {
             &EncodingConfig::from(Encoding::Json),
         );
 
-        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        let map: Map<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(&key[..], b"value");
         assert_eq!(map[&log_schema().message_key().to_string()], message);
@@ -536,7 +536,7 @@ mod tests {
             },
         );
 
-        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        let map: Map<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(&key[..], b"value");
         assert!(!map.contains_key("key"));

@@ -6,7 +6,7 @@ use crate::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::{btree_map::Entry, BTreeMap};
+use structures::map::hash::{Entry, Map};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -71,7 +71,7 @@ impl FunctionTransform for AddTags {
             let tags = &mut event.as_mut_metric().series.tags;
 
             if tags.is_none() {
-                *tags = Some(BTreeMap::new());
+                *tags = Some(Map::new());
             }
 
             for (name, value) in &self.tags {
@@ -105,7 +105,7 @@ mod tests {
         event::Event,
     };
     use indexmap::IndexMap;
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
 
     #[test]
     fn generate_config() {
@@ -138,7 +138,7 @@ mod tests {
 
     #[test]
     fn add_tags_override() {
-        let mut tags = BTreeMap::new();
+        let mut tags = Map::new();
         tags.insert("region".to_string(), "us-east-1".to_string());
         let event = Event::Metric(
             Metric::new(

@@ -19,7 +19,6 @@ tracing = { version = "0.1", optional = true }
 [features]
 default = [
   "aws_cloudwatch_logs_subscription",
-  "btreemap",
   "conversion",
   "tokenize",
 ]
@@ -28,8 +27,6 @@ aws_cloudwatch_logs_subscription = [
   "chrono/serde",
   "serde/derive",
 ]
-
-btreemap = []
 
 conversion = [
   "bytes",

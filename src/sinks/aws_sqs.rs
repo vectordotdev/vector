@@ -288,7 +288,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
 
     #[test]
     fn sqs_encode_event_text() {
@@ -305,7 +305,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
         let event = encode_event(event, &Encoding::Json.into(), None).unwrap();
 
-        let map: BTreeMap<String, String> = serde_json::from_str(&event.message_body).unwrap();
+        let map: Map<String, String> = serde_json::from_str(&event.message_body).unwrap();
 
         assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());

@@ -25,11 +25,8 @@ use bytes::Bytes;
 use futures::{future::BoxFuture, stream, SinkExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashMap},
-    future::ready,
-    task::Poll,
-};
+use std::{future::ready, task::Poll};
+use structures::map::hash::Map;
 use tower::Service;
 
 #[derive(Clone)]
@@ -53,7 +50,7 @@ pub struct InfluxDBConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub tags: Option<HashMap<String, String>>,
+    pub tags: Option<Map<String, String>>,
     pub tls: Option<TlsOptions>,
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
@@ -195,10 +192,7 @@ fn create_build_request(
     }
 }
 
-fn merge_tags(
-    event: &Metric,
-    tags: Option<&HashMap<String, String>>,
-) -> Option<BTreeMap<String, String>> {
+fn merge_tags(event: &Metric, tags: Option<&Map<String, String>>) -> Option<Map<String, String>> {
     match (&event.series.tags, tags) {
         (Some(ref event_tags), Some(ref config_tags)) => {
             let mut event_tags = event_tags.clone();
@@ -236,7 +230,7 @@ fn encode_events(
     protocol_version: ProtocolVersion,
     events: Vec<Metric>,
     default_namespace: Option<&str>,
-    tags: Option<&HashMap<String, String>>,
+    tags: Option<&Map<String, String>>,
     quantiles: &[f64],
 ) -> String {
     let mut output = String::new();
@@ -267,7 +261,7 @@ fn encode_events(
 fn get_type_and_fields(
     value: MetricValue,
     quantiles: &[f64],
-) -> (&'static str, Option<HashMap<String, Field>>) {
+) -> (&'static str, Option<Map<String, Field>>) {
     match value {
         MetricValue::Counter { value } => ("counter", Some(to_fields(value))),
         MetricValue::Gauge { value } => ("gauge", Some(to_fields(value))),
@@ -277,7 +271,7 @@ fn get_type_and_fields(
             count,
             sum,
         } => {
-            let mut fields: HashMap<String, Field> = buckets
+            let mut fields: Map<String, Field> = buckets
                 .iter()
                 .map(|sample| {
                     (
@@ -296,7 +290,7 @@ fn get_type_and_fields(
             count,
             sum,
         } => {
-            let mut fields: HashMap<String, Field> = quantiles
+            let mut fields: Map<String, Field> = quantiles
                 .iter()
                 .map(|quantile| {
                     (
@@ -321,10 +315,10 @@ fn get_type_and_fields(
     }
 }
 
-fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<String, Field>> {
+fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<Map<String, Field>> {
     let statistic = DistributionStatistic::from_samples(samples, quantiles)?;
 
-    let fields: HashMap<String, Field> = vec![
+    let fields: Map<String, Field> = vec![
         ("min".to_owned(), Field::Float(statistic.min)),
         ("max".to_owned(), Field::Float(statistic.max)),
         ("median".to_owned(), Field::Float(statistic.median)),
@@ -344,8 +338,8 @@ fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<HashMap<
     Some(fields)
 }
 
-fn to_fields(value: f64) -> HashMap<String, Field> {
-    let fields: HashMap<String, Field> = vec![("value".to_owned(), Field::Float(value))]
+fn to_fields(value: f64) -> Map<String, Field> {
+    let fields: Map<String, Field> = vec![("value".to_owned(), Field::Float(value))]
         .into_iter()
         .collect();
     fields
@@ -801,7 +795,7 @@ mod tests {
             .with_timestamp(Some(ts())),
         ];
 
-        let mut tags = HashMap::new();
+        let mut tags = Map::new();
         tags.insert("host".to_owned(), "local".to_owned());
         tags.insert("datacenter".to_owned(), "us-east".to_owned());
 
@@ -960,7 +954,7 @@ mod integration_tests {
         let sink = InfluxDBSvc::new(config, cx, client).unwrap();
         sink.run(stream::iter(events)).await.unwrap();
 
-        let mut body = std::collections::HashMap::new();
+        let mut body = Map::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));
         body.insert("type", "flux".to_owned());
 

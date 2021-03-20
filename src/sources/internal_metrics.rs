@@ -74,7 +74,7 @@ mod tests {
     use crate::event::metric::{Metric, MetricValue, StatisticKind};
     use crate::metrics::{capture_metrics, get_controller};
     use metrics::{counter, gauge, histogram};
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
 
     #[test]
     fn generate_config() {
@@ -107,7 +107,7 @@ mod tests {
                 let m = event.into_metric();
                 (m.name().to_string(), m)
             })
-            .collect::<BTreeMap<String, Metric>>();
+            .collect::<Map<String, Metric>>();
 
         assert_eq!(MetricValue::Gauge { value: 2.0 }, output["foo"].data.value);
         assert_eq!(
@@ -129,7 +129,7 @@ mod tests {
             output["quux"].data.value
         );
 
-        let mut labels = BTreeMap::new();
+        let mut labels = Map::new();
         labels.insert(String::from("host"), String::from("foo"));
         assert_eq!(Some(&labels), output["quux"].tags());
     }

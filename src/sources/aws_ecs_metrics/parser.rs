@@ -1,7 +1,7 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
-use std::collections::BTreeMap;
+use structures::map::hash::Map;
 
 #[derive(Deserialize)]
 struct BlockIoStat {
@@ -111,7 +111,7 @@ struct ContainerStats {
     cpu_stats: Option<CpuStats>,
     memory_stats: Option<MemoryStats>,
     #[serde(default)]
-    networks: BTreeMap<String, NetworkStats>,
+    networks: Map<String, NetworkStats>,
 }
 
 fn counter(
@@ -120,7 +120,7 @@ fn counter(
     namespace: Option<String>,
     timestamp: DateTime<Utc>,
     value: f64,
-    tags: BTreeMap<String, String>,
+    tags: Map<String, String>,
 ) -> Metric {
     Metric::new(
         format!("{}_{}", prefix, name),
@@ -138,7 +138,7 @@ fn gauge(
     namespace: Option<String>,
     timestamp: DateTime<Utc>,
     value: f64,
-    tags: BTreeMap<String, String>,
+    tags: Map<String, String>,
 ) -> Metric {
     Metric::new(
         format!("{}_{}", prefix, name),
@@ -150,7 +150,7 @@ fn gauge(
     .with_timestamp(Some(timestamp))
 }
 
-fn blkio_tags(item: &BlockIoStat, tags: &BTreeMap<String, String>) -> BTreeMap<String, String> {
+fn blkio_tags(item: &BlockIoStat, tags: &Map<String, String>) -> Map<String, String> {
     let mut tags = tags.clone();
     tags.insert("device".into(), format!("{}:{}", item.major, item.minor));
     tags.insert("op".into(), item.op.to_lowercase());
@@ -162,7 +162,7 @@ fn blkio_metrics(
     blkio: &BlockIoStats,
     timestamp: DateTime<Utc>,
     namespace: &Option<String>,
-    tags: &BTreeMap<String, String>,
+    tags: &Map<String, String>,
 ) -> Vec<Metric> {
     let mut metrics = vec![];
 
@@ -254,7 +254,7 @@ fn cpu_metrics(
     cpu: &CpuStats,
     timestamp: DateTime<Utc>,
     namespace: &Option<String>,
-    tags: &BTreeMap<String, String>,
+    tags: &Map<String, String>,
 ) -> Vec<Metric> {
     let mut metrics = vec![];
 
@@ -325,7 +325,7 @@ fn memory_metrics(
     memory: &MemoryStats,
     timestamp: DateTime<Utc>,
     namespace: &Option<String>,
-    tags: &BTreeMap<String, String>,
+    tags: &Map<String, String>,
 ) -> Vec<Metric> {
     let mut metrics = vec![];
 
@@ -419,7 +419,7 @@ fn network_metrics(
     network: &NetworkStats,
     timestamp: DateTime<Utc>,
     namespace: &Option<String>,
-    tags: &BTreeMap<String, String>,
+    tags: &Map<String, String>,
 ) -> Vec<Metric> {
     let mut tags = tags.clone();
     tags.insert("device".into(), interface.into());
@@ -450,10 +450,10 @@ fn network_metrics(
 
 pub fn parse(bytes: &[u8], namespace: Option<String>) -> Result<Vec<Metric>, serde_json::Error> {
     let mut metrics = Vec::new();
-    let parsed = serde_json::from_slice::<BTreeMap<String, ContainerStats>>(bytes)?;
+    let parsed = serde_json::from_slice::<Map<String, ContainerStats>>(bytes)?;
 
     for (id, container) in parsed {
-        let mut tags = BTreeMap::new();
+        let mut tags = Map::new();
         tags.insert("container_id".into(), id);
         if let Some(name) = container.name {
             tags.insert("container_name".into(), name);

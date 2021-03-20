@@ -113,7 +113,7 @@ type TypeId = u8;
 /// name, TypeId, and data as Bytes for the corresponding field (in that order).  Since the set of
 /// fields that might go into CacheEntries is not known at startup, we must store the field names
 /// as part of CacheEntries.  Since Event objects store their field in alphabetic order (as they
-/// are backed by a BTreeMap), and we build CacheEntries by iterating over the fields of the
+/// are backed by a Map), and we build CacheEntries by iterating over the fields of the
 /// incoming Events, we know that the CacheEntries for 2 equivalent events will always contain the
 /// fields in the same order.
 #[derive(PartialEq, Eq, Hash)]
@@ -205,7 +205,7 @@ mod tests {
     use super::*;
     use crate::transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig};
     use crate::{event::Event, event::Value};
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
 
     #[test]
     fn generate_config() {
@@ -418,12 +418,12 @@ mod tests {
     /// Test that two events where the matched field is a sub object and that object contains values
     /// that have different types but the same string representation aren't considered duplicates.
     fn type_matching_nested_objects(mut transform: Dedupe) {
-        let mut map1: BTreeMap<String, Value> = BTreeMap::new();
+        let mut map1: Map<String, Value> = Map::new();
         map1.insert("key".into(), "123".into());
         let mut event1 = Event::from("message");
         event1.as_mut_log().insert("matched", map1);
 
-        let mut map2: BTreeMap<String, Value> = BTreeMap::new();
+        let mut map2: Map<String, Value> = Map::new();
         map2.insert("key".into(), 123.into());
         let mut event2 = Event::from("message");
         event2.as_mut_log().insert("matched", map2);

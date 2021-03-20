@@ -15,10 +15,10 @@ use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::{
-    collections::BTreeMap,
     future::ready,
     time::{Duration, Instant},
 };
+use structures::map::hash::Map;
 
 mod parser;
 
@@ -157,7 +157,7 @@ fn apache_metrics(
                     .body(Body::empty())
                     .expect("error creating request");
 
-                let mut tags: BTreeMap<String, String> = BTreeMap::new();
+                let mut tags: Map<String, String> = Map::new();
                 tags.insert("endpoint".into(), sanitized_url.to_string());
                 tags.insert("host".into(), url.sanitized_authority());
 

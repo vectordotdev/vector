@@ -1,6 +1,8 @@
 use indexmap::IndexMap;
 use snafu::ResultExt;
-use std::{collections::BTreeMap, convert::TryFrom};
+use std::convert::TryFrom;
+use std::hash::{Hash, Hasher};
+use structures::map::hash::Map;
 
 mod line;
 
@@ -58,10 +60,20 @@ pub enum ParserError {
     RequestNoNameLabel,
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct GroupKey {
     pub timestamp: Option<i64>,
-    pub labels: BTreeMap<String, String>,
+    pub labels: Map<String, String>,
+}
+
+impl Hash for GroupKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.timestamp.hash(state);
+        for (k, v) in &self.labels {
+            k.hash(state);
+            v.hash(state);
+        }
+    }
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -344,7 +356,7 @@ impl MetricGroupSet {
     fn insert_sample(
         &mut self,
         name: &str,
-        labels: &BTreeMap<String, String>,
+        labels: &Map<String, String>,
         sample: proto::Sample,
     ) -> Result<(), ParserError> {
         let (_, basename, group) = self.get_group(name);
@@ -389,7 +401,7 @@ pub fn parse_request(request: proto::WriteRequest) -> Result<Vec<MetricGroup>, P
     }
 
     for timeseries in request.timeseries {
-        let mut labels: BTreeMap<String, String> = timeseries
+        let mut labels: Map<String, String> = timeseries
             .labels
             .into_iter()
             .map(|label| (label.name, label.value))
@@ -437,9 +449,9 @@ mod test {
     }
 
     macro_rules! labels {
-        () => { BTreeMap::new() };
+        () => { Map::new() };
         ( $( $name:ident => $value:literal ),* ) => {{
-            let mut result = BTreeMap::<String, String>::new();
+            let mut result = Map::<String, String>::new();
             $( result.insert(stringify!($name).into(), $value.to_string()); )*
             result
         }};

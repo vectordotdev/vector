@@ -108,7 +108,7 @@ mod tests {
         Metric, Value,
     };
     use indoc::formatdoc;
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
 
     #[test]
     fn generate_config() {
@@ -224,7 +224,7 @@ mod tests {
                 )
                 .with_namespace(Some("zerk"))
                 .with_tags(Some({
-                    let mut tags = BTreeMap::new();
+                    let mut tags = Map::new();
                     tags.insert("host".into(), "zoobub".into());
                     tags
                 }))

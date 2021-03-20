@@ -322,7 +322,7 @@ fn gen_partition_key() -> String {
 mod tests {
     use super::*;
     use crate::{event::Event, test_util::random_string};
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
 
     #[test]
     fn generate_config() {
@@ -344,7 +344,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
         let event = encode_event(event, &None, &Encoding::Json.into()).unwrap();
 
-        let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
+        let map: Map<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
         assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
@@ -379,7 +379,7 @@ mod tests {
         encoding.except_fields = Some(vec!["key".into()]);
 
         let event = encode_event(event, &Some("key".into()), &encoding).unwrap();
-        let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
+        let map: Map<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
         assert_eq!(&event.partition_key, &"some_key".to_string());
         assert!(!map.contains_key("key"));

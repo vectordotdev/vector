@@ -8,7 +8,8 @@ use crate::{
     filter_check,
 };
 use async_graphql::{Enum, InputObject, Object};
-use std::{cmp::Ordering, collections::BTreeMap};
+use std::cmp::Ordering;
+use structures::map::hash::Map;
 
 #[derive(Clone)]
 pub struct FileSourceMetricFile<'a> {
@@ -60,7 +61,7 @@ impl FileSourceMetrics {
                 Some(file) => Some((file, m)),
                 _ => None,
             })
-            .fold(BTreeMap::new(), |mut map, (file, m)| {
+            .fold(Map::new(), |mut map, (file, m)| {
                 map.entry(file).or_insert_with(Vec::new).push(m);
                 map
             })

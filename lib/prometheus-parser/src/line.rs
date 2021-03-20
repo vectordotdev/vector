@@ -10,7 +10,7 @@ use nom::{
     number::complete::double,
     sequence::{delimited, pair, preceded, tuple},
 };
-use std::collections::BTreeMap;
+use structures::map::hash::Map;
 
 /// We try to catch all nom's `ErrorKind` with our own `ErrorKind`,
 /// to provide a meaningful error message.
@@ -96,7 +96,7 @@ pub struct Header {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Metric {
     pub name: String,
-    pub labels: BTreeMap<String, String>,
+    pub labels: Map<String, String>,
     pub value: f64,
     pub timestamp: Option<i64>,
 }
@@ -175,10 +175,10 @@ impl Metric {
         }
     }
 
-    fn parse_labels_inner(mut input: &str) -> IResult<BTreeMap<String, String>> {
+    fn parse_labels_inner(mut input: &str) -> IResult<Map<String, String>> {
         let sep = match_char(',');
 
-        let mut result = BTreeMap::new();
+        let mut result = Map::new();
         loop {
             match Self::element_parser(input)? {
                 (inner_input, None) => {
@@ -210,11 +210,11 @@ impl Metric {
     }
 
     /// Parse `{label_name="value",...}`
-    fn parse_labels(input: &str) -> IResult<BTreeMap<String, String>> {
+    fn parse_labels(input: &str) -> IResult<Map<String, String>> {
         let input = trim_space(input);
 
         match opt(char('{'))(input) {
-            Ok((input, None)) => Ok((input, BTreeMap::new())),
+            Ok((input, None)) => Ok((input, Map::new())),
             Ok((input, Some(_))) => Self::parse_labels_inner(input),
             Err(failure) => Err(failure),
         }

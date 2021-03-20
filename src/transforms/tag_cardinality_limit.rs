@@ -272,14 +272,14 @@ mod tests {
     use super::*;
     use crate::transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode};
     use crate::{event::metric, event::Event, event::Metric};
-    use std::collections::BTreeMap;
+    use structures::map::hash::Map;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<TagCardinalityLimitConfig>();
     }
 
-    fn make_metric(tags: BTreeMap<String, String>) -> Event {
+    fn make_metric(tags: Map<String, String>) -> Event {
         Event::Metric(
             Metric::new(
                 "event",
@@ -325,15 +325,15 @@ mod tests {
     }
 
     fn drop_event(mut transform: TagCardinalityLimit) {
-        let tags1: BTreeMap<String, String> =
+        let tags1: Map<String, String> =
             vec![("tag1".into(), "val1".into())].into_iter().collect();
         let event1 = make_metric(tags1);
 
-        let tags2: BTreeMap<String, String> =
+        let tags2: Map<String, String> =
             vec![("tag1".into(), "val2".into())].into_iter().collect();
         let event2 = make_metric(tags2);
 
-        let tags3: BTreeMap<String, String> =
+        let tags3: Map<String, String> =
             vec![("tag1".into(), "val3".into())].into_iter().collect();
         let event3 = make_metric(tags3);
 
@@ -358,7 +358,7 @@ mod tests {
     }
 
     fn drop_tag(mut transform: TagCardinalityLimit) {
-        let tags1: BTreeMap<String, String> = vec![
+        let tags1: Map<String, String> = vec![
             ("tag1".into(), "val1".into()),
             ("tag2".into(), "val1".into()),
         ]
@@ -366,7 +366,7 @@ mod tests {
         .collect();
         let event1 = make_metric(tags1);
 
-        let tags2: BTreeMap<String, String> = vec![
+        let tags2: Map<String, String> = vec![
             ("tag1".into(), "val2".into()),
             ("tag2".into(), "val1".into()),
         ]
@@ -374,7 +374,7 @@ mod tests {
         .collect();
         let event2 = make_metric(tags2);
 
-        let tags3: BTreeMap<String, String> = vec![
+        let tags3: Map<String, String> = vec![
             ("tag1".into(), "val3".into()),
             ("tag2".into(), "val1".into()),
         ]
@@ -410,7 +410,7 @@ mod tests {
     /// Test that hitting the value limit on one tag does not affect the ability to take new
     /// values for other tags.
     fn separate_value_limit_per_tag(mut transform: TagCardinalityLimit) {
-        let tags1: BTreeMap<String, String> = vec![
+        let tags1: Map<String, String> = vec![
             ("tag1".into(), "val1".into()),
             ("tag2".into(), "val1".into()),
         ]
@@ -418,7 +418,7 @@ mod tests {
         .collect();
         let event1 = make_metric(tags1);
 
-        let tags2: BTreeMap<String, String> = vec![
+        let tags2: Map<String, String> = vec![
             ("tag1".into(), "val2".into()),
             ("tag2".into(), "val1".into()),
         ]
@@ -427,7 +427,7 @@ mod tests {
         let event2 = make_metric(tags2);
 
         // Now value limit is reached for "tag1", but "tag2" still has values available.
-        let tags3: BTreeMap<String, String> = vec![
+        let tags3: Map<String, String> = vec![
             ("tag1".into(), "val1".into()),
             ("tag1".into(), "val2".into()),
         ]
