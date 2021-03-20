@@ -259,7 +259,7 @@ security-framework = "2.0"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
-nix = "0.19.0"
+nix = "0.20.0"
 
 [build-dependencies]
 prost-build = "0.6.1"
