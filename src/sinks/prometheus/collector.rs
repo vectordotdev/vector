@@ -4,7 +4,7 @@ use crate::{
 };
 use indexmap::map::IndexMap;
 use prometheus_parser::{proto, METRIC_NAME_LABEL};
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 use std::fmt::Write as _;
 
 pub(super) trait MetricCollector {

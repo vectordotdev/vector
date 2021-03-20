@@ -10,7 +10,7 @@ use nom::{
     number::complete::double,
     sequence::{delimited, pair, preceded, tuple},
 };
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 /// We try to catch all nom's `ErrorKind` with our own `ErrorKind`,
 /// to provide a meaningful error message.

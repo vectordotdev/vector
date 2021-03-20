@@ -18,7 +18,7 @@ use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{convert::TryFrom, time::Instant};
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 use tokio::time;
 
 pub mod parser;

@@ -205,7 +205,7 @@ mod tests {
     use super::*;
     use crate::transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig};
     use crate::{event::Event, event::Value};
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
 
     #[test]
     fn generate_config() {

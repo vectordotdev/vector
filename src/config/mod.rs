@@ -723,7 +723,7 @@ mod resource_tests {
         Resource::tcp(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), port))
     }
 
-    fn hashmap(conflicts: Vec<(Resource, Vec<&str>)>) -> HashMap<Resource, HashSet<&str>> {
+    fn ordmap(conflicts: Vec<(Resource, Vec<&str>)>) -> HashMap<Resource, HashSet<&str>> {
         conflicts
             .into_iter()
             .map(|(key, values)| (key, values.into_iter().collect()))
@@ -751,7 +751,7 @@ mod resource_tests {
         let conflicting = Resource::conflicts(components);
         assert_eq!(
             conflicting,
-            hashmap(vec![(localhost(2), vec!["sink_1", "sink_2"])])
+            ordmap(vec![(localhost(2), vec!["sink_1", "sink_2"])])
         );
     }
 
@@ -765,7 +765,7 @@ mod resource_tests {
         let conflicting = Resource::conflicts(components);
         assert_eq!(
             conflicting,
-            hashmap(vec![
+            ordmap(vec![
                 (localhost(0), vec!["sink_0", "sink_1"]),
                 (localhost(2), vec!["sink_1", "sink_2"])
             ])
@@ -803,7 +803,7 @@ mod resource_tests {
         let conflicting = Resource::conflicts(components);
         assert_eq!(
             conflicting,
-            hashmap(vec![(localhost(0), vec!["sink_0", "sink_1"])])
+            ordmap(vec![(localhost(0), vec!["sink_0", "sink_1"])])
         );
     }
 

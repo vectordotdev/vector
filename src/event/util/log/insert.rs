@@ -1,6 +1,6 @@
 use super::{PathComponent, PathIter, Value};
 use std::iter::Peekable;
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 /// Inserts field value using a path specified using `a.b[1].c` notation.
 pub fn insert(fields: &mut Map<String, Value>, path: &str, value: Value) -> Option<Value> {
@@ -95,7 +95,7 @@ mod test {
     use super::super::test::fields_from_json;
     use super::*;
     use serde_json::json;
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
 
     #[test]
     fn test_insert_nested() {

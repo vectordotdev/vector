@@ -286,7 +286,7 @@ mod tests {
     };
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
     use std::io::Write;
     use std::net::SocketAddr;
     use tokio::sync::mpsc;

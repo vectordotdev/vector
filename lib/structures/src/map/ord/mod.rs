@@ -8,7 +8,7 @@ macro_rules! ordmap {
     () => (::structures::map::ord::Map::new());
 
     // trailing comma case
-    ($($key:expr => $value:expr,)+) => (hashmap!($($key => $value),+));
+    ($($key:expr => $value:expr,)+) => (ordmap!($($key => $value),+));
 
     ($($key:expr => $value:expr),*) => {
         {

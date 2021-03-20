@@ -22,7 +22,7 @@ use mongodb::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::time::Instant;
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 use tokio::time;
 
 mod types;

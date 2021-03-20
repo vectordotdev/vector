@@ -6,7 +6,7 @@ use crate::{
 use async_stream::stream;
 use lazy_static::lazy_static;
 use std::sync::Arc;
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 use tokio::{
     stream::{Stream, StreamExt},
     time::Duration,

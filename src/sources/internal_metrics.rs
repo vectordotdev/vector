@@ -74,7 +74,7 @@ mod tests {
     use crate::event::metric::{Metric, MetricValue, StatisticKind};
     use crate::metrics::{capture_metrics, get_controller};
     use metrics::{counter, gauge, histogram};
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
 
     #[test]
     fn generate_config() {

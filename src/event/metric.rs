@@ -9,7 +9,7 @@ use std::{
     fmt::{self, Display, Formatter},
     iter::FromIterator,
 };
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 use vrl::{path::Segment, Target};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -908,7 +908,7 @@ mod test {
     use super::*;
     use chrono::{offset::TimeZone, DateTime, Utc};
     use std::str::FromStr;
-    use structures::hashmap;
+    use structures::ordmap;
     use vrl::{Path, Value};
 
     fn ts() -> DateTime<Utc> {
@@ -1188,11 +1188,11 @@ mod test {
 
         assert_eq!(
             Ok(Some(
-                hashmap! {
+                ordmap! {
                     "name" => "zub",
                     "namespace" => "zoob",
                     "timestamp" => Utc.ymd(2020, 12, 10).and_hms(12, 0, 0),
-                    "tags" => hashmap! { "tig" => "tog" },
+                    "tags" => ordmap! { "tig" => "tog" },
                     "kind" => "absolute",
                     "type" => "counter",
                 }

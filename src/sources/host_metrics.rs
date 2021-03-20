@@ -31,10 +31,10 @@ use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 use std::fmt;
 use std::path::Path;
-use structures::hashmap;
+use structures::ordmap;
 use tokio::time;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -212,26 +212,26 @@ impl HostMetricsConfig {
                                     name,
                                     timestamp,
                                     times.idle().get::<second>(),
-                                    hashmap! { "mode" => "idle", "cpu" => index.to_string() },
+                                    ordmap! { "mode" => "idle", "cpu" => index.to_string() },
                                 ),
                                 #[cfg(target_os = "linux")]
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.nice().get::<second>(),
-                                    hashmap! { "mode" => "nice", "cpu" => index.to_string() },
+                                    ordmap! { "mode" => "nice", "cpu" => index.to_string() },
                                 ),
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.system().get::<second>(),
-                                    hashmap! { "mode" => "system", "cpu" => index.to_string() },
+                                    ordmap! { "mode" => "system", "cpu" => index.to_string() },
                                 ),
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.user().get::<second>(),
-                                    hashmap! { "mode" => "user", "cpu" => index.to_string() },
+                                    ordmap! { "mode" => "user", "cpu" => index.to_string() },
                                 ),
                             ]
                             .into_iter(),
@@ -257,68 +257,68 @@ impl HostMetricsConfig {
                         "memory_total_bytes",
                         timestamp,
                         memory.total().get::<byte>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                     self.gauge(
                         "memory_free_bytes",
                         timestamp,
                         memory.free().get::<byte>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                     self.gauge(
                         "memory_available_bytes",
                         timestamp,
                         memory.available().get::<byte>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                     #[cfg(any(target_os = "linux", target_os = "macos"))]
                     self.gauge(
                         "memory_active_bytes",
                         timestamp,
                         memory.active().get::<byte>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_buffers_bytes",
                         timestamp,
                         memory.buffers().get::<byte>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_cached_bytes",
                         timestamp,
                         memory.cached().get::<byte>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_shared_bytes",
                         timestamp,
                         memory.shared().get::<byte>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_used_bytes",
                         timestamp,
                         memory.used().get::<byte>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                     #[cfg(target_os = "macos")]
                     self.gauge(
                         "memory_inactive_bytes",
                         timestamp,
                         memory.inactive().get::<byte>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                     #[cfg(target_os = "macos")]
                     self.gauge(
                         "memory_wired_bytes",
                         timestamp,
                         memory.wire().get::<byte>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                 ]
             }
@@ -338,33 +338,33 @@ impl HostMetricsConfig {
                         "memory_swap_free_bytes",
                         timestamp,
                         swap.free().get::<byte>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                     self.gauge(
                         "memory_swap_total_bytes",
                         timestamp,
                         swap.total().get::<byte>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                     self.gauge(
                         "memory_swap_used_bytes",
                         timestamp,
                         swap.used().get::<byte>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                     #[cfg(not(target_os = "windows"))]
                     self.counter(
                         "memory_swapped_in_bytes_total",
                         timestamp,
                         swap.sin().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                     #[cfg(not(target_os = "windows"))]
                     self.counter(
                         "memory_swapped_out_bytes_total",
                         timestamp,
                         swap.sout().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                 ]
             }
@@ -385,19 +385,19 @@ impl HostMetricsConfig {
                         "load1",
                         timestamp,
                         loadavg.0.get::<ratio>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                     self.gauge(
                         "load5",
                         timestamp,
                         loadavg.1.get::<ratio>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                     self.gauge(
                         "load15",
                         timestamp,
                         loadavg.2.get::<ratio>() as f64,
-                        hashmap! {},
+                        ordmap! {},
                     ),
                 ]
             }
@@ -473,45 +473,45 @@ impl HostMetricsConfig {
                                     "network_receive_bytes_total",
                                     timestamp,
                                     counter.bytes_recv().get::<byte>() as f64,
-                                    hashmap! { "device" => interface },
+                                    ordmap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_receive_errs_total",
                                     timestamp,
                                     counter.errors_recv() as f64,
-                                    hashmap! { "device" => interface },
+                                    ordmap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_receive_packets_total",
                                     timestamp,
                                     counter.packets_recv() as f64,
-                                    hashmap! { "device" => interface },
+                                    ordmap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_transmit_bytes_total",
                                     timestamp,
                                     counter.bytes_sent().get::<byte>() as f64,
-                                    hashmap! { "device" => interface },
+                                    ordmap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_transmit_errs_total",
                                     timestamp,
                                     counter.errors_sent() as f64,
-                                    hashmap! { "device" => interface },
+                                    ordmap! { "device" => interface },
                                 ),
                                 #[cfg(any(target_os = "linux", target_os = "windows"))]
                                 self.counter(
                                     "network_transmit_packets_drop_total",
                                     timestamp,
                                     counter.drop_sent() as f64,
-                                    hashmap! { "device" => interface },
+                                    ordmap! { "device" => interface },
                                 ),
                                 #[cfg(any(target_os = "linux", target_os = "windows"))]
                                 self.counter(
                                     "network_transmit_packets_total",
                                     timestamp,
                                     counter.packets_sent() as f64,
-                                    hashmap! { "device" => interface },
+                                    ordmap! { "device" => interface },
                                 ),
                             ]
                             .into_iter(),
@@ -581,7 +581,7 @@ impl HostMetricsConfig {
                     .map(|(partition, usage)| {
                         let timestamp = Utc::now();
                         let fs = partition.file_system();
-                        let mut tags = hashmap! {
+                        let mut tags = ordmap! {
                             "filesystem" => fs.as_str(),
                             "mountpoint" => partition.mount_point().to_string_lossy()
                         };
@@ -639,7 +639,7 @@ impl HostMetricsConfig {
                     .filter_map(|counter| async { counter })
                     .map(|counter| {
                         let timestamp = Utc::now();
-                        let tags = hashmap! {
+                        let tags = ordmap! {
                             "device" => counter.device_name().to_string_lossy()
                         };
                         stream::iter(

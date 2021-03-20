@@ -24,7 +24,7 @@ use std::{
     convert::TryInto,
     task::{Context, Poll},
 };
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 use tower::Service;
 
 #[derive(Clone)]

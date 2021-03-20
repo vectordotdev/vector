@@ -344,7 +344,7 @@ mod test {
     use super::*;
     use crate::event::metric::{MetricKind::*, MetricValue, StatisticKind};
     use pretty_assertions::assert_eq;
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
 
     type Buffer = Vec<Vec<Metric>>;
 

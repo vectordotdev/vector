@@ -1,5 +1,5 @@
 use super::{all_fields, Value};
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order.
 /// It is implemented as a wrapper around `all_fields` to reduce code

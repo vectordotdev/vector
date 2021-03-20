@@ -437,7 +437,7 @@ fn encode_event(
 mod tests {
     use super::*;
     use crate::event::{Metric, MetricKind, MetricValue};
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
 
     #[test]
     fn generate_config() {

@@ -1,7 +1,7 @@
 use crate::event::{Event, Value};
 use std::convert::TryFrom;
 use std::hash::Hash;
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 pub mod parser;
 pub mod query;

@@ -8,7 +8,8 @@ use http::{StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use snafu::Snafu;
-use structures::map::hash::Map;
+use std::collections::HashMap;
+use structures::map::ord::Map;
 use tower::Service;
 
 pub(in crate::sinks) enum Field {
@@ -173,12 +174,12 @@ pub(in crate::sinks) fn influx_line_protocol(
     measurement: String,
     metric_type: &str,
     tags: Option<Map<String, String>>,
-    fields: Option<Map<String, Field>>,
+    fields: Option<HashMap<String, Field>>,
     timestamp: i64,
     line_protocol: &mut String,
 ) -> Result<(), &'static str> {
     // Fields
-    let unwrapped_fields = fields.unwrap_or_else(Map::new);
+    let unwrapped_fields = fields.unwrap_or_else(HashMap::new);
     // LineProtocol should have a field
     if unwrapped_fields.is_empty() {
         return Err("fields must not be empty");
@@ -221,7 +222,7 @@ fn encode_tags(tags: Map<String, String>, output: &mut String) {
 
 fn encode_fields(
     protocol_version: ProtocolVersion,
-    fields: Map<String, Field>,
+    fields: HashMap<String, Field>,
     output: &mut String,
 ) {
     for (key, value) in fields.into_iter() {

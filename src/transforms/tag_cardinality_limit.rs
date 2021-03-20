@@ -272,7 +272,7 @@ mod tests {
     use super::*;
     use crate::transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode};
     use crate::{event::metric, event::Event, event::Metric};
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
 
     #[test]
     fn generate_config() {

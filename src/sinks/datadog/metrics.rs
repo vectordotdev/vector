@@ -25,7 +25,8 @@ use std::{
     future::ready,
     sync::atomic::{AtomicI64, Ordering::SeqCst},
 };
-use structures::map::hash::Map;
+use structures::map::hash;
+use structures::map::ord::Map;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -57,7 +58,7 @@ pub struct DatadogConfig {
 struct DatadogSink {
     config: DatadogConfig,
     /// Endpoint -> (uri_path, last_sent_timestamp)
-    endpoint_data: Map<DatadogEndpoint, (Uri, AtomicI64)>,
+    endpoint_data: hash::Map<DatadogEndpoint, (Uri, AtomicI64)>,
 }
 
 lazy_static! {

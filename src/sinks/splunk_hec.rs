@@ -306,7 +306,7 @@ mod tests {
     use crate::sinks::util::{http::HttpSink, test::load_sink};
     use chrono::Utc;
     use serde::Deserialize;
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
 
     #[test]
     fn generate_config() {

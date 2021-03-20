@@ -1,5 +1,5 @@
 use super::{PathComponent, PathIter, Value};
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 /// Checks whether a field specified by a given path is present.
 pub fn contains(fields: &Map<String, Value>, path: &str) -> bool {

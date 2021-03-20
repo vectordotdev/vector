@@ -1,5 +1,5 @@
 use super::{PathComponent, PathIter, Value};
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 /// Returns a mutable reference to field value specified by the given path.
 pub fn get_mut<'a>(fields: &'a mut Map<String, Value>, path: &str) -> Option<&'a mut Value> {

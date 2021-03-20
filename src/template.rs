@@ -236,7 +236,7 @@ mod tests {
     use super::*;
     use crate::event::{MetricKind, MetricValue};
     use chrono::TimeZone;
-    use structures::hashmap;
+    use structures::ordmap;
 
     #[test]
     fn get_fields() {
@@ -444,7 +444,7 @@ mod tests {
     fn render_metric_with_tags() {
         let template = Template::try_from("name={{name}} component={{tags.component}}").unwrap();
         let metric = sample_metric().with_tags(Some(
-            hashmap! { "test" => "true", "component" => "template" },
+            ordmap! { "test" => "true", "component" => "template" },
         ));
         assert_eq!(
             Ok(Bytes::from("name=a-counter component=template")),

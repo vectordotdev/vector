@@ -108,7 +108,7 @@ mod tests {
         Metric, Value,
     };
     use indoc::formatdoc;
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
 
     #[test]
     fn generate_config() {

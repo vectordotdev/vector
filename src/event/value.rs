@@ -3,7 +3,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::{Serialize, Serializer};
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 use std::convert::{TryFrom, TryInto};
 use std::iter::FromIterator;
 use toml::value::Value as TomlValue;

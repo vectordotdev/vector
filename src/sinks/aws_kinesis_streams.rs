@@ -322,7 +322,7 @@ fn gen_partition_key() -> String {
 mod tests {
     use super::*;
     use crate::{event::Event, test_util::random_string};
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
 
     #[test]
     fn generate_config() {

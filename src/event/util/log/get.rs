@@ -1,5 +1,5 @@
 use super::{PathComponent, PathIter, Value};
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 /// Returns a reference to a field value specified by the given path.
 pub fn get<'a>(fields: &'a Map<String, Value>, path: &str) -> Option<&'a Value> {

@@ -5,7 +5,7 @@ use std::{
     error, fmt,
     num::{ParseFloatError, ParseIntError},
 };
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 lazy_static! {
     static ref WHITESPACE: Regex = Regex::new(r"\s+").unwrap();

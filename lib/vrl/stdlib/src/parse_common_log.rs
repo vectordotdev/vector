@@ -111,14 +111,14 @@ fn type_def() -> Map<&'static str, TypeDef> {
 mod tests {
     use super::*;
     use chrono::prelude::*;
-    use structures::hashmap;
+    use structures::ordmap;
 
     test_function![
         parse_common_log => ParseCommonLog;
 
         log_line_valid {
             args: func_args![value: r#"127.0.0.1 bob frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326"#],
-            want: Ok(hashmap! {
+            want: Ok(ordmap! {
                 "host" => "127.0.0.1",
                 "identity" => "bob",
                 "user" => "frank",
@@ -135,13 +135,13 @@ mod tests {
 
         log_line_valid_empty {
             args: func_args![value: "- - - - - - -"],
-            want: Ok(hashmap! {}),
+            want: Ok(ordmap! {}),
             tdef: TypeDef::new().fallible().object(type_def()),
         }
 
         log_line_valid_empty_variant {
             args: func_args![value: r#"- - - [-] "-" - -"#],
-            want: Ok(hashmap! {}),
+            want: Ok(ordmap! {}),
             tdef: TypeDef::new().fallible().object(type_def()),
         }
 
@@ -149,7 +149,7 @@ mod tests {
             args: func_args![value: r#"- - - [2000-10-10T20:55:36Z] "-" - -"#,
                              timestamp_format: "%+",
             ],
-            want: Ok(hashmap! {
+            want: Ok(ordmap! {
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2000-10-10T20:55:36Z").unwrap().into()),
             }),
             tdef: TypeDef::new().fallible().object(type_def()),

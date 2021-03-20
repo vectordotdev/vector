@@ -1,6 +1,6 @@
 use super::{LogEvent, Value};
 use std::hash::{Hash, Hasher};
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 // TODO: if we had `Value` implement `Eq` and `Hash`, the implementation here
 // would be much easier. The issue is with `f64` type. We should consider using

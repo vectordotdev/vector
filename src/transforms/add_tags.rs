@@ -6,7 +6,7 @@ use crate::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use structures::map::hash::{Entry, Map};
+use structures::map::ord::{Entry, Map};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -105,7 +105,7 @@ mod tests {
         event::Event,
     };
     use indexmap::IndexMap;
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
 
     #[test]
     fn generate_config() {

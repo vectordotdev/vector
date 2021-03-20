@@ -136,50 +136,50 @@ impl fmt::Display for DelFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use structures::hashmap;
+    use structures::ordmap;
 
     #[test]
     fn del() {
         let cases = vec![
             (
                 // String field exists
-                hashmap! { "exists" => "value" },
+                ordmap! { "exists" => "value" },
                 Ok(value!("value")),
                 DelFn::new("exists"),
             ),
             (
                 // String field doesn't exist
-                hashmap! { "exists" => "value" },
+                ordmap! { "exists" => "value" },
                 Ok(value!(null)),
                 DelFn::new("does_not_exist"),
             ),
             (
                 // Array field exists
-                hashmap! { "exists" => value!([1, 2, 3]) },
+                ordmap! { "exists" => value!([1, 2, 3]) },
                 Ok(value!([1, 2, 3])),
                 DelFn::new("exists"),
             ),
             (
                 // Null field exists
-                hashmap! { "exists" => value!(null) },
+                ordmap! { "exists" => value!(null) },
                 Ok(value!(null)),
                 DelFn::new("exists"),
             ),
             (
                 // Map field exists
-                hashmap! {"exists" => hashmap! { "foo" => "bar" }},
-                Ok(value!(hashmap! {"foo" => "bar" })),
+                ordmap! {"exists" => ordmap! { "foo" => "bar" }},
+                Ok(value!(ordmap! {"foo" => "bar" })),
                 DelFn::new("exists"),
             ),
             (
                 // Integer field exists
-                hashmap! { "exists" => 127 },
+                ordmap! { "exists" => 127 },
                 Ok(value!(127)),
                 DelFn::new("exists"),
             ),
             (
                 // Array field exists
-                hashmap! {"exists" => value!([1, 2, 3]) },
+                ordmap! {"exists" => value!([1, 2, 3]) },
                 Ok(value!(2)),
                 DelFn::new(".exists[1]"),
             ),

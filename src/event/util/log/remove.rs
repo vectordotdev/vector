@@ -1,6 +1,6 @@
 use super::{PathComponent, PathIter, Value};
 use std::{cmp::Ordering, iter::Peekable, mem};
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 /// Removes field value specified by the given path and return its value.
 ///

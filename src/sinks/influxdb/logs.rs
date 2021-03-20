@@ -22,8 +22,8 @@ use http::{Request, Uri};
 use indoc::indoc;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use structures::map::hash::Map;
+use std::collections::{HashMap, HashSet};
+use structures::map::ord::Map;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -178,7 +178,7 @@ impl HttpSink for InfluxDBLogsSink {
 
         // Tags + Fields
         let mut tags: Map<String, String> = Map::new();
-        let mut fields: Map<String, Field> = Map::new();
+        let mut fields: HashMap<String, Field> = HashMap::new();
         event.all_fields().for_each(|(key, value)| {
             if self.tags.contains(&key) {
                 tags.insert(key, value.to_string_lossy());

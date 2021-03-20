@@ -7,7 +7,7 @@ pub use lookup::Lookup;
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 pub(crate) use util::log::PathComponent;
 pub(crate) use util::log::PathIter;
 pub use value::Value;
@@ -198,7 +198,7 @@ impl From<proto::EventWrapper> for Event {
                 let tags: Option<Map<String, String>> = if proto.tags.is_empty() {
                     None
                 } else {
-                    Some(from_btree(proto.tags))
+                    Some(proto.tags)
                 };
 
                 let value = match proto.value.unwrap() {
@@ -248,22 +248,6 @@ impl From<proto::EventWrapper> for Event {
             }
         }
     }
-}
-
-fn from_btree(btree: BTreeMap<String, String>) -> Map<String, String> {
-    let mut map = Map::new();
-    for (k, v) in btree.into_iter() {
-        map.insert(k, v);
-    }
-    map
-}
-
-fn to_btree(map: Map<String, String>) -> BTreeMap<String, String> {
-    let mut btree = BTreeMap::new();
-    for (k, v) in map.into_iter() {
-        btree.insert(k, v);
-    }
-    btree
 }
 
 fn encode_value(value: Value) -> proto::Value {
@@ -371,7 +355,7 @@ impl From<Event> for proto::EventWrapper {
                     name,
                     namespace,
                     timestamp,
-                    tags: to_btree(tags),
+                    tags,
                     kind,
                     value: Some(metric),
                 });

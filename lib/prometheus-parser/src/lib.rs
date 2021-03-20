@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 use snafu::ResultExt;
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 mod line;
 

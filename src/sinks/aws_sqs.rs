@@ -288,7 +288,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
 
     #[test]
     fn sqs_encode_event_text() {

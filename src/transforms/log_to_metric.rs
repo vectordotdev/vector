@@ -15,7 +15,7 @@ use crate::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 use std::convert::TryFrom;
 use std::num::ParseFloatError;
 

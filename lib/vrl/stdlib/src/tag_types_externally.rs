@@ -125,14 +125,14 @@ mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
     use regex::Regex;
-    use structures::hashmap;
+    use structures::ordmap;
 
     test_function![
         tag_types_externally => TagTypesExternally;
 
         tag_bytes {
             args: func_args![value: "foo"],
-            want: Ok(hashmap! {
+            want: Ok(ordmap! {
                 "string" => "foo",
             }),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
@@ -140,7 +140,7 @@ mod tests {
 
         tag_integer {
             args: func_args![value: 123],
-            want: Ok(hashmap! {
+            want: Ok(ordmap! {
                 "integer" => 123
             }),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
@@ -148,7 +148,7 @@ mod tests {
 
         tag_float {
             args: func_args![value: 123.45],
-            want: Ok(hashmap! {
+            want: Ok(ordmap! {
                 "float" => 123.45
             }),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
@@ -156,16 +156,16 @@ mod tests {
 
         tag_boolean {
             args: func_args![value: true],
-            want: Ok(hashmap! {
+            want: Ok(ordmap! {
                 "boolean" => true
             }),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
         tag_map {
-            args: func_args![value: hashmap! {"foo" => "bar"}],
-            want: Ok(hashmap! {
-                "foo" => hashmap! {
+            args: func_args![value: ordmap! {"foo" => "bar"}],
+            want: Ok(ordmap! {
+                "foo" => ordmap! {
                     "string" => "bar"
                 }
             }),
@@ -175,7 +175,7 @@ mod tests {
         tag_array {
             args: func_args![value: vec!["foo"]],
             want: Ok(vec![
-                hashmap! {
+                ordmap! {
                     "string" => "foo"
                 },
             ]),
@@ -184,7 +184,7 @@ mod tests {
 
         tag_timestamp {
             args: func_args![value: Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)],
-            want: Ok(hashmap! {
+            want: Ok(ordmap! {
                 "timestamp" => Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)
             }),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
@@ -192,7 +192,7 @@ mod tests {
 
         tag_regex {
             args: func_args![value: Regex::new(".*").unwrap()],
-            want: Ok(hashmap! {
+            want: Ok(ordmap! {
                 "regex" => Regex::new(".*").unwrap()
             }),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),

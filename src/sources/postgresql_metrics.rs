@@ -18,7 +18,7 @@ use postgres_openssl::MakeTlsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{collections::HashSet, future::ready, path::PathBuf, time::Instant};
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 use tokio::time;
 use tokio_postgres::{
     config::{ChannelBinding, Host, SslMode, TargetSessionAttrs},

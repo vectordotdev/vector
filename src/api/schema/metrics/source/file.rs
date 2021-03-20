@@ -9,7 +9,7 @@ use crate::{
 };
 use async_graphql::{Enum, InputObject, Object};
 use std::cmp::Ordering;
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 #[derive(Clone)]
 pub struct FileSourceMetricFile<'a> {

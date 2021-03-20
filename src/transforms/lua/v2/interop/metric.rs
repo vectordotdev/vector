@@ -1,7 +1,7 @@
 use super::util::{table_to_set, table_to_timestamp, timestamp_to_table, type_name};
 use crate::event::{metric, Metric, MetricKind, MetricValue, StatisticKind};
 use rlua::prelude::*;
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 impl<'a> ToLua<'a> for MetricKind {
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {

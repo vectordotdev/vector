@@ -260,7 +260,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Record
 #[cfg(test)]
 mod tests {
     use super::*;
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
 
     #[test]
     fn generate_config() {

@@ -26,7 +26,9 @@ use futures::{future::BoxFuture, stream, SinkExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{future::ready, task::Poll};
-use structures::map::hash::Map;
+use structures::hashmap;
+use structures::map::hash;
+use structures::map::ord::Map;
 use tower::Service;
 
 #[derive(Clone)]
@@ -261,7 +263,7 @@ fn encode_events(
 fn get_type_and_fields(
     value: MetricValue,
     quantiles: &[f64],
-) -> (&'static str, Option<Map<String, Field>>) {
+) -> (&'static str, Option<hash::Map<String, Field>>) {
     match value {
         MetricValue::Counter { value } => ("counter", Some(to_fields(value))),
         MetricValue::Gauge { value } => ("gauge", Some(to_fields(value))),
@@ -271,7 +273,7 @@ fn get_type_and_fields(
             count,
             sum,
         } => {
-            let mut fields: Map<String, Field> = buckets
+            let mut fields: hash::Map<String, Field> = buckets
                 .iter()
                 .map(|sample| {
                     (
@@ -290,7 +292,7 @@ fn get_type_and_fields(
             count,
             sum,
         } => {
-            let mut fields: Map<String, Field> = quantiles
+            let mut fields: hash::Map<String, Field> = quantiles
                 .iter()
                 .map(|quantile| {
                     (
@@ -315,10 +317,10 @@ fn get_type_and_fields(
     }
 }
 
-fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<Map<String, Field>> {
+fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<hash::Map<String, Field>> {
     let statistic = DistributionStatistic::from_samples(samples, quantiles)?;
 
-    let fields: Map<String, Field> = vec![
+    let fields: hash::Map<String, Field> = vec![
         ("min".to_owned(), Field::Float(statistic.min)),
         ("max".to_owned(), Field::Float(statistic.max)),
         ("median".to_owned(), Field::Float(statistic.median)),
@@ -338,11 +340,10 @@ fn encode_distribution(samples: &[Sample], quantiles: &[f64]) -> Option<Map<Stri
     Some(fields)
 }
 
-fn to_fields(value: f64) -> Map<String, Field> {
-    let fields: Map<String, Field> = vec![("value".to_owned(), Field::Float(value))]
-        .into_iter()
-        .collect();
-    fields
+fn to_fields(value: f64) -> hash::Map<String, Field> {
+    hashmap! {
+        "value" => Field::Float(value),
+    }
 }
 
 #[cfg(test)]

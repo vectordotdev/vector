@@ -23,7 +23,7 @@ pub use remove::remove;
 pub(self) mod test {
     use super::Value;
     use serde_json::Value as JsonValue;
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
 
     pub fn fields_from_json(json_value: JsonValue) -> Map<String, Value> {
         match Value::from(json_value) {

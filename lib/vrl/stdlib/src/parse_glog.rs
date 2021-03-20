@@ -144,14 +144,14 @@ fn type_def() -> Map<&'static str, Kind> {
 mod tests {
     use super::*;
     use chrono::DateTime;
-    use structures::hashmap;
+    use structures::ordmap;
 
     test_function![
         parse_glog => ParseGlog;
 
         log_line_valid {
             args: func_args![value: "I20210131 14:48:54.411655 15520 main.c++:9] Hello world!"],
-            want: Ok(hashmap! {
+            want: Ok(ordmap! {
                 "level" => "info",
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-01-31T14:48:54.411655Z").unwrap().into()),
                 "id" => 15520,
@@ -164,7 +164,7 @@ mod tests {
 
         log_line_valid_strip_whitespace {
             args: func_args![value: "\n  I20210131 14:48:54.411655 15520 main.c++:9] Hello world!  \n"],
-            want: Ok(hashmap! {
+            want: Ok(ordmap! {
                 "level" => "info",
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-01-31T14:48:54.411655Z").unwrap().into()),
                 "id" => 15520,

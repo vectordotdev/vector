@@ -122,7 +122,7 @@ mod tests {
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
 
     #[test]
     fn generate_config() {

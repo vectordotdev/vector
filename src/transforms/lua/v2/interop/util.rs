@@ -2,7 +2,7 @@ use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 use rlua::prelude::*;
 use std::collections::BTreeSet;
 use std::hash::Hash;
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 pub fn timestamp_to_table(ctx: LuaContext<'_>, ts: DateTime<Utc>) -> LuaResult<LuaTable> {
     let table = ctx.create_table()?;

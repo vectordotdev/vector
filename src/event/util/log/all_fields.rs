@@ -1,7 +1,7 @@
 use super::Value;
 use serde::{Serialize, Serializer};
 use std::{iter, slice};
-use structures::map::hash::{self, Map};
+use structures::map::ord::{self, Map};
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
@@ -13,7 +13,7 @@ pub fn all_fields(
 
 #[derive(Clone)]
 enum LeafIter<'a> {
-    Map(hash::Iter<'a, String, Value>),
+    Map(ord::Iter<'a, String, Value>),
     Array(iter::Enumerate<slice::Iter<'a, Value>>),
 }
 

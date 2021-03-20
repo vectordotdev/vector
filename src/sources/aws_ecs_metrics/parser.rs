@@ -1,7 +1,7 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 #[derive(Deserialize)]
 struct BlockIoStat {

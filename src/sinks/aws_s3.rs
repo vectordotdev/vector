@@ -28,7 +28,7 @@ use std::{
     convert::{TryFrom, TryInto},
     task::{Context, Poll},
 };
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
 use uuid::Uuid;

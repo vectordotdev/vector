@@ -108,7 +108,7 @@ impl Condition for Remap {
 
 #[cfg(test)]
 mod test {
-    use structures::map::hash::Map;
+    use structures::map::ord::Map;
 
     use super::*;
     use crate::{event::Metric, event::MetricKind, event::MetricValue, log_event};

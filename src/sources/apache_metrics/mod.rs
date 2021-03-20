@@ -18,7 +18,7 @@ use std::{
     future::ready,
     time::{Duration, Instant},
 };
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 
 mod parser;
 

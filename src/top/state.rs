@@ -1,4 +1,4 @@
-use structures::map::hash::Map;
+use structures::map::ord::Map;
 use tokio::sync::mpsc;
 
 type NamedMetric = (String, i64);
