@@ -733,7 +733,7 @@ package-rpm-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Buil
 
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-musl timberio/ci_image ./scripts/package-rpm.sh
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-gnu timberio/ci_image ./scripts/package-rpm.sh
 
 .PHONY: package-rpm-armv7-gnu
 package-rpm-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf rpm package
