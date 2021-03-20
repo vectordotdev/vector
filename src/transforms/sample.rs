@@ -13,6 +13,7 @@ pub struct SampleConfig {
     pub rate: u64,
     pub key_field: Option<String>,
     pub exclude: Option<CheckFieldsConfig>,
+    pub field: Option<String>,
 }
 
 inventory::submit! {
@@ -29,6 +30,7 @@ impl GenerateConfig for SampleConfig {
             rate: 10,
             key_field: None,
             exclude: None,
+            field: None,
         })
         .unwrap()
     }
@@ -38,6 +40,10 @@ impl GenerateConfig for SampleConfig {
 #[typetag::serde(name = "sample")]
 impl TransformConfig for SampleConfig {
     async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
+        let field = self
+            .field
+            .clone()
+            .unwrap_or_else(|| crate::config::log_schema().message_key().into());
         Ok(Transform::function(Sample::new(
             self.rate,
             self.key_field.clone(),
@@ -45,6 +51,7 @@ impl TransformConfig for SampleConfig {
                 .as_ref()
                 .map(|condition| condition.build())
                 .transpose()?,
+            Some(field),
         )))
     }
 
@@ -91,15 +98,22 @@ pub struct Sample {
     key_field: Option<String>,
     exclude: Option<Box<dyn Condition>>,
     count: u64,
+    field: Option<String>,
 }
 
 impl Sample {
-    pub fn new(rate: u64, key_field: Option<String>, exclude: Option<Box<dyn Condition>>) -> Self {
+    pub fn new(
+        rate: u64,
+        key_field: Option<String>,
+        exclude: Option<Box<dyn Condition>>,
+        field: Option<String>,
+    ) -> Self {
         Self {
             rate,
             key_field,
             exclude,
             count: 0,
+            field,
         }
     }
 }
@@ -176,6 +190,7 @@ mod tests {
             2,
             Some(log_schema().message_key().into()),
             Some(condition_contains("na")),
+            None,
         );
         let total_passed = events
             .into_iter()
@@ -190,6 +205,7 @@ mod tests {
             25,
             Some(log_schema().message_key().into()),
             Some(condition_contains("na")),
+            None,
         );
         let total_passed = events
             .into_iter()
@@ -207,6 +223,7 @@ mod tests {
             2,
             Some(log_schema().message_key().into()),
             Some(condition_contains("na")),
+            None,
         );
 
         let first_run = events
@@ -226,8 +243,12 @@ mod tests {
     fn always_passes_events_matching_pass_list() {
         for key_field in &[None, Some(log_schema().message_key().into())] {
             let event = Event::from("i am important");
-            let mut sampler =
-                Sample::new(0, key_field.clone(), Some(condition_contains("important")));
+            let mut sampler = Sample::new(
+                0,
+                key_field.clone(),
+                Some(condition_contains("important")),
+                None,
+            );
             let iterations = 0..1000;
             let total_passed = iterations
                 .filter_map(|_| sampler.transform_one(event.clone()))
@@ -244,6 +265,7 @@ mod tests {
                 0,
                 key_field.clone(),
                 Some(condition(log_schema().timestamp_key(), "contains", ":")),
+                None,
             );
             let iterations = 0..1000;
             let total_passed = iterations
@@ -257,7 +279,8 @@ mod tests {
     fn sampler_adds_sampling_rate_to_event() {
         for key_field in &[None, Some(log_schema().message_key().into())] {
             let events = random_events(10000);
-            let mut sampler = Sample::new(10, key_field.clone(), Some(condition_contains("na")));
+            let mut sampler =
+                Sample::new(10, key_field.clone(), Some(condition_contains("na")), None);
             let passing = events
                 .into_iter()
                 .filter(|s| {
@@ -270,7 +293,8 @@ mod tests {
             assert_eq!(passing.as_log()["sample_rate"], "10".into());
 
             let events = random_events(10000);
-            let mut sampler = Sample::new(25, key_field.clone(), Some(condition_contains("na")));
+            let mut sampler =
+                Sample::new(25, key_field.clone(), Some(condition_contains("na")), None);
             let passing = events
                 .into_iter()
                 .filter(|s| {
@@ -283,11 +307,38 @@ mod tests {
             assert_eq!(passing.as_log()["sample_rate"], "25".into());
 
             // If the event passed the regex check, don't include the sampling rate
-            let mut sampler = Sample::new(25, key_field.clone(), Some(condition_contains("na")));
+            let mut sampler =
+                Sample::new(25, key_field.clone(), Some(condition_contains("na")), None);
             let event = Event::from("nananana");
             let passing = sampler.transform_one(event).unwrap();
             assert!(passing.as_log().get("sample_rate").is_none());
         }
+    }
+
+    #[test]
+    fn sampler_parse_field() {
+        let mut sampler = Sample::new(
+            0,
+            Some(log_schema().message_key().into()),
+            Some(condition_contains("message")),
+            Some("data".into()),
+        );
+
+        // Field present
+        let mut event = Event::from("message");
+        event
+            .as_mut_log()
+            .insert("data", r#"{"greeting": "hello", "name": "bob"}"#);
+
+        let event = sampler.transform_one(event).unwrap();
+        assert_eq!(
+            event.as_log()["data"],
+            r#"{"greeting": "hello", "name": "bob"}"#.into()
+        );
+
+        // Missing field
+        let event = Event::from("message");
+        assert!(sampler.transform_one(event).is_none());
     }
 
     fn random_events(n: usize) -> Vec<Event> {

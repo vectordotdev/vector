@@ -297,6 +297,7 @@ fn benchmark_complex(c: &mut Criterion) {
                         rate: sample_rate,
                         key_field: None,
                         exclude: None,
+                        field: None,
                     },
                 );
                 config.add_sink(

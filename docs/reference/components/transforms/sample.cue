@@ -67,6 +67,16 @@ components: transforms: sample: {
 				syntax: "remap_boolean_expression"
 			}
 		}
+		field: {
+			common:      true
+			description: "The log field to decode. The field must hold a string value."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "message"
+				syntax:  "literal"
+			}
+		}
 		rate: {
 			description: """
 				The rate at which events will be forwarded, expressed as 1/N. For example,

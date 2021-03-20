@@ -71,6 +71,7 @@ async fn sample() {
             rate: 10,
             key_field: Some(config::log_schema().message_key().into()),
             exclude: None,
+            field: None,
         },
     );
     config.add_sink(
