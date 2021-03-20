@@ -2,7 +2,7 @@ use std::str::FromStr;
 use crate::ast::*;
 use crate::lex::*;
 use diagnostic::span;
-use structures::map::ord::OrdMap as Map;
+use structures::map::ord::Map;
 use lalrpop_util::ErrorRecovery;
 use ordered_float::NotNan;
 

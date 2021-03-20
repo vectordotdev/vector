@@ -1,7 +1,7 @@
 use super::{Error, Value};
 use crate::ExpressionError;
 use std::convert::TryFrom;
-use structures::map::ord::OrdMap as Map;
+use structures::map::ord::Map;
 
 impl Value {
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).

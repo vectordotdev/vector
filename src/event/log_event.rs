@@ -318,7 +318,7 @@ mod test {
     use crate::test_util::open_fixture;
     use serde_json::json;
     use std::str::FromStr;
-    use structures::ordmap;
+    use structures::hashmap;
     use tracing::trace;
 
     // This test iterates over the `tests/data/fixtures/log_event` folder and:
@@ -420,28 +420,28 @@ mod test {
 
     #[test]
     fn object_get() {
-        use structures::ordmap;
+        use structures::hashmap;
         use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
-            (ordmap! {}, vec![], Ok(Some(ordmap! {}.into()))),
+            (hashmap! {}, vec![], Ok(Some(hashmap! {}.into()))),
             (
-                ordmap! { "foo" => "bar" },
+                hashmap! { "foo" => "bar" },
                 vec![],
-                Ok(Some(ordmap! { "foo" => "bar" }.into())),
+                Ok(Some(hashmap! { "foo" => "bar" }.into())),
             ),
             (
-                ordmap! { "foo" => "bar" },
+                hashmap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned()))],
                 Ok(Some("bar".into())),
             ),
             (
-                ordmap! { "foo" => "bar" },
+                hashmap! { "foo" => "bar" },
                 vec![Field(Regular("bar".to_owned()))],
                 Ok(None),
             ),
             (
-                ordmap! { "foo" => vec![ordmap! { "bar" => true }] },
+                hashmap! { "foo" => vec![hashmap! { "bar" => true }] },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Index(0),
@@ -450,7 +450,7 @@ mod test {
                 Ok(Some(true.into())),
             ),
             (
-                ordmap! { "foo" => ordmap! { "bar baz" => ordmap! { "baz" => 2 } } },
+                hashmap! { "foo" => hashmap! { "bar baz" => hashmap! { "baz" => 2 } } },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Coalesce(vec![
@@ -474,26 +474,26 @@ mod test {
 
     #[test]
     fn object_insert() {
-        use structures::ordmap;
+        use structures::hashmap;
         use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
             (
-                ordmap! { "foo" => "bar" },
+                hashmap! { "foo" => "bar" },
                 vec![],
-                ordmap! { "baz" => "qux" }.into(),
-                ordmap! { "baz" => "qux" },
+                hashmap! { "baz" => "qux" }.into(),
+                hashmap! { "baz" => "qux" },
                 Ok(()),
             ),
             (
-                ordmap! { "foo" => "bar" },
+                hashmap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned()))],
                 "baz".into(),
-                ordmap! { "foo" => "baz" },
+                hashmap! { "foo" => "baz" },
                 Ok(()),
             ),
             (
-                ordmap! { "foo" => "bar" },
+                hashmap! { "foo" => "bar" },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Index(2),
@@ -502,22 +502,22 @@ mod test {
                     Field(Regular("b".to_owned())),
                 ],
                 true.into(),
-                ordmap! {
+                hashmap! {
                     "foo" => vec![
                         Value::Null,
                         Value::Null,
-                        ordmap! {
-                            "bar baz" => ordmap! { "a" => ordmap! { "b" => true } },
+                        hashmap! {
+                            "bar baz" => hashmap! { "a" => hashmap! { "b" => true } },
                         }.into()
                     ]
                 },
                 Ok(()),
             ),
             (
-                ordmap! { "foo" => vec![0, 1, 2] },
+                hashmap! { "foo" => vec![0, 1, 2] },
                 vec![Field(Regular("foo".to_owned())), Index(5)],
                 "baz".into(),
-                ordmap! {
+                hashmap! {
                     "foo" => vec![
                         0.into(),
                         1.into(),
@@ -530,38 +530,38 @@ mod test {
                 Ok(()),
             ),
             (
-                ordmap! { "foo" => "bar" },
+                hashmap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                ordmap! { "foo" => vec!["baz"] },
+                hashmap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                ordmap! { "foo" => Value::Array(vec![]) },
+                hashmap! { "foo" => Value::Array(vec![]) },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                ordmap! { "foo" => vec!["baz"] },
+                hashmap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                ordmap! { "foo" => Value::Array(vec![0.into()]) },
+                hashmap! { "foo" => Value::Array(vec![0.into()]) },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                ordmap! { "foo" => vec!["baz"] },
+                hashmap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                ordmap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
+                hashmap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                ordmap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
+                hashmap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
                 Ok(()),
             ),
             (
-                ordmap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
+                hashmap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
                 vec![Field(Regular("foo".to_owned())), Index(1)],
                 "baz".into(),
-                ordmap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
+                hashmap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
                 Ok(()),
             ),
         ];
@@ -584,52 +584,52 @@ mod test {
 
     #[test]
     fn object_remove() {
-        use structures::ordmap;
+        use structures::hashmap;
         use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
             (
-                ordmap! { "foo" => "bar" },
+                hashmap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned()))],
                 false,
-                Some(ordmap! {}.into()),
+                Some(hashmap! {}.into()),
             ),
             (
-                ordmap! { "foo" => "bar" },
+                hashmap! { "foo" => "bar" },
                 vec![Coalesce(vec![
                     Quoted("foo bar".to_owned()),
                     Regular("foo".to_owned()),
                 ])],
                 false,
-                Some(ordmap! {}.into()),
+                Some(hashmap! {}.into()),
             ),
             (
-                ordmap! { "foo" => "bar", "baz" => "qux" },
+                hashmap! { "foo" => "bar", "baz" => "qux" },
                 vec![],
                 false,
-                Some(ordmap! {}.into()),
+                Some(hashmap! {}.into()),
             ),
             (
-                ordmap! { "foo" => "bar", "baz" => "qux" },
+                hashmap! { "foo" => "bar", "baz" => "qux" },
                 vec![],
                 true,
-                Some(ordmap! {}.into()),
+                Some(hashmap! {}.into()),
             ),
             (
-                ordmap! { "foo" => vec![0] },
+                hashmap! { "foo" => vec![0] },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 false,
-                Some(ordmap! { "foo" => Value::Array(vec![]) }.into()),
+                Some(hashmap! { "foo" => Value::Array(vec![]) }.into()),
             ),
             (
-                ordmap! { "foo" => vec![0] },
+                hashmap! { "foo" => vec![0] },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 true,
-                Some(ordmap! {}.into()),
+                Some(hashmap! {}.into()),
             ),
             (
-                ordmap! {
-                    "foo" => ordmap! { "bar baz" => vec![0] },
+                hashmap! {
+                    "foo" => hashmap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
                 vec![
@@ -639,16 +639,16 @@ mod test {
                 ],
                 false,
                 Some(
-                    ordmap! {
-                        "foo" => ordmap! { "bar baz" => Value::Array(vec![]) },
+                    hashmap! {
+                        "foo" => hashmap! { "bar baz" => Value::Array(vec![]) },
                         "bar" => "baz",
                     }
                     .into(),
                 ),
             ),
             (
-                ordmap! {
-                    "foo" => ordmap! { "bar baz" => vec![0] },
+                hashmap! {
+                    "foo" => hashmap! { "bar baz" => vec![0] },
                     "bar" => "baz",
                 },
                 vec![
@@ -657,7 +657,7 @@ mod test {
                     Index(0),
                 ],
                 true,
-                Some(ordmap! { "bar" => "baz" }.into()),
+                Some(hashmap! { "bar" => "baz" }.into()),
             ),
         ];
 

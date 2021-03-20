@@ -1,7 +1,7 @@
 use super::Value;
 use crate::path::Segment::*;
 use crate::Path;
-use structures::map::ord::OrdMap as Map;
+use structures::map::ord::Map;
 
 impl Value {
     /// Insert the current value into a given path.

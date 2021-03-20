@@ -144,7 +144,7 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_object(&mut self, node: Node<ast::Object>) -> Object {
-        use structures::map::ord::OrdMap as Map;
+        use structures::map::ord::Map;
 
         let exprs = node
             .into_inner()

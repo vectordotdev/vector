@@ -1,4 +1,4 @@
-use crate::map::ord::OrdMap as Map;
+use crate::map::ord::Map;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use std::collections::BTreeMap;
 

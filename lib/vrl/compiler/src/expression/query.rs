@@ -2,7 +2,7 @@ use crate::expression::{Container, FunctionCall, Resolved, Variable};
 use crate::parser::ast::Ident;
 use crate::{Context, Expression, Path, State, TypeDef, Value};
 use std::fmt;
-use structures::map::ord::OrdMap as Map;
+use structures::map::ord::Map;
 
 #[derive(Clone, PartialEq)]
 pub struct Query {

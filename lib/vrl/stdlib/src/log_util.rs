@@ -1,7 +1,7 @@
 use chrono::prelude::*;
 use lazy_static::lazy_static;
 use regex::{Captures, Regex};
-use structures::map::ord::OrdMap as Map;
+use structures::map::ord::Map;
 use vrl::prelude::*;
 
 lazy_static! {

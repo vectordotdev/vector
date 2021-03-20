@@ -1,4 +1,4 @@
-use structures::map::ord::OrdMap as Map;
+use structures::map::ord::Map;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]

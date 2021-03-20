@@ -1,4 +1,4 @@
-use crate::map::hash::HashMap as Map;
+use crate::map::hash::Map;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use std::collections::HashMap;
 

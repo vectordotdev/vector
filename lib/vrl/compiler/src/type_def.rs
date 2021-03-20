@@ -1,7 +1,7 @@
 use crate::value::Kind;
 use crate::{map, path, Path};
 use std::{collections::BTreeSet, ops::Sub};
-use structures::map::ord::OrdMap as Map;
+use structures::map::ord::Map;
 
 /// Properties for a given expression that express the expected outcome of the
 /// expression.

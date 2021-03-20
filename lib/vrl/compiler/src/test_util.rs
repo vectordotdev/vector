@@ -83,7 +83,7 @@ macro_rules! test_function {
                     Ok(expression) => {
                         let mut compiler_state = $crate::state::Compiler::default();
                         let mut runtime_state = $crate::state::Runtime::default();
-                        let mut target: $crate::Value = ::structures::map::ord::OrdMap::default().into();
+                        let mut target: $crate::Value = ::structures::map::ord::Map::default().into();
                         let mut ctx = $crate::Context::new(&mut target, &mut runtime_state);
 
                         let got_value = expression.resolve(&mut ctx)
@@ -124,6 +124,6 @@ macro_rules! map {
     ($($k:tt: $v:expr),+ $(,)?) => {
         vec![$(($k.into(), $v.into())),+]
             .into_iter()
-            .collect::<::structures::map::ord::OrdMap<_, _>>()
+            .collect::<::structures::map::ord::Map<_, _>>()
     };
 }

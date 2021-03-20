@@ -3,7 +3,7 @@ macro_rules! btreemap {
     () => (::std::collections::BTreeMap::new());
 
     // trailing comma case
-    ($($key:expr => $value:expr,)+) => (::structures::ordmap!($($key => $value),+));
+    ($($key:expr => $value:expr,)+) => (::structures::hashmap!($($key => $value),+));
 
     ($($key:expr => $value:expr),*) => {
         {
@@ -22,15 +22,15 @@ mod tests {
     fn test_btreemap() {
         use std::collections::BTreeMap;
 
-        assert_eq!(::structures::ordmap! {}, BTreeMap::<(), ()>::new());
+        assert_eq!(::structures::hashmap! {}, BTreeMap::<(), ()>::new());
 
         let mut map = BTreeMap::new();
         map.insert(1, "1");
-        assert_eq!(::structures::ordmap! { 1 => "1" }, map);
+        assert_eq!(::structures::hashmap! { 1 => "1" }, map);
 
         let mut map = BTreeMap::new();
         map.insert("1", "one");
         map.insert("2", "two");
-        assert_eq!(::structures::ordmap! { "1" => "one", "2" => "two" }, map);
+        assert_eq!(::structures::hashmap! { "1" => "one", "2" => "two" }, map);
     }
 }

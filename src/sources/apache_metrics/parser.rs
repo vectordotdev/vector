@@ -481,7 +481,7 @@ mod test {
     use crate::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::{DateTime, Utc};
     use pretty_assertions::assert_eq;
-    use structures::ordmap;
+    use structures::hashmap;
 
     // Test ExtendedStatus: Off
     // https://httpd.apache.org/docs/2.4/mod/core.html#extendedstatus
@@ -537,7 +537,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "closing" }))
+                .with_tags(Some(hashmap! { "state" => "closing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "connections",
@@ -545,7 +545,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "keepalive" }))
+                .with_tags(Some(hashmap! { "state" => "keepalive" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "connections",
@@ -553,7 +553,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "total" }))
+                .with_tags(Some(hashmap! { "state" => "total" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "connections",
@@ -561,7 +561,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "writing" }))
+                .with_tags(Some(hashmap! { "state" => "writing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -569,7 +569,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "closing" }))
+                .with_tags(Some(hashmap! { "state" => "closing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -577,7 +577,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "dnslookup" }))
+                .with_tags(Some(hashmap! { "state" => "dnslookup" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -585,7 +585,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "finishing" }))
+                .with_tags(Some(hashmap! { "state" => "finishing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -593,7 +593,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 2.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "idle_cleanup" }))
+                .with_tags(Some(hashmap! { "state" => "idle_cleanup" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -601,7 +601,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 2.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "keepalive" }))
+                .with_tags(Some(hashmap! { "state" => "keepalive" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -609,7 +609,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "logging" }))
+                .with_tags(Some(hashmap! { "state" => "logging" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -617,7 +617,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 325.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "open" }))
+                .with_tags(Some(hashmap! { "state" => "open" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -625,7 +625,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "reading" }))
+                .with_tags(Some(hashmap! { "state" => "reading" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -633,7 +633,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "sending" }))
+                .with_tags(Some(hashmap! { "state" => "sending" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -641,7 +641,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "starting" }))
+                .with_tags(Some(hashmap! { "state" => "starting" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -649,7 +649,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 64.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "waiting" }))
+                .with_tags(Some(hashmap! { "state" => "waiting" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "uptime_seconds_total",
@@ -664,7 +664,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "busy" }))
+                .with_tags(Some(hashmap! { "state" => "busy" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "workers",
@@ -672,7 +672,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 74.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "idle" }))
+                .with_tags(Some(hashmap! { "state" => "idle" }))
                 .with_timestamp(Some(now)),
             ]
         );
@@ -753,7 +753,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "closing" }))
+                .with_tags(Some(hashmap! { "state" => "closing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "connections",
@@ -761,7 +761,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "keepalive" }))
+                .with_tags(Some(hashmap! { "state" => "keepalive" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "connections",
@@ -769,7 +769,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "total" }))
+                .with_tags(Some(hashmap! { "state" => "total" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "connections",
@@ -777,7 +777,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "writing" }))
+                .with_tags(Some(hashmap! { "state" => "writing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "cpu_load",
@@ -792,7 +792,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "type" => "children_system" }))
+                .with_tags(Some(hashmap! { "type" => "children_system" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "cpu_seconds_total",
@@ -800,7 +800,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "type" => "children_user" }))
+                .with_tags(Some(hashmap! { "type" => "children_user" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "cpu_seconds_total",
@@ -808,7 +808,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.02 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "type" => "system" }))
+                .with_tags(Some(hashmap! { "type" => "system" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "cpu_seconds_total",
@@ -816,7 +816,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 0.2 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "type" => "user" }))
+                .with_tags(Some(hashmap! { "type" => "user" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "duration_seconds_total",
@@ -831,7 +831,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "closing" }))
+                .with_tags(Some(hashmap! { "state" => "closing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -839,7 +839,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "dnslookup" }))
+                .with_tags(Some(hashmap! { "state" => "dnslookup" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -847,7 +847,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "finishing" }))
+                .with_tags(Some(hashmap! { "state" => "finishing" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -855,7 +855,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 2.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "idle_cleanup" }))
+                .with_tags(Some(hashmap! { "state" => "idle_cleanup" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -863,7 +863,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 2.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "keepalive" }))
+                .with_tags(Some(hashmap! { "state" => "keepalive" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -871,7 +871,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "logging" }))
+                .with_tags(Some(hashmap! { "state" => "logging" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -879,7 +879,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 325.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "open" }))
+                .with_tags(Some(hashmap! { "state" => "open" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -887,7 +887,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "reading" }))
+                .with_tags(Some(hashmap! { "state" => "reading" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -895,7 +895,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "sending" }))
+                .with_tags(Some(hashmap! { "state" => "sending" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -903,7 +903,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "starting" }))
+                .with_tags(Some(hashmap! { "state" => "starting" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "scoreboard",
@@ -911,7 +911,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 64.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "waiting" }))
+                .with_tags(Some(hashmap! { "state" => "waiting" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "sent_bytes_total",
@@ -933,7 +933,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 1.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "busy" }))
+                .with_tags(Some(hashmap! { "state" => "busy" }))
                 .with_timestamp(Some(now)),
                 Metric::new(
                     "workers",
@@ -941,7 +941,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     MetricValue::Gauge { value: 74.0 },
                 )
                 .with_namespace(Some("apache"))
-                .with_tags(Some(ordmap! { "state" => "idle" }))
+                .with_tags(Some(hashmap! { "state" => "idle" }))
                 .with_timestamp(Some(now)),
             ]
         );
@@ -977,7 +977,7 @@ ConnsTotal: 1
                 MetricValue::Gauge { value: 1.0 },
             )
             .with_namespace(Some("apache"))
-            .with_tags(Some(ordmap! { "state" => "total" }))
+            .with_tags(Some(hashmap! { "state" => "total" }))
             .with_timestamp(Some(now)),]
         );
         assert_eq!(errors.len(), 1);

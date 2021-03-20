@@ -894,7 +894,7 @@ mod test {
     use super::*;
     use chrono::{offset::TimeZone, DateTime, Utc};
     use std::str::FromStr;
-    use structures::ordmap;
+    use structures::hashmap;
     use vrl::{Path, Value};
 
     fn ts() -> DateTime<Utc> {
@@ -1174,11 +1174,11 @@ mod test {
 
         assert_eq!(
             Ok(Some(
-                ordmap! {
+                hashmap! {
                     "name" => "zub",
                     "namespace" => "zoob",
                     "timestamp" => Utc.ymd(2020, 12, 10).and_hms(12, 0, 0),
-                    "tags" => ordmap! { "tig" => "tog" },
+                    "tags" => hashmap! { "tig" => "tog" },
                     "kind" => "absolute",
                     "type" => "counter",
                 }

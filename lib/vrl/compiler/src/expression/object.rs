@@ -1,7 +1,7 @@
 use crate::expression::{Expr, Resolved};
 use crate::{Context, Expression, State, TypeDef, Value};
 use std::fmt;
-use structures::map::ord::OrdMap as Map;
+use structures::map::ord::Map;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Object {

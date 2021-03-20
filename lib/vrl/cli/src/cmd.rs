@@ -4,7 +4,7 @@ use std::io::{self, Read};
 use std::iter::IntoIterator;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use structures::map::ord::OrdMap as Map;
+use structures::map::ord::Map;
 use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
 
 #[derive(Debug, StructOpt)]

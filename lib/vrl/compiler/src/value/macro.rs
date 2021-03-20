@@ -10,13 +10,13 @@ macro_rules! value {
     });
 
     ({}) => ({
-        $crate::Value::Object(::structures::map::ord::OrdMap::default())
+        $crate::Value::Object(::structures::map::ord::Map::default())
     });
 
     ({$($($k1:literal)? $($k2:ident)?: $v:tt),+ $(,)?}) => ({
         let map = vec![$((String::from($($k1)? $(stringify!($k2))?), $crate::value!($v))),+]
             .into_iter()
-            .collect::<::structures::map::ord::OrdMap<_, $crate::Value>>();
+            .collect::<::structures::map::ord::Map<_, $crate::Value>>();
 
         $crate::Value::Object(map)
     });

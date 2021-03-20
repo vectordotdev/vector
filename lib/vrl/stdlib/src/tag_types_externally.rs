@@ -1,4 +1,4 @@
-use structures::map::ord::OrdMap as Map;
+use structures::map::ord::Map;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -125,14 +125,14 @@ mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
     use regex::Regex;
-    use structures::ordmap;
+    use structures::hashmap;
 
     test_function![
         tag_types_externally => TagTypesExternally;
 
         tag_bytes {
             args: func_args![value: "foo"],
-            want: Ok(ordmap! {
+            want: Ok(hashmap! {
                 "string" => "foo",
             }),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
@@ -140,7 +140,7 @@ mod tests {
 
         tag_integer {
             args: func_args![value: 123],
-            want: Ok(ordmap! {
+            want: Ok(hashmap! {
                 "integer" => 123
             }),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
@@ -148,7 +148,7 @@ mod tests {
 
         tag_float {
             args: func_args![value: 123.45],
-            want: Ok(ordmap! {
+            want: Ok(hashmap! {
                 "float" => 123.45
             }),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
@@ -156,16 +156,16 @@ mod tests {
 
         tag_boolean {
             args: func_args![value: true],
-            want: Ok(ordmap! {
+            want: Ok(hashmap! {
                 "boolean" => true
             }),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
         }
 
         tag_map {
-            args: func_args![value: ordmap! {"foo" => "bar"}],
-            want: Ok(ordmap! {
-                "foo" => ordmap! {
+            args: func_args![value: hashmap! {"foo" => "bar"}],
+            want: Ok(hashmap! {
+                "foo" => hashmap! {
                     "string" => "bar"
                 }
             }),
@@ -175,7 +175,7 @@ mod tests {
         tag_array {
             args: func_args![value: vec!["foo"]],
             want: Ok(vec![
-                ordmap! {
+                hashmap! {
                     "string" => "foo"
                 },
             ]),
@@ -184,7 +184,7 @@ mod tests {
 
         tag_timestamp {
             args: func_args![value: Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)],
-            want: Ok(ordmap! {
+            want: Ok(hashmap! {
                 "timestamp" => Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)
             }),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),
@@ -192,7 +192,7 @@ mod tests {
 
         tag_regex {
             args: func_args![value: Regex::new(".*").unwrap()],
-            want: Ok(ordmap! {
+            want: Ok(hashmap! {
                 "regex" => Regex::new(".*").unwrap()
             }),
             tdef: TypeDef::new().object::<(), Kind>(map! { (): Kind::all() }),

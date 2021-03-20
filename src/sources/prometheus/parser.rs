@@ -137,7 +137,7 @@ mod test {
     use crate::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::{TimeZone, Utc};
     use pretty_assertions::assert_eq;
-    use structures::ordmap;
+    use structures::hashmap;
 
     fn parse_text(text: &str) -> Result<Vec<Metric>, ParserError> {
         super::parse_text(text).map(|events| events.into_iter().map(Event::into_metric).collect())
@@ -381,7 +381,7 @@ mod test {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(ordmap! { "tag" => "}" }))]),
+            .with_tags(Some(hashmap! { "tag" => "}" }))]),
         );
     }
 
@@ -399,7 +399,7 @@ mod test {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(ordmap! { "tag" => "a,b" }))]),
+            .with_tags(Some(hashmap! { "tag" => "a,b" }))]),
         );
     }
 
@@ -417,7 +417,7 @@ mod test {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(ordmap! { "tag" => "\\n" }))]),
+            .with_tags(Some(hashmap! { "tag" => "\\n" }))]),
         );
     }
 
@@ -435,7 +435,7 @@ mod test {
                 MetricKind::Absolute,
                 MetricValue::Counter { value: 0.0 },
             )
-            .with_tags(Some(ordmap! { "tag" => " * " }))]),
+            .with_tags(Some(hashmap! { "tag" => " * " }))]),
         );
     }
 
@@ -854,77 +854,77 @@ mod test {
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 263719.0 },
                 )
-                .with_tags(Some(ordmap! { "direction" => "in", "host" => "*" })),
+                .with_tags(Some(hashmap! { "direction" => "in", "host" => "*" })),
                 Metric::new(
                     "nginx_server_bytes",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 255061.0 },
                 )
-                .with_tags(Some(ordmap! { "direction" => "in", "host" => "_" })),
+                .with_tags(Some(hashmap! { "direction" => "in", "host" => "_" })),
                 Metric::new(
                     "nginx_server_bytes",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 8658.0 },
                 )
                 .with_tags(Some(
-                    ordmap! { "direction" => "in", "host" => "nginx-vts-status" }
+                    hashmap! { "direction" => "in", "host" => "nginx-vts-status" }
                 )),
                 Metric::new(
                     "nginx_server_bytes",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 944199.0 },
                 )
-                .with_tags(Some(ordmap! { "direction" => "out", "host" => "*" })),
+                .with_tags(Some(hashmap! { "direction" => "out", "host" => "*" })),
                 Metric::new(
                     "nginx_server_bytes",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 360775.0 },
                 )
-                .with_tags(Some(ordmap! { "direction" => "out", "host" => "_" })),
+                .with_tags(Some(hashmap! { "direction" => "out", "host" => "_" })),
                 Metric::new(
                     "nginx_server_bytes",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 583424.0 },
                 )
                 .with_tags(Some(
-                    ordmap! { "direction" => "out", "host" => "nginx-vts-status" }
+                    hashmap! { "direction" => "out", "host" => "nginx-vts-status" }
                 )),
                 Metric::new(
                     "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(ordmap! { "host" => "*", "status" => "bypass" })),
+                .with_tags(Some(hashmap! { "host" => "*", "status" => "bypass" })),
                 Metric::new(
                     "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(ordmap! { "host" => "*", "status" => "expired" })),
+                .with_tags(Some(hashmap! { "host" => "*", "status" => "expired" })),
                 Metric::new(
                     "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(ordmap! { "host" => "*", "status" => "hit" })),
+                .with_tags(Some(hashmap! { "host" => "*", "status" => "hit" })),
                 Metric::new(
                     "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(ordmap! { "host" => "*", "status" => "miss" })),
+                .with_tags(Some(hashmap! { "host" => "*", "status" => "miss" })),
                 Metric::new(
                     "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(ordmap! { "host" => "*", "status" => "revalidated" })),
+                .with_tags(Some(hashmap! { "host" => "*", "status" => "revalidated" })),
                 Metric::new(
                     "nginx_server_cache",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 0.0 },
                 )
-                .with_tags(Some(ordmap! { "host" => "*", "status" => "scarce" }))
+                .with_tags(Some(hashmap! { "host" => "*", "status" => "scarce" }))
             ])
         );
     }

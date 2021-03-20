@@ -1,6 +1,6 @@
 use std::fmt;
 use std::sync::Arc;
-use structures::map::ord::OrdMap as Map;
+use structures::map::ord::Map;
 use vrl::{
     diagnostic::{Label, Span},
     prelude::*,
@@ -154,7 +154,7 @@ impl Expression for ParseGrokFn {
 #[cfg(test)]
 mod test {
     use super::*;
-    use structures::ordmap;
+    use structures::hashmap;
 
     test_function![
         parse_grok => ParseGrok;
@@ -189,7 +189,7 @@ mod test {
         parsed {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z info Hello world",
                               pattern: "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"],
-            want: Ok(Value::from(ordmap! {
+            want: Ok(Value::from(hashmap! {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "info",
                 "message" => "Hello world",
@@ -202,7 +202,7 @@ mod test {
         parsed2 {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z",
                               pattern: "(%{TIMESTAMP_ISO8601:timestamp}|%{LOGLEVEL:level})"],
-            want: Ok(Value::from(ordmap! {
+            want: Ok(Value::from(hashmap! {
                 "timestamp" => "2020-10-02T23:22:12.223222Z",
                 "level" => "",
             })),
@@ -217,7 +217,7 @@ mod test {
                               remove_empty: true,
             ],
             want: Ok(Value::from(
-                ordmap! { "timestamp" => "2020-10-02T23:22:12.223222Z" },
+                hashmap! { "timestamp" => "2020-10-02T23:22:12.223222Z" },
             )),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all(),

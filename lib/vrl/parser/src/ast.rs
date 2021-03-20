@@ -6,7 +6,7 @@ use std::hash::{Hash, Hasher};
 use std::iter::IntoIterator;
 use std::ops::Deref;
 use std::str::FromStr;
-use structures::map::ord::OrdMap;
+use structures::map::ord::Map;
 
 // -----------------------------------------------------------------------------
 // node
@@ -489,7 +489,7 @@ impl IntoIterator for Array {
 // -----------------------------------------------------------------------------
 
 #[derive(Clone, PartialEq)]
-pub struct Object(pub(crate) OrdMap<Node<String>, Node<Expr>>);
+pub struct Object(pub(crate) Map<Node<String>, Node<Expr>>);
 
 impl fmt::Display for Object {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

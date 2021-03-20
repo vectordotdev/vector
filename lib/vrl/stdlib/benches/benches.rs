@@ -1,7 +1,7 @@
 use chrono::{DateTime, Local, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
-use structures::ordmap;
+use structures::hashmap;
 use vrl::prelude::*;
 
 criterion_group!(
@@ -1059,36 +1059,36 @@ bench_function! {
 
     tag_bytes {
         args: func_args![value: "foo"],
-        want: Ok(ordmap! {
+        want: Ok(hashmap! {
             "string" => "foo",
         }),
     }
 
     tag_integer {
         args: func_args![value: 123],
-        want: Ok(ordmap! {
+        want: Ok(hashmap! {
             "integer" => 123
         }),
     }
 
     tag_float {
         args: func_args![value: 123.45],
-        want: Ok(ordmap! {
+        want: Ok(hashmap! {
             "float" => 123.45
         }),
     }
 
     tag_boolean {
         args: func_args![value: true],
-        want: Ok(ordmap! {
+        want: Ok(hashmap! {
             "boolean" => true
         }),
     }
 
     tag_map {
-        args: func_args![value: ordmap! {"foo" => "bar"}],
-        want: Ok(ordmap! {
-            "foo" => ordmap! {
+        args: func_args![value: hashmap! {"foo" => "bar"}],
+        want: Ok(hashmap! {
+            "foo" => hashmap! {
                 "string" => "bar"
             }
         }),
@@ -1097,7 +1097,7 @@ bench_function! {
     tag_array {
         args: func_args![value: vec!["foo"]],
         want: Ok(vec![
-            ordmap! {
+            hashmap! {
                 "string" => "foo"
             },
         ]),
@@ -1105,14 +1105,14 @@ bench_function! {
 
     tag_timestamp {
         args: func_args![value: Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)],
-        want: Ok(ordmap! {
+        want: Ok(hashmap! {
             "timestamp" => Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)
         }),
     }
 
     tag_regex {
         args: func_args![value: Regex::new(".*").unwrap()],
-        want: Ok(ordmap! {
+        want: Ok(hashmap! {
             "regex" => Regex::new(".*").unwrap()
         }),
     }

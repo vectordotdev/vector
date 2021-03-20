@@ -7,7 +7,7 @@ use ordered_float::NotNan;
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
-use structures::map::ord::OrdMap as Map;
+use structures::map::ord::Map;
 
 impl Value {
     /// Convert a given [`Value`] into a [`Expression`] trait object.

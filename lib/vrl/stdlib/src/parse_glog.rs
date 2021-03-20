@@ -1,7 +1,7 @@
 use chrono::{offset::TimeZone, Utc};
 use lazy_static::lazy_static;
 use regex::Regex;
-use structures::map::ord::OrdMap as Map;
+use structures::map::ord::Map;
 use vrl::prelude::*;
 
 lazy_static! {
@@ -144,14 +144,14 @@ fn type_def() -> Map<&'static str, Kind> {
 mod tests {
     use super::*;
     use chrono::DateTime;
-    use structures::ordmap;
+    use structures::hashmap;
 
     test_function![
         parse_glog => ParseGlog;
 
         log_line_valid {
             args: func_args![value: "I20210131 14:48:54.411655 15520 main.c++:9] Hello world!"],
-            want: Ok(ordmap! {
+            want: Ok(hashmap! {
                 "level" => "info",
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-01-31T14:48:54.411655Z").unwrap().into()),
                 "id" => 15520,
@@ -164,7 +164,7 @@ mod tests {
 
         log_line_valid_strip_whitespace {
             args: func_args![value: "\n  I20210131 14:48:54.411655 15520 main.c++:9] Hello world!  \n"],
-            want: Ok(ordmap! {
+            want: Ok(hashmap! {
                 "level" => "info",
                 "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-01-31T14:48:54.411655Z").unwrap().into()),
                 "id" => 15520,
