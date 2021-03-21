@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use snafu::ResultExt;
 use std::convert::TryFrom;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use structures::map::ord::Map;
 
 mod line;
@@ -60,20 +60,10 @@ pub enum ParserError {
     RequestNoNameLabel,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 pub struct GroupKey {
     pub timestamp: Option<i64>,
     pub labels: Map<String, String>,
-}
-
-impl Hash for GroupKey {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.timestamp.hash(state);
-        for (k, v) in &self.labels {
-            k.hash(state);
-            v.hash(state);
-        }
-    }
 }
 
 #[derive(Debug, Default, PartialEq)]

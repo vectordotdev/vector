@@ -2,7 +2,6 @@ use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::hash::{Hash, Hasher};
 use std::{
     collections::BTreeSet,
     convert::TryFrom,
@@ -20,7 +19,7 @@ pub struct Metric {
     pub data: MetricData,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
 pub struct MetricSeries {
     #[serde(flatten)]
     pub name: MetricName,
@@ -29,18 +28,6 @@ pub struct MetricSeries {
 }
 
 pub type MetricTags = Map<String, String>;
-
-impl Hash for MetricSeries {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-        if let Some(tags) = &self.tags {
-            for (k, v) in tags.iter() {
-                k.hash(state);
-                v.hash(state);
-            }
-        }
-    }
-}
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct MetricName {
