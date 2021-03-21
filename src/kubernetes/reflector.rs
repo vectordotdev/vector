@@ -49,7 +49,14 @@ where
         pause_between_requests: Duration,
     ) -> Self {
         let resource_version = resource_version::State::new();
-        Self { watcher, state_writer, field_selector, label_selector, resource_version, pause_between_requests }
+        Self {
+            watcher,
+            state_writer,
+            field_selector,
+            label_selector,
+            resource_version,
+            pause_between_requests,
+        }
     }
 }
 

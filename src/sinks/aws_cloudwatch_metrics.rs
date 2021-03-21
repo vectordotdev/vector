@@ -239,7 +239,10 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
             return future::ok(()).boxed();
         }
 
-        let input = PutMetricDataInput { metric_data, namespace };
+        let input = PutMetricDataInput {
+            metric_data,
+            namespace,
+        };
 
         debug!(message = "Sending data.", input = ?input);
         let client = self.client.clone();
