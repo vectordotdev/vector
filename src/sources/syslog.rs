@@ -375,7 +375,7 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
 fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Event {
     let line = line.trim();
     let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
-    let mut event = Event::from(&parsed.msg[..]);
+    let mut event = Event::from(parsed.msg);
 
     // Add source type
     event

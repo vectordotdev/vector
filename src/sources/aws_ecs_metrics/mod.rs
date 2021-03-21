@@ -23,8 +23,8 @@ pub enum Version {
     V4,
 }
 
-#[serde(deny_unknown_fields)]
 #[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
 struct AwsEcsMetricsSourceConfig {
     #[serde(default = "default_endpoint")]
     endpoint: String,

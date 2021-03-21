@@ -10,6 +10,7 @@ pub type FormatHint = Option<Format>;
 
 /// The format used to represent the configuration data.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Format {
     /// TOML format is used.
     TOML,

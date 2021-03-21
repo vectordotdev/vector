@@ -183,7 +183,7 @@ impl RegexParser {
 
         let names = &patterns
             .iter()
-            .map(|regex| regex.capture_names().filter_map(|s| s).collect::<Vec<_>>())
+            .map(|regex| regex.capture_names().flatten().collect::<Vec<_>>())
             .flatten()
             .collect::<Vec<_>>();
 

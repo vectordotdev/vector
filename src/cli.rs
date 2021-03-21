@@ -129,6 +129,7 @@ impl RootOpts {
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
+#[allow(clippy::upper_case_acronyms)]
 pub enum SubCommand {
     /// Validate the target config, then exit.
     Validate(validate::Opts),

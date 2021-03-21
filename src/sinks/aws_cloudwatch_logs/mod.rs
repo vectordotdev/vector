@@ -465,7 +465,7 @@ fn partition_encode(
         }
     };
 
-    let key = CloudwatchKey { stream, group };
+    let key = CloudwatchKey { group, stream };
 
     encoding.apply_rules(&mut event);
     let event = encode_log(event.into_log(), encoding)

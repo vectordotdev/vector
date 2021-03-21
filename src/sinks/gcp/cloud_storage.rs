@@ -198,13 +198,7 @@ impl GcsSink {
         let client = HttpClient::new(tls)?;
         let base_url = format!("{}{}/", BASE_URL, config.bucket);
         let bucket = config.bucket.clone();
-        Ok(GcsSink {
-            client,
-            creds,
-            settings,
-            base_url,
-            bucket,
-        })
+        Ok(GcsSink { bucket, client, creds, base_url, settings })
     }
 
     fn service(self, config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<VectorSink> {

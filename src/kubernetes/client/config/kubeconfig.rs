@@ -71,11 +71,7 @@ fn kubeconfig_reader(config: &str) -> Result<Config, Error> {
         ..Default::default()
     };
 
-    Ok(Config {
-        base,
-        tls_options,
-        token,
-    })
+    Ok(Config { base, token, tls_options })
 }
 
 /// An error returned when building an in-cluster configuration.
