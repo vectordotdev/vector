@@ -186,6 +186,8 @@ fn kafka_source(
                             if let Some(headers_key) = &headers_key {
                                 let mut headers_map = BTreeMap::new();
                                 if let Some(headers) = msg.headers() {
+                                    // Using index-based for loop because rdkafka's `Headers` trait
+                                    // does not provide Iterator-based API
                                     for i in 0..headers.count() {
                                         let header =
                                             headers.get(i).expect("header index is out of bounds");
