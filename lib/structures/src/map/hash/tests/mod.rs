@@ -41,49 +41,51 @@ impl Arbitrary for Operation {
 
 #[test]
 fn model_check() {
-    fn inner(input: Vec<Operation>) -> TestResult {
+    fn inner(mut input: Vec<Operation>) -> TestResult {
         let mut model: HashMap<u16, u8> = HashMap::new();
         let mut sut: Map<u16, u8> = Map::new();
 
-        for op in &input {
+        for op in input.drain(..) {
             match op {
-                Operation::Insert(k, v) => assert_eq!(model.insert(*k, *v), sut.insert(*k, *v)),
-                Operation::Remove(k) => assert_eq!(model.remove(k), sut.remove(k)),
-                Operation::Get(k) => assert_eq!(model.get(k), sut.get(k)),
+                Operation::Insert(k, v) => assert_eq!(model.insert(k, v), sut.insert(k, v)),
+                Operation::Remove(k) => assert_eq!(model.remove(&k), sut.remove(&k)),
+                Operation::Get(k) => assert_eq!(model.get(&k), sut.get(&k)),
                 Operation::GetLen => assert_eq!(model.len(), sut.len()),
                 Operation::GetIsEmpty => assert_eq!(model.is_empty(), sut.is_empty()),
-                Operation::Clear => assert_eq!(model.clear(), sut.clear()),
-                Operation::ContainsKey(k) => assert_eq!(model.contains_key(k), sut.contains_key(k)),
-                Operation::GetMut(k) => assert_eq!(model.get_mut(k), sut.get_mut(k)),
+                Operation::Clear => {}
+                Operation::ContainsKey(k) => {
+                    assert_eq!(model.contains_key(&k), sut.contains_key(&k))
+                }
+                Operation::GetMut(k) => assert_eq!(model.get_mut(&k), sut.get_mut(&k)),
                 Operation::Iter => {
                     assert_eq!(model.len(), sut.len());
-                    let mut sut_iter = sut.iter();
-                    while let Some((k, v)) = sut_iter.next() {
+                    let sut_iter = sut.iter();
+                    for (k, v) in sut_iter {
                         assert_eq!(Some(v), model.get(k));
                     }
                 }
                 Operation::IterMut => {
                     assert_eq!(model.len(), sut.len());
-                    let mut sut_iter = sut.iter_mut();
-                    while let Some((k, v)) = sut_iter.next() {
+                    let sut_iter = sut.iter_mut();
+                    for (k, v) in sut_iter {
                         assert_eq!(Some(v), model.get_mut(k));
                     }
                 }
                 Operation::Keys => {
-                    let mut sut_keys: Vec<u16> = sut.keys().map(|x| *x).collect();
-                    let mut model_keys: Vec<u16> = model.keys().map(|x| *x).collect();
+                    let mut sut_keys: Vec<u16> = sut.keys().copied().collect();
+                    let mut model_keys: Vec<u16> = model.keys().copied().collect();
 
-                    sut_keys.sort();
-                    model_keys.sort();
+                    sut_keys.sort_unstable();
+                    model_keys.sort_unstable();
 
                     assert_eq!(sut_keys, model_keys);
                 }
                 Operation::Values => {
-                    let mut sut_values: Vec<u8> = sut.values().map(|x| *x).collect();
-                    let mut model_values: Vec<u8> = model.values().map(|x| *x).collect();
+                    let mut sut_values: Vec<u8> = sut.values().copied().collect();
+                    let mut model_values: Vec<u8> = model.values().copied().collect();
 
-                    sut_values.sort();
-                    model_values.sort();
+                    sut_values.sort_unstable();
+                    model_values.sort_unstable();
 
                     assert_eq!(sut_values, model_values);
                 }
