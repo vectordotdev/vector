@@ -100,8 +100,7 @@ impl Path {
 
         let components = self.to_alternative_components();
         let mut loop_count = components.iter().fold(1, |acc, vec| acc * vec.len());
-        let mut paths: Vec<Vec<String>> = Vec::with_capacity(loop_count - 1);
-        paths.resize(loop_count, vec![]);
+        let mut paths: Vec<Vec<String>> = vec![vec![]; loop_count - 1];
 
         for fields in components.iter() {
             debug_assert!(!fields.is_empty());
