@@ -105,7 +105,6 @@ impl Geoip {
 }
 
 #[derive(Default, Serialize)]
-#[allow(clippy::upper_case_acronyms)]
 struct ISP<'a> {
     autonomous_system_number: i64,
     autonomous_system_organization: &'a str,

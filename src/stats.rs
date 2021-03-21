@@ -1,6 +1,5 @@
 /// Exponentially Weighted Moving Average
 #[derive(Clone, Copy, Debug)]
-#[allow(clippy::upper_case_acronyms)]
 pub struct EWMA {
     average: Option<f64>,
     alpha: f64,
