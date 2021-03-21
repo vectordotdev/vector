@@ -98,7 +98,7 @@ impl Path {
             return vec![];
         }
 
-        let components = self.to_alternative_components();
+        let components: Vec<Vec<String>> = self.to_alternative_components();
         let mut loop_count = components.iter().fold(1, |acc, vec| acc * vec.len());
         let mut paths: Vec<Vec<String>> = vec![vec![]; loop_count - 1];
 
