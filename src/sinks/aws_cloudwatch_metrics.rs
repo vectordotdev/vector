@@ -25,6 +25,7 @@ use std::{
     convert::TryInto,
     task::{Context, Poll},
 };
+use structures::str::immutable::String as ImStr;
 use tower::Service;
 
 #[derive(Clone)]
@@ -132,7 +133,7 @@ impl CloudWatchMetricsSvc {
         client: CloudWatchClient,
         cx: SinkContext,
     ) -> crate::Result<super::VectorSink> {
-        let default_namespace = config.default_namespace.clone();
+        let default_namespace: ImStr = config.default_namespace.clone().into_boxed_str();
         let batch = BatchSettings::default()
             .events(20)
             .timeout(1)
@@ -150,7 +151,7 @@ impl CloudWatchMetricsSvc {
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
             .with_flat_map(move |event: Event| {
                 stream::iter(normalizer.apply(event).map(|mut event| {
-                    let namespace = event
+                    let namespace: ImStr = event
                         .as_mut_metric()
                         .series
                         .name
@@ -223,7 +224,7 @@ impl MetricNormalize for AwsCloudwatchMetricNormalize {
     }
 }
 
-impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc {
+impl Service<PartitionInnerBuffer<Vec<Metric>, ImStr>> for CloudWatchMetricsSvc {
     type Response = ();
     type Error = RusotoError<PutMetricDataError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -232,7 +233,7 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, items: PartitionInnerBuffer<Vec<Metric>, String>) -> Self::Future {
+    fn call(&mut self, items: PartitionInnerBuffer<Vec<Metric>, ImStr>) -> Self::Future {
         let (items, namespace) = items.into_parts();
         let metric_data = self.encode_events(items);
         if metric_data.is_empty() {
@@ -240,8 +241,8 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
         }
 
         let input = PutMetricDataInput {
+            namespace: namespace.to_string(),
             metric_data,
-            namespace,
         };
 
         debug!(message = "Sending data.", input = ?input);

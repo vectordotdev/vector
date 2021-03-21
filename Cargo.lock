@@ -6740,6 +6740,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "structures"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "quickcheck",
+]
+
+[[package]]
 name = "strum"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7903,6 +7911,7 @@ dependencies = [
  "stream-cancel",
  "strip-ansi-escapes",
  "structopt 0.3.21",
+ "structures",
  "syslog",
  "syslog_loose",
  "tempfile",

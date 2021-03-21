@@ -262,6 +262,12 @@ impl From<String> for Value {
     }
 }
 
+impl From<Box<str>> for Value {
+    fn from(v: Box<str>) -> Self {
+        Value::Bytes(Bytes::copy_from_slice(v.as_bytes()))
+    }
+}
+
 impl From<&str> for Value {
     fn from(v: &str) -> Self {
         Value::Bytes(Bytes::copy_from_slice(v.as_bytes()))

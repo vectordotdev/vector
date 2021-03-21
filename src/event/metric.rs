@@ -12,6 +12,7 @@ use std::{
     fmt::{self, Display, Formatter},
     iter::FromIterator,
 };
+use structures::str::immutable::String as ImStr;
 use vrl::{path::Segment, Target};
 
 #[derive(Clone, Debug, Deserialize, Getters, PartialEq, Serialize)]
@@ -37,9 +38,9 @@ pub type MetricTags = BTreeMap<String, String>;
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct MetricName {
-    pub name: String,
+    pub name: ImStr,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub namespace: Option<String>,
+    pub namespace: Option<ImStr>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -245,7 +246,7 @@ impl Metric {
         Self {
             series: MetricSeries {
                 name: MetricName {
-                    name: name.into(),
+                    name: name.into().into_boxed_str(),
                     namespace: None,
                 },
                 tags: None,
@@ -260,7 +261,7 @@ impl Metric {
     }
 
     pub fn with_namespace<T: Into<String>>(mut self, namespace: Option<T>) -> Self {
-        self.series.name.namespace = namespace.map(Into::into);
+        self.series.name.namespace = namespace.map(Into::into).map(|s| s.into_boxed_str());
         self
     }
 
@@ -780,12 +781,12 @@ impl Target for Metric {
             }
             [Segment::Field(name)] if name.as_str() == "name" => {
                 let value = value.try_bytes().map_err(|e| e.to_string())?;
-                self.series.name.name = String::from_utf8_lossy(&value).into_owned();
+                self.series.name.name = String::from_utf8_lossy(&value).into();
                 Ok(())
             }
             [Segment::Field(namespace)] if namespace.as_str() == "namespace" => {
                 let value = value.try_bytes().map_err(|e| e.to_string())?;
-                self.series.name.namespace = Some(String::from_utf8_lossy(&value).into_owned());
+                self.series.name.namespace = Some(String::from_utf8_lossy(&value).into());
                 Ok(())
             }
             [Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {

@@ -378,8 +378,8 @@ impl From<Event> for proto::EventWrapper {
                 };
 
                 let event = EventProto::Metric(proto::Metric {
-                    name,
-                    namespace,
+                    name: name.to_string(),
+                    namespace: namespace.to_string(),
                     timestamp,
                     tags,
                     kind,

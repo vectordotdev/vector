@@ -227,14 +227,14 @@ fn encode_events(token: &str, default_namespace: &str, events: Vec<Metric>) -> S
         tags.insert("token".into(), token.into());
 
         let (metric_type, fields) = match event.data.value {
-            MetricValue::Counter { value } => ("counter", to_fields(label, value)),
-            MetricValue::Gauge { value } => ("gauge", to_fields(label, value)),
+            MetricValue::Counter { value } => ("counter", to_fields(label.to_string(), value)),
+            MetricValue::Gauge { value } => ("gauge", to_fields(label.to_string(), value)),
             _ => unreachable!(), // handled by SematextMetricNormalize
         };
 
         if let Err(error) = influx_line_protocol(
             ProtocolVersion::V1,
-            namespace,
+            namespace.to_string(),
             metric_type,
             Some(tags),
             Some(fields),
