@@ -100,21 +100,29 @@ impl Path {
 
         let components: Vec<Vec<String>> = self.to_alternative_components();
         let mut loop_count = components.iter().fold(1, |acc, vec| acc * vec.len());
-        let mut paths: Vec<Vec<String>> = vec![vec![]; loop_count - 1];
+        let mut paths: Vec<String> = Vec::with_capacity(loop_count - 1);
+        paths.resize(loop_count, String::with_capacity(128));
 
+        // Loops each of the components appending to `paths` whenever we hit an
+        // alternative expansion. This loop will dot-separate the alternatives
+        // inline but will add one additional dot more than required at the
+        // close.
         for fields in components.iter() {
             debug_assert!(!fields.is_empty());
 
             loop_count /= fields.len();
 
+            let paths_index_max = paths.len() - 1;
             let mut paths_index = 0;
             let mut component_index = 0;
             'outer: loop {
                 for _ in 0..loop_count {
                     let idx = component_index % fields.len();
-                    paths[paths_index].push(fields[idx].clone());
+                    let buf = &mut paths[paths_index];
+                    buf.push_str(&fields[idx]);
+                    buf.push_str(".");
 
-                    if paths_index == paths.len() - 1 {
+                    if paths_index == paths_index_max {
                         break 'outer;
                     }
 
@@ -124,8 +132,13 @@ impl Path {
                 component_index += 1;
             }
         }
+        // Loop each of the overly dotted paths and remove the final, extraneous
+        // dot.
+        for path in &mut paths {
+            let _ = path.pop();
+        }
 
-        paths.into_iter().map(|p| p.join(".")).collect()
+        paths
     }
 
     /// A poor-mans way to convert an "alternative" string representation to a
