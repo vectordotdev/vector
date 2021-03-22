@@ -455,7 +455,8 @@ pub mod test_util {
 
         assert!(
             status == StatusCode::CREATED || status == StatusCode::UNPROCESSABLE_ENTITY,
-            format!("UnexpectedStatus: {}", status)
+            "UnexpectedStatus: {}",
+            status
         );
     }
 }

@@ -56,10 +56,7 @@ impl FileSourceMetrics {
     pub fn get_files(&self) -> Vec<FileSourceMetricFile<'_>> {
         self.0
             .iter()
-            .filter_map(|m| match m.tag_value("file") {
-                Some(file) => Some((file, m)),
-                _ => None,
-            })
+            .filter_map(|m| m.tag_value("file").map(|file| (file, m)))
             .fold(BTreeMap::new(), |mut map, (file, m)| {
                 map.entry(file).or_insert_with(Vec::new).push(m);
                 map

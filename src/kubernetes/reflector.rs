@@ -52,8 +52,8 @@ where
         Self {
             watcher,
             state_writer,
-            label_selector,
             field_selector,
+            label_selector,
             resource_version,
             pause_between_requests,
         }

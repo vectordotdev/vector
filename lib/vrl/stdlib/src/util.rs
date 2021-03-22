@@ -30,19 +30,16 @@ pub(crate) fn capture_regex_to_map(
 ) -> std::collections::BTreeMap<String, Value> {
     let indexed = capture
         .iter()
-        .filter_map(std::convert::identity)
+        .flatten()
         .enumerate()
         .map(|(idx, c)| (idx.to_string(), c.as_str().into()));
 
-    let names = regex
-        .capture_names()
-        .filter_map(std::convert::identity)
-        .map(|name| {
-            (
-                name.to_owned(),
-                capture.name(name).map(|s| s.as_str()).into(),
-            )
-        });
+    let names = regex.capture_names().flatten().map(|name| {
+        (
+            name.to_owned(),
+            capture.name(name).map(|s| s.as_str()).into(),
+        )
+    });
 
     indexed.chain(names).collect()
 }
@@ -57,7 +54,7 @@ pub(crate) fn regex_type_def(regex: &regex::Regex) -> BTreeMap<String, Kind> {
     }
 
     // Add a typedef for each capture name.
-    for name in regex.capture_names().filter_map(std::convert::identity) {
+    for name in regex.capture_names().flatten() {
         inner_type.insert(name.to_owned(), Kind::Bytes);
     }
 
@@ -93,11 +90,11 @@ impl Default for Base64Charset {
     }
 }
 
-impl Into<base64::CharacterSet> for Base64Charset {
-    fn into(self) -> base64::CharacterSet {
+impl From<Base64Charset> for base64::CharacterSet {
+    fn from(charset: Base64Charset) -> base64::CharacterSet {
         use Base64Charset::*;
 
-        match self {
+        match charset {
             Standard => base64::CharacterSet::Standard,
             UrlSafe => base64::CharacterSet::UrlSafe,
         }

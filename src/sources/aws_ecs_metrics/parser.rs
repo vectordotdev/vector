@@ -256,16 +256,14 @@ fn cpu_metrics(
     namespace: &Option<String>,
     tags: &BTreeMap<String, String>,
 ) -> Vec<Metric> {
-    let mut metrics = vec![];
-
-    metrics.push(gauge(
+    let mut metrics = vec![gauge(
         "cpu",
         "online_cpus",
         namespace.clone(),
         timestamp,
         cpu.online_cpus as f64,
         tags.clone(),
-    ));
+    )];
 
     metrics.extend(
         vec![

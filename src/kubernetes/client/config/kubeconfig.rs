@@ -73,8 +73,8 @@ fn kubeconfig_reader(config: &str) -> Result<Config, Error> {
 
     Ok(Config {
         base,
-        tls_options,
         token,
+        tls_options,
     })
 }
 

@@ -327,7 +327,7 @@ mod tests {
         config.encoding = encoding;
         let bytes = config.encode_event(event).unwrap();
 
-        assert_eq!(bytes, Vec::from(&"hello world\n"[..]));
+        assert_eq!(bytes, Vec::from("hello world\n"));
     }
 
     #[test]
