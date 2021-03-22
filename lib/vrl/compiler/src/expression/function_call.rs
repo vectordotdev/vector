@@ -42,16 +42,7 @@ impl FunctionCall {
         let function = match funcs.iter().find(|f| f.identifier() == ident.as_ref()) {
             Some(function) => function,
             None => {
-                let idents = funcs
-                    .iter()
-                    .map(|func| func.identifier())
-                    .collect::<Vec<_>>();
-
-                return Err(Error::Undefined {
-                    ident_span,
-                    ident: ident.clone(),
-                    idents,
-                });
+                return Err(Error::Undefined { ident_span });
             }
         };
 
@@ -340,11 +331,7 @@ impl PartialEq for FunctionCall {
 #[allow(clippy::large_enum_variant)]
 pub enum Error {
     #[error("call to undefined function")]
-    Undefined {
-        ident_span: Span,
-        ident: Ident,
-        idents: Vec<&'static str>,
-    },
+    Undefined { ident_span: Span },
 
     #[error("wrong number of function arguments")]
     WrongNumberOfArgs { arguments_span: Span, max: usize },
@@ -407,30 +394,8 @@ impl DiagnosticError for Error {
         use Error::*;
 
         match self {
-            Undefined {
-                ident_span,
-                ident,
-                idents,
-            } => {
-                let mut vec = vec![Label::primary("undefined function", ident_span)];
-
-                let mut corpus = ngrammatic::CorpusBuilder::new()
-                    .arity(2)
-                    .pad_full(ngrammatic::Pad::Auto)
-                    .finish();
-
-                for func in idents {
-                    corpus.add_text(func);
-                }
-
-                if let Some(guess) = corpus.search(ident.as_ref(), 0.25).first() {
-                    vec.push(Label::context(
-                        format!(r#"did you mean "{}"?"#, guess.text),
-                        ident_span,
-                    ));
-                }
-
-                vec
+            Undefined { ident_span } => {
+                vec![Label::primary("undefined function", ident_span)]
             }
 
             WrongNumberOfArgs {
