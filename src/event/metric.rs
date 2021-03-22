@@ -12,7 +12,7 @@ use std::{
     fmt::{self, Display, Formatter},
     iter::FromIterator,
 };
-use structures::str::immutable::String as ImStr;
+use structures::str::immutable::ImStr;
 use vrl::{path::Segment, Target};
 
 #[derive(Clone, Debug, Deserialize, Getters, PartialEq, Serialize)]
@@ -261,7 +261,7 @@ impl Metric {
     }
 
     pub fn with_namespace<T: Into<String>>(mut self, namespace: Option<T>) -> Self {
-        self.series.name.namespace = namespace.map(Into::into).map(|s| s.into_boxed_str());
+        self.series.name.namespace = namespace.map(|s| s.into().into_boxed_str());
         self
     }
 

@@ -234,7 +234,7 @@ fn encode_events(token: &str, default_namespace: &str, events: Vec<Metric>) -> S
 
         if let Err(error) = influx_line_protocol(
             ProtocolVersion::V1,
-            namespace.to_string(),
+            namespace.into(),
             metric_type,
             Some(tags),
             Some(fields),

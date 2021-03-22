@@ -6742,10 +6742,6 @@ dependencies = [
 [[package]]
 name = "structures"
 version = "0.1.0"
-dependencies = [
- "criterion",
- "quickcheck",
-]
 
 [[package]]
 name = "strum"

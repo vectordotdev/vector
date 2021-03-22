@@ -25,7 +25,7 @@ use std::{
     convert::TryInto,
     task::{Context, Poll},
 };
-use structures::str::immutable::String as ImStr;
+use structures::str::immutable::ImStr;
 use tower::Service;
 
 #[derive(Clone)]
@@ -133,7 +133,7 @@ impl CloudWatchMetricsSvc {
         client: CloudWatchClient,
         cx: SinkContext,
     ) -> crate::Result<super::VectorSink> {
-        let default_namespace: ImStr = config.default_namespace.clone().into_boxed_str();
+        let default_namespace: ImStr = config.default_namespace.clone().into();
         let batch = BatchSettings::default()
             .events(20)
             .timeout(1)
@@ -241,7 +241,7 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, ImStr>> for CloudWatchMetricsSvc 
         }
 
         let input = PutMetricDataInput {
-            namespace: namespace.to_string(),
+            namespace: namespace.into(),
             metric_data,
         };
 

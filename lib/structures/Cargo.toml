@@ -6,15 +6,3 @@ edition = "2018"
 publish = false
 
 [dependencies]
-
-[dev-dependencies]
-quickcheck = "1.0"
-criterion = "0.3"
-
-[[bench]]
-name = "ord_map"
-harness = false
-
-[[bench]]
-name = "hash_map"
-harness = false
