@@ -354,6 +354,7 @@ sources = ["sources-logs", "sources-metrics"]
 sources-logs = [
   "sources-aws_kinesis_firehose",
   "sources-aws_s3",
+  "sources-datadog",
   "sources-docker_logs",
   "sources-file",
   "sources-generator",
@@ -386,6 +387,7 @@ sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
+sources-datadog = ["sources-utils-http"]
 sources-docker_logs = ["bollard", "dirs-next"]
 sources-file = ["bytesize", "file-source"]
 sources-generator = ["fakedata"]
