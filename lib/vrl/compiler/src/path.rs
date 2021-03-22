@@ -113,14 +113,21 @@ impl Path {
             // Each time we loop the total number of alternatives left for
             // duplication drop by the number of alternatives in `field`.
             total_alternatives /= fields.len();
-            for (path_idx, buf) in paths.iter_mut().enumerate() {
-                // Compute the field index by first determining the mulitple of
-                // the _path_ index with regard to the remaining alternatives
-                // and then map this into the field vector. This ensures we
-                // generate all the combinations in the order expected.
-                let idx = (path_idx / total_alternatives) % fields.len();
-                buf.push_str(&fields[idx]);
+
+            // Now, for each buffer in `paths` loop and per buffer push the
+            // current sub-field. The current sub-field is computed by keeping
+            // track of how many times we've repeated the current sub-field and
+            // rolling when we arrive at `total_alternatives` duplications.
+            let mut field_idx = 0;
+            let mut repeats = 0;
+            for buf in paths.iter_mut() {
+                if repeats == total_alternatives {
+                    repeats = 0;
+                    field_idx = (field_idx + 1) % fields.len();
+                }
+                buf.push_str(&fields[field_idx]);
                 buf.push_str(".");
+                repeats += 1;
             }
         }
         // Loop each of the overly dotted paths and remove the final, extraneous
