@@ -40,7 +40,14 @@ components: sources: file: {
 			"x86_64-unknown-linux-gnu":       true
 			"x86_64-unknown-linux-musl":      true
 		}
-		requirements: []
+		requirements: [
+			"""
+				The `vector` process must have the ability to read the files
+				listed in `include` and execute any of the parent directories
+				for these files. Please see [File
+				permissions](#file-permissions) for more details.
+				""",
+		]
 		warnings: []
 		notices: []
 	}
