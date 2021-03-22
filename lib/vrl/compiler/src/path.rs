@@ -99,37 +99,28 @@ impl Path {
         }
 
         let components: Vec<Vec<String>> = self.to_alternative_components();
-        let mut loop_count = components.iter().fold(1, |acc, vec| acc * vec.len());
-        let mut paths: Vec<String> = Vec::with_capacity(loop_count - 1);
-        paths.resize(loop_count, String::with_capacity(128));
+        let mut total_alternatives = components.iter().fold(1, |acc, vec| acc * vec.len());
+        let mut paths: Vec<String> = Vec::with_capacity(total_alternatives - 1);
+        paths.resize(total_alternatives, String::with_capacity(128));
 
         // Loops each of the components appending to `paths` whenever we hit an
         // alternative expansion. This loop will dot-separate the alternatives
         // inline but will add one additional dot more than required at the
         // close.
-        for fields in components.iter() {
+        for fields in components.into_iter() {
             debug_assert!(!fields.is_empty());
 
-            loop_count /= fields.len();
-
-            let paths_index_max = paths.len() - 1;
-            let mut paths_index = 0;
-            let mut component_index = 0;
-            'outer: loop {
-                for _ in 0..loop_count {
-                    let idx = component_index % fields.len();
-                    let buf = &mut paths[paths_index];
-                    buf.push_str(&fields[idx]);
-                    buf.push_str(".");
-
-                    if paths_index == paths_index_max {
-                        break 'outer;
-                    }
-
-                    paths_index += 1;
-                }
-
-                component_index += 1;
+            // Each time we loop the total number of alternatives left for
+            // duplication drop by the number of alternatives in `field`.
+            total_alternatives /= fields.len();
+            for (path_idx, buf) in paths.iter_mut().enumerate() {
+                // Compute the field index by first determining the mulitple of
+                // the _path_ index with regard to the remaining alternatives
+                // and then map this into the field vector. This ensures we
+                // generate all the combinations in the order expected.
+                let idx = (path_idx / total_alternatives) % fields.len();
+                buf.push_str(&fields[idx]);
+                buf.push_str(".");
             }
         }
         // Loop each of the overly dotted paths and remove the final, extraneous
@@ -514,38 +505,38 @@ mod tests {
     fn test_to_alternate_strings() {
         let path = Path::from_str(r#".a.(b | c | d | e).f.(g | h | i).(j | k)"#).unwrap();
 
-        assert_eq!(
-            path.to_alternative_strings(),
-            vec![
-                "a.b.f.g.j",
-                "a.b.f.g.k",
-                "a.b.f.h.j",
-                "a.b.f.h.k",
-                "a.b.f.i.j",
-                "a.b.f.i.k",
-                //
-                "a.c.f.g.j",
-                "a.c.f.g.k",
-                "a.c.f.h.j",
-                "a.c.f.h.k",
-                "a.c.f.i.j",
-                "a.c.f.i.k",
-                //
-                "a.d.f.g.j",
-                "a.d.f.g.k",
-                "a.d.f.h.j",
-                "a.d.f.h.k",
-                "a.d.f.i.j",
-                "a.d.f.i.k",
-                //
-                "a.e.f.g.j",
-                "a.e.f.g.k",
-                "a.e.f.h.j",
-                "a.e.f.h.k",
-                "a.e.f.i.j",
-                "a.e.f.i.k",
-            ]
-        );
+        let actual: Vec<String> = path.to_alternative_strings();
+        let expected: Vec<&str> = vec![
+            "a.b.f.g.j",
+            "a.b.f.g.k",
+            "a.b.f.h.j",
+            "a.b.f.h.k",
+            "a.b.f.i.j",
+            "a.b.f.i.k",
+            //
+            "a.c.f.g.j",
+            "a.c.f.g.k",
+            "a.c.f.h.j",
+            "a.c.f.h.k",
+            "a.c.f.i.j",
+            "a.c.f.i.k",
+            //
+            "a.d.f.g.j",
+            "a.d.f.g.k",
+            "a.d.f.h.j",
+            "a.d.f.h.k",
+            "a.d.f.i.j",
+            "a.d.f.i.k",
+            //
+            "a.e.f.g.j",
+            "a.e.f.g.k",
+            "a.e.f.h.j",
+            "a.e.f.h.k",
+            "a.e.f.i.j",
+            "a.e.f.i.k",
+        ];
+
+        assert_eq!(actual, expected);
     }
 
     #[test]
