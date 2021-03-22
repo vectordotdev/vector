@@ -15,13 +15,13 @@ fn has_values_or_none(tags: BTreeMap<String, String>) -> Option<BTreeMap<String,
     }
 }
 
-fn utc_timestamp(timestamp: Option<i64>, now: DateTime<Utc>) -> DateTime<Utc> {
+fn utc_timestamp(timestamp: Option<i64>, default: DateTime<Utc>) -> DateTime<Utc> {
     timestamp
         .and_then(|timestamp| {
             Utc.timestamp_opt(timestamp / 1000, (timestamp % 1000) as u32 * 1000000)
                 .latest()
         })
-        .unwrap_or(now)
+        .unwrap_or(default)
 }
 
 pub(super) fn parse_text(packet: &str) -> Result<Vec<Event>, ParserError> {
@@ -34,7 +34,7 @@ pub(super) fn parse_request(request: proto::WriteRequest) -> Result<Vec<Event>, 
 
 fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
     let mut result = Vec::new();
-    let now = Utc::now();
+    let start = Utc::now();
 
     for group in groups {
         match group.metrics {
@@ -47,7 +47,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                             value: metric.value,
                         },
                     )
-                    .with_timestamp(Some(utc_timestamp(key.timestamp, now)))
+                    .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
                     .with_tags(has_values_or_none(key.labels));
 
                     result.push(counter.into());
@@ -62,7 +62,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                             value: metric.value,
                         },
                     )
-                    .with_timestamp(Some(utc_timestamp(key.timestamp, now)))
+                    .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
                     .with_tags(has_values_or_none(key.labels));
 
                     result.push(gauge.into());
@@ -97,7 +97,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                                 sum: metric.sum,
                             },
                         )
-                        .with_timestamp(Some(utc_timestamp(key.timestamp, now)))
+                        .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
                         .with_tags(has_values_or_none(key.labels))
                         .into(),
                     );
@@ -122,7 +122,7 @@ fn reparse_groups(groups: Vec<MetricGroup>) -> Vec<Event> {
                                 sum: metric.sum,
                             },
                         )
-                        .with_timestamp(Some(utc_timestamp(key.timestamp, now)))
+                        .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
                         .with_tags(has_values_or_none(key.labels))
                         .into(),
                     );
