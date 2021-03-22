@@ -232,7 +232,7 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
 impl Compression {
     pub fn content_type(&self) -> Option<&'static str> {
         match self {
-            Self::None => Some("text/x-log"),
+            Self::None => Some("text/plain"),
             Self::Gzip(_) => Some("application/octet-stream"),
         }
     }
@@ -325,5 +325,167 @@ fn build_request(
         blob_name: blob,
         content_encoding: compression.content_encoding(),
         content_type: compression.content_type(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AzureBlobSinkConfig>();
+    }
+
+    #[test]
+    fn azure_blob_encode_event_text() {
+        let message = String::from("hello world");
+        let event = Event::from(message.clone());
+        let blob_prefix = Template::try_from("logs/blob/%F").unwrap();
+        let encoding = EncodingConfig {
+            codec: Encoding::Text,
+            schema: None,
+            only_fields: None,
+            except_fields: None,
+            timestamp_format: None,
+        };
+
+        let bytes = encode_event(event, &blob_prefix, &encoding).unwrap();
+
+        let encoded_message = message + "\n";
+        let (bytes, _) = bytes.into_parts();
+        assert_eq!(&bytes[..], encoded_message.as_bytes());
+    }
+
+    #[test]
+    fn azure_blob_encode_event_json() {
+        let message = String::from("hello world");
+        let mut event = Event::from(message.clone());
+        event.as_mut_log().insert("key", "value");
+        let blob_prefix = Template::try_from("logs/blob/%F").unwrap();
+        let encoding = EncodingConfig {
+            codec: Encoding::Json,
+            schema: None,
+            only_fields: None,
+            except_fields: None,
+            timestamp_format: None,
+        };
+
+        let bytes = encode_event(event, &blob_prefix, &encoding).unwrap();
+
+        let (bytes, _) = bytes.into_parts();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        assert_eq!(map[&log_schema().message_key().to_string()], message);
+        assert_eq!(map["key"], "value".to_string());
+    }
+
+    #[test]
+    fn azure_blob_encode_event_with_removed_key() {
+        let message = "hello world".to_string();
+        let mut event = Event::from(message.clone());
+        event.as_mut_log().insert("key", "value");
+        let blob_prefix = Template::try_from("logs/blob/%F").unwrap();
+        let encoding = EncodingConfig {
+            codec: Encoding::Json,
+            schema: None,
+            only_fields: None,
+            except_fields: Some(vec!["key".into()]),
+            timestamp_format: None,
+        };
+
+        let bytes = encode_event(event, &blob_prefix, &encoding).unwrap();
+
+        let (bytes, _) = bytes.into_parts();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+        assert_eq!(map[&log_schema().message_key().to_string()], message);
+    }
+
+    #[test]
+    fn azure_blob_build_request_without_compression() {
+        let partition = PartitionInnerBuffer::new(vec![0u8; 10], Bytes::from("blob"));
+        let compression = Compression::None;
+        let container_name = String::from("logs");
+        let blob_time_format = String::from("");
+        let blob_append_uuid = false;
+
+        let request = build_request(
+            partition,
+            compression,
+            container_name,
+            blob_time_format,
+            blob_append_uuid,
+        );
+
+        assert_eq!(request.container_name, "logs".to_string());
+        assert_eq!(request.blob_name, "blob.log".to_string());
+        assert_eq!(request.content_encoding, None);
+        assert_eq!(request.content_type.unwrap(), "text/plain");
+    }
+
+    #[test]
+    fn azure_blob_build_request_with_compression() {
+        let partition = PartitionInnerBuffer::new(vec![0u8; 10], Bytes::from("blob"));
+        let compression = Compression::gzip_default();
+        let container_name = String::from("logs");
+        let blob_time_format = String::from("");
+        let blob_append_uuid = false;
+
+        let request = build_request(
+            partition,
+            compression,
+            container_name,
+            blob_time_format,
+            blob_append_uuid,
+        );
+
+        assert_eq!(request.container_name, "logs".to_string());
+        assert_eq!(request.blob_name, "blob.log.gz".to_string());
+        assert_eq!(request.content_encoding, Some("gzip"));
+        assert_eq!(request.content_type.unwrap(), "application/octet-stream");
+    }
+
+    #[test]
+    fn azure_blob_build_request_with_time_format() {
+        let partition = PartitionInnerBuffer::new(vec![0u8; 10], Bytes::from("blob"));
+        let compression = Compression::None;
+        let container_name = String::from("logs");
+        let blob_time_format = String::from("%F");
+        let blob_append_uuid = false;
+
+        let request = build_request(
+            partition,
+            compression,
+            container_name,
+            blob_time_format,
+            blob_append_uuid,
+        );
+
+        assert_eq!(request.container_name, "logs".to_string());
+        assert_eq!(request.blob_name, format!("blob{}.log", Utc::now().format("%F")));
+        assert_eq!(request.content_encoding, None);
+        assert_eq!(request.content_type.unwrap(), "text/plain");
+    }
+
+    #[test]
+    fn azure_blob_build_request_with_uuid() {
+        let partition = PartitionInnerBuffer::new(vec![0u8; 10], Bytes::from("blob"));
+        let compression = Compression::None;
+        let container_name = String::from("logs");
+        let blob_time_format = String::from("");
+        let blob_append_uuid = true;
+
+        let request = build_request(
+            partition,
+            compression,
+            container_name,
+            blob_time_format,
+            blob_append_uuid,
+        );
+
+        assert_eq!(request.container_name, "logs".to_string());
+        assert_ne!(request.blob_name, "blob.log".to_string());
+        assert_eq!(request.content_encoding, None);
+        assert_eq!(request.content_type.unwrap(), "text/plain");
     }
 }
