@@ -8371,13 +8371,14 @@ dependencies = [
 
 [[package]]
 name = "vector-api-client"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
  "futures 0.3.13",
  "graphql_client",
+ "indoc",
  "reqwest 0.10.10",
  "serde",
  "serde_json",

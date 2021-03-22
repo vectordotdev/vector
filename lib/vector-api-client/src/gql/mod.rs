@@ -10,3 +10,4 @@ pub use self::meta::*;
 pub use components::*;
 pub use health::*;
 pub use metrics::*;
+pub use tap::*;
