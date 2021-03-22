@@ -33,6 +33,7 @@ use std::{
 };
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct AzureBlobSink {
@@ -46,6 +47,7 @@ pub struct AzureBlobSinkConfig {
     pub container_name: String,
     pub blob_prefix: Option<String>,
     pub blob_time_format: Option<String>,
+    pub blob_append_uuid: Option<bool>,
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
@@ -97,9 +99,9 @@ impl GenerateConfig for AzureBlobSinkConfig {
         toml::Value::try_from(Self {
             connection_string: String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;EndpointSuffix=core.windows.net"),
             container_name: String::from("logs"),
-            // todo: implement blob_append_uuid
             blob_prefix: Some(String::from("blob")),
             blob_time_format: Some(String::from("%s")),
+            blob_append_uuid: Some(true),
             encoding: Encoding::Json.into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
@@ -138,6 +140,7 @@ impl AzureBlobSinkConfig {
         let compression = self.compression;
         let container_name = self.container_name.clone();
         let blob_time_format = self.blob_time_format.clone().unwrap_or_else(|| "%s".into());
+        let blob_append_uuid = self.blob_append_uuid.unwrap_or(true);
         let blob = AzureBlobSink { client };
         let svc = ServiceBuilder::new()
             .map(move |partition| {
@@ -146,6 +149,7 @@ impl AzureBlobSinkConfig {
                     compression,
                     container_name.clone(),
                     blob_time_format.clone(),
+                    blob_append_uuid,
                 )
             })
             .settings(request, AzureBlobRetryLogic)
@@ -292,9 +296,19 @@ fn build_request(
     compression: Compression,
     container_name: String,
     blob_time_format: String,
+    blob_append_uuid: bool,
 ) -> AzureBlobSinkRequest {
     let (inner, key) = partition.into_parts();
-    let filename = Utc::now().format(&blob_time_format).to_string();
+    let filename = {
+        let time_format = Utc::now().format(&blob_time_format);
+
+        if blob_append_uuid {
+            let uuid = Uuid::new_v4();
+            format!("{}-{}", time_format.to_string(), uuid.to_hyphenated())
+        } else {
+            time_format.to_string()
+        }
+    };
     let blob = String::from_utf8_lossy(&key[..]).into_owned();
     let blob = format!("{}{}.{}", blob, filename, compression.extension());
 
