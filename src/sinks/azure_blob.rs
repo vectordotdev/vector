@@ -42,8 +42,8 @@ pub struct AzureBlobSink {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
-    pub connection_string: Option<String>,
-    pub container_name: Option<String>,
+    pub connection_string: String,
+    pub container_name: String,
     pub blob_prefix: Option<String>,
     pub blob_time_format: Option<String>,
     pub encoding: EncodingConfig<Encoding>,
@@ -95,10 +95,11 @@ lazy_static! {
 impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            connection_string: None,
-            container_name: Option::Some(String::from("logs")),
-            blob_prefix: None,
-            blob_time_format: None,
+            connection_string: String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;EndpointSuffix=core.windows.net"),
+            container_name: String::from("logs"),
+            // todo: implement blob_append_uuid
+            blob_prefix: Some(String::from("blob")),
+            blob_time_format: Some(String::from("%s")),
             encoding: Encoding::Json.into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
@@ -134,9 +135,9 @@ impl AzureBlobSinkConfig {
             .bytes(10 * 1024 * 1024)
             .timeout(300)
             .parse_config(self.batch)?;
-        let compression = self.compression.clone();
-        let container_name = self.container_name.clone().unwrap();
-        let blob_time_format = self.blob_time_format.clone().unwrap();
+        let compression = self.compression;
+        let container_name = self.container_name.clone();
+        let blob_time_format = self.blob_time_format.clone().unwrap_or_else(|| "%s".into());
         let blob = AzureBlobSink { client };
         let svc = ServiceBuilder::new()
             .map(move |partition| {
@@ -151,7 +152,7 @@ impl AzureBlobSinkConfig {
             .service(blob);
 
         let encoding = self.encoding.clone();
-        let blob_prefix = self.blob_prefix.as_deref().unwrap();
+        let blob_prefix = self.blob_prefix.as_deref().unwrap_or_else(|| "blob".into());
         let blob_prefix = Template::try_from(blob_prefix)?;
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, compression));
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
@@ -164,7 +165,7 @@ impl AzureBlobSinkConfig {
     }
 
     pub async fn healthcheck(self, client: KeyClient) -> Result<()> {
-        let container_name = self.container_name.clone().unwrap();
+        let container_name = self.container_name.clone();
         let request = client
             .get_container_properties()
             .with_container_name(container_name.as_str())
@@ -187,7 +188,7 @@ impl AzureBlobSinkConfig {
     }
 
     pub fn create_client(&self) -> Result<KeyClient> {
-        let connection_string = self.connection_string.clone().unwrap();
+        let connection_string = self.connection_string.clone();
         let client = from_connection_string(connection_string.as_str())?;
 
         Ok(client)
