@@ -26,15 +26,13 @@ impl fmt::Display for Parameters {
 }
 
 fn benchmark_to_alternative_strings(c: &mut Criterion) {
-    let mut group = c.benchmark_group("path::to_alternative_strings");
+    let mut group = c.benchmark_group("vrl::path::to_alternative_strings");
     for param in &PARAMETERS {
         group.throughput(Throughput::Bytes(param.basis.len() as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(param), &param, |b, &param| {
             let path = Path::from_str(param.basis).unwrap();
-            b.iter(|| {
-                let _ = path.to_alternative_strings();
-            })
+            b.iter(|| path.to_alternative_strings())
         });
     }
 }
