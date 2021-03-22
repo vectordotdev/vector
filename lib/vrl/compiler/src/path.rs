@@ -126,7 +126,7 @@ impl Path {
                     field_idx = (field_idx + 1) % fields.len();
                 }
                 buf.push_str(&fields[field_idx]);
-                buf.push_str(".");
+                buf.push('.');
                 repeats += 1;
             }
         }
