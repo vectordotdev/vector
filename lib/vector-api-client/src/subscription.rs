@@ -37,7 +37,16 @@ pub struct Payload {
 }
 
 impl Payload {
-    /// Returns a "start" payload necessary for starting a new subscription
+    /// Returns an "init" payload to confirm the connection to the server.
+    pub fn init(id: Uuid) -> Self {
+        Self {
+            id,
+            payload_type: "connection_init".to_owned(),
+            payload: json!({}),
+        }
+    }
+
+    /// Returns a "start" payload necessary for starting a new subscription.
     pub fn start<T: GraphQLQuery + Send + Sync>(
         id: Uuid,
         payload: &graphql_client::QueryBody<T::Variables>,
@@ -49,7 +58,7 @@ impl Payload {
         }
     }
 
-    /// Returns a "stop" payload for terminating the subscription in the GraphQL server
+    /// Returns a "stop" payload for terminating the subscription in the GraphQL server.
     fn stop(id: Uuid) -> Self {
         Self {
             id,
@@ -94,6 +103,11 @@ impl Subscription {
     pub fn new(id: Uuid, client_tx: tokio::sync::mpsc::UnboundedSender<Payload>) -> Self {
         let (tx, _) = broadcast::channel(100);
         Self { id, tx, client_tx }
+    }
+
+    // Initalize the connection by sending a "GQL_CONNECTION_INIT" message.
+    fn init(&self) -> Result<(), tokio::sync::mpsc::error::SendError<Payload>> {
+        self.client_tx.send(Payload::init(self.id))
     }
 
     /// Send a payload down the channel. This is synchronous because broadcast::Sender::send
@@ -205,6 +219,9 @@ impl SubscriptionClient {
             .lock()
             .unwrap()
             .insert(id, Arc::clone(&subscription));
+
+        // Initialize the connection
+        let _ = subscription.init();
 
         // Start the subscription by sending a { type: "start" } payload upstream
         let _ = subscription.start::<T>(request_body);
