@@ -63,14 +63,6 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-musl.tar.gz"
-      - uses: actions/upload-artifact@v1
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
-          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-arm64.deb"
-      - uses: actions/upload-artifact@v1
-        with:
-          name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
-          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
 
   build-aarch64-unknown-linux-gnu-packages:
     runs-on: ubuntu-20.04
@@ -86,6 +78,14 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-aarch64-unknown-linux-gnu.tar.gz"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-arm64.deb
+          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-arm64.deb"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
+          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm"
 
   build-armv7-unknown-linux-gnueabihf-packages:
     runs-on: ubuntu-20.04
@@ -431,7 +431,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - build-x86_64-unknown-linux-gnu-packages
-      - build-aarch64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-gnu-packages
       - build-armv7-unknown-linux-gnueabihf-packages
       - deb-verify
       - rpm-verify

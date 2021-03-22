@@ -103,165 +103,71 @@ impl Expression for TruncateFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![
-//         infallible {
-//             expr: |_| TruncateFn {
-//                 value: Literal::from("foo").boxed(),
-//                 limit: Literal::from(1).boxed(),
-//                 ellipsis: None,
-//             },
-//             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-//         }
+    test_function![
+        truncate => Truncate;
 
-//         value_non_string {
-//             expr: |_| TruncateFn {
-//                 value: Literal::from(false).boxed(),
-//                 limit: Literal::from(1).boxed(),
-//                 ellipsis: None,
-//             },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Bytes,
-//                 ..Default::default()
-//             },
-//         }
+        empty {
+             args: func_args![value: "Super",
+                              limit: 0,
+             ],
+             want: Ok(""),
+             tdef: TypeDef::new().infallible().bytes(),
+         }
 
-//         limit_float {
-//             expr: |_| TruncateFn {
-//                 value: Literal::from("foo").boxed(),
-//                 limit: Literal::from(1.0).boxed(),
-//                 ellipsis: None,
-//             },
-//             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-//         }
+        ellipsis {
+            args: func_args![value: "Super",
+                             limit: 0,
+                             ellipsis: true
+            ],
+            want: Ok("..."),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
 
-//         limit_non_number {
-//             expr: |_| TruncateFn {
-//                 value: Literal::from("foo").boxed(),
-//                 limit: Literal::from("bar").boxed(),
-//                 ellipsis: None,
-//             },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Bytes,
-//                 ..Default::default()
-//             },
-//         }
+        complete {
+            args: func_args![value: "Super",
+                             limit: 10
+            ],
+            want: Ok("Super"),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
 
-//         ellipsis_boolean {
-//             expr: |_| TruncateFn {
-//                 value: Literal::from("foo").boxed(),
-//                 limit: Literal::from(10).boxed(),
-//                 ellipsis: Some(Literal::from(true).boxed()),
-//             },
-//             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-//         }
+        exact {
+            args: func_args![value: "Super",
+                             limit: 5,
+                             ellipsis: true
+            ],
+            want: Ok("Super"),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
 
-//         ellipsis_non_boolean {
-//             expr: |_| TruncateFn {
-//                 value: Literal::from("foo").boxed(),
-//                 limit: Literal::from("bar").boxed(),
-//                 ellipsis: Some(Literal::from("baz").boxed()),
-//             },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Bytes,
-//                 ..Default::default()
-//             },
-//         }
-//     ];
+        big {
+            args: func_args![value: "Supercalifragilisticexpialidocious",
+                             limit: 5
+            ],
+            want: Ok("Super"),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
 
-//     #[test]
-//     fn truncate() {
-//         let cases = vec![
-//             (
-//                 map!["foo": "Super"],
-//                 Ok("".into()),
-//                 TruncateFn::new(
-//                     Box::new(Path::from("foo")),
-//                     Box::new(Literal::from(0.0)),
-//                     Some(false.into()),
-//                 ),
-//             ),
-//             (
-//                 map!["foo": "Super"],
-//                 Ok("...".into()),
-//                 TruncateFn::new(
-//                     Box::new(Path::from("foo")),
-//                     Box::new(Literal::from(0.0)),
-//                     Some(true.into()),
-//                 ),
-//             ),
-//             (
-//                 map!["foo": "Super"],
-//                 Ok("Super".into()),
-//                 TruncateFn::new(
-//                     Box::new(Path::from("foo")),
-//                     Box::new(Literal::from(10.0)),
-//                     Some(false.into()),
-//                 ),
-//             ),
-//             (
-//                 map!["foo": "Super"],
-//                 Ok("Super".into()),
-//                 TruncateFn::new(
-//                     Box::new(Path::from("foo")),
-//                     Box::new(Literal::from(5.0)),
-//                     Some(true.into()),
-//                 ),
-//             ),
-//             (
-//                 map!["foo": "Supercalifragilisticexpialidocious"],
-//                 Ok("Super".into()),
-//                 TruncateFn::new(
-//                     Box::new(Path::from("foo")),
-//                     Box::new(Literal::from(5.0)),
-//                     Some(false.into()),
-//                 ),
-//             ),
-//             (
-//                 map!["foo": "♔♕♖♗♘♙♚♛♜♝♞♟"],
-//                 Ok("♔♕♖♗♘♙...".into()),
-//                 TruncateFn::new(
-//                     Box::new(Path::from("foo")),
-//                     Box::new(Literal::from(6.0)),
-//                     Some(true.into()),
-//                 ),
-//             ),
-//             (
-//                 map!["foo": "Supercalifragilisticexpialidocious"],
-//                 Ok("Super...".into()),
-//                 TruncateFn::new(
-//                     Box::new(Path::from("foo")),
-//                     Box::new(Literal::from(5.0)),
-//                     Some(true.into()),
-//                 ),
-//             ),
-//             (
-//                 map!["foo": "Supercalifragilisticexpialidocious"],
-//                 Ok("Super".into()),
-//                 TruncateFn::new(
-//                     Box::new(Path::from("foo")),
-//                     Box::new(Literal::from(5.0)),
-//                     None,
-//                 ),
-//             ),
-//         ];
+        big_ellipsis {
+            args: func_args![value: "Supercalifragilisticexpialidocious",
+                             limit: 5,
+                             ellipsis: true,
+            ],
+            want: Ok("Super..."),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
 
-//         let mut state = state::Program::default();
-
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+        unicode {
+            args: func_args![value: "♔♕♖♗♘♙♚♛♜♝♞♟",
+                             limit: 6,
+                             ellipsis: true
+            ],
+            want: Ok("♔♕♖♗♘♙..."),
+            tdef: TypeDef::new().infallible().bytes(),
+        }
+    ];
+}

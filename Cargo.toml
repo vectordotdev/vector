@@ -25,6 +25,7 @@ debug = false     # Do not include debug symbols in the executable.
 debug = true
 
 [package.metadata.deb]
+name = "vector"
 maintainer-scripts = "distribution/debian/scripts/"
 conf-files = ["/etc/vector/vector.toml"]
 assets = [
@@ -171,7 +172,7 @@ bollard = { version = "0.9.1", features = ["ssl"], optional = true }
 bytes = { version = "0.5.6", features = ["serde"] }
 bytesize = { version = "1.0.0", optional = true }
 chrono = { version = "0.4.19", features = ["serde"] }
-cidr-utils = "0.5.0"
+cidr-utils = "0.5.1"
 colored = "2.0"
 dashmap = "4"
 db-key = "0.0.5"
@@ -259,7 +260,7 @@ security-framework = "2.0"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
-nix = "0.19.0"
+nix = "0.20.0"
 
 [build-dependencies]
 prost-build = "0.6.1"
@@ -354,6 +355,7 @@ sources = ["sources-logs", "sources-metrics"]
 sources-logs = [
   "sources-aws_kinesis_firehose",
   "sources-aws_s3",
+  "sources-datadog",
   "sources-docker_logs",
   "sources-file",
   "sources-generator",
@@ -386,6 +388,7 @@ sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
+sources-datadog = ["sources-utils-http"]
 sources-docker_logs = ["bollard", "dirs-next"]
 sources-file = ["bytesize", "file-source"]
 sources-generator = ["fakedata"]
