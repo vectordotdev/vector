@@ -189,12 +189,12 @@ fn kafka_source(
                                     // Using index-based for loop because rdkafka's `Headers` trait
                                     // does not provide Iterator-based API
                                     for i in 0..headers.count() {
-                                        let header =
-                                            headers.get(i).expect("header index is out of bounds");
-                                        headers_map.insert(
-                                            header.0.to_string(),
-                                            Bytes::from(header.1.to_owned()).into(),
-                                        );
+                                        if let Some(header) = headers.get(i) {
+                                            headers_map.insert(
+                                                header.0.to_string(),
+                                                Bytes::from(header.1.to_owned()).into(),
+                                            );
+                                        }
                                     }
                                 }
                                 log.insert(headers_key, Value::from(headers_map));
