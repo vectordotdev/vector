@@ -14,12 +14,55 @@ type DateTime = chrono::DateTime<chrono::Utc>;
 )]
 pub struct OutputLogEventsSubscription;
 
+/// Tap encoding format type that is more convenient to use for public clients than the
+/// generated `output_log_events_subscription::LogEventEncodingType`.  
+#[derive(Debug, Clone, Copy)]
+pub enum TapEncodingFormat {
+    Json,
+    Yaml,
+}
+
+/// String -> TapEncodingFormat, typically for parsing user input.
+impl std::str::FromStr for TapEncodingFormat {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "json" => Ok(Self::Json),
+            "yaml" => Ok(Self::Yaml),
+            _ => Err("Invalid encoding format".to_string()),
+        }
+    }
+}
+
+/// Map the public-facing `TapEncodingFormat` to the internal `LogEventEncodingType`.
+impl From<TapEncodingFormat> for output_log_events_subscription::LogEventEncodingType {
+    fn from(encoding: TapEncodingFormat) -> Self {
+        match encoding {
+            TapEncodingFormat::Json => Self::JSON,
+            TapEncodingFormat::Yaml => Self::YAML,
+        }
+    }
+}
+
+impl output_log_events_subscription::OutputLogEventsSubscriptionOutputLogEvents {
+    pub fn as_log(
+        &self,
+    ) -> Option<&output_log_events_subscription::OutputLogEventsSubscriptionOutputLogEventsOnLogEvent>
+    {
+        match self {
+            output_log_events_subscription::OutputLogEventsSubscriptionOutputLogEvents::LogEvent(ev) => Some(ev),
+            _ => None
+        }
+    }
+}
+
 pub trait TapSubscriptionExt {
     /// Executes an output log events subscription.
     fn output_log_events_subscription(
         &self,
         component_names: Vec<String>,
-        encoding: output_log_events_subscription::LogEventEncodingType,
+        encoding: TapEncodingFormat,
         limit: i64,
         interval: i64,
     ) -> crate::BoxedSubscription<OutputLogEventsSubscription>;
@@ -30,7 +73,7 @@ impl TapSubscriptionExt for crate::SubscriptionClient {
     fn output_log_events_subscription(
         &self,
         component_names: Vec<String>,
-        encoding: output_log_events_subscription::LogEventEncodingType,
+        encoding: TapEncodingFormat,
         limit: i64,
         interval: i64,
     ) -> BoxedSubscription<OutputLogEventsSubscription> {
@@ -39,7 +82,7 @@ impl TapSubscriptionExt for crate::SubscriptionClient {
                 component_names,
                 limit,
                 interval,
-                encoding,
+                encoding: encoding.into(),
             });
 
         self.start::<OutputLogEventsSubscription>(&request_body)

@@ -2,27 +2,9 @@ mod cmd;
 
 use structopt::StructOpt;
 use url::Url;
+use vector_api_client::gql::TapEncodingFormat;
 
 pub use cmd::cmd;
-
-/// Encoding format for `event::LogEvent`s
-#[derive(Debug, Clone, Copy)]
-pub enum Encoding {
-    Json,
-    Yaml,
-}
-
-impl std::str::FromStr for Encoding {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "json" => Ok(Self::Json),
-            "yaml" => Ok(Self::Yaml),
-            _ => Err("Invalid encoding format".to_string()),
-        }
-    }
-}
 
 #[derive(StructOpt, Debug, Clone)]
 #[structopt(rename_all = "kebab-case")]
@@ -40,6 +22,9 @@ pub struct Opts {
     limit: u32,
 
     /// Encoding format for logs printed to screen
-    #[structopt(default_value = "Encoding::Json", long)]
-    encoding: Encoding,
+    #[structopt(default_value = "json", short = "f", long)]
+    format: TapEncodingFormat,
+
+    #[structopt(default_value = "*", use_delimiter(true), raw(true))]
+    components: Vec<String>,
 }

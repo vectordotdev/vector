@@ -1,7 +1,7 @@
 pub mod components;
 pub mod filter;
 mod health;
-mod log_events;
+pub mod log_events;
 mod meta;
 mod metrics;
 mod relay;
