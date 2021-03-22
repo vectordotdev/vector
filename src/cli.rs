@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use structopt::{clap::AppSettings, StructOpt};
 
 #[cfg(feature = "api-client")]
+use crate::tap;
+#[cfg(feature = "api-client")]
 use crate::top;
 
 #[cfg(windows)]
@@ -146,6 +148,10 @@ pub enum SubCommand {
     /// Display topology and metrics in the console, for a local or remote Vector instance
     #[cfg(feature = "api-client")]
     Top(top::Opts),
+
+    /// Observe log events from topology components
+    #[cfg(feature = "api-client")]
+    Tap(tap::Opts),
 
     /// Manage the vector service.
     #[cfg(windows)]

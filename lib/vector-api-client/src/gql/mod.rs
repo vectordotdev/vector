@@ -4,6 +4,7 @@ mod components;
 mod health;
 mod meta;
 mod metrics;
+mod tap;
 
 pub use self::meta::*;
 pub use components::*;

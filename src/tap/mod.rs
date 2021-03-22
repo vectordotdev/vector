@@ -1,8 +1,4 @@
 mod cmd;
-mod dashboard;
-mod events;
-mod metrics;
-mod state;
 
 use structopt::StructOpt;
 use url::Url;
@@ -20,7 +16,7 @@ pub struct Opts {
     #[structopt(short, long)]
     url: Option<Url>,
 
-    /// Humanize metrics, using numeric suffixes - e.g. 1,100 = 1.10 k, 1,000,000 = 1.00 M
-    #[structopt(short, long)]
-    human_metrics: bool,
+    /// Sample log events to the provided limit
+    #[structopt(default_value = "100", short = "l", long)]
+    limit: u32,
 }
