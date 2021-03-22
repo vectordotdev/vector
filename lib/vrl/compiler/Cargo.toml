@@ -21,3 +21,10 @@ serde = "1"
 thiserror = "1"
 tracing = "0.1"
 dyn-clone = "1.0.4"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "path"
+harness = false
