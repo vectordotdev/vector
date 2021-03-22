@@ -4,7 +4,10 @@
 #   ┌─ :2:1
 #   │
 # 2 │ unknown_function(.foo, .bar)
-#   │ ^^^^^^^^^^^^^^^^ undefined function
+#   │ ^^^^^^^^^^^^^^^^
+#   │ │
+#   │ undefined function
+#   │ did you mean "parse_duration"?
 #   │
 #   = learn more about error code 105 at https://errors.vrl.dev/105
 #   = see language documentation at https://vrl.dev

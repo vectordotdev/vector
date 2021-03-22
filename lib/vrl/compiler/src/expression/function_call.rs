@@ -1,4 +1,4 @@
-use crate::expression::{FunctionArgument, Noop};
+use crate::expression::{levenstein, FunctionArgument, Noop};
 use crate::function::{ArgumentList, Parameter};
 use crate::parser::{Ident, Node};
 use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
@@ -42,7 +42,16 @@ impl FunctionCall {
         let function = match funcs.iter().find(|f| f.identifier() == ident.as_ref()) {
             Some(function) => function,
             None => {
-                return Err(Error::Undefined { ident_span });
+                let idents = funcs
+                    .iter()
+                    .map(|func| func.identifier())
+                    .collect::<Vec<_>>();
+
+                return Err(Error::Undefined {
+                    ident_span,
+                    ident: ident.clone(),
+                    idents,
+                });
             }
         };
 
@@ -331,7 +340,11 @@ impl PartialEq for FunctionCall {
 #[allow(clippy::large_enum_variant)]
 pub enum Error {
     #[error("call to undefined function")]
-    Undefined { ident_span: Span },
+    Undefined {
+        ident_span: Span,
+        ident: Ident,
+        idents: Vec<&'static str>,
+    },
 
     #[error("wrong number of function arguments")]
     WrongNumberOfArgs { arguments_span: Span, max: usize },
@@ -394,8 +407,33 @@ impl DiagnosticError for Error {
         use Error::*;
 
         match self {
-            Undefined { ident_span } => {
-                vec![Label::primary("undefined function", ident_span)]
+            Undefined {
+                ident_span,
+                ident,
+                idents,
+            } => {
+                let mut vec = vec![Label::primary("undefined function", ident_span)];
+                let ident_chars = ident.as_ref().chars().collect::<Vec<_>>();
+
+                if let Some((idx, _)) = idents
+                    .iter()
+                    .map(|possible| {
+                        let possible_chars = possible.chars().collect::<Vec<_>>();
+                        levenstein::distance(&ident_chars, &possible_chars)
+                    })
+                    .enumerate()
+                    .min_by_key(|(_, score)| *score)
+                {
+                    {
+                        let guessed: &str = idents[idx];
+                        vec.push(Label::context(
+                            format!(r#"did you mean "{}"?"#, guessed),
+                            ident_span,
+                        ));
+                    }
+                }
+
+                vec
             }
 
             WrongNumberOfArgs {
