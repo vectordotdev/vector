@@ -1,4 +1,5 @@
-subscription OutputLogEvents($componentNames: [String]!, $limit: Int!, $interval: Int!, $encoding: LogEventEncodingType!){
+subscription OutputLogEventsSubscription(
+    $componentNames: [String!]!, $limit: Int!, $interval: Int!, $encoding: LogEventEncodingType!){
     outputLogEvents(componentNames: $componentNames, limit: $limit, interval: $interval) {
         __typename
         ... on LogEvent {
