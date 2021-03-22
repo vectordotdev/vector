@@ -18,7 +18,11 @@ use azure_sdk_core::{
     ContentTypeSupport,
 };
 use azure_sdk_storage_blob::{blob::responses::PutBlockBlobResponse, Blob, Container};
-use azure_sdk_storage_core::{key_client::KeyClient, prelude::client::from_connection_string};
+use azure_sdk_storage_core::{
+    key_client::KeyClient,
+    prelude::client::{from_connection_string, with_emulator},
+    ConnectionString,
+};
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
@@ -33,6 +37,7 @@ use std::{
 };
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
+use url::Url;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -97,7 +102,7 @@ lazy_static! {
 impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            connection_string: String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;EndpointSuffix=core.windows.net"),
+            connection_string: String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;"),
             container_name: String::from("logs"),
             blob_prefix: Some(String::from("blob")),
             blob_time_format: Some(String::from("%s")),
@@ -107,7 +112,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
         })
-        .unwrap()
+            .unwrap()
     }
 }
 
@@ -193,7 +198,15 @@ impl AzureBlobSinkConfig {
 
     pub fn create_client(&self) -> Result<KeyClient> {
         let connection_string = self.connection_string.clone();
-        let client = from_connection_string(connection_string.as_str())?;
+        let client = match ConnectionString::new(connection_string.as_str()) {
+            Ok(ConnectionString {
+                use_development_storage: Some(true),
+                blob_endpoint: Some(blob_endpoint),
+                table_endpoint: Some(table_endpoint),
+                ..
+            }) => with_emulator(&Url::parse(blob_endpoint)?, &Url::parse(table_endpoint)?),
+            _ => from_connection_string(connection_string.as_str())?,
+        };
 
         Ok(client)
     }
@@ -462,7 +475,10 @@ mod tests {
         );
 
         assert_eq!(request.container_name, "logs".to_string());
-        assert_eq!(request.blob_name, format!("blob{}.log", Utc::now().format("%F")));
+        assert_eq!(
+            request.blob_name,
+            format!("blob{}.log", Utc::now().format("%F"))
+        );
         assert_eq!(request.content_encoding, None);
         assert_eq!(request.content_type.unwrap(), "text/plain");
     }
@@ -487,5 +503,64 @@ mod tests {
         assert_ne!(request.blob_name, "blob.log".to_string());
         assert_eq!(request.content_encoding, None);
         assert_eq!(request.content_type.unwrap(), "text/plain");
+    }
+}
+
+#[cfg(feature = "azure-blob-integration-tests")]
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use azure_sdk_storage_blob::container::PublicAccess;
+    use azure_sdk_storage_blob::container::PublicAccessSupport;
+
+    #[tokio::test]
+    async fn azure_blob_passed_healthcheck() {
+        let config = emulator_config().await;
+        let client = config.create_client().unwrap();
+
+        let response = config.healthcheck(client).await;
+
+        response.expect("Failed to pass healthcheck");
+    }
+
+    async fn emulator_config() -> AzureBlobSinkConfig {
+        let config = AzureBlobSinkConfig {
+            connection_string: "UseDevelopmentStorage=true;BlobEndpoint=http://127.0.0.1:10000/;TableEndpoint=http://127.0.0.1:10000/;".to_string(),
+            container_name: "logs".to_string(),
+            blob_prefix: None,
+            blob_time_format: None,
+            blob_append_uuid: None,
+            encoding: Encoding::Text.into(),
+            compression: Compression::None,
+            batch: Default::default(),
+            request: TowerRequestConfig::default(),
+        };
+
+        ensure_container(&config).await;
+
+        config
+    }
+
+    async fn ensure_container(config: &AzureBlobSinkConfig) {
+        let client = config.create_client().unwrap();
+        let container_name = config.container_name.clone();
+        let request = client
+            .create_container()
+            .with_container_name(container_name.as_str())
+            .with_public_access(PublicAccess::None)
+            .finalize();
+
+        let response = match request.await {
+            Ok(_) => Ok(()),
+            Err(reason) => match reason {
+                AzureError::UnexpectedHTTPResult(result) => match result.status_code() {
+                    StatusCode::CONFLICT => Ok(()),
+                    status => Err(format!("Unexpected status code {}", status)),
+                },
+                error => Err(format!("Unexpected error {}", error)),
+            },
+        };
+
+        response.expect("Failed to create container")
     }
 }

@@ -621,6 +621,10 @@ aws-integration-tests = [
   "aws-sqs-integration-tests",
 ]
 
+azure-integration-tests = [
+  "azure-blob-integration-tests"
+]
+
 aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
@@ -629,6 +633,7 @@ aws-kinesis-firehose-integration-tests = ["rusoto_es", "sinks-aws_kinesis_fireho
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sinks-aws_s3", "sources-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs"]
+azure-blob-integration-tests = ["sinks-azure_blob"]
 clickhouse-integration-tests = ["sinks-clickhouse", "warp"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
