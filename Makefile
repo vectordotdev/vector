@@ -315,6 +315,18 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh aws stop
 endif
 
+.PHONY: test-integration-azure
+test-integration-azure:
+ifeq ($(AUTOSPAWN), true)
+	@scripts/setup_integration_env.sh azure stop
+	@scripts/setup_integration_env.sh azure start
+	sleep 5 # Many services are very slow... Give them a sec...
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features azure-integration-tests --lib ::azure_ -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	@scripts/setup_integration_env.sh azure stop
+endif
+
 .PHONY: test-integration-clickhouse
 test-integration-clickhouse: ## Runs Clickhouse integration tests
 ifeq ($(AUTOSPAWN), true)
