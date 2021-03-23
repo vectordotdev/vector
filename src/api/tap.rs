@@ -152,29 +152,25 @@ async fn tap_handler(
                                     component_name = ?name, patterns = ?patterns, matched = ?matched
                                 );
 
-                                // Add sink, if it's not already known to this tap.
-                                if !sinks.contains_key(name) {
-                                    let id = Uuid::new_v4().to_string();
-                                    let sink = make_router(tx.clone(), name);
-                                    if control_tx
-                                        .send(fanout::ControlMessage::Add(id.to_string(), sink))
-                                        .is_ok()
-                                    {
-                                        debug!(
-                                            message = "Component connected.",
-                                            component_name = ?name, id = ?id
-                                        );
-                                        sinks.insert(name.to_string(), id);
-                                    } else {
-                                        error!(
-                                            message = "Couldn't connect component.",
-                                            component_name = ?name, id = ?id
-                                        );
-                                    }
-                                } else {
+                                // (Re)connect the sink. This is necessary because a sink may be
+                                // reconfigured with the same name as a previous, and we are not
+                                // getting involved in config diffing at this point.
+                                let id = Uuid::new_v4().to_string();
+                                let sink = make_router(tx.clone(), name);
+                                if control_tx
+                                    .send(fanout::ControlMessage::Add(id.to_string(), sink))
+                                    .is_ok()
+                                {
+                                    // (Over)write the sink entry.
                                     debug!(
-                                        message="Component already connected; skipping.",
-                                        component_name = ?name
+                                        message = "Component connected.",
+                                        component_name = ?name, id = ?id
+                                    );
+                                    sinks.insert(name.to_string(), id);
+                                } else {
+                                    error!(
+                                        message = "Couldn't connect component.",
+                                        component_name = ?name, id = ?id
                                     );
                                 }
 
