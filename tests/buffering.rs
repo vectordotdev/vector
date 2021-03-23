@@ -64,7 +64,7 @@ fn test_buffering() {
         let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
-            .sink_map_err(|error| panic!(error))
+            .sink_map_err(|error| panic!("{}", error))
             .send_all(&mut input_events_stream)
             .await
             .unwrap();
@@ -114,7 +114,7 @@ fn test_buffering() {
         let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
-            .sink_map_err(|error| panic!(error))
+            .sink_map_err(|error| panic!("{}", error))
             .send_all(&mut input_events_stream)
             .await
             .unwrap();

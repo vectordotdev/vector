@@ -7,8 +7,8 @@ use futures::{stream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::RecvError;
 
-#[serde(deny_unknown_fields)]
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct InternalLogsConfig {}
 
 inventory::submit! {

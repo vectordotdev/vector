@@ -7941,6 +7941,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "twox-hash"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04f8ab788026715fa63b31960869617cba39117e520eb415b0139543e325ab59"
+dependencies = [
+ "cfg-if 0.1.10",
+ "rand 0.7.3",
+ "static_assertions",
+]
+
+[[package]]
 name = "typed-builder"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8344,6 +8355,7 @@ dependencies = [
  "tracing-subscriber",
  "tracing-tower",
  "tui",
+ "twox-hash",
  "typetag",
  "url",
  "uuid 0.8.2",
@@ -8443,6 +8455,7 @@ dependencies = [
  "bitflags",
  "bytes 0.5.6",
  "chrono",
+ "criterion",
  "dyn-clone",
  "lalrpop-util",
  "ngrammatic",
@@ -8515,6 +8528,7 @@ dependencies = [
  "ansi_term 0.12.1",
  "chrono",
  "glob 0.3.0",
+ "jemallocator",
  "prettydiff",
  "regex",
  "serde",

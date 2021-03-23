@@ -439,7 +439,11 @@ mod tests {
 
         let err = transform.process(Event::new_empty_log()).unwrap_err();
         let err = format_error(&err);
-        assert!(err.contains("error converting Lua boolean to String"), err);
+        assert!(
+            err.contains("error converting Lua boolean to String"),
+            "{}",
+            err
+        );
     }
 
     #[test]
@@ -456,7 +460,11 @@ mod tests {
 
         let err = transform.process(Event::new_empty_log()).unwrap_err();
         let err = format_error(&err);
-        assert!(err.contains("error converting Lua boolean to String"), err);
+        assert!(
+            err.contains("error converting Lua boolean to String"),
+            "{}",
+            err
+        );
     }
 
     #[test]
@@ -473,7 +481,7 @@ mod tests {
 
         let err = transform.process(Event::new_empty_log()).unwrap_err();
         let err = format_error(&err);
-        assert!(err.contains("this is an error"), err);
+        assert!(err.contains("this is an error"), "{}", err);
     }
 
     #[test]
@@ -490,7 +498,7 @@ mod tests {
         .unwrap_err()
         .to_string();
 
-        assert!(err.contains("syntax error:"), err);
+        assert!(err.contains("syntax error:"), "{}", err);
     }
 
     #[test]

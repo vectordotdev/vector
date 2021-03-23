@@ -376,7 +376,9 @@ mod tests {
         let now = Utc::now().timestamp_millis() as f64 / 1000f64;
         assert!(
             (hec_event.time - now).abs() < 0.2,
-            format!("hec_event.time = {}, now = {}", hec_event.time, now)
+            "hec_event.time = {}, now = {}",
+            hec_event.time,
+            now
         );
         assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
     }
@@ -413,7 +415,9 @@ mod tests {
         let now = Utc::now().timestamp_millis() as f64 / 1000f64;
         assert!(
             (hec_event.time - now).abs() < 0.2,
-            format!("hec_event.time = {}, now = {}", hec_event.time, now)
+            "hec_event.time = {}, now = {}",
+            hec_event.time,
+            now
         );
         assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
     }

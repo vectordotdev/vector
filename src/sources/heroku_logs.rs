@@ -162,7 +162,7 @@ fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, Erro
         );
 
         if cfg!(test) {
-            panic!(error_msg);
+            panic!("{}", error_msg);
         }
         return Err(header_error_message("Logplex-Msg-Count", &error_msg));
     }
