@@ -75,14 +75,13 @@ fn run(opts: &Opts) -> Result<(), Error> {
     }
 }
 
-#[cfg(feature = "repl")]
 fn repl(objects: Vec<Value>) -> Result<(), Error> {
-    repl::run(objects);
-    Ok(())
-}
-#[cfg(not(feature = "repl"))]
-fn repl(_objects: Vec<Value>) -> Result<(), Error> {
-    Err(Error::ReplFeature)
+    if cfg!(feature = "repl") {
+        repl::run(objects);
+        Ok(())
+    } else {
+        Err(Error::ReplFeature)
+    }
 }
 
 fn execute(object: &mut impl Target, source: String) -> Result<Value, Error> {
