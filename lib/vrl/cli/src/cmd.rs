@@ -1,4 +1,6 @@
-use super::{repl, Error};
+#[cfg(feature = "repl")]
+use super::repl;
+use super::Error;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{self, Read};
@@ -76,13 +78,14 @@ fn run(opts: &Opts) -> Result<(), Error> {
     }
 }
 
+#[cfg(feature = "repl")]
 fn repl(objects: Vec<Value>) -> Result<(), Error> {
-    if cfg!(feature = "repl") {
-        repl::run(objects);
-        Ok(())
-    } else {
-        Err(Error::ReplFeature)
-    }
+    repl::run(objects);
+    Ok(())
+}
+#[cfg(not(feature = "repl"))]
+fn repl(_objects: Vec<Value>) -> Result<(), Error> {
+    Err(Error::ReplFeature)
 }
 
 fn execute(object: &mut impl Target, program: &Program) -> Result<Value, Error> {
