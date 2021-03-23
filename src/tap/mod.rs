@@ -25,6 +25,6 @@ pub struct Opts {
     #[structopt(default_value = "json", short = "f", long)]
     format: TapEncodingFormat,
 
-    #[structopt(default_value = "*", use_delimiter(true), raw(true))]
+    #[structopt(default_value = "*", use_delimiter(true))]
     components: Vec<String>,
 }
