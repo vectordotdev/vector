@@ -514,8 +514,7 @@ mod integration_tests {
     use crate::{assert_downcast_matches, test_util::random_lines_with_stream};
     use azure_sdk_core::MaxResultsSupport;
     use azure_sdk_storage_blob::{
-        Blob, container::PublicAccess, container::PublicAccessSupport,
-        blob::Blob as BlobState,
+        blob::Blob as BlobState, container::PublicAccess, container::PublicAccessSupport, Blob,
     };
     use bytes::{buf::BufExt, BytesMut};
     use flate2::read::GzDecoder;
