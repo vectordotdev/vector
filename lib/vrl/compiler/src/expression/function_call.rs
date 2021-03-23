@@ -1,4 +1,4 @@
-use crate::expression::{FunctionArgument, Noop};
+use crate::expression::{levenstein, FunctionArgument, Noop};
 use crate::function::{ArgumentList, Parameter};
 use crate::parser::{Ident, Node};
 use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
@@ -413,21 +413,24 @@ impl DiagnosticError for Error {
                 idents,
             } => {
                 let mut vec = vec![Label::primary("undefined function", ident_span)];
+                let ident_chars = ident.as_ref().chars().collect::<Vec<_>>();
 
-                let mut corpus = ngrammatic::CorpusBuilder::new()
-                    .arity(2)
-                    .pad_full(ngrammatic::Pad::Auto)
-                    .finish();
-
-                for func in idents {
-                    corpus.add_text(func);
-                }
-
-                if let Some(guess) = corpus.search(ident.as_ref(), 0.25).first() {
-                    vec.push(Label::context(
-                        format!(r#"did you mean "{}"?"#, guess.text),
-                        ident_span,
-                    ));
+                if let Some((idx, _)) = idents
+                    .iter()
+                    .map(|possible| {
+                        let possible_chars = possible.chars().collect::<Vec<_>>();
+                        levenstein::distance(&ident_chars, &possible_chars)
+                    })
+                    .enumerate()
+                    .min_by_key(|(_, score)| *score)
+                {
+                    {
+                        let guessed: &str = idents[idx];
+                        vec.push(Label::context(
+                            format!(r#"did you mean "{}"?"#, guessed),
+                            ident_span,
+                        ));
+                    }
                 }
 
                 vec

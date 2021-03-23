@@ -8527,6 +8527,7 @@ dependencies = [
  "ansi_term 0.12.1",
  "chrono",
  "glob 0.3.0",
+ "jemallocator",
  "prettydiff",
  "regex",
  "serde",
