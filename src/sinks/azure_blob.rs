@@ -14,8 +14,8 @@ use crate::{
     Event, Result,
 };
 use azure_sdk_core::{
-    errors::AzureError, BlobNameSupport, BodySupport, ContainerNameSupport, ContentEncodingOption,
-    ContentEncodingSupport, ContentTypeSupport,
+    errors::AzureError, BlobNameSupport, BodySupport, ContainerNameSupport, ContentEncodingSupport,
+    ContentTypeSupport,
 };
 use azure_sdk_storage_blob::{blob::responses::PutBlockBlobResponse, Blob, Container};
 use azure_sdk_storage_core::{
@@ -559,6 +559,27 @@ mod integration_tests {
         let blobs = config.get_blobs().await;
         assert_eq!(blobs.len(), 1);
         assert!(blobs[0].clone().ends_with(".log"));
+        let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
+        assert_eq!(blob.content_encoding, None);
+        assert_eq!(lines, blob_lines);
+    }
+
+    #[tokio::test]
+    async fn azure_blob_insert_lines_into_blob_gzip() {
+        let config = AzureBlobSinkConfig::new_emulator().await;
+        let config = AzureBlobSinkConfig {
+            blob_prefix: Some(format!("lines/into/blob/gzip/{}", uuid::Uuid::new_v4())),
+            compression: Compression::gzip_default(),
+            ..config
+        };
+        let sink = config.to_sink();
+        let (lines, events) = random_lines_with_stream(100, 10);
+
+        sink.run(events).await.expect("Failed to run sink");
+
+        let blobs = config.get_blobs().await;
+        assert_eq!(blobs.len(), 1);
+        assert!(blobs[0].clone().ends_with(".log.gz"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
         assert_eq!(blob.content_encoding, None);
         assert_eq!(lines, blob_lines);
