@@ -161,7 +161,7 @@ impl AzureBlobSinkConfig {
             .service(blob);
 
         let encoding = self.encoding.clone();
-        let blob_prefix = self.blob_prefix.as_deref().unwrap_or_else(|| "blob".into());
+        let blob_prefix = self.blob_prefix.as_deref().unwrap_or("blob");
         let blob_prefix = Template::try_from(blob_prefix)?;
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, compression));
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
@@ -226,6 +226,7 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
         let container_name = request.container_name.clone();
         let blob_name = request.blob_name.clone();
         let blob_data = request.blob_data.clone();
+        let content_encoding = request.content_encoding.unwrap_or("").clone();
 
         Box::pin(async move {
             client
@@ -233,7 +234,7 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
                 .with_container_name(container_name.as_str())
                 .with_blob_name(blob_name.as_str())
                 .with_body(blob_data.as_slice())
-                .with_content_encoding(request.content_encoding.unwrap())
+                .with_content_encoding(content_encoding)
                 .with_content_type(request.content_type.unwrap())
                 .finalize()
                 .instrument(info_span!("request"))
@@ -510,57 +511,161 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use azure_sdk_storage_blob::container::PublicAccess;
-    use azure_sdk_storage_blob::container::PublicAccessSupport;
+    use crate::{assert_downcast_matches, test_util::random_lines_with_stream};
+    use azure_sdk_core::MaxResultsSupport;
+    use azure_sdk_storage_blob::{
+        Blob, container::PublicAccess, container::PublicAccessSupport,
+        blob::Blob as BlobState,
+    };
+    use bytes::{buf::BufExt, BytesMut};
+    use flate2::read::GzDecoder;
+    use std::io::{BufRead, BufReader};
 
     #[tokio::test]
-    async fn azure_blob_passed_healthcheck() {
-        let config = emulator_config().await;
-        let client = config.create_client().unwrap();
+    async fn azure_blob_healthcheck_passed() {
+        let config = AzureBlobSinkConfig::new_emulator().await;
+        let client = config.create_client().expect("Failed to create client");
 
         let response = config.healthcheck(client).await;
 
         response.expect("Failed to pass healthcheck");
     }
 
-    async fn emulator_config() -> AzureBlobSinkConfig {
+    #[tokio::test]
+    async fn azure_blob_healthcheck_unknown_container() {
+        let config = AzureBlobSinkConfig::new_emulator().await;
         let config = AzureBlobSinkConfig {
-            connection_string: "UseDevelopmentStorage=true;BlobEndpoint=http://127.0.0.1:10000/;TableEndpoint=http://127.0.0.1:10000/;".to_string(),
-            container_name: "logs".to_string(),
-            blob_prefix: None,
-            blob_time_format: None,
-            blob_append_uuid: None,
-            encoding: Encoding::Text.into(),
-            compression: Compression::None,
-            batch: Default::default(),
-            request: TowerRequestConfig::default(),
+            container_name: String::from("other_container_name"),
+            ..config
         };
+        let client = config.create_client().expect("Failed to create client");
 
-        ensure_container(&config).await;
-
-        config
+        assert_downcast_matches!(
+            config.healthcheck(client).await.unwrap_err(),
+            HealthcheckError,
+            HealthcheckError::UnknownContainer { .. }
+        );
     }
 
-    async fn ensure_container(config: &AzureBlobSinkConfig) {
-        let client = config.create_client().unwrap();
-        let container_name = config.container_name.clone();
-        let request = client
-            .create_container()
-            .with_container_name(container_name.as_str())
-            .with_public_access(PublicAccess::None)
-            .finalize();
-
-        let response = match request.await {
-            Ok(_) => Ok(()),
-            Err(reason) => match reason {
-                AzureError::UnexpectedHTTPResult(result) => match result.status_code() {
-                    StatusCode::CONFLICT => Ok(()),
-                    status => Err(format!("Unexpected status code {}", status)),
-                },
-                error => Err(format!("Unexpected error {}", error)),
-            },
+    #[tokio::test]
+    async fn azure_blob_insert_lines_into_blob() {
+        let config = AzureBlobSinkConfig::new_emulator().await;
+        let config = AzureBlobSinkConfig {
+            blob_prefix: Some(format!("lines/into/blob/{}", uuid::Uuid::new_v4())),
+            ..config
         };
+        let sink = config.to_sink();
+        let (lines, events) = random_lines_with_stream(100, 10);
 
-        response.expect("Failed to create container")
+        sink.run(events).await.expect("Failed to run sink");
+
+        let blobs = config.get_blobs().await;
+        assert_eq!(blobs.len(), 1);
+        assert!(blobs[0].clone().ends_with(".log"));
+        let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
+        assert_eq!(blob.content_encoding, None);
+        assert_eq!(lines, blob_lines);
+    }
+
+    impl AzureBlobSinkConfig {
+        pub async fn new_emulator() -> AzureBlobSinkConfig {
+            let config = AzureBlobSinkConfig {
+                connection_string: String::from("UseDevelopmentStorage=true;BlobEndpoint=http://127.0.0.1:10000/;TableEndpoint=http://127.0.0.1:10000/;"),
+                container_name: "logs".to_string(),
+                blob_prefix: None,
+                blob_time_format: None,
+                blob_append_uuid: None,
+                encoding: Encoding::Text.into(),
+                compression: Compression::None,
+                batch: Default::default(),
+                request: TowerRequestConfig::default(),
+            };
+
+            config.ensure_container().await;
+
+            config
+        }
+
+        pub fn to_sink(&self) -> VectorSink {
+            let cx = SinkContext::new_test();
+            let client = self.create_client().expect("Failed to create client");
+
+            self.new(client, cx).expect("Failed to create sink")
+        }
+
+        pub async fn get_blobs(&self) -> Vec<String> {
+            let prefix = self.blob_prefix.clone().expect("Blob prefix None");
+            let client = self.create_client().unwrap();
+
+            let mut blobs = Vec::new();
+            let mut stream = Box::pin(
+                client
+                    .list_blobs()
+                    .with_container_name(self.container_name.as_str())
+                    .with_max_results(5)
+                    .stream(),
+            );
+
+            while let Some(items) = stream.next().await {
+                let items = items.expect("Failed to fetch blobs").incomplete_vector;
+
+                for item in items.iter() {
+                    if item.name.contains(prefix.as_str()) {
+                        blobs.push(item.name.clone());
+                    }
+                }
+            }
+
+            blobs
+        }
+
+        pub async fn get_blob(&self, blob: String) -> (BlobState, Vec<String>) {
+            let client = self.create_client().unwrap();
+            let response = client
+                .get_blob()
+                .with_container_name(self.container_name.as_str())
+                .with_blob_name(blob.as_str())
+                .finalize()
+                .await
+                .expect("Failed to get blob");
+
+            (response.blob, self.get_blob_content(response.data))
+        }
+
+        fn get_blob_content(&self, data: Vec<u8>) -> Vec<String> {
+            let body = BytesMut::from(data.as_slice()).freeze().reader();
+
+            if self.compression == Compression::None {
+                BufReader::new(body).lines().map(|l| l.unwrap()).collect()
+            } else {
+                BufReader::new(GzDecoder::new(body))
+                    .lines()
+                    .map(|l| l.unwrap())
+                    .collect()
+            }
+        }
+
+        async fn ensure_container(&self) {
+            let client = self.create_client().unwrap();
+            let container_name = self.container_name.clone();
+            let request = client
+                .create_container()
+                .with_container_name(container_name.as_str())
+                .with_public_access(PublicAccess::None)
+                .finalize();
+
+            let response = match request.await {
+                Ok(_) => Ok(()),
+                Err(reason) => match reason {
+                    AzureError::UnexpectedHTTPResult(result) => match result.status_code() {
+                        StatusCode::CONFLICT => Ok(()),
+                        status => Err(format!("Unexpected status code {}", status)),
+                    },
+                    error => Err(format!("Unexpected error {}", error)),
+                },
+            };
+
+            response.expect("Failed to create container")
+        }
     }
 }
