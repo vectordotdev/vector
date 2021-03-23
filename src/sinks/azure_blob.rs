@@ -14,8 +14,8 @@ use crate::{
     Event, Result,
 };
 use azure_sdk_core::{
-    errors::AzureError, BlobNameSupport, BodySupport, ContainerNameSupport, ContentEncodingSupport,
-    ContentTypeSupport,
+    errors::AzureError, BlobNameSupport, BodySupport, ContainerNameSupport, ContentEncodingOption,
+    ContentEncodingSupport, ContentTypeSupport,
 };
 use azure_sdk_storage_blob::{blob::responses::PutBlockBlobResponse, Blob, Container};
 use azure_sdk_storage_core::{
@@ -223,22 +223,20 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
 
     fn call(&mut self, request: AzureBlobSinkRequest) -> Self::Future {
         let client = self.client.clone();
-        let container_name = request.container_name.clone();
-        let blob_name = request.blob_name.clone();
-        let blob_data = request.blob_data.clone();
-        let content_encoding = request.content_encoding.unwrap_or("").clone();
 
         Box::pin(async move {
-            client
+            let blob = client
                 .put_block_blob()
-                .with_container_name(container_name.as_str())
-                .with_blob_name(blob_name.as_str())
-                .with_body(blob_data.as_slice())
-                .with_content_encoding(content_encoding)
+                .with_container_name(request.container_name.as_str())
+                .with_blob_name(request.blob_name.as_str())
                 .with_content_type(request.content_type.unwrap())
-                .finalize()
-                .instrument(info_span!("request"))
-                .await
+                .with_body(request.blob_data.as_slice());
+            let blob = match request.content_encoding {
+                Some(encoding) => blob.with_content_encoding(encoding),
+                None => blob,
+            };
+
+            blob.finalize().instrument(info_span!("request")).await
         })
     }
 }
