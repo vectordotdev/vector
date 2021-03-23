@@ -32,6 +32,7 @@ impl Runtime {
     /// Given the provided [`Target`], resolve the provided [`Program`] to
     /// completion.
     pub fn resolve(&mut self, target: &mut dyn Target, program: &Program) -> RuntimeResult {
+        coz::begin!("vrl::core::resolve");
         // Validate that the path is an object.
         //
         // VRL technically supports any `Value` object as the root, but the
@@ -59,6 +60,7 @@ impl Runtime {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        coz::end!("vrl::core::resolve");
         Ok(values.pop().unwrap_or(Value::Null))
     }
 }

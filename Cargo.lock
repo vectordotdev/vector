@@ -1157,6 +1157,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea221b5284a47e40033bf9b66f35f984ec0ea2931eb03505246cd27a963f981b"
 
 [[package]]
+name = "coz"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cef55b3fe2f5477d59e12bc792e8b3c95a25bd099eadcfae006ecea136de76e2"
+dependencies = [
+ "libc",
+ "once_cell",
+]
+
+[[package]]
 name = "cpu-time"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8420,6 +8430,7 @@ name = "vrl"
 version = "0.1.0"
 dependencies = [
  "bytes 0.5.6",
+ "coz",
  "indoc",
  "ordered-float",
  "thiserror",
@@ -8433,6 +8444,7 @@ name = "vrl-cli"
 version = "0.1.0"
 dependencies = [
  "bytes 0.5.6",
+ "coz",
  "exitcode",
  "indoc",
  "lazy_static",
@@ -8480,6 +8492,7 @@ dependencies = [
 name = "vrl-parser"
 version = "0.1.0"
 dependencies = [
+ "coz",
  "lalrpop",
  "lalrpop-util",
  "ordered-float",

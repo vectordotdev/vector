@@ -13,6 +13,7 @@ lalrpop-util = "0.19"
 ordered-float = "2"
 paste = "1"
 thiserror = "1"
+coz = "0.1"
 
 [dev-dependencies]
 test-case = "1"

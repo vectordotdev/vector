@@ -554,6 +554,7 @@ impl<'input> Iterator for Lexer<'input> {
 
 impl<'input> Lexer<'input> {
     fn open(&mut self, start: usize, token: Token<&'input str>) -> Spanned<'input, usize> {
+        coz::progress!();
         match &token {
             Token::LParen => self.open_parens += 1,
             Token::LBracket => self.open_brackets += 1,
@@ -565,6 +566,7 @@ impl<'input> Lexer<'input> {
     }
 
     fn close(&mut self, start: usize, token: Token<&'input str>) -> Spanned<'input, usize> {
+        coz::progress!();
         match &token {
             Token::RParen => self.open_parens = self.open_parens.saturating_sub(1),
             Token::RBracket => self.open_brackets = self.open_brackets.saturating_sub(1),
@@ -586,10 +588,12 @@ impl<'input> Lexer<'input> {
         end: usize,
         token: Token<&'input str>,
     ) -> Spanned<'input, usize> {
+        coz::progress!();
         (start, token, end)
     }
 
     fn query_end(&mut self, start: usize) -> Option<usize> {
+        coz::progress!();
         match self.rquery_indices.last() {
             Some(end) if start > 0 && start.saturating_sub(1) == *end => self.rquery_indices.pop(),
             _ => None,
@@ -597,6 +601,7 @@ impl<'input> Lexer<'input> {
     }
 
     fn query_start(&mut self, start: usize) -> bool {
+        coz::progress!();
         // If we already opened a query for the current position, we don't want
         // to open another one.
         if self.rquery_indices.last() == Some(&start) {
@@ -867,6 +872,7 @@ impl<'input> Lexer<'input> {
     }
 
     fn string_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
+        coz::progress!();
         let content_start = self.next_index();
 
         loop {
@@ -901,6 +907,7 @@ impl<'input> Lexer<'input> {
     }
 
     fn numeric_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
+        coz::progress!();
         let (end, int) = self.take_while(start, |ch| is_digit(ch) || ch == '_');
 
         match self.peek() {
@@ -932,6 +939,7 @@ impl<'input> Lexer<'input> {
     }
 
     fn identifier_or_function_call(&mut self, start: usize) -> Spanned<'input, usize> {
+        coz::progress!();
         let (end, ident) = self.take_while(start, is_ident_continue);
 
         let token = if self.test_peek(|ch| ch == '(' || ch == '!') {
@@ -944,6 +952,7 @@ impl<'input> Lexer<'input> {
     }
 
     fn operator(&mut self, start: usize) -> Spanned<'input, usize> {
+        coz::progress!();
         let (end, op) = self.take_while(start, is_operator);
 
         let token = match op {
@@ -957,6 +966,7 @@ impl<'input> Lexer<'input> {
     }
 
     fn internal_test(&mut self, start: usize) -> Spanned<'input, usize> {
+        coz::progress!();
         self.bump();
         let (end, test) = self.take_while(start, char::is_alphabetic);
 
@@ -968,6 +978,7 @@ impl<'input> Lexer<'input> {
         start: usize,
         tok: impl Fn(&'input str) -> Tok<'input>,
     ) -> SpannedResult<'input, usize> {
+        coz::progress!();
         self.bump();
         let content_start = self.next_index();
 

@@ -60,6 +60,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
         })?;
 
         for mut object in objects {
+            coz::begin!("vrl::cli::execute");
             let result = execute(&mut object, &program).map(|v| {
                 if opts.print_object {
                     object.to_string()
@@ -72,6 +73,7 @@ fn run(opts: &Opts) -> Result<(), Error> {
                 Ok(ok) => println!("{}", ok),
                 Err(err) => eprintln!("{}", err),
             }
+            coz::end!("vrl::cli::execute");
         }
 
         Ok(())
