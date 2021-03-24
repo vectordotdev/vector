@@ -251,6 +251,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn quoted() {
+        for i in 0..u16::MAX {
+            let kind = Kind::new(i);
+            assert_eq!(kind.quoted(), format!(r#""{}""#, kind.as_str()));
+        }
+    }
+
+    #[test]
     fn kind_is_scalar() {
         let scalars = vec![
             Kind::Integer,
