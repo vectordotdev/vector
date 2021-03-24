@@ -252,7 +252,7 @@ cfg-if = { version = "1.0.0", default-features = false }
 tonic = { version = "0.4", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
 thiserror = "1.0"
 readonly = { version = "0.2", optional = true }
-data-encoding = { version="2.2", optional=true }
+data-encoding = { version = "2.2", optional=true }
 trust-dns-proto = { version = "0.20", features = ["dnssec"], optional = true }
 
 # For WASM

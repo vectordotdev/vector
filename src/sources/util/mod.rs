@@ -13,7 +13,6 @@ mod unix_datagram;
 #[cfg(all(unix, feature = "sources-utils-unix"))]
 mod unix_stream;
 
-#[cfg(all(unix, feature = "sources-dnstap"))]
 #[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
 pub(crate) use self::body_decoding::{decode_body, Encoding};
 pub use self::framestream::build_framestream_unix_source;

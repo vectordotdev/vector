@@ -1,9 +1,8 @@
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::Event,
-    shutdown::ShutdownSignal,
-    Pipeline, Result,
+    Result,
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -75,13 +74,7 @@ impl_generate_config_from_default!(DnstapConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "dnstap")]
 impl SourceConfig for DnstapConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> Result<super::Source> {
         let host_key = self
             .host_key
             .clone()
@@ -111,7 +104,11 @@ impl SourceConfig for DnstapConfig {
             self.socket_receive_buffer_size,
             self.socket_send_buffer_size,
         );
-        Ok(build_framestream_unix_source(frame_handler, shutdown, out))
+        Ok(build_framestream_unix_source(
+            frame_handler,
+            cx.shutdown,
+            cx.out,
+        ))
     }
 
     fn output_type(&self) -> DataType {

@@ -29,6 +29,7 @@ use std::{
     time::Duration,
 };
 use tokio::{self, net::UnixListener, task::JoinHandle};
+use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{length_delimited, Framed};
 use tracing::field;
 use tracing_futures::Instrument;
@@ -380,7 +381,7 @@ pub fn build_framestream_unix_source(
     };
 
     let fut = async move {
-        let mut listener = UnixListener::bind(&path).expect("Failed to bind to listener socket");
+        let listener = UnixListener::bind(&path).expect("Failed to bind to listener socket");
 
         // system's 'net.core.rmem_max' might have to be changed if socket receive buffer is not updated properly
         if let Some(socket_receive_buffer_size) = frame_handler.socket_receive_buffer_size() {
@@ -436,7 +437,7 @@ pub fn build_framestream_unix_source(
 
         info!(message = "Listening...", ?path, r#type = "unix");
 
-        let mut stream = listener.incoming().take_until(shutdown.clone());
+        let mut stream = UnixListenerStream::new(listener).take_until(shutdown.clone());
         while let Some(socket) = stream.next().await {
             let socket = match socket {
                 Err(e) => {
@@ -785,7 +786,7 @@ mod test {
         assert_eq!(true, shutdown_success);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn normal_framestream_singlethreaded() {
         let source_name = "test_source";
         let (tx, rx) = Pipeline::new_test();
@@ -835,7 +836,7 @@ mod test {
         let _ = source_handle.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn normal_framestream_multithreaded() {
         let source_name = "test_source";
         let (tx, rx) = Pipeline::new_test();
@@ -883,7 +884,7 @@ mod test {
         let _ = source_handle.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn multiple_content_types() {
         let source_name = "test_source";
         let (tx, _) = Pipeline::new_test();
@@ -913,7 +914,7 @@ mod test {
         let _ = source_handle.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn wrong_content_type() {
         let source_name = "test_source";
         let (tx, _) = Pipeline::new_test();
@@ -948,7 +949,7 @@ mod test {
         let _ = source_handle.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn data_too_soon() {
         let source_name = "test_source";
         let (tx, rx) = Pipeline::new_test();
@@ -1006,7 +1007,7 @@ mod test {
         let _ = source_handle.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn unidirectional_framestream() {
         let source_name = "test_source";
         let (tx, rx) = Pipeline::new_test();
@@ -1046,7 +1047,7 @@ mod test {
         let _ = source_handle.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_spawn_event_handling_tasks() {
         let (tx, rx) = Pipeline::new_test();
         let out = tx.sink_map_err(|e| error!("Error sending event: {:?}.", e));
