@@ -15,7 +15,7 @@ type DateTime = chrono::DateTime<chrono::Utc>;
 pub struct OutputLogEventsSubscription;
 
 /// Tap encoding format type that is more convenient to use for public clients than the
-/// generated `output_log_events_subscription::LogEventEncodingType`.  
+/// generated `output_log_events_subscription::LogEventEncodingType`.
 #[derive(Debug, Clone, Copy)]
 pub enum TapEncodingFormat {
     Json,
