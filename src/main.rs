@@ -3,6 +3,8 @@ use vector::app::Application;
 
 #[cfg(unix)]
 fn main() {
+    coz::thread_init();
+
     let app = Application::prepare().unwrap_or_else(|code| {
         std::process::exit(code);
     });

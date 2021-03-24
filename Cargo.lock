@@ -8239,6 +8239,7 @@ dependencies = [
  "cidr-utils",
  "codec",
  "colored",
+ "coz",
  "criterion",
  "crossterm 0.19.0",
  "dashmap 4.0.2",

@@ -111,6 +111,7 @@ impl StreamSink for BlackholeSink {
             }
 
             self.acker.ack(1);
+            coz::end!("stdin_line");
         }
         Ok(())
     }

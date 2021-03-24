@@ -100,6 +100,7 @@ where
             .take_until(shutdown)
             .map_err(|error| emit!(StdinReadFailed { error }))
             .map_ok(move |line| {
+                coz::begin!("stdin_line");
                 emit!(StdinEventReceived {
                     byte_size: line.len()
                 });

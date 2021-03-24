@@ -174,6 +174,7 @@ bytesize = { version = "1.0.0", optional = true }
 chrono = { version = "0.4.19", features = ["serde"] }
 cidr-utils = "0.5.1"
 colored = "2.0"
+coz = "0.1"
 dashmap = "4"
 db-key = "0.0.5"
 derivative = "2.1.1"
@@ -644,6 +645,11 @@ statistic-benches = []
 metrics-benches = ["sinks-socket", "sources-socket"]
 remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json_parser", "transforms-remap"]
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-lua", "transforms-remap", "transforms-wasm"]
+
+[[bench]]
+name = "path_iter"
+harness = false
+required-features = ["benches"]
 
 [[bench]]
 name = "default"
