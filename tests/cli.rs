@@ -94,19 +94,19 @@ fn validate_cleanup() {
         .arg(config)
         .env("VECTOR_DATA_DIR", dir.clone());
 
-    let output = cmd.status().expect("Failed to execute process");
+    let output = cmd.output().expect("Failed to execute process");
 
-    // assert_no_log_lines(output.stdout);
-    assert_eq!(output.code(), Some(0));
+    assert_no_log_lines(output.stdout);
+    assert_eq!(output.status.code(), Some(0));
 
-    // // Assert that data folder didn't change
-    // assert_eq!(
-    //     vec![path],
-    //     read_dir(dir)
-    //         .unwrap()
-    //         .map(|entry| entry.unwrap().path())
-    //         .collect::<Vec<_>>()
-    // );
+    // Assert that data folder didn't change
+    assert_eq!(
+        vec![path],
+        read_dir(dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect::<Vec<_>>()
+    );
 }
 
 #[test]
@@ -138,5 +138,5 @@ fn validate(config: &str) -> i32 {
     let mut cmd = Command::cargo_bin("vector").unwrap();
     cmd.arg("validate").arg(config).env("VECTOR_DATA_DIR", dir);
 
-    cmd.status().unwrap().code().unwrap()
+    cmd.output().unwrap().status.code().unwrap()
 }
