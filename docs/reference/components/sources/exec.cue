@@ -57,12 +57,12 @@ components: sources: exec: {
 			}
 		}
 		command: {
-		    common:      false
+			common:      false
 			required:    false
 			description: "The command to be run."
 			warnings: []
 			type: string: {
-			    default: null
+				default: null
 				examples: ["echo", "./myscript.sh"]
 				syntax: "literal"
 			}
@@ -80,10 +80,10 @@ components: sources: exec: {
 			}
 		}
 		exec_interval_secs: {
-		    common:      false
+			common:        false
 			description:   "The interval in seconds between scheduled command runs."
 			relevant_when: "mode = `scheduled`"
-			required:    false
+			required:      false
 			type: uint: {
 				default: 60
 				unit:    "seconds"
@@ -104,8 +104,8 @@ components: sources: exec: {
 			required:      false
 			warnings: []
 			type: string: {
-			    default: "exec_duration_millis"
-				syntax: "literal"
+				default: "exec_duration_millis"
+				syntax:  "literal"
 			}
 		}
 		respawn_on_exit: {
@@ -116,7 +116,7 @@ components: sources: exec: {
 			type: bool: default: true
 		}
 		respawn_interval_secs: {
-		    common:        false
+			common:        false
 			description:   "The interval in seconds between restarting streaming commands if needed."
 			relevant_when: "mode = `streaming`"
 			required:      false
@@ -127,13 +127,13 @@ components: sources: exec: {
 			}
 		}
 		current_dir: {
-		    common:      false
+			common:      false
 			required:    false
 			description: "The directory from within which to run the command."
 			warnings: []
 			type: string: {
-			    default: null
-				syntax: "literal"
+				default: null
+				syntax:  "literal"
 			}
 		}
 		include_stderr: {
@@ -183,8 +183,8 @@ components: sources: exec: {
 			required:    false
 			warnings: []
 			type: string: {
-			    default: null
-				syntax: "literal"
+				default: null
+				syntax:  "literal"
 			}
 		}
 		argument_key: {
@@ -194,8 +194,8 @@ components: sources: exec: {
 			required:    false
 			warnings: []
 			type: string: {
-			    default: null
-				syntax: "literal"
+				default: null
+				syntax:  "literal"
 			}
 		}
 	}
@@ -211,26 +211,26 @@ components: sources: exec: {
 					syntax: "literal"
 				}
 			}
-		    exec_duration_millis: {
-		        common:        false
-			    description:   "The duration in milliseconds a scheduled command took to complete."
-			    relevant_when: "mode = `scheduled`"
-			    required:      false
-			    type: uint: {
-				    default: null
-				    unit:    "milliseconds"
-			    }
-		    }
-		    exit_status: {
-		        common:        false
-			    description:   "The exit status of a scheduled command."
-			    relevant_when: "mode = `scheduled`"
-			    required:      false
-			    type: uint: {
-				    default: null
-				    unit:    null
-			    }
-		    }
+			exec_duration_millis: {
+				common:        false
+				description:   "The duration in milliseconds a scheduled command took to complete."
+				relevant_when: "mode = `scheduled`"
+				required:      false
+				type: uint: {
+					default: null
+					unit:    "milliseconds"
+				}
+			}
+			exit_status: {
+				common:        false
+				description:   "The exit status of a scheduled command."
+				relevant_when: "mode = `scheduled`"
+				required:      false
+				type: uint: {
+					default: null
+					unit:    null
+				}
+			}
 			pid: {
 				description: "The process ID of the command."
 				required:    true
@@ -240,30 +240,30 @@ components: sources: exec: {
 				}
 			}
 			command: {
-			    common:      false
+				common:      false
 				description: "The command that was run to generate this event."
 				required:    false
 				type: string: {
-				    default: null
+					default: null
 					examples: ["echo", "./myscript.sh"]
 					syntax: "literal"
 				}
 			}
-		    arguments: {
-			    common:      false
-			    description: "Array of any arguments that were passed to the command."
-			    required:    false
-			    type: array: {
-				    default: null
-				    items: type: string: {
-					    examples: ["Hello World!"]
-					    syntax: "literal"
-				    }
-			    }
-		    }
-			host:        fields._local_host
-			message:     fields._raw_line
-			timestamp:   fields._current_timestamp
+			arguments: {
+				common:      false
+				description: "Array of any arguments that were passed to the command."
+				required:    false
+				type: array: {
+					default: null
+					items: type: string: {
+						examples: ["Hello World!"]
+						syntax: "literal"
+					}
+				}
+			}
+			host:      fields._local_host
+			message:   fields._raw_line
+			timestamp: fields._current_timestamp
 		}
 	}
 
@@ -279,12 +279,12 @@ components: sources: exec: {
 				```
 				"""
 			output: log: {
-				data_stream: "stdout"
+				data_stream:          "stdout"
 				exec_duration_millis: 1500
-				exit_status: 0
-				timestamp:   _timestamp
-				host:        _values.local_host
-				message:     _line
+				exit_status:          0
+				timestamp:            _timestamp
+				host:                 _values.local_host
+				message:              _line
 			}
 		},
 	]
@@ -299,9 +299,8 @@ components: sources: exec: {
 	}
 
 	telemetry: metrics: {
-		processed_bytes_total:    components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:   components.sources.internal_metrics.output.metrics.processed_events_total
-		processing_errors_total:  components.sources.internal_metrics.output.metrics.processing_errors_total
+		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:  components.sources.internal_metrics.output.metrics.processed_events_total
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }
-

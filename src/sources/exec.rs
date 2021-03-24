@@ -786,6 +786,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
     async fn test_run_once_scheduled() {
         trace_init();
 
@@ -811,9 +812,9 @@ mod tests {
         assert_eq!(log["data_stream"], STDOUT.into());
         assert_eq!(log["exit_status"], (0 as i64).into());
         assert_eq!(log["command"], config.command.clone().into());
-        assert_eq!(log["arguments"], config.arguments.clone().unwrap().into());
-        assert_eq!(log[log_schema().message_key()], "Hello World!\n".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
+        assert_eq!(log[log_schema().message_key()], "Hello World!\n".into());
+        assert_eq!(log["arguments"], config.arguments.clone().unwrap().into());
     }
 
     fn standard_scheduled_test_config() -> ExecConfig {
