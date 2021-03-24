@@ -150,7 +150,7 @@ macro_rules! impl_kind {
                     return write!(f, "{}", self.quoted())
                 }
 
-                let mut kinds = vec![];
+                let mut kinds = Vec::with_capacity(16);
                 $(paste::paste! {
                 if self.[<contains_ $name>]() {
                     kinds.push(Kind::$kind.quoted())
