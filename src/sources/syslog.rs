@@ -327,11 +327,7 @@ impl SyslogDecoder {
             }
         }
 
-        if self.in_octet {
-            Some(self.octet_decode(src))
-        } else {
-            None
-        }
+        self.in_octet.then(|| self.octet_decode(src))
     }
 }
 
