@@ -42,8 +42,10 @@ fn benchmark_path_iter(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(param.basis.len() as u64));
 
         group.bench_with_input(BenchmarkId::from_parameter(param), &param, |b, &param| {
-            let iter = PathIter::new(param.basis);
-            b.iter(|| while let Some(_) = iter.next() {})
+            b.iter(|| {
+                let mut iter = PathIter::new(param.basis);
+                while let Some(_) = iter.next() {}
+            })
         });
     }
 }
