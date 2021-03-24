@@ -380,6 +380,7 @@ urls: {
 	statsd_udp_protocol:                                      "\(github)/b/statsd_spec"
 	stderr:                                                   "\(wikipedia)/wiki/Standard_streams#Standard_error_(stderr)"
 	stdin:                                                    "\(wikipedia)/wiki/Standard_streams#Standard_input_(stdin)"
+	exec:                                                     "\(wikipedia)/wiki/Exec_(system_call)"
 	stdout:                                                   "\(wikipedia)/wiki/Standard_streams#Standard_output_(stdout)"
 	stripe_blog_canonical_log_lines:                          "https://stripe.com/blog/canonical-log-lines"
 	strptime_specifiers:                                      "https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers"

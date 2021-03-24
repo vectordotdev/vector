@@ -357,6 +357,7 @@ sources-logs = [
   "sources-aws_s3",
   "sources-datadog",
   "sources-docker_logs",
+  "sources-exec",
   "sources-file",
   "sources-generator",
   "sources-heroku_logs",
@@ -390,6 +391,7 @@ sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
 sources-datadog = ["sources-utils-http"]
 sources-docker_logs = ["bollard", "dirs-next"]
+sources-exec = []
 sources-file = ["bytesize", "file-source"]
 sources-generator = ["fakedata"]
 sources-heroku_logs = ["sources-utils-http"]
