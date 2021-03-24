@@ -3,6 +3,22 @@ use std::{fs::read_dir, process::Command};
 
 mod support;
 
+const FAILLING_HEALTHCHECK: &'static str = r#"
+data_dir = "${VECTOR_DATA_DIR}"
+
+[sources.in]
+    type = "generator"
+    lines = ["log"]
+    format = "shuffle"
+
+[sinks.out]
+    inputs = ["in"]
+    type = "socket"
+    address = "192.168.0.0:62178"
+    encoding.codec = "json" # required
+    mode = "tcp"
+"#;
+
 /// Returns `stdout` of `vector arguments`
 fn run_command(arguments: Vec<&str>) -> Vec<u8> {
     let mut cmd = Command::cargo_bin("vector").unwrap();
@@ -81,6 +97,7 @@ fn validate_cleanup() {
     let output = cmd.output().expect("Failed to execute process");
 
     assert_no_log_lines(output.stdout);
+    assert_eq!(output.status.code(), Some(0));
 
     // Assert that data folder didn't change
     assert_eq!(
@@ -90,4 +107,36 @@ fn validate_cleanup() {
             .map(|entry| entry.unwrap().path())
             .collect::<Vec<_>>()
     );
+}
+
+#[test]
+fn validate_failling_healthcheck() {
+    assert_eq!(validate(FAILLING_HEALTHCHECK), exitcode::CONFIG);
+}
+
+#[test]
+fn validate_ignore_healthcheck() {
+    assert_eq!(
+        validate(&format!(
+            r#"       
+        healthchecks.enabled = false
+        {}
+        "#,
+            FAILLING_HEALTHCHECK
+        )),
+        exitcode::OK
+    );
+}
+
+fn validate(config: &str) -> i32 {
+    let dir = support::create_directory();
+
+    // Config with some componenets that write to file system.
+    let config = support::create_file(config);
+
+    // Run vector
+    let mut cmd = Command::cargo_bin("vector").unwrap();
+    cmd.arg("validate").arg(config).env("VECTOR_DATA_DIR", dir);
+
+    cmd.output().unwrap().status.code().unwrap()
 }
