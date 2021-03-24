@@ -3,7 +3,7 @@ use std::{fs::read_dir, process::Command};
 
 mod support;
 
-const FAILLING_HEALTHCHECK: &'static str = r#"
+const FAILING_HEALTHCHECK: &'static str = r#"
 data_dir = "${VECTOR_DATA_DIR}"
 
 [sources.in]
@@ -110,8 +110,8 @@ fn validate_cleanup() {
 }
 
 #[test]
-fn validate_failling_healthcheck() {
-    assert_eq!(validate(FAILLING_HEALTHCHECK), exitcode::CONFIG);
+fn validate_failing_healthcheck() {
+    assert_eq!(validate(FAILING_HEALTHCHECK), exitcode::CONFIG);
 }
 
 #[test]
@@ -122,7 +122,7 @@ fn validate_ignore_healthcheck() {
         healthchecks.enabled = false
         {}
         "#,
-            FAILLING_HEALTHCHECK
+            FAILING_HEALTHCHECK
         )),
         exitcode::OK
     );
