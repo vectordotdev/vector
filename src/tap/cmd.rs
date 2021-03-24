@@ -48,6 +48,10 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         let stream = res.stream();
     };
 
+    // Loop over the returned results, printing out log events.
+    // NOTE: This will currently ignore notifications. A later `--verbose` option is planned
+    // to include these.
+    // TODO: https://github.com/timberio/vector/issues/6870
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             for formatted_string in d
