@@ -1,4 +1,6 @@
-use super::{repl, Error};
+#[cfg(feature = "repl")]
+use super::repl;
+use super::Error;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{self, Read};
