@@ -118,7 +118,7 @@ fn validate_failing_healthcheck() {
 fn validate_ignore_healthcheck() {
     assert_eq!(
         validate(&format!(
-            r#"       
+            r#"
         healthchecks.enabled = false
         {}
         "#,
