@@ -38,7 +38,7 @@ RemoveIPC=yes
 RestrictNamespaces=yes
 
 # syscall filtering
-SystemCallFilter=@aio @basic-io @debug @file-system @io-event @ipc @network-io @signal @sync @timer
+SystemCallFilter=@system-service @debug
 SystemCallArchitectures=native
 
 # process properties
