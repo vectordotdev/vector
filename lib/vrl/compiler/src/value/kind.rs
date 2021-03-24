@@ -68,8 +68,21 @@ impl Kind {
         self == self.scalar()
     }
 
-    pub(crate) fn quoted(self) -> String {
-        format!(r#""{}""#, self.as_str())
+    pub(crate) fn quoted(self) -> &'static str {
+        match self {
+            Kind::Bytes => "\"string\"",
+            Kind::Integer => "\"integer\"",
+            Kind::Float => "\"float\"",
+            Kind::Boolean => "\"boolean\"",
+            Kind::Object => "\"object\"",
+            Kind::Array => "\"array\"",
+            Kind::Timestamp => "\"timestamp\"",
+            Kind::Regex => "\"regex\"",
+            Kind::Null => "\"null\"",
+            _ if self.is_all() => "\"unknown type\"",
+            _ if self.is_empty() => "\"none\"",
+            _ => "\"multiple\"",
+        }
     }
 
     pub fn as_str(self) -> &'static str {
