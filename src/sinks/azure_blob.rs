@@ -514,7 +514,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         assert_downcast_matches,
-        test_util::{random_events_with_stream, random_lines_with_stream},
+        test_util::{random_events_with_stream, random_lines, random_lines_with_stream},
     };
     use azure_sdk_core::MaxResultsSupport;
     use azure_sdk_storage_blob::{
@@ -522,6 +522,7 @@ mod integration_tests {
     };
     use bytes::{buf::BufExt, BytesMut};
     use flate2::read::GzDecoder;
+    use futures::Stream;
     use std::io::{BufRead, BufReader};
 
     #[tokio::test]
@@ -552,9 +553,10 @@ mod integration_tests {
 
     #[tokio::test]
     async fn azure_blob_insert_lines_into_blob() {
+        let blob_prefix = String::from("lines/into/blob");
         let config = AzureBlobSinkConfig::new_emulator().await;
         let config = AzureBlobSinkConfig {
-            blob_prefix: Some(format!("lines/into/blob/{}", uuid::Uuid::new_v4())),
+            blob_prefix: Some(blob_prefix.clone()),
             ..config
         };
         let sink = config.to_sink();
@@ -562,7 +564,7 @@ mod integration_tests {
 
         sink.run(input).await.expect("Failed to run sink");
 
-        let blobs = config.get_blobs().await;
+        let blobs = config.get_blobs(blob_prefix.as_str()).await;
         assert_eq!(blobs.len(), 1);
         assert!(blobs[0].clone().ends_with(".log"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
@@ -572,9 +574,10 @@ mod integration_tests {
 
     #[tokio::test]
     async fn azure_blob_insert_json_into_blob() {
+        let blob_prefix = String::from("json/into/blob");
         let config = AzureBlobSinkConfig::new_emulator().await;
         let config = AzureBlobSinkConfig {
-            blob_prefix: Some(format!("json/into/blob/{}", uuid::Uuid::new_v4())),
+            blob_prefix: Some(blob_prefix.clone()),
             encoding: Encoding::Ndjson.into(),
             ..config
         };
@@ -583,7 +586,7 @@ mod integration_tests {
 
         sink.run(input).await.expect("Failed to run sink");
 
-        let blobs = config.get_blobs().await;
+        let blobs = config.get_blobs(blob_prefix.as_str()).await;
         assert_eq!(blobs.len(), 1);
         assert!(blobs[0].clone().ends_with(".log"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
@@ -597,9 +600,10 @@ mod integration_tests {
 
     #[tokio::test]
     async fn azure_blob_insert_lines_into_blob_gzip() {
+        let blob_prefix = String::from("lines-gzip/into/blob");
         let config = AzureBlobSinkConfig::new_emulator().await;
         let config = AzureBlobSinkConfig {
-            blob_prefix: Some(format!("lines/into/blob/gzip/{}", uuid::Uuid::new_v4())),
+            blob_prefix: Some(blob_prefix.clone()),
             compression: Compression::gzip_default(),
             ..config
         };
@@ -608,19 +612,23 @@ mod integration_tests {
 
         sink.run(events).await.expect("Failed to run sink");
 
-        let blobs = config.get_blobs().await;
+        let blobs = config.get_blobs(blob_prefix.as_str()).await;
         assert_eq!(blobs.len(), 1);
         assert!(blobs[0].clone().ends_with(".log.gz"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
-        assert_eq!(blob.content_type, Some(String::from("application/octet-stream")));
+        assert_eq!(
+            blob.content_type,
+            Some(String::from("application/octet-stream"))
+        );
         assert_eq!(lines, blob_lines);
     }
 
     #[tokio::test]
     async fn azure_blob_insert_json_into_blob_gzip() {
+        let blob_prefix = String::from("json-gzip/into/blob");
         let config = AzureBlobSinkConfig::new_emulator().await;
         let config = AzureBlobSinkConfig {
-            blob_prefix: Some(format!("json/into/blob/gzip/{}", uuid::Uuid::new_v4())),
+            blob_prefix: Some(blob_prefix.clone()),
             encoding: Encoding::Ndjson.into(),
             compression: Compression::gzip_default(),
             ..config
@@ -630,16 +638,53 @@ mod integration_tests {
 
         sink.run(input).await.expect("Failed to run sink");
 
-        let blobs = config.get_blobs().await;
+        let blobs = config.get_blobs(blob_prefix.as_str()).await;
         assert_eq!(blobs.len(), 1);
         assert!(blobs[0].clone().ends_with(".log.gz"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
-        assert_eq!(blob.content_type, Some(String::from("application/octet-stream")));
+        assert_eq!(
+            blob.content_type,
+            Some(String::from("application/octet-stream"))
+        );
         let expected = events
             .iter()
             .map(|event| serde_json::to_string(&event.as_log().all_fields()).unwrap())
             .collect::<Vec<_>>();
         assert_eq!(expected, blob_lines);
+    }
+
+    #[tokio::test]
+    async fn azure_blob_rotate_files_after_the_buffer_size_is_reached() {
+        let blob_prefix = String::from("lines-rotate/into/blob/");
+        let config = AzureBlobSinkConfig::new_emulator().await;
+        let config = AzureBlobSinkConfig {
+            blob_prefix: Some(blob_prefix.clone() + "{{key}}"),
+            blob_append_uuid: Some(false),
+            batch: BatchConfig {
+                max_bytes: Some(1010),
+                ..config.batch
+            },
+            ..config
+        };
+        let sink = config.to_sink();
+        let groups = 3;
+        let (lines, input) = random_lines_with_stream_with_group_key(100, 30, groups);
+
+        sink.run(input).await.expect("Failed to run sink");
+
+        let blobs = config.get_blobs(blob_prefix.as_str()).await;
+        assert_eq!(blobs.len(), 3);
+        let response = stream::iter(blobs)
+            .fold(Vec::new(), |mut acc, blob| async {
+                let (_, lines) = config.get_blob(blob).await;
+                acc.push(lines);
+                acc
+            })
+            .await;
+
+        for i in 0..groups {
+            assert_eq!(&lines[(i * 10)..((i + 1) * 10)], response[i].as_slice());
+        }
     }
 
     impl AzureBlobSinkConfig {
@@ -668,10 +713,8 @@ mod integration_tests {
             self.new(client, cx).expect("Failed to create sink")
         }
 
-        pub async fn get_blobs(&self) -> Vec<String> {
-            let prefix = self.blob_prefix.clone().expect("Blob prefix None");
+        pub async fn get_blobs(&self, prefix: &str) -> Vec<String> {
             let client = self.create_client().unwrap();
-
             let mut blobs = Vec::new();
             let mut stream = Box::pin(
                 client
@@ -685,7 +728,7 @@ mod integration_tests {
                 let items = items.expect("Failed to fetch blobs").incomplete_vector;
 
                 for item in items.iter() {
-                    if item.name.contains(prefix.as_str()) {
+                    if item.name.starts_with(prefix) {
                         blobs.push(item.name.clone());
                     }
                 }
@@ -742,5 +785,22 @@ mod integration_tests {
 
             response.expect("Failed to create container")
         }
+    }
+
+    fn random_lines_with_stream_with_group_key(
+        len: usize,
+        count: usize,
+        groups: usize,
+    ) -> (Vec<String>, impl Stream<Item = Event>) {
+        let key = count / groups;
+        let lines = random_lines(len).take(count).collect::<Vec<_>>();
+        let events = lines.clone().into_iter().enumerate().map(move |(i, line)| {
+            let mut event = Event::from(line);
+            let i = ((i / key) + 1) as i32;
+            event.as_mut_log().insert("key", i);
+            event
+        });
+
+        (lines, stream::iter(events))
     }
 }
