@@ -77,7 +77,7 @@ struct AzureBlobSinkRequest {
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
-    Json,
+    Ndjson,
     Text,
 }
 
@@ -107,7 +107,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             blob_prefix: Some(String::from("blob")),
             blob_time_format: Some(String::from("%s")),
             blob_append_uuid: Some(true),
-            encoding: Encoding::Json.into(),
+            encoding: Encoding::Ndjson.into(),
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -287,9 +287,12 @@ fn encode_event(
 
     let log = event.into_log();
     let bytes = match encoding.codec() {
-        Encoding::Json => {
-            serde_json::to_vec(&log).expect("Failed to encode event as json, this is a bug!")
-        }
+        Encoding::Ndjson => serde_json::to_vec(&log)
+            .map(|mut b| {
+                b.push(b'\n');
+                b
+            })
+            .expect("Failed to encode event as json, this is a bug!"),
         Encoding::Text => {
             let mut bytes = log
                 .get(log_schema().message_key())
@@ -377,7 +380,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
         let blob_prefix = Template::try_from("logs/blob/%F").unwrap();
         let encoding = EncodingConfig {
-            codec: Encoding::Json,
+            codec: Encoding::Ndjson,
             schema: None,
             only_fields: None,
             except_fields: None,
@@ -399,7 +402,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
         let blob_prefix = Template::try_from("logs/blob/%F").unwrap();
         let encoding = EncodingConfig {
-            codec: Encoding::Json,
+            codec: Encoding::Ndjson,
             schema: None,
             only_fields: None,
             except_fields: Some(vec!["key".into()]),
@@ -509,7 +512,10 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::{assert_downcast_matches, test_util::random_lines_with_stream};
+    use crate::{
+        assert_downcast_matches,
+        test_util::{random_events_with_stream, random_lines_with_stream},
+    };
     use azure_sdk_core::MaxResultsSupport;
     use azure_sdk_storage_blob::{
         blob::Blob as BlobState, container::PublicAccess, container::PublicAccessSupport, Blob,
@@ -552,9 +558,9 @@ mod integration_tests {
             ..config
         };
         let sink = config.to_sink();
-        let (lines, events) = random_lines_with_stream(100, 10);
+        let (lines, input) = random_lines_with_stream(100, 10);
 
-        sink.run(events).await.expect("Failed to run sink");
+        sink.run(input).await.expect("Failed to run sink");
 
         let blobs = config.get_blobs().await;
         assert_eq!(blobs.len(), 1);
@@ -562,6 +568,31 @@ mod integration_tests {
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
         assert_eq!(blob.content_encoding, None);
         assert_eq!(lines, blob_lines);
+    }
+
+    #[tokio::test]
+    async fn azure_blob_insert_json_into_blob() {
+        let config = AzureBlobSinkConfig::new_emulator().await;
+        let config = AzureBlobSinkConfig {
+            blob_prefix: Some(format!("json/into/blob/{}", uuid::Uuid::new_v4())),
+            encoding: Encoding::Ndjson.into(),
+            ..config
+        };
+        let sink = config.to_sink();
+        let (events, input) = random_events_with_stream(100, 10);
+
+        sink.run(input).await.expect("Failed to run sink");
+
+        let blobs = config.get_blobs().await;
+        assert_eq!(blobs.len(), 1);
+        assert!(blobs[0].clone().ends_with(".log"));
+        let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
+        assert_eq!(blob.content_encoding, None);
+        let expected = events
+            .iter()
+            .map(|event| serde_json::to_string(&event.as_log().all_fields()).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(expected, blob_lines);
     }
 
     #[tokio::test]
