@@ -566,7 +566,7 @@ mod integration_tests {
         assert_eq!(blobs.len(), 1);
         assert!(blobs[0].clone().ends_with(".log"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
-        assert_eq!(blob.content_encoding, None);
+        assert_eq!(blob.content_type, Some(String::from("text/plain")));
         assert_eq!(lines, blob_lines);
     }
 
@@ -587,7 +587,7 @@ mod integration_tests {
         assert_eq!(blobs.len(), 1);
         assert!(blobs[0].clone().ends_with(".log"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
-        assert_eq!(blob.content_encoding, None);
+        assert_eq!(blob.content_type, Some(String::from("text/plain")));
         let expected = events
             .iter()
             .map(|event| serde_json::to_string(&event.as_log().all_fields()).unwrap())
@@ -612,8 +612,34 @@ mod integration_tests {
         assert_eq!(blobs.len(), 1);
         assert!(blobs[0].clone().ends_with(".log.gz"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
-        assert_eq!(blob.content_encoding, None);
+        assert_eq!(blob.content_type, Some(String::from("application/octet-stream")));
         assert_eq!(lines, blob_lines);
+    }
+
+    #[tokio::test]
+    async fn azure_blob_insert_json_into_blob_gzip() {
+        let config = AzureBlobSinkConfig::new_emulator().await;
+        let config = AzureBlobSinkConfig {
+            blob_prefix: Some(format!("json/into/blob/gzip/{}", uuid::Uuid::new_v4())),
+            encoding: Encoding::Ndjson.into(),
+            compression: Compression::gzip_default(),
+            ..config
+        };
+        let sink = config.to_sink();
+        let (events, input) = random_events_with_stream(100, 10);
+
+        sink.run(input).await.expect("Failed to run sink");
+
+        let blobs = config.get_blobs().await;
+        assert_eq!(blobs.len(), 1);
+        assert!(blobs[0].clone().ends_with(".log.gz"));
+        let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
+        assert_eq!(blob.content_type, Some(String::from("application/octet-stream")));
+        let expected = events
+            .iter()
+            .map(|event| serde_json::to_string(&event.as_log().all_fields()).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(expected, blob_lines);
     }
 
     impl AzureBlobSinkConfig {
