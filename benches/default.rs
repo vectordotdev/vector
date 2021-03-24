@@ -9,11 +9,13 @@ mod isolated_buffering;
 mod lookup;
 mod lua;
 mod metrics_snapshot;
+mod path_iter;
 mod regex;
 mod template;
 mod topology;
 
 criterion_main!(
+    path_iter::benches,
     batch::benches,
     buffering::benches,
     event::benches,

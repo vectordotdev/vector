@@ -647,11 +647,6 @@ remap-benches = ["transforms-add_fields", "transforms-coercer", "transforms-json
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-lua", "transforms-remap", "transforms-wasm"]
 
 [[bench]]
-name = "path_iter"
-harness = false
-required-features = ["benches"]
-
-[[bench]]
 name = "default"
 harness = false
 required-features = ["benches"]
