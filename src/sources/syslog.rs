@@ -296,6 +296,15 @@ impl SyslogDecoder {
 
                 (false, None, _) if src.len() < self.other.max_length() => return Ok(None),
 
+                (false, Some(offline_pos), _) => {
+                    // Beyond maximum length, advance to the newline.
+                    src.advance(offline_pos + 1);
+                    return Err(LinesCodecError::Io(io::Error::new(
+                        io::ErrorKind::Other,
+                        "Frame length limit exceeded",
+                    )));
+                }
+
                 _ => {
                     self.is_discarding = true;
                     src.advance(src.len());
@@ -912,7 +921,7 @@ mod test {
         let mut buffer = BytesMut::with_capacity(32);
 
         // An invalid syslog message containing invalid utf8 bytes.
-        buffer.put(&b"32thisshouldbelongerthanthmaxframeasizewhichmeansthesyslogparserwillnotbeabletodecodeit"[..]);
+        buffer.put(&b"32thisshouldbelongerthanthmaxframeasizewhichmeansthesyslogparserwillnotbeabletodecodeit\n"[..]);
         let result = decoder.checked_decode(&mut buffer);
 
         assert!(result.unwrap().is_err());
