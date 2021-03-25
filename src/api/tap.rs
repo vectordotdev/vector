@@ -98,9 +98,16 @@ fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
 
         while let Some(ev) = event_rx.next().await {
             if let Event::Log(ev) = ev {
-                let _ = tx
+                if tx
                     .send(TapPayload::LogEvent(component_name.clone(), ev))
-                    .await;
+                    .await
+                    .is_err()
+                {
+                    debug!(
+                        message = "Couldn't send log event.",
+                        component_name = ?component_name);
+                    break;
+                }
             }
         }
 
@@ -157,21 +164,23 @@ async fn tap_handler(
                                 // getting involved in config diffing at this point.
                                 let id = Uuid::new_v4().to_string();
                                 let sink = make_router(tx.clone(), name);
-                                if control_tx
-                                    .send(fanout::ControlMessage::Add(id.to_string(), sink))
-                                    .is_ok()
-                                {
-                                    // (Over)write the sink entry.
-                                    debug!(
-                                        message = "Component connected.",
-                                        component_name = ?name, id = ?id
-                                    );
-                                    sinks.insert(name.to_string(), id);
-                                } else {
-                                    error!(
-                                        message = "Couldn't connect component.",
-                                        component_name = ?name, id = ?id
-                                    );
+
+                                match control_tx.send(fanout::ControlMessage::Add(id.to_string(), sink)) {
+                                    Ok(_) => {
+                                        // (Over)write the sink entry.
+                                        debug!(
+                                            message = "Component connected.",
+                                            component_name = ?name, id = ?id
+                                        );
+                                        sinks.insert(name.to_string(), id);
+                                    }
+                                    Err(err) => {
+                                        error!(
+                                            message = "Couldn't connect component.",
+                                            error = ?err,
+                                            component_name = ?name, id = ?id
+                                        );
+                                    }
                                 }
 
                                 Some(matched)
@@ -182,7 +191,7 @@ async fn tap_handler(
                                     component_name = ?name, patterns = ?patterns
                                 );
                                 None
-                            },
+                            }
                         }
                     })
                     .flatten()
@@ -228,7 +237,12 @@ async fn tap_handler(
     if let Some(outputs) = last_outputs {
         for (name, id) in sinks {
             if let Some(control_tx) = outputs.get(&name) {
-                let _ = control_tx.send(fanout::ControlMessage::Remove(id));
+                if let Err(err) = control_tx.send(fanout::ControlMessage::Remove(id)) {
+                    error!(
+                        message = "Couldn't disconnect tap sink.",
+                        error = ?err,
+                        component_name = ?name);
+                }
             }
         }
     }

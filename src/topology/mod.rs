@@ -53,7 +53,7 @@ pub type WatchRx = watch::Receiver<Outputs>;
 #[allow(dead_code)]
 pub struct RunningTopology {
     inputs: HashMap<String, buffers::BufferInputCloner>,
-    pub outputs: Outputs,
+    outputs: Outputs,
     source_tasks: HashMap<String, TaskHandle>,
     tasks: HashMap<String, TaskHandle>,
     shutdown_coordinator: SourceShutdownCoordinator,
