@@ -30,7 +30,7 @@ pub struct ExecConfig {
     pub current_dir: Option<PathBuf>,
     pub include_stderr: Option<bool>,
     #[serde(default = "default_host_key")]
-    pub host_key: Option<String>,
+    pub host_key: String,
     pub data_stream_key: Option<String>,
     pub pid_key: Option<String>,
     pub exit_status_key: Option<String>,
@@ -47,15 +47,15 @@ pub enum Mode {
         #[serde(default = "default_exec_interval_secs")]
         exec_interval_secs: u64,
         #[serde(default = "default_events_per_line")]
-        event_per_line: Option<bool>,
+        event_per_line: bool,
         #[serde(default = "default_exec_duration_millis_key")]
-        exec_duration_millis_key: Option<String>,
+        exec_duration_millis_key: String,
     },
     Streaming {
         #[serde(default = "default_respawn_on_exit")]
-        respawn_on_exit: Option<bool>,
+        respawn_on_exit: bool,
         #[serde(default = "default_respawn_interval_secs")]
-        respawn_interval_secs: Option<u64>,
+        respawn_interval_secs: u64,
     },
 }
 
@@ -86,24 +86,24 @@ fn default_exec_interval_secs() -> u64 {
     60
 }
 
-fn default_respawn_interval_secs() -> Option<u64> {
-    Some(60)
+fn default_respawn_interval_secs() -> u64 {
+    60
 }
 
-fn default_respawn_on_exit() -> Option<bool> {
-    Some(true)
+fn default_respawn_on_exit() -> bool {
+    true
 }
 
-fn default_host_key() -> Option<String> {
-    Some(log_schema().host_key().to_string())
+fn default_host_key() -> String {
+    log_schema().host_key().to_string()
 }
 
-fn default_events_per_line() -> Option<bool> {
-    Some(true)
+fn default_events_per_line() -> bool {
+    true
 }
 
-fn default_exec_duration_millis_key() -> Option<String> {
-    Some("exec_duration_millis".to_string())
+fn default_exec_duration_millis_key() -> String {
+    "exec_duration_millis".to_string()
 }
 
 fn default_hostname() -> Option<String> {
@@ -168,8 +168,8 @@ impl SourceConfig for ExecConfig {
 pub fn run_scheduled(
     config: ExecConfig,
     exec_interval_secs: u64,
-    event_per_line: Option<bool>,
-    exec_duration_millis_key: Option<String>,
+    event_per_line: bool,
+    exec_duration_millis_key: String,
     shutdown: ShutdownSignal,
     mut out: Pipeline,
 ) -> crate::Result<super::Source> {
@@ -205,14 +205,14 @@ pub fn run_scheduled(
 
 pub fn run_streaming(
     config: ExecConfig,
-    respawn_on_exit: Option<bool>,
-    respawn_interval_secs: Option<u64>,
+    respawn_on_exit: bool,
+    respawn_interval_secs: u64,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> crate::Result<super::Source> {
     Ok(Box::pin(async move {
-        if respawn_on_exit.unwrap_or(true) {
-            let duration = time::Duration::from_secs(respawn_interval_secs.unwrap_or(60));
+        if respawn_on_exit {
+            let duration = time::Duration::from_secs(respawn_interval_secs);
 
             // Continue to loop while shutdown is pending
             while futures::poll!(shutdown.clone()).is_pending() {
@@ -278,8 +278,8 @@ async fn run_once_streaming(
                     Bytes::from(line),
                     &None,
                     &Some(stream.to_string()),
-                    &Some(pid),
-                    &None,
+                    Some(pid),
+                    None,
                     &None,
                 );
 
@@ -306,8 +306,8 @@ async fn run_once_streaming(
 async fn run_once_scheduled(
     config: &ExecConfig,
     exec_interval_secs: u64,
-    event_per_line: Option<bool>,
-    exec_duration_millis_key: Option<String>,
+    event_per_line: bool,
+    exec_duration_millis_key: String,
 ) -> Option<Vec<Event>> {
     let mut command = build_command(config);
 
@@ -334,10 +334,10 @@ async fn run_once_scheduled(
 
                         let stdout_events = process_scheduled_output(
                             config,
-                            &event_per_line,
-                            &exec_duration_millis_key,
+                            event_per_line,
+                            exec_duration_millis_key.clone(),
                             pid,
-                            &exit_status,
+                            exit_status,
                             elapsed_millis,
                             output.stdout,
                             STDOUT,
@@ -350,10 +350,10 @@ async fn run_once_scheduled(
                         if config.include_stderr.unwrap_or(true) {
                             let stderr_events = process_scheduled_output(
                                 config,
-                                &event_per_line,
-                                &exec_duration_millis_key,
+                                event_per_line,
+                                exec_duration_millis_key.clone(),
                                 pid,
-                                &exit_status,
+                                exit_status,
                                 elapsed_millis,
                                 output.stderr,
                                 STDERR,
@@ -397,10 +397,10 @@ async fn run_once_scheduled(
 
 fn process_scheduled_output(
     config: &ExecConfig,
-    event_per_line: &Option<bool>,
-    exec_duration_millis_key: &Option<String>,
+    event_per_line: bool,
+    exec_duration_millis_key: String,
     pid: u32,
-    exit_status: &Option<i32>,
+    exit_status: Option<i32>,
     elapsed_millis: u128,
     output: Vec<u8>,
     stream: &str,
@@ -411,16 +411,16 @@ fn process_scheduled_output(
         None
     } else {
         let mut events = Vec::new();
-        if event_per_line.unwrap_or(true) {
+        if event_per_line {
             let lines = output_string.lines();
             for line in lines {
                 let event = create_event(
                     config,
                     Bytes::from(line.to_owned()),
-                    &exec_duration_millis_key,
+                    &Some(exec_duration_millis_key.clone()),
                     &Some(stream.to_string()),
-                    &Some(pid),
-                    &exit_status,
+                    Some(pid),
+                    exit_status,
                     &Some(elapsed_millis),
                 );
 
@@ -430,10 +430,10 @@ fn process_scheduled_output(
             let event = create_event(
                 config,
                 Bytes::from(output_string),
-                &exec_duration_millis_key,
+                &Some(exec_duration_millis_key),
                 &Some(stream.to_string()),
-                &Some(pid),
-                &exit_status,
+                Some(pid),
+                exit_status,
                 &Some(elapsed_millis),
             );
 
@@ -471,8 +471,8 @@ fn create_event(
     line: Bytes,
     exec_duration_millis_key: &Option<String>,
     data_stream: &Option<String>,
-    pid: &Option<u32>,
-    exit_status: &Option<i32>,
+    pid: Option<u32>,
+    exit_status: Option<i32>,
     exec_duration_millis: &Option<u128>,
 ) -> Event {
     emit!(ExecEventReceived {
@@ -498,12 +498,12 @@ fn create_event(
 
     // Add pid (if needed)
     if let (Some(pid_key), Some(pid)) = (pid_key, pid) {
-        log_event.insert(pid_key, *pid as i64);
+        log_event.insert(pid_key, pid as i64);
     }
 
     // Add exit status (if needed)
     if let (Some(exit_status_key), Some(exit_status)) = (exit_status_key, exit_status) {
-        log_event.insert(exit_status_key, *exit_status as i64);
+        log_event.insert(exit_status_key, exit_status as i64);
     }
 
     // Add exec duration millis (if needed)
@@ -514,7 +514,7 @@ fn create_event(
     }
 
     // Add hostname (if needed)
-    if let (Some(host_key), Some(hostname)) = (host_key, hostname) {
+    if let Some(hostname) = hostname {
         log_event.insert(host_key, hostname);
     }
 
@@ -571,28 +571,28 @@ mod tests {
         let exec_duration_millis_key = Some("exec_duration_millis".to_string());
         let line = Bytes::from("hello world");
         let data_stream = Some(STDOUT.to_string());
-        let pid = Some(8888 as u32);
-        let exit_status = Some(0 as i32);
-        let exec_duration_millis = Some(500 as u128);
+        let pid = Some(8888_u32);
+        let exit_status = Some(0_i32);
+        let exec_duration_millis = Some(500_u128);
 
         let event = create_event(
             &config,
             line,
             &exec_duration_millis_key,
             &data_stream,
-            &pid,
-            &exit_status,
+            pid,
+            exit_status,
             &exec_duration_millis,
         );
         let log = event.into_log();
 
         assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(log["data_stream"], STDOUT.into());
-        assert_eq!(log["pid"], (8888 as i64).into());
-        assert_eq!(log["exit_status"], (0 as i64).into());
+        assert_eq!(log["pid"], (8888_i64).into());
+        assert_eq!(log["exit_status"], (0_i64).into());
         assert_eq!(log["command"], config.command.into());
         assert_eq!(log["arguments"], config.arguments.unwrap().into());
-        assert_eq!(log["exec_duration_millis"], (500 as i64).into());
+        assert_eq!(log["exec_duration_millis"], (500_i64).into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
     }
@@ -603,7 +603,7 @@ mod tests {
 
         let line = Bytes::from("hello world");
         let data_stream = Some(STDOUT.to_string());
-        let pid = Some(8888 as u32);
+        let pid = Some(8888_u32);
         let exit_status = None;
         let exec_duration_millis = None;
 
@@ -612,17 +612,17 @@ mod tests {
             line,
             &None,
             &data_stream,
-            &pid,
-            &exit_status,
+            pid,
+            exit_status,
             &exec_duration_millis,
         );
         let log = event.into_log();
 
         assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(log["data_stream"], STDOUT.into());
-        assert_eq!(log["pid"], (8888 as i64).into());
+        assert_eq!(log["pid"], (8888_i64).into());
         assert_eq!(log["command"], config.command.clone().into());
-        assert_eq!(log["arguments"], config.arguments.clone().unwrap().into());
+        assert_eq!(log["arguments"], config.arguments.unwrap().into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
     }
@@ -638,7 +638,7 @@ mod tests {
             arguments: Some(vec!["arg1".to_owned(), "arg2".to_owned()]),
             current_dir: Some(PathBuf::from("/tmp")),
             include_stderr: None,
-            host_key: None,
+            host_key: default_host_key(),
             data_stream_key: None,
             pid_key: None,
             exit_status_key: None,
@@ -663,23 +663,23 @@ mod tests {
 
     #[test]
     fn test_process_scheduled_output_per_line() {
-        let exec_duration_millis_key = Some("exec_duration_millis".to_string());
-        let event_per_line = Some(true);
+        let exec_duration_millis_key = "exec_duration_millis".to_string();
+        let event_per_line = true;
         let config = standard_scheduled_test_config();
 
         let multiple_lines = "hello world\nhello world again".to_string().into_bytes();
 
         let data_stream = STDOUT;
-        let pid = 8888 as u32;
-        let exit_status = Some(0 as i32);
-        let exec_duration_millis = 500 as u128;
+        let pid = 8888_u32;
+        let exit_status = Some(0_i32);
+        let exec_duration_millis = 500_u128;
 
         let events = process_scheduled_output(
             &config,
-            &event_per_line,
-            &exec_duration_millis_key,
+            event_per_line,
+            exec_duration_millis_key,
             pid,
-            &exit_status,
+            exit_status,
             exec_duration_millis,
             multiple_lines,
             data_stream,
@@ -692,11 +692,11 @@ mod tests {
         let log = event.as_log();
         assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(log["data_stream"], STDOUT.into());
-        assert_eq!(log["pid"], (8888 as i64).into());
-        assert_eq!(log["exit_status"], (0 as i64).into());
+        assert_eq!(log["pid"], (8888_i64).into());
+        assert_eq!(log["exit_status"], (0_i64).into());
         assert_eq!(log["command"], config.command.clone().into());
         assert_eq!(log["arguments"], config.arguments.clone().unwrap().into());
-        assert_eq!(log["exec_duration_millis"], (500 as i64).into());
+        assert_eq!(log["exec_duration_millis"], (500_i64).into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
 
@@ -704,34 +704,34 @@ mod tests {
         let log = event.as_log();
         assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(log["data_stream"], STDOUT.into());
-        assert_eq!(log["pid"], (8888 as i64).into());
-        assert_eq!(log["exit_status"], (0 as i64).into());
+        assert_eq!(log["pid"], (8888_i64).into());
+        assert_eq!(log["exit_status"], (0_i64).into());
         assert_eq!(log["command"], config.command.clone().into());
-        assert_eq!(log["arguments"], config.arguments.clone().unwrap().into());
-        assert_eq!(log["exec_duration_millis"], (500 as i64).into());
+        assert_eq!(log["arguments"], config.arguments.unwrap().into());
+        assert_eq!(log["exec_duration_millis"], (500_i64).into());
         assert_eq!(log[log_schema().message_key()], "hello world again".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
     }
 
     #[test]
     fn test_process_scheduled_output_per_blob() {
-        let exec_duration_millis_key = Some("exec_duration_millis".to_string());
-        let event_per_line = Some(false);
+        let exec_duration_millis_key = default_exec_duration_millis_key();
+        let event_per_line = false;
         let config = standard_scheduled_test_config();
 
         let multiple_lines = "hello world\nhello world again".to_string().into_bytes();
 
         let data_stream = STDOUT;
-        let pid = 8888 as u32;
-        let exit_status = Some(0 as i32);
-        let exec_duration_millis = 500 as u128;
+        let pid = 8888_u32;
+        let exit_status = Some(0_i32);
+        let exec_duration_millis = 500_u128;
 
         let events = process_scheduled_output(
             &config,
-            &event_per_line,
-            &exec_duration_millis_key,
+            event_per_line,
+            exec_duration_millis_key,
             pid,
-            &exit_status,
+            exit_status,
             exec_duration_millis,
             multiple_lines,
             data_stream,
@@ -744,11 +744,11 @@ mod tests {
         let log = event.as_log();
         assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(log["data_stream"], STDOUT.into());
-        assert_eq!(log["pid"], (8888 as i64).into());
-        assert_eq!(log["exit_status"], (0 as i64).into());
+        assert_eq!(log["pid"], (8888_i64).into());
+        assert_eq!(log["exit_status"], (0_i64).into());
         assert_eq!(log["command"], config.command.clone().into());
-        assert_eq!(log["arguments"], config.arguments.clone().unwrap().into());
-        assert_eq!(log["exec_duration_millis"], (500 as i64).into());
+        assert_eq!(log["arguments"], config.arguments.unwrap().into());
+        assert_eq!(log["exec_duration_millis"], (500_i64).into());
         assert_eq!(
             log[log_schema().message_key()],
             "hello world\nhello world again".into()
@@ -791,8 +791,8 @@ mod tests {
         trace_init();
 
         let config = standard_scheduled_test_config();
-        let exec_duration_millis_key = Some("exec_duration_millis".to_string());
-        let event_per_line = Some(false);
+        let exec_duration_millis_key = default_exec_duration_millis_key();
+        let event_per_line = false;
         let exec_interval_secs = default_exec_interval_secs();
 
         let events = run_once_scheduled(
@@ -810,7 +810,7 @@ mod tests {
         let log = event.as_log();
         assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(log["data_stream"], STDOUT.into());
-        assert_eq!(log["exit_status"], (0 as i64).into());
+        assert_eq!(log["exit_status"], (0_i64).into());
         assert_eq!(log["command"], config.command.clone().into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
         assert_eq!(log[log_schema().message_key()], "Hello World!\n".into());
