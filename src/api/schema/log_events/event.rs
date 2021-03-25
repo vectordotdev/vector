@@ -50,10 +50,12 @@ impl LogEvent {
     }
 
     /// Log event as an encoded string format
-    async fn string(&self, encoding: LogEventEncodingType) -> Option<String> {
+    async fn string(&self, encoding: LogEventEncodingType) -> String {
         match encoding {
-            LogEventEncodingType::Json => serde_json::to_string(&self.event).ok(),
-            LogEventEncodingType::Yaml => serde_yaml::to_string(&self.event).ok(),
+            LogEventEncodingType::Json => serde_json::to_string(&self.event)
+                .expect("JSON serialization of log event failed. Please report."),
+            LogEventEncodingType::Yaml => serde_yaml::to_string(&self.event)
+                .expect("YAML serialization of log event failed. Please report."),
         }
     }
 }
