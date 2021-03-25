@@ -78,7 +78,7 @@ fn create_log_events_stream(
     // interval, this is capped to the same value.
     let (tap_tx, mut tap_rx) = mpsc::channel(limit);
 
-    // The resulting vector of `LogEventPayload` sent ot the client. Only one result set will be streamed
+    // The resulting vector of `LogEventPayload` sent to the client. Only one result set will be streamed
     // back to the client at a time. This value is set higher than `1` to prevent blocking the event
     // pipeline on slower client connections, but low enough to apply a modest cap on mem usage.
     let (mut log_tx, log_rx) = mpsc::channel::<Vec<LogEventPayload>>(10);
@@ -96,7 +96,7 @@ fn create_log_events_stream(
         let mut results = Vec::<LogEventPayload>::with_capacity(limit);
 
         // Random number generator to allow for sampling. Speed trumps cryptographic security here.
-        // The RNG must be Send + Sync to use with the `select!` loop below.
+        // The RNG must be Send + Sync to use with the `select!` loop below, hence `SmallRng`.
         let mut rng = SmallRng::from_entropy();
 
         // Keep a count of the batch size, which will be used as a seed for random eviction
@@ -115,6 +115,7 @@ fn create_log_events_stream(
                         // If an error occurs when sending, the subscription has likely gone
                         // away. Break the loop to terminate the thread.
                         if log_tx.send(vec![tap]).await.is_err() {
+                            debug!("Couldn't send notification");
                             break;
                         }
                     } else {
@@ -130,7 +131,7 @@ fn create_log_events_stream(
                                 results[random_number] = tap;
                             }
                         }
-                        // Increment the batch count, to be used for the next Algo R loop
+                        // Increment the batch count, to be used for the next Algo R loop.
                         batch += 1;
                     }
                 }
@@ -158,6 +159,7 @@ fn create_log_events_stream(
                         // If we get an error here, it likely means that the subscription has
                         // gone has away. This is a valid/common situation.
                         if log_tx.send(results).await.is_err() {
+                            debug!("Couldn't send log events");
                             break;
                         }
                     }

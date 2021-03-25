@@ -98,9 +98,16 @@ fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
 
         while let Some(ev) = event_rx.next().await {
             if let Event::Log(ev) = ev {
-                let _ = tx
+                if tx
                     .send(TapPayload::LogEvent(component_name.clone(), ev))
-                    .await;
+                    .await
+                    .is_err()
+                {
+                    debug!(
+                        message = "Couldn't send log event.",
+                        component_name = ?component_name);
+                    break;
+                }
             }
         }
 
@@ -228,7 +235,9 @@ async fn tap_handler(
     if let Some(outputs) = last_outputs {
         for (name, id) in sinks {
             if let Some(control_tx) = outputs.get(&name) {
-                let _ = control_tx.send(fanout::ControlMessage::Remove(id));
+                if control_tx.send(fanout::ControlMessage::Remove(id)).is_err() {
+                    error!(message = "Couldn't disconnect tap sink.", component_name = ?name);
+                }
             }
         }
     }
