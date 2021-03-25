@@ -15,7 +15,7 @@ use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::cmp::Ordering;
 use tokio::{select, stream::Stream, sync::mpsc, time};
 
-#[derive(Union)]
+#[derive(Union, Debug)]
 /// Log event payload which can be a log event or notification
 pub enum LogEventPayload {
     /// Log event
@@ -45,7 +45,7 @@ impl From<TapPayload> for LogEventPayload {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct LogEventsSubscription;
 
 #[Subscription]
@@ -114,8 +114,8 @@ fn create_log_events_stream(
                     if let LogEventPayload::Notification(_) = tap {
                         // If an error occurs when sending, the subscription has likely gone
                         // away. Break the loop to terminate the thread.
-                        if log_tx.send(vec![tap]).await.is_err() {
-                            debug!("Couldn't send notification.");
+                        if let Err(err) = log_tx.send(vec![tap]).await {
+                            debug!(message = "Couldn't send notification.", error = ?err);
                             break;
                         }
                     } else {
@@ -158,8 +158,8 @@ fn create_log_events_stream(
 
                         // If we get an error here, it likely means that the subscription has
                         // gone has away. This is a valid/common situation.
-                        if log_tx.send(results).await.is_err() {
-                            debug!("Couldn't send log events.");
+                        if let Err(err) = log_tx.send(results).await {
+                            debug!(message = "Couldn't send log events.", error = ?err);
                             break;
                         }
                     }

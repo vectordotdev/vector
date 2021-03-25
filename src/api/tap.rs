@@ -30,6 +30,7 @@ impl GlobMatcher<&str> for String {
 }
 
 /// A tap notification signals whether a pattern matches a component.
+#[derive(Debug)]
 pub enum TapNotification {
     Matched,
     NotMatched,
@@ -37,6 +38,7 @@ pub enum TapNotification {
 
 /// A tap payload can either contain a log event or a notification that's intended
 /// to be communicated back to the client to alert them about the status of the tap request.
+#[derive(Debug)]
 pub enum TapPayload {
     LogEvent(String, LogEvent),
     Notification(String, TapNotification),
@@ -54,6 +56,7 @@ impl TapPayload {
 
 /// A tap sink spawns a process for listening for topology changes. If topology changes,
 /// sinks are rewired to accommodate matched/unmatched patterns.
+#[derive(Debug)]
 pub struct TapSink {
     _shutdown: ShutdownTx,
 }
@@ -98,13 +101,13 @@ fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
 
         while let Some(ev) = event_rx.next().await {
             if let Event::Log(ev) = ev {
-                if tx
+                if let Err(err) = tx
                     .send(TapPayload::LogEvent(component_name.clone(), ev))
                     .await
-                    .is_err()
                 {
                     debug!(
                         message = "Couldn't send log event.",
+                        error = ?err,
                         component_name = ?component_name);
                     break;
                 }

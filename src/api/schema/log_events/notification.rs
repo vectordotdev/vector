@@ -1,6 +1,6 @@
 use async_graphql::{Enum, SimpleObject};
 
-#[derive(Enum, Copy, Clone, PartialEq, Eq)]
+#[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
 /// Log event notification type
 pub enum LogEventNotificationType {
     /// A component was found that matched the provided pattern
@@ -9,7 +9,7 @@ pub enum LogEventNotificationType {
     NotMatched,
 }
 
-#[derive(SimpleObject)]
+#[derive(Debug, SimpleObject)]
 /// A notification regarding logs events observation
 pub struct LogEventNotification {
     /// Name of the component associated with the notification
