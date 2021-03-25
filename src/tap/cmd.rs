@@ -54,12 +54,8 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     // TODO: https://github.com/timberio/vector/issues/6870
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
-            for formatted_string in d
-                .output_log_events
-                .iter()
-                .filter_map(|ev| ev.as_log()?.string.as_ref())
-            {
-                println!("{}", formatted_string);
+            for log_event in d.output_log_events.iter().filter_map(|ev| ev.as_log()) {
+                println!("{}", log_event.string);
             }
         }
     }
