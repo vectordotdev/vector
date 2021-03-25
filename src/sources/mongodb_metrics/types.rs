@@ -6,7 +6,7 @@ use std::collections::HashMap;
 /// Can be determined with `isMaster` command, see `CommandIsMaster`.
 #[derive(Debug, PartialEq, Eq)]
 pub enum NodeType {
-    Mongod,  // MongoDB daemon
+    Mongod,  // MongoDb daemon
     Mongos,  // Mongo sharding server
     Replset, // https://docs.mongodb.com/manual/reference/glossary/#term-replica-set
 }

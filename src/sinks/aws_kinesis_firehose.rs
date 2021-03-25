@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
+    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
@@ -49,7 +49,7 @@ pub struct KinesisFirehoseSinkConfig {
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
-    pub auth: AWSAuthentication,
+    pub auth: AwsAuthentication,
 }
 
 lazy_static! {
@@ -352,7 +352,7 @@ mod integration_tests {
         delay_for(Duration::from_secs(1)).await;
 
         let config = ElasticSearchConfig {
-            auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default {})),
+            auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
             endpoint: "http://localhost:4571".into(),
             index: Some(stream.clone()),
             ..Default::default()

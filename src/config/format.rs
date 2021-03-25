@@ -12,16 +12,16 @@ pub type FormatHint = Option<Format>;
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Format {
     /// TOML format is used.
-    TOML,
+    Toml,
     /// JSON format is used.
-    JSON,
+    Json,
     /// YAML format is used.
-    YAML,
+    Yaml,
 }
 
 impl Default for Format {
     fn default() -> Self {
-        Format::TOML
+        Format::Toml
     }
 }
 
@@ -29,9 +29,9 @@ impl Format {
     /// Obtain the format from the file path using extension as a hint.
     pub fn from_path<T: AsRef<Path>>(path: T) -> Result<Self, T> {
         match path.as_ref().extension().and_then(|ext| ext.to_str()) {
-            Some("toml") => Ok(Format::TOML),
-            Some("yaml") | Some("yml") => Ok(Format::YAML),
-            Some("json") => Ok(Format::JSON),
+            Some("toml") => Ok(Format::Toml),
+            Some("yaml") | Some("yml") => Ok(Format::Yaml),
+            Some("json") => Ok(Format::Json),
             _ => Err(path),
         }
     }
@@ -45,9 +45,9 @@ where
     T: de::DeserializeOwned,
 {
     match format.unwrap_or_default() {
-        Format::TOML => toml::from_str(content).map_err(|e| vec![e.to_string()]),
-        Format::YAML => serde_yaml::from_str(content).map_err(|e| vec![e.to_string()]),
-        Format::JSON => serde_json::from_str(content).map_err(|e| vec![e.to_string()]),
+        Format::Toml => toml::from_str(content).map_err(|e| vec![e.to_string()]),
+        Format::Yaml => serde_yaml::from_str(content).map_err(|e| vec![e.to_string()]),
+        Format::Json => serde_json::from_str(content).map_err(|e| vec![e.to_string()]),
     }
 }
 
@@ -89,24 +89,24 @@ mod tests {
             (".yml", None),
             (".json", None),
             // TOML
-            ("config.toml", Some(Format::TOML)),
-            ("/config.toml", Some(Format::TOML)),
-            ("/dir/config.toml", Some(Format::TOML)),
-            ("config.qq.toml", Some(Format::TOML)),
+            ("config.toml", Some(Format::Toml)),
+            ("/config.toml", Some(Format::Toml)),
+            ("/dir/config.toml", Some(Format::Toml)),
+            ("config.qq.toml", Some(Format::Toml)),
             // YAML
-            ("config.yaml", Some(Format::YAML)),
-            ("/config.yaml", Some(Format::YAML)),
-            ("/dir/config.yaml", Some(Format::YAML)),
-            ("config.qq.yaml", Some(Format::YAML)),
-            ("config.yml", Some(Format::YAML)),
-            ("/config.yml", Some(Format::YAML)),
-            ("/dir/config.yml", Some(Format::YAML)),
-            ("config.qq.yml", Some(Format::YAML)),
+            ("config.yaml", Some(Format::Yaml)),
+            ("/config.yaml", Some(Format::Yaml)),
+            ("/dir/config.yaml", Some(Format::Yaml)),
+            ("config.qq.yaml", Some(Format::Yaml)),
+            ("config.yml", Some(Format::Yaml)),
+            ("/config.yml", Some(Format::Yaml)),
+            ("/dir/config.yml", Some(Format::Yaml)),
+            ("config.qq.yml", Some(Format::Yaml)),
             // JSON
-            ("config.json", Some(Format::JSON)),
-            ("/config.json", Some(Format::JSON)),
-            ("/dir/config.json", Some(Format::JSON)),
-            ("config.qq.json", Some(Format::JSON)),
+            ("config.json", Some(Format::Json)),
+            ("/config.json", Some(Format::Json)),
+            ("/dir/config.json", Some(Format::Json)),
+            ("config.qq.json", Some(Format::Json)),
         ];
 
         for (input, expected) in cases {
@@ -150,23 +150,23 @@ mod tests {
         let cases = vec![
             // Valid empty inputs should resolve to default.
             ("", None, Ok("")),
-            ("", Some(Format::TOML), Ok("")),
-            ("{}", Some(Format::YAML), Ok("")),
-            ("{}", Some(Format::JSON), Ok("")),
+            ("", Some(Format::Toml), Ok("")),
+            ("{}", Some(Format::Yaml), Ok("")),
+            ("{}", Some(Format::Json), Ok("")),
             // Invalid "empty" inputs should resolve to an error.
             (
                 "",
-                Some(Format::YAML),
+                Some(Format::Yaml),
                 Err(vec!["EOF while parsing a value"]),
             ),
             (
                 "",
-                Some(Format::JSON),
+                Some(Format::Json),
                 Err(vec!["EOF while parsing a value at line 1 column 0"]),
             ),
             // Sample config.
             (SAMPLE_TOML, None, Ok(SAMPLE_TOML)),
-            (SAMPLE_TOML, Some(Format::TOML), Ok(SAMPLE_TOML)),
+            (SAMPLE_TOML, Some(Format::Toml), Ok(SAMPLE_TOML)),
             (
                 // YAML is sensitive to leading whitespace and linebreaks.
                 concat_with_newlines!(
@@ -188,7 +188,7 @@ mod tests {
                     r#"    encoding: "text""#,
                     r#"    address: "127.0.0.1:9999""#,
                 ),
-                Some(Format::YAML),
+                Some(Format::Yaml),
                 Ok(SAMPLE_TOML),
             ),
             (
@@ -219,7 +219,7 @@ mod tests {
                     }
                 }
                 "#,
-                Some(Format::JSON),
+                Some(Format::Json),
                 Ok(SAMPLE_TOML),
             ),
         ];
@@ -237,7 +237,7 @@ mod tests {
                         format, input
                     ));
                     let output_json = serde_json::to_value(output).unwrap();
-                    let expected_output: ConfigBuilder = deserialize(expected, Some(Format::TOML))
+                    let expected_output: ConfigBuilder = deserialize(expected, Some(Format::Toml))
                         .expect("Invalid TOML passed as an expectation");
                     let expected_json = serde_json::to_value(expected_output).unwrap();
                     assert_eq!(expected_json, output_json, "{}", input)

@@ -120,7 +120,7 @@ impl Application {
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
                         #[cfg(feature = "vrl-cli")]
-                        SubCommand::VRL(s) => vrl_cli::cmd::cmd(&s),
+                        SubCommand::Vrl(s) => vrl_cli::cmd::cmd(&s),
                     };
 
                     return Err(code);
