@@ -32,7 +32,7 @@ pub(in crate::sinks) enum ProtocolVersion {
 
 #[derive(Debug, Snafu)]
 enum ConfigError {
-    #[snafu(display("InfluxDb v1 or v2 should be configured as endpoint."))]
+    #[snafu(display("InfluxDB v1 or v2 should be configured as endpoint."))]
     MissingConfiguration,
     #[snafu(display(
         "Unclear settings. Both version configured v1: {:?}, v2: {:?}.",
@@ -501,7 +501,7 @@ mod tests {
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(
             format!("{}", settings.expect_err("expected error")),
-            "InfluxDb v1 or v2 should be configured as endpoint.".to_owned()
+            "InfluxDB v1 or v2 should be configured as endpoint.".to_owned()
         );
     }
 
