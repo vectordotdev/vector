@@ -1,3 +1,4 @@
+#![cfg(feature = "cli-tests")]
 use assert_cmd::prelude::*;
 use std::{fs::read_dir, process::Command};
 
