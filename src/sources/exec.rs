@@ -257,13 +257,10 @@ async fn run_once_streaming(
 
             // Set up communication channels
             let (sender, mut receiver) = channel(1024);
-            let error_sender = sender.clone();
 
             let stdout_shutdown = shutdown.clone();
 
             let pid = child.id();
-
-            spawn_streaming_thread(stdout_lines, stdout_shutdown, STDOUT, sender);
 
             // Optionally include stderr
             if config.include_stderr.unwrap_or(true) {
@@ -273,10 +270,14 @@ async fn run_once_streaming(
                 let stderr_reader = BufReader::new(stderr);
                 let stderr_lines = stderr_reader.lines();
 
+                let error_sender = sender.clone();
+
                 let stderr_shutdown = shutdown.clone();
 
                 spawn_streaming_thread(stderr_lines, stderr_shutdown, STDERR, error_sender);
             }
+
+            spawn_streaming_thread(stdout_lines, stdout_shutdown, STDOUT, sender);
 
             while let Some((line, stream)) = receiver.recv().await {
                 let event = create_event(
