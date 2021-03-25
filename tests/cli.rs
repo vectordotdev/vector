@@ -95,6 +95,10 @@ fn validate_cleanup() {
         .env("VECTOR_DATA_DIR", dir.clone());
 
     let output = cmd.output().expect("Failed to execute process");
+    println!(
+        "{}",
+        String::from_utf8(output.stdout.clone()).expect("Vector output isn't a valid utf8 string")
+    );
 
     assert_no_log_lines(output.stdout);
     assert_eq!(output.status.code(), Some(0));
@@ -138,5 +142,10 @@ fn validate(config: &str) -> i32 {
     let mut cmd = Command::cargo_bin("vector").unwrap();
     cmd.arg("validate").arg(config).env("VECTOR_DATA_DIR", dir);
 
-    cmd.output().unwrap().status.code().unwrap()
+    let output = cmd.output().unwrap();
+    println!(
+        "{}",
+        String::from_utf8(output.stdout).expect("Vector output isn't a valid utf8 string")
+    );
+    output.status.code().unwrap()
 }
