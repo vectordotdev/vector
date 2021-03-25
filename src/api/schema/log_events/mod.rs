@@ -115,7 +115,7 @@ fn create_log_events_stream(
                         // If an error occurs when sending, the subscription has likely gone
                         // away. Break the loop to terminate the thread.
                         if log_tx.send(vec![tap]).await.is_err() {
-                            debug!("Couldn't send notification");
+                            debug!("Couldn't send notification.");
                             break;
                         }
                     } else {
@@ -159,7 +159,7 @@ fn create_log_events_stream(
                         // If we get an error here, it likely means that the subscription has
                         // gone has away. This is a valid/common situation.
                         if log_tx.send(results).await.is_err() {
-                            debug!("Couldn't send log events");
+                            debug!("Couldn't send log events.");
                             break;
                         }
                     }
