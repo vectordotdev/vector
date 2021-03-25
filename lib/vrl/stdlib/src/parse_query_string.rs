@@ -109,6 +109,14 @@ mod tests {
             tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
         }
 
+        ruby_on_rails_multiple_values {
+            args: func_args![value: value!("?foo%5b%5d=bar&foo%5b%5d=xyz")],
+            want: Ok(value!({
+                "foo[]": ["bar", "xyz"],
+            })),
+            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+        }
+
         empty_key {
             args: func_args![value: value!("=&=")],
             want: Ok(value!({

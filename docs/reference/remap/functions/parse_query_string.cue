@@ -34,5 +34,14 @@ remap: functions: parse_query_string: {
 				xyz: ""
 			}
 		},
+		{
+			title: "Parse Ruby on Rails' query string"
+			source: #"""
+				parse_query_string("?foo%5b%5d=1&foo%5b%5d=2")
+				"""#
+			return: {
+				"foo[]": ["1", "2"]
+			}
+		},
 	]
 }
