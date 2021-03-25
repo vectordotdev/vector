@@ -1,4 +1,3 @@
-use bytes::Buf;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use url::form_urlencoded;
@@ -46,9 +45,15 @@ struct ParseQueryStringFn {
 
 impl Expression for ParseQueryStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let query_string = self.value.resolve(ctx)?.try_bytes()?;
+        let bytes = self.value.resolve(ctx)?.try_bytes()?;
+
+        let mut query_string = bytes.as_ref();
+        if !query_string.is_empty() && query_string[0] == b'?' {
+            query_string = &query_string[1..];
+        }
+
         let mut result: BTreeMap<String, Value> = BTreeMap::new();
-        let parsed = form_urlencoded::parse(query_string.bytes());
+        let parsed = form_urlencoded::parse(query_string);
         for (k, v) in parsed {
             let value = v.as_ref().into();
             let entry = result.entry(k.as_ref().to_owned());
@@ -125,6 +130,14 @@ mod tests {
         empty {
             args: func_args![value: value!("")],
             want: Ok(value!({})),
+            tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
+        }
+
+        starts_with_question_mark {
+            args: func_args![value: value!("?foo=bar")],
+            want: Ok(value!({
+                foo: "bar",
+            })),
             tdef: TypeDef::new().infallible().object::<(), Kind>(type_def()),
         }
     ];
