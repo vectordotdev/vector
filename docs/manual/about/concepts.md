@@ -28,7 +28,7 @@ A "log" event is a generic key/value representation of an event.
 A "metric" event is a first-class representation of numerical operation
 performed on a time series. Vector's metric events are fully interoperable.
 
-<Jump to="/docs/about/under-the-hood/architecture/data-model/log/">Metric events</Jump>
+<Jump to="/docs/about/under-the-hood/architecture/data-model/metric/">Metric events</Jump>
 
 ## Components
 
