@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LaneConfig {
-    #[serde(flatten)]
     condition: AnyCondition,
 }
 
@@ -153,7 +152,7 @@ impl TransformConfig for RouteCompatConfig {
 
 #[cfg(test)]
 mod test {
-    use super::RouteConfig;
+    use super::{AnyCondition, LaneConfig, RouteConfig};
 
     #[test]
     fn generate_config() {
@@ -169,5 +168,16 @@ mod test {
         "#,
         )
         .unwrap();
+    }
+
+    #[test]
+    fn can_serialize() {
+        // We need to serialize the config to check if a config has
+        // changed when reloading.
+        let config = LaneConfig {
+            condition: AnyCondition::String("foo".to_string()),
+        };
+
+        assert!(serde_json::to_vec(&config).is_ok());
     }
 }
