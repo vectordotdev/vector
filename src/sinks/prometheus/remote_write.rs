@@ -528,10 +528,10 @@ mod integration_tests {
     async fn query(url: &str, query: &str) -> Value {
         let result = query_v1(url, query).await;
         let text = result.text().await.unwrap();
-        serde_json::from_str(&text).expect("error when parsing InfluxDb response JSON")
+        serde_json::from_str(&text).expect("error when parsing InfluxDB response JSON")
     }
 
-    // InfluxDb strips off trailing zeros in
+    // InfluxDB strips off trailing zeros in
     fn strip_timestamp(timestamp: String) -> String {
         let strip_one = || format!("{}Z", &timestamp[..timestamp.len() - 2]);
         match timestamp {

@@ -398,7 +398,7 @@ pub mod test_util {
             .await
             .status();
         assert_eq!(status, http::StatusCode::OK, "UnexpectedStatus: {}", status);
-        // Some times InfluxDb will return OK before it can actually
+        // Some times InfluxDB will return OK before it can actually
         // accept writes to the database, leading to test failures. Test
         // this with empty writes and loop if it reports the database
         // does not exist yet.

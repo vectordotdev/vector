@@ -84,7 +84,7 @@ impl GenerateConfig for InfluxDbLogsConfig {
             tags = []
             org = "my-org"
             bucket = "my-bucket"
-            token = "${INFLUXDb_TOKEN}"
+            token = "${INFLUXDB_TOKEN}"
         "#})
         .unwrap()
     }

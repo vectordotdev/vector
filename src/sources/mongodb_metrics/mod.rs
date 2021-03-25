@@ -1029,7 +1029,7 @@ mod tests {
 
     #[tokio::test]
     async fn sanitize_endpoint_test() {
-        let endpoint = "mongodb://myDbReader:D1fficultP%40ssw0rd@mongos0.example.com:27017,mongos1.example.com:27017,mongos2.example.com:27017/?authSource=admin&tls=true";
+        let endpoint = "mongodb://myDBReader:D1fficultP%40ssw0rd@mongos0.example.com:27017,mongos1.example.com:27017,mongos2.example.com:27017/?authSource=admin&tls=true";
         let client_options = ClientOptions::parse(endpoint).await.unwrap();
         let endpoint = sanitize_endpoint(endpoint, &client_options);
         assert_eq!(&endpoint, "mongodb://mongos0.example.com:27017,mongos1.example.com:27017,mongos2.example.com:27017/?tls=true");

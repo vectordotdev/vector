@@ -882,7 +882,7 @@ mod integration_tests {
         .await;
         let string = res.text().await.unwrap();
         let res: serde_json::Value =
-            serde_json::from_str(&string).expect("error when parsing InfluxDb response JSON");
+            serde_json::from_str(&string).expect("error when parsing InfluxDB response JSON");
 
         //
         // {"results":[{"statement_id":0,"series":[{"columns":["key"],"values":
