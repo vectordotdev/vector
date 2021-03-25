@@ -20,7 +20,6 @@ use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use std::cmp;
 use std::io;
 use std::net::SocketAddr;
 #[cfg(unix)]
@@ -224,91 +223,89 @@ impl SyslogDecoder {
         // |
         // | ASCII decimal number of unknown length
 
-        loop {
-            let read_to = cmp::min(self.other.max_length().saturating_add(1), src.len());
-            let space_pos = src.iter().position(|&b| b == b' ');
+        let space_pos = src.iter().position(|&b| b == b' ');
 
-            // If we are discarding, discard to the next newline.
-            let newline_pos = src.iter().position(|&b| b == b'\n');
+        // If we are discarding, discard to the next newline.
+        let newline_pos = src.iter().position(|&b| b == b'\n');
 
-            match (self.is_discarding, newline_pos, space_pos) {
-                (true, Some(offset), _) => {
-                    // When discarding we keep discarding to the next newline.
-                    src.advance(offset + 1);
-                    self.is_discarding = false;
-                    self.in_octet = false;
-                    return Err(LinesCodecError::Io(io::Error::new(
-                        io::ErrorKind::Other,
-                        "Frame length limit exceeded",
-                    )));
-                }
-                (true, None, _) => {
-                    // There is no newline in this frame. Advance as far as we can to
-                    // discard the entire frame.
-                    src.advance(read_to);
-                    if src.is_empty() {
-                        return Ok(None);
+        match (self.is_discarding, newline_pos, space_pos) {
+            (true, Some(offset), _) => {
+                // When discarding we keep discarding to the next newline.
+                src.advance(offset + 1);
+                self.is_discarding = false;
+                self.in_octet = false;
+                Err(LinesCodecError::Io(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Frame length limit exceeded",
+                )))
+            }
+            (true, None, _) => {
+                // There is no newline in this frame. Advance as far as we can to
+                // discard the entire frame.
+                src.advance(src.len());
+                Ok(None)
+            }
+            (false, _, Some(space_pos)) => {
+                let len: usize = match std::str::from_utf8(&src[..space_pos])
+                    .map_err(|_| ())
+                    .and_then(|num| num.parse().map_err(|_| ()))
+                {
+                    Ok(len) => len,
+                    Err(_) => {
+                        // Advance the buffer past the erroneous bytes
+                        // to prevent us getting stuck in an infinite loop.
+                        src.advance(space_pos + 1);
+                        self.in_octet = false;
+                        return Err(LinesCodecError::Io(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "Unable to decode message len as number",
+                        )));
                     }
-                }
-                (false, _, Some(i)) => {
-                    let len: usize = match std::str::from_utf8(&src[..i])
-                        .map_err(|_| ())
-                        .and_then(|num| num.parse().map_err(|_| ()))
-                    {
-                        Ok(len) => len,
+                };
+
+                let from = space_pos + 1;
+                let to = from + len;
+
+                if let Some(msg) = src.get(from..to) {
+                    let s = match std::str::from_utf8(msg) {
+                        Ok(s) => s.to_string(),
                         Err(_) => {
                             // Advance the buffer past the erroneous bytes
                             // to prevent us getting stuck in an infinite loop.
-                            src.advance(i + 1);
+                            src.advance(to);
                             self.in_octet = false;
                             return Err(LinesCodecError::Io(io::Error::new(
                                 io::ErrorKind::InvalidData,
-                                "Unable to decode message len as number",
+                                "Unable to decode message as UTF8",
                             )));
                         }
                     };
 
-                    let from = i + 1;
-                    let to = from + len;
-
-                    if let Some(msg) = src.get(from..to) {
-                        let s = match std::str::from_utf8(msg) {
-                            Ok(s) => s.to_string(),
-                            Err(_) => {
-                                // Advance the buffer past the erroneous bytes
-                                // to prevent us getting stuck in an infinite loop.
-                                src.advance(to);
-                                self.in_octet = false;
-                                return Err(LinesCodecError::Io(io::Error::new(
-                                    io::ErrorKind::InvalidData,
-                                    "Unable to decode message as UTF8",
-                                )));
-                            }
-                        };
-
-                        src.advance(to);
-                        self.in_octet = false;
-                        return Ok(Some(s));
-                    } else {
-                        return Ok(None);
-                    }
+                    src.advance(to);
+                    self.in_octet = false;
+                    Ok(Some(s))
+                } else {
+                    Ok(None)
                 }
+            }
 
-                (false, None, _) if src.len() < self.other.max_length() => return Ok(None),
+            (false, Some(offline_pos), _) => {
+                // Beyond maximum length, advance to the newline.
+                src.advance(offline_pos + 1);
+                Err(LinesCodecError::Io(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Frame length limit exceeded",
+                )))
+            }
 
-                (false, Some(offline_pos), _) => {
-                    // Beyond maximum length, advance to the newline.
-                    src.advance(offline_pos + 1);
-                    return Err(LinesCodecError::Io(io::Error::new(
-                        io::ErrorKind::Other,
-                        "Frame length limit exceeded",
-                    )));
-                }
+            (false, None, None) if src.len() < self.other.max_length() => Ok(None),
 
-                _ => {
-                    self.is_discarding = true;
-                    src.advance(src.len());
-                }
+            (false, None, None) => {
+                // There is no newline in this frame. Advance as far as we can to
+                // discard the entire frame.
+                self.is_discarding = true;
+                src.advance(src.len());
+                Ok(None)
             }
         }
     }
@@ -916,7 +913,6 @@ mod test {
         let mut decoder = SyslogDecoder::new(16);
         let mut buffer = BytesMut::with_capacity(32);
 
-        // An invalid syslog message containing invalid utf8 bytes.
         buffer.put(&b"32thisshouldbelongerthanthmaxframeasizewhichmeansthesyslogparserwillnotbeabletodecodeit\n"[..]);
         let result = decoder.checked_decode(&mut buffer);
 
@@ -929,7 +925,6 @@ mod test {
         let mut decoder = SyslogDecoder::new(16);
         let mut buffer = BytesMut::with_capacity(32);
 
-        // An invalid syslog message containing invalid utf8 bytes.
         buffer.put(&b"32thisshouldbelongerthanthmaxframeasizewhichmeansthesyslogparserwillnotbeabletodecodeit"[..]);
         let _ = decoder.checked_decode(&mut buffer);
 
