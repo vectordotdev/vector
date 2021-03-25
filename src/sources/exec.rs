@@ -250,27 +250,33 @@ async fn run_once_streaming(
     match child {
         Ok(mut child) => {
             let stdout = child.stdout.take().unwrap();
-            let stderr = child.stderr.take().unwrap();
 
             // Create stdout async reader
             let stdout_reader = BufReader::new(stdout);
             let stdout_lines = stdout_reader.lines();
-
-            // Create stderr async reader
-            let stderr_reader = BufReader::new(stderr);
-            let stderr_lines = stderr_reader.lines();
 
             // Set up communication channels
             let (sender, mut receiver) = channel(1024);
             let error_sender = sender.clone();
 
             let stdout_shutdown = shutdown.clone();
-            let stderr_shutdown = shutdown.clone();
 
             let pid = child.id();
 
             spawn_streaming_thread(stdout_lines, stdout_shutdown, STDOUT, sender);
-            spawn_streaming_thread(stderr_lines, stderr_shutdown, STDERR, error_sender);
+
+            // Optionally include stderr
+            if config.include_stderr.unwrap_or(true) {
+                let stderr = child.stderr.take().unwrap();
+
+                // Create stderr async reader
+                let stderr_reader = BufReader::new(stderr);
+                let stderr_lines = stderr_reader.lines();
+
+                let stderr_shutdown = shutdown.clone();
+
+                spawn_streaming_thread(stderr_lines, stderr_shutdown, STDERR, error_sender);
+            }
 
             while let Some((line, stream)) = receiver.recv().await {
                 let event = create_event(
@@ -347,6 +353,7 @@ async fn run_once_scheduled(
                             events.append(&mut stdout_events);
                         }
 
+                        // Optionally include stderr
                         if config.include_stderr.unwrap_or(true) {
                             let stderr_events = process_scheduled_output(
                                 config,
