@@ -1,4 +1,3 @@
-use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use url::form_urlencoded;
 use vrl::prelude::*;
@@ -54,24 +53,23 @@ impl Expression for ParseQueryStringFn {
 
         let mut result: BTreeMap<String, Value> = BTreeMap::new();
         let parsed = form_urlencoded::parse(query_string);
-        for (k, v) in parsed {
-            let value = v.as_ref().into();
-            let entry = result.entry(k.as_ref().to_owned());
-            match entry {
-                Entry::Occupied(mut e) => {
-                    if e.get().is_array() {
-                        e.get_mut().as_array_mut().unwrap().push(value);
-                    } else {
-                        let prev_value = e.get().to_owned();
-                        result.insert(k.as_ref().into(), vec![prev_value, value].into());
-                    }
-                }
-                Entry::Vacant(e) => {
-                    e.insert(value);
-                }
-            }
+        for (k, value) in parsed {
+            let value = value.as_ref();
+            result
+                .entry(k.into_owned())
+                .and_modify(|v| {
+                    match v {
+                        Value::Array(v) => {
+                            v.push(value.into());
+                        }
+                        v => {
+                            *v = Value::Array(vec![v.to_owned(), value.into()]);
+                        }
+                    };
+                })
+                .or_insert(value.into());
         }
-        Ok(Value::Object(result))
+        Ok(result.into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
