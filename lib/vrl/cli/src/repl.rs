@@ -6,7 +6,7 @@ use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
 use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
 use rustyline::hint::{Hinter, HistoryHinter};
-use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Validator};
+use rustyline::validate::{self, ValidationResult, Validator};
 use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
 use vrl::{diagnostic::Formatter, state, value, Runtime, RuntimeResult, Target, Terminate, Value};
@@ -143,7 +143,6 @@ fn resolve(
 
 struct Repl {
     highlighter: MatchingBracketHighlighter,
-    validator: MatchingBracketValidator,
     history_hinter: HistoryHinter,
     colored_prompt: String,
     hints: Vec<&'static str>,
@@ -155,7 +154,6 @@ impl Repl {
             highlighter: MatchingBracketHighlighter::new(),
             history_hinter: HistoryHinter {},
             colored_prompt: "$ ".to_owned(),
-            validator: MatchingBracketValidator::new(),
             hints: initial_hints(),
         }
     }
@@ -239,33 +237,31 @@ impl Validator for Repl {
         &self,
         ctx: &mut validate::ValidationContext,
     ) -> rustyline::Result<ValidationResult> {
-        self.validator.validate(ctx).map(|result| match result {
-            ValidationResult::Valid(_) => {
-                let mut compiler_state = state::Compiler::default();
-                let mut rt = Runtime::new(state::Runtime::default());
-                let target: Option<&mut Value> = None;
+        let mut compiler_state = state::Compiler::default();
+        let mut rt = Runtime::new(state::Runtime::default());
+        let target: Option<&mut Value> = None;
 
-                match resolve(target, &mut rt, ctx.input(), &mut compiler_state) {
-                    Err(error) => {
-                        let m = error.to_string();
+        let result = match resolve(target, &mut rt, ctx.input(), &mut compiler_state) {
+            Err(error) => {
+                let m = error.to_string();
 
-                        // TODO: Ideally we'd used typed errors for this, but
-                        // that requires some more work to the VRL compiler.
-                        if m.contains("syntax error") && m.contains("unexpected end of program") {
-                            return ValidationResult::Incomplete;
-                        }
-
-                        result
-                    }
-                    Ok(..) => result,
+                // TODO: Ideally we'd used typed errors for this, but
+                // that requires some more work to the VRL compiler.
+                if m.contains("syntax error") && m.contains("unexpected end of program") {
+                    ValidationResult::Incomplete
+                } else {
+                    ValidationResult::Valid(None)
                 }
             }
-            result => result,
-        })
+
+            Ok(..) => ValidationResult::Valid(None),
+        };
+
+        Ok(result)
     }
 
     fn validate_while_typing(&self) -> bool {
-        self.validator.validate_while_typing()
+        false
     }
 }
 
