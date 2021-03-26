@@ -1,15 +1,16 @@
-use super::event::EventEncodingType;
+use super::EventEncodingType;
 use crate::event;
+
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
 
 #[derive(Debug)]
-pub struct LogEvent {
+pub struct Log {
     component_name: String,
     event: event::LogEvent,
 }
 
-impl LogEvent {
+impl Log {
     pub fn new(component_name: &str, event: event::LogEvent) -> Self {
         Self {
             component_name: component_name.to_string(),
@@ -28,7 +29,7 @@ impl LogEvent {
 
 #[Object]
 /// Log event with fields for querying log data
-impl LogEvent {
+impl Log {
     /// Name of the component associated with the log event
     async fn component_name(&self) -> &str {
         &self.component_name

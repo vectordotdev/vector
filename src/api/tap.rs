@@ -40,8 +40,8 @@ pub enum TapNotification {
 /// to be communicated back to the client to alert them about the status of the tap request.
 #[derive(Debug)]
 pub enum TapPayload {
-    LogEvent(String, LogEvent),
-    MetricEvent(String, LogEvent),
+    Log(String, LogEvent),
+    Metric(String, LogEvent),
     Notification(String, TapNotification),
 }
 
@@ -92,7 +92,7 @@ async fn send_not_matched(mut tx: TapSender, pattern: &str) -> Result<(), SendEr
     tx.send(TapPayload::not_matched(pattern)).await
 }
 
-/// Makes a `RouterSink` that relays `LogEvent` as `TapPayload::LogEvent` to a client.
+/// Makes a `RouterSink` that relays `Log` as `TapPayload::Log` to a client.
 fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
     let (event_tx, mut event_rx) = futures_mpsc::unbounded();
     let component_name = component_name.to_string();
@@ -102,10 +102,7 @@ fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
 
         while let Some(ev) = event_rx.next().await {
             if let Event::Log(ev) = ev {
-                if let Err(err) = tx
-                    .send(TapPayload::LogEvent(component_name.clone(), ev))
-                    .await
-                {
+                if let Err(err) = tx.send(TapPayload::Log(component_name.clone(), ev)).await {
                     debug!(
                         message = "Couldn't send log event.",
                         error = ?err,
@@ -334,7 +331,7 @@ mod tests {
         // 3rd payload should be the log event
         assert!(matches!(
             sink_rx.recv().await,
-            Some(TapPayload::LogEvent(returned_name, _)) if returned_name == name
+            Some(TapPayload::Log(returned_name, _)) if returned_name == name
         ));
     }
 }
