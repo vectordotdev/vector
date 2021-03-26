@@ -12,7 +12,6 @@ use async_graphql::{validators::IntRange, Context, Subscription, Union};
 use futures::StreamExt;
 use itertools::Itertools;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
-use std::cmp::Ordering;
 use tokio::{select, stream::Stream, sync::mpsc, time};
 
 #[derive(Union, Debug)]
@@ -91,9 +90,15 @@ fn create_log_events_stream(
         // A tick interval to represent when to 'cut' the results back to the client.
         let mut interval = time::interval(time::Duration::from_millis(interval));
 
+        // Temporary structure to hold sortable values of `LogEventPayload`.
+        struct SortablePayload {
+            batch: usize,
+            payload: LogEventPayload,
+        }
+
         // Collect a vector of results, with a capacity of `limit`. As new `LogEvent`s come in,
         // they will be sampled and added to results.
-        let mut results = Vec::<LogEventPayload>::with_capacity(limit);
+        let mut results = Vec::<SortablePayload>::with_capacity(limit);
 
         // Random number generator to allow for sampling. Speed trumps cryptographic security here.
         // The RNG must be Send + Sync to use with the `select!` loop below, hence `SmallRng`.
@@ -107,28 +112,32 @@ fn create_log_events_stream(
             select! {
                 // Process `TapPayload`s. A tap payload could contain a `LogEvent` or a notification.
                 // Notifications are emitted immediately; log events buffer until the next `interval`.
-                Some(tap) = tap_rx.next() => {
-                    let tap = tap.into();
+                Some(payload) = tap_rx.next() => {
+                    let payload = payload.into();
 
                     // Emit notifications immediately; these don't count as a 'batch'.
-                    if let LogEventPayload::Notification(_) = tap {
+                    if let LogEventPayload::Notification(_) = payload {
                         // If an error occurs when sending, the subscription has likely gone
                         // away. Break the loop to terminate the thread.
-                        if let Err(err) = log_tx.send(vec![tap]).await {
+                        if let Err(err) = log_tx.send(vec![payload]).await {
                             debug!(message = "Couldn't send notification.", error = ?err);
                             break;
                         }
                     } else {
+                        // Wrap tap in a 'sortable' wrapper, using the batch as a key, to
+                        // re-sort after random eviction.
+                        let payload = SortablePayload { batch, payload };
+
                         // A simple implementation of "Algorithm R" per
                         // https://en.wikipedia.org/wiki/Reservoir_sampling. As we're unable to
                         // pluck the nth result, this is chosen over the more optimal "Algorithm L"
                         // since discarding results isn't an option.
                         if limit > results.len() {
-                            results.push(tap);
+                            results.push(payload);
                         } else {
                             let random_number = rng.gen_range(0..batch);
                             if random_number < results.len() {
-                                results[random_number] = tap;
+                                results[random_number] = payload;
                             }
                         }
                         // Increment the batch count, to be used for the next Algo R loop.
@@ -145,15 +154,8 @@ fn create_log_events_stream(
                         // strategy, drain the existing results and sort by timestamp.
                         let results = results
                             .drain(..)
-                            .sorted_by(|a, b| match (a, b) {
-                                (LogEventPayload::LogEvent(a), LogEventPayload::LogEvent(b)) => {
-                                    match (a.get_timestamp(), b.get_timestamp()) {
-                                        (Some(a), Some(b)) => a.cmp(b),
-                                        _ => Ordering::Equal,
-                                    }
-                                }
-                                _ => Ordering::Equal,
-                            })
+                            .sorted_by_key(|r| r.batch)
+                            .map(|r| r.payload)
                             .collect();
 
                         // If we get an error here, it likely means that the subscription has
