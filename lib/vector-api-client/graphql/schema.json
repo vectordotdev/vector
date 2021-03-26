@@ -817,7 +817,7 @@
           "possibleTypes": null
         },
         {
-          "description": null,
+          "description": "An event or a notification",
           "enumValues": null,
           "fields": null,
           "inputFields": null,
@@ -836,6 +836,29 @@
               "ofType": null
             }
           ]
+        },
+        {
+          "description": "Encoding format for the event",
+          "enumValues": [
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "JSON"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "YAML"
+            }
+          ],
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "ENUM",
+          "name": "EventEncodingType",
+          "possibleTypes": null
         },
         {
           "description": "A notification regarding events observation",
@@ -1769,7 +1792,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "ENUM",
-                      "name": "LogEventEncodingType",
+                      "name": "EventEncodingType",
                       "ofType": null
                     }
                   }
@@ -1794,29 +1817,6 @@
           "interfaces": [],
           "kind": "OBJECT",
           "name": "LogEvent",
-          "possibleTypes": null
-        },
-        {
-          "description": null,
-          "enumValues": [
-            {
-              "deprecationReason": null,
-              "description": null,
-              "isDeprecated": false,
-              "name": "JSON"
-            },
-            {
-              "deprecationReason": null,
-              "description": null,
-              "isDeprecated": false,
-              "name": "YAML"
-            }
-          ],
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "kind": "ENUM",
-          "name": "LogEventEncodingType",
           "possibleTypes": null
         },
         {
