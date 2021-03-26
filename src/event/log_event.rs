@@ -2,6 +2,7 @@ use super::{lookup::Segment, util, EventMetadata, Lookup, PathComponent, Value};
 use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::Utc;
+use getset::Getters;
 use serde::{Serialize, Serializer};
 use shared::EventDataEq;
 use std::{
@@ -11,10 +12,11 @@ use std::{
     iter::FromIterator,
 };
 
-#[derive(PartialEq, Debug, Clone, Default)]
+#[derive(Clone, Debug, Default, Getters, PartialEq)]
 pub struct LogEvent {
     fields: BTreeMap<String, Value>,
-    pub(super) metadata: EventMetadata,
+    #[getset(get = "pub")]
+    metadata: EventMetadata,
 }
 
 impl LogEvent {

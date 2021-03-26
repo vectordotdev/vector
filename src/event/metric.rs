@@ -1,6 +1,7 @@
 use super::EventMetadata;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
+use getset::Getters;
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
 use snafu::Snafu;
@@ -12,14 +13,15 @@ use std::{
 };
 use vrl::{path::Segment, Target};
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Getters, PartialEq, Serialize)]
 pub struct Metric {
     #[serde(flatten)]
     pub series: MetricSeries,
     #[serde(flatten)]
     pub data: MetricData,
+    #[getset(get = "pub")]
     #[serde(skip)]
-    pub metadata: EventMetadata,
+    metadata: EventMetadata,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
