@@ -1,12 +1,7 @@
+use super::event::EventEncodingType;
 use crate::event;
-use async_graphql::{Enum, Object};
+use async_graphql::Object;
 use chrono::{DateTime, Utc};
-
-#[derive(Enum, Copy, Clone, PartialEq, Eq)]
-pub enum LogEventEncodingType {
-    Json,
-    Yaml,
-}
 
 #[derive(Debug)]
 pub struct LogEvent {
@@ -50,11 +45,11 @@ impl LogEvent {
     }
 
     /// Log event as an encoded string format
-    async fn string(&self, encoding: LogEventEncodingType) -> String {
+    async fn string(&self, encoding: EventEncodingType) -> String {
         match encoding {
-            LogEventEncodingType::Json => serde_json::to_string(&self.event)
+            EventEncodingType::Json => serde_json::to_string(&self.event)
                 .expect("JSON serialization of log event failed. Please report."),
-            LogEventEncodingType::Yaml => serde_yaml::to_string(&self.event)
+            EventEncodingType::Yaml => serde_yaml::to_string(&self.event)
                 .expect("YAML serialization of log event failed. Please report."),
         }
     }
