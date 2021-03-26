@@ -1,7 +1,7 @@
 # object: { "message": "bananas and another ant" }
 # result:
 #
-# error[E103]: unhandled error
+# error[E103]: unhandled fallible assignment
 #   ┌─ :3:6
 #   │
 # 3 │ .a = sha3(.result[0].an)

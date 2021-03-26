@@ -3,7 +3,7 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use glob::glob;
 use std::str::FromStr;
 use structopt::StructOpt;
-use vrl::{diagnostic::Formatter, state, Runtime, Value};
+use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
 
 use vrl_tests::{docs, Test};
 
@@ -89,7 +89,7 @@ fn main() {
 
     for mut test in tests {
         if category != test.category {
-            category = test.category;
+            category = test.category.clone();
             println!("{}", Colour::Fixed(3).bold().paint(category.to_string()));
         }
 
@@ -115,7 +115,7 @@ fn main() {
         let mut runtime = Runtime::new(state);
         let program = vrl::compile(&test.source, &stdlib::all());
 
-        let want = test.result;
+        let want = test.result.clone();
 
         match program {
             Ok(program) => {
@@ -189,6 +189,32 @@ fn main() {
                                 || got == want
                             {
                                 println!("{}", Colour::Green.bold().paint("OK"));
+                            } else if err == Terminate::Abort {
+                                let want =
+                                    match serde_json::from_str::<'_, serde_json::Value>(&want) {
+                                        Ok(want) => want,
+                                        Err(err) => {
+                                            eprintln!("{}", err);
+                                            want.into()
+                                        }
+                                    };
+
+                                let got = vrl_value_to_json_value(test.object.clone());
+                                if got == want {
+                                    println!("{} (abort)", Colour::Green.bold().paint("OK"));
+                                } else {
+                                    println!("{} (abort)", Colour::Red.bold().paint("FAILED"));
+                                    failed_count += 1;
+
+                                    if !cmd.no_diff {
+                                        let want = serde_json::to_string_pretty(&want).unwrap();
+                                        let got = serde_json::to_string_pretty(&got).unwrap();
+                                        let diff = prettydiff::diff_lines(&want, &got);
+                                        println!("{}", diff);
+                                    }
+
+                                    failed = true;
+                                }
                             } else {
                                 println!("{} (runtime)", Colour::Red.bold().paint("FAILED"));
                                 failed_count += 1;

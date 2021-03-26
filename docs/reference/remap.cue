@@ -214,13 +214,13 @@ remap: #Remap & {
 				"""
 		},
 		{
-			title: "Unhandled error"
+			title: "Unhandled fallible assignment"
 			input: log: message: "key1=value1 key2=value2"
 			source: """
 				structured = parse_key_value(.message)
 				"""
 			raises: compiletime: """
-				error[E103]: unhandled error
+				error[E103]: unhandled fallible assignment
 				  ┌─ :1:14
 				  │
 				1 │ structured = parse_key_value(.message)
