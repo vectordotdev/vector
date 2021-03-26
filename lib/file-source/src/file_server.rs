@@ -148,7 +148,7 @@ where
         self.handle.spawn(async move {
             let mut done = false;
             loop {
-                let sleep = tokio::time::sleep(sleep_duration);
+                let sleep = sleep(sleep_duration);
                 tokio::select! {
                     _ = &mut shutdown2 => done = true,
                     _ = sleep => {},
