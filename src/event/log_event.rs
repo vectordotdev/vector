@@ -1,4 +1,7 @@
 use super::{lookup::Segment, util, EventMetadata, Lookup, PathComponent, Value};
+use crate::config::log_schema;
+use bytes::Bytes;
+use chrono::Utc;
 use serde::{Serialize, Serializer};
 use shared::EventDataEq;
 use std::{
@@ -142,6 +145,29 @@ impl LogEvent {
 impl EventDataEq for LogEvent {
     fn event_data_eq(&self, other: &Self) -> bool {
         self.fields == other.fields && self.metadata.event_data_eq(&other.metadata)
+    }
+}
+
+impl From<Bytes> for LogEvent {
+    fn from(message: Bytes) -> Self {
+        let mut log = LogEvent::default();
+
+        log.insert(log_schema().message_key(), message);
+        log.insert(log_schema().timestamp_key(), Utc::now());
+
+        log
+    }
+}
+
+impl From<&str> for LogEvent {
+    fn from(message: &str) -> Self {
+        message.to_owned().into()
+    }
+}
+
+impl From<String> for LogEvent {
+    fn from(message: String) -> Self {
+        Bytes::from(message).into()
     }
 }
 

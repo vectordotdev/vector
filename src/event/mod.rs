@@ -1,5 +1,4 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
-use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
@@ -477,28 +476,19 @@ impl From<proto::SummaryQuantile> for metric::Quantile {
 
 impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
-        let mut event = Event::Log(LogEvent::from(BTreeMap::new()));
-
-        event
-            .as_mut_log()
-            .insert(log_schema().message_key(), message);
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), Utc::now());
-
-        event
+        Event::Log(LogEvent::from(message))
     }
 }
 
 impl From<&str> for Event {
     fn from(line: &str) -> Self {
-        line.to_owned().into()
+        LogEvent::from(line).into()
     }
 }
 
 impl From<String> for Event {
     fn from(line: String) -> Self {
-        Bytes::from(line).into()
+        LogEvent::from(line).into()
     }
 }
 
@@ -517,6 +507,7 @@ impl From<Metric> for Event {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::config::log_schema;
     use regex::Regex;
     use std::collections::HashSet;
 
