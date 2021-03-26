@@ -77,6 +77,7 @@ impl Expression for ParseCsvFn {
     }
 }
 
+#[inline]
 fn type_def() -> Vec<Kind> {
     vec![Kind::Bytes]
 }
