@@ -60,15 +60,16 @@ impl Expression for ParseCsvFn {
             .delimiter(delimiter)
             .from_reader(csv_string.bytes());
 
-        let parsed_record = reader.into_records().next();
-        match parsed_record {
-            Some(Ok(record)) => {
-                let result = record.iter().map(|l| l.into()).collect();
-                Ok(Value::Array(result))
-            }
-            Some(Err(_)) => Err("failed to parse csv string".into()),
-            None => Ok(value!([])),
-        }
+        let result = reader
+            .into_byte_records()
+            .next()
+            .transpose()
+            .map_err(|err| format!("invalid csv record: {}", err))? // shouldn't really happen
+            .map(|record| record.iter().map(Into::into).collect::<Vec<Value>>())
+            .unwrap_or_default()
+            .into();
+
+        Ok(result)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -90,12 +91,6 @@ mod tests {
         valid {
             args: func_args![value: value!("foo,bar,\"foo \"\", bar\"")],
             want: Ok(value!(["foo", "bar", "foo \", bar"])),
-            tdef: TypeDef::new().fallible().array::<Kind>(type_def()),
-        }
-
-        invalid_utf8 {
-            args: func_args![value: value!(&b"foo,  b\xFFar,\tbaz\na,b,c\nd,e,f"[..])],
-            want: Err("failed to parse csv string"),
             tdef: TypeDef::new().fallible().array::<Kind>(type_def()),
         }
 

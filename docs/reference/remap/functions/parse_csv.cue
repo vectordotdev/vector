@@ -28,7 +28,6 @@ remap: functions: parse_csv: {
 	]
 	internal_failure_reasons: [
 		"delimiter must be a single-byte utf8 character",
-		"failed to parse csv string",
 	]
 	return: types: ["array"]
 
