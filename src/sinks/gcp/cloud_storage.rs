@@ -199,11 +199,11 @@ impl GcsSink {
         let base_url = format!("{}{}/", BASE_URL, config.bucket);
         let bucket = config.bucket.clone();
         Ok(GcsSink {
+            bucket,
             client,
             creds,
-            settings,
             base_url,
-            bucket,
+            settings,
         })
     }
 

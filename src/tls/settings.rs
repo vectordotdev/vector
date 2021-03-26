@@ -12,12 +12,8 @@ use openssl::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::{
-    fmt,
-    fs::File,
-    io::Read,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
+use std::{fmt, fs::File, io::Read};
 
 const PEM_START_MARKER: &str = "-----BEGIN ";
 
@@ -220,7 +216,7 @@ impl TlsOptions {
     }
 
     /// Parse identity from a PEM encoded certificate + key pair of files
-    fn parse_pem_identity(&self, pem: String, crt_file: &PathBuf) -> Result<Option<IdentityStore>> {
+    fn parse_pem_identity(&self, pem: String, crt_file: &Path) -> Result<Option<IdentityStore>> {
         match &self.key_file {
             None => Err(TlsError::MissingKey),
             Some(key_file) => {

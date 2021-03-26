@@ -56,22 +56,6 @@ struct EndsWithFn {
     case_sensitive: Option<Box<dyn Expression>>,
 }
 
-/*
-impl EndsWithFn {
-    #[cfg(test)]
-    fn new(value: Box<dyn Expression>, substring: &str, case_sensitive: bool) -> Self {
-        let substring = Box::new(Literal::from(substring));
-        let case_sensitive = Some(Box::new(Literal::from(case_sensitive)) as _);
-
-        Self {
-            value,
-            substring,
-            case_sensitive,
-        }
-    }
-}
-*/
-
 impl Expression for EndsWithFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let case_sensitive = match &self.case_sensitive {

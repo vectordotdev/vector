@@ -5,11 +5,13 @@ use metrics_tracing_context::{LabelFilter, TracingContextLayer};
 use metrics_util::layers::Layer;
 use metrics_util::{CompositeKey, Handle, MetricKind};
 use once_cell::sync::OnceCell;
+use std::hash::BuildHasherDefault;
 use std::hash::Hash;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc,
 };
+use twox_hash::XxHash64;
 
 static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 
@@ -45,7 +47,7 @@ pub fn init() -> crate::Result<()> {
 
     // Prepare the registry.
     let registry = VectorRegistry {
-        map: DashMap::new(),
+        map: DashMap::default(),
     };
     let registry = Arc::new(registry);
 
@@ -106,7 +108,7 @@ where
     K: Eq + Hash + Clone + 'static,
     H: 'static,
 {
-    pub map: DashMap<K, H>,
+    pub map: DashMap<K, H, BuildHasherDefault<XxHash64>>,
 }
 
 impl<K, H> VectorRegistry<K, H>

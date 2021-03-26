@@ -17,11 +17,11 @@ use nix::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
+use std::path::{Path, PathBuf};
 use std::{
     collections::{HashMap, HashSet},
     io::SeekFrom,
     iter::FromIterator,
-    path::PathBuf,
     process::Stdio,
     str::FromStr,
     time::Duration,
@@ -343,7 +343,7 @@ type StartJournalctlFn = Box<
 type StopJournalctlFn = Box<dyn FnOnce() + Send>;
 
 fn start_journalctl(
-    path: &PathBuf,
+    path: &Path,
     current_boot_only: bool,
     cursor: &Option<String>,
 ) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {

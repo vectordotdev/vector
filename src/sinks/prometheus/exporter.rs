@@ -339,16 +339,13 @@ mod tests {
     use crate::{
         event::metric::{Metric, MetricData, MetricSeries, MetricValue},
         http::HttpClient,
-        test_util::{random_string, trace_init},
+        test_util::{next_addr, random_string, trace_init},
         tls::MaybeTlsSettings,
     };
     use chrono::Duration;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
     use tokio::{sync::mpsc, time};
-
-    const PROMETHEUS_ADDRESS_TLS: &str = "127.0.0.1:9102";
-    const PROMETHEUS_ADDRESS_NOTLS: &str = "127.0.0.1:9103";
 
     #[test]
     fn generate_config() {
@@ -357,14 +354,14 @@ mod tests {
 
     #[tokio::test]
     async fn prometheus_notls() {
-        export_and_fetch_simple(PROMETHEUS_ADDRESS_NOTLS, None).await;
+        export_and_fetch_simple(None).await;
     }
 
     #[tokio::test]
     async fn prometheus_tls() {
         let mut tls_config = TlsConfig::test_config();
         tls_config.options.verify_hostname = Some(false);
-        export_and_fetch_simple(PROMETHEUS_ADDRESS_TLS, Some(tls_config)).await;
+        export_and_fetch_simple(Some(tls_config)).await;
     }
 
     #[tokio::test]
@@ -377,7 +374,7 @@ mod tests {
         let event2 = Event::from(event2.into_metric().with_timestamp(Some(timestamp2)));
         let events = vec![event1, event2];
 
-        let body = export_and_fetch(PROMETHEUS_ADDRESS_NOTLS, None, events).await;
+        let body = export_and_fetch(None, events).await;
         let timestamp = timestamp2.timestamp_millis();
         assert_eq!(
             body,
@@ -393,11 +390,7 @@ mod tests {
         );
     }
 
-    async fn export_and_fetch(
-        address: &str,
-        tls_config: Option<TlsConfig>,
-        events: Vec<Event>,
-    ) -> String {
+    async fn export_and_fetch(tls_config: Option<TlsConfig>, events: Vec<Event>) -> String {
         trace_init();
 
         let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
@@ -406,8 +399,9 @@ mod tests {
             None => "http",
         };
 
+        let address = next_addr();
         let config = PrometheusExporterConfig {
-            address: address.parse().unwrap(),
+            address,
             tls: tls_config,
             ..Default::default()
         };
@@ -439,12 +433,12 @@ mod tests {
         String::from_utf8(bytes.to_vec()).unwrap()
     }
 
-    async fn export_and_fetch_simple(address: &str, tls_config: Option<TlsConfig>) {
+    async fn export_and_fetch_simple(tls_config: Option<TlsConfig>) {
         let (name1, event1) = create_metric_gauge(None, 123.4);
         let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         let events = vec![event1, event2];
 
-        let body = export_and_fetch(address, tls_config, events).await;
+        let body = export_and_fetch(tls_config, events).await;
 
         assert!(body.contains(&format!(
             indoc! {r#"
@@ -492,7 +486,7 @@ mod tests {
     #[tokio::test]
     async fn sink_absolute() {
         let config = PrometheusExporterConfig {
-            address: PROMETHEUS_ADDRESS_TLS.parse().unwrap(),
+            address: next_addr(), // Not actually bound, just needed to fill config
             tls: None,
             ..Default::default()
         };

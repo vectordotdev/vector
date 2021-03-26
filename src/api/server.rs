@@ -35,7 +35,7 @@ impl Server {
         // Spawn the server in the background
         tokio::spawn(server);
 
-        Self { addr, _shutdown }
+        Self { _shutdown, addr }
     }
 
     /// Returns a copy of the SocketAddr that the server was started on

@@ -129,10 +129,7 @@ pub fn component_counter_metrics(
     get_all_metrics(interval).map(move |m| {
         m.into_iter()
             .filter(filter_fn)
-            .filter_map(|m| match m.tag_value("component_name") {
-                Some(name) => Some((name, m)),
-                _ => None,
-            })
+            .filter_map(|m| m.tag_value("component_name").map(|name| (name, m)))
             .fold(BTreeMap::new(), |mut map, (name, m)| {
                 map.entry(name).or_insert_with(Vec::new).push(m);
                 map
@@ -193,10 +190,7 @@ pub fn component_counter_throughputs(
         .map(move |m| {
             m.into_iter()
                 .filter(filter_fn)
-                .filter_map(|m| match m.tag_value("component_name") {
-                    Some(name) => Some((name, m)),
-                    _ => None,
-                })
+                .filter_map(|m| m.tag_value("component_name").map(|name| (name, m)))
                 .fold(BTreeMap::new(), |mut map, (name, m)| {
                     map.entry(name).or_insert_with(Vec::new).push(m);
                     map

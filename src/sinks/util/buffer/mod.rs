@@ -17,7 +17,7 @@ pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
 
 #[derive(Debug)]
 pub struct Buffer {
-    inner: InnerBuffer,
+    inner: Option<InnerBuffer>,
     num_items: usize,
     num_bytes: usize,
     settings: BatchSize<Self>,
@@ -32,19 +32,8 @@ pub enum InnerBuffer {
 
 impl Buffer {
     pub fn new(settings: BatchSize<Self>, compression: Compression) -> Self {
-        let buffer = Vec::with_capacity(settings.bytes);
-        let inner = match compression {
-            Compression::None => InnerBuffer::Plain(buffer),
-            Compression::Gzip(level) => {
-                let level = level.unwrap_or(GZIP_FAST);
-                InnerBuffer::Gzip(GzEncoder::new(
-                    buffer,
-                    flate2::Compression::new(level as u32),
-                ))
-            }
-        };
         Self {
-            inner,
+            inner: None,
             num_items: 0,
             num_bytes: 0,
             settings,
@@ -52,9 +41,27 @@ impl Buffer {
         }
     }
 
+    fn buffer(&mut self) -> &mut InnerBuffer {
+        let bytes = self.settings.bytes;
+        let compression = self.compression;
+        self.inner.get_or_insert_with(|| {
+            let buffer = Vec::with_capacity(bytes);
+            match compression {
+                Compression::None => InnerBuffer::Plain(buffer),
+                Compression::Gzip(level) => {
+                    let level = level.unwrap_or(GZIP_FAST);
+                    InnerBuffer::Gzip(GzEncoder::new(
+                        buffer,
+                        flate2::Compression::new(level as u32),
+                    ))
+                }
+            }
+        })
+    }
+
     pub fn push(&mut self, input: &[u8]) {
         self.num_items += 1;
-        match &mut self.inner {
+        match self.buffer() {
             InnerBuffer::Plain(inner) => {
                 inner.extend_from_slice(input);
             }
@@ -65,10 +72,13 @@ impl Buffer {
     }
 
     pub fn is_empty(&self) -> bool {
-        match &self.inner {
-            InnerBuffer::Plain(inner) => inner.is_empty(),
-            InnerBuffer::Gzip(inner) => inner.get_ref().is_empty(),
-        }
+        self.inner
+            .as_ref()
+            .map(|inner| match inner {
+                InnerBuffer::Plain(inner) => inner.is_empty(),
+                InnerBuffer::Gzip(inner) => inner.get_ref().is_empty(),
+            })
+            .unwrap_or(true)
     }
 }
 
@@ -113,10 +123,11 @@ impl Batch for Buffer {
 
     fn finish(self) -> Self::Output {
         match self.inner {
-            InnerBuffer::Plain(inner) => inner,
-            InnerBuffer::Gzip(inner) => inner
+            Some(InnerBuffer::Plain(inner)) => inner,
+            Some(InnerBuffer::Gzip(inner)) => inner
                 .finish()
                 .expect("This can't fail because the inner writer is a Vec"),
+            None => Vec::new(),
         }
     }
 

@@ -5,19 +5,17 @@ use crate::{
     },
     event::{Event, Value},
     shutdown::ShutdownSignal,
-    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+    sources::util::{
+        add_query_parameters, decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
+    },
     tls::TlsConfig,
     Pipeline,
 };
-use bytes::{Bytes, BytesMut};
-use chrono::Utc;
-use codec::BytesDelimitedCodec;
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
 use std::{collections::HashMap, net::SocketAddr};
 
-use tokio_util::codec::Decoder;
-use warp::http::{HeaderMap, HeaderValue, StatusCode};
+use warp::http::{HeaderMap, HeaderValue};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SimpleHttpConfig {
@@ -73,16 +71,6 @@ struct SimpleHttpSource {
     headers: Vec<String>,
     query_parameters: Vec<String>,
     path_key: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative, Copy)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Text,
-    Ndjson,
-    Json,
 }
 
 impl HttpSource for SimpleHttpSource {
@@ -175,98 +163,6 @@ fn add_headers(
     }
 
     events
-}
-
-fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>> {
-    let mut body = BytesMut::new();
-    body.extend_from_slice(&buf);
-
-    let mut decoder = BytesDelimitedCodec::new(b'\n');
-    std::iter::from_fn(move || {
-        match decoder.decode_eof(&mut body) {
-            Err(error) => Some(Err(ErrorMessage::new(
-                StatusCode::BAD_REQUEST,
-                format!("Bad request: {}", error),
-            ))),
-            Ok(Some(b)) => Some(Ok(b)),
-            Ok(None) => None, // actually done
-        }
-    })
-    .filter(|s| match s {
-        // filter empty lines
-        Ok(b) => !b.is_empty(),
-        _ => true,
-    })
-}
-
-fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
-    match enc {
-        Encoding::Text => body_to_lines(body)
-            .map(|r| Ok(Event::from(r?)))
-            .collect::<Result<_, _>>(),
-        Encoding::Ndjson => body_to_lines(body)
-            .map(|j| {
-                let parsed_json = serde_json::from_slice(&j?)
-                    .map_err(|error| json_error(format!("Error parsing Ndjson: {:?}", error)))?;
-                json_parse_object(parsed_json)
-            })
-            .collect::<Result<_, _>>(),
-        Encoding::Json => {
-            let parsed_json = serde_json::from_slice(&body)
-                .map_err(|error| json_error(format!("Error parsing Json: {:?}", error)))?;
-            json_parse_array_of_object(parsed_json)
-        }
-    }
-}
-
-fn json_parse_object(value: JsonValue) -> Result<Event, ErrorMessage> {
-    let mut event = Event::new_empty_log();
-    let log = event.as_mut_log();
-    log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
-    match value {
-        JsonValue::Object(map) => {
-            for (k, v) in map {
-                log.insert_flat(k, v);
-            }
-            Ok(event)
-        }
-        _ => Err(json_error(format!(
-            "Expected Object, got {}",
-            json_value_to_type_string(&value)
-        ))),
-    }
-}
-
-fn json_parse_array_of_object(value: JsonValue) -> Result<Vec<Event>, ErrorMessage> {
-    match value {
-        JsonValue::Array(v) => v
-            .into_iter()
-            .map(json_parse_object)
-            .collect::<Result<_, _>>(),
-        JsonValue::Object(map) => {
-            //treat like an array of one object
-            Ok(vec![json_parse_object(JsonValue::Object(map))?])
-        }
-        _ => Err(json_error(format!(
-            "Expected Array or Object, got {}.",
-            json_value_to_type_string(&value)
-        ))),
-    }
-}
-
-fn json_error(s: String) -> ErrorMessage {
-    ErrorMessage::new(StatusCode::BAD_REQUEST, format!("Bad JSON: {}", s))
-}
-
-fn json_value_to_type_string(value: &JsonValue) -> &'static str {
-    match value {
-        JsonValue::Object(_) => "Object",
-        JsonValue::Array(_) => "Array",
-        JsonValue::String(_) => "String",
-        JsonValue::Number(_) => "Number",
-        JsonValue::Bool(_) => "Bool",
-        JsonValue::Null => "Null",
-    }
 }
 
 #[cfg(test)]
