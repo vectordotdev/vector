@@ -64,7 +64,7 @@ impl Expression for ParseCsvFn {
             .into_byte_records()
             .next()
             .transpose()
-            .map_err(|err| format!("invalid csv record: {}", err))? // shouldn't really happen
+            .expect("unexpected error parsing csv")
             .map(|record| record.iter().map(Into::into).collect::<Vec<Value>>())
             .unwrap_or_default()
             .into();
@@ -91,6 +91,12 @@ mod tests {
         valid {
             args: func_args![value: value!("foo,bar,\"foo \"\", bar\"")],
             want: Ok(value!(["foo", "bar", "foo \", bar"])),
+            tdef: TypeDef::new().fallible().array::<Kind>(type_def()),
+        }
+
+        invalid_utf8 {
+            args: func_args![value: value!(&b"foo,b\xFFar"[..])],
+            want: Ok(value!(vec!["foo".into(), value!(&b"b\xFFar"[..])])),
             tdef: TypeDef::new().fallible().array::<Kind>(type_def()),
         }
 
