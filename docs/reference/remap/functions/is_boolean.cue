@@ -27,7 +27,7 @@ remap: functions: is_boolean: {
 		{
 			title: "Valid boolean"
 			source: """
-				is_boolean([1, 2, 3])
+				is_boolean(false)
 				"""
 			return: true
 		},

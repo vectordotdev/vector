@@ -123,7 +123,6 @@ default = [
     "to_syslog_severity",
     "to_timestamp",
     "to_unix_timestamp",
-    "type_of",
     "truncate",
     "upcase",
     "uuid_v4",
@@ -203,7 +202,6 @@ starts_with = []
 string = []
 strip_ansi_escape_codes = ["bytes", "strip-ansi-escapes"]
 strip_whitespace = []
-type_of = []
 tag_types_externally = []
 timestamp = []
 to_bool = ["shared/conversion"]
