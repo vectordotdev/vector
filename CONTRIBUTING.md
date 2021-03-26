@@ -330,9 +330,9 @@ We use explicit environment opt-in as many contributors choose to keep their Rus
 
 To build Vector on your own host will require a fairly complete development environment!
 
-We keep an up to date list of all dependencies used in our CI environment inside our `default.nix` file. Loosely, you'll need the following:
+Loosely, you'll need the following:
 
-- **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, and `autotools`. (Full list in [`scripts/environment/definition.nix`](./scripts/environment/definition.nix).
+- **To build Vector:** Have working Rustup, Protobuf tools, C++/C build tools (LLVM, GCC, or MSVC), Python, and Perl, `make` (the GNU one preferably), `bash`, `cmake`, and `autotools`.
 - **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
 - **To run `make check-component-features`:** Have `remarshal` installed.
 
