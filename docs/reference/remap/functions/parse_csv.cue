@@ -20,14 +20,15 @@ remap: functions: parse_csv: {
 		},
 		{
 			name:        "delimiter"
-			description: "The field delimiter to use when parsing. Must be a single-character string."
+			description: "The field delimiter to use when parsing. Must be a single-byte utf8 character."
 			required:    false
 			default: ","
 			type: ["string"]
 		},
 	]
 	internal_failure_reasons: [
-		"delimiter must be a single character",
+		"delimiter must be a single-byte utf8 character",
+		"failed to parse csv string",
 	]
 	return: types: ["array"]
 

@@ -62,16 +62,12 @@ impl Expression for ParseCsvFn {
 
         let parsed_record = reader.into_records().next();
         match parsed_record {
-            Some(_) => {
-                let result = parsed_record
-                    .unwrap()
-                    .unwrap()
-                    .iter()
-                    .map(|l| l.into())
-                    .collect();
+            Some(Ok(record)) => {
+                let result = record.iter().map(|l| l.into()).collect();
                 Ok(Value::Array(result))
             }
-            None => Ok(Value::Array(vec![])),
+            Some(Err(_)) => Err("failed to parse csv string".into()),
+            None => Ok(value!([])),
         }
     }
 
@@ -94,6 +90,12 @@ mod tests {
         valid {
             args: func_args![value: value!("foo,bar,\"foo \"\", bar\"")],
             want: Ok(value!(["foo", "bar", "foo \", bar"])),
+            tdef: TypeDef::new().fallible().array::<Kind>(type_def()),
+        }
+
+        invalid_utf8 {
+            args: func_args![value: value!(&b"foo,  b\xFFar,\tbaz\na,b,c\nd,e,f"[..])],
+            want: Err("failed to parse csv string"),
             tdef: TypeDef::new().fallible().array::<Kind>(type_def()),
         }
 
@@ -122,7 +124,7 @@ mod tests {
         }
 
         multiple_lines {
-            args: func_args![value: value!("first,line\nsecond,line")],
+            args: func_args![value: value!("first,line\nsecond,line,with,more,fields")],
             want: Ok(value!(["first", "line"])),
             tdef: TypeDef::new().fallible().array::<Kind>(type_def()),
         }
