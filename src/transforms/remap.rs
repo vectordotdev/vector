@@ -2,10 +2,16 @@ use crate::{
     config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
     internal_events::RemapMappingError,
-    transforms::{FunctionTransform, Transform},
+    transforms::{TaskTransform, Transform},
     Result,
 };
+use futures::stream::StreamExt;
+use futures::Stream;
 use serde::{Deserialize, Serialize};
+use std::future::ready;
+use std::pin::Pin;
+use std::sync::Arc;
+use tokio::task;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime};
 
@@ -27,7 +33,7 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
     async fn build(&self, _globals: &GlobalOptions) -> Result<Transform> {
-        Remap::new(self.clone()).map(Transform::function)
+        Remap::new(self.clone()).map(Transform::task)
     }
 
     fn input_type(&self) -> DataType {
@@ -45,7 +51,7 @@ impl TransformConfig for RemapConfig {
 
 #[derive(Debug, Clone)]
 pub struct Remap {
-    program: Program,
+    program: Arc<Program>,
     drop_on_error: bool,
 }
 
@@ -58,45 +64,63 @@ impl Remap {
         })?;
 
         Ok(Remap {
-            program,
+            program: Arc::new(program),
             drop_on_error: config.drop_on_error,
         })
     }
 }
 
-impl FunctionTransform for Remap {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        let original_event = if !self.drop_on_error && self.program.is_fallible() {
-            // We need to clone the original event, since it might be mutated by
-            // the program before it aborts, while we want to return the
-            // unmodified event when an error occurs.
-            Some(event.clone())
-        } else {
-            None
-        };
+async fn transform_one(
+    drop_on_error: bool,
+    program: Arc<Program>,
+    mut event: Event,
+) -> Option<Event> {
+    let original_event = if !drop_on_error && program.is_fallible() {
+        // We need to clone the original event, since it might be mutated by
+        // the program before it aborts, while we want to return the
+        // unmodified event when an error occurs.
+        Some(event.clone())
+    } else {
+        None
+    };
 
-        let mut runtime = Runtime::default();
+    let mut runtime = Runtime::default();
 
-        let result = match event {
-            Event::Log(ref mut event) => runtime.resolve(event, &self.program),
-            Event::Metric(ref mut event) => runtime.resolve(event, &self.program),
-        };
+    let resolved = match event {
+        Event::Log(ref mut event) => runtime.resolve(event, &program),
+        Event::Metric(ref mut event) => runtime.resolve(event, &program),
+    };
 
-        match result {
-            Ok(_) => output.push(event),
-            Err(error) => {
-                emit!(RemapMappingError {
-                    error: error.to_string(),
-                    event_dropped: self.drop_on_error,
-                });
+    match resolved {
+        Ok(_) => Some(event),
+        Err(error) => {
+            emit!(RemapMappingError {
+                error: error.to_string(),
+                event_dropped: drop_on_error,
+            });
 
-                if self.drop_on_error {
-                    return;
-                }
-
-                output.push(original_event.unwrap_or(event))
+            if drop_on_error {
+                None
+            } else {
+                original_event.or(Some(event))
             }
         }
+    }
+}
+
+impl TaskTransform for Remap {
+    fn transform(
+        self: Box<Self>,
+        task: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    ) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+    where
+        Self: 'static,
+    {
+        let output = task.filter_map(move |event| {
+            transform_one(self.drop_on_error, self.program.clone(), event)
+        });
+
+        Box::pin(output)
     }
 }
 
