@@ -2,6 +2,12 @@ use super::log_event::LogEvent;
 use crate::api::tap::{TapNotification, TapPayload};
 use async_graphql::{Enum, SimpleObject, Union};
 
+#[derive(Enum, Copy, Clone, PartialEq, Eq)]
+pub enum EventEncodingType {
+    Json,
+    Yaml,
+}
+
 #[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
 /// Event notification type
 pub enum EventNotificationType {
