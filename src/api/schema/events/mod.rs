@@ -1,15 +1,24 @@
-mod event;
-mod log_event;
+mod encoding;
+mod log;
+mod notification;
+mod output;
 
-use event::Event;
+use output::OutputEventsPayload;
 
 use crate::{api::tap::TapSink, topology::WatchRx};
 
-use async_graphql::{validators::IntRange, Context, Subscription};
+use async_graphql::{validators::IntRange, Context, Enum, Subscription};
 use futures::StreamExt;
 use itertools::Itertools;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use tokio::{select, stream::Stream, sync::mpsc, time};
+
+#[derive(Enum, Copy, Clone, PartialEq, Eq)]
+/// Encoding format for the event
+pub enum EventEncodingType {
+    Json,
+    Yaml,
+}
 
 #[derive(Debug, Default)]
 pub struct EventsSubscription;
@@ -23,7 +32,7 @@ impl EventsSubscription {
         component_names: Vec<String>,
         #[graphql(default = 500)] interval: u32,
         #[graphql(default = 100, validator(IntRange(min = "1", max = "10_000")))] limit: u32,
-    ) -> impl Stream<Item = Vec<Event>> + 'a {
+    ) -> impl Stream<Item = Vec<OutputEventsPayload>> + 'a {
         let watch_rx = ctx.data_unchecked::<WatchRx>().clone();
 
         // Client input is confined to `u32` to provide sensible bounds.
@@ -39,7 +48,7 @@ fn create_events_stream(
     component_names: Vec<String>,
     interval: u64,
     limit: usize,
-) -> impl Stream<Item = Vec<Event>> {
+) -> impl Stream<Item = Vec<OutputEventsPayload>> {
     // Channel for receiving individual tap payloads. Since we can process at most `limit` per
     // interval, this is capped to the same value.
     let (tap_tx, mut tap_rx) = mpsc::channel(limit);
@@ -47,7 +56,7 @@ fn create_events_stream(
     // The resulting vector of `Event` sent to the client. Only one result set will be streamed
     // back to the client at a time. This value is set higher than `1` to prevent blocking the event
     // pipeline on slower client connections, but low enough to apply a modest cap on mem usage.
-    let (mut event_tx, event_rx) = mpsc::channel::<Vec<Event>>(10);
+    let (mut event_tx, event_rx) = mpsc::channel::<Vec<OutputEventsPayload>>(10);
 
     tokio::spawn(async move {
         // Create a tap sink. When this drops out of scope, clean up will be performed on the
@@ -58,14 +67,14 @@ fn create_events_stream(
         let mut interval = time::interval(time::Duration::from_millis(interval));
 
         // Temporary structure to hold sortable values of `Event`.
-        struct SortableEvent {
+        struct SortableOutputEventsPayload {
             batch: usize,
-            event: Event,
+            payload: OutputEventsPayload,
         }
 
         // Collect a vector of results, with a capacity of `limit`. As new `Event`s come in,
         // they will be sampled and added to results.
-        let mut results = Vec::<SortableEvent>::with_capacity(limit);
+        let mut results = Vec::<SortableOutputEventsPayload>::with_capacity(limit);
 
         // Random number generator to allow for sampling. Speed trumps cryptographic security here.
         // The RNG must be Send + Sync to use with the `select!` loop below, hence `SmallRng`.
@@ -80,32 +89,32 @@ fn create_events_stream(
                 // Process `TapPayload`s. A tap payload could contain log/metric events or a
                 // notification. Notifications are emitted immediately; events buffer until
                 // the next `interval`.
-                Some(event) = tap_rx.next() => {
-                    let event = event.into();
+                Some(payload) = tap_rx.next() => {
+                    let payload = payload.into();
 
                     // Emit notifications immediately; these don't count as a 'batch'.
-                    if let Event::Notification(_) = event {
+                    if let OutputEventsPayload::Notification(_) = payload {
                         // If an error occurs when sending, the subscription has likely gone
                         // away. Break the loop to terminate the thread.
-                        if let Err(err) = event_tx.send(vec![event]).await {
+                        if let Err(err) = event_tx.send(vec![payload]).await {
                             debug!(message = "Couldn't send notification.", error = ?err);
                             break;
                         }
                     } else {
                         // Wrap tap in a 'sortable' wrapper, using the batch as a key, to
                         // re-sort after random eviction.
-                        let event = SortableEvent { batch, event };
+                        let payload = SortableOutputEventsPayload { batch, payload };
 
                         // A simple implementation of "Algorithm R" per
                         // https://en.wikipedia.org/wiki/Reservoir_sampling. As we're unable to
                         // pluck the nth result, this is chosen over the more optimal "Algorithm L"
                         // since discarding results isn't an option.
                         if limit > results.len() {
-                            results.push(event);
+                            results.push(payload);
                         } else {
                             let random_number = rng.gen_range(0..batch);
                             if random_number < results.len() {
-                                results[random_number] = event;
+                                results[random_number] = payload;
                             }
                         }
                         // Increment the batch count, to be used for the next Algo R loop.
@@ -123,7 +132,7 @@ fn create_events_stream(
                         let results = results
                             .drain(..)
                             .sorted_by_key(|r| r.batch)
-                            .map(|r| r.event)
+                            .map(|r| r.payload)
                             .collect();
 
                         // If we get an error here, it likely means that the subscription has
