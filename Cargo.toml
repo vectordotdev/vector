@@ -341,6 +341,7 @@ api = [
   "async-graphql-warp",
   "base64",
   "itertools",
+  "warp",
 ]
 
 # API client
