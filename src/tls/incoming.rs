@@ -273,22 +273,13 @@ impl AsyncWrite for MaybeTlsIncomingStream<TcpStream> {
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
         let mut this = self.get_mut();
         match &mut this.state {
-            StreamState::Accepted(stream) => {
-                let pinned = Pin::new(&mut *stream);
-                match pinned.poll_flush(cx) {
-                    Poll::Ready(Ok(())) => (),
-                    poll_result => return poll_result,
-                };
-
-                let pinned = Pin::new(&mut *stream);
-                match pinned.poll_shutdown(cx) {
-                    Poll::Ready(Ok(())) => {
-                        this.state = StreamState::Closed;
-                        Poll::Ready(Ok(()))
-                    }
-                    poll_result => poll_result,
+            StreamState::Accepted(stream) => match Pin::new(stream).poll_shutdown(cx) {
+                Poll::Ready(Ok(())) => {
+                    this.state = StreamState::Closed;
+                    Poll::Ready(Ok(()))
                 }
-            }
+                poll_result => poll_result,
+            },
             StreamState::Accepting(fut) => match futures::ready!(fut.as_mut().poll(cx)) {
                 Ok(stream) => {
                     this.state = StreamState::Accepted(MaybeTlsStream::Tls(stream));
