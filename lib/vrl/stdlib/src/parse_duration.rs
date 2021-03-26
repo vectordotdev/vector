@@ -11,7 +11,7 @@ lazy_static! {
             \A
             (?P<value>[0-9]*\.?[0-9]+) # value: integer or float
             \s?                        # optional space between value and unit
-            (?P<unit>[µa-z]{1,2})       # unit: one or two letters
+            (?P<unit>[µa-z]{1,2})      # unit: one or two letters
             \z"
     )
     .unwrap();
