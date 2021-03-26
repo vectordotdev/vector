@@ -67,7 +67,7 @@ impl Expression for ParseQueryStringFn {
                         }
                     };
                 })
-                .or_insert(value.into());
+                .or_insert_with(|| value.into());
         }
         Ok(result.into())
     }
