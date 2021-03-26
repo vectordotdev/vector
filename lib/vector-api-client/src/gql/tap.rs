@@ -4,18 +4,18 @@ use graphql_client::GraphQLQuery;
 /// Shorthand for a Chrono datetime, set to UTC.
 type DateTime = chrono::DateTime<chrono::Utc>;
 
-/// OutputLogEventsSubscription allows observability into the log events that are
+/// OutputEventsSubscription allows observability into the events that are
 /// generated from component(s).
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "graphql/subscriptions/output_log_events.graphql",
+    query_path = "graphql/subscriptions/output_events.graphql",
     response_derives = "Debug"
 )]
-pub struct OutputLogEventsSubscription;
+pub struct OutputEventsSubscription;
 
 /// Tap encoding format type that is more convenient to use for public clients than the
-/// generated `output_log_events_subscription::LogEventEncodingType`.
+/// generated `output_events_subscription::EventEncodingType`.
 #[derive(Debug, Clone, Copy)]
 pub enum TapEncodingFormat {
     Json,
@@ -35,8 +35,8 @@ impl std::str::FromStr for TapEncodingFormat {
     }
 }
 
-/// Map the public-facing `TapEncodingFormat` to the internal `LogEventEncodingType`.
-impl From<TapEncodingFormat> for output_log_events_subscription::LogEventEncodingType {
+/// Map the public-facing `TapEncodingFormat` to the internal `EventEncodingType`.
+impl From<TapEncodingFormat> for output_events_subscription::EventEncodingType {
     fn from(encoding: TapEncodingFormat) -> Self {
         match encoding {
             TapEncodingFormat::Json => Self::JSON,
@@ -45,46 +45,47 @@ impl From<TapEncodingFormat> for output_log_events_subscription::LogEventEncodin
     }
 }
 
-impl output_log_events_subscription::OutputLogEventsSubscriptionOutputLogEvents {
+impl output_events_subscription::OutputEventsSubscriptionOutputEvents {
     pub fn as_log(
         &self,
-    ) -> Option<&output_log_events_subscription::OutputLogEventsSubscriptionOutputLogEventsOnLogEvent>
-    {
+    ) -> Option<&output_events_subscription::OutputEventsSubscriptionOutputEventsOnLogEvent> {
         match self {
-            output_log_events_subscription::OutputLogEventsSubscriptionOutputLogEvents::LogEvent(ev) => Some(ev),
-            _ => None
+            output_events_subscription::OutputEventsSubscriptionOutputEvents::LogEvent(ev) => {
+                Some(ev)
+            }
+            _ => None,
         }
     }
 }
 
 pub trait TapSubscriptionExt {
-    /// Executes an output log events subscription.
-    fn output_log_events_subscription(
+    /// Executes an output events subscription.
+    fn output_events_subscription(
         &self,
         component_names: Vec<String>,
         encoding: TapEncodingFormat,
         limit: i64,
         interval: i64,
-    ) -> crate::BoxedSubscription<OutputLogEventsSubscription>;
+    ) -> crate::BoxedSubscription<OutputEventsSubscription>;
 }
 
 impl TapSubscriptionExt for crate::SubscriptionClient {
-    /// Executes an output log events subscription.
-    fn output_log_events_subscription(
+    /// Executes an output events subscription.
+    fn output_events_subscription(
         &self,
         component_names: Vec<String>,
         encoding: TapEncodingFormat,
         limit: i64,
         interval: i64,
-    ) -> BoxedSubscription<OutputLogEventsSubscription> {
+    ) -> BoxedSubscription<OutputEventsSubscription> {
         let request_body =
-            OutputLogEventsSubscription::build_query(output_log_events_subscription::Variables {
+            OutputEventsSubscription::build_query(output_events_subscription::Variables {
                 component_names,
                 limit,
                 interval,
                 encoding: encoding.into(),
             });
 
-        self.start::<OutputLogEventsSubscription>(&request_body)
+        self.start::<OutputEventsSubscription>(&request_body)
     }
 }

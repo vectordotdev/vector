@@ -37,7 +37,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     };
 
     // Issue the 'tap' request, printing to stdout.
-    let res = subscription_client.output_log_events_subscription(
+    let res = subscription_client.output_events_subscription(
         opts.components.clone(),
         opts.format,
         opts.limit as i64,
@@ -54,7 +54,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     // TODO: https://github.com/timberio/vector/issues/6870
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
-            for log_event in d.output_log_events.iter().filter_map(|ev| ev.as_log()) {
+            for log_event in d.output_events.iter().filter_map(|ev| ev.as_log()) {
                 println!("{}", log_event.string);
             }
         }
