@@ -819,6 +819,93 @@
         {
           "description": null,
           "enumValues": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "UNION",
+          "name": "Event",
+          "possibleTypes": [
+            {
+              "kind": "OBJECT",
+              "name": "LogEvent",
+              "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "EventNotification",
+              "ofType": null
+            }
+          ]
+        },
+        {
+          "description": "A notification regarding events observation",
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Name of the component associated with the notification",
+              "isDeprecated": false,
+              "name": "componentName",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Event notification type",
+              "isDeprecated": false,
+              "name": "notification",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "EventNotificationType",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "EventNotification",
+          "possibleTypes": null
+        },
+        {
+          "description": "Event notification type",
+          "enumValues": [
+            {
+              "deprecationReason": null,
+              "description": "A component was found that matched the provided pattern",
+              "isDeprecated": false,
+              "name": "MATCHED"
+            },
+            {
+              "deprecationReason": null,
+              "description": "There isn't currently a component that matches this pattern",
+              "isDeprecated": false,
+              "name": "NOT_MATCHED"
+            }
+          ],
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "ENUM",
+          "name": "EventNotificationType",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
           "fields": [
             {
               "args": [],
@@ -1731,93 +1818,6 @@
           "kind": "ENUM",
           "name": "LogEventEncodingType",
           "possibleTypes": null
-        },
-        {
-          "description": "A notification regarding logs events observation",
-          "enumValues": null,
-          "fields": [
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Name of the component associated with the notification",
-              "isDeprecated": false,
-              "name": "componentName",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Log event notification type",
-              "isDeprecated": false,
-              "name": "notification",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "ENUM",
-                  "name": "LogEventNotificationType",
-                  "ofType": null
-                }
-              }
-            }
-          ],
-          "inputFields": null,
-          "interfaces": [],
-          "kind": "OBJECT",
-          "name": "LogEventNotification",
-          "possibleTypes": null
-        },
-        {
-          "description": "Log event notification type",
-          "enumValues": [
-            {
-              "deprecationReason": null,
-              "description": "A component was found that matched the provided pattern",
-              "isDeprecated": false,
-              "name": "MATCHED"
-            },
-            {
-              "deprecationReason": null,
-              "description": "There isn't currently a component that matches this pattern",
-              "isDeprecated": false,
-              "name": "NOT_MATCHED"
-            }
-          ],
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "kind": "ENUM",
-          "name": "LogEventNotificationType",
-          "possibleTypes": null
-        },
-        {
-          "description": "Log event payload which can be a log event or notification",
-          "enumValues": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "kind": "UNION",
-          "name": "LogEventPayload",
-          "possibleTypes": [
-            {
-              "kind": "OBJECT",
-              "name": "LogEvent",
-              "ofType": null
-            },
-            {
-              "kind": "OBJECT",
-              "name": "LogEventNotification",
-              "ofType": null
-            }
-          ]
         },
         {
           "description": "Host memory metrics",
@@ -3748,9 +3748,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "A stream of log events emitted from matched component(s)",
+              "description": "A stream of events emitted from matched component(s)",
               "isDeprecated": false,
-              "name": "outputLogEvents",
+              "name": "outputEvents",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -3762,7 +3762,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "UNION",
-                      "name": "LogEventPayload",
+                      "name": "Event",
                       "ofType": null
                     }
                   }

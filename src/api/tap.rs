@@ -36,11 +36,12 @@ pub enum TapNotification {
     NotMatched,
 }
 
-/// A tap payload can either contain a log event or a notification that's intended
+/// A tap payload can either contain a log/metric event or a notification that's intended
 /// to be communicated back to the client to alert them about the status of the tap request.
 #[derive(Debug)]
 pub enum TapPayload {
     LogEvent(String, LogEvent),
+    MetricEvent(String, LogEvent),
     Notification(String, TapNotification),
 }
 
