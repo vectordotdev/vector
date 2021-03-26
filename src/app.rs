@@ -4,7 +4,6 @@ use crate::topology::RunningTopology;
 use crate::{
     config, generate, heartbeat, list, metrics, signal, topology, trace, unit_test, validate,
 };
-use std::cmp::max;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -95,10 +94,8 @@ impl Application {
         }
 
         let rt = {
-            let threads = root_opts.threads.unwrap_or_else(|| max(1, num_cpus::get()));
             runtime::Builder::new_multi_thread()
                 .enable_all()
-                .worker_threads(threads)
                 .build()
                 .expect("Unable to create async runtime")
         };
