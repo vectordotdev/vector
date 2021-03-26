@@ -164,7 +164,7 @@ mod tests {
             tdef: TypeDef::new().fallible().float(),
         }
 
-        us_s {
+        us_ms {
             args: func_args![value: "1 µs",
                              unit: "ms"],
             want: Ok(0.001),
