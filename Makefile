@@ -316,7 +316,7 @@ ifeq ($(AUTODESPAWN), true)
 endif
 
 .PHONY: test-integration-azure
-test-integration-azure:
+test-integration-azure: ## Runs Azure integration tests
 ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh azure stop
 	@scripts/setup_integration_env.sh azure start
