@@ -1,13 +1,13 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
-use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
 use std::collections::{BTreeMap, HashMap};
 
 pub mod discriminant;
 pub mod merge;
 pub mod merge_state;
+pub mod metadata;
 pub mod metric;
 pub mod util;
 
@@ -17,6 +17,7 @@ mod value;
 
 pub use log_event::LogEvent;
 pub use lookup::Lookup;
+pub use metadata::EventMetadata;
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use std::convert::{TryFrom, TryInto};
 pub(crate) use util::log::PathComponent;
@@ -28,15 +29,6 @@ pub mod proto {
 }
 
 pub const PARTIAL: &str = "_partial";
-
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-pub struct EventMetadata;
-
-impl EventDataEq for EventMetadata {
-    fn event_data_eq(&self, _other: &Self) -> bool {
-        true
-    }
-}
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Event {
