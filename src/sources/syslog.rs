@@ -257,7 +257,7 @@ impl SyslogDecoder {
                 src.advance(src.len());
                 Ok(None)
             }
-            
+
             (true, _, Some(offset), _) => {
                 // When discarding we keep discarding to the next newline.
                 src.advance(offset + 1);
