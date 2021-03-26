@@ -1,6 +1,6 @@
+use super::Error;
 #[cfg(feature = "repl")]
 use super::{repl, tutorial::vrl_tutorial};
-use super::Error;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{self, Read};
