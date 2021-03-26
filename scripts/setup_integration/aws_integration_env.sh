@@ -29,7 +29,7 @@ start_podman () {
   localstack/localstack-full:0.11.6
   podman run -d --pod=vector-test-integration-aws --name vector_mockwatchlogs \
   -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
-  podman run -d --pod=vector-test-integration-aws -v /var/run:/var/run --name vector_local_ecs \
+  podman run -d --pod=vector-test-integration-aws -v /var/run/docker.sock:/var/run/docker.sock --name vector_local_ecs \
   -e RUST_LOG=trace amazon/amazon-ecs-local-container-endpoints:latest
 }
 
@@ -43,7 +43,7 @@ start_docker () {
   localstack/localstack-full:0.11.6
   docker run -d --network=vector-test-integration-aws -p 6000:6000 --name vector_mockwatchlogs \
   -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
-  docker run -d --network=vector-test-integration-aws -v /var/run:/var/run -p 9088:80 --name vector_local_ecs \
+  docker run -d --network=vector-test-integration-aws -v /var/run/docker.sock:/var/run/docker.sock -p 9088:80 --name vector_local_ecs \
   -e RUST_LOG=trace amazon/amazon-ecs-local-container-endpoints:latest
 }
 

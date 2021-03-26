@@ -966,9 +966,9 @@ dependencies = [
 
 [[package]]
 name = "cidr-utils"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89f7b6372f3c783f6d44c0da283d3694af4104967bf2371cb3bdc9d09e1cfe00"
+checksum = "b926222810dca24b177606653e09ebf34310c23c60931d630d408486e341335c"
 dependencies = [
  "debug-helper",
  "num-bigint 0.3.1",
@@ -4312,6 +4312,18 @@ name = "nix"
 version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2ccba0cfe4fdf15982d1674c69b1fd80bad427d293849982668dfe454bd61f2"
+dependencies = [
+ "bitflags",
+ "cc",
+ "cfg-if 1.0.0",
+ "libc",
+]
+
+[[package]]
+name = "nix"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa9b4819da1bc61c0ea48b63b7bc8604064dd43013e7cc325df098d49cd7c18a"
 dependencies = [
  "bitflags",
  "cc",
@@ -7796,6 +7808,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "twox-hash"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04f8ab788026715fa63b31960869617cba39117e520eb415b0139543e325ab59"
+dependencies = [
+ "cfg-if 0.1.10",
+ "rand 0.7.3",
+ "static_assertions",
+]
+
+[[package]]
 name = "typed-builder"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8117,7 +8140,7 @@ dependencies = [
  "metrics-tracing-context",
  "metrics-util",
  "mongodb",
- "nix 0.19.1",
+ "nix 0.20.0",
  "nom 6.1.2",
  "notify",
  "num-format",
@@ -8194,6 +8217,7 @@ dependencies = [
  "tracing-subscriber",
  "tracing-tower",
  "tui",
+ "twox-hash",
  "typetag",
  "url",
  "uuid 0.8.2",
@@ -8294,6 +8318,7 @@ dependencies = [
  "bitflags",
  "bytes 1.0.1",
  "chrono",
+ "criterion",
  "dyn-clone",
  "lalrpop-util",
  "ngrammatic",
@@ -8366,6 +8391,7 @@ dependencies = [
  "ansi_term 0.12.1",
  "chrono",
  "glob 0.3.0",
+ "jemallocator",
  "prettydiff",
  "regex",
  "serde",

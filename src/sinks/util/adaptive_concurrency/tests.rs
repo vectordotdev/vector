@@ -523,7 +523,7 @@ impl ResultTest {
                 .and_then(|range| range.assert_usize(stat.mode, name, "mode")),
         ]
         .into_iter()
-        .filter_map(|f| f)
+        .flatten()
         .collect::<Vec<_>>()
     }
 
@@ -537,7 +537,7 @@ impl ResultTest {
                 .and_then(|range| range.assert_f64(stat.mean, name, "mean")),
         ]
         .into_iter()
-        .filter_map(|f| f)
+        .flatten()
         .collect::<Vec<_>>()
     }
 }

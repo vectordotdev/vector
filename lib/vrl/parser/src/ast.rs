@@ -1171,7 +1171,7 @@ macro_rules! test_enum {
                 pub fn [<$func>](self) -> $ret {
                     match self {
                         Test::$variant(v) => v,
-                        v => panic!(v),
+                        v => panic!("{:?}", v),
                     }
                 }
             })+

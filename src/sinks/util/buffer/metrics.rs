@@ -109,7 +109,7 @@ impl DerefMut for MetricEntry {
 /// metrics have their their samples compressed with
 /// `compress_distribution` below.
 pub struct MetricsBuffer {
-    metrics: MetricSet,
+    metrics: Option<MetricSet>,
     max_events: usize,
 }
 
@@ -120,7 +120,7 @@ impl MetricsBuffer {
 
     fn with_capacity(max_events: usize) -> Self {
         Self {
-            metrics: MetricSet::with_capacity(max_events),
+            metrics: None,
             max_events,
         }
     }
@@ -145,12 +145,16 @@ impl Batch for MetricsBuffer {
             PushResult::Overflow(item)
         } else {
             let item = item.into_metric();
+            let max_events = self.max_events;
+            let metrics = self
+                .metrics
+                .get_or_insert_with(|| MetricSet::with_capacity(max_events));
             let new_entry = match item.data.kind {
                 MetricKind::Absolute => MetricEntry(item),
                 MetricKind::Incremental => {
                     // Incremental metrics update existing entries, if present
                     let entry = MetricEntry(item);
-                    self.metrics
+                    metrics
                         .take(&entry)
                         .map(|mut existing| {
                             existing.data.update(&entry.data);
@@ -159,7 +163,7 @@ impl Batch for MetricsBuffer {
                         .unwrap_or(entry)
                 }
             };
-            self.metrics.replace(new_entry);
+            metrics.replace(new_entry);
             PushResult::Ok(self.num_items() >= self.max_events)
         }
     }
@@ -173,11 +177,19 @@ impl Batch for MetricsBuffer {
     }
 
     fn finish(self) -> Self::Output {
-        self.metrics.0.into_iter().map(finish_metric).collect()
+        self.metrics
+            .unwrap_or_else(|| MetricSet::with_capacity(0))
+            .0
+            .into_iter()
+            .map(finish_metric)
+            .collect()
     }
 
     fn num_items(&self) -> usize {
-        self.metrics.len()
+        self.metrics
+            .as_ref()
+            .map(|metrics| metrics.0.len())
+            .unwrap_or(0)
     }
 }
 
@@ -381,7 +393,8 @@ mod test {
                 match buffer.push(event) {
                     PushResult::Overflow(_) => panic!("overflowed too early"),
                     PushResult::Ok(true) => {
-                        result.push(buffer.fresh_replace().finish());
+                        let batch = std::mem::replace(&mut buffer, MetricsBuffer::new(batch_size));
+                        result.push(batch.finish());
                     }
                     PushResult::Ok(false) => (),
                 }

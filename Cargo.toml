@@ -25,6 +25,7 @@ debug = false     # Do not include debug symbols in the executable.
 debug = true
 
 [package.metadata.deb]
+name = "vector"
 maintainer-scripts = "distribution/debian/scripts/"
 conf-files = ["/etc/vector/vector.toml"]
 assets = [
@@ -36,7 +37,24 @@ assets = [
 ]
 license-file = ["target/debian-license.txt"]
 extended-description-file = "target/debian-extended-description.txt"
-depends = "libc6 (>= 2.17)"
+
+# libc requirements are defined by `cross`
+# https://github.com/rust-embedded/cross#supported-targets
+# Though, it seems like aarch64 libc is actually 2.18 and not 2.19
+[package.metadata.deb.variants.armv7-unknown-linux-gnueabihf]
+depends = "libc6 (>= 2.15)"
+
+[package.metadata.deb.variants.x86_64-unknown-linux-gnu]
+depends = "libc6 (>= 2.15)"
+
+[package.metadata.deb.variants.x86_64-unknown-linux-musl]
+depends = ""
+
+[package.metadata.deb.variants.aarch64-unknown-linux-gnu]
+depends = "libc6 (>= 2.18)"
+
+[package.metadata.deb.variants.aarch64-unknown-linux-musl]
+depends = ""
 
 [workspace]
 members = [
@@ -156,7 +174,7 @@ bollard = { version = "0.10.1", features = ["ssl"], optional = true }
 bytes = { version = "1.0.0", features = ["serde"] }
 bytesize = { version = "1.0.0", optional = true }
 chrono = { version = "0.4.19", features = ["serde"] }
-cidr-utils = "0.5.0"
+cidr-utils = "0.5.1"
 colored = "2.0"
 dashmap = "4"
 db-key = "0.0.5"
@@ -223,6 +241,7 @@ thread_local = "=1.0.1"
 tokio-postgres = { version = "0.5.5", features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = "0.5.8"
 typetag = "0.1.6"
+twox-hash = "1.6"
 url = "2.2.1"
 uuid = { version = "0.8", features = ["serde", "v4"], optional = true }
 warp = { version = "0.3.0", default-features = false, optional = true }
@@ -243,7 +262,7 @@ security-framework = "2.0"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
-nix = "0.19.0"
+nix = "0.20.0"
 
 [build-dependencies]
 prost-build = "0.7.0"
@@ -338,6 +357,7 @@ sources = ["sources-logs", "sources-metrics"]
 sources-logs = [
   "sources-aws_kinesis_firehose",
   "sources-aws_s3",
+  "sources-datadog",
   "sources-docker_logs",
   "sources-file",
   "sources-generator",
@@ -370,6 +390,7 @@ sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
+sources-datadog = ["sources-utils-http"]
 sources-docker_logs = ["bollard", "dirs-next"]
 sources-file = ["bytesize", "file-source"]
 sources-generator = ["fakedata"]

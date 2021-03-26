@@ -307,7 +307,7 @@ mod tests {
                 .edges
                 .into_iter()
                 .flatten()
-                .filter_map(std::convert::identity)
+                .flatten()
                 .collect::<Vec<_>>();
 
             let transforms = data
@@ -315,7 +315,7 @@ mod tests {
                 .edges
                 .into_iter()
                 .flatten()
-                .filter_map(std::convert::identity)
+                .flatten()
                 .collect::<Vec<_>>();
 
             let sinks = data
@@ -323,7 +323,7 @@ mod tests {
                 .edges
                 .into_iter()
                 .flatten()
-                .filter_map(std::convert::identity)
+                .flatten()
                 .collect::<Vec<_>>();
 
             // should be a single source named "in1"

@@ -166,7 +166,7 @@ async fn validate_healthchecks(
     pieces: &mut Pieces,
     fmt: &mut Formatter,
 ) -> bool {
-    if config.healthchecks.enabled {
+    if !config.healthchecks.enabled {
         fmt.warning("Health checks are disabled");
         return !opts.deny_warnings;
     }

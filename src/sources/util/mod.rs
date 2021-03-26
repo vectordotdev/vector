@@ -1,3 +1,5 @@
+#[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
+mod body_decoding;
 mod encoding_config;
 #[cfg(feature = "sources-utils-http")]
 mod http;
@@ -9,6 +11,8 @@ mod unix_datagram;
 #[cfg(all(unix, feature = "sources-utils-unix"))]
 mod unix_stream;
 
+#[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
+pub(crate) use self::body_decoding::{decode_body, Encoding};
 #[cfg(any(feature = "sources-http", feature = "sources-heroku_logs"))]
 pub(crate) use self::http::add_query_parameters;
 #[cfg(feature = "sources-prometheus")]

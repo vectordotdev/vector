@@ -143,10 +143,9 @@ impl From<BTreeMap<String, Value>> for LogEvent {
     }
 }
 
-impl Into<BTreeMap<String, Value>> for LogEvent {
-    fn into(self) -> BTreeMap<String, Value> {
-        let Self { fields } = self;
-        fields
+impl From<LogEvent> for BTreeMap<String, Value> {
+    fn from(event: LogEvent) -> BTreeMap<String, Value> {
+        event.fields
     }
 }
 
@@ -158,9 +157,9 @@ impl From<HashMap<String, Value>> for LogEvent {
     }
 }
 
-impl Into<HashMap<String, Value>> for LogEvent {
-    fn into(self) -> HashMap<String, Value> {
-        self.fields.into_iter().collect()
+impl From<LogEvent> for HashMap<String, Value> {
+    fn from(event: LogEvent) -> HashMap<String, Value> {
+        event.fields.into_iter().collect()
     }
 }
 
