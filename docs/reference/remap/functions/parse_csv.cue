@@ -38,7 +38,7 @@ remap: functions: parse_csv: {
 			source: #"""
 				parse_csv!("foo,bar,\"foo \"\", bar\"")
 				"""#
-			return: ["foo", "bar", "foo \", bar"]
+			return: ["foo", "bar", #"foo ", bar"#]
 		},
 		{
 			title: "Parse a single CSV formatted row with custom delimiter"
