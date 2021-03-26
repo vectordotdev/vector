@@ -9,7 +9,7 @@ use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Validator};
 use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
-use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
+use vrl::{diagnostic::Formatter, state, value, Abort, Runtime, RuntimeResult, Target, Value};
 
 // Create a list of all possible error values for potential docs lookup
 lazy_static! {
@@ -93,13 +93,19 @@ pub(crate) fn run(mut objects: Vec<Value>) {
                     _ => line,
                 };
 
-                let value = resolve(
+                let result = resolve(
                     objects.get_mut(index),
                     &mut rt,
                     command,
                     &mut compiler_state,
                 );
-                println!("{}\n", value);
+
+                let string = match result {
+                    Ok(v) => v.to_string(),
+                    Err(v) => v.to_string(),
+                };
+
+                println!("{}\n", string);
             }
             Err(ReadlineError::Interrupted) => break,
             Err(ReadlineError::Eof) => break,
@@ -116,21 +122,23 @@ fn resolve(
     runtime: &mut Runtime,
     program: &str,
     state: &mut state::Compiler,
-) -> String {
+) -> RuntimeResult {
+    let mut empty = value!({});
     let object = match object {
-        None => return Value::Null.to_string(),
+        None => &mut empty as &mut dyn Target,
         Some(object) => object,
     };
 
     let program = match vrl::compile_with_state(program, &stdlib::all(), state) {
         Ok(program) => program,
-        Err(diagnostics) => return Formatter::new(program, diagnostics).colored().to_string(),
+        Err(diagnostics) => {
+            return Err(Abort(
+                Formatter::new(program, diagnostics).colored().to_string(),
+            ))
+        }
     };
 
-    match runtime.resolve(object, &program) {
-        Ok(value) => value.to_string(),
-        Err(err) => err.to_string(),
-    }
+    runtime.resolve(object, &program)
 }
 
 struct Repl {
@@ -233,12 +241,24 @@ impl Validator for Repl {
     ) -> rustyline::Result<ValidationResult> {
         self.validator.validate(ctx).map(|result| match result {
             ValidationResult::Valid(_) => {
-                // support multi-line input by ending the line with a '\'
-                if ctx.input().ends_with('\\') {
-                    return ValidationResult::Incomplete;
-                }
+                let mut compiler_state = state::Compiler::default();
+                let mut rt = Runtime::new(state::Runtime::default());
+                let target: Option<&mut Value> = None;
 
-                result
+                match resolve(target, &mut rt, ctx.input(), &mut compiler_state) {
+                    Err(error) => {
+                        let m = error.to_string();
+
+                        // TODO: Ideally we'd used typed errors for this, but
+                        // that requires some more work to the VRL compiler.
+                        if m.contains("syntax error") && m.contains("unexpected end of program") {
+                            return ValidationResult::Incomplete;
+                        }
+
+                        result
+                    }
+                    Ok(..) => result,
+                }
             }
             result => result,
         })
