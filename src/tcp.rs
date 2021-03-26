@@ -15,20 +15,17 @@ pub struct TcpKeepaliveConfig {
 // This function will be obsolete after tokio/mio internally use `socket2` and expose the methods to
 // apply options to a socket.
 pub fn set_keepalive(socket: &TcpStream, params: &socket2::TcpKeepalive) -> std::io::Result<()> {
-    let socket = SockRef::from(socket);
-    socket.set_tcp_keepalive(params)
+    SockRef::from(socket).set_tcp_keepalive(params)
 }
 
 // This function will be obsolete after tokio/mio internally use `socket2` and expose the methods to
 // apply options to a socket.
 pub fn set_receive_buffer_size(socket: &TcpStream, size: usize) -> std::io::Result<()> {
-    let socket = SockRef::from(socket);
-    socket.set_recv_buffer_size(size)
+    SockRef::from(socket).set_recv_buffer_size(size)
 }
 
 // This function will be obsolete after tokio/mio internally use `socket2` and expose the methods to
 // apply options to a socket.
 pub fn set_send_buffer_size(socket: &TcpStream, size: usize) -> std::io::Result<()> {
-    let socket = SockRef::from(socket);
-    socket.set_send_buffer_size(size)
+    SockRef::from(socket).set_send_buffer_size(size)
 }
