@@ -3,7 +3,6 @@ use crate::{
     topology::{self, RunningTopology},
     trace, Event,
 };
-use async_stream::stream;
 use flate2::read::GzDecoder;
 use futures::{
     ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
@@ -36,6 +35,9 @@ use tokio::{
     task::JoinHandle,
     time::{sleep, Duration, Instant},
 };
+use tokio_stream::wrappers::TcpListenerStream;
+#[cfg(unix)]
+use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
 
 const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
@@ -445,12 +447,13 @@ impl CountReceiver<String> {
     pub fn receive_lines(addr: SocketAddr) -> CountReceiver<String> {
         CountReceiver::new(|count, tripwire, connected| async move {
             let listener = TcpListener::bind(addr).await.unwrap();
-            let stream = stream! {
-                loop {
-                    yield listener.accept().await.map(|(stream, _addr)| stream)
-                }
-            };
-            CountReceiver::receive_lines_stream(stream, count, tripwire, Some(connected)).await
+            CountReceiver::receive_lines_stream(
+                TcpListenerStream::new(listener),
+                count,
+                tripwire,
+                Some(connected),
+            )
+            .await
         })
     }
 
@@ -461,12 +464,13 @@ impl CountReceiver<String> {
     {
         CountReceiver::new(|count, tripwire, connected| async move {
             let listener = tokio::net::UnixListener::bind(path).unwrap();
-            let stream = stream! {
-                loop {
-                    yield listener.accept().await.map(|(stream, _addr)| stream)
-                }
-            };
-            CountReceiver::receive_lines_stream(stream, count, tripwire, Some(connected)).await
+            CountReceiver::receive_lines_stream(
+                UnixListenerStream::new(listener),
+                count,
+                tripwire,
+                Some(connected),
+            )
+            .await
         })
     }
 

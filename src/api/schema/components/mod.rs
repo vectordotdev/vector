@@ -13,13 +13,12 @@ use crate::{
     filter_check,
 };
 use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
-use async_stream::stream;
 use lazy_static::lazy_static;
 use std::{
     cmp,
     collections::{HashMap, HashSet},
 };
-use tokio_stream::Stream;
+use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(
@@ -230,28 +229,18 @@ pub struct ComponentsSubscription;
 impl ComponentsSubscription {
     /// Subscribes to all newly added components
     async fn component_added(&self) -> impl Stream<Item = Component> {
-        let mut rx = COMPONENT_CHANGED.subscribe();
-        stream! {
-            loop {
-                match rx.recv().await {
-                    Ok(ComponentChanged::Added(c)) => yield c,
-                    _ => {},
-                }
-            }
-        }
+        BroadcastStream::new(COMPONENT_CHANGED.subscribe()).filter_map(|c| match c {
+            Ok(ComponentChanged::Added(c)) => Some(c),
+            _ => None,
+        })
     }
 
     /// Subscribes to all removed components
     async fn component_removed(&self) -> impl Stream<Item = Component> {
-        let mut rx = COMPONENT_CHANGED.subscribe();
-        stream! {
-            loop {
-                match rx.recv().await {
-                    Ok(ComponentChanged::Removed(c)) => yield c,
-                    _ => {},
-                }
-            }
-        }
+        BroadcastStream::new(COMPONENT_CHANGED.subscribe()).filter_map(|c| match c {
+            Ok(ComponentChanged::Removed(c)) => Some(c),
+            _ => None,
+        })
     }
 }
 

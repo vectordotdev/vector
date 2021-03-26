@@ -1,8 +1,4 @@
-use async_stream::stream;
-use futures::{
-    stream::{Stream, StreamExt},
-    SinkExt,
-};
+use futures::SinkExt;
 use graphql_client::GraphQLQuery;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -11,6 +7,7 @@ use std::{
     sync::{Arc, Mutex, Weak},
 };
 use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use url::Url;
 use uuid::Uuid;
@@ -133,14 +130,11 @@ where
 {
     /// Returns a stream of `Payload` responses, received from the GraphQL server
     fn stream(&self) -> StreamResponse<T> {
-        let mut rx = self.tx.subscribe();
-        Box::pin(stream! {
-            loop {
-                if let Ok(p) = rx.recv().await {
-                    yield p.response::<T>()
-                }
-            }
-        })
+        Box::pin(
+            BroadcastStream::new(self.tx.subscribe())
+                .filter(Result::is_ok)
+                .map(|p| p.unwrap().response::<T>()),
+        )
     }
 }
 

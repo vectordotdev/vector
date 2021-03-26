@@ -7,12 +7,12 @@ use crate::{
     sources::Source,
     Pipeline,
 };
-use async_stream::stream;
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt, StreamExt};
 use std::{future::ready, path::PathBuf};
 use tokio::io::AsyncWriteExt;
 use tokio::net::{UnixListener, UnixStream};
+use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::field;
 use tracing_futures::Instrument;
@@ -40,12 +40,7 @@ where
         info!(message = "Listening.", path = ?listen_path, r#type = "unix");
 
         let connection_open = OpenGauge::new();
-        let stream = stream! {
-            loop {
-                yield listener.accept().await.map(|(stream, _addr)| stream)
-            }
-        }
-        .take_until(shutdown.clone());
+        let stream = UnixListenerStream::new(listener).take_until(shutdown.clone());
         tokio::pin!(stream);
         while let Some(socket) = stream.next().await {
             let socket = match socket {
