@@ -242,7 +242,7 @@ typetag = "0.1.6"
 twox-hash = "1.6"
 url = "2.2.1"
 uuid = { version = "0.8", features = ["serde", "v4"], optional = true }
-warp = { version = "0.2.5", default-features = false, optional = true }
+warp = { version = "0.3.1", default-features = false, optional = true }
 
 # For WASM
 async-stream = "0.3.0"

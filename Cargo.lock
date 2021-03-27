@@ -322,7 +322,7 @@ dependencies = [
  "async-graphql",
  "futures-util",
  "serde_json",
- "warp",
+ "warp 0.2.5",
 ]
 
 [[package]]
@@ -8364,7 +8364,7 @@ dependencies = [
  "vrl-cli",
  "vrl-stdlib",
  "walkdir",
- "warp",
+ "warp 0.3.1",
  "windows-service",
 ]
 
@@ -8632,6 +8632,33 @@ dependencies = [
  "tracing 0.1.23",
  "tracing-futures 0.2.5",
  "urlencoding",
+]
+
+[[package]]
+name = "warp"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "332d47745e9a0c38636dbd454729b147d16bd1ed08ae67b3ab281c4506771054"
+dependencies = [
+ "bytes 1.0.1",
+ "futures 0.3.13",
+ "headers",
+ "http",
+ "hyper 0.14.4",
+ "log",
+ "mime",
+ "mime_guess",
+ "percent-encoding",
+ "pin-project 1.0.5",
+ "scoped-tls",
+ "serde",
+ "serde_json",
+ "serde_urlencoded 0.7.0",
+ "tokio 1.2.0",
+ "tokio-stream",
+ "tokio-util 0.6.3",
+ "tower-service",
+ "tracing 0.1.23",
 ]
 
 [[package]]
