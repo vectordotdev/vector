@@ -245,7 +245,7 @@ impl Metric {
                 kind,
                 value,
             },
-            metadata: EventMetadata,
+            metadata: EventMetadata::default(),
         }
     }
 
@@ -274,7 +274,7 @@ impl Metric {
         Self {
             series: self.series,
             data: self.data.into_absolute(),
-            metadata: EventMetadata,
+            metadata: self.metadata,
         }
     }
 
@@ -283,7 +283,7 @@ impl Metric {
         Self {
             series: self.series,
             data: self.data.into_incremental(),
-            metadata: EventMetadata,
+            metadata: self.metadata,
         }
     }
 
@@ -375,7 +375,7 @@ impl Metric {
         Self {
             series: self.series.clone(),
             data: self.data.zero(),
-            metadata: EventMetadata,
+            metadata: self.metadata.clone(),
         }
     }
 }
