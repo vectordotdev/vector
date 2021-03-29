@@ -1,4 +1,3 @@
-use bytes::Buf;
 use csv::ReaderBuilder;
 use vrl::prelude::*;
 
@@ -58,7 +57,7 @@ impl Expression for ParseCsvFn {
         let reader = ReaderBuilder::new()
             .has_headers(false)
             .delimiter(delimiter)
-            .from_reader(csv_string.bytes());
+            .from_reader(&*csv_string);
 
         let result = reader
             .into_byte_records()
