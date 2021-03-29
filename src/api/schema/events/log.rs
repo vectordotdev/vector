@@ -1,8 +1,10 @@
 use super::EventEncodingType;
-use crate::event;
+use crate::{event, Value};
 
-use async_graphql::Object;
+use async_graphql::{scalar, Object};
 use chrono::{DateTime, Utc};
+
+scalar!(Value, "FieldValue", "Field value");
 
 #[derive(Debug)]
 pub struct Log {
@@ -53,5 +55,10 @@ impl Log {
             EventEncodingType::Yaml => serde_yaml::to_string(&self.event)
                 .expect("YAML serialization of log event failed. Please report."),
         }
+    }
+
+    /// Get field data on the log event
+    async fn field(&self, name: String) -> Option<&Value> {
+        self.event.get(name)
     }
 }
