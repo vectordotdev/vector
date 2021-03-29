@@ -48,11 +48,9 @@ impl From<TapEncodingFormat> for output_events_subscription::EventEncodingType {
 impl output_events_subscription::OutputEventsSubscriptionOutputEvents {
     pub fn as_log(
         &self,
-    ) -> Option<&output_events_subscription::OutputEventsSubscriptionOutputEventsOnLogEvent> {
+    ) -> Option<&output_events_subscription::OutputEventsSubscriptionOutputEventsOnLog> {
         match self {
-            output_events_subscription::OutputEventsSubscriptionOutputEvents::LogEvent(ev) => {
-                Some(ev)
-            }
+            output_events_subscription::OutputEventsSubscriptionOutputEvents::Log(ev) => Some(ev),
             _ => None,
         }
     }
