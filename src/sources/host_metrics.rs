@@ -749,10 +749,6 @@ pub fn init_roots() {
 }
 
 impl FilterList {
-    fn is_empty(&self) -> bool {
-        self.includes.is_none() && self.excludes.is_none()
-    }
-
     fn contains_str(&self, value: &str) -> bool {
         (match &self.includes {
             // No includes list includes everything
