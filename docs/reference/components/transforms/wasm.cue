@@ -12,6 +12,7 @@ components: transforms: wasm: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      true
 	}
 
 	features: {
@@ -26,12 +27,14 @@ components: transforms: wasm: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  false
-			"aarch64-unknown-linux-musl": false
-			"x86_64-apple-darwin":        false
-			"x86_64-pc-windows-msv":      false
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  false
+			"aarch64-unknown-linux-gnu":      false
+			"aarch64-unknown-linux-musl":     false
+			"armv7-unknown-linux-gnueabihf":  false
+			"armv7-unknown-linux-musleabihf": false
+			"x86_64-apple-darwin":            false
+			"x86_64-pc-windows-msv":          false
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      false
 		}
 
 		requirements: [
@@ -43,11 +46,10 @@ components: transforms: wasm: {
 		warnings: []
 		notices: [
 			"""
-			Please consider the [`remap` transform](\(urls.vector_remap_transform)) before using
-			this tranform. The [Vector Remap Language](\(urls.vector_remap_language_reference))
-			is designed for safe, performant, and easy data mapping. It is intended to cover the
-			vast majority of data mapping use cases leaving WASM for very advanced and edge-case
-			situations.
+			Please consider the [`remap` transform](\(urls.vector_remap_transform)) before using this tranform. The
+			[Vector Remap Language](\(urls.vrl_reference)) is designed for safe, performant, and easy data mapping. It
+			is intended to cover the vast majority of data mapping use cases leaving WASM for very advanced and
+			edge-case situations.
 			""",
 		]
 	}
@@ -57,11 +59,14 @@ components: transforms: wasm: {
 			description: "The directory where Vector should store the artifact it builds of this WASM module. Typically, all WASM modules share this."
 			required:    true
 			warnings: []
-			type: string: examples: [
-				"/etc/vector/artifacts",
-				"/var/lib/vector/artifacts",
-				"C:\\vector\\artifacts",
-			]
+			type: string: {
+				examples: [
+					"/etc/vector/artifacts",
+					"/var/lib/vector/artifacts",
+					"C:\\vector\\artifacts",
+				]
+				syntax: "file_system_path"
+			}
 		}
 		heap_max_size: {
 			common:      false
@@ -77,11 +82,14 @@ components: transforms: wasm: {
 			description: "The file path of the `.wasm` or `.wat` module."
 			required:    true
 			warnings: []
-			type: string: examples: [
-				"./modules/example.wasm",
-				"/example.wat",
-				"example.wasm",
-			]
+			type: string: {
+				examples: [
+					"./modules/example.wasm",
+					"/example.wat",
+					"example.wasm",
+				]
+				syntax: "file_system_path"
+			}
 		}
 	}
 

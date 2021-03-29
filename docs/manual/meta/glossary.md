@@ -92,9 +92,9 @@ this is commonly used to describe Vector.
 "Rust" refers to the [Rust programming language][urls.rust] that Vector is
 written in.
 
-## Sampler
+## Sample
 
-"Sampler" refers to a [transform][docs.transforms] that samples data.
+"Sample" refers to a [transform][docs.transforms] that samples data.
 
 ## Sink
 

@@ -1,14 +1,14 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    internal_events::{AwsSqsEventSent, AwsSqsMessageGroupIdMissingKeys},
-    rusoto,
+    internal_events::{AwsSqsEventSent, TemplateRenderingFailed},
+    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
         BatchSettings, EncodedLength, TowerRequestConfig, VecBuffer,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     Event,
 };
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
@@ -34,7 +34,7 @@ enum BuildError {
     #[snafu(display("`message_group_id` is not allowed with non-FIFO queue."))]
     MessageGroupIdNotAllowed,
     #[snafu(display("invalid topic template: {}", source))]
-    TopicTemplate { source: TemplateError },
+    TopicTemplate { source: TemplateParseError },
 }
 
 #[derive(Debug, Snafu)]
@@ -56,12 +56,15 @@ pub struct SqsSink {
 pub struct SqsSinkConfig {
     pub queue_url: String,
     #[serde(flatten)]
-    pub region: rusoto::RegionOrEndpoint,
+    pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
     pub message_group_id: Option<String>,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub assume_role: Option<String>,
+    // Deprecated name. Moved to auth.
+    assume_role: Option<String>,
+    #[serde(default)]
+    pub auth: AWSAuthentication,
 }
 
 lazy_static! {
@@ -132,7 +135,7 @@ impl SqsSinkConfig {
         let region = (&self.region).try_into()?;
         let client = rusoto::client()?;
 
-        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+        let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         Ok(SqsClient::new_with(client, creds, region))
     }
@@ -255,9 +258,11 @@ fn encode_event(
     let message_group_id = match message_group_id {
         Some(tpl) => match tpl.render_string(&event) {
             Ok(value) => Some(value),
-            Err(missing_keys) => {
-                emit!(AwsSqsMessageGroupIdMissingKeys {
-                    keys: &missing_keys
+            Err(error) => {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("message_group_id"),
+                    drop_event: true
                 });
                 return None;
             }
@@ -346,11 +351,12 @@ mod integration_tests {
 
         let config = SqsSinkConfig {
             queue_url: queue_url.clone(),
-            region: rusoto::RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
             encoding: Encoding::Text.into(),
             message_group_id: None,
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         config.clone().healthcheck(client.clone()).await.unwrap();

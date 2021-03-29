@@ -9,6 +9,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS"]
+		stateful: false
 	}
 
 	features: {
@@ -68,14 +69,15 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -99,15 +101,15 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 			required:    true
 			type: string: {
 				examples: ["group-name", "{{ file }}"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 		stream_name: {
-			description: "The [stream name](\(urls.aws_cloudwatch_logs_stream_name)) of the target CloudWatch Logs stream."
+			description: "The [stream name](\(urls.aws_cloudwatch_logs_stream_name)) of the target CloudWatch Logs stream. Note that there can only be one writer to a log stream at a time so if you are running multiple vectors all writing to the same log group, include a identifier in the stream name that is guaranteed to be unique by vector instance (for example, you might choose `host`)"
 			required:    true
 			type: string: {
 				examples: ["{{ host }}", "%Y-%m-%d", "stream-name"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 	}
@@ -146,6 +148,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 	]
 
 	telemetry: metrics: {
+		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
 		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

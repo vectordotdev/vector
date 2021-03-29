@@ -1304,7 +1304,7 @@ impl Value {
                     .flatten();
 
                 if only_leaves && !self.is_empty() {
-                    Box::new(children)
+                   Box::new(children)
                 } else {
                     Box::new(this.chain(children))
                 }
@@ -1607,9 +1607,9 @@ impl TryInto<DateTime<Utc>> for Value {
     }
 }
 
-impl From<remap_lang::Value> for Value {
-    fn from(v: remap_lang::Value) -> Self {
-        use remap_lang::Value::*;
+impl From<vrl::Value> for Value {
+    fn from(v: vrl::Value) -> Self {
+        use vrl::Value::*;
 
         match v {
             Bytes(v) => Value::Bytes(v),
@@ -1625,9 +1625,9 @@ impl From<remap_lang::Value> for Value {
     }
 }
 
-impl From<Value> for remap_lang::Value {
+impl From<Value> for vrl::Value {
     fn from(v: Value) -> Self {
-        use remap_lang::Value::*;
+        use vrl::Value::*;
 
         match v {
             Value::Bytes(v) => Bytes(v),

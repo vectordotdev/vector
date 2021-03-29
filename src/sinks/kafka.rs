@@ -2,13 +2,15 @@ use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LookupBuf},
+    internal_events::TemplateRenderingFailed,
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         BatchConfig,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
+    Event,
 };
 use futures::{
     channel::oneshot::Canceled, future::BoxFuture, ready, stream::FuturesUnordered, FutureExt,
@@ -40,7 +42,7 @@ enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
     KafkaCreateFailed { source: KafkaError },
     #[snafu(display("invalid topic template: {}", source))]
-    TopicTemplate { source: TemplateError },
+    TopicTemplate { source: TemplateParseError },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -278,15 +280,19 @@ impl Sink<Event> for KafkaSink {
             "Expected `poll_ready` to be called first."
         );
 
-        let topic = self.topic.render_string(&item).map_err(|missing_keys| {
-            error!(message = "Missing keys for topic.", missing_keys = ?missing_keys);
+        let topic = self.topic.render_string(&item).map_err(|error| {
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("topic"),
+                drop_event: true,
+            });
         })?;
 
         let timestamp_ms = match &item {
             Event::Log(log) => log
                 .get(log_schema().timestamp_key())
                 .and_then(|v| v.clone().try_into().ok()),
-            Event::Metric(metric) => metric.timestamp,
+            Event::Metric(metric) => metric.data.timestamp.as_ref(),
         }
         .map(|ts| ts.timestamp_millis());
         let (key, body) = encode_event(item, &self.key_field, &self.encoding);
@@ -377,10 +383,10 @@ async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
             .borrow(),
         ) {
         Ok(topic) => Some(topic),
-        Err(missing_keys) => {
+        Err(error) => {
             warn!(
                 message = "Could not generate topic for healthcheck.",
-                ?missing_keys
+                %error,
             );
             None
         }
@@ -495,14 +501,11 @@ mod tests {
 
     #[test]
     fn kafka_encode_event_metric_text() {
-        let metric = Metric {
-            name: "kafka-metric".to_owned(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 0.0 },
-        };
+        let metric = Metric::new(
+            "kafka-metric",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 0.0 },
+        );
         let (key_bytes, bytes) = encode_event(
             metric.clone().into(),
             &None,
@@ -515,14 +518,11 @@ mod tests {
 
     #[test]
     fn kafka_encode_event_metric_json() {
-        let metric = Metric {
-            name: "kafka-metric".to_owned(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 0.0 },
-        };
+        let metric = Metric::new(
+            "kafka-metric",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 0.0 },
+        );
         let (key_bytes, bytes) = encode_event(
             metric.clone().into(),
             &None,

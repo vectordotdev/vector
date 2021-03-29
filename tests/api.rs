@@ -306,7 +306,7 @@ mod tests {
                 .edges
                 .into_iter()
                 .flatten()
-                .filter_map(std::convert::identity)
+                .flatten()
                 .collect::<Vec<_>>();
 
             let transforms = data
@@ -314,7 +314,7 @@ mod tests {
                 .edges
                 .into_iter()
                 .flatten()
-                .filter_map(std::convert::identity)
+                .flatten()
                 .collect::<Vec<_>>();
 
             let sinks = data
@@ -322,7 +322,7 @@ mod tests {
                 .edges
                 .into_iter()
                 .flatten()
-                .filter_map(std::convert::identity)
+                .flatten()
                 .collect::<Vec<_>>();
 
             // should be a single source named "in1"
@@ -873,8 +873,9 @@ mod tests {
                 file_source_metrics_query::FileSourceMetricsQuerySourcesEdgesNodeMetricsOn::FileSourceMetrics(
                     file_source_metrics_query::FileSourceMetricsQuerySourcesEdgesNodeMetricsOnFileSourceMetrics { files, .. },
                 ) => {
-                    assert_eq!(files[0].name, path);
-                    assert_eq!(files[0].processed_events_total.as_ref().unwrap().processed_events_total as usize, lines.len());
+                    let node = &files.edges.iter().flatten().next().unwrap().as_ref().unwrap().node;
+                    assert_eq!(node.name, path);
+                    assert_eq!(node.processed_events_total.as_ref().unwrap().processed_events_total as usize, lines.len());
                 }
                 _ => panic!("not a file source"),
             }

@@ -1,6 +1,8 @@
 use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
+#[cfg(unix)]
+use crate::udp;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
@@ -35,11 +37,11 @@ use tokio_util::{
 // #[serde(deny_unknown_fields)]
 pub struct SyslogConfig {
     #[serde(flatten)]
-    pub mode: Mode,
+    mode: Mode,
     #[serde(default = "default_max_length")]
-    pub max_length: usize,
+    max_length: usize,
     /// The host key of the log. (This differs from `hostname`)
-    pub host_key: Option<LookupBuf>,
+    host_key: Option<LookupBuf>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, is_enum_variant)]
@@ -49,14 +51,15 @@ pub enum Mode {
         address: SocketListenAddr,
         keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
+        receive_buffer_bytes: Option<usize>,
     },
     Udp {
         address: SocketAddr,
+        #[cfg(unix)]
+        receive_buffer_bytes: Option<usize>,
     },
     #[cfg(unix)]
-    Unix {
-        path: PathBuf,
-    },
+    Unix { path: PathBuf },
 }
 
 pub fn default_max_length() -> usize {
@@ -64,7 +67,7 @@ pub fn default_max_length() -> usize {
 }
 
 impl SyslogConfig {
-    pub fn new(mode: Mode) -> Self {
+    pub fn from_mode(mode: Mode) -> Self {
         Self {
             mode,
             host_key: None,
@@ -95,6 +98,7 @@ impl GenerateConfig for SyslogConfig {
                 address: SocketListenAddr::SocketAddr("0.0.0.0:514".parse().unwrap()),
                 keepalive: None,
                 tls: None,
+                receive_buffer_bytes: None,
             },
             host_key: None,
             max_length: default_max_length(),
@@ -123,6 +127,7 @@ impl SourceConfig for SyslogConfig {
                 address,
                 keepalive,
                 tls,
+                receive_buffer_bytes,
             } => {
                 let source = SyslogTcpSource {
                     max_length: self.max_length,
@@ -130,8 +135,29 @@ impl SourceConfig for SyslogConfig {
                 };
                 let shutdown_secs = 30;
                 let tls = MaybeTlsSettings::from_config(&tls, true)?;
-                source.run(address, keepalive, shutdown_secs, tls, shutdown, out)
+                source.run(
+                    address,
+                    keepalive,
+                    shutdown_secs,
+                    tls,
+                    receive_buffer_bytes,
+                    shutdown,
+                    out,
+                )
             }
+            #[cfg(unix)]
+            Mode::Udp {
+                address,
+                receive_buffer_bytes,
+            } => Ok(udp(
+                address,
+                self.max_length,
+                host_key,
+                receive_buffer_bytes,
+                shutdown,
+                out,
+            )),
+            #[cfg(not(unix))]
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, shutdown, out)),
             #[cfg(unix)]
             Mode::Unix { path } => Ok(build_unix_stream_source(
@@ -140,7 +166,7 @@ impl SourceConfig for SyslogConfig {
                 host_key,
                 shutdown,
                 out,
-                event_from_str,
+                |host_key, default_host, line| Some(event_from_str(host_key, default_host, line)),
             )),
         }
     }
@@ -156,7 +182,7 @@ impl SourceConfig for SyslogConfig {
     fn resources(&self) -> Vec<Resource> {
         match self.mode.clone() {
             Mode::Tcp { address, .. } => vec![address.into()],
-            Mode::Udp { address } => vec![Resource::udp(address)],
+            Mode::Udp { address, .. } => vec![Resource::udp(address)],
             #[cfg(unix)]
             Mode::Unix { .. } => vec![],
         }
@@ -178,7 +204,7 @@ impl TcpSource for SyslogTcpSource {
     }
 
     fn build_event(&self, frame: String, host: Bytes) -> Option<Event> {
-        event_from_str(self.host_key.clone(), Some(host), &frame)
+        Some(event_from_str(&self.host_key.clone(), Some(host), &frame))
     }
 }
 
@@ -288,6 +314,7 @@ pub fn udp(
     addr: SocketAddr,
     _max_length: usize,
     host_key: LookupBuf,
+    #[cfg(unix)] receive_buffer_bytes: Option<usize>,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
@@ -297,6 +324,12 @@ pub fn udp(
         let socket = UdpSocket::bind(&addr)
             .await
             .expect("Failed to bind to UDP listener socket");
+
+        #[cfg(unix)]
+        if let Some(receive_buffer_bytes) = receive_buffer_bytes {
+            udp::set_receive_buffer_size(&socket, receive_buffer_bytes);
+        }
+
         info!(
             message = "Listening.",
             addr = %addr,
@@ -315,9 +348,7 @@ pub fn udp(
                             std::str::from_utf8(&bytes)
                                 .map_err(|error| emit!(SyslogUdpUtf8Error { error }))
                                 .ok()
-                                .and_then(|s| {
-                                    event_from_str(host_key, Some(received_from), s).map(Ok)
-                                })
+                                .map(|s| Ok(event_from_str(host_key, Some(received_from), s)))
                         }
                         Err(error) => {
                             emit!(SyslogUdpReadError { error });
@@ -353,7 +384,7 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
 // TODO: many more cases to handle:
 // octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
 // null byte delimiter in place of newline
-fn event_from_str(host_key: LookupBuf, default_host: Option<Bytes>, line: &str) -> Option<Event> {
+fn event_from_str(host_key: LookupBuf, default_host: Option<Bytes>, line: &str) -> Event {
     let line = line.trim();
     let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
     let mut event = log_event! {
@@ -397,7 +428,7 @@ fn event_from_str(host_key: LookupBuf, default_host: Option<Bytes>, line: &str) 
         event = ?event
     );
 
-    Some(event)
+    event
 }
 
 fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
@@ -466,6 +497,28 @@ mod test {
     }
 
     #[test]
+    fn config_tcp_with_receive_buffer_size() {
+        let config: SyslogConfig = toml::from_str(
+            r#"
+            mode = "tcp"
+            address = "127.0.0.1:1235"
+            receive_buffer_bytes = 256
+          "#,
+        )
+        .unwrap();
+
+        let receive_buffer_bytes = match config.mode {
+            Mode::Tcp {
+                receive_buffer_bytes,
+                ..
+            } => receive_buffer_bytes,
+            _ => panic!("expected Mode::Tcp"),
+        };
+
+        assert_eq!(receive_buffer_bytes, Some(256));
+    }
+
+    #[test]
     fn config_tcp_keepalive_empty() {
         let config: SyslogConfig = toml::from_str(
             r#"
@@ -515,6 +568,30 @@ mod test {
         )
         .unwrap();
         assert!(config.mode.is_udp());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn config_udp_with_receive_buffer_size() {
+        let config: SyslogConfig = toml::from_str(
+            r#"
+            mode = "udp"
+            address = "127.0.0.1:1235"
+            max_length = 32187
+            receive_buffer_bytes = 256
+          "#,
+        )
+        .unwrap();
+
+        let receive_buffer_bytes = match config.mode {
+            Mode::Udp {
+                receive_buffer_bytes,
+                ..
+            } => receive_buffer_bytes,
+            _ => panic!("expected Mode::Udp"),
+        };
+
+        assert_eq!(receive_buffer_bytes, Some(256));
     }
 
     #[cfg(unix)]
@@ -570,7 +647,7 @@ mod test {
         }
 
         assert_eq!(
-            event_from_str(LookupBuf::from("host"), None, &raw).unwrap(),
+            event_from_str(LookupBuf::from("host"), None, &raw),
             expected
         );
     }
@@ -605,7 +682,7 @@ mod test {
         }
 
         let event = event_from_str(LookupBuf::from("host"), None, &raw);
-        assert_eq!(event, Some(expected.clone()));
+        assert_eq!(event, expected.clone());
 
         let raw = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
@@ -613,7 +690,7 @@ mod test {
         );
 
         let event = event_from_str(LookupBuf::from("host"), None, &raw);
-        assert_eq!(event, Some(expected));
+        assert_eq!(event, expected);
     }
 
     #[test]
@@ -632,7 +709,7 @@ mod test {
             r#"[empty]"#
         );
 
-        let event = event_from_str(LookupBuf::from("host"), None, &msg).unwrap();
+        let event = event_from_str(LookupBuf::from("host"), None, &msg);
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -640,7 +717,7 @@ mod test {
             r#"[non_empty x="1"][empty]"#
         );
 
-        let event = event_from_str(LookupBuf::from("host"), None, &msg).unwrap();
+        let event = event_from_str(LookupBuf::from("host"), None, &msg);
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -648,7 +725,7 @@ mod test {
             r#"[empty][non_empty x="1"]"#
         );
 
-        let event = event_from_str(LookupBuf::from("host"), None, &msg).unwrap();
+        let event = event_from_str(LookupBuf::from("host"), None, &msg);
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -656,7 +733,7 @@ mod test {
             r#"[empty not_really="testing the test"]"#
         );
 
-        let event = event_from_str(LookupBuf::from("host"), None, &msg).unwrap();
+        let event = event_from_str(LookupBuf::from("host"), None, &msg);
         assert!(!there_is_map_called_empty(event));
     }
 
@@ -670,8 +747,8 @@ mod test {
         let cleaned = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
         assert_eq!(
-            event_from_str(LookupBuf::from("host"), None, raw).unwrap(),
-            event_from_str(LookupBuf::from("host"), None, cleaned).unwrap()
+            event_from_str(LookupBuf::from("host"), None, raw),
+            event_from_str(LookupBuf::from("host"), None, cleaned)
         );
     }
 
@@ -680,7 +757,7 @@ mod test {
         crate::test_util::trace_init();
         let msg = "i am foobar";
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
-        let event = event_from_str(LookupBuf::from("host"), None, &raw).unwrap();
+        let event = event_from_str(LookupBuf::from("host"), None, &raw);
 
         let mut expected = log_event! {
             log_schema().message_key().clone() => msg.to_string(),
@@ -714,7 +791,7 @@ mod test {
             r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] {}"#,
             msg
         );
-        let event = event_from_str(LookupBuf::from("host"), None, &raw).unwrap();
+        let event = event_from_str(LookupBuf::from("host"), None, &raw);
 
         let mut expected = log_event! {
             log_schema().message_key().clone() => msg.to_string(),
@@ -783,7 +860,7 @@ mod test {
         }
 
         assert_eq!(
-            event_from_str(LookupBuf::from("host"), None, &raw).unwrap(),
+            event_from_str(LookupBuf::from("host"), None, &raw),
             expected
         );
     }

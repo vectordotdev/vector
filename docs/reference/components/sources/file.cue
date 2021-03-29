@@ -11,6 +11,7 @@ components: sources: file: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -25,19 +26,28 @@ components: sources: file: {
 			}
 		}
 		multiline: enabled: true
+		encoding: enabled:  true
 	}
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
-		requirements: []
+		requirements: [
+			"""
+				The `vector` process must have the ability to read the files
+				listed in `include` and execute any of the parent directories
+				for these files. Please see [File
+				permissions](#file-permissions) for more details.
+				""",
+		]
 		warnings: []
 		notices: []
 	}
@@ -53,7 +63,10 @@ components: sources: file: {
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: examples: ["\(_directory)/binary-file.log"]
+				items: type: string: {
+					examples: ["\(_directory)/binary-file.log"]
+					syntax: "literal"
+				}
 			}
 		}
 		file_key: {
@@ -64,6 +77,7 @@ components: sources: file: {
 			type: string: {
 				default: "file"
 				examples: ["file"]
+				syntax: "literal"
 			}
 		}
 		fingerprint: {
@@ -78,19 +92,10 @@ components: sources: file: {
 					type: string: {
 						default: "checksum"
 						enum: {
-							checksum:         "Read `bytes` bytes from the head of the file to uniquely identify files via a checksum."
+							checksum:         "Read the first line of the file, skipping the first `ignored_header_bytes` bytes, to uniquely identify files via a checksum."
 							device_and_inode: "Uses the [device and inode](\(urls.inode)) to unique identify files."
 						}
-					}
-				}
-				bytes: {
-					common:        false
-					description:   "The number of bytes read off the head of the file to generate a unique fingerprint."
-					relevant_when: "strategy = \"checksum\""
-					required:      false
-					type: uint: {
-						default: 256
-						unit:    "bytes"
+						syntax: "literal"
 					}
 				}
 				ignored_header_bytes: {
@@ -105,7 +110,7 @@ components: sources: file: {
 				}
 			}
 		}
-		glob_minimum_cooldown: {
+		glob_minimum_cooldown_ms: {
 			common:      false
 			description: "Delay between file discovery calls. This controls the interval at which Vector searches for files."
 			required:    false
@@ -117,13 +122,22 @@ components: sources: file: {
 		host_key: {
 			category:    "Context"
 			common:      false
-			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.global-options#host_key]."
+			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
 			required:    false
-			type: string: default: "host"
+			type: string: {
+				default: "host"
+				syntax:  "literal"
+			}
 		}
-		ignore_older: {
+		ignore_not_found: {
+			common:      false
+			description: "Ignore missing files when fingerprinting. This may be useful when used with source directories containing dangling symlinks."
+			required:    false
+			type: bool: default: false
+		}
+		ignore_older_secs: {
 			common:      true
-			description: "Ignore files with a data modification date that does not exceed this age."
+			description: "Ignore files with a data modification date older than the specified number of seconds."
 			required:    false
 			type: uint: {
 				default: null
@@ -134,7 +148,20 @@ components: sources: file: {
 		include: {
 			description: "Array of file patterns to include. [Globbing](#globbing) is supported."
 			required:    true
-			type: array: items: type: string: examples: ["\(_directory)/**/*.log"]
+			type: array: items: type: string: {
+				examples: ["\(_directory)/**/*.log"]
+				syntax: "literal"
+			}
+		}
+		line_delimiter: {
+			common:      false
+			description: "String sequence used to separate one file line from another"
+			required:    false
+			type: string: {
+				default: "\n"
+				examples: ["\r\n"]
+				syntax: "literal"
+			}
 		}
 		max_line_bytes: {
 			common:      false
@@ -163,7 +190,7 @@ components: sources: file: {
 			required:    false
 			type: bool: default: false
 		}
-		remove_after: {
+		remove_after_secs: {
 			common:      false
 			description: "Timeout from reaching `eof` after which file will be removed from filesystem, unless new data is written in the meantime. If not specified, files will not be removed."
 			required:    false
@@ -174,9 +201,22 @@ components: sources: file: {
 				unit: "seconds"
 			}
 		}
-		start_at_beginning: {
+		read_from: {
+			common:      true
+			description: "In the absence of a checkpoint, this setting tells Vector where to start reading files that are present at startup."
+			required:    false
+			type: string: {
+				syntax:  "literal"
+				default: "beginning"
+				enum: {
+					"beginning": "Read from the beginning of the file."
+					"end":       "Start reading from the current end of the file."
+				}
+			}
+		}
+		ignore_checkpoints: {
 			common:      false
-			description: "For files with a stored checkpoint at startup, setting this option to `true` will tell Vector to read from the beginning of the file instead of the stored checkpoint. "
+			description: "This causes Vector to ignore existing checkpoints when determining where to start reading a file. Checkpoints are still written normally."
 			required:    false
 			type: bool: default: false
 		}
@@ -188,13 +228,19 @@ components: sources: file: {
 			file: {
 				description: "The absolute path of originating file."
 				required:    true
-				type: string: examples: ["\(_directory)/apache/access.log"]
+				type: string: {
+					examples: ["\(_directory)/apache/access.log"]
+					syntax: "literal"
+				}
 			}
 			host: fields._local_host
 			message: {
 				description: "The raw line from the file."
 				required:    true
-				type: string: examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+				type: string: {
+					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+					syntax: "literal"
+				}
 			}
 			timestamp: fields._current_timestamp
 		}
@@ -357,8 +403,9 @@ components: sources: file: {
 		line_delimiters: {
 			title: "Line Delimiters"
 			body: """
-				Each line is read until a new line delimiter (the `0xA` byte) or `EOF`
-				is found.
+				Each line is read until a new line delimiter (by default, `\n` i.e.
+				the `0xA` byte) or `EOF` is found. If needed, the default line
+				delimiter can be overriden via the `line_delimiter` option.
 				"""
 		}
 
@@ -488,18 +535,60 @@ components: sources: file: {
 		read_position: {
 			title: "Read Position"
 			body: """
-				By default, Vector will read new data only for newly discovered
-				files, similar to the `tail` command. You can read from the
-				beginning of the file by setting the `start_at_beginning` option to
-				`true`.
+				By default, Vector will read from the beginning of newly discovered
+				files. You can change this behavior by setting the `read_from` option to
+				`"end"`.
 
-				Previously discovered files will be checkpointed](#checkpointing),
-				and the read position will resume from the last checkpoint.
+				Previously discovered files will be [checkpointed](#checkpointing), and
+				the read position will resume from the last checkpoint. To disable this
+				behavior, you can set the `ignore_checkpoints` option to `true`.  This
+				will cause Vector to disregard existing checkpoints when determining the
+				starting read position of a file.
 				"""
 		}
+
+		permissions: {
+			title: "File permissions"
+			body:  """
+				To be able to source events from the files, Vector must be able
+				to read the files and execute their parent directories.
+
+				If you have deployed Vector as using one our distributed
+				packages, then you will find Vector running as the `vector`
+				user. You should ensure this user has read access to the desired
+				files used as `include`. Strategies for this include:
+
+				* Create a new unix group, make it the group owner of the
+				  target files, with read access, and  add `vector` to that
+				  group
+				* Use [POSIX ACLs](\(urls.posix_acls)) to grant access to the
+				  files to the `vector` user
+				* Grant the `CAP_DAC_READ_SEARCH` [Linux
+				  capability](\(urls.linux_capability)]. This capability
+				  bypasses the file system permissions checks to allow
+				  Vector to read any file. This is not recommended as it gives
+				  Vector more permissions than it requires, but it is
+				  recommended over running Vector as `root` which would grant it
+				  even broader permissions. This can be granted via SystemD by
+				  creating an override file using `systemctl edit vector` and
+				  adding:
+
+				  ```
+				  AmbientCapabilities=CAP_DAC_READ_SEARCH
+				  CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+				  ```
+
+				On Debian-based distributions, the `vector` user is
+				automatically added to the [`adm`
+				group](\(urls.debian_system_groups)), if it exists, which has
+				permissions to read `/var/log`.
+				"""
+		}
+
 	}
 
 	telemetry: metrics: {
+		events_in_total:               components.sources.internal_metrics.output.metrics.events_in_total
 		checkpoint_write_errors_total: components.sources.internal_metrics.output.metrics.checkpoint_write_errors_total
 		checkpoints_total:             components.sources.internal_metrics.output.metrics.checkpoints_total
 		checksum_errors_total:         components.sources.internal_metrics.output.metrics.checksum_errors_total
@@ -510,5 +599,6 @@ components: sources: file: {
 		files_resumed_total:           components.sources.internal_metrics.output.metrics.files_resumed_total
 		files_unwatched_total:         components.sources.internal_metrics.output.metrics.files_unwatched_total
 		fingerprint_read_errors_total: components.sources.internal_metrics.output.metrics.fingerprint_read_errors_total
+		glob_errors_total:             components.sources.internal_metrics.output.metrics.glob_errors_total
 	}
 }

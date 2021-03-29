@@ -9,7 +9,7 @@ use crate::{
 };
 use evmap::ReadHandle;
 use k8s_openapi::{
-    api::core::v1::{Container, Pod, PodSpec, PodStatus},
+    api::core::v1::{Container, ContainerStatus, Pod, PodSpec, PodStatus},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use serde::{Deserialize, Serialize};
@@ -25,6 +25,7 @@ pub struct FieldsSpec {
     pub pod_labels: LookupBuf,
     pub pod_node_name: LookupBuf,
     pub container_name: LookupBuf,
+    pub container_id: LookupBuf,
     pub container_image: LookupBuf,
 }
 
@@ -39,6 +40,7 @@ impl Default for FieldsSpec {
             pod_labels: LookupBuf::from_str("kubernetes.pod_labels").unwrap(),
             pod_node_name: LookupBuf::from_str("kubernetes.pod_node_name").unwrap(),
             container_name: LookupBuf::from_str("kubernetes.container_name").unwrap(),
+            container_id: LookupBuf::from_str("kubernetes.container_id").unwrap(),
             container_image: LookupBuf::from_str("kubernetes.container_image").unwrap(),
         }
     }
@@ -67,7 +69,7 @@ impl PodMetadataAnnotator {
     /// Annotates an event with the information from the [`Pod::metadata`].
     /// The event has to be obtained from kubernetes log file, and have a
     /// [`FILE_KEY`] field set with a file that the line came from.
-    pub fn annotate(&self, event: &mut Event, file: &str) -> Option<()> {
+    pub fn annotate<'a>(&self, event: &mut Event, file: &'a str) -> Option<LogFileInfo<'a>> {
         let log = event.as_mut_log();
         let file_info = parse_log_file_path(file)?;
         let guard = self.pods_state_reader.get(file_info.pod_uid)?;
@@ -77,10 +79,11 @@ impl PodMetadataAnnotator {
         annotate_from_file_info(log, &self.fields_spec, &file_info);
         annotate_from_metadata(log, &self.fields_spec, &pod.metadata);
 
+        let container;
         if let Some(ref pod_spec) = pod.spec {
             annotate_from_pod_spec(log, &self.fields_spec, pod_spec);
 
-            let container = pod_spec
+            container = pod_spec
                 .containers
                 .iter()
                 .find(|c| c.name == file_info.container_name);
@@ -91,8 +94,16 @@ impl PodMetadataAnnotator {
 
         if let Some(ref pod_status) = pod.status {
             annotate_from_pod_status(log, &self.fields_spec, pod_status);
+            if let Some(ref container_statuses) = pod_status.container_statuses {
+                let container_status = container_statuses
+                    .iter()
+                    .find(|c| c.name == file_info.container_name);
+                if let Some(container_status) = container_status {
+                    annotate_from_container_status(log, &self.fields_spec, container_status)
+                }
+            }
         }
-        Some(())
+        Some(file_info)
     }
 }
 
@@ -153,6 +164,18 @@ fn annotate_from_pod_status(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_st
                 .filter_map(|v| v.ip.clone())
                 .collect::<Vec<String>>();
             log.insert((*key).clone(), inner);
+        }
+    }
+}
+
+fn annotate_from_container_status(
+    log: &mut LogEvent,
+    fields_spec: &FieldsSpec,
+    container_status: &ContainerStatus,
+) {
+    for (ref key, ref val) in [(&fields_spec.container_id, &container_status.container_id)].iter() {
+        if let Some(val) = val {
+            log.insert(key, val.to_owned());
         }
     }
 }
@@ -430,8 +453,7 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    let mut ips_vec = Vec::new();
-                    ips_vec.push("192.168.1.2");
+                    let ips_vec = vec!["192.168.1.2"];
                     log.insert(LookupBuf::from_str("kubernetes.pod_ips").unwrap(), ips_vec);
                     log
                 },
@@ -460,9 +482,7 @@ mod tests {
                         LookupBuf::from_str("kubernetes.custom_pod_ip").unwrap(),
                         "192.168.1.2",
                     );
-                    let mut ips_vec = Vec::new();
-                    ips_vec.push("192.168.1.2");
-                    ips_vec.push("192.168.1.3");
+                    let ips_vec = vec!["192.168.1.2", "192.168.1.3"];
                     log.insert(
                         LookupBuf::from_str("kubernetes.custom_pod_ips").unwrap(),
                         ips_vec,
@@ -493,9 +513,7 @@ mod tests {
                         LookupBuf::from_str("kubernetes.pod_ip").unwrap(),
                         "192.168.1.2",
                     );
-                    let mut ips_vec = Vec::new();
-                    ips_vec.push("192.168.1.2");
-                    ips_vec.push("192.168.1.3");
+                    let ips_vec = vec!["192.168.1.2", "192.168.1.3"];
                     log.insert(LookupBuf::from_str("kubernetes.pod_ips").unwrap(), ips_vec);
                     log
                 },
@@ -505,6 +523,36 @@ mod tests {
         for (fields_spec, pod_status, expected) in cases.into_iter() {
             let mut log = LogEvent::default();
             annotate_from_pod_status(&mut log, &fields_spec, &pod_status);
+            assert_eq!(log, expected);
+        }
+    }
+
+    #[test]
+    fn test_annotate_from_container_status() {
+        let cases = vec![
+            (
+                FieldsSpec::default(),
+                ContainerStatus::default(),
+                LogEvent::default(),
+            ),
+            (
+                FieldsSpec {
+                    ..FieldsSpec::default()
+                },
+                ContainerStatus {
+                    container_id: Some("container_id_foo".to_owned()),
+                    ..ContainerStatus::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert("kubernetes.container_id", "container_id_foo");
+                    log
+                },
+            ),
+        ];
+        for (fields_spec, container_status, expected) in cases.into_iter() {
+            let mut log = LogEvent::default();
+            annotate_from_container_status(&mut log, &fields_spec, &container_status);
             assert_eq!(log, expected);
         }
     }

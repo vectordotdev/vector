@@ -1,5 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+    },
     event::{self, Event, LogEvent, LookupBuf},
     internal_events::MetricToLogFailedSerialize,
     transforms::{FunctionTransform, Transform},
@@ -8,11 +10,13 @@ use crate::{
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use shared::TimeZone;
 
-#[derive(Clone, Deserialize, Serialize, Debug)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct MetricToLogConfig {
     pub host_tag: Option<LookupBuf>,
+    pub timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -23,6 +27,7 @@ impl GenerateConfig for MetricToLogConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             host_tag: Some(LookupBuf::from("host-tag")),
+            timezone: None,
         })
         .unwrap()
     }
@@ -31,8 +36,11 @@ impl GenerateConfig for MetricToLogConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
-    async fn build(&self) -> crate::Result<Transform> {
-        Ok(Transform::function(MetricToLog::new(self.host_tag.clone())))
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+        Ok(Transform::function(MetricToLog::new(
+            self.host_tag.clone(),
+            self.timezone.unwrap_or(globals.timezone),
+        )))
     }
 
     fn input_type(&self) -> DataType {
@@ -52,16 +60,18 @@ impl TransformConfig for MetricToLogConfig {
 pub struct MetricToLog {
     timestamp_key: LookupBuf,
     host_tag: LookupBuf,
+    timezone: TimeZone,
 }
 
 impl MetricToLog {
-    pub fn new(host_tag: Option<LookupBuf>) -> Self {
+    pub fn new(host_tag: Option<LookupBuf>, timezone: TimeZone) -> Self {
         let host_tag = host_tag.unwrap_or_else(|| log_schema().host_key().clone());
         let mut tag_lookup = LookupBuf::from("tags");
         tag_lookup.extend(host_tag);
         Self {
             timestamp_key: "timestamp".into(),
             host_tag: tag_lookup,
+            timezone,
         }
     }
 }
@@ -84,7 +94,9 @@ impl FunctionTransform for MetricToLog {
                     let timestamp = log
                         .remove(&self.timestamp_key, false)
                         .and_then(|value| {
-                            Conversion::Timestamp.convert(value.clone_into_bytes()).ok()
+                            Conversion::Timestamp(self.timezone)
+                                .convert(value.clone_into_bytes())
+                                .ok()
                         })
                         .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
                     log.insert(log_schema().timestamp_key().clone(), timestamp);
@@ -109,6 +121,7 @@ mod tests {
         Lookup, Metric, Value,
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
+    use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
 
     #[test]
@@ -118,7 +131,7 @@ mod tests {
 
     fn do_transform(metric: Metric) -> Option<LogEvent> {
         let event = Event::Metric(metric);
-        let mut transformer = MetricToLog::new(Some("host".into()));
+        let mut transformer = MetricToLog::new(Some("host".into()), Default::default());
 
         transformer
             .transform_one(event)
@@ -140,14 +153,13 @@ mod tests {
 
     #[test]
     fn transform_counter() {
-        let counter = Metric {
-            name: "counter".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: Some(tags()),
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 1.0 },
-        };
+        let counter = Metric::new(
+            "counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_tags(Some(tags()))
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(counter).unwrap();
         let collected: Vec<_> = log.pairs(true).collect();
@@ -173,14 +185,12 @@ mod tests {
 
     #[test]
     fn transform_gauge() {
-        let gauge = Metric {
-            name: "gauge".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Gauge { value: 1.0 },
-        };
+        let gauge = Metric::new(
+            "gauge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.0 },
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(gauge).unwrap();
         let collected: Vec<_> = log.pairs(true).collect();
@@ -198,16 +208,14 @@ mod tests {
 
     #[test]
     fn transform_set() {
-        let set = Metric {
-            name: "set".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Set {
+        let set = Metric::new(
+            "set",
+            MetricKind::Absolute,
+            MetricValue::Set {
                 values: vec!["one".into(), "two".into()].into_iter().collect(),
             },
-        };
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(set).unwrap();
         let collected: Vec<_> = log.pairs(true).collect();
@@ -232,18 +240,15 @@ mod tests {
 
     #[test]
     fn transform_distribution() {
-        let distro = Metric {
-            name: "distro".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Distribution {
-                values: vec![1.0, 2.0],
-                sample_rates: vec![10, 20],
+        let distro = Metric::new(
+            "distro",
+            MetricKind::Absolute,
+            MetricValue::Distribution {
+                samples: crate::samples![1.0 => 10, 2.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
-        };
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(distro).unwrap();
         let collected: Vec<_> = log.pairs(true).collect();
@@ -252,24 +257,24 @@ mod tests {
             collected,
             vec![
                 (
-                    Lookup::from_str("distribution.sample_rates[0]").unwrap(),
+                    Lookup::from_str("distribution.samples[0].rate").unwrap(),
                     &Value::from(10)
                 ),
                 (
-                    Lookup::from_str("distribution.sample_rates[1]").unwrap(),
+                    Lookup::from_str("distribution.samples[0].value").unwrap(),
+                    &Value::from(1.0)
+                ),
+                (
+                    Lookup::from_str("distribution.samples[1].rate").unwrap(),
                     &Value::from(20)
+                ),
+                (
+                    Lookup::from_str("distribution.samples[1].value").unwrap(),
+                    &Value::from(2.0)
                 ),
                 (
                     Lookup::from_str("distribution.statistic").unwrap(),
                     &Value::from("histogram")
-                ),
-                (
-                    Lookup::from_str("distribution.values[0]").unwrap(),
-                    &Value::from(1.0)
-                ),
-                (
-                    Lookup::from_str("distribution.values[1]").unwrap(),
-                    &Value::from(2.0)
                 ),
                 (Lookup::from_str("kind").unwrap(), &Value::from("absolute")),
                 (Lookup::from_str("name").unwrap(), &Value::from("distro")),
@@ -280,19 +285,16 @@ mod tests {
 
     #[test]
     fn transform_histogram() {
-        let histo = Metric {
-            name: "histo".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::AggregatedHistogram {
-                buckets: vec![1.0, 2.0],
-                counts: vec![10, 20],
+        let histo = Metric::new(
+            "histo",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 10, 2.0 => 20],
                 count: 30,
                 sum: 50.0,
             },
-        };
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(histo).unwrap();
         let collected: Vec<_> = log.pairs(true).collect();
@@ -301,24 +303,24 @@ mod tests {
             collected,
             vec![
                 (
-                    Lookup::from_str("aggregated_histogram.buckets[0]").unwrap(),
+                    Lookup::from_str("aggregated_histogram.buckets[0].count").unwrap(),
+                    &Value::from(10)
+                ),
+                (
+                    Lookup::from_str("aggregated_histogram.buckets[0].upper_limit").unwrap(),
                     &Value::from(1.0)
                 ),
                 (
-                    Lookup::from_str("aggregated_histogram.buckets[1]").unwrap(),
+                    Lookup::from_str("aggregated_histogram.buckets[1].count").unwrap(),
+                    &Value::from(20)
+                ),
+                (
+                    Lookup::from_str("aggregated_histogram.buckets[1].upper_limit").unwrap(),
                     &Value::from(2.0)
                 ),
                 (
                     Lookup::from_str("aggregated_histogram.count").unwrap(),
                     &Value::from(30)
-                ),
-                (
-                    Lookup::from_str("aggregated_histogram.counts[0]").unwrap(),
-                    &Value::from(10)
-                ),
-                (
-                    Lookup::from_str("aggregated_histogram.counts[1]").unwrap(),
-                    &Value::from(20)
                 ),
                 (
                     Lookup::from_str("aggregated_histogram.sum").unwrap(),
@@ -333,19 +335,16 @@ mod tests {
 
     #[test]
     fn transform_summary() {
-        let summary = Metric {
-            name: "summary".into(),
-            namespace: None,
-            timestamp: Some(ts()),
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::AggregatedSummary {
-                quantiles: vec![50.0, 90.0],
-                values: vec![10.0, 20.0],
+        let summary = Metric::new(
+            "summary",
+            MetricKind::Absolute,
+            MetricValue::AggregatedSummary {
+                quantiles: crate::quantiles![50.0 => 10.0, 90.0 => 20.0],
                 count: 30,
                 sum: 50.0,
             },
-        };
+        )
+        .with_timestamp(Some(ts()));
 
         let log = do_transform(summary).unwrap();
         let collected: Vec<_> = log.pairs(true).collect();
@@ -354,28 +353,24 @@ mod tests {
             collected,
             vec![
                 (
-                    Lookup::from_str("aggregated_summary.count").unwrap(),
-                    &Value::from(30)
-                ),
-                (
-                    Lookup::from_str("aggregated_summary.quantiles[0]").unwrap(),
+                    Lookup::from_str("aggregated_summary.quantiles[0].upper_limit").unwrap(),
                     &Value::from(50.0)
                 ),
                 (
-                    Lookup::from_str("aggregated_summary.quantiles[1]").unwrap(),
+                    Lookup::from_str("aggregated_summary.quantiles[0].value").unwrap(),
+                    &Value::from(10.0)
+                ),
+                (
+                    Lookup::from_str("aggregated_summary.quantiles[1].upper_limit").unwrap(),
                     &Value::from(90.0)
+                ),
+                (
+                    Lookup::from_str("aggregated_summary.quantiles[1].value").unwrap(),
+                    &Value::from(20.0)
                 ),
                 (
                     Lookup::from_str("aggregated_summary.sum").unwrap(),
                     &Value::from(50.0)
-                ),
-                (
-                    Lookup::from_str("aggregated_summary.values[0]").unwrap(),
-                    &Value::from(10.0)
-                ),
-                (
-                    Lookup::from_str("aggregated_summary.values[1]").unwrap(),
-                    &Value::from(20.0)
                 ),
                 (Lookup::from_str("kind").unwrap(), &Value::from("absolute")),
                 (Lookup::from_str("name").unwrap(), &Value::from("summary")),

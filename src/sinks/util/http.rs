@@ -3,7 +3,11 @@ use super::{
     sink, Batch, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestSettings,
 };
-use crate::{buffers::Acker, http::HttpClient, Event};
+use crate::{
+    buffers::Acker,
+    http::{HttpClient, HttpError},
+    Event,
+};
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
 use http::StatusCode;
@@ -95,7 +99,7 @@ impl<T, B, L> BatchedHttpSink<T, B, L>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
-    L: RetryLogic<Response = http::Response<Bytes>, Error = hyper::Error> + Send + 'static,
+    L: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn with_retry_logic(
@@ -232,7 +236,7 @@ where
     B::Output: Clone + Send + 'static,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
-    L: RetryLogic<Response = http::Response<Bytes>, Error = hyper::Error> + Send + 'static,
+    L: RetryLogic<Response = http::Response<Bytes>, Error = HttpError> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn with_retry_logic(
@@ -378,7 +382,7 @@ impl<T: fmt::Debug> sink::Response for http::Response<T> {
 pub struct HttpRetryLogic;
 
 impl RetryLogic for HttpRetryLogic {
-    type Error = hyper::Error;
+    type Error = HttpError;
     type Response = hyper::Response<Bytes>;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
@@ -426,9 +430,8 @@ impl RequestConfig {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_util::next_addr;
-    use futures::{compat::Future01CompatExt, future::ready};
-    use futures01::Stream;
+    use crate::{sinks::util::service::Concurrency, test_util::next_addr};
+    use futures::{future::ready, StreamExt};
     use hyper::{
         service::{make_service_fn, service_fn},
         Response, Server, Uri,
@@ -469,7 +472,7 @@ mod test {
             ))
         });
 
-        let (tx, rx) = futures01::sync::mpsc::channel(10);
+        let (tx, rx) = futures::channel::mpsc::channel(10);
 
         let new_service = make_service_fn(move |_| {
             let tx = tx.clone();
@@ -501,7 +504,14 @@ mod test {
         tokio::time::delay_for(std::time::Duration::from_millis(50)).await;
         service.call(request).await.unwrap();
 
-        let (body, _rest) = rx.into_future().compat().await.unwrap();
+        let (body, _rest) = rx.into_future().await;
         assert_eq!(body.unwrap(), "hello");
+    }
+
+    #[test]
+    fn alias_in_flight_limit_works() {
+        let cfg = toml::from_str::<RequestConfig>("in_flight_limit = 10")
+            .expect("Fixed concurrency failed for in_flight_limit param");
+        assert_eq!(cfg.tower.concurrency(), &Concurrency::Fixed(10));
     }
 }

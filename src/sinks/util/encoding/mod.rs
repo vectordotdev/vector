@@ -157,6 +157,7 @@ pub enum TimestampFormat {
 mod tests {
     use super::*;
     use crate::{config::log_schema, event::Lookup, log_event};
+    use indoc::indoc;
 
     #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
     enum TestEncoding {
@@ -169,9 +170,12 @@ mod tests {
         encoding: EncodingConfig<TestEncoding>,
     }
 
-    const TOML_SIMPLE_STRING: &str = r#"
-        encoding = "Snoot"
-    "#;
+    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
+    fn as_path_components(a: &str) -> Vec<PathComponent> {
+        PathIter::new(a).collect()
+    }
+
+    const TOML_SIMPLE_STRING: &str = r#"encoding = "Snoot""#;
     #[test]
     fn config_string() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRING).unwrap();
@@ -179,11 +183,11 @@ mod tests {
         assert_eq!(config.encoding.codec(), &TestEncoding::Snoot);
     }
 
-    const TOML_SIMPLE_STRUCT: &str = r#"
+    const TOML_SIMPLE_STRUCT: &str = indoc! {r#"
         encoding.codec = "Snoot"
         encoding.except_fields = ["Doop"]
         encoding.only_fields = ["Boop"]
-    "#;
+    "#};
     #[test]
     fn config_struct() {
         let config: TestConfig = toml::from_str(TOML_SIMPLE_STRUCT).unwrap();
@@ -196,21 +200,21 @@ mod tests {
         );
     }
 
-    const TOML_EXCLUSIVITY_VIOLATION: &str = r#"
+    const TOML_EXCLUSIVITY_VIOLATION: &str = indoc! {r#"
         encoding.codec = "Snoot"
         encoding.except_fields = ["Doop"]
         encoding.only_fields = ["Doop"]
-    "#;
+    "#};
     #[test]
     fn exclusivity_violation() {
         let config: std::result::Result<TestConfig, _> = toml::from_str(TOML_EXCLUSIVITY_VIOLATION);
         assert!(config.is_err())
     }
 
-    const TOML_EXCEPT_FIELD: &str = r#"
+    const TOML_EXCEPT_FIELD: &str = indoc! {r#"
         encoding.codec = "Snoot"
         encoding.except_fields = ["a.b.c", "b", "c[0].y"]
-    "#;
+    "#};
     #[test]
     fn test_except() {
         crate::test_util::trace_init();
@@ -246,10 +250,10 @@ mod tests {
             .contains(Lookup::from_str("c[0].x").unwrap()));
     }
 
-    const TOML_ONLY_FIELD: &str = r#"
+    const TOML_ONLY_FIELD: &str = indoc! {r#"
         encoding.codec = "Snoot"
         encoding.only_fields = ["a.b.c", "b", "c[0].y"]
-    "#;
+    "#};
     #[test]
     fn test_only() {
         crate::test_util::trace_init();
@@ -285,10 +289,10 @@ mod tests {
             .contains(Lookup::from_str("c[0].x").unwrap()));
     }
 
-    const TOML_TIMESTAMP_FORMAT: &str = r#"
+    const TOML_TIMESTAMP_FORMAT: &str = indoc! {r#"
         encoding.codec = "Snoot"
         encoding.timestamp_format = "unix"
-    "#;
+    "#};
     #[test]
     fn test_timestamp() {
         crate::test_util::trace_init();

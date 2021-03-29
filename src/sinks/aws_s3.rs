@@ -1,6 +1,7 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    rusoto::{self, RegionOrEndpoint},
+    internal_events::TemplateRenderingFailed,
+    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -56,7 +57,10 @@ pub struct S3SinkConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
-    pub assume_role: Option<String>,
+    // Deprecated name. Moved to auth.
+    assume_role: Option<String>,
+    #[serde(default)]
+    pub auth: AWSAuthentication,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -147,6 +151,7 @@ impl GenerateConfig for S3SinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             assume_role: None,
+            auth: AWSAuthentication::default(),
         })
         .unwrap()
     }
@@ -258,7 +263,7 @@ impl S3SinkConfig {
         let region = (&self.region).try_into()?;
         let client = rusoto::client()?;
 
-        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+        let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         Ok(S3Client::new_with(client, creds, region))
     }
@@ -393,12 +398,12 @@ fn encode_event(
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
     let key = key_prefix
         .render_string(&event)
-        .map_err(|missing_keys| {
-            warn!(
-                message = "Keys do not exist on the event; dropping event.",
-                ?missing_keys,
-                internal_log_rate_secs = 30,
-            );
+        .map_err(|error| {
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("key_prefix"),
+                drop_event: true,
+            });
         })
         .ok()?;
 
@@ -708,7 +713,7 @@ mod integration_tests {
         assert_downcast_matches!(
             config.healthcheck(client).await.unwrap_err(),
             HealthcheckError,
-            HealthcheckError::UnknownBucket{ .. }
+            HealthcheckError::UnknownBucket { .. }
         );
     }
 
@@ -747,6 +752,7 @@ mod integration_tests {
             },
             request: TowerRequestConfig::default(),
             assume_role: None,
+            auth: Default::default(),
         }
     }
 

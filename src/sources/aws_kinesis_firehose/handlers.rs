@@ -1,6 +1,8 @@
 use super::errors::{ParseRecords, RequestError};
 use super::models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse};
-use crate::{config::log_schema, event::Event, Pipeline};
+use crate::{
+    config::log_schema, event::Event, internal_events::AwsKinesisFirehoseEventReceived, Pipeline,
+};
 use bytes::Bytes;
 use chrono::Utc;
 use flate2::read::GzDecoder;
@@ -57,6 +59,10 @@ fn parse_records(
         .iter()
         .map(|record| {
             decode_record(record).map(|record| {
+                emit!(AwsKinesisFirehoseEventReceived {
+                    byte_size: record.len()
+                });
+
                 let mut event = Event::new_empty_log();
                 let log = event.as_mut_log();
 

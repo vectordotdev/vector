@@ -97,7 +97,7 @@ impl<'a> FromLua<'a> for Event {
             LuaValue::Table(t) => t,
             _ => {
                 return Err(LuaError::FromLuaConversionError {
-                    from: value.type_name(),
+                    from: type_name(&value),
                     to: "Event",
                     message: Some("Event should be a Lua table".to_string()),
                 })
@@ -112,7 +112,7 @@ impl<'a> FromLua<'a> for Event {
                 ctx,
             )?)),
             _ => Err(LuaError::FromLuaConversionError {
-                from: value.type_name(),
+                from: type_name(&value),
                 to: "Event",
                 message: Some(
                     "Event should contain either \"log\" or \"metric\" key at the top level"
@@ -120,6 +120,22 @@ impl<'a> FromLua<'a> for Event {
                 ),
             }),
         }
+    }
+}
+
+// Taken from https://github.com/amethyst/rlua/blob/v0.17.0/src/value.rs#L52-L61
+pub fn type_name(value: &LuaValue) -> &'static str {
+    match *value {
+        LuaValue::Nil => "nil",
+        LuaValue::Boolean(_) => "boolean",
+        LuaValue::LightUserData(_) => "light userdata",
+        LuaValue::Integer(_) => "integer",
+        LuaValue::Number(_) => "number",
+        LuaValue::String(_) => "string",
+        LuaValue::Table(_) => "table",
+        LuaValue::Function(_) => "function",
+        LuaValue::Thread(_) => "thread",
+        LuaValue::UserData(_) | LuaValue::Error(_) => "userdata",
     }
 }
 
@@ -157,14 +173,11 @@ mod test {
 
     #[test_env_log::test]
     fn to_lua_metric() {
-        let event = Event::Metric(Metric {
-            name: "example counter".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 0.57721566 },
-        });
+        let event = Event::Metric(Metric::new(
+            "example counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 0.57721566 },
+        ));
 
         let assertions = vec![
             "type(event) == 'table'",
@@ -214,14 +227,11 @@ mod test {
                 }
             }
         }"#;
-        let expected = Event::Metric(Metric {
-            name: "example counter".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 0.57721566 },
-        });
+        let expected = Event::Metric(Metric::new(
+            "example counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 0.57721566 },
+        ));
 
         Lua::new().context(|ctx| {
             let event = ctx.load(lua_event).eval::<Event>().unwrap();

@@ -11,6 +11,7 @@ pub mod statistic;
 pub mod tcp;
 #[cfg(test)]
 pub mod test;
+#[cfg(feature = "socket2")]
 pub mod udp;
 #[cfg(all(any(feature = "sinks-socket", feature = "sinks-statsd"), unix))]
 pub mod unix;
@@ -25,7 +26,7 @@ use std::borrow::Cow;
 
 pub use batch::{Batch, BatchConfig, BatchSettings, BatchSize, PushResult};
 pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
-pub use buffer::metrics::{MetricBuffer, MetricEntry};
+pub use buffer::metrics::MetricEntry;
 pub use buffer::partition::Partition;
 pub use buffer::vec::{EncodedLength, VecBuffer};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};

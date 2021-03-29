@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
     event::LookupBuf,
     internal_events::{RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten},
@@ -35,7 +35,7 @@ impl GenerateConfig for RenameFieldsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "rename_fields")]
 impl TransformConfig for RenameFieldsConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         let mut fields = IndexMap::default();
         for (key, value) in self.fields.clone().all_fields() {
             fields.insert(

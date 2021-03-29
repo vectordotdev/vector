@@ -1,6 +1,6 @@
 #![cfg(feature = "leveldb")]
 
-use futures::{compat::Future01CompatExt, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt};
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
 use tracing::trace;
@@ -64,7 +64,7 @@ fn test_buffering() {
         let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
-            .sink_map_err(|error| panic!(error))
+            .sink_map_err(|error| panic!("{}", error))
             .send_all(&mut input_events_stream)
             .await
             .unwrap();
@@ -114,14 +114,14 @@ fn test_buffering() {
         let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
-            .sink_map_err(|error| panic!(error))
+            .sink_map_err(|error| panic!("{}", error))
             .send_all(&mut input_events_stream)
             .await
             .unwrap();
 
         let output_events = CountReceiver::receive_events(out_rx);
 
-        topology.stop().compat().await.unwrap();
+        topology.stop().await;
 
         let output_events = output_events.await;
         assert_eq!(

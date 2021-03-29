@@ -15,6 +15,7 @@ components: sources: host_metrics: {
 		deployment_roles: ["daemon"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -27,14 +28,15 @@ components: sources: host_metrics: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		notices: []
 		requirements: []
 		warnings: []
@@ -44,20 +46,44 @@ components: sources: host_metrics: {
 		platform_name: null
 	}
 
+	env_vars: {
+		PROCFS_ROOT: {
+			description: "Sets an arbitrary path to the system's Procfs root. Can be used to expose host metrics from within a container. Unset and uses system `/proc` by default."
+			type: string: {
+				default: null
+				examples: ["/mnt/host/proc"]
+				syntax: "literal"
+			}
+		}
+
+		SYSFS_ROOT: {
+			description: "Sets an arbitrary path to the system's Sysfs root. Can be used to expose host metrics from within a container. Unset and uses system `/sys` by default."
+			type: string: {
+				default: null
+				examples: ["/mnt/host/sys"]
+				syntax: "literal"
+			}
+		}
+	}
+
 	configuration: {
 		collectors: {
 			description: "The list of host metric collector services to use. Defaults to all collectors."
 			common:      true
 			required:    false
 			type: array: {
-				default: ["cpu", "disk", "filesystem", "load", "memory", "network"]
-				items: type: string: enum: {
-					cpu:        "Metrics related to CPU utilization."
-					disk:       "Metrics related to disk I/O utilization."
-					filesystem: "Metrics related to filesystem space utilization."
-					load:       "Load average metrics (UNIX only)."
-					memory:     "Metrics related to memory utilization."
-					network:    "Metrics related to network utilization."
+				default: ["cpu", "disk", "filesystem", "load", "host", "memory", "network"]
+				items: type: string: {
+					enum: {
+						cpu:        "Metrics related to CPU utilization."
+						disk:       "Metrics related to disk I/O utilization."
+						filesystem: "Metrics related to filesystem space utilization."
+						load:       "Load average metrics (UNIX only)."
+						host:       "Metrics related to host"
+						memory:     "Metrics related to memory utilization."
+						network:    "Metrics related to network utilization."
+					}
+					syntax: "literal"
 				}
 			}
 		}
@@ -65,7 +91,10 @@ components: sources: host_metrics: {
 			description: "The namespace of metrics. Disabled if empty."
 			common:      false
 			required:    false
-			type: string: default: "host"
+			type: string: {
+				default: "host"
+				syntax:  "literal"
+			}
 		}
 		scrape_interval_secs: {
 			description: "The interval between metric gathering, in seconds."
@@ -96,7 +125,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: ["*"]
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 						excludes: {
@@ -109,7 +141,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: []
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 					}
@@ -136,7 +171,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: ["*"]
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 						excludes: {
@@ -149,7 +187,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: []
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 					}
@@ -169,7 +210,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: ["*"]
-								items: type: string: examples: ["ntfs", "ext*"]
+								items: type: string: {
+									examples: ["ntfs", "ext*"]
+									syntax: "literal"
+								}
 							}
 						}
 						excludes: {
@@ -182,7 +226,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: []
-								items: type: string: examples: ["ntfs", "ext*"]
+								items: type: string: {
+									examples: ["ntfs", "ext*"]
+									syntax: "literal"
+								}
 							}
 						}
 					}
@@ -202,7 +249,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: ["*"]
-								items: type: string: examples: ["/home", "/raid*"]
+								items: type: string: {
+									examples: ["/home", "/raid*"]
+									syntax: "literal"
+								}
 							}
 						}
 						excludes: {
@@ -215,7 +265,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: []
-								items: type: string: examples: ["/home", "/raid*"]
+								items: type: string: {
+									examples: ["/home", "/raid*"]
+									syntax: "literal"
+								}
 							}
 						}
 					}
@@ -242,7 +295,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: ["*"]
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 						excludes: {
@@ -255,7 +311,10 @@ components: sources: host_metrics: {
 								"""
 							type: array: {
 								default: []
-								items: type: string: examples: ["sda", "dm-*"]
+								items: type: string: {
+									examples: ["sda", "dm-*"]
+									syntax: "literal"
+								}
 							}
 						}
 					}
@@ -311,6 +370,10 @@ components: sources: host_metrics: {
 		load1:  _host & _loadavg & {description: "System load averaged over the last 1 second."}
 		load5:  _host & _loadavg & {description: "System load averaged over the last 5 seconds."}
 		load15: _host & _loadavg & {description: "System load averaged over the last 15 seconds."}
+
+		// Host time
+		uptime:    _host & _host_metric & {description: "The number of seconds since the last boot."}
+		boot_time: _host & _host_metric & {description: "The UNIX timestamp of the last boot."}
 
 		// Host memory
 		memory_active_bytes:           _host & _memory_gauge & _memory_nowin & {description: "The number of bytes of active main memory."}
@@ -378,6 +441,12 @@ components: sources: host_metrics: {
 			}
 			relevant_when: "OS is not Windows"
 		}
+		_host_metric: {
+			type: "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["host"]
+			}
+		}
 		_memory_counter: {
 			type: "counter"
 			tags: _host_metrics_tags & {
@@ -405,5 +474,9 @@ components: sources: host_metrics: {
 			}
 		}
 		_network_nomac: _network_gauge & {relevant_when: "OS is not macOS"}
+	}
+
+	telemetry: metrics: {
+		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
 	}
 }

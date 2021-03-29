@@ -7,25 +7,20 @@ use crate::{
     buffers,
     config::{DataType, SinkContext},
     event::Event,
-    internal_events::EventProcessed,
+    internal_events::{EventIn, EventOut, EventProcessed, EventZeroIn},
     shutdown::SourceShutdownCoordinator,
+    stream::VecStreamExt,
     transforms::Transform,
     Pipeline,
 };
-use futures::{
-    compat::Future01CompatExt, future, FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt,
-};
-use futures01::{Future as Future01, Stream as Stream01};
+use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use std::{
     collections::HashMap,
     future::ready,
     sync::{Arc, Mutex},
 };
 use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
-use tokio::{
-    sync::mpsc,
-    time::{timeout, Duration},
-};
+use tokio::time::{timeout, Duration};
 
 pub struct Pieces {
     pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,
@@ -59,7 +54,7 @@ pub async fn build_pieces(
         .iter()
         .filter(|(name, _)| diff.sources.contains_new(&name))
     {
-        let (tx, rx) = mpsc::channel(1000);
+        let (tx, rx) = tokio::sync::mpsc::channel(1000);
         let pipeline = Pipeline::from_sender(tx, vec![]);
 
         let typetag = source.source_type();
@@ -86,12 +81,16 @@ pub async fn build_pieces(
         // forcibly shut down. We accomplish this by select()-ing on the server Task with the
         // force_shutdown_tripwire. That means that if the force_shutdown_tripwire resolves while
         // the server Task is still running the Task will simply be dropped on the floor.
-        let server = future::try_select(server, force_shutdown_tripwire.unit_error().boxed())
-            .map_ok(|_| {
-                debug!("Finished.");
-                TaskOutput::Source
-            })
-            .map_err(|_| ());
+        let server = async {
+            emit!(EventZeroIn);
+            match future::try_select(server, force_shutdown_tripwire.unit_error().boxed()).await {
+                Ok(_) => {
+                    debug!("Finished.");
+                    Ok(TaskOutput::Source)
+                }
+                Err(_) => Err(()),
+            }
+        };
         let server = Task::new(name, typetag, server);
 
         outputs.insert(name.clone(), control);
@@ -110,7 +109,7 @@ pub async fn build_pieces(
         let typetag = transform.inner.transform_type();
 
         let input_type = transform.inner.input_type();
-        let transform = match transform.inner.build().await {
+        let transform = match transform.inner.build(&config.global).await {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
                 continue;
@@ -118,41 +117,43 @@ pub async fn build_pieces(
             Ok(transform) => transform,
         };
 
-        let (input_tx, input_rx) = mpsc::channel(100);
+        let (input_tx, input_rx) = futures::channel::mpsc::channel(100);
         let input_tx = buffers::BufferInputCloner::Memory(input_tx, buffers::WhenFull::Block);
+        let input_rx = crate::utilization::wrap(input_rx);
 
         let (output, control) = Fanout::new();
 
-        let filtered = input_rx
-            .map(Ok)
-            .compat()
-            .filter(move |event| filter_event_type(event, input_type))
-            .inspect(|_| emit!(EventProcessed));
         let transform = match transform {
-            Transform::Function(mut t) => {
-                #[allow(deprecated)]
-                // `boxed()` here is deprecated, but the replacement won't work until we adopt futures 0.3 here.
-                let transformed = filtered
-                    .map(move |v| {
-                        let mut buf = Vec::with_capacity(1);
-                        t.transform(&mut buf, v);
-                        futures01::stream::iter_ok(buf.into_iter())
-                    })
-                    .flatten()
-                    .boxed();
-                transformed.forward(output.compat())
-            }
+            Transform::Function(mut t) => input_rx
+                .filter(move |event| ready(filter_event_type(event, input_type)))
+                .inspect(|_| emit!(EventIn))
+                .flat_map(move |v| {
+                    let mut buf = Vec::with_capacity(1);
+                    t.transform(&mut buf, v);
+                    emit!(EventOut { count: buf.len() });
+                    emit!(EventProcessed);
+                    stream::iter(buf.into_iter()).map(Ok)
+                })
+                .forward(output)
+                .boxed(),
             Transform::Task(t) => {
-                let transformed: Box<dyn futures01::Stream<Item = _, Error = _> + Send> =
-                    t.transform(Box::new(filtered));
-                transformed.forward(output.compat())
+                let filtered = input_rx
+                    .filter(move |event| ready(filter_event_type(event, input_type)))
+                    .inspect(|_| emit!(EventIn))
+                    .on_processed(|| emit!(EventProcessed));
+                t.transform(Box::pin(filtered))
+                    .map(Ok)
+                    .forward(output.with(|event| async {
+                        emit!(EventOut { count: 1 });
+                        Ok(event)
+                    }))
+                    .boxed()
             }
         }
-        .map(|_| {
+        .map_ok(|_| {
             debug!("Finished.");
             TaskOutput::Transform
-        })
-        .compat();
+        });
         let task = Task::new(name, typetag, transform);
 
         inputs.insert(name.clone(), (input_tx, trans_inputs.clone()));
@@ -189,6 +190,7 @@ pub async fn build_pieces(
         let cx = SinkContext {
             acker: acker.clone(),
             healthcheck,
+            globals: config.global.clone(),
         };
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
@@ -208,15 +210,18 @@ pub async fn build_pieces(
             // which will enable us to reuse rx to rebuild
             // old configuration by passing this Arc<Mutex<Option<_>>>
             // yet again.
-            let mut rx = rx
+            let rx = rx
                 .lock()
                 .unwrap()
                 .take()
                 .expect("Task started but input has been taken.");
 
+            let mut rx = Box::pin(crate::utilization::wrap(rx));
+
             sink.run(
                 rx.by_ref()
                     .filter(|event| ready(filter_event_type(event, input_type)))
+                    .inspect(|_| emit!(EventIn))
                     .take_until_if(tripwire),
             )
             .await
@@ -227,6 +232,7 @@ pub async fn build_pieces(
         };
         let task = Task::new(name, typetag, sink);
 
+        let component_name = name.clone();
         let healthcheck_task = async move {
             if enable_healthcheck {
                 let duration = Duration::from_secs(10);
@@ -237,11 +243,22 @@ pub async fn build_pieces(
                             Ok(TaskOutput::Healthcheck)
                         }
                         Ok(Err(error)) => {
-                            error!(message = "Healthcheck: Failed Reason.", %error);
+                            error!(
+                                msg = "Healthcheck: Failed Reason.",
+                                %error,
+                                component_kind = "sink",
+                                component_type = typetag,
+                                ?component_name,
+                            );
                             Err(())
                         }
                         Err(_) => {
-                            error!("Healthcheck: timeout.");
+                            error!(
+                                msg = "Healthcheck: timeout.",
+                                component_kind = "sink",
+                                component_type = typetag,
+                                ?component_name,
+                            );
                             Err(())
                         }
                     })

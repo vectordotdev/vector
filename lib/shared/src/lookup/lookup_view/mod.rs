@@ -4,7 +4,7 @@ use crate::lookup::*;
 use core::fmt;
 use pest::iterators::Pair;
 use pest::Parser;
-use remap_lang::parser::{Parser as RemapParser, ParserRule};
+// use remap_lang::parser::{Parser as RemapParser, ParserRule};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};

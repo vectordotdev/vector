@@ -3,7 +3,8 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     http::{Auth, HttpClient},
     internal_events::{
-        NginxMetricsCollectCompleted, NginxMetricsRequestError, NginxMetricsStubStatusParseError,
+        NginxMetricsCollectCompleted, NginxMetricsEventsReceived, NginxMetricsRequestError,
+        NginxMetricsStubStatusParseError,
     },
     shutdown::ShutdownSignal,
     tls::{TlsOptions, TlsSettings},
@@ -16,7 +17,7 @@ use http::{Request, StatusCode};
 use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::BTreeMap, convert::TryFrom, future::ready, time::Instant};
+use std::{collections::BTreeMap, convert::TryFrom, time::Instant};
 use tokio::time;
 
 pub mod parser;
@@ -114,7 +115,11 @@ impl SourceConfig for NginxMetricsConfig {
                     end: Instant::now()
                 });
 
-                let mut stream = stream::iter(metrics).flatten().map(Event::Metric).map(Ok);
+                let mut stream = stream::iter(metrics)
+                    .map(stream::iter)
+                    .flatten()
+                    .map(Event::Metric)
+                    .map(Ok);
                 out.send_all(&mut stream).await?;
             }
 
@@ -168,15 +173,20 @@ impl NginxMetrics {
         })
     }
 
-    async fn collect(&self) -> stream::BoxStream<'static, Metric> {
-        let (up_value, metrics) = match self.collect_metrics().await {
+    async fn collect(&self) -> Vec<Metric> {
+        let (up_value, mut metrics) = match self.collect_metrics().await {
             Ok(metrics) => (1.0, metrics),
             Err(()) => (0.0, vec![]),
         };
 
-        stream::once(ready(self.create_metric("up", gauge!(up_value))))
-            .chain(stream::iter(metrics))
-            .boxed()
+        metrics.push(self.create_metric("up", gauge!(up_value)));
+
+        emit!(NginxMetricsEventsReceived {
+            count: metrics.len(),
+            uri: &self.endpoint
+        });
+
+        metrics
     }
 
     async fn collect_metrics(&self) -> Result<Vec<Metric>, ()> {
@@ -221,14 +231,10 @@ impl NginxMetrics {
     }
 
     fn create_metric(&self, name: &str, value: MetricValue) -> Metric {
-        Metric {
-            name: name.into(),
-            namespace: self.namespace.clone(),
-            timestamp: Some(Utc::now()),
-            tags: Some(self.tags.clone()),
-            kind: MetricKind::Absolute,
-            value,
-        }
+        Metric::new(name, MetricKind::Absolute, value)
+            .with_namespace(self.namespace.clone())
+            .with_tags(Some(self.tags.clone()))
+            .with_timestamp(Some(Utc::now()))
     }
 }
 

@@ -12,12 +12,8 @@ use openssl::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::{
-    fmt,
-    fs::File,
-    io::Read,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
+use std::{fmt, fs::File, io::Read};
 
 const PEM_START_MARKER: &str = "-----BEGIN ";
 
@@ -220,7 +216,7 @@ impl TlsOptions {
     }
 
     /// Parse identity from a PEM encoded certificate + key pair of files
-    fn parse_pem_identity(&self, pem: String, crt_file: &PathBuf) -> Result<Option<IdentityStore>> {
+    fn parse_pem_identity(&self, pem: String, crt_file: &Path) -> Result<Option<IdentityStore>> {
         match &self.key_file {
             None => Err(TlsError::MissingKey),
             Some(key_file) => {
@@ -434,7 +430,7 @@ fn der_or_pem<T>(data: Vec<u8>, der_fn: impl Fn(Vec<u8>) -> T, pem_fn: impl Fn(S
 /// inline data and is used directly instead of opening a file.
 fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> {
     if let Some(filename) = filename.to_str() {
-        if filename.find(PEM_START_MARKER).is_some() {
+        if filename.contains(PEM_START_MARKER) {
             return Ok((Vec::from(filename), "inline text".into()));
         }
     }
@@ -452,7 +448,6 @@ fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::BoolAndSome;
 
     const TEST_PKCS12_PATH: &str = "tests/data/localhost.p12";
     const TEST_PEM_CRT_BYTES: &[u8] = include_bytes!("../../tests/data/localhost.crt");
@@ -502,7 +497,7 @@ mod test {
     #[test]
     fn from_options_ca() {
         let options = TlsOptions {
-            ca_file: Some("tests/data/Vector_CA.crt".into()),
+            ca_file: Some(TEST_PEM_CA_PATH.into()),
             ..Default::default()
         };
         let settings = TlsSettings::from_options(&Some(options))
@@ -620,8 +615,8 @@ mod test {
         TlsConfig {
             enabled,
             options: TlsOptions {
-                crt_file: set_crt.and_some(TEST_PEM_CRT_PATH.into()),
-                key_file: set_key.and_some(TEST_PEM_KEY_PATH.into()),
+                crt_file: set_crt.then(|| TEST_PEM_CRT_PATH.into()),
+                key_file: set_key.then(|| TEST_PEM_KEY_PATH.into()),
                 ..Default::default()
             },
         }

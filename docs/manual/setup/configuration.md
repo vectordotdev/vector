@@ -32,14 +32,14 @@ data_dir = "/var/lib/vector"
   patterns      = ['^(?P<host>[w.]+) - (?P<user>[w]+) (?P<bytes_in>[d]+) [(?P<timestamp>.*)] "(?P<method>[w]+) (?P<path>.*)" (?P<status>[d]+) (?P<bytes_out>[d]+)$']
 
 # Sample the data to save on cost
-[transforms.apache_sampler]
+[transforms.apache_sample]
   inputs       = ["apache_parser"]
-  type         = "sampler"
+  type         = "sample"
   rate         = 50                            # only keep 50%
 
 # Send structured data to a short-term storage
 [sinks.es_cluster]
-  inputs       = ["apache_sampler"]            # only take sampled data
+  inputs       = ["apache_sample"]            # only take sampled data
   type         = "elasticsearch"
   host         = "http://79.12.221.222:9200"   # local or external host
   index        = "vector-%Y-%m-%d"             # daily indices
@@ -141,7 +141,8 @@ from the event's data. Two syntaxes are supported for fields that support field
 interpolation:
 
 1. [Strptime specifiers][urls.strptime_specifiers]. Ex: `date=%Y/%m/%d`
-2. [Event fields][docs.data-model]. Ex: `{{ field_name }}`
+2. [Log fields][docs.data-model.log]. Ex: `{{ field_name }}`
+3. [Metric name, namespace, or tags][docs.data-model.metric]. Ex: `{{ name }} {{ namespace }} {{ tags.tag_name }}`
 
 For example:
 

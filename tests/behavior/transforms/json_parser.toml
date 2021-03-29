@@ -10,8 +10,11 @@
   [[tests.outputs]]
     extract_from = "json_parser_nested"
     [[tests.outputs.conditions]]
-      "a.equals" = 3
-      "b.c.equals" = 4
+      type = "remap"
+      source = '''
+        .a == 3 &&
+        .b.c == 4
+      '''
 
 [transforms.json_parser_target_field]
   inputs = []
@@ -26,8 +29,11 @@
   [[tests.outputs]]
     extract_from = "json_parser_target_field"
     [[tests.outputs.conditions]]
-      "target_field.a.equals" = 3
-      "target_field.b.c.equals" = 4
+      type = "remap"
+      source = '''
+        .target_field.a == 3
+        .target_field.b.c == 4
+      '''
 
 [transforms.json_parser_null_value]
   inputs = []
@@ -41,5 +47,8 @@
   [[tests.outputs]]
     extract_from = "json_parser_null_value"
     [[tests.outputs.conditions]]
-      "a.equals" = 3
-      "b.equals" = "<null>"
+      type = "remap"
+      source = '''
+        .a == 3 &&
+        .b == null
+      '''

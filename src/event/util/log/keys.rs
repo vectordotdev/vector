@@ -2,7 +2,7 @@ use super::all_fields;
 use crate::event::Value;
 use std::collections::BTreeMap;
 
-/// Iterates over all paths in form "a.b[0].c[1]" in alphabetical order.
+/// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order.
 /// It is implemented as a wrapper around `all_fields` to reduce code
 /// duplication.
 #[deprecated(since = "0.12.0", note = "Please use Event/Value keys instead.")]

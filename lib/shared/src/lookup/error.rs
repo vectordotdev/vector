@@ -1,4 +1,4 @@
-use remap_lang::parser::ParserRule;
+// use remap_lang::parser::ParserRule;
 use snafu::Snafu;
 use std::num::ParseIntError;
 pub use LookupError::*;
@@ -18,14 +18,18 @@ pub enum LookupError {
     MissingInnerSegment,
     #[snafu(display("No tokens found to parse."))]
     NoTokens,
+    /*
     #[snafu(display("Parsing error: {}", source))]
     PestParser {
         source: pest::error::Error<ParserRule>,
     },
+    */
 }
 
+/*
 impl From<pest::error::Error<ParserRule>> for LookupError {
     fn from(source: pest::error::Error<ParserRule>) -> Self {
         Self::PestParser { source }
     }
 }
+*/

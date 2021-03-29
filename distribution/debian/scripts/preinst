@@ -2,7 +2,7 @@
 set -e
 
 # Add vector:vector user & group
-useradd -M --system --user-group vector
+id --user vector >/dev/null 2>&1 || useradd -M --system --user-group vector
 
 # Create default Vector data directory
 mkdir -p /var/lib/vector

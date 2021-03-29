@@ -4,7 +4,7 @@ use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 use rand_distr::{Alphanumeric, Distribution, Uniform};
 
 use vector::{
-    config::{log_schema, TransformConfig},
+    config::{log_schema, GlobalOptions, TransformConfig},
     event::Event,
     log_event,
     test_util::runtime,
@@ -40,7 +40,7 @@ fn benchmark_regex(c: &mut Criterion) {
                 drop_failed: true,
                 ..Default::default()
             }
-            .build()
+            .build(&GlobalOptions::default())
             .await
             .unwrap().into_function()
         });

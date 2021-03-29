@@ -1,3 +1,4 @@
+use indoc::indoc;
 use k8s_e2e_tests::*;
 use k8s_test_framework::{
     lock, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
@@ -5,19 +6,18 @@ use k8s_test_framework::{
 
 const HELM_CHART_VECTOR: &str = "vector";
 
-const HELM_VALUES_STDOUT_SINK: &str = r#"
-vector-aggregator:
-  vectorSource:
-    sourceId: vector
+const HELM_VALUES_STDOUT_SINK: &str = indoc! {r#"
+    vector-aggregator:
+      vectorSource:
+        sourceId: vector
 
-  sinks:
-    stdout:
-      type: "console"
-      inputs: ["vector"]
-      rawConfig: |
-        target = "stdout"
-        encoding = "json"
-"#;
+      sinks:
+        stdout:
+          type: "console"
+          inputs: ["vector"]
+          target: "stdout"
+          encoding: "json"
+"#};
 
 /// This test validates that vector picks up logs with an agent and
 /// delivers them to the aggregator out of the box.

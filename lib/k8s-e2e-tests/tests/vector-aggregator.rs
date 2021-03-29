@@ -1,25 +1,24 @@
+use indoc::indoc;
 use k8s_e2e_tests::*;
 use k8s_test_framework::{lock, vector::Config as VectorConfig};
 
 const HELM_CHART_VECTOR_AGGREGATOR: &str = "vector-aggregator";
 
-const HELM_VALUES_DUMMY_TOPOLOGY: &str = r#"
-sources:
-  dummy:
-    type: "generator"
-    rawConfig: |
-      format = "shuffle"
-      lines = ["Hello world"]
-      interval = 60 # once a minute
+const HELM_VALUES_DUMMY_TOPOLOGY: &str = indoc! {r#"
+    sources:
+      dummy:
+        type: "generator"
+        format: "shuffle"
+        lines: ["Hello world"]
+        interval: 60 # once a minute
 
-sinks:
-  stdout:
-    type: "console"
-    inputs: ["dummy"]
-    rawConfig: |
-      target = "stdout"
-      encoding = "json"
-"#;
+    sinks:
+      stdout:
+        type: "console"
+        inputs: ["dummy"]
+        target: "stdout"
+        encoding: "json"
+"#};
 
 /// This test validates that vector-aggregator can deploy with the default
 /// settings and a dummy topology.

@@ -1,5 +1,7 @@
-use crate::event::lua::{table_to_set, table_to_timestamp, timestamp_to_table};
-use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+use crate::event::{
+    lua::{table_to_set, table_to_timestamp, timestamp_to_table, type_name},
+    metric, Metric, MetricKind, MetricValue, StatisticKind,
+};
 use rlua::prelude::*;
 use std::collections::BTreeMap;
 
@@ -19,7 +21,7 @@ impl<'a> FromLua<'a> for MetricKind {
             LuaValue::String(s) if s == "absolute" => Ok(MetricKind::Absolute),
             LuaValue::String(s) if s == "incremental" => Ok(MetricKind::Incremental),
             _ => Err(LuaError::FromLuaConversionError {
-                from: value.type_name(),
+                from: type_name(&value),
                 to: "MetricKind",
                 message: Some(
                     "Metric kind should be either \"incremental\" or \"absolute\"".to_string(),
@@ -45,7 +47,7 @@ impl<'a> FromLua<'a> for StatisticKind {
             LuaValue::String(s) if s == "summary" => Ok(StatisticKind::Summary),
             LuaValue::String(s) if s == "histogram" => Ok(StatisticKind::Histogram),
             _ => Err(LuaError::FromLuaConversionError {
-                from: value.type_name(),
+                from: type_name(&value),
                 to: "StatisticKind",
                 message: Some(
                     "Statistic kind should be either \"summary\" or \"histogram\"".to_string(),
@@ -59,16 +61,19 @@ impl<'a> ToLua<'a> for Metric {
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
         let tbl = ctx.create_table()?;
 
-        tbl.set("name", self.name)?;
-        if let Some(ts) = self.timestamp {
+        tbl.set("name", self.name())?;
+        if let Some(namespace) = self.namespace() {
+            tbl.set("namespace", namespace)?;
+        }
+        if let Some(ts) = self.data.timestamp {
             tbl.set("timestamp", timestamp_to_table(ctx, ts)?)?;
         }
-        if let Some(tags) = self.tags {
+        if let Some(tags) = self.series.tags {
             tbl.set("tags", tags)?;
         }
-        tbl.set("kind", self.kind)?;
+        tbl.set("kind", self.data.kind)?;
 
-        match self.value {
+        match self.data.value {
             MetricValue::Counter { value } => {
                 let counter = ctx.create_table()?;
                 counter.set("value", value)?;
@@ -84,12 +89,10 @@ impl<'a> ToLua<'a> for Metric {
                 set.set("values", ctx.create_sequence_from(values.into_iter())?)?;
                 tbl.set("set", set)?;
             }
-            MetricValue::Distribution {
-                values,
-                sample_rates,
-                statistic,
-            } => {
+            MetricValue::Distribution { samples, statistic } => {
                 let distribution = ctx.create_table()?;
+                let sample_rates: Vec<_> = samples.iter().map(|s| s.rate).collect();
+                let values: Vec<_> = samples.into_iter().map(|s| s.value).collect();
                 distribution.set("values", values)?;
                 distribution.set("sample_rates", sample_rates)?;
                 distribution.set("statistic", statistic)?;
@@ -97,11 +100,12 @@ impl<'a> ToLua<'a> for Metric {
             }
             MetricValue::AggregatedHistogram {
                 buckets,
-                counts,
                 count,
                 sum,
             } => {
                 let aggregated_histogram = ctx.create_table()?;
+                let counts: Vec<_> = buckets.iter().map(|b| b.count).collect();
+                let buckets: Vec<_> = buckets.into_iter().map(|b| b.upper_limit).collect();
                 aggregated_histogram.set("buckets", buckets)?;
                 aggregated_histogram.set("counts", counts)?;
                 aggregated_histogram.set("count", count)?;
@@ -110,11 +114,12 @@ impl<'a> ToLua<'a> for Metric {
             }
             MetricValue::AggregatedSummary {
                 quantiles,
-                values,
                 count,
                 sum,
             } => {
                 let aggregated_summary = ctx.create_table()?;
+                let values: Vec<_> = quantiles.iter().map(|q| q.value).collect();
+                let quantiles: Vec<_> = quantiles.into_iter().map(|q| q.upper_limit).collect();
                 aggregated_summary.set("quantiles", quantiles)?;
                 aggregated_summary.set("values", values)?;
                 aggregated_summary.set("count", count)?;
@@ -133,7 +138,7 @@ impl<'a> FromLua<'a> for Metric {
             LuaValue::Table(table) => table,
             other => {
                 return Err(LuaError::FromLuaConversionError {
-                    from: other.type_name(),
+                    from: type_name(&other),
                     to: "Metric",
                     message: Some("Metric should be a Lua table".to_string()),
                 })
@@ -145,6 +150,7 @@ impl<'a> FromLua<'a> for Metric {
             .get::<_, Option<LuaTable>>("timestamp")?
             .map(table_to_timestamp)
             .transpose()?;
+        let namespace: Option<String> = table.get("namespace")?;
         let tags: Option<BTreeMap<String, String>> = table.get("tags")?;
         let kind = table
             .get::<_, Option<MetricKind>>("kind")?
@@ -163,47 +169,45 @@ impl<'a> FromLua<'a> for Metric {
                 values: set.get::<_, LuaTable>("values").and_then(table_to_set)?,
             }
         } else if let Some(distribution) = table.get::<_, Option<LuaTable>>("distribution")? {
+            let values: Vec<f64> = distribution.get("values")?;
+            let rates: Vec<u32> = distribution.get("sample_rates")?;
             MetricValue::Distribution {
-                values: distribution.get("values")?,
-                sample_rates: distribution.get("sample_rates")?,
+                samples: metric::zip_samples(values, rates),
                 statistic: distribution.get("statistic")?,
             }
         } else if let Some(aggregated_histogram) =
             table.get::<_, Option<LuaTable>>("aggregated_histogram")?
         {
             let counts: Vec<u32> = aggregated_histogram.get("counts")?;
+            let buckets: Vec<f64> = aggregated_histogram.get("buckets")?;
             let count = counts.iter().sum();
             MetricValue::AggregatedHistogram {
-                buckets: aggregated_histogram.get("buckets")?,
-                counts,
+                buckets: metric::zip_buckets(buckets, counts),
                 count,
                 sum: aggregated_histogram.get("sum")?,
             }
         } else if let Some(aggregated_summary) =
             table.get::<_, Option<LuaTable>>("aggregated_summary")?
         {
+            let quantiles: Vec<f64> = aggregated_summary.get("quantiles")?;
+            let values: Vec<f64> = aggregated_summary.get("values")?;
             MetricValue::AggregatedSummary {
-                quantiles: aggregated_summary.get("quantiles")?,
-                values: aggregated_summary.get("values")?,
+                quantiles: metric::zip_quantiles(quantiles, values),
                 count: aggregated_summary.get("count")?,
                 sum: aggregated_summary.get("sum")?,
             }
         } else {
             return Err(LuaError::FromLuaConversionError {
-                from: value.type_name(),
+                from: type_name(&value),
                 to: "Metric",
                 message: Some("Cannot find metric value, expected presence one of \"counter\", \"gauge\", \"set\", \"distribution\", \"aggregated_histogram\", \"aggregated_summary\"".to_string()),
             });
         };
 
-        Ok(Metric {
-            name,
-            namespace: None,
-            timestamp,
-            tags,
-            kind,
-            value,
-        })
+        Ok(Metric::new(name, kind, value)
+            .with_namespace(namespace)
+            .with_tags(tags)
+            .with_timestamp(timestamp))
     }
 }
 
@@ -226,21 +230,22 @@ mod test {
 
     #[test_env_log::test]
     fn to_lua_counter_full() {
-        let metric = Metric {
-            name: "example counter".into(),
-            namespace: None,
-            timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)),
-            tags: Some(
-                vec![("example tag".to_string(), "example value".to_string())]
-                    .into_iter()
-                    .collect(),
-            ),
-            kind: MetricKind::Incremental,
-            value: MetricValue::Counter { value: 1.0 },
-        };
+        let metric = Metric::new(
+            "example counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_namespace(Some("namespace_example"))
+        .with_tags(Some(
+            vec![("example tag".to_string(), "example value".to_string())]
+                .into_iter()
+                .collect(),
+        ))
+        .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)));
         let assertions = vec![
             "type(metric) == 'table'",
             "metric.name == 'example counter'",
+            "metric.namespace == 'namespace_example'",
             "type(metric.timestamp) == 'table'",
             "metric.timestamp.year == 2018",
             "metric.timestamp.month == 11",
@@ -259,14 +264,11 @@ mod test {
 
     #[test_env_log::test]
     fn to_lua_counter_minimal() {
-        let metric = Metric {
-            name: "example counter".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 0.57721566 },
-        };
+        let metric = Metric::new(
+            "example counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 0.57721566 },
+        );
         let assertions = vec![
             "metric.timestamp == nil",
             "metric.tags == nil",
@@ -278,32 +280,26 @@ mod test {
 
     #[test_env_log::test]
     fn to_lua_gauge() {
-        let metric = Metric {
-            name: "example gauge".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Gauge { value: 1.6180339 },
-        };
+        let metric = Metric::new(
+            "example gauge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.6180339 },
+        );
         let assertions = vec!["metric.gauge.value == 1.6180339", "metric.counter == nil"];
         assert_metric(metric, assertions);
     }
 
     #[test_env_log::test]
     fn to_lua_set() {
-        let metric = Metric {
-            name: "example set".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Incremental,
-            value: MetricValue::Set {
+        let metric = Metric::new(
+            "example set",
+            MetricKind::Incremental,
+            MetricValue::Set {
                 values: vec!["value".into(), "another value".into()]
                     .into_iter()
                     .collect(),
             },
-        };
+        );
         let assertions = vec![
             "type(metric.set) == 'table'",
             "type(metric.set.values) == 'table'",
@@ -316,18 +312,14 @@ mod test {
 
     #[test_env_log::test]
     fn to_lua_distribution() {
-        let metric = Metric {
-            name: "example distribution".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Incremental,
-            value: MetricValue::Distribution {
-                values: vec![1.0, 1.0],
-                sample_rates: vec![10, 20],
+        let metric = Metric::new(
+            "example distribution",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: crate::samples![1.0 => 10, 1.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
-        };
+        );
         let assertions = vec![
             "type(metric.distribution) == 'table'",
             "#metric.distribution.values == 2",
@@ -342,19 +334,15 @@ mod test {
 
     #[test_env_log::test]
     fn to_lua_aggregated_histogram() {
-        let metric = Metric {
-            name: "example histogram".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Incremental,
-            value: MetricValue::AggregatedHistogram {
-                buckets: vec![1.0, 2.0, 4.0, 8.0],
-                counts: vec![20, 10, 45, 12],
+        let metric = Metric::new(
+            "example histogram",
+            MetricKind::Incremental,
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
                 count: 87,
                 sum: 975.2,
             },
-        };
+        );
         let assertions = vec![
             "type(metric.aggregated_histogram) == 'table'",
             "#metric.aggregated_histogram.buckets == 4",
@@ -371,19 +359,17 @@ mod test {
 
     #[test_env_log::test]
     fn to_lua_aggregated_summary() {
-        let metric = Metric {
-            name: "example summary".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Incremental,
-            value: MetricValue::AggregatedSummary {
-                quantiles: vec![0.1, 0.25, 0.5, 0.75, 0.9, 0.99, 1.0],
-                values: vec![2.0, 3.0, 5.0, 8.0, 7.0, 9.0, 10.0],
+        let metric = Metric::new(
+            "example summary",
+            MetricKind::Incremental,
+            MetricValue::AggregatedSummary {
+                quantiles: crate::quantiles![
+                    0.1 => 2.0, 0.25 => 3.0, 0.5 => 5.0, 0.75 => 8.0, 0.9 => 7.0, 0.99 => 9.0, 1.0 => 10.0
+                ],
                 count: 197,
                 sum: 975.2,
             },
-        };
+        );
         let assertions = vec![
             "type(metric.aggregated_summary) == 'table'",
             "#metric.aggregated_summary.quantiles == 7",
@@ -404,14 +390,11 @@ mod test {
                 value = 0.57721566
             }
         }"#;
-        let expected = Metric {
-            name: "example counter".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 0.57721566 },
-        };
+        let expected = Metric::new(
+            "example counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 0.57721566 },
+        );
         Lua::new().context(|ctx| {
             assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
@@ -421,6 +404,7 @@ mod test {
     fn from_lua_counter_full() {
         let value = r#"{
             name = "example counter",
+            namespace = "example_namespace",
             timestamp = {
                 year = 2018,
                 month = 11,
@@ -437,18 +421,18 @@ mod test {
                 value = 1
             }
         }"#;
-        let expected = Metric {
-            name: "example counter".into(),
-            namespace: None,
-            timestamp: Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10)),
-            tags: Some(
-                vec![("example tag".to_string(), "example value".to_string())]
-                    .into_iter()
-                    .collect(),
-            ),
-            kind: MetricKind::Incremental,
-            value: MetricValue::Counter { value: 1.0 },
-        };
+        let expected = Metric::new(
+            "example counter",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        )
+        .with_namespace(Some("example_namespace"))
+        .with_tags(Some(
+            vec![("example tag".to_string(), "example value".to_string())]
+                .into_iter()
+                .collect(),
+        ))
+        .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10)));
         Lua::new().context(|ctx| {
             assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
@@ -462,14 +446,11 @@ mod test {
                 value = 1.6180339
             }
         }"#;
-        let expected = Metric {
-            name: "example gauge".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Gauge { value: 1.6180339 },
-        };
+        let expected = Metric::new(
+            "example gauge",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 1.6180339 },
+        );
         Lua::new().context(|ctx| {
             assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
@@ -483,18 +464,15 @@ mod test {
                 values = { "value", "another value" }
             }
         }"#;
-        let expected = Metric {
-            name: "example set".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Set {
+        let expected = Metric::new(
+            "example set",
+            MetricKind::Absolute,
+            MetricValue::Set {
                 values: vec!["value".into(), "another value".into()]
                     .into_iter()
                     .collect(),
             },
-        };
+        );
         Lua::new().context(|ctx| {
             assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
@@ -510,18 +488,14 @@ mod test {
                 statistic = "histogram"
             }
         }"#;
-        let expected = Metric {
-            name: "example distribution".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Distribution {
-                values: vec![1.0, 1.0],
-                sample_rates: vec![10, 20],
+        let expected = Metric::new(
+            "example distribution",
+            MetricKind::Absolute,
+            MetricValue::Distribution {
+                samples: crate::samples![1.0 => 10, 1.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
-        };
+        );
         Lua::new().context(|ctx| {
             assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
@@ -537,19 +511,15 @@ mod test {
                 sum = 975.2
             }
         }"#;
-        let expected = Metric {
-            name: "example histogram".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::AggregatedHistogram {
-                buckets: vec![1.0, 2.0, 4.0, 8.0],
-                counts: vec![20, 10, 45, 12],
+        let expected = Metric::new(
+            "example histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets: crate::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
                 count: 87,
                 sum: 975.2,
             },
-        };
+        );
         Lua::new().context(|ctx| {
             assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
@@ -566,19 +536,17 @@ mod test {
                 sum = 975.2
             }
         }"#;
-        let expected = Metric {
-            name: "example summary".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::AggregatedSummary {
-                quantiles: vec![0.1, 0.25, 0.5, 0.75, 0.9, 0.99, 1.0],
-                values: vec![2.0, 3.0, 5.0, 8.0, 7.0, 9.0, 10.0],
+        let expected = Metric::new(
+            "example summary",
+            MetricKind::Absolute,
+            MetricValue::AggregatedSummary {
+                quantiles: crate::quantiles![
+                    0.1 => 2.0, 0.25 => 3.0, 0.5 => 5.0, 0.75 => 8.0, 0.9 => 7.0, 0.99 => 9.0, 1.0 => 10.0
+                ],
                 count: 197,
                 sum: 975.2,
             },
-        };
+        );
         Lua::new().context(|ctx| {
             assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });

@@ -1,4 +1,5 @@
-use crate::{event::*, lookup::*};
+use crate::event::lua::type_name;
+use crate::{event::{LogEvent, Value}, lookup::*};
 use rlua::prelude::*;
 
 impl<'a> ToLua<'a> for LogEvent {
@@ -21,7 +22,7 @@ impl<'a> FromLua<'a> for LogEvent {
                 Ok(log)
             }
             _ => Err(rlua::Error::FromLuaConversionError {
-                from: value.type_name(),
+                from: type_name(&value),
                 to: "LogEvent",
                 message: Some("LogEvent should ba a Lua table".to_string()),
             }),

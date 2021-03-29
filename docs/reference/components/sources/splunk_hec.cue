@@ -11,6 +11,7 @@ components: sources: splunk_hec: {
 		deployment_roles: ["aggregator"]
 		development:   "stable"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -42,14 +43,15 @@ components: sources: splunk_hec: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -67,6 +69,7 @@ components: sources: splunk_hec: {
 			warnings: []
 			type: string: {
 				default: "0.0.0.0:\(_port)"
+				syntax:  "literal"
 			}
 		}
 		token: {
@@ -77,6 +80,7 @@ components: sources: splunk_hec: {
 			type: string: {
 				default: null
 				examples: ["A94A8FE5CCB19BA61C4C08"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -95,6 +99,7 @@ components: sources: splunk_hec: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:           components.sources.internal_metrics.output.metrics.events_in_total
 		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
 		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
 	}

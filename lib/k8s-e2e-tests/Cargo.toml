@@ -5,15 +5,17 @@ authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "End-to-end tests of Vector in the Kubernetes environment"
 publish = false
+license = "MPL-2.0"
 
 [dependencies]
 futures = "0.3"
-k8s-openapi = { version = "0.10.0", default-features = false, features = ["v1_16"] }
+k8s-openapi = { version = "0.11.0", default-features = false, features = ["v1_16"] }
 k8s-test-framework = { version = "0.1", path = "../k8s-test-framework" }
 regex = "1"
 reqwest = { version = "0.10", features = ["json"] }
 serde_json = "1"
 tokio = { version = "0.2", features = ["macros", "rt-threaded", "time"] }
+indoc = "1.0.3"
 
 [features]
 e2e-tests = []

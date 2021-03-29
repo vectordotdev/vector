@@ -1,19 +1,20 @@
 use crate::{
-    config::{DataType, TransformConfig, TransformDescription},
+    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
     internal_events::RemapMappingError,
     transforms::{FunctionTransform, Transform},
     Result,
 };
-use remap::{value, Program, Runtime, TypeConstraint, TypeDef};
 use serde::{Deserialize, Serialize};
+use vrl::diagnostic::Formatter;
+use vrl::{Program, Runtime};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct RemapConfig {
     pub source: String,
-    pub drop_on_err: bool,
+    pub drop_on_error: bool,
 }
 
 inventory::submit! {
@@ -25,7 +26,7 @@ impl_generate_config_from_default!(RemapConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
-    async fn build(&self) -> Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform> {
         Remap::new(self.clone()).map(Transform::function)
     }
 
@@ -45,49 +46,57 @@ impl TransformConfig for RemapConfig {
 #[derive(Debug, Clone)]
 pub struct Remap {
     program: Program,
-    drop_on_err: bool,
+    drop_on_error: bool,
 }
 
 impl Remap {
-    pub fn new(config: RemapConfig) -> crate::Result<Remap> {
-        let accepts = TypeConstraint {
-            allow_any: true,
-            type_def: TypeDef {
-                fallible: true,
-                kind: value::Kind::all(),
-                ..Default::default()
-            },
-        };
-
-        let program = Program::new(&config.source, &remap_functions::all(), Some(accepts))?;
+    pub fn new(config: RemapConfig) -> crate::Result<Self> {
+        let program = vrl::compile(&config.source, &vrl_stdlib::all()).map_err(|diagnostics| {
+            Formatter::new(&config.source, diagnostics)
+                .colored()
+                .to_string()
+        })?;
 
         Ok(Remap {
             program,
-            drop_on_err: config.drop_on_err,
+            drop_on_error: config.drop_on_error,
         })
     }
 }
 
 impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        let mut runtime = Runtime::default();
-        let result = match event {
-            Event::Log(ref mut event) => runtime.execute(event, &self.program),
-            Event::Metric(ref mut event) => runtime.execute(event, &self.program),
+        let original_event = if !self.drop_on_error && self.program.is_fallible() {
+            // We need to clone the original event, since it might be mutated by
+            // the program before it aborts, while we want to return the
+            // unmodified event when an error occurs.
+            Some(event.clone())
+        } else {
+            None
         };
 
-        if let Err(error) = result {
-            emit!(RemapMappingError {
-                error: error.to_string(),
-                event_dropped: self.drop_on_err,
-            });
+        let mut runtime = Runtime::default();
 
-            if self.drop_on_err {
-                return;
+        let result = match event {
+            Event::Log(ref mut event) => runtime.resolve(event, &self.program),
+            Event::Metric(ref mut event) => runtime.resolve(event, &self.program),
+        };
+
+        match result {
+            Ok(_) => output.push(event),
+            Err(error) => {
+                emit!(RemapMappingError {
+                    error: error.to_string(),
+                    event_dropped: self.drop_on_error,
+                });
+
+                if self.drop_on_error {
+                    return;
+                }
+
+                output.push(original_event.unwrap_or(event))
             }
         }
-
-        output.push(event);
     }
 }
 
@@ -95,6 +104,11 @@ impl FunctionTransform for Remap {
 mod tests {
     use super::*;
     use crate::config::log_schema;
+    use crate::event::{
+        metric::{MetricKind, MetricValue},
+        Metric, Value,
+    };
+    use indoc::formatdoc;
     use shared::{event::*, log_event, lookup::*};
     use std::collections::BTreeMap;
 
@@ -130,7 +144,7 @@ mod tests {
   .copy = .copy_from
 "#
             .to_string(),
-            drop_on_err: true,
+            drop_on_error: true,
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -143,15 +157,62 @@ mod tests {
     }
 
     #[test]
+    fn check_remap_error() {
+        let event = {
+            let mut event = Event::from("augment me");
+            event.as_mut_log().insert("bar", "is a string");
+            event
+        };
+
+        let conf = RemapConfig {
+            source: formatdoc! {r#"
+                .foo = "foo"
+                .not_an_int = int!(.bar)
+                .baz = 12
+            "#},
+            drop_on_error: false,
+        };
+        let mut tform = Remap::new(conf).unwrap();
+
+        let event = tform.transform_one(event).unwrap();
+
+        assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
+
+        assert!(event.as_log().get("foo").is_none());
+        assert!(event.as_log().get("baz").is_none());
+    }
+
+    #[test]
+    fn check_remap_error_infallible() {
+        let event = {
+            let mut event = Event::from("augment me");
+            event.as_mut_log().insert("bar", "is a string");
+            event
+        };
+
+        let conf = RemapConfig {
+            source: formatdoc! {r#"
+                .foo = "foo"
+                .baz = 12
+            "#},
+            drop_on_error: false,
+        };
+        let mut tform = Remap::new(conf).unwrap();
+
+        let event = tform.transform_one(event).unwrap();
+
+        assert_eq!(event.as_log().get("foo"), Some(&Value::from("foo")));
+        assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
+        assert_eq!(event.as_log().get("baz"), Some(&Value::from(12)));
+    }
+
+    #[test]
     fn check_remap_metric() {
-        let metric = Event::Metric(Metric {
-            name: "counter".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 1.0 },
-        });
+        let metric = Event::Metric(Metric::new(
+            "counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        ));
 
         let conf = RemapConfig {
             source: r#".tags.host = "zoobub"
@@ -159,25 +220,26 @@ mod tests {
                        .namespace = "zerk"
                        .kind = "incremental""#
                 .to_string(),
-            drop_on_err: true,
+            drop_on_error: true,
         };
         let mut tform = Remap::new(conf).unwrap();
 
         let result = tform.transform_one(metric).unwrap();
         assert_eq!(
             result,
-            Event::Metric(Metric {
-                name: "zork".into(),
-                namespace: Some("zerk".into()),
-                timestamp: None,
-                tags: Some({
+            Event::Metric(
+                Metric::new(
+                    "zork",
+                    MetricKind::Incremental,
+                    MetricValue::Counter { value: 1.0 },
+                )
+                .with_namespace(Some("zerk"))
+                .with_tags(Some({
                     let mut tags = BTreeMap::new();
                     tags.insert("host".into(), "zoobub".into());
                     tags
-                }),
-                kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: 1.0 },
-            })
+                }))
+            )
         );
     }
 }

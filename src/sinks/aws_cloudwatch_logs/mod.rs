@@ -3,7 +3,8 @@ mod request;
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
-    rusoto::{self, RegionOrEndpoint},
+    internal_events::TemplateRenderingFailed,
+    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
@@ -72,7 +73,10 @@ pub struct CloudwatchLogsSinkConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig<Option<usize>>,
-    pub assume_role: Option<String>,
+    // Deprecated name. Moved to auth.
+    assume_role: Option<String>,
+    #[serde(default)]
+    pub auth: AWSAuthentication,
 }
 
 inventory::submit! {
@@ -97,6 +101,7 @@ fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
         batch: Default::default(),
         request: Default::default(),
         assume_role: Default::default(),
+        auth: Default::default(),
     }
 }
 
@@ -158,7 +163,7 @@ impl CloudwatchLogsSinkConfig {
         let region = (&self.region).try_into()?;
 
         let client = rusoto::client()?;
-        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+        let creds = self.auth.build(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
         Ok(CloudWatchLogsClient::new_with_client(client, region))
@@ -438,29 +443,29 @@ fn partition_encode(
 ) -> Option<PartitionInnerBuffer<InputLogEvent, CloudwatchKey>> {
     let group = match group.render_string(&event) {
         Ok(b) => b,
-        Err(missing_keys) => {
-            warn!(
-                message = "Keys in group template do not exist on the event; dropping event.",
-                ?missing_keys,
-                internal_log_rate_secs = 30
-            );
+        Err(error) => {
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("group"),
+                drop_event: true,
+            });
             return None;
         }
     };
 
     let stream = match stream.render_string(&event) {
         Ok(b) => b,
-        Err(missing_keys) => {
-            warn!(
-                message = "Keys in stream template do not exist on the event; dropping event.",
-                ?missing_keys,
-                internal_log_rate_secs = 30
-            );
+        Err(error) => {
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("stream"),
+                drop_event: true,
+            });
             return None;
         }
     };
 
-    let key = CloudwatchKey { stream, group };
+    let key = CloudwatchKey { group, stream };
 
     encoding.apply_rules(&mut event);
     let event = encode_log(event.into_log(), encoding)
@@ -474,8 +479,8 @@ fn partition_encode(
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
-    #[snafu(display("DescribeLogStreams failed: {}", source))]
-    DescribeLogStreamsFailed {
+    #[snafu(display("DescribeLogGroups failed: {}", source))]
+    DescribeLogGroupsFailed {
         source: RusotoError<rusoto_logs::DescribeLogGroupsError>,
     },
     #[snafu(display("No log group found"))]
@@ -525,7 +530,7 @@ async fn healthcheck(
             }
             None => Err(HealthcheckError::NoLogGroup.into()),
         },
-        Err(source) => Err(HealthcheckError::DescribeLogStreamsFailed { source }.into()),
+        Err(source) => Err(HealthcheckError::DescribeLogGroupsFailed { source }.into()),
     }
 }
 
@@ -911,6 +916,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -957,6 +963,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1023,6 +1030,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1094,6 +1102,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1145,6 +1154,7 @@ mod integration_tests {
             },
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1192,6 +1202,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
@@ -1279,6 +1290,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            auth: Default::default(),
         };
 
         let client = config.create_client().unwrap();

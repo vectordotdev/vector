@@ -15,6 +15,7 @@ components: sources: vector: {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -30,9 +31,8 @@ components: sources: vector: {
 					ssl: "optional"
 				}
 			}
-
-			keepalive: enabled: true
-
+			receive_buffer_bytes: enabled: true
+			keepalive: enabled:            true
 			tls: {
 				enabled:                true
 				can_enable:             true
@@ -44,14 +44,15 @@ components: sources: vector: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: []
 		notices: []
@@ -68,6 +69,7 @@ components: sources: vector: {
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#1"]
+				syntax: "literal"
 			}
 		}
 		shutdown_timeout_secs: {
@@ -129,6 +131,7 @@ components: sources: vector: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:              components.sources.internal_metrics.output.metrics.events_in_total
 		protobuf_decode_errors_total: components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
 	}
 }

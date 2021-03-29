@@ -1,0 +1,6 @@
+# object: { "status": 201 }
+# result: true
+
+if (status, err = int(.status); err == null) {
+	status >= 200 && status < 300
+}

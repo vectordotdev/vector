@@ -2,6 +2,7 @@ use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     http::{HttpClient, HttpClientFuture, HttpError},
+    internal_events::TemplateRenderingFailed,
     serde::to_string,
     sinks::{
         util::{
@@ -12,7 +13,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     tls::{TlsOptions, TlsSettings},
     Event,
 };
@@ -24,6 +25,7 @@ use hyper::{
     header::{HeaderName, HeaderValue},
     Body, Request, Response,
 };
+use indoc::indoc;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -146,11 +148,11 @@ inventory::submit! {
 
 impl GenerateConfig for GcsSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"bucket = "my-bucket"
+        toml::from_str(indoc! {r#"
+            bucket = "my-bucket"
             credentials_path = "/path/to/credentials.json"
-            encoding.codec = "ndjson""#,
-        )
+            encoding.codec = "ndjson"
+        "#})
         .unwrap()
     }
 }
@@ -182,7 +184,7 @@ enum HealthcheckError {
     #[snafu(display("Unknown bucket: {:?}", bucket))]
     UnknownBucket { bucket: String },
     #[snafu(display("key_prefix template parse error: {}", source))]
-    KeyPrefixTemplate { source: TemplateError },
+    KeyPrefixTemplate { source: TemplateParseError },
 }
 
 impl GcsSink {
@@ -197,11 +199,11 @@ impl GcsSink {
         let base_url = format!("{}{}/", BASE_URL, config.bucket);
         let bucket = config.bucket.clone();
         Ok(GcsSink {
+            bucket,
             client,
             creds,
-            settings,
             base_url,
-            bucket,
+            settings,
         })
     }
 
@@ -403,12 +405,12 @@ fn encode_event(
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
     let key = key_prefix
         .render_string(&event)
-        .map_err(|missing_keys| {
-            warn!(
-                message = "Keys do not exist on the event; dropping event.",
-                ?missing_keys,
-                internal_log_rate_secs = 30,
-            );
+        .map_err(|error| {
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("key_prefix"),
+                drop_event: true,
+            });
         })
         .ok()?;
     encoding.apply_rules(&mut event);

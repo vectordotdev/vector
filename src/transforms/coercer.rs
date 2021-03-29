@@ -1,20 +1,21 @@
 use crate::{
-    config::{DataType, TransformConfig, TransformDescription},
+    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, LookupBuf, Value},
     internal_events::CoercerConversionFailed,
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use std::collections::HashMap;
 use std::str;
 
-#[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields, default)]
-#[derivative(Default)]
 pub struct CoercerConfig {
     types: HashMap<LookupBuf, String>,
     drop_unspecified: bool,
+    timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -26,7 +27,8 @@ impl_generate_config_from_default!(CoercerConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+        let timezone = self.timezone.unwrap_or(globals.timezone);
         let types = parse_conversion_map(
             &self
                 .types
@@ -38,6 +40,7 @@ impl TransformConfig for CoercerConfig {
         .into_iter()
         .map(|(k, v)| LookupBuf::from_str(&k).map(|k| (k, v)))
         .collect::<Result<_, _>>()?;
+
         Ok(Transform::function(Coercer {
             types,
             drop_unspecified: self.drop_unspecified,
@@ -104,9 +107,9 @@ impl FunctionTransform for Coercer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::CoercerConfig;
     use crate::{
-        config::TransformConfig,
+        config::{GlobalOptions, TransformConfig},
         event::{LogEvent, Lookup, LookupBuf, Value},
         log_event, Event,
     };
@@ -142,7 +145,7 @@ mod tests {
             extra
         ))
         .unwrap()
-        .build()
+        .build(&GlobalOptions::default())
         .await
         .unwrap();
         let coercer = coercer.as_function();

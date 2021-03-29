@@ -1,6 +1,5 @@
 use crate::{
-    config::DataType,
-    config::CONFIG_PATHS,
+    config::{DataType, CONFIG_PATHS},
     event::Event,
     internal_events::{LuaBuildError, LuaGcTriggered},
     transforms::{
@@ -351,7 +350,7 @@ mod tests {
         test_util::trace_init,
         transforms::TaskTransform,
     };
-    use futures::{compat::Stream01CompatExt, StreamExt};
+    use futures::{stream, StreamExt};
 
     fn from_config(config: &str) -> crate::Result<Box<Lua>> {
         Lua::new(&toml::from_str(config).unwrap()).map(Box::new)
@@ -376,9 +375,9 @@ mod tests {
             log_schema().message_key().clone() => "program me".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
-        let mut out_stream = transform.transform(in_stream).compat();
-        let output = out_stream.next().await.unwrap().unwrap();
+        let in_stream = Box::pin(stream::iter(vec![event]));
+        let mut out_stream = transform.transform(in_stream);
+        let output = out_stream.next().await.unwrap();
 
         assert_eq!(output.as_log()[Lookup::from("hello")], "goodbye".into());
         Ok(())
@@ -404,9 +403,9 @@ mod tests {
             log_schema().message_key().clone() => "Hello, my name is Bob.".to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };
-        let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
-        let mut out_stream = transform.transform(in_stream).compat();
-        let output = out_stream.next().await.unwrap().unwrap();
+        let in_stream = Box::pin(stream::iter(vec![event]));
+        let mut out_stream = transform.transform(in_stream);
+        let output = out_stream.next().await.unwrap();
 
         assert_eq!(output.as_log()[Lookup::from("name")], "Bob".into());
         Ok(())
@@ -430,9 +429,9 @@ mod tests {
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert(LookupBuf::from("name"), "Bob");
 
-        let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
-        let mut out_stream = transform.transform(in_stream).compat();
-        let output = out_stream.next().await.unwrap().unwrap();
+        let in_stream = Box::pin(stream::iter(vec![event]));
+        let mut out_stream = transform.transform(in_stream);
+        let output = out_stream.next().await.unwrap();
 
         assert!(output.as_log().get(Lookup::from("name")).is_none());
         Ok(())
@@ -453,8 +452,8 @@ mod tests {
         .unwrap();
 
         let event = Event::new_empty_log();
-        let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
-        let mut out_stream = transform.transform(in_stream).compat();
+        let in_stream = Box::pin(stream::iter(vec![event]));
+        let mut out_stream = transform.transform(in_stream);
         let output = out_stream.next().await;
 
         assert!(output.is_none());
@@ -480,9 +479,9 @@ mod tests {
         event
             .as_mut_log()
             .insert(LookupBuf::from("host"), "127.0.0.1");
-        let input = Box::new(futures01::stream::iter_ok(vec![event]));
-        let output = transform.transform(Box::new(input));
-        let out = output.compat().collect::<Vec<_>>().await;
+        let input = Box::pin(stream::iter(vec![event]));
+        let output = transform.transform(input);
+        let out = output.collect::<Vec<_>>().await;
 
         assert_eq!(out.len(), 2);
         Ok(())
@@ -509,9 +508,9 @@ mod tests {
 
         let event = Event::new_empty_log();
 
-        let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
-        let mut out_stream = transform.transform(in_stream).compat();
-        let output = out_stream.next().await.unwrap().unwrap();
+        let in_stream = Box::pin(stream::iter(vec![event]));
+        let mut out_stream = transform.transform(in_stream);
+        let output = out_stream.next().await.unwrap();
 
         assert_eq!(output.as_log()[Lookup::from("result")], "empty".into());
         Ok(())
@@ -533,9 +532,9 @@ mod tests {
         .unwrap();
 
         let event = Event::new_empty_log();
-        let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
-        let mut out_stream = transform.transform(in_stream).compat();
-        let output = out_stream.next().await.unwrap().unwrap();
+        let in_stream = Box::pin(stream::iter(vec![event]));
+        let mut out_stream = transform.transform(in_stream);
+        let output = out_stream.next().await.unwrap();
 
         assert_eq!(output.as_log()[Lookup::from("number")], Value::Integer(3));
         Ok(())
@@ -557,9 +556,9 @@ mod tests {
         .unwrap();
 
         let event = Event::new_empty_log();
-        let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
-        let mut out_stream = transform.transform(in_stream).compat();
-        let output = out_stream.next().await.unwrap().unwrap();
+        let in_stream = Box::pin(stream::iter(vec![event]));
+        let mut out_stream = transform.transform(in_stream);
+        let output = out_stream.next().await.unwrap();
 
         assert_eq!(
             output.as_log()[Lookup::from("number")],
@@ -584,9 +583,9 @@ mod tests {
         .unwrap();
 
         let event = Event::new_empty_log();
-        let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
-        let mut out_stream = transform.transform(in_stream).compat();
-        let output = out_stream.next().await.unwrap().unwrap();
+        let in_stream = Box::pin(stream::iter(vec![event]));
+        let mut out_stream = transform.transform(in_stream);
+        let output = out_stream.next().await.unwrap();
 
         assert_eq!(output.as_log()[Lookup::from("bool")], Value::Boolean(true));
         Ok(())
@@ -608,9 +607,9 @@ mod tests {
         .unwrap();
 
         let event = Event::new_empty_log();
-        let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
-        let mut out_stream = transform.transform(in_stream).compat();
-        let output = out_stream.next().await.unwrap().unwrap();
+        let in_stream = Box::pin(stream::iter(vec![event]));
+        let mut out_stream = transform.transform(in_stream);
+        let output = out_stream.next().await.unwrap();
 
         assert_eq!(output.as_log().get(Lookup::from("junk")), None);
         Ok(())
@@ -635,7 +634,11 @@ mod tests {
             .process_single(Event::new_empty_log())
             .unwrap_err();
         let err = format_error(&err);
-        assert!(err.contains("error converting Lua boolean to String"), err);
+        assert!(
+            err.contains("error converting Lua boolean to String"),
+            "{}",
+            err
+        );
         Ok(())
     }
 
@@ -655,9 +658,9 @@ mod tests {
         .unwrap();
 
         let event = Event::new_empty_log();
-        let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
-        let mut out_stream = transform.transform(in_stream).compat();
-        let output = out_stream.next().await.unwrap().unwrap();
+        let in_stream = Box::pin(stream::iter(vec![event]));
+        let mut out_stream = transform.transform(in_stream);
+        let output = out_stream.next().await.unwrap();
         assert_eq!(output.as_log().get(Lookup::from("result")), None);
         Ok(())
     }
@@ -680,7 +683,7 @@ mod tests {
             .process_single(Event::new_empty_log())
             .unwrap_err();
         let err = format_error(&err);
-        assert!(err.contains("this is an error"), err);
+        assert!(err.contains("this is an error"), "{}", err);
         Ok(())
     }
 
@@ -700,7 +703,7 @@ mod tests {
         .unwrap_err()
         .to_string();
 
-        assert!(err.contains("syntax error:"), err);
+        assert!(err.contains("syntax error:"), "{}", err);
         Ok(())
     }
 
@@ -742,9 +745,9 @@ mod tests {
         let transform = from_config(&config).unwrap();
 
         let event = Event::new_empty_log();
-        let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
-        let mut out_stream = transform.transform(in_stream).compat();
-        let output = out_stream.next().await.unwrap().unwrap();
+        let in_stream = Box::pin(stream::iter(vec![event]));
+        let mut out_stream = transform.transform(in_stream);
+        let output = out_stream.next().await.unwrap();
 
         assert_eq!(
             output.as_log()[Lookup::from("new field")],
@@ -776,9 +779,9 @@ mod tests {
             .as_mut_log()
             .insert(LookupBuf::from("friend"), "Alice");
 
-        let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
-        let mut out_stream = transform.transform(in_stream).compat();
-        let output = out_stream.next().await.unwrap().unwrap();
+        let in_stream = Box::pin(stream::iter(vec![event]));
+        let mut out_stream = transform.transform(in_stream);
+        let output = out_stream.next().await.unwrap();
 
         assert_eq!(output.as_log()[Lookup::from("name")], "nameBob".into());
         assert_eq!(
@@ -803,27 +806,21 @@ mod tests {
         )
         .unwrap();
 
-        let event = Event::Metric(Metric {
-            name: "example counter".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 1.0 },
-        });
+        let event = Event::Metric(Metric::new(
+            "example counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.0 },
+        ));
 
-        let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
-        let mut out_stream = transform.transform(in_stream).compat();
-        let output = out_stream.next().await.unwrap().unwrap();
+        let in_stream = Box::pin(stream::iter(vec![event]));
+        let mut out_stream = transform.transform(in_stream);
+        let output = out_stream.next().await.unwrap();
 
-        let expected = Event::Metric(Metric {
-            name: "example counter".into(),
-            namespace: None,
-            timestamp: None,
-            tags: None,
-            kind: MetricKind::Absolute,
-            value: MetricValue::Counter { value: 2.0 },
-        });
+        let expected = Event::Metric(Metric::new(
+            "example counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 2.0 },
+        ));
 
         assert_eq!(output, expected);
         Ok(())
@@ -853,8 +850,8 @@ mod tests {
             }
         });
 
-        let in_stream = Box::new(futures01::stream::iter_ok(events));
-        let out_stream = transform.transform(in_stream).compat();
+        let in_stream = Box::pin(stream::iter(events));
+        let out_stream = transform.transform(in_stream);
         let output = out_stream.collect::<Vec<_>>().await;
 
         assert_eq!(output.len(), n);

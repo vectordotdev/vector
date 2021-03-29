@@ -1,6 +1,6 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, LogSchema, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, LookupBuf, Value},
     internal_events::{
@@ -41,8 +41,8 @@ use tokio::sync::mpsc;
 // From bollard source.
 const DEFAULT_TIMEOUT: u64 = 120;
 
-/// The beginning of image names of vector docker images packaged by vector.
-const VECTOR_IMAGE_NAME: &str = "timberio/vector";
+// Prevent short hostname from being wrongly regconized as a container's short ID.
+const MIN_HOSTNAME_LENGTH: usize = 6;
 
 // The beginning of image names of vector docker images packaged by vector.
 lazy_static! {
@@ -64,7 +64,7 @@ enum Error {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
-    #[serde(default = "LogSchema::default_host_key")]
+    #[serde(default = "host_key")]
     host_key: LookupBuf,
     docker_host: Option<String>,
     tls: Option<DockerTlsConfig>,
@@ -89,7 +89,7 @@ pub struct DockerTlsConfig {
 impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
-            host_key: LogSchema::default_host_key(),
+            host_key: host_key(),
             docker_host: None,
             tls: None,
             exclude_containers: None,
@@ -102,6 +102,10 @@ impl Default for DockerLogsConfig {
             retry_backoff_secs: 2,
         }
     }
+}
+
+fn host_key() -> String {
+    log_schema().host_key().to_string()
 }
 
 impl DockerLogsConfig {
@@ -306,8 +310,6 @@ struct DockerLogsSource {
     main_recv: mpsc::UnboundedReceiver<Result<ContainerLogInfo, ContainerId>>,
     /// It may contain shortened container id.
     hostname: Option<String>,
-    /// True if self needs to be excluded
-    exclude_self: bool,
     backoff_duration: Duration,
 }
 
@@ -317,28 +319,6 @@ impl DockerLogsSource {
         out: Pipeline,
         shutdown: ShutdownSignal,
     ) -> crate::Result<DockerLogsSource> {
-        // Find out it's own container id, if it's inside a docker container.
-        // Since docker doesn't readily provide such information,
-        // various approaches need to be made. As such the solution is not
-        // exact, but probable.
-        // This is to be used only if source is in state of catching everything.
-        // Or in other words, if includes are used then this is not necessary.
-        let include_containers_specified = config
-            .include_containers
-            .as_ref()
-            .map(Vec::is_empty)
-            .unwrap_or(false);
-
-        let exclude_containers_specified = config
-            .exclude_containers
-            .as_ref()
-            .map(Vec::is_empty)
-            .unwrap_or(false);
-
-        let exclude_self = include_containers_specified
-            && !exclude_containers_specified
-            && config.include_labels.clone().unwrap_or_default().is_empty();
-
         let backoff_secs = config.retry_backoff_secs;
 
         let host_key = config.host_key.clone();
@@ -365,7 +345,7 @@ impl DockerLogsSource {
         // In that case, logs between [t1,t2] will be pulled to vector only on next start/unpause of that container.
         let esb = EventStreamBuilder {
             host_key,
-            hostname,
+            hostname: hostname.clone(),
             core: Arc::new(core),
             out,
             main_send,
@@ -377,8 +357,7 @@ impl DockerLogsSource {
             events: Box::pin(events),
             containers: HashMap::new(),
             main_recv,
-            hostname: env::var("HOSTNAME").ok(),
-            exclude_self,
+            hostname,
             backoff_duration: Duration::from_secs(backoff_secs),
         })
     }
@@ -409,11 +388,11 @@ impl DockerLogsSource {
             .for_each(|container| {
                 let id = container.id.unwrap();
                 let names = container.names.unwrap();
-                let image = container.image.unwrap();
 
                 trace!(message = "Found already running container.", id = %id, names = ?names);
 
-                if !self.exclude_vector(id.as_str(), image.as_str()) {
+                if self.exclude_self(id.as_str()) {
+                    info!(message = "Excluded self container.", id = %id);
                     return;
                 }
 
@@ -429,7 +408,7 @@ impl DockerLogsSource {
                         }
                     }),
                 ) {
-                    trace!(message = "Container excluded.", id = %id);
+                    info!(message = "Excluded container.", id = %id);
                     return;
                 }
 
@@ -505,12 +484,9 @@ impl DockerLogsSource {
                                                 attributes.get("name").map(|s| s.as_str()),
                                             );
 
-                                        let self_check = self.exclude_vector(
-                                            id.as_str(),
-                                            attributes.get("image").map(|s| s.as_str()),
-                                        );
+                                        let exclude_self = self.exclude_self(id.as_str());
 
-                                        if include_name && self_check {
+                                        if include_name && !exclude_self {
                                             self.containers.insert(id.clone(), self.esb.start(id, None));
                                         }
                                     }
@@ -531,26 +507,11 @@ impl DockerLogsSource {
         }
     }
 
-    /// True if container with the given id and image must be excluded from logging,
-    /// because it's a vector instance, probably this one.
-    fn exclude_vector<'a>(&self, id: &str, image: impl Into<Option<&'a str>>) -> bool {
-        if self.exclude_self {
-            let hostname_hint = self
-                .hostname
-                .as_ref()
-                .map(|maybe_short_id| id.starts_with(maybe_short_id))
-                .unwrap_or(false);
-            let image_hint = image
-                .into()
-                .map(|image| image.starts_with(VECTOR_IMAGE_NAME))
-                .unwrap_or(false);
-            if hostname_hint || image_hint {
-                // This container is probably itself.
-                info!(message = "Detected self container.", id = %id);
-                return false;
-            }
-        }
-        true
+    fn exclude_self(&self, id: &str) -> bool {
+        self.hostname
+            .as_ref()
+            .map(|hostname| id.starts_with(hostname) && hostname.len() >= MIN_HOSTNAME_LENGTH)
+            .unwrap_or(false)
     }
 }
 
@@ -598,10 +559,8 @@ impl EventStreamBuilder {
                     container_id: id.as_str()
                 }),
             }
-            // In case of any error we have to notify the main thread that it should try again. This is %error because the API doesn't support Display.
-            if let Err(error) = this.main_send.send(Err(id)) {
-                error!(message = "Unable to send ContainerId to main.", %error);
-            }
+
+            this.finish(Err(id));
         });
 
         ContainerState::new_running()
@@ -615,7 +574,7 @@ impl EventStreamBuilder {
         }
     }
 
-    async fn run_event_stream(&self, mut info: ContainerLogInfo) {
+    async fn run_event_stream(self, mut info: ContainerLogInfo) {
         // Establish connection
         let options = Some(LogsOptions::<String> {
             follow: true,
@@ -695,10 +654,14 @@ impl EventStreamBuilder {
             Ok(()) => Ok(info),
             Err(crate::pipeline::ClosedError) => Err(info.id),
         };
-        // This is %error because the API doesn't support Display.
-        if let Err(error) = self.main_send.send(result) {
-            error!(message = "Unable to return ContainerLogInfo to main.", %error);
-        }
+
+        self.finish(result);
+    }
+
+    fn finish(self, result: Result<ContainerLogInfo, ContainerId>) {
+        // This can legaly fail when shutting down, and any other
+        // reason should have been logged in the main future.
+        let _ = self.main_send.send(result);
     }
 }
 
@@ -980,7 +943,8 @@ impl ContainerLogInfo {
 
         emit!(DockerLogsEventReceived {
             byte_size,
-            container_id: self.id.as_str()
+            container_id: self.id.as_str(),
+            container_name: &self.metadata.name_str
         });
 
         Some(event)
@@ -992,6 +956,8 @@ struct ContainerMetadata {
     labels: Vec<(LookupBuf, Value)>,
     /// name -> String
     name: Value,
+    /// name
+    name_str: String,
     /// image -> String
     image: Value,
     /// created_at
@@ -1022,6 +988,7 @@ impl ContainerMetadata {
         Ok(ContainerMetadata {
             labels,
             name: name.as_str().trim_start_matches('/').to_owned().into(),
+            name_str: name,
             image: config.image.unwrap().into(),
             created_at: DateTime::parse_from_rfc3339(created.as_str())?.with_timezone(&Utc),
         })
@@ -1125,6 +1092,21 @@ mod tests {
     fn generate_config() {
         crate::test_util::test_generate_config::<DockerLogsConfig>();
     }
+
+    #[test]
+    fn exclude_self() {
+        let (tx, _rx) = Pipeline::new_test();
+        let mut source =
+            DockerLogsSource::new(DockerLogsConfig::default(), tx, ShutdownSignal::noop()).unwrap();
+        source.hostname = Some("451062c59603".to_owned());
+        assert!(
+            source.exclude_self("451062c59603a1cf0c6af3e74a31c0ae63d8275aa16a5fc78ef31b923baaffc3")
+        );
+
+        // hostname too short
+        source.hostname = Some("a".to_owned());
+        assert!(!source.exclude_self("a29d569bd46c"));
+    }
 }
 
 #[cfg(all(test, feature = "docker-logs-integration-tests"))]
@@ -1157,9 +1139,7 @@ mod integration_tests {
         })
     }
 
-    /// None if docker is not present on the system
     fn source_with_config(config: DockerLogsConfig) -> mpsc::Receiver<Event> {
-        // trace_init();
         let (sender, recv) = Pipeline::new_test();
         tokio::spawn(async move {
             config
@@ -1244,7 +1224,6 @@ mod integration_tests {
         container.ok().map(|c| c.id)
     }
 
-    /// Polling busybox image
     async fn pull_busybox(docker: &Docker) {
         let mut filters = HashMap::new();
         filters.insert("reference", vec!["busybox:latest"]);
@@ -1477,6 +1456,7 @@ mod integration_tests {
         let id0 = container_log_n(1, &excluded0, None, "will not be read", &docker).await;
         let id1 = container_log_n(1, &included0, None, will_be_read, &docker).await;
         let id2 = container_log_n(1, &included1, None, will_be_read, &docker).await;
+        tokio::time::delay_for(Duration::from_secs(1)).await;
         let events = collect_ready(out).await;
         container_remove(&id0, &docker).await;
         container_remove(&id1, &docker).await;

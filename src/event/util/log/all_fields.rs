@@ -5,7 +5,7 @@ use std::{
     iter, slice,
 };
 
-/// Iterates over all paths in form "a.b[0].c[1]" in alphabetical order
+/// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
 #[deprecated(since = "0.12.0", note = "Please use Event/Value pairs instead.")]
 pub fn all_fields(

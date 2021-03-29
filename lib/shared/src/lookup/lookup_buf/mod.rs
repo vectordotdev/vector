@@ -11,8 +11,8 @@ use std::{
 
 use crate::{event::*, lookup::*};
 use indexmap::map::IndexMap;
-use pest::iterators::Pair;
-use remap_lang::parser::ParserRule;
+// use pest::iterators::Pair;
+// use remap_lang::parser::ParserRule;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use toml::Value as TomlValue;
@@ -50,7 +50,7 @@ pub use segmentbuf::SegmentBuf;
 ///
 /// # Parsing
 ///
-/// To parse buffer into a `LookupBuf`, use the `std::str::FromStr` implementation. If you're working
+/// to parse buffer into a `LookupBuf`, use the `std::str::FromStr` implementation. If you're working
 /// something that's not able to be a `str`, you should consult `std::str::from_utf8` and handle the
 /// possible error.
 ///
@@ -88,6 +88,7 @@ pub struct LookupBuf {
     pub segments: VecDeque<SegmentBuf>,
 }
 
+/*
 impl<'a> TryFrom<Pair<'a, ParserRule>> for LookupBuf {
     type Error = LookupError;
 
@@ -102,21 +103,12 @@ impl<'a> TryFrom<Pair<'a, ParserRule>> for LookupBuf {
         Ok(retval)
     }
 }
+*/
 
 // TODO: Added in https://github.com/timberio/vector/pull/5374, Path will eventually become Lookup.
-impl TryFrom<remap_lang::Path> for LookupBuf {
+impl TryFrom<&vrl::Path> for LookupBuf {
     type Error = LookupError;
-    fn try_from(target: remap_lang::Path) -> Result<Self, Self::Error> {
-        let path_string = target.to_string();
-        trace!(path = %path_string, "Converting to LookupBuf.");
-        LookupBuf::from_str(&path_string)
-    }
-}
-
-// TODO: Added in https://github.com/timberio/vector/pull/5374, Path will eventually become Lookup.
-impl TryFrom<&remap_lang::Path> for LookupBuf {
-    type Error = LookupError;
-    fn try_from(target: &remap_lang::Path) -> Result<Self, Self::Error> {
+    fn try_from(target: &vrl::Path) -> Result<Self, Self::Error> {
         let path_string = target.to_string();
         trace!(path = %path_string, "Converting to LookupBuf.");
         LookupBuf::from_str(&path_string)

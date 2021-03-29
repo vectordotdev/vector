@@ -1,6 +1,6 @@
 use crate::lookup::*;
 use pest::iterators::Pair;
-use remap_lang::parser::ParserRule;
+//use remap_lang::parser::ParserRule;
 use std::{
     collections::VecDeque,
     fmt::{Display, Formatter},
@@ -56,6 +56,7 @@ impl<'a> Segment<'a> {
         matches!(self, Segment::Coalesce(_))
     }
 
+    /*
     #[tracing::instrument(level = "trace", skip(segment))]
     pub fn from_lookup(
         segment: Pair<'a, ParserRule>,
@@ -247,6 +248,7 @@ impl<'a> Segment<'a> {
         tracing::trace!(segment = %segment_str, ?rule, action = %"exit");
         Ok(retval)
     }
+    */
 
     #[instrument]
     pub fn as_segment_buf(&self) -> SegmentBuf {

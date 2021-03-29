@@ -1,4 +1,4 @@
-use super::{default_host_key, Encoding};
+use super::{host_key, Encoding};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::LookupBuf,
@@ -23,8 +23,7 @@ pub struct HumioLogsConfig {
 
     pub(in crate::sinks::humio) event_type: Option<Template>,
 
-    #[serde(default = "default_host_key")]
-    #[derivative(Default(value = "default_host_key()"))]
+    #[serde(default = "host_key")]
     pub(in crate::sinks::humio) host_key: LookupBuf,
 
     #[serde(default)]
@@ -51,7 +50,7 @@ impl GenerateConfig for HumioLogsConfig {
             source: None,
             encoding: Encoding::Json.into(),
             event_type: None,
-            host_key: default_host_key(),
+            host_key: host_key(),
             compression: Compression::default(),
             request: TowerRequestConfig::default(),
             batch: BatchConfig::default(),
@@ -160,6 +159,7 @@ mod integration_tests {
     };
     use chrono::Utc;
     use futures::stream;
+    use indoc::indoc;
     use serde_json::{json, Value as JsonValue};
     use std::{collections::HashMap, convert::TryFrom, future::ready};
 
@@ -324,20 +324,20 @@ mod integration_tests {
 
         let params = json!({
         "query": format!(
-            r#"
-mutation {{
-  createRepository(name:"{}") {{
-    repository {{
-      name
-      type
-      ingestTokens {{
-        name
-        token
-      }}
-    }}
-  }}
-}}
-"#,
+            indoc!{ r#"
+                mutation {{
+                  createRepository(name:"{}") {{
+                    repository {{
+                      name
+                      type
+                      ingestTokens {{
+                        name
+                        token
+                      }}
+                    }}
+                  }}
+                }}
+            "#},
             name
         ),
         });

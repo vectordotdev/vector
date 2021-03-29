@@ -8,7 +8,7 @@ use std::cmp::max;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use futures::{compat::Future01CompatExt, StreamExt};
+use futures::StreamExt;
 use tokio::sync::mpsc;
 
 #[cfg(feature = "sources-host_metrics")]
@@ -56,6 +56,7 @@ impl Application {
             level => [
                 format!("vector={}", level),
                 format!("codec={}", level),
+                format!("vrl={}", level),
                 format!("file_source={}", level),
                 "tower_limit=trace".to_owned(),
                 format!("rdkafka={}", level),
@@ -119,7 +120,7 @@ impl Application {
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
                         #[cfg(feature = "vrl-cli")]
-                        SubCommand::VRL(s) => remap_cli::cmd::cmd(&s),
+                        SubCommand::VRL(s) => vrl_cli::cmd::cmd(&s),
                     };
 
                     return Err(code);
@@ -146,12 +147,10 @@ impl Application {
                     path = ?config_paths
                 );
 
-                let mut config =
-                    config::load_from_paths(&config_paths, false).map_err(handle_config_errors)?;
+                config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
-                config::LOG_SCHEMA
-                    .set(config.global.log_schema.clone())
-                    .expect("Couldn't set schema");
+                let mut config =
+                    config::load_from_paths(&config_paths).map_err(handle_config_errors)?;
 
                 if !config.healthchecks.enabled {
                     info!("Health checks are disabled.");
@@ -199,6 +198,10 @@ impl Application {
         #[cfg(feature = "api")]
         let api_config = self.config.api;
 
+        // Any internal_logs sources will have grabbed a copy of the
+        // early buffer by this point and set up a subscriber.
+        crate::trace::stop_buffering();
+
         rt.block_on(async move {
             emit!(VectorStarted);
             tokio::spawn(heartbeat::heartbeat());
@@ -228,7 +231,7 @@ impl Application {
                         // Reload paths
                         config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
                         // Reload config
-                        let new_config = config::load_from_paths(&config_paths, false).map_err(handle_config_errors).ok();
+                        let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
 
                         if let Some(mut new_config) = new_config {
                             new_config.healthchecks.set_require_healthy(opts.require_healthy);
@@ -271,7 +274,7 @@ impl Application {
                 SignalTo::Shutdown => {
                     emit!(VectorStopped);
                     tokio::select! {
-                    _ = topology.stop().compat() => (), // Graceful shutdown finished
+                    _ = topology.stop() => (), // Graceful shutdown finished
                     _ = signals.next() => {
                         // It is highly unlikely that this event will exit from topology.
                         emit!(VectorQuit);

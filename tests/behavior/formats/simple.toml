@@ -1,20 +1,19 @@
-[transforms.add_fields_nested]
+[transforms.add_fields_nested_toml]
   inputs = []
   type = "add_fields"
-  [transforms.add_fields_nested.fields]
+  [transforms.add_fields_nested_toml.fields]
     "a.b" = 123
     x.y = 456
     "x.z" = 789
 
 [[tests]]
-  name = "add_fields_nested"
+  name = "add_fields_nested_toml"
   [tests.input]
-    insert_at = "add_fields_nested"
+    insert_at = "add_fields_nested_toml"
     type = "raw"
     value = ""
   [[tests.outputs]]
-    extract_from = "add_fields_nested"
+    extract_from = "add_fields_nested_toml"
     [[tests.outputs.conditions]]
-      "a.b.equals" = 123
-      "x.y.equals" = 456
-      "x.z.equals" = 789
+      type = "remap"
+      source = ".a.b == 123 && .x.y == 456 && .x.z == 789"

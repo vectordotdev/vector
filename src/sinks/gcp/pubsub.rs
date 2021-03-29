@@ -203,6 +203,7 @@ async fn healthcheck(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use indoc::indoc;
 
     #[test]
     fn generate_config() {
@@ -211,12 +212,10 @@ mod tests {
 
     #[tokio::test]
     async fn fails_missing_creds() {
-        let config: PubsubConfig = toml::from_str(
-            r#"
-           project = "project"
-           topic = "topic"
-        "#,
-        )
+        let config: PubsubConfig = toml::from_str(indoc! {r#"
+                project = "project"
+                topic = "topic"
+            "#})
         .unwrap();
         if config.build(SinkContext::new_test()).await.is_ok() {
             panic!("config.build failed to error");

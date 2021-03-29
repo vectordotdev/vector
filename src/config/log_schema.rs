@@ -1,8 +1,11 @@
 use crate::event::LookupBuf;
+use super::{load_builder_from_paths, FormatHint};
 use getset::{Getters, Setters};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-pub static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
+use std::path::PathBuf;
+
+static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
 
 lazy_static::lazy_static! {
     static ref LOG_SCHEMA_DEFAULT: LogSchema = LogSchema {
@@ -12,6 +15,27 @@ lazy_static::lazy_static! {
         source_type_key: LookupBuf::from("source_type"),
     };
 }
+
+/// Loads Log Schema from configurations and sets global schema.
+/// Once this is done, configurations can be correctly loaded using
+/// configured log schema defaults.
+/// If deny is set, will panic if schema has already been set.
+pub fn init_log_schema(
+    config_paths: &[(PathBuf, FormatHint)],
+    deny_if_set: bool,
+) -> Result<(), Vec<String>> {
+    let (builder, _) = load_builder_from_paths(config_paths)?;
+
+    if LOG_SCHEMA.set(builder.global.log_schema).is_err() && deny_if_set {
+        panic!("Couldn't set schema");
+    }
+
+    Ok(())
+}
+
+/// Components should use global LogShema returned by this function.
+/// The returned value can differ from LogSchema::default()
+/// which is unchanging.
 pub fn log_schema() -> &'static LogSchema {
     LOG_SCHEMA.get().unwrap_or(&LOG_SCHEMA_DEFAULT)
 }
@@ -41,16 +65,16 @@ impl Default for LogSchema {
 }
 
 impl LogSchema {
-    pub fn default_message_key() -> LookupBuf {
+    fn default_message_key() -> LookupBuf {
         LookupBuf::from("message")
     }
-    pub fn default_timestamp_key() -> LookupBuf {
+    fn default_timestamp_key() -> LookupBuf {
         LookupBuf::from("timestamp")
     }
-    pub fn default_host_key() -> LookupBuf {
+    fn default_host_key() -> LookupBuf {
         LookupBuf::from("host")
     }
-    pub fn default_source_type_key() -> LookupBuf {
+    fn default_source_type_key() -> LookupBuf {
         LookupBuf::from("source_type")
     }
 

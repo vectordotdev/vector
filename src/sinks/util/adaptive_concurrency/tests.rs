@@ -17,11 +17,9 @@ use crate::{
         start_topology,
         stats::{HistogramStats, LevelTimeHistogram, TimeHistogram, WeightedSumStats},
     },
-    BoolAndSome,
 };
 use core::task::Context;
 use futures::{
-    compat::Future01CompatExt,
     future::{self, BoxFuture},
     FutureExt, SinkExt,
 };
@@ -79,7 +77,7 @@ struct LimitParams {
 impl LimitParams {
     fn action_at_level(&self, level: usize) -> Option<Action> {
         self.limit
-            .and_then(|limit| (level > limit).and_some(self.action))
+            .and_then(|limit| (level > limit).then(|| self.action))
     }
 
     fn scale(&self, level: usize) -> f64 {
@@ -386,7 +384,7 @@ async fn run_test(params: TestParams) -> TestResults {
     while stats.lock().expect("Poisoned stats lock").completed < params.requests {
         time::advance(Duration::from_millis(1)).await;
     }
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let stats = Arc::try_unwrap(stats)
         .expect("Failed to unwrap stats Arc")
@@ -404,27 +402,43 @@ async fn run_test(params: TestParams) -> TestResults {
 
     let metrics = capture_metrics(&controller)
         .map(Event::into_metric)
-        .map(|event| (event.name.clone(), event))
+        .map(|event| (event.name().to_string(), event))
         .collect::<HashMap<_, _>>();
     // Ensure basic statistics are captured, don't actually examine them
-    assert!(
-        matches!(metrics.get("adaptive_concurrency_observed_rtt").unwrap().value,
-                 MetricValue::Distribution { .. })
-    );
-    assert!(
-        matches!(metrics.get("adaptive_concurrency_averaged_rtt").unwrap().value,
-                 MetricValue::Distribution { .. })
-    );
+    assert!(matches!(
+        metrics
+            .get("adaptive_concurrency_observed_rtt")
+            .unwrap()
+            .data
+            .value,
+        MetricValue::Distribution { .. }
+    ));
+    assert!(matches!(
+        metrics
+            .get("adaptive_concurrency_averaged_rtt")
+            .unwrap()
+            .data
+            .value,
+        MetricValue::Distribution { .. }
+    ));
     if params.concurrency == Concurrency::Adaptive {
-        assert!(
-            matches!(metrics.get("adaptive_concurrency_limit").unwrap().value,
-                     MetricValue::Distribution { .. })
-        );
+        assert!(matches!(
+            metrics
+                .get("adaptive_concurrency_limit")
+                .unwrap()
+                .data
+                .value,
+            MetricValue::Distribution { .. }
+        ));
     }
-    assert!(
-        matches!(metrics.get("adaptive_concurrency_in_flight").unwrap().value,
-                 MetricValue::Distribution { .. })
-    );
+    assert!(matches!(
+        metrics
+            .get("adaptive_concurrency_in_flight")
+            .unwrap()
+            .data
+            .value,
+        MetricValue::Distribution { .. }
+    ));
 
     TestResults { stats, cstats }
 }
@@ -509,7 +523,7 @@ impl ResultTest {
                 .and_then(|range| range.assert_usize(stat.mode, name, "mode")),
         ]
         .into_iter()
-        .filter_map(|f| f)
+        .flatten()
         .collect::<Vec<_>>()
     }
 
@@ -523,7 +537,7 @@ impl ResultTest {
                 .and_then(|range| range.assert_f64(stat.mean, name, "mean")),
         ]
         .into_iter()
-        .filter_map(|f| f)
+        .flatten()
         .collect::<Vec<_>>()
     }
 }

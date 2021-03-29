@@ -1,11 +1,12 @@
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformDescription},
+    config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, LookupBuf, Value},
     internal_events::{LogfmtParserConversionFailed, LogfmtParserMissingField},
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use std::collections::HashMap;
 use std::str;
 
@@ -15,6 +16,7 @@ pub struct LogfmtConfig {
     pub field: Option<LookupBuf>,
     pub drop_field: bool,
     pub types: HashMap<LookupBuf, String>,
+    pub timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -26,11 +28,12 @@ impl_generate_config_from_default!(LogfmtConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| log_schema().message_key().clone());
+            .unwrap_or_else(|| crate::config::log_schema().message_key().clone());
+        let timezone = self.timezone.unwrap_or(globals.timezone);
         let conversions = parse_conversion_map(
             &self
                 .types
@@ -121,9 +124,9 @@ impl FunctionTransform for Logfmt {
 mod tests {
     use super::LogfmtConfig;
     use crate::{
-        config::{log_schema, TransformConfig},
+        config::{GlobalOptions, TransformConfig},
         event::{LogEvent, Lookup, Value},
-        log_event,
+        Event,
     };
 
     #[test]
@@ -141,8 +144,9 @@ mod tests {
             field: None,
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
+            timezone: Default::default(),
         }
-        .build()
+        .build(&GlobalOptions::default())
         .await
         .unwrap();
         let parser = parser.as_function();

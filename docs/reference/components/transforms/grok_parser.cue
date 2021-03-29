@@ -11,6 +11,7 @@ components: transforms: grok_parser: {
 		commonly_used: false
 		development:   "deprecated"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -25,20 +26,23 @@ components: transforms: grok_parser: {
 
 	support: {
 		targets: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"aarch64-unknown-linux-gnu":      true
+			"aarch64-unknown-linux-musl":     true
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
+			"x86_64-apple-darwin":            true
+			"x86_64-pc-windows-msv":          true
+			"x86_64-unknown-linux-gnu":       true
+			"x86_64-unknown-linux-musl":      true
 		}
-
 		requirements: []
 		warnings: [
 			"""
-			This component has been deprecated in favor of the new [`remap` transform's `parse_grok`
-			function](\(urls.vector_remap_transform)#parse_grok)` The `remap` transform provides a
-			simple syntax for robust data transformation. Let us know what you think!
+			\(grok_parser._remap_deprecation_notice)
+
+			```vrl
+			.message = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
+			```
 			""",
 		]
 		notices: [
@@ -67,6 +71,7 @@ components: transforms: grok_parser: {
 			type: string: {
 				default: "message"
 				examples: ["message", "parent.child", "array[0]"]
+				syntax: "literal"
 			}
 		}
 		pattern: {
@@ -75,9 +80,11 @@ components: transforms: grok_parser: {
 			warnings: []
 			type: string: {
 				examples: ["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]
+				syntax: "literal"
 			}
 		}
-		types: configuration._types
+		timezone: configuration._timezone
+		types:    configuration._types
 	}
 
 	input: {

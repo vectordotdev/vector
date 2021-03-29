@@ -1,13 +1,6 @@
-// Root
-//
-// The root file defines the schema for all of Vector's reference metadata.
-// It does not include boilerplate or domain specific policies.
-
 package metadata
 
-import (
-	"strings"
-)
+import "strings"
 
 _values: {
 	current_timestamp: "2020-10-10T17:07:36.452332Z"
@@ -17,7 +10,7 @@ _values: {
 }
 
 // `#Any` allows for any value.
-#Any: _ | {[_=string]: #Any}
+#Any: *_ | {[_=string]: #Any}
 
 #Arch: "ARM64" | "ARMv7" | "x86_64"
 
@@ -83,8 +76,8 @@ _values: {
 #Enum: [Name=_]: string
 
 #Event: {
-	close({log: #LogEvent}) |
-	close({metric: #MetricEvent})
+	{log?: #LogEvent} |
+	{metric?: #MetricEvent}
 }
 
 // `#EventType` represents one of Vector's supported event types.
@@ -93,15 +86,15 @@ _values: {
 // * `metric` - metric event
 #EventType: "log" | "metric"
 
-#Fields: [Name=string]: #Fields | _
+#Fields: [Name=string]: #Fields | *_
 
 #Interface: {
-	close({binary: #InterfaceBinary}) |
-	close({ffi: close({})}) |
-	close({file_system: #InterfaceFileSystem}) |
-	close({socket: #InterfaceSocket}) |
-	close({stdin: close({})}) |
-	close({stdout: close({})})
+	{binary: #InterfaceBinary} |
+	{ffi: {}} |
+	{file_system: #InterfaceFileSystem} |
+	{socket: #InterfaceSocket} |
+	{stdin: {}} |
+	{stdout: {}}
 }
 
 #InterfaceBinary: {
@@ -134,7 +127,7 @@ _values: {
 	ssl:     "disabled" | "required" | "optional"
 }
 
-#HowItWorks: [Name=string]: close({
+#HowItWorks: [Name=string]: {
 	#Subsection: {
 		title: string
 		body:  string
@@ -144,13 +137,10 @@ _values: {
 	title: string
 	body:  string | null
 	sub_sections?: [#Subsection, ...#Subsection]
-})
+}
 
 #LogEvent: {
-	host?:      string | null
-	message?:   string | null
-	timestamp?: string | null
-	#Any
+	...
 }
 
 #Map: [string]: string
@@ -161,12 +151,12 @@ _values: {
 	namespace?: string
 	tags: [Name=string]: string
 	timestamp?: string
-	close({counter: #MetricEventCounter}) |
-	close({distribution: #MetricEventDistribution}) |
-	close({gauge: #MetricEventGauge}) |
-	close({histogram: #MetricEventHistogram}) |
-	close({set: #MetricEventSet}) |
-	close({summary: #MetricEventSummary})
+	{counter: #MetricEventCounter} |
+	{distribution: #MetricEventDistribution} |
+	{gauge: #MetricEventGauge} |
+	{histogram: #MetricEventHistogram} |
+	{set: #MetricEventSet} |
+	{summary: #MetricEventSummary}
 }
 
 #MetricEventCounter: {
@@ -174,9 +164,13 @@ _values: {
 }
 
 #MetricEventDistribution: {
-	values: [float, ...float]
-	sample_rates: [uint, ...uint]
+	samples: [#DistributionSample, ...#DistributionSample]
 	statistic: "histogram" | "summary"
+}
+
+#DistributionSample: {
+	value: float
+	rate:  uint
 }
 
 #MetricEventGauge: {
@@ -184,10 +178,14 @@ _values: {
 }
 
 #MetricEventHistogram: {
-	buckets: [float, ...float]
-	counts: [int, ...int]
-	count: int
+	buckets: [#HistogramBucket, ...#HistogramBucket]
+	count: uint
 	sum:   float
+}
+
+#HistogramBucket: {
+	upper_limit: float
+	count:       uint
 }
 
 #MetricEventSet: {
@@ -195,20 +193,24 @@ _values: {
 }
 
 #MetricEventSummary: {
-	quantiles: [float, ...float]
-	values: [float, ...float]
+	quantiles: [#SummaryQuantile, ...#SummaryQuantile]
 	count: int
 	sum:   float
 }
 
-#MetricTags: [Name=string]: close({
+#SummaryQuantile: {
+	upper_limit: float
+	value:       float
+}
+
+#MetricTags: [Name=string]: {
 	name:        Name
 	default?:    string
 	description: string
 	enum?:       #Enum
 	examples?: [string, ...string]
 	required: bool
-})
+}
 
 #MetricType: "counter" | "distribution" | "gauge" | "histogram" | "summary"
 
@@ -269,7 +271,9 @@ _values: {
 
 #SetupSteps: [#SetupStep, ...#SetupStep]
 
-#Schema: [Name=string]: {
+#Schema: [Name=string]: #SchemaField & {name: Name}
+
+#SchemaField: {
 	// `category` allows you to group options into categories.
 	//
 	// For example, all of the `*_key` options might be grouped under the
@@ -293,7 +297,7 @@ _values: {
 
 	// `name` sets the name for this option. It is automatically set for you
 	// via the key you use.
-	name: Name
+	name: string
 
 	// `relevant_when` clarifies when an option is relevant.
 	//
@@ -330,12 +334,14 @@ _values: {
 }
 
 #TargetTriples: {
-	"aarch64-unknown-linux-gnu":  bool
-	"aarch64-unknown-linux-musl": bool
-	"x86_64-apple-darwin":        bool
-	"x86_64-pc-windows-msv":      bool
-	"x86_64-unknown-linux-gnu":   bool
-	"x86_64-unknown-linux-musl":  bool
+	"aarch64-unknown-linux-gnu":      bool
+	"aarch64-unknown-linux-musl":     bool
+	"armv7-unknown-linux-gnueabihf":  bool
+	"armv7-unknown-linux-musleabihf": bool
+	"x86_64-apple-darwin":            bool
+	"x86_64-pc-windows-msv":          bool
+	"x86_64-unknown-linux-gnu":       bool
+	"x86_64-unknown-linux-musl":      bool
 }
 
 #Timestamp: =~"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{6}Z"
@@ -351,7 +357,7 @@ _values: {
 	//
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
-	close({"array": #TypeArray & {_args: required: Args.required}}) |
+	{"array": #TypeArray & {_args: required: Args.required}} |
 	#TypePrimitive
 }
 
@@ -366,13 +372,13 @@ _values: {
 	//
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
-	close({"*": close({})}) |
-	close({"bool": #TypeBool & {_args: required: Args.required}}) |
-	close({"float": #TypeFloat & {_args: required: Args.required}}) |
-	close({"object": #TypeObject & {_args: required: Args.required}}) |
-	close({"string": #TypeString & {_args: required: Args.required}}) |
-	close({"timestamp": #TypeTimestamp & {_args: required: Args.required}}) |
-	close({"uint": #TypeUint & {_args: required: Args.required}})
+	{"*": {}} |
+	{"bool": #TypeBool & {_args: required: Args.required}} |
+	{"float": #TypeFloat & {_args: required: Args.required}} |
+	{"object": #TypeObject & {_args: required: Args.required}} |
+	{"string": #TypeString & {_args: required: Args.required}} |
+	{"timestamp": #TypeTimestamp & {_args: required: Args.required}} |
+	{"uint": #TypeUint & {_args: required: Args.required}}
 }
 
 #TypeArray: {
@@ -443,7 +449,7 @@ _values: {
 
 	examples?: [...string]
 
-	if Args.required {
+	if Args.required && enum != _|_ {
 		// `examples` demonstrates example values. This should be used when
 		// examples cannot be derived from the `default` or `enum` options.
 		examples: [string, ...string] | *[
@@ -453,9 +459,7 @@ _values: {
 		]
 	}
 
-	// `templateable` means that the option supports dynamic templated
-	// values.
-	templateable?: bool
+	syntax: "file_system_path" | "field_path" | "literal" | "template" | "regex" | "remap_boolean_expression" | "remap_program" | "strftime"
 }
 
 #TypeTimestamp: {

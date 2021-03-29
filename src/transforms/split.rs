@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformDescription},
+    config::{log_schema, DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, LookupBuf, Value},
     internal_events::{SplitConvertFailed, SplitFieldMissing},
     transforms::{FunctionTransform, Transform},
@@ -7,6 +7,7 @@ use crate::{
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use std::collections::HashMap;
 use std::str;
 
@@ -18,6 +19,7 @@ pub struct SplitConfig {
     pub field: Option<LookupBuf>,
     pub drop_field: bool,
     pub types: HashMap<LookupBuf, String>,
+    pub timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -29,12 +31,13 @@ impl_generate_config_from_default!(SplitConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "split")]
 impl TransformConfig for SplitConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
             .unwrap_or_else(|| log_schema().message_key().clone());
 
+        let timezone = self.timezone.unwrap_or(globals.timezone);
         let types = parse_check_conversion_map(
             &self
                 .types
@@ -209,8 +212,9 @@ mod tests {
             field,
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
+            timezone: Default::default(),
         }
-        .build()
+        .build(&GlobalOptions::default())
         .await
         .unwrap();
         let parser = parser.as_function();

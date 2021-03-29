@@ -21,9 +21,10 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter};
+use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, ReadFrom};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use std::convert::TryInto;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -37,10 +38,7 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
-use futures::{
-    compat::Stream01CompatExt, future::FutureExt, sink::Sink, stream::StreamExt, TryStreamExt,
-};
-use futures01::Stream as Stream01;
+use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
 use pod_metadata_annotator::PodMetadataAnnotator;
@@ -101,7 +99,14 @@ pub struct Config {
     /// This is useful to compute the latency between important event processing
     /// stages, i.e. the time delta between log line was written and when it was
     /// processed by the `kubernetes_logs` source.
-    ingestion_timestamp_field: Option<LookupBuf>,
+    ingestion_timestamp_field: Option<LookupBufString>,
+
+    /// The default time zone for timestamps without an explicit zone.
+    timezone: Option<TimeZone>,
+
+    /// Optional path to a kubeconfig file readable by Vector. If not set,
+    /// Vector will try to connect to Kubernetes using in-cluster configuration.
+    kube_config_file: Option<PathBuf>,
 }
 
 inventory::submit! {
@@ -160,6 +165,7 @@ struct Source {
     max_read_bytes: usize,
     glob_minimum_cooldown: Duration,
     ingestion_timestamp_field: Option<LookupBuf>,
+    timezone: TimeZone,
 }
 
 impl Source {
@@ -167,10 +173,14 @@ impl Source {
         let field_selector = prepare_field_selector(config)?;
         let label_selector = prepare_label_selector(config);
 
-        let k8s_config = k8s::client::config::Config::in_cluster()?;
+        let k8s_config = match &config.kube_config_file {
+            Some(kc) => k8s::client::config::Config::kubeconfig(kc)?,
+            None => k8s::client::config::Config::in_cluster()?,
+        };
         let client = k8s::client::Client::new(k8s_config)?;
 
         let data_dir = globals.resolve_and_make_data_subdir(None, name)?;
+        let timezone = config.timezone.unwrap_or(globals.timezone);
 
         let exclude_paths = config
             .exclude_paths_glob_patterns
@@ -199,6 +209,7 @@ impl Source {
             max_read_bytes: config.max_read_bytes,
             glob_minimum_cooldown,
             ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
+            timezone,
         })
     }
 
@@ -218,6 +229,7 @@ impl Source {
             max_read_bytes,
             glob_minimum_cooldown,
             ingestion_timestamp_field,
+            timezone,
         } = self;
 
         let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
@@ -259,16 +271,20 @@ impl Source {
             max_read_bytes,
             // We want to use checkpoining mechanism, and resume from where we
             // left off.
-            start_at_beginning: false,
+            ignore_checkpoints: false,
+            // Match the default behavior
+            read_from: ReadFrom::Beginning,
             // We're now aware of the use cases that would require specifying
             // the starting point in time since when we should collect the logs,
             // so we just disable it. If users ask, we can expose it. There may
             // be other, more sound ways for users considering the use of this
-            // option to solvce their use case, so take consideration.
+            // option to solve their use case, so take consideration.
             ignore_before: None,
             // Max line length to expect during regular log reads, see the
             // explanation above.
             max_line_bytes,
+            // Delimiter bytes that is used to read the file line-by-line
+            line_delimiter: Bytes::from("\n"),
             // The directory where to keep the checkpoints.
             data_dir,
             // This value specifies not exactly the globbing, but interval
@@ -304,20 +320,25 @@ impl Source {
         let (file_source_tx, file_source_rx) =
             futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
 
-        let mut parser = parser::build();
+        let mut parser = parser::build(timezone);
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
         let events = file_source_rx.map(futures::stream::iter);
         let events = events.flatten();
         let events = events.map(move |(bytes, file)| {
+            let byte_size = bytes.len();
+            let mut event = create_event(bytes, &file, ingestion_timestamp_field.as_deref());
+            let file_info = annotator.annotate(&mut event, &file);
+
             emit!(KubernetesLogsEventReceived {
                 file: &file,
-                byte_size: bytes.len(),
+                byte_size,
+                pod_name: file_info.as_ref().map(|info| info.pod_name),
             });
-            let mut event = create_event(bytes, &file, ingestion_timestamp_field.clone());
-            if annotator.annotate(&mut event, &file).is_none() {
+            if file_info.is_none() {
                 emit!(KubernetesLogsEventAnnotationFailed { event: &event });
             }
+
             event
         });
         let events = events.flat_map(move |event| {
@@ -326,9 +347,10 @@ impl Source {
             futures::stream::iter(buf)
         });
 
-        let event_processing_loop = partial_events_merger.transform(
-            Box::new(events.map(Ok).compat())
-        ).map_err(|_| unreachable!("These errors should only happen if our futures compat layer is wrong. If you meet this, please report it.")).compat().forward(out);
+        let event_processing_loop = partial_events_merger
+            .transform(Box::pin(events))
+            .map(Ok)
+            .forward(out);
 
         let mut lifecycle = Lifecycle::new();
         {

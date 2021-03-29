@@ -35,7 +35,6 @@ License: ASL 2.0
 Group: Applications/System
 Source: %{_source}
 URL: %{_url}
-AutoReqProv: no
 
 %description
 %{summary}

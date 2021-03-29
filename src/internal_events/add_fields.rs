@@ -1,37 +1,5 @@
 use super::InternalEvent;
 use crate::event::LookupBuf;
-use metrics::counter;
-
-#[derive(Debug)]
-pub struct AddFieldsTemplateRenderingError<'a> {
-    pub field: &'a LookupBuf,
-}
-
-impl<'a> InternalEvent for AddFieldsTemplateRenderingError<'a> {
-    fn emit_logs(&self) {
-        error!(message = "Failed to render templated value; discarding value.", field = %self.field, internal_log_rate_secs = 30);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct AddFieldsTemplateInvalid<'a> {
-    pub error: crate::template::TemplateError,
-    pub field: &'a LookupBuf,
-}
-
-impl<'a> InternalEvent for AddFieldsTemplateInvalid<'a> {
-    fn emit_logs(&self) {
-        error!(message = "Invalid template; using as string.", field = %self.field, error = ?self.error, internal_log_rate_secs = 30);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1);
-    }
-}
 
 #[derive(Debug)]
 pub struct AddFieldsFieldOverwritten<'a> {

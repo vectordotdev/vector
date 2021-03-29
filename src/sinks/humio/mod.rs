@@ -20,6 +20,6 @@ impl From<Encoding> for splunk_hec::Encoding {
     }
 }
 
-fn default_host_key() -> LookupBuf {
-    crate::config::LogSchema::default().host_key().clone()
+fn host_key() -> LookupBuf {
+    crate::config::log_schema().host_key().clone()
 }

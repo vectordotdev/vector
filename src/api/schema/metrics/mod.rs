@@ -55,7 +55,7 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Uptime> {
-        get_metrics(interval).filter_map(|m| match m.name.as_str() {
+        get_metrics(interval).filter_map(|m| match m.name() {
             "uptime_seconds" => Some(Uptime::new(m)),
             _ => None,
         })
@@ -66,7 +66,7 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = ProcessedEventsTotal> {
-        get_metrics(interval).filter_map(|m| match m.name.as_str() {
+        get_metrics(interval).filter_map(|m| match m.name() {
             "processed_events_total" => Some(ProcessedEventsTotal::new(m)),
             _ => None,
         })
@@ -77,7 +77,7 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = i64> {
-        counter_throughput(interval, &|m| m.name == "processed_events_total")
+        counter_throughput(interval, &|m| m.name() == "processed_events_total")
             .map(|(_, throughput)| throughput as i64)
     }
 
@@ -86,16 +86,18 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentProcessedEventsThroughput>> {
-        component_counter_throughputs(interval, &|m| m.name == "processed_events_total").map(|m| {
-            m.into_iter()
-                .map(|(m, throughput)| {
-                    ComponentProcessedEventsThroughput::new(
-                        m.tag_value("component_name").unwrap(),
-                        throughput as i64,
-                    )
-                })
-                .collect()
-        })
+        component_counter_throughputs(interval, &|m| m.name() == "processed_events_total").map(
+            |m| {
+                m.into_iter()
+                    .map(|(m, throughput)| {
+                        ComponentProcessedEventsThroughput::new(
+                            m.tag_value("component_name").unwrap(),
+                            throughput as i64,
+                        )
+                    })
+                    .collect()
+            },
+        )
     }
 
     /// Component event processing metrics over `interval`.
@@ -103,7 +105,7 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentProcessedEventsTotal>> {
-        component_counter_metrics(interval, &|m| m.name == "processed_events_total").map(|m| {
+        component_counter_metrics(interval, &|m| m.name() == "processed_events_total").map(|m| {
             m.into_iter()
                 .map(ComponentProcessedEventsTotal::new)
                 .collect()
@@ -115,7 +117,7 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = ProcessedBytesTotal> {
-        get_metrics(interval).filter_map(|m| match m.name.as_str() {
+        get_metrics(interval).filter_map(|m| match m.name() {
             "processed_bytes_total" => Some(ProcessedBytesTotal::new(m)),
             _ => None,
         })
@@ -126,7 +128,7 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = i64> {
-        counter_throughput(interval, &|m| m.name == "processed_bytes_total")
+        counter_throughput(interval, &|m| m.name() == "processed_bytes_total")
             .map(|(_, throughput)| throughput as i64)
     }
 
@@ -135,7 +137,7 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentProcessedBytesTotal>> {
-        component_counter_metrics(interval, &|m| m.name == "processed_bytes_total").map(|m| {
+        component_counter_metrics(interval, &|m| m.name() == "processed_bytes_total").map(|m| {
             m.into_iter()
                 .map(ComponentProcessedBytesTotal::new)
                 .collect()
@@ -147,7 +149,7 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentProcessedBytesThroughput>> {
-        component_counter_throughputs(interval, &|m| m.name == "processed_bytes_total").map(|m| {
+        component_counter_throughputs(interval, &|m| m.name() == "processed_bytes_total").map(|m| {
             m.into_iter()
                 .map(|(m, throughput)| {
                     ComponentProcessedBytesThroughput::new(
@@ -165,7 +167,7 @@ impl MetricsSubscription {
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = ErrorsTotal> {
         get_metrics(interval)
-            .filter(|m| m.name.ends_with("_errors_total"))
+            .filter(|m| m.name().ends_with("_errors_total"))
             .map(ErrorsTotal::new)
     }
 
@@ -174,7 +176,7 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentErrorsTotal>> {
-        component_counter_metrics(interval, &|m| m.name.ends_with("_errors_total"))
+        component_counter_metrics(interval, &|m| m.name().ends_with("_errors_total"))
             .map(|m| m.into_iter().map(ComponentErrorsTotal::new).collect())
     }
 
@@ -183,7 +185,7 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = MetricType> {
-        get_metrics(interval).filter_map(|m| match m.name.as_str() {
+        get_metrics(interval).filter_map(|m| match m.name() {
             "uptime_seconds" => Some(MetricType::Uptime(m.into())),
             "processed_events_total" => Some(MetricType::ProcessedEventsTotal(m.into())),
             "processed_bytes_total" => Some(MetricType::ProcessedBytesTotal(m.into())),

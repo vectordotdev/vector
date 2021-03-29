@@ -23,8 +23,8 @@ pub enum Version {
     V4,
 }
 
-#[serde(deny_unknown_fields)]
 #[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields)]
 struct AwsEcsMetricsSourceConfig {
     #[serde(default = "default_endpoint")]
     endpoint: String,
@@ -539,13 +539,13 @@ mod test {
 
         match metrics
             .iter()
-            .find(|m| m.name == "network_receive_bytes_total")
+            .find(|m| m.name() == "network_receive_bytes_total")
         {
             Some(m) => {
-                assert_eq!(m.value, MetricValue::Counter { value: 329932716.0 });
-                assert_eq!(m.namespace, Some("awsecs".into()));
+                assert_eq!(m.data.value, MetricValue::Counter { value: 329932716.0 });
+                assert_eq!(m.namespace(), Some("awsecs"));
 
-                match &m.tags {
+                match m.tags() {
                     Some(tags) => {
                         assert_eq!(tags.get("device"), Some(&"eth1".to_string()));
                     }

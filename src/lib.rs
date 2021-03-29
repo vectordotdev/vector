@@ -18,7 +18,7 @@ extern crate derivative;
 #[macro_use]
 extern crate pest_derive;
 #[cfg(feature = "vrl-cli")]
-extern crate remap_cli;
+extern crate vrl_cli;
 
 #[cfg(feature = "jemallocator")]
 #[global_allocator]
@@ -26,7 +26,6 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[macro_use]
 pub mod config;
-pub mod buffers;
 pub mod cli;
 pub mod conditions;
 pub mod dns;
@@ -41,6 +40,8 @@ pub mod internal_events;
 pub mod api;
 pub mod app;
 pub mod async_read;
+pub mod buffers;
+pub mod encoding_transcode;
 pub mod heartbeat;
 pub mod http;
 #[cfg(feature = "rdkafka")]
@@ -51,8 +52,6 @@ pub mod list;
 pub mod mapping;
 pub mod metrics;
 pub(crate) mod pipeline;
-#[cfg(any(feature = "sinks-prometheus", feature = "sources-prometheus"))]
-pub(crate) mod prometheus;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod serde;
@@ -62,6 +61,7 @@ pub mod signal;
 pub mod sink;
 pub mod sinks;
 pub mod sources;
+pub(crate) mod stats;
 pub mod stream;
 pub mod tcp;
 pub mod template;
@@ -74,7 +74,10 @@ pub mod trace;
 pub mod transforms;
 pub mod trigger;
 pub mod types;
+#[cfg(any(feature = "sources-utils-udp", feature = "sinks-utils-udp"))]
+pub mod udp;
 pub mod unit_test;
+pub(crate) mod utilization;
 pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
@@ -115,21 +118,4 @@ mod built_info {
 
 pub fn get_hostname() -> std::io::Result<String> {
     Ok(hostname::get()?.to_string_lossy().into())
-}
-
-// This is a private implementation of the unstable `bool_to_option`
-// feature. This can be removed once this stabilizes:
-// https://github.com/rust-lang/rust/issues/64260
-trait BoolAndSome {
-    fn and_some<T>(self, value: T) -> Option<T>;
-}
-
-impl BoolAndSome for bool {
-    fn and_some<T>(self, value: T) -> Option<T> {
-        if self {
-            Some(value)
-        } else {
-            None
-        }
-    }
 }

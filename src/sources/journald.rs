@@ -17,11 +17,11 @@ use nix::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
+use std::path::{Path, PathBuf};
 use std::{
     collections::{HashMap, HashSet},
     io::SeekFrom,
     iter::FromIterator,
-    path::PathBuf,
     process::Stdio,
     str::FromStr,
     time::Duration,
@@ -75,8 +75,9 @@ pub struct JournaldConfig {
     pub data_dir: Option<PathBuf>,
     pub batch_size: Option<usize>,
     pub journalctl_path: Option<PathBuf>,
+    /// Deprecated
     #[serde(default)]
-    pub remap_priority: bool,
+    remap_priority: bool,
 }
 
 inventory::submit! {
@@ -97,6 +98,10 @@ impl SourceConfig for JournaldConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
+        if self.remap_priority {
+            warn!("Option `remap_priority` has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead.");
+        }
+
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
 
         let include_units = match (!self.units.is_empty(), !self.include_units.is_empty()) {
@@ -338,7 +343,7 @@ type StartJournalctlFn = Box<
 type StopJournalctlFn = Box<dyn FnOnce() + Send>;
 
 fn start_journalctl(
-    path: &PathBuf,
+    path: &Path,
     current_boot_only: bool,
     cursor: &Option<String>,
 ) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {
@@ -386,21 +391,19 @@ fn create_event(record: Record) -> Event {
         log.insert(log_schema().host_key().clone(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
-    if let Some(timestamp) = log
+    if let Some(Value::Bytes(timestamp)) = log
         .get(&*SOURCE_TIMESTAMP)
         .or_else(|| log.get(&*RECEIVED_TIMESTAMP))
     {
-        if let Value::Bytes(timestamp) = timestamp {
-            if let Ok(timestamp) = String::from_utf8_lossy(&timestamp).parse::<u64>() {
-                let timestamp = chrono::Utc.timestamp(
-                    (timestamp / 1_000_000) as i64,
-                    (timestamp % 1_000_000) as u32 * 1_000,
-                );
-                log.insert(
-                    log_schema().timestamp_key().clone(),
-                    Value::Timestamp(timestamp),
-                );
-            }
+        if let Ok(timestamp) = String::from_utf8_lossy(&timestamp).parse::<u64>() {
+            let timestamp = chrono::Utc.timestamp(
+                (timestamp / 1_000_000) as i64,
+                (timestamp % 1_000_000) as u32 * 1_000,
+            );
+            log.insert(
+                log_schema().timestamp_key().clone(),
+                Value::Timestamp(timestamp),
+            );
         }
     }
     // Add source type
@@ -631,7 +634,7 @@ mod tests {
     impl FakeJournal {
         fn new(
             checkpoint: &Option<String>,
-        ) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {
+        ) -> (BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn) {
             let cursor = Cursor::new(FAKE_JOURNAL);
             let reader = BufReader::new(cursor);
             let mut journal = FakeJournal { reader };
@@ -644,7 +647,7 @@ mod tests {
                 }
             }
 
-            Ok((Box::pin(journal), Box::new(|| ())))
+            (Box::pin(journal), Box::new(|| ()))
         }
     }
 
@@ -678,7 +681,10 @@ mod tests {
             remap_priority: true,
             out: tx,
         }
-        .run_shutdown(shutdown, Box::new(FakeJournal::new));
+        .run_shutdown(
+            shutdown,
+            Box::new(|checkpoint| Ok(FakeJournal::new(checkpoint))),
+        );
         tokio::spawn(source);
 
         delay_for(Duration::from_millis(100)).await;
