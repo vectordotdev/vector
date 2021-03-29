@@ -72,7 +72,7 @@ impl Expression for ParseCsvFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        return TypeDef::new().fallible().array::<Kind>(type_def());
+        TypeDef::new().fallible().array::<Kind>(type_def())
     }
 }
 
