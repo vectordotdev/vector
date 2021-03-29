@@ -237,11 +237,7 @@ impl SyslogDecoder {
         // If we are discarding, discard to the next newline.
         let newline_pos = src.iter().position(|&b| b == b'\n');
 
-        match (
-            state,
-            newline_pos,
-            space_pos,
-        ) {
+        match (state, newline_pos, space_pos) {
             (State::Discarding(chars), _, _) if src.len() >= chars => {
                 // We have a certain number of chars to discard.
                 // There are enough chars in this frame to discard
