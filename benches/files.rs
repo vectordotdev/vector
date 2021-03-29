@@ -11,7 +11,7 @@ use vector::{
     test_util::{random_lines, runtime, start_topology},
 };
 
-fn benchmark_files_without_partitions(c: &mut Criterion) {
+fn benchmark_files_no_partitions(c: &mut Criterion) {
     let num_lines: usize = 10_000;
     let line_size: usize = 100;
 
@@ -19,7 +19,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
     group.throughput(Throughput::Bytes((num_lines * line_size) as u64));
     group.sampling_mode(SamplingMode::Flat);
 
-    group.bench_function("files_without_partitions", |b| {
+    group.bench_function("no_partitions", |b| {
         b.iter_batched(
             || {
                 let temp = tempdir().unwrap();
@@ -97,5 +97,5 @@ criterion_group!(
     // encapsulates inherent CI noise we saw in
     // https://github.com/timberio/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
-    targets = benchmark_files_without_partitions
+    targets = benchmark_files_no_partitions
 );

@@ -15,7 +15,7 @@ fn benchmark_simple_pipes(c: &mut Criterion) {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let mut group = c.benchmark_group("pipe");
+    let mut group = c.benchmark_group("topology");
     group.sampling_mode(SamplingMode::Flat);
 
     let benchmarks = [
@@ -27,7 +27,7 @@ fn benchmark_simple_pipes(c: &mut Criterion) {
 
     for (name, num_lines, line_size, num_writers) in benchmarks.iter() {
         group.throughput(Throughput::Bytes((num_lines * line_size) as u64));
-        group.bench_function(format!("pipe_{}", name), |b| {
+        group.bench_function(format!("pipe/{}", name), |b| {
             b.iter_batched(
                 || {
                     let mut config = config::Config::builder();
@@ -90,7 +90,7 @@ fn benchmark_interconnected(c: &mut Criterion) {
     let out_addr1 = next_addr();
     let out_addr2 = next_addr();
 
-    let mut group = c.benchmark_group("interconnected");
+    let mut group = c.benchmark_group("topology");
     group.throughput(Throughput::Bytes((num_lines * line_size * 2) as u64));
     group.sampling_mode(SamplingMode::Flat);
 
@@ -160,7 +160,7 @@ fn benchmark_transforms(c: &mut Criterion) {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let mut group = c.benchmark_group("transforms");
+    let mut group = c.benchmark_group("topology");
     group.throughput(Throughput::Bytes(
         (num_lines * (line_size + "status=404".len())) as u64,
     ));
@@ -241,7 +241,7 @@ fn benchmark_complex(c: &mut Criterion) {
     let out_addr_404 = next_addr();
     let out_addr_500 = next_addr();
 
-    let mut group = c.benchmark_group("complex");
+    let mut group = c.benchmark_group("topology");
     group.sampling_mode(SamplingMode::Flat);
 
     group.bench_function("complex", |b| {
@@ -453,10 +453,10 @@ fn benchmark_real_world_1(c: &mut Criterion) {
     let out_addr_company_unfurler = next_addr();
     let out_addr_audit = next_addr();
 
-    let mut group = c.benchmark_group("real_world_1");
+    let mut group = c.benchmark_group("topology");
     group.sampling_mode(SamplingMode::Flat);
     group.throughput(Throughput::Elements(num_lines as u64));
-    group.bench_function("topology", |b| {
+    group.bench_function("real_world_1", |b| {
         b.iter_batched(
             || {
                 let mut config = config::Config::builder();

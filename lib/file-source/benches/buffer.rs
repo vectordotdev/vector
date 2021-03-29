@@ -23,7 +23,7 @@ impl fmt::Display for Parameters {
 }
 
 fn read_until_bench(c: &mut Criterion) {
-    let mut group = c.benchmark_group("read_until");
+    let mut group = c.benchmark_group("file-source");
 
     let mut parameters = vec![
         Parameters {
@@ -55,18 +55,22 @@ fn read_until_bench(c: &mut Criterion) {
         let mut buffer = BytesMut::with_capacity(param.max_size as usize);
         let mut reader = Cursor::new(&param.bytes);
         let delimiter: [u8; 1] = [param.delim];
-        group.bench_with_input(BenchmarkId::from_parameter(&param), &param, |b, _| {
-            b.iter(|| {
-                let _ = read_until_with_max_size(
-                    &mut reader,
-                    &mut position,
-                    &delimiter,
-                    &mut buffer,
-                    param.max_size as usize,
-                );
-                reader.set_position(0);
-            })
-        });
+        group.bench_with_input(
+            BenchmarkId::new("read_until", param.clone()),
+            &param,
+            |b, _| {
+                b.iter(|| {
+                    let _ = read_until_with_max_size(
+                        &mut reader,
+                        &mut position,
+                        &delimiter,
+                        &mut buffer,
+                        param.max_size as usize,
+                    );
+                    reader.set_position(0);
+                })
+            },
+        );
     }
 }
 
