@@ -2,7 +2,6 @@ use super::regex::Regex;
 use crate::event::Value;
 
 #[derive(PartialEq, Debug, Clone)]
-#[allow(clippy::large_enum_variant)]
 pub(in crate::mapping) enum QueryValue {
     Value(Value),
 
