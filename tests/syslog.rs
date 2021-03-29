@@ -262,7 +262,7 @@ impl fmt::Display for SyslogMessageRfc5424 {
     }
 }
 
-#[allow(non_camel_case_types,clippy::upper_case_acronyms)]
+#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Copy, Clone, Deserialize, PartialEq, Debug)]
 pub enum Severity {
     #[serde(rename(deserialize = "emergency"))]
@@ -283,7 +283,7 @@ pub enum Severity {
     LOG_DEBUG,
 }
 
-#[allow(non_camel_case_types,clippy::upper_case_acronyms)]
+#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Copy, Clone, PartialEq, Deserialize, Debug)]
 pub enum Facility {
     #[serde(rename(deserialize = "kernel"))]

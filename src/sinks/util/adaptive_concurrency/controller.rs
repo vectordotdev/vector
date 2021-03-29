@@ -10,7 +10,7 @@ use crate::{
         AdaptiveConcurrencyObservedRtt,
     },
     sinks::util::retries::{RetryAction, RetryLogic},
-    stats::{Mean, Ewma},
+    stats::{Ewma, Mean},
 };
 use std::future::Future;
 use std::sync::{Arc, Mutex, MutexGuard};

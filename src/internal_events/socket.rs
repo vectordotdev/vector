@@ -4,7 +4,9 @@ use metrics::counter;
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum SocketMode {
     Tcp,
+    #[cfg(any(feature = "sources-utils-udp", feature = "sinks-utils-udp"))]
     Udp,
+    #[cfg(any(feature = "sources-utils-unix"))]
     Unix,
 }
 
@@ -12,7 +14,9 @@ impl SocketMode {
     fn as_str(self) -> &'static str {
         match self {
             Self::Tcp => "tcp",
+            #[cfg(any(feature = "sources-utils-udp", feature = "sinks-utils-udp"))]
             Self::Udp => "udp",
+            #[cfg(any(feature = "sources-utils-unix"))]
             Self::Unix => "unix",
         }
     }
