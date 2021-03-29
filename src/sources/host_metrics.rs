@@ -1229,7 +1229,7 @@ mod tests {
             .await;
 
             assert!(filtered_metrics_with.len() <= all_metrics.len());
-            assert!(filtered_metrics_with.len() > 0);
+            assert!(!filtered_metrics_with.is_empty());
             assert!(all_tags_match(&filtered_metrics_with, tag, |s| s == key));
 
             let filtered_metrics_with_match = get_metrics(FilterList {
