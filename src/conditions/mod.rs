@@ -42,18 +42,17 @@ inventory::collect!(ConditionDescription);
 /// `condition = '.message == "hooray"'`.
 /// In this case it is turned into a Remap condition.
 /// Otherwise it is a condition such as:
-/// ```
+///
 /// condition.type = 'check_fields'
 /// condition."message.equals" = 'hooray'
-/// ```
+///
 ///
 /// It is important to note that because the way this is
 /// structured, it is wrong to flatten a field that contains
 /// an AnyCondition:
-/// ```
+///
 /// #[serde(flatten)]
 /// condition: AnyCondition,
-/// ```
 ///
 /// This will result in an error when serializing to json
 /// which we need to do when determining which transforms have changed
