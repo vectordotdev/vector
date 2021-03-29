@@ -1,4 +1,4 @@
-use crate::expression::{levenstein, FunctionArgument, Noop};
+use crate::expression::{levenstein, ExpressionError, FunctionArgument, Noop};
 use crate::function::{ArgumentList, Parameter};
 use crate::parser::{Ident, Node};
 use crate::{value::Kind, Context, Expression, Function, Resolved, Span, State, TypeDef};
@@ -205,16 +205,27 @@ impl FunctionCall {
 impl Expression for FunctionCall {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         span!(Level::ERROR, "remap", vrl_position = &self.span.start()).in_scope(|| {
-            self.expr.resolve(ctx).map_err(|mut err| {
-                err.message = format!(
-                    r#"function call error for "{}" at ({}:{}): {}"#,
-                    self.ident,
-                    self.span.start(),
-                    self.span.end(),
-                    err.message
-                );
+            self.expr.resolve(ctx).map_err(|err| {
+                use ExpressionError::*;
 
-                err
+                match err {
+                    Abort => panic!("abort errors must only be defined by `abort` statement"),
+                    Error {
+                        message,
+                        labels,
+                        notes,
+                    } => ExpressionError::Error {
+                        message: format!(
+                            r#"function call error for "{}" at ({}:{}): {}"#,
+                            self.ident,
+                            self.span.start(),
+                            self.span.end(),
+                            message
+                        ),
+                        labels,
+                        notes,
+                    },
+                }
             })
         })
     }

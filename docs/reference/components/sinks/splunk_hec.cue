@@ -110,13 +110,13 @@ components: sinks: splunk_hec: {
 		}
 		index: {
 			common:      false
-			description: "The name of the index where send the events to. If not specified, the default index is used.\n"
+			description: "The name of the index where send the events to. If not specified, the default index is used."
 			required:    false
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["custom_index"]
-				syntax: "literal"
+				examples: ["{{ host }}", "custom_index"]
+				syntax: "template"
 			}
 		}
 		indexed_fields: {
@@ -134,24 +134,24 @@ components: sinks: splunk_hec: {
 		}
 		source: {
 			common:      false
-			description: "The source of events sent to this sink. Typically the filename the logs originated from. If unset, the Splunk collector will set it.\n"
+			description: "The source of events sent to this sink. Typically the filename the logs originated from. If unset, the Splunk collector will set it."
 			required:    false
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["/var/log/syslog", "UDP:514"]
-				syntax: "literal"
+				examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
+				syntax: "template"
 			}
 		}
 		sourcetype: {
 			common:      false
-			description: "The sourcetype of events sent to this sink. If unset, Splunk will default to httpevent.\n"
+			description: "The sourcetype of events sent to this sink. If unset, Splunk will default to httpevent."
 			required:    false
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["_json", "httpevent"]
-				syntax: "literal"
+				examples: ["{{ sourcetype }}", "_json", "httpevent"]
+				syntax: "template"
 			}
 		}
 		token: {

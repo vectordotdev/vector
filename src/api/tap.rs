@@ -1,4 +1,5 @@
 use super::{ShutdownRx, ShutdownTx};
+use crate::topology::fanout::ControlChannel;
 use crate::{
     event::{Event, LogEvent},
     topology::{fanout, WatchRx},
@@ -93,21 +94,33 @@ async fn send_not_matched(mut tx: TapSender, pattern: &str) -> Result<(), SendEr
 }
 
 /// Makes a `RouterSink` that relays `Log` as `TapPayload::Log` to a client.
-fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
+fn make_router(
+    mut tx: TapSender,
+    control_tx: ControlChannel,
+    sink_id: String,
+    component_name: String,
+) -> (fanout::RouterSink, ShutdownTx) {
+    let (shutdown_tx, mut shutdown_rx) = oneshot::channel();
     let (event_tx, mut event_rx) = futures_mpsc::unbounded();
-    let component_name = component_name.to_string();
 
     tokio::spawn(async move {
         debug!(message = "Spawned event handler.", component_name = ?component_name);
 
-        while let Some(ev) = event_rx.next().await {
-            if let Event::Log(ev) = ev {
-                if let Err(err) = tx.send(TapPayload::Log(component_name.clone(), ev)).await {
-                    debug!(
-                        message = "Couldn't send log event.",
-                        error = ?err,
-                        component_name = ?component_name);
+        loop {
+            tokio::select! {
+                _ = &mut shutdown_rx => {
+                    let _ = control_tx.send(fanout::ControlMessage::Remove(sink_id.to_string()));
                     break;
+                },
+                Some(ev) = event_rx.next() => {
+                    if let Event::Log(ev) = ev {
+                        if let Err(err) = tx.send(TapPayload::Log(component_name.clone(), ev)).await {
+                            debug!(
+                                message = "Couldn't send log event.",
+                                error = ?err,
+                                component_name = ?component_name);
+                        }
+                    }
                 }
             }
         }
@@ -115,7 +128,7 @@ fn make_router(mut tx: TapSender, component_name: &str) -> fanout::RouterSink {
         debug!(message = "Stopped event handler.", component_name = ?component_name);
     });
 
-    Box::new(event_tx.sink_map_err(|_| ()))
+    (Box::new(event_tx.sink_map_err(|_| ())), shutdown_tx)
 }
 
 /// Returns a tap handler that listens for topology changes, and connects sinks to observe
@@ -130,9 +143,6 @@ async fn tap_handler(
 
     // Sinks register for the current tap. Will be updated as new components match.
     let mut sinks = HashMap::new();
-
-    // Keep a copy of the last topology snapshot, for later clean-up.
-    let mut last_outputs = None;
 
     loop {
         tokio::select! {
@@ -164,16 +174,22 @@ async fn tap_handler(
                                 // reconfigured with the same name as a previous, and we are not
                                 // getting involved in config diffing at this point.
                                 let id = Uuid::new_v4().to_string();
-                                let sink = make_router(tx.clone(), name);
+                                let (sink, shutdown_tx) = make_router(
+                                    tx.clone(),
+                                    control_tx.clone(),
+                                    id.to_string(),
+                                    name.to_string(),
+                                );
 
                                 match control_tx.send(fanout::ControlMessage::Add(id.to_string(), sink)) {
                                     Ok(_) => {
                                         // (Over)write the sink entry.
+                                        sinks.insert(name.to_string(), shutdown_tx);
+
                                         debug!(
                                             message = "Component connected.",
                                             component_name = ?name, id = ?id
                                         );
-                                        sinks.insert(name.to_string(), id);
                                     }
                                     Err(err) => {
                                         error!(
@@ -206,9 +222,6 @@ async fn tap_handler(
                     }
                 });
 
-                // Keep the outputs for later clean-up when a shutdown is triggered.
-                last_outputs = Some(outputs);
-
                 // Send notifications to the client. The # of notifications will always be
                 // exactly equal to the number of patterns, so we can pre-allocate capacity.
                 let mut notifications = Vec::with_capacity(patterns.len());
@@ -228,21 +241,6 @@ async fn tap_handler(
                 if try_join_all(notifications).await.is_err() {
                     debug!("Couldn't send notification(s); tap gone away.");
                     break;
-                }
-            }
-        }
-    }
-
-    // At this point, the tap handler is being shut down due to the client/subscription
-    // going away. Clean up tap sinks by disconnecting them from the components being observed.
-    if let Some(outputs) = last_outputs {
-        for (name, id) in sinks {
-            if let Some(control_tx) = outputs.get(&name) {
-                if let Err(err) = control_tx.send(fanout::ControlMessage::Remove(id)) {
-                    error!(
-                        message = "Couldn't disconnect tap sink.",
-                        error = ?err,
-                        component_name = ?name);
                 }
             }
         }

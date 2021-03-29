@@ -817,27 +817,6 @@
           "possibleTypes": null
         },
         {
-          "description": "An event or a notification",
-          "enumValues": null,
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "kind": "UNION",
-          "name": "Event",
-          "possibleTypes": [
-            {
-              "kind": "OBJECT",
-              "name": "LogEvent",
-              "ofType": null
-            },
-            {
-              "kind": "OBJECT",
-              "name": "EventNotification",
-              "ofType": null
-            }
-          ]
-        },
-        {
           "description": "Encoding format for the event",
           "enumValues": [
             {
@@ -1816,7 +1795,7 @@
           "inputFields": null,
           "interfaces": [],
           "kind": "OBJECT",
-          "name": "LogEvent",
+          "name": "Log",
           "possibleTypes": null
         },
         {
@@ -2154,6 +2133,27 @@
           "kind": "OBJECT",
           "name": "NetworkMetrics",
           "possibleTypes": null
+        },
+        {
+          "description": "An event or a notification",
+          "enumValues": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "UNION",
+          "name": "OutputEventsPayload",
+          "possibleTypes": [
+            {
+              "kind": "OBJECT",
+              "name": "Log",
+              "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "EventNotification",
+              "ofType": null
+            }
+          ]
         },
         {
           "description": "Information about pagination in a connection",
@@ -3762,7 +3762,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "UNION",
-                      "name": "Event",
+                      "name": "OutputEventsPayload",
                       "ofType": null
                     }
                   }
