@@ -839,7 +839,6 @@ mod tests {
     #[test]
     fn filterlist_default_includes_everything() {
         let filters = FilterList::default();
-        assert!(filters.is_empty());
         assert!(filters.contains_test("anything"));
         assert!(filters.contains_test("should"));
         assert!(filters.contains_test("work"));
