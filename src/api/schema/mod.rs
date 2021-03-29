@@ -5,6 +5,7 @@ mod health;
 mod meta;
 mod metrics;
 mod relay;
+mod scalar;
 pub mod sort;
 
 use async_graphql::{EmptyMutation, MergedObject, MergedSubscription, Schema, SchemaBuilder};

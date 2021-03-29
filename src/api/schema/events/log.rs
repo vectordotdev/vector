@@ -1,10 +1,8 @@
 use super::EventEncodingType;
 use crate::{event, Value};
 
-use async_graphql::{scalar, Object};
+use async_graphql::Object;
 use chrono::{DateTime, Utc};
-
-scalar!(Value, "FieldValue", "Field value");
 
 #[derive(Debug)]
 pub struct Log {
@@ -57,8 +55,8 @@ impl Log {
         }
     }
 
-    /// Get field data on the log event
-    async fn field(&self, name: String) -> Option<&Value> {
-        self.event.get(name)
+    /// Get JSON field data on the log event, by field name
+    async fn json(&self, field: String) -> Option<&Value> {
+        self.event.get(field)
     }
 }
