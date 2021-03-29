@@ -3,6 +3,7 @@ use diagnostic::{DiagnosticError, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
 use std::fmt;
 
+mod abort;
 mod array;
 mod block;
 mod function_argument;
@@ -23,6 +24,7 @@ pub(crate) mod literal;
 pub(crate) mod predicate;
 pub(crate) mod query;
 
+pub use abort::Abort;
 pub use array::Array;
 pub use assignment::Assignment;
 pub use block::Block;
@@ -81,6 +83,7 @@ pub enum Expr {
     Variable(Variable),
     Noop(Noop),
     Unary(Unary),
+    Abort(Abort),
 }
 
 impl Expr {
@@ -104,6 +107,7 @@ impl Expr {
             Variable(..) => "variable call",
             Noop(..) => "noop",
             Unary(..) => "unary operation",
+            Abort(..) => "abort operation",
         }
     }
 }
@@ -123,6 +127,7 @@ impl Expression for Expr {
             Variable(v) => v.resolve(ctx),
             Noop(v) => v.resolve(ctx),
             Unary(v) => v.resolve(ctx),
+            Abort(v) => v.resolve(ctx),
         }
     }
 
@@ -140,6 +145,7 @@ impl Expression for Expr {
             Variable(v) => v.type_def(state),
             Noop(v) => v.type_def(state),
             Unary(v) => v.type_def(state),
+            Abort(v) => v.type_def(state),
         }
     }
 }
@@ -159,6 +165,7 @@ impl fmt::Display for Expr {
             Variable(v) => v.fmt(f),
             Noop(v) => v.fmt(f),
             Unary(v) => v.fmt(f),
+            Abort(v) => v.fmt(f),
         }
     }
 }
@@ -225,6 +232,12 @@ impl From<Unary> for Expr {
     }
 }
 
+impl From<Abort> for Expr {
+    fn from(abort: Abort) -> Self {
+        Expr::Abort(abort)
+    }
+}
+
 // -----------------------------------------------------------------------------
 
 #[derive(thiserror::Error, Debug)]
@@ -264,16 +277,19 @@ impl DiagnosticError for Error {
 
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Default, PartialEq)]
-pub struct ExpressionError {
-    pub message: String,
-    pub labels: Vec<Label>,
-    pub notes: Vec<Note>,
+#[derive(Debug, PartialEq)]
+pub enum ExpressionError {
+    Abort,
+    Error {
+        message: String,
+        labels: Vec<Label>,
+        notes: Vec<Note>,
+    },
 }
 
 impl std::fmt::Display for ExpressionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.message.fmt(f)
+        self.message().fmt(f)
     }
 }
 
@@ -289,23 +305,39 @@ impl DiagnosticError for ExpressionError {
     }
 
     fn message(&self) -> String {
-        self.message.clone()
+        use ExpressionError::*;
+
+        match self {
+            Abort => "aborted".to_owned(),
+            Error { message, .. } => message.clone(),
+        }
     }
 
     fn labels(&self) -> Vec<Label> {
-        self.labels.clone()
+        use ExpressionError::*;
+
+        match self {
+            Abort => vec![],
+            Error { labels, .. } => labels.clone(),
+        }
     }
 
     fn notes(&self) -> Vec<Note> {
-        self.notes.clone()
+        use ExpressionError::*;
+
+        match self {
+            Abort => vec![],
+            Error { notes, .. } => notes.clone(),
+        }
     }
 }
 
 impl From<String> for ExpressionError {
     fn from(message: String) -> Self {
-        ExpressionError {
+        ExpressionError::Error {
             message,
-            ..Default::default()
+            labels: vec![],
+            notes: vec![],
         }
     }
 }

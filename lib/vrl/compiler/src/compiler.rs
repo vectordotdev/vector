@@ -93,6 +93,7 @@ impl<'a> Compiler<'a> {
             FunctionCall(node) => self.compile_function_call(node).into(),
             Variable(node) => self.compile_variable(node).into(),
             Unary(node) => self.compile_unary(node).into(),
+            Abort(node) => self.compile_abort(node).into(),
         }
     }
 
@@ -379,6 +380,10 @@ impl<'a> Compiler<'a> {
             self.errors.push(Box::new(err));
             Not::noop()
         })
+    }
+
+    fn compile_abort(&mut self, _: Node<()>) -> Abort {
+        Abort
     }
 
     fn handle_parser_error(&mut self, error: parser::Error) {

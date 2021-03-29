@@ -209,6 +209,7 @@ pub enum Expr {
     FunctionCall(Node<FunctionCall>),
     Variable(Node<Ident>),
     Unary(Node<Unary>),
+    Abort(Node<()>),
 }
 
 impl fmt::Debug for Expr {
@@ -225,6 +226,7 @@ impl fmt::Debug for Expr {
             FunctionCall(v) => format!("{:?}", v),
             Variable(v) => format!("{:?}", v),
             Unary(v) => format!("{:?}", v),
+            Abort(_) => "abort".to_owned(),
         };
 
         write!(f, "Expr({})", value)
@@ -245,6 +247,7 @@ impl fmt::Display for Expr {
             FunctionCall(v) => v.fmt(f),
             Variable(v) => v.fmt(f),
             Unary(v) => v.fmt(f),
+            Abort(_) => f.write_str("abort"),
         }
     }
 }
