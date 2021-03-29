@@ -53,6 +53,7 @@ criterion_group!(
               parse_grok,
               parse_key_value,
               parse_json,
+              parse_query_string,
               parse_regex,
               parse_regex_all,
               parse_syslog,
@@ -759,6 +760,18 @@ bench_function! {
             tag: "stopping_fetchers",
             id: "ConsumerFetcherManager-1382721708341",
             module: "kafka.consumer.ConsumerFetcherManager"
+        }))
+    }
+}
+
+bench_function! {
+    parse_query_string => vrl_stdlib::ParseQueryString;
+
+    literal {
+        args: func_args![value: "foo=%2B1&bar=2"],
+        want: Ok(value!({
+            foo: "+1",
+            bar: "2",
         }))
     }
 }

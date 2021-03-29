@@ -3,9 +3,12 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use glob::glob;
 use std::str::FromStr;
 use structopt::StructOpt;
-use vrl::{diagnostic::Formatter, state, Runtime, Value};
+use vrl::{diagnostic::Formatter, state, Runtime, Terminate, Value};
 
 use vrl_tests::{docs, Test};
+
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "VRL Tests", about = "Vector Remap Language Tests")]
@@ -24,10 +27,33 @@ pub struct Cmd {
 
     #[structopt(long)]
     skip_functions: bool,
+
+    /// When enabled, any log output at the INFO or above level is printed
+    /// during the test run.
+    #[structopt(short, long)]
+    logging: bool,
+}
+
+fn should_run(name: &str, pat: &Option<String>) -> bool {
+    if name == "tests/example.vrl" {
+        return false;
+    }
+
+    if let Some(pat) = pat {
+        if !name.contains(pat) {
+            return false;
+        }
+    }
+
+    true
 }
 
 fn main() {
     let cmd = Cmd::from_args();
+
+    if cmd.logging {
+        tracing_subscriber::fmt::init();
+    }
 
     let mut failed_count = 0;
     let mut category = "".to_owned();
@@ -37,17 +63,6 @@ fn main() {
         .into_iter()
         .filter_map(|entry| {
             let path = entry.ok()?;
-
-            if &path.to_string_lossy() == "tests/example.vrl" {
-                return None;
-            }
-
-            if let Some(pat) = &cmd.pattern {
-                if !path.to_string_lossy().contains(pat) {
-                    return None;
-                }
-            }
-
             Some(Test::from_path(&path))
         })
         .chain({
@@ -69,11 +84,12 @@ fn main() {
             tests.into_iter()
         })
         .chain(docs::tests().into_iter())
+        .filter(|test| should_run(&format!("{}/{}", test.category, test.name), &cmd.pattern))
         .collect::<Vec<_>>();
 
     for mut test in tests {
         if category != test.category {
-            category = test.category;
+            category = test.category.clone();
             println!("{}", Colour::Fixed(3).bold().paint(category.to_string()));
         }
 
@@ -99,7 +115,7 @@ fn main() {
         let mut runtime = Runtime::new(state);
         let program = vrl::compile(&test.source, &stdlib::all());
 
-        let want = test.result;
+        let want = test.result.clone();
 
         match program {
             Ok(program) => {
@@ -173,6 +189,32 @@ fn main() {
                                 || got == want
                             {
                                 println!("{}", Colour::Green.bold().paint("OK"));
+                            } else if err == Terminate::Abort {
+                                let want =
+                                    match serde_json::from_str::<'_, serde_json::Value>(&want) {
+                                        Ok(want) => want,
+                                        Err(err) => {
+                                            eprintln!("{}", err);
+                                            want.into()
+                                        }
+                                    };
+
+                                let got = vrl_value_to_json_value(test.object.clone());
+                                if got == want {
+                                    println!("{} (abort)", Colour::Green.bold().paint("OK"));
+                                } else {
+                                    println!("{} (abort)", Colour::Red.bold().paint("FAILED"));
+                                    failed_count += 1;
+
+                                    if !cmd.no_diff {
+                                        let want = serde_json::to_string_pretty(&want).unwrap();
+                                        let got = serde_json::to_string_pretty(&got).unwrap();
+                                        let diff = prettydiff::diff_lines(&want, &got);
+                                        println!("{}", diff);
+                                    }
+
+                                    failed = true;
+                                }
                             } else {
                                 println!("{} (runtime)", Colour::Red.bold().paint("FAILED"));
                                 failed_count += 1;

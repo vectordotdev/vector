@@ -214,6 +214,7 @@ fn apache_metrics(
                                 emit!(ApacheMetricsEventReceived {
                                     byte_size,
                                     count: metrics.len(),
+                                    uri: &sanitized_url,
                                 });
                                 Some(stream::iter(metrics).map(Event::Metric).map(Ok))
                             }

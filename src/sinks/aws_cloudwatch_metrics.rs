@@ -240,8 +240,8 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
         }
 
         let input = PutMetricDataInput {
-            namespace,
             metric_data,
+            namespace,
         };
 
         debug!(message = "Sending data.", input = ?input);

@@ -1,1 +1,1 @@
-FROM rustembedded/cross:armv7-unknown-linux-musleabihf
+FROM docker.io/rustembedded/cross:armv7-unknown-linux-musleabihf

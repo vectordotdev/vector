@@ -2,7 +2,8 @@ use crate::{
     config::{self, GlobalOptions, SourceConfig, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
-        MongoDBMetricsBsonParseError, MongoDBMetricsCollectCompleted, MongoDBMetricsRequestError,
+        MongoDBMetricsBsonParseError, MongoDBMetricsCollectCompleted, MongoDBMetricsEventsReceived,
+        MongoDBMetricsRequestError,
     },
     shutdown::ShutdownSignal,
     Event, Pipeline,
@@ -20,7 +21,7 @@ use mongodb::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::BTreeMap, future::ready, time::Instant};
+use std::{collections::BTreeMap, time::Instant};
 use tokio::time;
 
 mod types;
@@ -134,7 +135,11 @@ impl SourceConfig for MongoDBMetricsConfig {
                     end: Instant::now()
                 });
 
-                let mut stream = stream::iter(metrics).flatten().map(Event::Metric).map(Ok);
+                let mut stream = stream::iter(metrics)
+                    .map(stream::iter)
+                    .flatten()
+                    .map(Event::Metric)
+                    .map(Ok);
                 out.send_all(&mut stream).await?;
             }
 
@@ -230,9 +235,9 @@ impl MongoDBMetrics {
             .with_timestamp(Some(Utc::now()))
     }
 
-    async fn collect(&self) -> stream::BoxStream<'static, Metric> {
+    async fn collect(&self) -> Vec<Metric> {
         // `up` metric is `1` if collection is successful, otherwise `0`.
-        let (up_value, metrics) = match self.collect_server_status().await {
+        let (up_value, mut metrics) = match self.collect_server_status().await {
             Ok(metrics) => (1.0, metrics),
             Err(error) => {
                 match error {
@@ -250,13 +255,14 @@ impl MongoDBMetrics {
             }
         };
 
-        stream::once(ready(self.create_metric(
-            "up",
-            gauge!(up_value),
-            tags!(self.tags),
-        )))
-        .chain(stream::iter(metrics))
-        .boxed()
+        metrics.push(self.create_metric("up", gauge!(up_value), tags!(self.tags)));
+
+        emit!(MongoDBMetricsEventsReceived {
+            count: metrics.len(),
+            uri: &self.endpoint,
+        });
+
+        metrics
     }
 
     /// Collect metrics from `serverStatus` command.

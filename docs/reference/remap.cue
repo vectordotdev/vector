@@ -31,12 +31,13 @@ package metadata
 	description: string
 	errors:      _
 	examples: [#Example, ...#Example]
-	expressions: _
-	features:    _
-	functions:   _
-	literals:    _
-	principles:  _
-	syntax:      _
+	expressions:  _
+	features:     _
+	functions:    _
+	how_it_works: #HowItWorks
+	literals:     _
+	principles:   _
+	syntax:       _
 }
 
 remap: #Remap & {
@@ -213,13 +214,13 @@ remap: #Remap & {
 				"""
 		},
 		{
-			title: "Unhandled error"
+			title: "Unhandled fallible assignment"
 			input: log: message: "key1=value1 key2=value2"
 			source: """
 				structured = parse_key_value(.message)
 				"""
 			raises: compiletime: """
-				error[E103]: unhandled error
+				error[E103]: unhandled fallible assignment
 				  ┌─ :1:14
 				  │
 				1 │ structured = parse_key_value(.message)
@@ -236,4 +237,16 @@ remap: #Remap & {
 				"""
 		},
 	]
+
+	how_it_works: {
+		event_data_model: {
+			title: "Event Data Model"
+			body:  """
+				You can use the `remap` transform with both log and metric events. Log events in the `remap` transform
+				correspond directly to Vector's [log schem](\(urls.vector_log)), which means that the transform has
+				access to the whole event. With metric events, however, the remap transform only has access to the
+				event's tags.
+				"""
+		}
+	}
 }

@@ -616,7 +616,7 @@ mod tests {
         let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
 {"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
 "#;
-        assert_eq!(std::str::from_utf8(&encoded).unwrap(), &expected[..]);
+        assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     }
 
     #[test]
@@ -668,7 +668,7 @@ mod tests {
         let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
 {"foo":"bar","message":"hello there"}
 "#;
-        assert_eq!(std::str::from_utf8(&encoded).unwrap(), &expected[..]);
+        assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     }
 
     #[test]

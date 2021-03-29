@@ -69,7 +69,7 @@ impl PodMetadataAnnotator {
     /// Annotates an event with the information from the [`Pod::metadata`].
     /// The event has to be obtained from kubernetes log file, and have a
     /// [`FILE_KEY`] field set with a file that the line came from.
-    pub fn annotate(&self, event: &mut Event, file: &str) -> Option<()> {
+    pub fn annotate<'a>(&self, event: &mut Event, file: &'a str) -> Option<LogFileInfo<'a>> {
         let log = event.as_mut_log();
         let file_info = parse_log_file_path(file)?;
         let guard = self.pods_state_reader.get(file_info.pod_uid)?;
@@ -103,7 +103,7 @@ impl PodMetadataAnnotator {
                 }
             }
         }
-        Some(())
+        Some(file_info)
     }
 }
 
@@ -404,8 +404,7 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    let mut ips_vec = Vec::new();
-                    ips_vec.push("192.168.1.2");
+                    let ips_vec = vec!["192.168.1.2"];
                     log.insert("kubernetes.pod_ips", ips_vec);
                     log
                 },
@@ -431,9 +430,7 @@ mod tests {
                 {
                     let mut log = LogEvent::default();
                     log.insert("kubernetes.custom_pod_ip", "192.168.1.2");
-                    let mut ips_vec = Vec::new();
-                    ips_vec.push("192.168.1.2");
-                    ips_vec.push("192.168.1.3");
+                    let ips_vec = vec!["192.168.1.2", "192.168.1.3"];
                     log.insert("kubernetes.custom_pod_ips", ips_vec);
                     log
                 },
@@ -458,9 +455,7 @@ mod tests {
                 {
                     let mut log = LogEvent::default();
                     log.insert("kubernetes.pod_ip", "192.168.1.2");
-                    let mut ips_vec = Vec::new();
-                    ips_vec.push("192.168.1.2");
-                    ips_vec.push("192.168.1.3");
+                    let ips_vec = vec!["192.168.1.2", "192.168.1.3"];
                     log.insert("kubernetes.pod_ips", ips_vec);
                     log
                 },

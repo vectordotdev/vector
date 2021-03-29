@@ -1,5 +1,5 @@
 use crate::expression::*;
-use crate::{Function, Program, State};
+use crate::{Function, Program, State, Value};
 use chrono::{TimeZone, Utc};
 use diagnostic::DiagnosticError;
 use ordered_float::NotNan;
@@ -12,6 +12,7 @@ pub struct Compiler<'a> {
     fns: &'a [Box<dyn Function>],
     state: &'a mut State,
     errors: Errors,
+    fallible: bool,
 }
 
 impl<'a> Compiler<'a> {
@@ -20,6 +21,7 @@ impl<'a> Compiler<'a> {
             fns,
             state,
             errors: vec![],
+            fallible: false,
         }
     }
 
@@ -34,7 +36,10 @@ impl<'a> Compiler<'a> {
             return Err(self.errors);
         }
 
-        Ok(Program(expressions))
+        Ok(Program {
+            expressions,
+            fallible: self.fallible,
+        })
     }
 
     fn compile_root_exprs(
@@ -88,6 +93,7 @@ impl<'a> Compiler<'a> {
             FunctionCall(node) => self.compile_function_call(node).into(),
             Variable(node) => self.compile_variable(node).into(),
             Unary(node) => self.compile_unary(node).into(),
+            Abort(node) => self.compile_abort(node).into(),
         }
     }
 
@@ -255,12 +261,22 @@ impl<'a> Compiler<'a> {
                     AssignmentOp::Assign => {
                         let expr =
                             Box::new(expr.map(|node| self.compile_expr(Node::new(span, node))));
-                        let node = Variant::Infallible { ok, err, expr };
+                        let node = Variant::Infallible {
+                            ok,
+                            err,
+                            expr,
+                            default: Value::Null,
+                        };
                         Node::new(span, node)
                     }
                     AssignmentOp::Merge => {
                         let expr = self.rewrite_to_merge(span, &ok, expr);
-                        let node = Variant::Infallible { ok, err, expr };
+                        let node = Variant::Infallible {
+                            ok,
+                            err,
+                            expr,
+                            default: Value::Null,
+                        };
 
                         Node::new(span, node)
                     }
@@ -317,6 +333,10 @@ impl<'a> Compiler<'a> {
             .map(|node| Node::new(node.span(), self.compile_function_argument(node)))
             .collect();
 
+        if abort_on_error {
+            self.fallible = true;
+        }
+
         FunctionCall::new(
             call_span,
             ident,
@@ -360,6 +380,10 @@ impl<'a> Compiler<'a> {
             self.errors.push(Box::new(err));
             Not::noop()
         })
+    }
+
+    fn compile_abort(&mut self, _: Node<()>) -> Abort {
+        Abort
     }
 
     fn handle_parser_error(&mut self, error: parser::Error) {

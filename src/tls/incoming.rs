@@ -152,7 +152,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
             ),
             None => StreamState::Accepted(MaybeTlsStream::Raw(stream)),
         };
-        Self { peer_addr, state }
+        Self { state, peer_addr }
     }
 
     // Explicit handshake method

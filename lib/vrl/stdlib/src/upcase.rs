@@ -48,25 +48,17 @@ impl Expression for UpcaseFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
-//     use std::convert::TryFrom;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![
-//         string {
-//             expr: |_| UpcaseFn { value: Literal::from("foo").boxed() },
-//             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-//         }
+    test_function![
+        upcase => Upcase;
 
-//         non_string {
-//             expr: |_| UpcaseFn { value: Literal::from(true).boxed() },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Bytes,
-//                 ..Default::default()
-//             },
-//         }
-//     ];
-// }
+        simple {
+            args: func_args![value: "FOO 2 bar"],
+            want: Ok(value!("FOO 2 BAR")),
+            tdef: TypeDef::new().bytes(),
+        }
+    ];
+}

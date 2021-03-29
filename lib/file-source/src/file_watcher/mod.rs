@@ -1,5 +1,6 @@
+use crate::buffer::read_until_with_max_size;
+use crate::metadata_ext::PortableFileExt;
 use crate::{FilePosition, ReadFrom};
-use bstr::Finder;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use flate2::bufread::MultiGzDecoder;
@@ -9,8 +10,9 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
-
-use crate::metadata_ext::PortableFileExt;
+use tracing::debug;
+#[cfg(test)]
+mod tests;
 
 /// The `FileWatcher` struct defines the polling based state machine which reads
 /// from a file path, transparently updating the underlying file descriptor when
@@ -220,18 +222,22 @@ impl FileWatcher {
         }
     }
 
+    #[inline]
     fn track_read_attempt(&mut self) {
         self.last_read_attempt = Instant::now();
     }
 
+    #[inline]
     fn track_read_success(&mut self) {
         self.last_read_success = Instant::now();
     }
 
+    #[inline]
     pub fn last_read_success(&self) -> Instant {
         self.last_read_success
     }
 
+    #[inline]
     pub fn should_read(&self) -> bool {
         self.last_read_success.elapsed() < Duration::from_secs(10)
             || self.last_read_attempt.elapsed() > Duration::from_secs(10)
@@ -240,153 +246,11 @@ impl FileWatcher {
 
 fn is_gzipped(r: &mut io::BufReader<fs::File>) -> io::Result<bool> {
     let header_bytes = r.fill_buf()?;
+    // WARN: The paired `BufReader::consume` is not called intentionally. If we
+    // do we'll chop a decent part of the potential gzip stream off.
     Ok(header_bytes.starts_with(&[0x1f, 0x8b]))
 }
 
 fn null_reader() -> impl BufRead {
     io::Cursor::new(Vec::new())
-}
-
-// Tweak of https://github.com/rust-lang/rust/blob/bf843eb9c2d48a80a5992a5d60858e27269f9575/src/libstd/io/mod.rs#L1471
-// After more than max_size bytes are read as part of a single line, this discard the remaining bytes
-// in that line, and then starts again on the next line.
-fn read_until_with_max_size<R: BufRead + ?Sized>(
-    r: &mut R,
-    p: &mut FilePosition,
-    delim: &[u8],
-    buf: &mut BytesMut,
-    max_size: usize,
-) -> io::Result<Option<usize>> {
-    let mut total_read = 0;
-    let mut discarding = false;
-    let delim_finder = Finder::new(delim);
-    let delim_len = delim.len();
-    loop {
-        let available = match r.fill_buf() {
-            Ok(n) => n,
-            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
-            Err(e) => return Err(e),
-        };
-
-        let (done, used) = {
-            match delim_finder.find(available) {
-                Some(i) => {
-                    if !discarding {
-                        buf.extend_from_slice(&available[..i]);
-                    }
-                    (true, i + delim_len)
-                }
-                None => {
-                    if !discarding {
-                        buf.extend_from_slice(available);
-                    }
-                    (false, available.len())
-                }
-            }
-        };
-        r.consume(used);
-        *p += used as u64; // do this at exactly same time
-        total_read += used;
-
-        if !discarding && buf.len() > max_size {
-            warn!(
-                message = "Found line that exceeds max_line_bytes; discarding.",
-                internal_log_rate_secs = 30
-            );
-            discarding = true;
-        }
-
-        if done {
-            if !discarding {
-                return Ok(Some(total_read));
-            } else {
-                discarding = false;
-                buf.clear();
-            }
-        } else if used == 0 {
-            // We've hit EOF but not yet seen a newline. This can happen when unlucky timing causes
-            // us to observe an incomplete write. We return None here and let the loop continue
-            // next time the method is called. This is safe because the buffer is specific to this
-            // FileWatcher.
-            return Ok(None);
-        }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::read_until_with_max_size;
-    use bytes::BytesMut;
-    use std::io::Cursor;
-
-    #[test]
-    fn test_read_until_with_max_size() {
-        let mut buf = Cursor::new(&b"12"[..]);
-        let mut pos = 0;
-        let mut v = BytesMut::new();
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"3", &mut v, 1000).unwrap();
-        assert_eq!(pos, 2);
-        assert_eq!(p, None);
-        assert_eq!(&*v, b"12");
-        let mut buf = Cursor::new(&b"34"[..]);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"3", &mut v, 1000).unwrap();
-        assert_eq!(pos, 3);
-        assert_eq!(p, Some(1));
-        assert_eq!(&*v, b"12");
-
-        let mut buf = Cursor::new(&b"1233"[..]);
-        let mut pos = 0;
-        let mut v = BytesMut::new();
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"3", &mut v, 1000).unwrap();
-        assert_eq!(pos, 3);
-        assert_eq!(p, Some(3));
-        assert_eq!(&*v, b"12");
-        v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"3", &mut v, 1000).unwrap();
-        assert_eq!(pos, 4);
-        assert_eq!(p, Some(1));
-        assert_eq!(&*v, b"");
-        v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"3", &mut v, 1000).unwrap();
-        assert_eq!(pos, 4);
-        assert_eq!(p, None);
-        assert_eq!(&*v, [0; 0]);
-
-        let mut buf = Cursor::new(&b"short\nthis is too long\nexact size\n11 eleven11\n"[..]);
-        let mut pos = 0;
-        let mut v = BytesMut::new();
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"\n", &mut v, 10).unwrap();
-        assert_eq!(pos, 6);
-        assert_eq!(p, Some(6));
-        assert_eq!(&*v, b"short");
-        v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"\n", &mut v, 10).unwrap();
-        assert_eq!(pos, 34);
-        assert_eq!(p, Some(28));
-        assert_eq!(&*v, b"exact size");
-        v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"\n", &mut v, 10).unwrap();
-        assert_eq!(pos, 46);
-        assert_eq!(p, None);
-        assert_eq!(&*v, [0; 0]);
-
-        let mut buf =
-            Cursor::new(&b"short\r\nthis is too long\r\nexact size\r\n11 eleven11\r\n"[..]);
-        let mut pos = 0;
-        let mut v = BytesMut::new();
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"\r\n", &mut v, 10).unwrap();
-        assert_eq!(pos, 7);
-        assert_eq!(p, Some(7));
-        assert_eq!(&*v, b"short");
-        v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"\r\n", &mut v, 10).unwrap();
-        assert_eq!(pos, 37);
-        assert_eq!(p, Some(30));
-        assert_eq!(&*v, b"exact size");
-        v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b"\r\n", &mut v, 10).unwrap();
-        assert_eq!(pos, 50);
-        assert_eq!(p, None);
-        assert_eq!(&*v, [0; 0]);
-    }
 }

@@ -254,6 +254,7 @@ components: sources: http: {
 	]
 
 	telemetry: metrics: {
+		events_in_total:         components.sources.internal_metrics.output.metrics.events_in_total
 		http_bad_requests_total: components.sources.internal_metrics.output.metrics.http_bad_requests_total
 		parse_errors_total:      components.sources.internal_metrics.output.metrics.parse_errors_total
 	}

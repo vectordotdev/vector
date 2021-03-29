@@ -122,6 +122,10 @@ impl Test {
 }
 
 fn test_category(path: &Path) -> String {
+    if path.as_os_str() == "tests/example.vrl" {
+        return "".to_owned();
+    }
+
     path.to_string_lossy()
         .strip_prefix("tests/")
         .expect("test")
