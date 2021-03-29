@@ -546,13 +546,10 @@ impl HostMetricsConfig {
                     .filter_map(|partition| async { partition })
                     // Filter on configured devices
                     .map(|partition| {
-                        (self.filesystem.devices.is_empty()
-                            && partition
-                                .device()
-                                .map(|device| {
-                                    self.filesystem.devices.contains_path(device.as_ref())
-                                })
-                                .unwrap_or(true))
+                        (partition
+                            .device()
+                            .map(|device| self.filesystem.devices.contains_path(device.as_ref()))
+                            .unwrap_or(true))
                         .then(|| partition)
                     })
                     .filter_map(|partition| async { partition })
@@ -1215,6 +1212,7 @@ mod tests {
             .await;
 
             assert!(filtered_metrics_with.len() <= all_metrics.len());
+            assert!(filtered_metrics_with.len() > 0);
             assert!(all_tags_match(&filtered_metrics_with, tag, |s| s == key));
 
             let filtered_metrics_with_match = get_metrics(FilterList {
