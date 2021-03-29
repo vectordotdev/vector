@@ -208,9 +208,6 @@ enum State {
 struct SyslogDecoder {
     other: LinesCodec,
     octet_decoding: Option<State>,
-    //is_discarding: bool,
-    //discard_chars: Option<usize>,
-    //in_octet: bool,
 }
 
 impl SyslogDecoder {
@@ -218,9 +215,6 @@ impl SyslogDecoder {
         Self {
             other: LinesCodec::new_with_max_length(max_length),
             octet_decoding: None,
-            //is_discarding: false,
-            //discard_chars: None,
-            //in_octet: false,
         }
     }
 
@@ -244,8 +238,6 @@ impl SyslogDecoder {
         let newline_pos = src.iter().position(|&b| b == b'\n');
 
         match (
-            // self.is_discarding,
-            // self.discard_chars,
             state,
             newline_pos,
             space_pos,
@@ -255,9 +247,6 @@ impl SyslogDecoder {
                 // There are enough chars in this frame to discard
                 src.advance(chars);
                 self.octet_decoding = None;
-                // self.is_discarding = false;
-                // self.in_octet = false;
-                // self.discard_chars = None;
                 Err(LinesCodecError::Io(io::Error::new(
                     io::ErrorKind::Other,
                     "Frame length limit exceeded",
@@ -268,7 +257,6 @@ impl SyslogDecoder {
                 // We have a certain number of chars to discard.
                 // There aren't enough in this frame so we need to discard
                 // The entire frame and adjust the amount to discard accordingly.
-                //self.discard_chars = Some(src.len() - chars);
                 self.octet_decoding = Some(State::Discarding(src.len() - chars));
                 src.advance(src.len());
                 Ok(None)
@@ -277,8 +265,6 @@ impl SyslogDecoder {
             (State::DiscardingToEOL, Some(offset), _) => {
                 // When discarding we keep discarding to the next newline.
                 src.advance(offset + 1);
-                // self.is_discarding = false;
-                // self.in_octet = false;
                 self.octet_decoding = None;
                 Err(LinesCodecError::Io(io::Error::new(
                     io::ErrorKind::Other,
@@ -298,7 +284,6 @@ impl SyslogDecoder {
                 // Everything looks good. We aren't discarding, we have a space that is not beyond our
                 // maximum length. Attempt to parse the bytes as a number which will hopefully
                 // give us a sensible length for our message.
-
                 let len: usize = match std::str::from_utf8(&src[..space_pos])
                     .map_err(|_| ())
                     .and_then(|num| num.parse().map_err(|_| ()))
@@ -323,8 +308,6 @@ impl SyslogDecoder {
                 if len > self.other.max_length() {
                     // The length is greater than we want.
                     // We need to discard the entire message.
-                    // self.is_discarding = true;
-                    // self.discard_chars = Some(len);
                     self.octet_decoding = Some(State::Discarding(len));
                     src.advance(space_pos + 1);
 
@@ -376,7 +359,6 @@ impl SyslogDecoder {
             (State::NotDiscarding, None, _) => {
                 // There is no newline in this frame and we have more data than we want to handle.
                 // Advance as far as we can to discard the entire frame.
-                // self.is_discarding = true;
                 self.octet_decoding = Some(State::DiscardingToEOL);
                 src.advance(src.len());
                 Ok(None)
@@ -394,7 +376,6 @@ impl SyslogDecoder {
                 // First character is non zero number so we can assume that
                 // octet count framing is used.
                 trace!("Octet counting encoded event detected.");
-                // self.in_octet = true;
                 self.octet_decoding = Some(State::NotDiscarding);
             }
         }
