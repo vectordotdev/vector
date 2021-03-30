@@ -22,7 +22,10 @@ components: sinks: console: {
 				codec: {
 					enabled: true
 					default: null
-					enum: ["json", "text"]
+					enum: {
+						json: "Whole event will be encoded"
+						text: "For logs, only message field will be encoded"
+					}
 				}
 			}
 			request: enabled: false
