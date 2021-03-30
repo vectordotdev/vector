@@ -175,15 +175,11 @@ fn kafka_source(
                             // Add source type
                             log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
 
-                            match msg.key() {
-                                None => (),
-                                Some(key) => {
-                                    log.insert(
-                                        &key_field,
-                                        Value::from(String::from_utf8_lossy(key).to_string()),
-                                    );
-                                }
-                            }
+                            let msg_key = msg
+                                .key()
+                                .map(|key| Value::from(String::from_utf8_lossy(key).to_string()))
+                                .unwrap_or(Value::Null);
+                            log.insert(&key_field, msg_key);
 
                             log.insert(&topic_key, Value::from(msg.topic().to_string()));
 
