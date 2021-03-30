@@ -8336,7 +8336,6 @@ dependencies = [
  "syslog",
  "syslog_loose",
  "tempfile",
- "thread_local",
  "tokio 0.2.25",
  "tokio-openssl",
  "tokio-postgres",
