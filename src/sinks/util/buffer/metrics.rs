@@ -354,7 +354,10 @@ fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::event::metric::{MetricKind::*, MetricValue, StatisticKind};
+    use crate::event::{
+        metric::{MetricKind::*, MetricValue, StatisticKind},
+        EventMetadata,
+    };
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
 
@@ -889,36 +892,44 @@ mod test {
     }
 
     fn sample_counter(num: usize, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
-        Metric::new(
+        Metric::new_with_metadata(
             format!("counter-{}", num),
             kind,
             MetricValue::Counter { value },
+            EventMetadata::test_default(),
         )
         .with_tags(Some(tag(tagstr)))
     }
 
     fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
-        Metric::new(format!("gauge-{}", num), kind, MetricValue::Gauge { value })
+        Metric::new_with_metadata(
+            format!("gauge-{}", num),
+            kind,
+            MetricValue::Gauge { value },
+            EventMetadata::test_default(),
+        )
     }
 
     fn sample_set<T: ToString>(num: usize, kind: MetricKind, values: &[T]) -> Metric {
-        Metric::new(
+        Metric::new_with_metadata(
             format!("set-{}", num),
             kind,
             MetricValue::Set {
                 values: values.iter().map(|s| s.to_string()).collect(),
             },
+            EventMetadata::test_default(),
         )
     }
 
     fn sample_distribution_histogram(num: u32, kind: MetricKind, rate: u32) -> Metric {
-        Metric::new(
+        Metric::new_with_metadata(
             format!("dist-{}", num),
             kind,
             MetricValue::Distribution {
                 samples: crate::samples![num as f64 => rate],
                 statistic: StatisticKind::Histogram,
             },
+            EventMetadata::test_default(),
         )
     }
 
@@ -929,7 +940,7 @@ mod test {
         cfactor: u32,
         sum: f64,
     ) -> Metric {
-        Metric::new(
+        Metric::new_with_metadata(
             format!("buckets-{}", num),
             kind,
             MetricValue::AggregatedHistogram {
@@ -941,11 +952,12 @@ mod test {
                 count: 7 * cfactor,
                 sum,
             },
+            EventMetadata::test_default(),
         )
     }
 
     fn sample_aggregated_summary(num: u32, kind: MetricKind, factor: f64) -> Metric {
-        Metric::new(
+        Metric::new_with_metadata(
             format!("quantiles-{}", num),
             kind,
             MetricValue::AggregatedSummary {
@@ -957,6 +969,7 @@ mod test {
                 count: factor as u32 * 10,
                 sum: factor * 7.0,
             },
+            EventMetadata::test_default(),
         )
     }
 }
