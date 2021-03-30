@@ -12,6 +12,7 @@ use futures::{
     task::Poll,
     FutureExt, Sink, SinkExt, StreamExt,
 };
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
@@ -407,31 +408,51 @@ impl<T> Sink<T> for DeadSink<T> {
 /// process fork. This allows us to test functionality without conflicting with global
 /// state that may have been set/mutated from previous tests
 pub fn fork_test<T: std::future::Future<Output = ()>>(test_name: &'static str, fut: T) {
+    lazy_static! {
+        static ref MUTEX: Mutex<()> = Mutex::new(());
+    }
+
+    println!("fork_test 0: {}", test_name);
+
+    let _lock = MUTEX.lock();
+
     let fork_id = rusty_fork::rusty_fork_id!();
+
+    println!("fork_test 1: {}", test_name);
 
     rusty_fork::fork(
         test_name,
         fork_id,
         |_| {},
         |child, f| {
+            println!("fork_test parent 1: {}", test_name);
             let status = child.wait().expect("Couldn't wait for child process");
+            println!("fork_test parent 2: {}", test_name);
 
             // Copy all output
             let mut stdout = io::stdout();
             io::copy(f, &mut stdout).expect("Couldn't write to stdout");
+            println!("fork_test parent 3: {}", test_name);
 
             // If the test failed, panic on the parent thread
             if !status.success() {
+                println!("fork_test parent 4: {}", test_name);
                 panic!("Test failed");
             }
+            println!("fork_test parent 5: {}", test_name);
         },
         || {
+            println!("fork_test child 1: {}", test_name);
             // Since we are spawning the runtime from within a forked process, use one worker less
             // to account for the additional process.
             // This adjustment mainly serves to not overload CI workers with low resources.
             let rt = runtime_constrained(std::cmp::max(1, num_cpus::get() - 1));
+            println!("fork_test child 2: {}", test_name);
             rt.block_on(fut);
+            println!("fork_test child 3: {}", test_name);
         },
     )
     .expect("Couldn't fork test");
+
+    println!("fork_test 2: {}", test_name);
 }
