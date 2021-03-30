@@ -65,7 +65,7 @@ components: transforms: route: {
 	}
 
 	input: {
-		logs:    true
+		logs: true
 		metrics: {
 			counter:      true
 			distribution: true
