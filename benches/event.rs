@@ -13,7 +13,7 @@ use vector::{
 fn benchmark_event_iterate(c: &mut Criterion) {
     let mut group = c.benchmark_group("event/iterate");
 
-    event.bench_function("single-level", |b| {
+    group.bench_function("single-level", |b| {
         b.iter_batched_ref(
             || {
                 create_event(json!({
@@ -27,7 +27,7 @@ fn benchmark_event_iterate(c: &mut Criterion) {
         )
     });
 
-    c.bench_function("nested-keys", |b| {
+    group.bench_function("nested-keys", |b| {
         b.iter_batched_ref(
             || {
                 create_event(json!({
@@ -45,7 +45,7 @@ fn benchmark_event_iterate(c: &mut Criterion) {
         )
     });
 
-    c.bench_function("array", |b| {
+    group.bench_function("array", |b| {
         b.iter_batched_ref(
             || {
                 create_event(json!({
@@ -75,7 +75,7 @@ fn benchmark_event_create(c: &mut Criterion) {
         })
     });
 
-    event.bench_function("nested-keys", |b| {
+    group.bench_function("nested-keys", |b| {
         b.iter(|| {
             let mut log = Event::new_empty_log().into_log();
             log.insert("key1.nested1.nested2", Bytes::from("value1"));
@@ -83,7 +83,7 @@ fn benchmark_event_create(c: &mut Criterion) {
             log.insert("key3", Bytes::from("value3"));
         })
     });
-    c.bench_function("array", |b| {
+    group.bench_function("array", |b| {
         b.iter(|| {
             let mut log = Event::new_empty_log().into_log();
             log.insert("key1.nested1[0]", Bytes::from("value1"));
