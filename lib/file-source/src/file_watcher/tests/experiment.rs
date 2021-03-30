@@ -23,7 +23,7 @@ use std::os::windows::fs::MetadataExt;
 // What we can do, though, is drive our FWFile model and the SUT at the same
 // time, recording the total number of reads/writes. The SUT reads should be
 // bounded below by the model reads, bounded above by the writes.
-fn experiment(actions: Vec<FWAction>) {
+fn experiment(actions: Vec<FileWatcherAction>) {
     let dir = tempfile::TempDir::new().expect("could not create tempdir");
     let path = dir.path().join("a_file.log");
     let mut fp = fs::File::create(&path).expect("could not create");
@@ -41,18 +41,17 @@ fn experiment(actions: Vec<FWAction>) {
     let mut sut_reads = 0;
     let mut model_reads = 0;
 
-    let mut fwfiles: Vec<FWFile> = vec![];
-    fwfiles.push(FWFile::new());
+    let mut fwfiles: Vec<FileWatcherFile> = vec![FileWatcherFile::new()];
     let mut read_index = 0;
     for action in actions.iter() {
         match *action {
-            FWAction::DeleteFile => {
+            FileWatcherAction::DeleteFile => {
                 let _ = fs::remove_file(&path);
                 assert!(!path.exists());
                 fwfiles[0].reset();
                 break;
             }
-            FWAction::TruncateFile => {
+            FileWatcherAction::TruncateFile => {
                 fwfiles[0].truncate();
                 fp = fs::OpenOptions::new()
                     .read(true)
@@ -69,25 +68,25 @@ fn experiment(actions: Vec<FWAction>) {
                 );
                 assert!(path.exists());
             }
-            FWAction::Pause(ps) => delay(ps),
-            FWAction::Exit => break,
-            FWAction::WriteLine(ref s) => {
+            FileWatcherAction::Pause(ps) => delay(ps),
+            FileWatcherAction::Exit => break,
+            FileWatcherAction::WriteLine(ref s) => {
                 fwfiles[0].write_line(s);
                 assert!(fp.write(s.as_bytes()).is_ok());
                 assert!(fp.write(b"\n").is_ok());
                 assert!(fp.flush().is_ok());
                 writes += 1;
             }
-            FWAction::RotateFile => {
+            FileWatcherAction::RotateFile => {
                 let mut new_path = path.clone();
                 new_path.set_extension(format!("log.{}", rotation_count));
                 rotation_count += 1;
                 fs::rename(&path, &new_path).expect("could not rename");
                 fp = fs::File::create(&path).expect("could not create");
-                fwfiles.insert(0, FWFile::new());
+                fwfiles.insert(0, FileWatcherFile::new());
                 read_index += 1;
             }
-            FWAction::Read => {
+            FileWatcherAction::Read => {
                 let mut attempts = 10;
                 while attempts > 0 {
                     match fw.read_line() {
@@ -122,12 +121,12 @@ fn experiment(actions: Vec<FWAction>) {
 
 #[test]
 fn file_watcher_with_truncation() {
-    fn inner(actions: Vec<FWAction>) -> TestResult {
+    fn inner(actions: Vec<FileWatcherAction>) -> TestResult {
         experiment(actions);
         TestResult::passed()
     }
     QuickCheck::new()
         .tests(10000)
         .max_tests(100000)
-        .quickcheck(inner as fn(Vec<FWAction>) -> TestResult);
+        .quickcheck(inner as fn(Vec<FileWatcherAction>) -> TestResult);
 }

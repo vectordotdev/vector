@@ -120,9 +120,9 @@ impl RootOpts {
     pub fn config_paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
         config::merge_path_lists(vec![
             (&self.config_paths, None),
-            (&self.config_paths_toml, Some(config::Format::TOML)),
-            (&self.config_paths_json, Some(config::Format::JSON)),
-            (&self.config_paths_yaml, Some(config::Format::YAML)),
+            (&self.config_paths_toml, Some(config::Format::Toml)),
+            (&self.config_paths_json, Some(config::Format::Json)),
+            (&self.config_paths_yaml, Some(config::Format::Yaml)),
         ])
     }
 }
@@ -153,7 +153,7 @@ pub enum SubCommand {
 
     /// Vector Remap Language CLI
     #[cfg(feature = "vrl-cli")]
-    VRL(vrl_cli::Opts),
+    Vrl(vrl_cli::Opts),
 }
 
 #[derive(Debug, Clone, PartialEq)]

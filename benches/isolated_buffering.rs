@@ -49,7 +49,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                 let rt = runtime();
 
                 let (writer, reader) = futures01::sync::mpsc::channel(100);
-                let writer = writer.sink_map_err(|e| panic!(e));
+                let writer = writer.sink_map_err(|e| panic!("{}", e));
 
                 let read_loop = reader.for_each(move |_| Ok(()));
 
