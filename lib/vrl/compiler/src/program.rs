@@ -14,13 +14,15 @@ impl Program {
     ///
     /// A program can only fail at runtime if the fallible-function-call
     /// (`foo!()`) is used within the source.
-    pub fn is_fallible(&self) -> bool {
+    pub fn can_fail(&self) -> bool {
         self.fallible
     }
 
-    /// Returns whether the compiled program can be aborted
-    /// (if there is an `abort` statement within the program).
-    pub fn is_abortable(&self) -> bool {
+    /// Returns whether the compiled program can be aborted at runtime.
+    ///
+    /// A program can only abort at runtime if there's an explicit `abort`
+    /// statement in the source.
+    pub fn can_abort(&self) -> bool {
         self.abortable
     }
 }
