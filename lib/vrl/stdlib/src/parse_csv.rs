@@ -59,16 +59,17 @@ impl Expression for ParseCsvFn {
             .delimiter(delimiter)
             .from_reader(&*csv_string);
 
-        let result = reader
+        reader
             .into_byte_records()
             .next()
             .transpose()
-            .expect("unexpected error parsing csv")
-            .map(|record| record.iter().map(Into::into).collect::<Vec<Value>>())
-            .unwrap_or_default()
-            .into();
-
-        Ok(result)
+            .map_err(|err| format!("invalid csv record: {}", err).into()) // shouldn't really happen
+            .map(|record| {
+                record
+                    .map(|record| record.iter().map(Into::into).collect::<Vec<Value>>())
+                    .unwrap_or_default()
+                    .into()
+            })
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
