@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
     fs::{create_dir, OpenOptions},
-    io::{self, Write},
+    io::Write,
     path::PathBuf,
     pin::Pin,
     sync::{
@@ -424,22 +424,17 @@ pub fn fork_test<T: std::future::Future<Output = ()>>(test_name: &'static str, f
         test_name,
         fork_id,
         |_| {},
-        |child, f| {
+        |child, _| {
             println!("fork_test parent 1: {}", test_name);
-            // Copy all output
-            let mut stdout = io::stdout();
-            io::copy(f, &mut stdout).expect("Couldn't write to stdout");
-            println!("fork_test parent 2: {}", test_name);
-
             let status = child.wait().expect("Couldn't wait for child process");
-            println!("fork_test parent 3: {}", test_name);
+            println!("fork_test parent 2: {}", test_name);
 
             // If the test failed, panic on the parent thread
             if !status.success() {
-                println!("fork_test parent 4: {}", test_name);
+                println!("fork_test parent 3: {}", test_name);
                 panic!("Test failed");
             }
-            println!("fork_test parent 5: {}", test_name);
+            println!("fork_test parent 4: {}", test_name);
         },
         || {
             println!("fork_test child 1: {}", test_name);
