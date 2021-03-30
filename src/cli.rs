@@ -97,7 +97,7 @@ pub struct RootOpts {
     pub quiet: u8,
 
     /// Set the logging format
-    #[structopt(long, default_value = "text", possible_values = &["text", "json"])]
+    #[structopt(long, default_value = "text", env = "VECTOR_LOG_FORMAT", possible_values = &["text", "json"])]
     pub log_format: LogFormat,
 
     /// Control when ANSI terminal formatting is used.
@@ -107,7 +107,7 @@ pub struct RootOpts {
     /// the `--color always` option will always enable ANSI terminal formatting. `--color never`
     /// will disable all ANSI terminal formatting. `--color auto` will attempt
     /// to detect it automatically.
-    #[structopt(long, default_value = "auto", possible_values = &["auto", "always", "never"])]
+    #[structopt(long, default_value = "auto", env = "VECTOR_COLOR", possible_values = &["auto", "always", "never"])]
     pub color: Color,
 
     /// Watch for changes in configuration file, and reload accordingly.
