@@ -79,7 +79,7 @@ components: sources: kafka: {
 		}
 		key_field: {
 			common:      true
-			description: "The log field name to use for the Kafka message key. If the message has null key, then this field would not be added to the log event."
+			description: "The log field name to use for the Kafka message key."
 			required:    false
 			warnings: []
 			type: string: {
