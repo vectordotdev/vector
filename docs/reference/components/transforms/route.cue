@@ -94,6 +94,31 @@ components: transforms: route: {
 				level: "info"
 			}
 		},
+		{
+			title: "Split by metric namespace"
+			configuration: {
+				route: {
+					app:  #".namespace == "app""#
+					host: #".namespace == "host""#
+				}
+			}
+			input: metric: {
+				"counter" : {
+					"value" : 10000000
+				},
+				"kind" : "absolute",
+				"name" : "memory_available_bytes",
+				"namespace" : "host",				
+			}
+			output: metric: {
+				"counter" : {
+					"value" : 10000000
+				},
+				"kind" : "absolute",
+				"name" : "memory_available_bytes",
+				"namespace" : "host",	
+			}
+		},
 	]
 
 	telemetry: metrics: {
