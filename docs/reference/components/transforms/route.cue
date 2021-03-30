@@ -104,21 +104,19 @@ components: transforms: route: {
 			}
 			input: metric: {
 				counter: {
-					value: 10000000
+					value: 10000.0
 				}
 				kind:      "absolute"
 				name:      "memory_available_bytes"
 				namespace: "host"
-				tags: []
 			}
 			output: metric: {
 				counter: {
-					value: 10000000
+					value: 10000.0
 				}
 				kind:      "absolute"
 				name:      "memory_available_bytes"
 				namespace: "host"
-				tags: []
 			}
 		},
 	]
