@@ -66,7 +66,14 @@ components: transforms: route: {
 
 	input: {
 		logs:    true
-		metrics: null
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
 	}
 
 	examples: [
