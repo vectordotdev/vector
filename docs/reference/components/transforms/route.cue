@@ -103,20 +103,20 @@ components: transforms: route: {
 				}
 			}
 			input: metric: {
-				"counter" : {
-					"value" : 10000000
+				"counter": {
+					"value": 10000000
 				},
-				"kind" : "absolute",
-				"name" : "memory_available_bytes",
-				"namespace" : "host",				
+				"kind":      "absolute",
+				"name":      "memory_available_bytes",
+				"namespace": "host",
 			}
 			output: metric: {
-				"counter" : {
-					"value" : 10000000
+				"counter": {
+					"value": 10000000
 				},
-				"kind" : "absolute",
-				"name" : "memory_available_bytes",
-				"namespace" : "host",	
+				"kind":      "absolute",
+				"name":      "memory_available_bytes",
+				"namespace": "host",
 			}
 		},
 	]
