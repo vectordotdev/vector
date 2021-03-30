@@ -762,7 +762,7 @@ impl FilterList {
             // No excludes, list excludes nothing
             (None, _) => true,
             // No value, never excluded
-            (_, None) => true,
+            (Some(_), None) => true,
             // Otherwise find the given value
             (Some(excludes), Some(value)) => {
                 !excludes.iter().any(|pattern| pattern.matches_str(value))
@@ -784,7 +784,7 @@ impl FilterList {
             // No excludes, list excludes nothing
             (None, _) => true,
             // No value, never excluded
-            (_, None) => true,
+            (Some(_), None) => true,
             // Otherwise find the given value
             (Some(excludes), Some(value)) => {
                 !excludes.iter().any(|pattern| pattern.matches_path(value))
