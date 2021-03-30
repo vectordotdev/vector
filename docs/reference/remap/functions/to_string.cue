@@ -21,8 +21,9 @@ remap: functions: to_string: {
 		types: ["string"]
 		rules: [
 			#"If `value` is an integer or float, returns the string representation."#,
-			#"If `value` is a Boolean, returns `"true"` or `"false"`."#,
+			#"If `value` is a boolean, returns `"true"` or `"false"`."#,
 			#"If `value` is a timestamp, returns an [RFC 3339](\(urls.rfc3339)) representation."#,
+			#"If `value` is a null, returns `""`."#,
 		]
 	}
 
