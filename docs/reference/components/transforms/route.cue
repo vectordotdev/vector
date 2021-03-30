@@ -109,6 +109,7 @@ components: transforms: route: {
 				kind:      "absolute"
 				name:      "memory_available_bytes"
 				namespace: "host"
+				tags:      []
 			}
 			output: metric: {
 				counter: {
@@ -117,6 +118,7 @@ components: transforms: route: {
 				kind:      "absolute"
 				name:      "memory_available_bytes"
 				namespace: "host"
+				tags:      []
 			}
 		},
 	]
