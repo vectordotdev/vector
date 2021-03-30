@@ -84,6 +84,7 @@ default = [
     "parse_grok",
     "parse_json",
     "parse_key_value",
+    "parse_linux_authorization",
     "parse_logfmt",
     "parse_query_string",
     "parse_regex",
@@ -167,6 +168,7 @@ parse_glog = ["chrono"]
 parse_grok = ["grok"]
 parse_json = ["serde_json"]
 parse_key_value = ["nom"]
+parse_linux_authorization = ["parse_syslog"]
 parse_logfmt = ["parse_key_value"]
 parse_query_string = []
 parse_regex = ["regex"]

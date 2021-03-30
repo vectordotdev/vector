@@ -105,13 +105,13 @@ pub struct Encoder {
     // is, its variety). Since encoding_rs does not have encoders for utf-16,
     // this is necessary:
     // https://docs.rs/encoding_rs/0.8.26/encoding_rs/index.html#utf-16le-utf-16be-and-unicode-encoding-schemes
-    utf16_encoding: Option<UTF16Encoding>,
+    utf16_encoding: Option<Utf16Encoding>,
 }
 
 #[derive(Debug, Clone, Copy)]
-enum UTF16Encoding {
-    LE, // little-endian
-    BE, // big-endian
+enum Utf16Encoding {
+    Le, // little-endian
+    Be, // big-endian
 }
 
 impl Encoder {
@@ -124,18 +124,18 @@ impl Encoder {
         }
     }
 
-    fn get_utf16_encoding(encoding: &'static Encoding) -> Option<UTF16Encoding> {
+    fn get_utf16_encoding(encoding: &'static Encoding) -> Option<Utf16Encoding> {
         match encoding.name() {
-            "UTF-16LE" => Some(UTF16Encoding::LE),
-            "UTF-16BE" => Some(UTF16Encoding::BE),
+            "UTF-16LE" => Some(Utf16Encoding::Le),
+            "UTF-16BE" => Some(Utf16Encoding::Be),
             _ => None,
         }
     }
 
-    fn encode_from_utf8_to_utf16(&mut self, input: &str, variant: UTF16Encoding) -> Bytes {
+    fn encode_from_utf8_to_utf16(&mut self, input: &str, variant: Utf16Encoding) -> Bytes {
         let to_bytes_func = match variant {
-            UTF16Encoding::LE => u16::to_le_bytes,
-            UTF16Encoding::BE => u16::to_be_bytes,
+            Utf16Encoding::Le => u16::to_le_bytes,
+            Utf16Encoding::Be => u16::to_be_bytes,
         };
 
         for utf16_value in input.encode_utf16() {

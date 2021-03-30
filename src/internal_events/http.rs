@@ -3,12 +3,12 @@ use metrics::counter;
 use std::error::Error;
 
 #[derive(Debug)]
-pub struct HTTPEventsReceived {
+pub struct HttpEventsReceived {
     pub events_count: usize,
     pub byte_size: usize,
 }
 
-impl InternalEvent for HTTPEventsReceived {
+impl InternalEvent for HttpEventsReceived {
     fn emit_logs(&self) {
         trace!(
             message = "Received events.",
@@ -25,12 +25,12 @@ impl InternalEvent for HTTPEventsReceived {
 }
 
 #[derive(Debug)]
-pub struct HTTPBadRequest<'a> {
+pub struct HttpBadRequest<'a> {
     pub error_code: u16,
     pub error_message: &'a str,
 }
 
-impl<'a> InternalEvent for HTTPBadRequest<'a> {
+impl<'a> InternalEvent for HttpBadRequest<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Received bad request.",
@@ -46,9 +46,9 @@ impl<'a> InternalEvent for HTTPBadRequest<'a> {
 }
 
 #[derive(Debug)]
-pub struct HTTPEventMissingMessage;
+pub struct HttpEventMissingMessage;
 
-impl InternalEvent for HTTPEventMissingMessage {
+impl InternalEvent for HttpEventMissingMessage {
     fn emit_logs(&self) {
         warn!(
             message = "Event missing the message key; dropping event.",
@@ -62,11 +62,11 @@ impl InternalEvent for HTTPEventMissingMessage {
 }
 
 #[derive(Debug)]
-pub struct HTTPEventEncoded {
+pub struct HttpEventEncoded {
     pub byte_size: usize,
 }
 
-impl InternalEvent for HTTPEventEncoded {
+impl InternalEvent for HttpEventEncoded {
     fn emit_logs(&self) {
         trace!(message = "Encode event.");
     }
@@ -78,12 +78,12 @@ impl InternalEvent for HTTPEventEncoded {
 }
 
 #[derive(Debug)]
-pub struct HTTPDecompressError<'a> {
+pub struct HttpDecompressError<'a> {
     pub error: &'a dyn Error,
     pub encoding: &'a str,
 }
 
-impl<'a> InternalEvent for HTTPDecompressError<'a> {
+impl<'a> InternalEvent for HttpDecompressError<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Failed decompressing payload.",

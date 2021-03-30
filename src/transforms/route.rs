@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LaneConfig {
-    #[serde(flatten)]
     condition: AnyCondition,
 }
 
@@ -153,7 +152,7 @@ impl TransformConfig for RouteCompatConfig {
 
 #[cfg(test)]
 mod test {
-    use super::RouteConfig;
+    use super::*;
 
     #[test]
     fn generate_config() {
@@ -169,5 +168,40 @@ mod test {
         "#,
         )
         .unwrap();
+    }
+
+    #[test]
+    fn can_serialize_remap() {
+        // We need to serialize the config to check if a config has
+        // changed when reloading.
+        let config = LaneConfig {
+            condition: AnyCondition::String("foo".to_string()),
+        };
+
+        assert_eq!(
+            serde_json::to_string(&config).unwrap(),
+            r#"{"condition":"foo"}"#
+        );
+    }
+
+    #[test]
+    fn can_serialize_check_fields() {
+        // We need to serialize the config to check if a config has
+        // changed when reloading.
+        let config = toml::from_str::<RouteConfig>(
+            r#"
+            lanes.first.type = "check_fields"
+            lanes.first."message.eq" = "foo"
+        "#,
+        )
+        .unwrap()
+        .expand()
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(
+            serde_json::to_string(&config).unwrap(),
+            r#"{"first":{"type":"lane","condition":{"type":"check_fields","message.eq":"foo"}}}"#
+        );
     }
 }

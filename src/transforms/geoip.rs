@@ -105,7 +105,7 @@ impl Geoip {
 }
 
 #[derive(Default, Serialize)]
-struct ISP<'a> {
+struct Isp<'a> {
     autonomous_system_number: i64,
     autonomous_system_organization: &'a str,
     isp: &'a str,
@@ -125,7 +125,7 @@ struct City<'a> {
 
 impl FunctionTransform for Geoip {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        let mut isp: ISP = Default::default();
+        let mut isp: Isp = Default::default();
         let mut city: City = Default::default();
         let target_field = self.target.clone();
         let ipaddress = event

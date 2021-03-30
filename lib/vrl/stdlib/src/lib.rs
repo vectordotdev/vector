@@ -96,6 +96,8 @@ mod parse_grok;
 mod parse_json;
 #[cfg(feature = "parse_key_value")]
 mod parse_key_value;
+#[cfg(feature = "parse_linux_authorization")]
+mod parse_linux_authorization;
 #[cfg(feature = "parse_logfmt")]
 mod parse_logfmt;
 #[cfg(feature = "parse_regex")]
@@ -263,6 +265,8 @@ pub use parse_grok::ParseGrok;
 pub use parse_json::ParseJson;
 #[cfg(feature = "parse_key_value")]
 pub use parse_key_value::ParseKeyValue;
+#[cfg(feature = "parse_linux_authorization")]
+pub use parse_linux_authorization::ParseLinuxAuthorization;
 #[cfg(feature = "parse_logfmt")]
 pub use parse_logfmt::ParseLogFmt;
 #[cfg(feature = "parse_query_string")]
@@ -432,6 +436,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseCommonLog),
         #[cfg(feature = "parse_key_value")]
         Box::new(ParseKeyValue),
+        #[cfg(feature = "parse_linux_authorization")]
+        Box::new(ParseLinuxAuthorization),
         #[cfg(feature = "parse_logfmt")]
         Box::new(ParseLogFmt),
         #[cfg(feature = "parse_query_string")]
