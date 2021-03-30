@@ -42,10 +42,14 @@ pub struct KafkaSourceConfig {
     fetch_wait_max_ms: u64,
     #[serde(default = "default_commit_interval_ms")]
     commit_interval_ms: u64,
-    key_field: Option<String>,
-    topic_key: Option<String>,
-    partition_key: Option<String>,
-    offset_key: Option<String>,
+    #[serde(default = "default_key_field")]
+    key_field: String,
+    #[serde(default = "default_topic_key")]
+    topic_key: String,
+    #[serde(default = "default_partition_key")]
+    partition_key: String,
+    #[serde(default = "default_offset_key")]
+    offset_key: String,
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
@@ -69,6 +73,22 @@ fn default_commit_interval_ms() -> u64 {
 
 fn default_auto_offset_reset() -> String {
     "largest".into() // default in librdkafka
+}
+
+fn default_key_field() -> String {
+    "message_key".into()
+}
+
+fn default_topic_key() -> String {
+    "topic".into()
+}
+
+fn default_partition_key() -> String {
+    "partition".into()
+}
+
+fn default_offset_key() -> String {
+    "offset".into()
 }
 
 inventory::submit! {
@@ -155,29 +175,21 @@ fn kafka_source(
                             // Add source type
                             log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
 
-                            if let Some(key_field) = &key_field {
-                                match msg.key() {
-                                    None => (),
-                                    Some(key) => {
-                                        log.insert(
-                                            key_field,
-                                            Value::from(String::from_utf8_lossy(key).to_string()),
-                                        );
-                                    }
+                            match msg.key() {
+                                None => (),
+                                Some(key) => {
+                                    log.insert(
+                                        &key_field,
+                                        Value::from(String::from_utf8_lossy(key).to_string()),
+                                    );
                                 }
                             }
 
-                            if let Some(topic_key) = &topic_key {
-                                log.insert(topic_key, Value::from(msg.topic().to_string()));
-                            }
+                            log.insert(&topic_key, Value::from(msg.topic().to_string()));
 
-                            if let Some(partition_key) = &partition_key {
-                                log.insert(partition_key, Value::from(msg.partition()));
-                            }
+                            log.insert(&partition_key, Value::from(msg.partition()));
 
-                            if let Some(offset_key) = &offset_key {
-                                log.insert(offset_key, Value::from(msg.offset()));
-                            }
+                            log.insert(&offset_key, Value::from(msg.offset()));
 
                             consumer.store_offset(&msg).map_err(|error| {
                                 emit!(KafkaOffsetUpdateFailed { error });
