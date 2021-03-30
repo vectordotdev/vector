@@ -50,11 +50,7 @@ struct IsStringFn {
 
 impl Expression for IsStringFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let v = self.value.resolve(ctx)?;
-        match v {
-            Value::Bytes(_) => Ok(value!(true)),
-            _ => Ok(value!(false)),
-        }
+        self.value.resolve(ctx).map(|v| value!(v.is_bytes()))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

@@ -50,11 +50,7 @@ struct IsArrayFn {
 
 impl Expression for IsArrayFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let v = self.value.resolve(ctx)?;
-        match v {
-            Value::Array(_) => Ok(value!(true)),
-            _ => Ok(value!(false)),
-        }
+        self.value.resolve(ctx).map(|v| value!(v.is_array()))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

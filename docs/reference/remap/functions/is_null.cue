@@ -1,9 +1,10 @@
 package metadata
 
-remap: functions: is_timestamp: {
+remap: functions: is_null: {
 	category: "Type"
 	description: """
-		Check if the type of a `value` is a timestamp or not.
+		Check if the type of a `value` is `null` or not. For a more relaxed function please
+		check [`is_nullish`](\(urls.vrl_functions)#\(remap.functions.is_nullish.anchor)).
 		"""
 
 	arguments: [
@@ -18,23 +19,23 @@ remap: functions: is_timestamp: {
 	return: {
 		types: ["boolean"]
 		rules: [
-			#"Returns `true` if `value` is a timestamp."#,
+			#"Returns `true` if `value` is null."#,
 			#"Returns `false` if `value` is anything else."#,
 		]
 	}
 
 	examples: [
 		{
-			title: "Valid timestamp"
+			title: "Null value"
 			source: """
-				is_timestamp(t'2021-03-26T16:00:00Z')
+				is_null(null)
 				"""
 			return: true
 		},
 		{
 			title: "Non-matching type"
 			source: """
-				is_timestamp("a string")
+				is_null("a string")
 				"""
 			return: false
 		},

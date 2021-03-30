@@ -69,6 +69,7 @@ default = [
     "is_boolean",
     "is_float",
     "is_integer",
+    "is_null",
     "is_nullish",
     "is_object",
     "is_regex",
@@ -159,6 +160,7 @@ is_array = []
 is_boolean = []
 is_float = []
 is_integer = []
+is_null = []
 is_nullish = []
 is_object = []
 is_regex = []

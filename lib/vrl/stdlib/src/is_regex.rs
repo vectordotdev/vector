@@ -50,11 +50,7 @@ struct IsRegexFn {
 
 impl Expression for IsRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let v = self.value.resolve(ctx)?;
-        match v {
-            Value::Regex(_) => Ok(value!(true)),
-            _ => Ok(value!(false)),
-        }
+        self.value.resolve(ctx).map(|v| value!(v.is_regex()))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
