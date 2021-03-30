@@ -426,12 +426,12 @@ pub fn fork_test<T: std::future::Future<Output = ()>>(test_name: &'static str, f
         |_| {},
         |child, f| {
             println!("fork_test parent 1: {}", test_name);
-            let status = child.wait().expect("Couldn't wait for child process");
-            println!("fork_test parent 2: {}", test_name);
-
             // Copy all output
             let mut stdout = io::stdout();
             io::copy(f, &mut stdout).expect("Couldn't write to stdout");
+            println!("fork_test parent 2: {}", test_name);
+
+            let status = child.wait().expect("Couldn't wait for child process");
             println!("fork_test parent 3: {}", test_name);
 
             // If the test failed, panic on the parent thread
