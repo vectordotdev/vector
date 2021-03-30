@@ -7,9 +7,9 @@ updates:
       day: "saturday"
       time: "04:00" # UTC
     reviewers:
-      - "fanatid"
+      - "timberio/vector-support"
     assignees:
-      - "fanatid"
+      - "timberio/vector-support"
     labels:
       - "domain: deps"
     commit-message:
