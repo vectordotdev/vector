@@ -319,6 +319,7 @@ mod tests {
     use super::*;
 
     use crate::event::{Metric, MetricKind, MetricValue};
+    use futures::SinkExt;
     use tokio::sync::watch;
 
     #[test]
