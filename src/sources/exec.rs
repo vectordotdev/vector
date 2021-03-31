@@ -1,5 +1,6 @@
+use crate::async_read::VecAsyncReadExt;
 use crate::config::{DataType, GlobalOptions};
-use crate::internal_events::ExecTimeout;
+use crate::internal_events::{ExecCommandExecuted, ExecTimeout};
 use crate::{
     config::{log_schema, SourceConfig, SourceDescription},
     event::Event,
@@ -9,11 +10,14 @@ use crate::{
 };
 use bytes::Bytes;
 use derive_is_enum_variant::is_enum_variant;
-use futures::{SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
+use std::process::ExitStatus;
+use std::task::Poll;
 use std::time::{Duration, Instant};
-use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader, Lines};
+use tokio::io::{AsyncRead, AsyncReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio::time;
@@ -29,14 +33,11 @@ pub struct ExecConfig {
     pub arguments: Option<Vec<String>>,
     pub current_dir: Option<PathBuf>,
     pub include_stderr: Option<bool>,
-    #[serde(default = "default_host_key")]
-    pub host_key: String,
-    pub data_stream_key: Option<String>,
-    pub pid_key: Option<String>,
-    pub exit_status_key: Option<String>,
-    pub command_key: Option<String>,
-    pub arguments_key: Option<String>,
-    #[serde(skip, default = "default_hostname")]
+    #[serde(default = "default_events_per_line")]
+    pub event_per_line: bool,
+    #[serde(default = "default_maximum_buffer_size")]
+    pub maximum_buffer_size: usize,
+    #[serde(skip, default = "get_hostname")]
     pub hostname: Option<String>,
 }
 
@@ -46,10 +47,6 @@ pub enum Mode {
     Scheduled {
         #[serde(default = "default_exec_interval_secs")]
         exec_interval_secs: u64,
-        #[serde(default = "default_events_per_line")]
-        event_per_line: bool,
-        #[serde(default = "default_exec_duration_millis_key")]
-        exec_duration_millis_key: String,
     },
     Streaming {
         #[serde(default = "default_respawn_on_exit")]
@@ -64,22 +61,21 @@ impl Default for ExecConfig {
         ExecConfig {
             mode: Mode::Scheduled {
                 exec_interval_secs: default_exec_interval_secs(),
-                event_per_line: default_events_per_line(),
-                exec_duration_millis_key: default_exec_duration_millis_key(),
             },
             command: "echo".to_owned(),
             arguments: Some(vec!["Hello World!".to_owned()]),
             current_dir: None,
             include_stderr: Some(true),
-            host_key: default_host_key(),
-            data_stream_key: Some("data_stream".to_string()),
-            pid_key: Some("pid".to_string()),
-            exit_status_key: Some("exit_status".to_string()),
-            command_key: None,
-            arguments_key: None,
-            hostname: default_hostname(),
+            event_per_line: default_events_per_line(),
+            maximum_buffer_size: default_maximum_buffer_size(),
+            hostname: get_hostname(),
         }
     }
+}
+
+fn default_maximum_buffer_size() -> usize {
+    // 1GB
+    1000000
 }
 
 fn default_exec_interval_secs() -> u64 {
@@ -94,25 +90,23 @@ fn default_respawn_on_exit() -> bool {
     true
 }
 
-fn default_host_key() -> String {
-    log_schema().host_key().to_string()
-}
-
 fn default_events_per_line() -> bool {
     true
 }
 
-fn default_exec_duration_millis_key() -> String {
-    "exec_duration_millis".to_string()
-}
-
-fn default_hostname() -> Option<String> {
+fn get_hostname() -> Option<String> {
     crate::get_hostname().ok()
 }
 
 pub const EXEC: &str = "exec";
 pub const STDOUT: &str = "stdout";
 pub const STDERR: &str = "stderr";
+pub const DATA_STREAM_KEY: &str = "data_stream";
+pub const PID_KEY: &str = "pid";
+pub const EXIT_STATUS_KEY: &str = "exit_status";
+pub const COMMAND_KEY: &str = "command";
+pub const ARGUMENTS_KEY: &str = "arguments";
+pub const EXEC_DURATION_MILLIS_KEY: &str = "exec_duration_millis";
 
 inventory::submit! {
     SourceDescription::new::<ExecConfig>("exec")
@@ -131,18 +125,9 @@ impl SourceConfig for ExecConfig {
         out: Pipeline,
     ) -> crate::Result<super::Source> {
         match self.mode.clone() {
-            Mode::Scheduled {
-                exec_interval_secs,
-                event_per_line,
-                exec_duration_millis_key,
-            } => run_scheduled(
-                self.clone(),
-                exec_interval_secs,
-                event_per_line,
-                exec_duration_millis_key,
-                shutdown,
-                out,
-            ),
+            Mode::Scheduled { exec_interval_secs } => {
+                run_scheduled(self.clone(), exec_interval_secs, shutdown, out)
+            }
             Mode::Streaming {
                 respawn_on_exit,
                 respawn_interval_secs,
@@ -168,37 +153,46 @@ impl SourceConfig for ExecConfig {
 pub fn run_scheduled(
     config: ExecConfig,
     exec_interval_secs: u64,
-    event_per_line: bool,
-    exec_duration_millis_key: String,
     shutdown: ShutdownSignal,
-    mut out: Pipeline,
+    out: Pipeline,
 ) -> crate::Result<super::Source> {
     Ok(Box::pin(async move {
-        info!("Starting scheduled exec run.");
-        let duration = time::Duration::from_secs(exec_interval_secs);
-        let mut interval = time::interval(duration).take_until(shutdown);
+        info!("Starting scheduled exec runs.");
+        let schedule = time::Duration::from_secs(exec_interval_secs);
+        let mut interval = time::interval(schedule).take_until(shutdown.clone());
 
         while interval.next().await.is_some() {
-            let output = run_once_scheduled(
-                &config,
-                exec_interval_secs,
-                event_per_line,
-                exec_duration_millis_key.clone(),
-            )
-            .await;
+            // Mark the start time just before spawning the process as
+            // this seems to be the best approximation of exec duration
+            let now = Instant::now();
 
-            if let Some(events) = output {
-                for event in events {
-                    out.send(event)
-                        .await
-                        .map_err(|_: crate::pipeline::ClosedError| {
-                            error!(message = "Failed to forward events; downstream is closed.");
-                        })?;
+            // Wait for our task to finish, wrapping it in a timeout
+            let timeout = tokio::time::timeout(
+                schedule,
+                run_command(config.clone(), shutdown.clone(), out.clone()),
+            );
+
+            let timeout_result = timeout.await;
+
+            match timeout_result {
+                Ok(output) => {
+                    if let Err(command_error) = output {
+                        emit!(ExecFailed {
+                            command: config.command.as_str(),
+                            error: command_error,
+                        });
+                    }
+                }
+                Err(_) => {
+                    emit!(ExecTimeout {
+                        command: config.command.as_str(),
+                        elapsed_seconds: now.elapsed().as_secs(),
+                    });
                 }
             }
         }
 
-        info!("Finished scheduled exec run.");
+        info!("Finished scheduled exec runs.");
         Ok(())
     }))
 }
@@ -216,7 +210,14 @@ pub fn run_streaming(
 
             // Continue to loop while shutdown is pending
             while futures::poll!(shutdown.clone()).is_pending() {
-                let _ = run_once_streaming(config.clone(), shutdown.clone(), out.clone()).await;
+                let output = run_command(config.clone(), shutdown.clone(), out.clone()).await;
+
+                if let Err(command_error) = output {
+                    emit!(ExecFailed {
+                        command: config.command.as_str(),
+                        error: command_error,
+                    });
+                }
 
                 if futures::poll!(shutdown.clone()).is_ready() {
                     break;
@@ -232,224 +233,141 @@ pub fn run_streaming(
                 }
             }
         } else {
-            let _ = run_once_streaming(config, shutdown, out).await;
+            let output = run_command(config.clone(), shutdown, out).await;
+
+            if let Err(command_error) = output {
+                emit!(ExecFailed {
+                    command: config.command.as_str(),
+                    error: command_error,
+                });
+            }
         }
 
         Ok(())
     }))
 }
 
-async fn run_once_streaming(
+async fn run_command(
     config: ExecConfig,
     shutdown: ShutdownSignal,
     mut out: Pipeline,
-) -> Result<(), ()> {
-    info!("Starting streaming exec run.");
+) -> Result<Option<ExitStatus>, Error> {
+    info!("Starting command run.");
     let mut command = build_command(&config);
-    let child = command.spawn();
-    match child {
-        Ok(mut child) => {
-            let stdout = child.stdout.take().unwrap();
-
-            // Create stdout async reader
-            let stdout_reader = BufReader::new(stdout);
-            let stdout_lines = stdout_reader.lines();
-
-            // Set up communication channels
-            let (sender, mut receiver) = channel(1024);
-
-            let stdout_shutdown = shutdown.clone();
-
-            let pid = child.id();
-
-            // Optionally include stderr
-            if config.include_stderr.unwrap_or(true) {
-                let stderr = child.stderr.take().unwrap();
-
-                // Create stderr async reader
-                let stderr_reader = BufReader::new(stderr);
-                let stderr_lines = stderr_reader.lines();
-
-                let error_sender = sender.clone();
-
-                let stderr_shutdown = shutdown.clone();
-
-                spawn_streaming_thread(stderr_lines, stderr_shutdown, STDERR, error_sender);
-            }
-
-            spawn_streaming_thread(stdout_lines, stdout_shutdown, STDOUT, sender);
-
-            while let Some((line, stream)) = receiver.recv().await {
-                let event = create_event(
-                    &config,
-                    Bytes::from(line),
-                    &None,
-                    &Some(stream.to_string()),
-                    Some(pid),
-                    None,
-                    &None,
-                );
-
-                out.send(event)
-                    .await
-                    .map_err(|_: crate::pipeline::ClosedError| {
-                        error!(message = "Failed to forward events; downstream is closed.");
-                    })?;
-            }
-
-            info!("Finished streaming exec run.");
-            let _ = out.flush().await;
-            Ok(())
-        }
-        Err(spawn_error) => {
-            error!("Error during streaming exec run.");
-            emit!(ExecFailed { error: spawn_error });
-
-            Err(())
-        }
-    }
-}
-
-async fn run_once_scheduled(
-    config: &ExecConfig,
-    exec_interval_secs: u64,
-    event_per_line: bool,
-    exec_duration_millis_key: String,
-) -> Option<Vec<Event>> {
-    let mut command = build_command(config);
 
     // Mark the start time just before spawning the process as
     // this seems to be the best approximation of exec duration
     let now = Instant::now();
-    let child = command.spawn();
 
-    match child {
-        Ok(child) => {
-            let schedule = Duration::from_secs(exec_interval_secs);
-            let pid = child.id();
+    let mut child = command.spawn()?;
 
-            // Wait for our task to finish, wrapping it in a timeout
-            let timeout = tokio::time::timeout(schedule, child.wait_with_output());
-            let timeout_result = timeout.await;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| Error::new(ErrorKind::Other, "Unable to take stdout of spawned process"))?;
 
-            match timeout_result {
-                Ok(output) => match output {
-                    Ok(output) => {
-                        let mut events = Vec::new();
-                        let elapsed_millis = now.elapsed().as_millis();
-                        let exit_status = output.status.code();
+    // Create stdout async reader
+    let stdout_reader = BufReader::new(stdout);
 
-                        let stdout_events = process_scheduled_output(
-                            config,
-                            event_per_line,
-                            exec_duration_millis_key.clone(),
-                            pid,
-                            exit_status,
-                            elapsed_millis,
-                            output.stdout,
-                            STDOUT,
-                        );
+    // Set up communication channels
+    let (sender, mut receiver) = channel(1024);
 
-                        if let Some(mut stdout_events) = stdout_events {
-                            events.append(&mut stdout_events);
-                        }
+    let pid = child.id();
 
-                        // Optionally include stderr
-                        if config.include_stderr.unwrap_or(true) {
-                            let stderr_events = process_scheduled_output(
-                                config,
-                                event_per_line,
-                                exec_duration_millis_key.clone(),
-                                pid,
-                                exit_status,
-                                elapsed_millis,
-                                output.stderr,
-                                STDERR,
-                            );
+    // Optionally include stderr
+    if config.include_stderr.unwrap_or(true) {
+        let stderr = child.stderr.take().ok_or_else(|| {
+            Error::new(ErrorKind::Other, "Unable to take stderr of spawned process")
+        })?;
 
-                            if let Some(mut stderr_events) = stderr_events {
-                                events.append(&mut stderr_events);
-                            }
-                        }
+        // Create stderr async reader
+        let stderr_reader = BufReader::new(stderr);
 
-                        if events.is_empty() {
-                            None
-                        } else {
-                            Some(events)
-                        }
-                    }
-                    Err(command_error) => {
-                        error!("Error during scheduled exec run.");
-                        emit!(ExecFailed {
-                            error: command_error
-                        });
-                        None
-                    }
-                },
-                Err(_) => {
-                    error!("Timed out during scheduled exec run.");
-                    emit!(ExecTimeout {
-                        elapsed_millis: now.elapsed().as_secs()
-                    });
-                    None
-                }
-            }
-        }
-        Err(spawn_error) => {
-            error!("Error during scheduled exec run.");
-            emit!(ExecFailed { error: spawn_error });
-            None
-        }
+        spawn_reader_thread(
+            stderr_reader,
+            shutdown.clone(),
+            config.event_per_line,
+            config.maximum_buffer_size,
+            STDERR,
+            sender.clone(),
+        );
+    }
+
+    spawn_reader_thread(
+        stdout_reader,
+        shutdown.clone(),
+        config.event_per_line,
+        config.maximum_buffer_size,
+        STDOUT,
+        sender,
+    );
+
+    while let Some((line, stream)) = receiver.recv().await {
+        let event = create_event(
+            &config,
+            Bytes::from(line),
+            &Some(stream.to_string()),
+            Some(pid),
+            None,
+            &None,
+        );
+
+        let _ = out
+            .send(event)
+            .await
+            .map_err(|_: crate::pipeline::ClosedError| {
+                error!(message = "Failed to forward events; downstream is closed.");
+            });
+    }
+
+    let elapsed = now.elapsed();
+
+    info!("Finished command run.");
+    let _ = out.flush().await;
+
+    // TODO: Tokio 1.0.1+ has a wait and try_wait method to get exit status
+    if let Poll::Ready(Ok(exit_status)) = futures::poll!(child) {
+        handle_exit_status(&config, pid, exit_status, elapsed, out).await;
+        Ok(Some(exit_status))
+    } else {
+        emit!(ExecCommandExecuted {
+            command: config.command.as_str(),
+            exit_status: None,
+            exec_duration: elapsed,
+        });
+
+        Ok(None)
     }
 }
 
-fn process_scheduled_output(
+async fn handle_exit_status(
     config: &ExecConfig,
-    event_per_line: bool,
-    exec_duration_millis_key: String,
     pid: u32,
-    exit_status: Option<i32>,
-    elapsed_millis: u128,
-    output: Vec<u8>,
-    stream: &str,
-) -> Option<Vec<Event>> {
-    let output_string: String = String::from_utf8(output).unwrap();
+    exit_status: ExitStatus,
+    exec_duration: Duration,
+    mut out: Pipeline,
+) {
+    emit!(ExecCommandExecuted {
+        command: config.command.as_str(),
+        exit_status: exit_status.code(),
+        exec_duration,
+    });
 
-    if output_string.is_empty() {
-        None
-    } else {
-        let mut events = Vec::new();
-        if event_per_line {
-            let lines = output_string.lines();
-            for line in lines {
-                let event = create_event(
-                    config,
-                    Bytes::from(line.to_owned()),
-                    &Some(exec_duration_millis_key.clone()),
-                    &Some(stream.to_string()),
-                    Some(pid),
-                    exit_status,
-                    &Some(elapsed_millis),
-                );
+    let event = create_event(
+        config,
+        Bytes::new(),
+        &None,
+        Some(pid),
+        exit_status.code(),
+        &Some(exec_duration.as_millis()),
+    );
 
-                events.push(event);
-            }
-        } else {
-            let event = create_event(
-                config,
-                Bytes::from(output_string),
-                &Some(exec_duration_millis_key),
-                &Some(stream.to_string()),
-                Some(pid),
-                exit_status,
-                &Some(elapsed_millis),
-            );
-
-            events.push(event);
-        }
-
-        Some(events)
-    }
+    let _ = out
+        .send(event)
+        .await
+        .map_err(|_: crate::pipeline::ClosedError| {
+            error!(message = "Failed to forward events; downstream is closed.");
+        });
 }
 
 fn build_command(config: &ExecConfig) -> Command {
@@ -477,22 +395,16 @@ fn build_command(config: &ExecConfig) -> Command {
 fn create_event(
     config: &ExecConfig,
     line: Bytes,
-    exec_duration_millis_key: &Option<String>,
     data_stream: &Option<String>,
     pid: Option<u32>,
     exit_status: Option<i32>,
     exec_duration_millis: &Option<u128>,
 ) -> Event {
     emit!(ExecEventReceived {
-        byte_size: line.len()
+        command: config.command.as_str(),
+        byte_size: line.len(),
     });
-    let data_stream_key = config.data_stream_key.clone();
-    let pid_key = config.pid_key.clone();
-    let exit_status_key = config.exit_status_key.clone();
-    let host_key = config.host_key.clone();
-    let hostname = config.hostname.clone();
-    let command_key = config.command_key.clone();
-    let arguments_key = config.arguments_key.clone();
+
     let mut event = Event::from(line);
     let log_event = event.as_mut_log();
 
@@ -500,65 +412,146 @@ fn create_event(
     log_event.insert(log_schema().source_type_key(), Bytes::from(EXEC));
 
     // Add data stream of stdin or stderr (if needed)
-    if let (Some(data_stream_key), Some(data_stream)) = (data_stream_key, data_stream) {
-        log_event.insert(data_stream_key, data_stream.clone());
+    if let Some(data_stream) = data_stream {
+        log_event.insert(DATA_STREAM_KEY, data_stream.clone());
     }
 
     // Add pid (if needed)
-    if let (Some(pid_key), Some(pid)) = (pid_key, pid) {
-        log_event.insert(pid_key, pid as i64);
+    if let Some(pid) = pid {
+        log_event.insert(PID_KEY, pid as i64);
     }
 
     // Add exit status (if needed)
-    if let (Some(exit_status_key), Some(exit_status)) = (exit_status_key, exit_status) {
-        log_event.insert(exit_status_key, exit_status as i64);
+    if let Some(exit_status) = exit_status {
+        log_event.insert(EXIT_STATUS_KEY, exit_status as i64);
     }
 
     // Add exec duration millis (if needed)
-    if let (Some(exec_duration_millis_key), Some(exec_duration_millis)) =
-        (exec_duration_millis_key, exec_duration_millis)
-    {
-        log_event.insert(exec_duration_millis_key, *exec_duration_millis as i64);
+    if let Some(exec_duration_millis) = exec_duration_millis {
+        log_event.insert(EXEC_DURATION_MILLIS_KEY, *exec_duration_millis as i64);
     }
 
     // Add hostname (if needed)
-    if let Some(hostname) = hostname {
-        log_event.insert(host_key, hostname);
+    if let Some(hostname) = config.hostname.clone() {
+        log_event.insert(log_schema().host_key(), hostname);
     }
 
-    // Add command (if needed)
-    if let Some(command_key) = command_key {
-        log_event.insert(command_key, config.command.clone());
-    }
+    // Add command
+    log_event.insert(COMMAND_KEY, config.command.clone());
 
-    // Add arguments (if needed)
-    if let (Some(arguments_key), Some(arguments)) = (arguments_key, config.arguments.clone()) {
-        log_event.insert(arguments_key, arguments);
-    }
+    // Add arguments
+    log_event.insert(ARGUMENTS_KEY, config.arguments.clone());
 
     event
 }
 
-fn spawn_streaming_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
-    lines: Lines<BufReader<R>>,
+fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
+    reader: BufReader<R>,
     shutdown: ShutdownSignal,
+    event_per_line: bool,
+    buf_size: usize,
     stream: &'static str,
     mut sender: Sender<(String, &'static str)>,
 ) {
     // Start the green background thread for collecting
-    tokio::spawn(async move {
-        info!("Start capturing {} streaming command output.", stream);
+    Box::pin(tokio::spawn(async move {
+        info!("Start capturing {} command output.", stream);
 
-        let mut lines_stream = lines.take_until(shutdown);
+        let mut buffer: Vec<u8> = Vec::new();
 
-        while let Some(Ok(line)) = lines_stream.next().await {
-            if sender.send((line, stream)).await.is_err() {
+        let mut reader = reader.allow_read_until(shutdown.clone().map(|_| ()));
+
+        // Read one byte at a time so we don't block waiting for the buffer to
+        // fill up e.g. If a line filled up half the buffer we would not know about
+        // it until the buffer is returned. We could increase the read buffer if we are
+        // willing to accept some blocking waiting for it to fill up. I'm not sure if
+        // the underlying BufReader will read in larger chunks or not.
+        // Possibly could look into https://crates.io/crates/fixed-buffer-tokio but
+        // I don't know much about this library.
+        let mut read_buffer = [0_u8; 1];
+
+        // Not using the shutdown signal in this method so we need to shutdown
+        // in other methods to end the reading
+        while let Ok(bytes_read) = reader.read(&mut read_buffer).await {
+            if bytes_read == 0 {
+                info!("End of input reached, stop reading");
                 break;
+            } else {
+                let read_byte = read_buffer[0];
+
+                // Could be enhanced to split 'lines' based on user defined
+                // delimiters in addition to newline.
+                if event_per_line && read_byte == b'\n' {
+                    if buffer.ends_with(&[b'\r']) {
+                        let _ = buffer.pop();
+                    }
+
+                    if let Some(buffer_string) = buffer_to_string(&mut buffer, false) {
+                        if sender.send((buffer_string, stream)).await.is_err() {
+                            break;
+                        }
+                    } else {
+                        info!("Invalid utf8, stop reading");
+                        break;
+                    }
+                } else {
+                    buffer.push(read_byte);
+
+                    if buffer.len() == buf_size {
+                        if let Some(buffer_string) = buffer_to_string(&mut buffer, true) {
+                            if sender.send((buffer_string, stream)).await.is_err() {
+                                break;
+                            }
+                        } else {
+                            info!("Invalid utf8, stop reading");
+                            break;
+                        }
+                    }
+                }
             }
         }
 
-        info!("Finished capturing {} streaming command output.", stream);
-    });
+        // Handle any left over buffer
+        if !buffer.is_empty() {
+            if let Some(buffer_string) = buffer_to_string(&mut buffer, true) {
+                let _ = sender.send((buffer_string, stream)).await;
+                if !buffer.is_empty() {
+                    info!("Invalid utf8, left in buffer");
+                }
+            } else {
+                info!("Invalid utf8, left in buffer");
+            }
+        }
+
+        info!("Finished capturing {} command output.", stream);
+    }));
+}
+
+fn buffer_to_string(buffer: &mut Vec<u8>, allow_shrinking: bool) -> Option<String> {
+    let mut left_over_buffer: Vec<u8> = Vec::new();
+    loop {
+        if let Ok(buffer_string) = String::from_utf8(buffer.clone()) {
+            buffer.clear();
+            buffer.append(&mut left_over_buffer);
+            return Some(buffer_string);
+        } else {
+            // Only try shrinking the buffer by at most 3 bytes as
+            // the maximum utf8 character is 4 bytes. If we shrink
+            // by 3 and it is still invalid then assume the whole thing
+            // is invalid utf8. Don't shrink to smaller than 1 byte.
+            if allow_shrinking && left_over_buffer.len() < 3 && buffer.len() > 1 {
+                if let Some(last_byte) = buffer.pop() {
+                    left_over_buffer.insert(0, last_byte);
+                } else {
+                    buffer.append(&mut left_over_buffer);
+                    return None;
+                }
+            } else {
+                buffer.append(&mut left_over_buffer);
+                return None;
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -575,18 +568,15 @@ mod tests {
     #[test]
     fn test_scheduled_create_event() {
         let config = standard_scheduled_test_config();
-
-        let exec_duration_millis_key = Some("exec_duration_millis".to_string());
         let line = Bytes::from("hello world");
         let data_stream = Some(STDOUT.to_string());
         let pid = Some(8888_u32);
-        let exit_status = Some(0_i32);
-        let exec_duration_millis = Some(500_u128);
+        let exit_status = None;
+        let exec_duration_millis = None;
 
         let event = create_event(
             &config,
             line,
-            &exec_duration_millis_key,
             &data_stream,
             pid,
             exit_status,
@@ -594,15 +584,14 @@ mod tests {
         );
         let log = event.into_log();
 
-        assert_eq!(log["host"], "Some.Machine".into());
-        assert_eq!(log["data_stream"], STDOUT.into());
-        assert_eq!(log["pid"], (8888_i64).into());
-        assert_eq!(log["exit_status"], (0_i64).into());
-        assert_eq!(log["command"], config.command.into());
-        assert_eq!(log["arguments"], config.arguments.unwrap().into());
-        assert_eq!(log["exec_duration_millis"], (500_i64).into());
+        assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
+        assert_eq!(log[DATA_STREAM_KEY], STDOUT.into());
+        assert_eq!(log[PID_KEY], (8888_i64).into());
+        assert_eq!(log[COMMAND_KEY], config.command.clone().into());
+        assert_eq!(log[ARGUMENTS_KEY], config.arguments.unwrap().into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
+        assert_ne!(log[log_schema().timestamp_key()], "".into());
     }
 
     #[test]
@@ -618,7 +607,6 @@ mod tests {
         let event = create_event(
             &config,
             line,
-            &None,
             &data_stream,
             pid,
             exit_status,
@@ -626,13 +614,14 @@ mod tests {
         );
         let log = event.into_log();
 
-        assert_eq!(log["host"], "Some.Machine".into());
-        assert_eq!(log["data_stream"], STDOUT.into());
-        assert_eq!(log["pid"], (8888_i64).into());
-        assert_eq!(log["command"], config.command.clone().into());
-        assert_eq!(log["arguments"], config.arguments.unwrap().into());
+        assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
+        assert_eq!(log[DATA_STREAM_KEY], STDOUT.into());
+        assert_eq!(log[PID_KEY], (8888_i64).into());
+        assert_eq!(log[COMMAND_KEY], config.command.clone().into());
+        assert_eq!(log[ARGUMENTS_KEY], config.arguments.unwrap().into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
+        assert_ne!(log[log_schema().timestamp_key()], "".into());
     }
 
     #[test]
@@ -646,13 +635,9 @@ mod tests {
             arguments: Some(vec!["arg1".to_owned(), "arg2".to_owned()]),
             current_dir: Some(PathBuf::from("/tmp")),
             include_stderr: None,
-            host_key: default_host_key(),
-            data_stream_key: None,
-            pid_key: None,
-            exit_status_key: None,
-            command_key: None,
-            arguments_key: None,
-            hostname: None,
+            event_per_line: true,
+            maximum_buffer_size: default_maximum_buffer_size(),
+            hostname: get_hostname(),
         };
 
         let command = build_command(&config);
@@ -670,112 +655,55 @@ mod tests {
     }
 
     #[test]
-    fn test_process_scheduled_output_per_line() {
-        let exec_duration_millis_key = "exec_duration_millis".to_string();
-        let event_per_line = true;
-        let config = standard_scheduled_test_config();
+    fn test_buffer_to_string_no_leftover() {
+        let mut buffer: Vec<u8> = vec![0x46, 0x61, 0x73, 0x74, 0x20, 0xF0, 0x9F, 0x9A, 0x80];
 
-        let multiple_lines = "hello world\nhello world again".to_string().into_bytes();
-
-        let data_stream = STDOUT;
-        let pid = 8888_u32;
-        let exit_status = Some(0_i32);
-        let exec_duration_millis = 500_u128;
-
-        let events = process_scheduled_output(
-            &config,
-            event_per_line,
-            exec_duration_millis_key,
-            pid,
-            exit_status,
-            exec_duration_millis,
-            multiple_lines,
-            data_stream,
-        );
-
-        let events = events.unwrap();
-        assert_eq!(2, events.len());
-
-        let event = events.get(0).unwrap();
-        let log = event.as_log();
-        assert_eq!(log["host"], "Some.Machine".into());
-        assert_eq!(log["data_stream"], STDOUT.into());
-        assert_eq!(log["pid"], (8888_i64).into());
-        assert_eq!(log["exit_status"], (0_i64).into());
-        assert_eq!(log["command"], config.command.clone().into());
-        assert_eq!(log["arguments"], config.arguments.clone().unwrap().into());
-        assert_eq!(log["exec_duration_millis"], (500_i64).into());
-        assert_eq!(log[log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key()], "exec".into());
-
-        let event = events.get(1).unwrap();
-        let log = event.as_log();
-        assert_eq!(log["host"], "Some.Machine".into());
-        assert_eq!(log["data_stream"], STDOUT.into());
-        assert_eq!(log["pid"], (8888_i64).into());
-        assert_eq!(log["exit_status"], (0_i64).into());
-        assert_eq!(log["command"], config.command.clone().into());
-        assert_eq!(log["arguments"], config.arguments.unwrap().into());
-        assert_eq!(log["exec_duration_millis"], (500_i64).into());
-        assert_eq!(log[log_schema().message_key()], "hello world again".into());
-        assert_eq!(log[log_schema().source_type_key()], "exec".into());
+        if let Some(buffer_string) = buffer_to_string(&mut buffer, false) {
+            assert_eq!("Fast 🚀", buffer_string);
+            assert_eq!(0, buffer.len());
+        } else {
+            panic!("The buffer should be converted to a string");
+        }
     }
 
     #[test]
-    fn test_process_scheduled_output_per_blob() {
-        let exec_duration_millis_key = default_exec_duration_millis_key();
-        let event_per_line = false;
-        let config = standard_scheduled_test_config();
+    fn test_buffer_to_string_with_leftover() {
+        let mut buffer: Vec<u8> = vec![
+            0x46, 0x61, 0x73, 0x74, 0x20, 0xF0, 0x9F, 0x9A, 0x80, 0xF0, 0x9F,
+        ];
 
-        let multiple_lines = "hello world\nhello world again".to_string().into_bytes();
+        if let Some(buffer_string) = buffer_to_string(&mut buffer, true) {
+            assert_eq!("Fast 🚀", buffer_string);
+            assert_eq!(2, buffer.len());
+            assert_eq!(vec![0xF0, 0x9F], buffer);
+        } else {
+            panic!("The buffer should be converted to a string");
+        }
+    }
 
-        let data_stream = STDOUT;
-        let pid = 8888_u32;
-        let exit_status = Some(0_i32);
-        let exec_duration_millis = 500_u128;
+    #[test]
+    fn test_buffer_to_string_invalid_utf8() {
+        let mut buffer: Vec<u8> = vec![
+            0x46, 0x61, 0x73, 0x74, 0x20, 0xF0, 0x9F, 0x9A, 0x80, 0xF0, 0x9F,
+        ];
 
-        let events = process_scheduled_output(
-            &config,
-            event_per_line,
-            exec_duration_millis_key,
-            pid,
-            exit_status,
-            exec_duration_millis,
-            multiple_lines,
-            data_stream,
-        );
-
-        let events = events.unwrap();
-        assert_eq!(1, events.len());
-
-        let event = events.get(0).unwrap();
-        let log = event.as_log();
-        assert_eq!(log["host"], "Some.Machine".into());
-        assert_eq!(log["data_stream"], STDOUT.into());
-        assert_eq!(log["pid"], (8888_i64).into());
-        assert_eq!(log["exit_status"], (0_i64).into());
-        assert_eq!(log["command"], config.command.clone().into());
-        assert_eq!(log["arguments"], config.arguments.unwrap().into());
-        assert_eq!(log["exec_duration_millis"], (500_i64).into());
-        assert_eq!(
-            log[log_schema().message_key()],
-            "hello world\nhello world again".into()
-        );
-        assert_eq!(log[log_schema().source_type_key()], "exec".into());
+        if buffer_to_string(&mut buffer, false).is_some() {
+            panic!("The buffer should be not converted to a string");
+        } else {
+            assert_eq!(11, buffer.len());
+        }
     }
 
     #[tokio::test]
-    async fn test_spawn_streaming_thread() {
+    async fn test_spawn_reader_thread_per_line() {
         trace_init();
 
-        let buf = Cursor::new("hello world\nhello world again");
+        let buf = Cursor::new("hello world\nhello rocket 🚀");
         let reader = BufReader::new(buf);
-        let lines = reader.lines();
-
         let shutdown = ShutdownSignal::noop();
         let (sender, mut receiver) = channel(1024);
 
-        spawn_streaming_thread(lines, shutdown, STDOUT, sender);
+        spawn_reader_thread(reader, shutdown, true, 88888, STDOUT, sender);
 
         let mut counter = 0;
         if let Some((line, stream)) = receiver.recv().await {
@@ -785,7 +713,7 @@ mod tests {
         }
 
         if let Some((line, stream)) = receiver.recv().await {
-            assert_eq!("hello world again", line);
+            assert_eq!("hello rocket 🚀", line);
             assert_eq!(STDOUT, stream);
             counter += 1;
         }
@@ -794,54 +722,188 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(not(target_os = "windows"))]
-    async fn test_run_once_scheduled() {
+    async fn test_spawn_reader_thread_per_blob() {
         trace_init();
 
+        let buf = Cursor::new("hello world\nhello rocket 🚀");
+        let reader = BufReader::new(buf);
+        let shutdown = ShutdownSignal::noop();
+        let (sender, mut receiver) = channel(1024);
+
+        spawn_reader_thread(reader, shutdown, false, 88888, STDOUT, sender);
+
+        let mut counter = 0;
+        if let Some((line, stream)) = receiver.recv().await {
+            assert_eq!("hello world\nhello rocket 🚀", line);
+            assert_eq!(STDOUT, stream);
+            counter += 1;
+        }
+
+        assert_eq!(counter, 1);
+    }
+
+    #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
+    async fn test_run_command_linux() {
+        trace_init();
         let config = standard_scheduled_test_config();
-        let exec_duration_millis_key = default_exec_duration_millis_key();
-        let event_per_line = false;
-        let exec_interval_secs = default_exec_interval_secs();
+        let (tx, mut rx) = Pipeline::new_test();
+        let shutdown = ShutdownSignal::noop();
 
-        let events = run_once_scheduled(
-            &config,
-            exec_interval_secs,
-            event_per_line,
-            exec_duration_millis_key,
-        )
-        .await;
+        // Wait for our task to finish, wrapping it in a timeout
+        let timeout = tokio::time::timeout(
+            time::Duration::from_secs(5),
+            run_command(config.clone(), shutdown, tx),
+        );
 
-        let events = events.unwrap();
-        assert_eq!(1, events.len());
+        let timeout_result = timeout.await;
 
-        let event = events.get(0).unwrap();
-        let log = event.as_log();
-        assert_eq!(log["host"], "Some.Machine".into());
-        assert_eq!(log["data_stream"], STDOUT.into());
-        assert_eq!(log["exit_status"], (0_i64).into());
-        assert_eq!(log["command"], config.command.clone().into());
-        assert_eq!(log[log_schema().source_type_key()], "exec".into());
-        assert_eq!(log[log_schema().message_key()], "Hello World!\n".into());
-        assert_eq!(log["arguments"], config.arguments.clone().unwrap().into());
+        match timeout_result {
+            Ok(output) => match output {
+                Ok(exit_status) => assert_eq!(0_i32, exit_status.unwrap().code().unwrap()),
+                Err(_) => panic!("Unable to run linux command"),
+            },
+            Err(_) => panic!("Timed out during test of run linux command."),
+        }
+
+        if let Ok(event) = rx.try_recv() {
+            let log = event.as_log();
+            assert_eq!(log[COMMAND_KEY], config.command.clone().into());
+            assert_eq!(log[ARGUMENTS_KEY], config.arguments.clone().unwrap().into());
+            assert_eq!(log[DATA_STREAM_KEY], STDOUT.into());
+            assert_eq!(log[log_schema().source_type_key()], "exec".into());
+            assert_eq!(log[log_schema().message_key()], "Hello World!".into());
+            assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
+            assert_ne!(log[PID_KEY], "".into());
+            assert_ne!(log[log_schema().timestamp_key()], "".into());
+
+            let mut counter = 0;
+            for _ in log.all_fields() {
+                counter += 1;
+            }
+
+            assert_eq!(8, counter);
+        } else {
+            panic!("Expected to receive a linux event");
+        }
+
+        if let Ok(event) = rx.try_recv() {
+            let log = event.as_log();
+            assert_eq!(log[COMMAND_KEY], config.command.clone().into());
+            assert_eq!(log[ARGUMENTS_KEY], config.arguments.clone().unwrap().into());
+            assert_eq!(log[log_schema().source_type_key()], "exec".into());
+            assert_eq!(log[log_schema().message_key()], "".into());
+            assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
+            assert_eq!(log[EXIT_STATUS_KEY], (0_i64).into());
+            assert_ne!(log[PID_KEY], "".into());
+            assert_ne!(log[EXEC_DURATION_MILLIS_KEY], "".into());
+            assert_ne!(log[log_schema().timestamp_key()], "".into());
+
+            let mut counter = 0;
+            for _ in log.all_fields() {
+                counter += 1;
+            }
+
+            assert_eq!(9, counter);
+        } else {
+            panic!("Expected to receive an end of process linux event");
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(target_os = "windows")]
+    async fn test_run_command_windows() {
+        trace_init();
+        let config = standard_scheduled_windows_test_config();
+
+        let (tx, mut rx) = Pipeline::new_test();
+        let shutdown = ShutdownSignal::noop();
+
+        // Wait for our task to finish, wrapping it in a timeout
+        let timeout = tokio::time::timeout(
+            time::Duration::from_secs(5),
+            run_command(config.clone(), shutdown, tx),
+        );
+
+        let timeout_result = timeout.await;
+
+        match timeout_result {
+            Ok(output) => match output {
+                Ok(exit_status) => assert_eq!(0_i32, exit_status.unwrap().code().unwrap()),
+                Err(_) => panic!("Unable to run windows command"),
+            },
+            Err(_) => panic!("Timed out during test of run windows command."),
+        }
+
+        if let Ok(event) = rx.try_recv() {
+            let log = event.as_log();
+            assert_eq!(log[COMMAND_KEY], config.command.clone().into());
+            assert_eq!(log[DATA_STREAM_KEY], STDOUT.into());
+            assert_eq!(log[log_schema().source_type_key()], "exec".into());
+            assert_ne!(log[log_schema().message_key()], "".into());
+            assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
+            assert_ne!(log[PID_KEY], "".into());
+            assert_ne!(log[log_schema().timestamp_key()], "".into());
+
+            let mut counter = 0;
+            for _ in log.all_fields() {
+                counter += 1;
+            }
+
+            assert_eq!(8, counter);
+        } else {
+            panic!("Expected to receive a windows event");
+        }
+
+        if let Ok(event) = rx.try_recv() {
+            let log = event.as_log();
+            assert_eq!(log[COMMAND_KEY], config.command.clone().into());
+            assert_eq!(log[log_schema().source_type_key()], "exec".into());
+            assert_eq!(log[log_schema().message_key()], "".into());
+            assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
+            assert_eq!(log[EXIT_STATUS_KEY], (0_i64).into());
+            assert_ne!(log[PID_KEY], "".into());
+            assert_ne!(log[EXEC_DURATION_MILLIS_KEY], "".into());
+            assert_ne!(log[log_schema().timestamp_key()], "".into());
+
+            let mut counter = 0;
+            for _ in log.all_fields() {
+                counter += 1;
+            }
+
+            assert_eq!(9, counter);
+        } else {
+            panic!("Expected to receive an end of process windows event");
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    fn standard_scheduled_windows_test_config() -> ExecConfig {
+        ExecConfig {
+            mode: Mode::Scheduled {
+                exec_interval_secs: default_exec_interval_secs(),
+            },
+            command: "dir".to_owned(),
+            arguments: None,
+            current_dir: None,
+            include_stderr: Some(true),
+            event_per_line: false,
+            maximum_buffer_size: default_maximum_buffer_size(),
+            hostname: Some("Some.Machine".to_string()),
+        }
     }
 
     fn standard_scheduled_test_config() -> ExecConfig {
         ExecConfig {
             mode: Mode::Scheduled {
                 exec_interval_secs: default_exec_interval_secs(),
-                event_per_line: default_events_per_line(),
-                exec_duration_millis_key: default_exec_duration_millis_key(),
             },
             command: "echo".to_owned(),
             arguments: Some(vec!["Hello World!".to_owned()]),
             current_dir: None,
             include_stderr: Some(true),
-            host_key: default_host_key(),
-            data_stream_key: Some("data_stream".to_string()),
-            pid_key: Some("pid".to_string()),
-            exit_status_key: Some("exit_status".to_string()),
-            command_key: Some("command".to_string()),
-            arguments_key: Some("arguments".to_string()),
+            event_per_line: true,
+            maximum_buffer_size: default_maximum_buffer_size(),
             hostname: Some("Some.Machine".to_string()),
         }
     }
@@ -856,12 +918,8 @@ mod tests {
             arguments: Some(vec!["Hello World!".to_owned()]),
             current_dir: None,
             include_stderr: Some(true),
-            host_key: default_host_key(),
-            data_stream_key: Some("data_stream".to_string()),
-            pid_key: Some("pid".to_string()),
-            exit_status_key: Some("exit_status".to_string()),
-            command_key: Some("command".to_string()),
-            arguments_key: Some("arguments".to_string()),
+            event_per_line: true,
+            maximum_buffer_size: default_maximum_buffer_size(),
             hostname: Some("Some.Machine".to_string()),
         }
     }

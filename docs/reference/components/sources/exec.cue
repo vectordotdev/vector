@@ -7,7 +7,7 @@ components: sources: exec: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["sidecar"]
-		development:   "stable"
+		development:   "beta"
 		egress_method: "stream"
 		stateful:      false
 	}
@@ -47,7 +47,6 @@ components: sources: exec: {
 		mode: {
 			description: "The type of exec mechanism."
 			required:    true
-			warnings: []
 			type: string: {
 				enum: {
 					scheduled: "Scheduled exec mechanism."
@@ -57,12 +56,9 @@ components: sources: exec: {
 			}
 		}
 		command: {
-			common:      false
-			required:    false
+			required:    true
 			description: "The command to be run."
-			warnings: []
 			type: string: {
-				default: null
 				examples: ["echo", "./myscript.sh"]
 				syntax: "literal"
 			}
@@ -73,39 +69,51 @@ components: sources: exec: {
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: {
-					examples: ["Hello World!"]
+				items: type: [string]: {
+					examples: ["Hello World!", "-la"]
 					syntax: "literal"
 				}
 			}
 		}
+		current_dir: {
+			common:      false
+			required:    false
+			description: "The directory from within which to run the command."
+			warnings: []
+			type: string: {
+				default: null
+				syntax:  "literal"
+			}
+		}
+		include_stderr: {
+			common:      false
+			description: "Include the output of stderr when generating events."
+			required:    false
+			type: bool: default: false
+		}
+		event_per_line: {
+			common:      false
+			description: "Determine if events should be generated per line."
+			required:    false
+			type: bool: default: true
+		}
+		maximum_buffer_size: {
+			common:      false
+			description: "The maximum buffer size allowed before a log event will be generated."
+			required:    false
+			type: uint: {
+				default: 1000000
+				unit:    "bytes"
+			}
+		}
 		exec_interval_secs: {
 			common:        false
-			description:   "The interval in seconds between scheduled command runs."
+			description:   "The interval in seconds between scheduled command runs. The command will be killed if it takes longer than exec_interval_secs to run."
 			relevant_when: "mode = `scheduled`"
 			required:      false
 			type: uint: {
 				default: 60
 				unit:    "seconds"
-			}
-		}
-		event_per_line: {
-			common:        false
-			description:   "Determine if events should be generated per line."
-			relevant_when: "mode = `scheduled`"
-			required:      false
-			type: bool: default: true
-		}
-		exec_duration_millis_key: {
-			category:      "Context"
-			common:        false
-			description:   "The key name added to each event representing the duration in millis that the command took to run."
-			relevant_when: "mode = `scheduled`"
-			required:      false
-			warnings: []
-			type: string: {
-				default: "exec_duration_millis"
-				syntax:  "literal"
 			}
 		}
 		respawn_on_exit: {
@@ -126,78 +134,6 @@ components: sources: exec: {
 				unit:    "seconds"
 			}
 		}
-		current_dir: {
-			common:      false
-			required:    false
-			description: "The directory from within which to run the command."
-			warnings: []
-			type: string: {
-				default: null
-				syntax:  "literal"
-			}
-		}
-		include_stderr: {
-			common:      false
-			description: "Include the output of stderr when generating events."
-			required:    false
-			type: bool: default: false
-		}
-		host_key: {
-			category:    "Context"
-			common:      false
-			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
-			required:    false
-			warnings: []
-			type: string: {
-				default: "host"
-				syntax:  "literal"
-			}
-		}
-
-		pid_key: {
-			category:    "Context"
-			common:      false
-			description: "The key name added to each event representing the process ID of the running command."
-			required:    false
-			warnings: []
-			type: string: {
-				default: "pid"
-				syntax:  "literal"
-			}
-		}
-		exit_status_key: {
-			category:    "Context"
-			common:      false
-			description: "The key name added to each event representing the exit status of a scheduled command."
-			required:    false
-			warnings: []
-			type: string: {
-				default: "exit_status"
-				syntax:  "literal"
-			}
-		}
-		command_key: {
-			category:    "Context"
-			common:      false
-			description: "The key name added to each event representing the command that was run."
-			required:    false
-			warnings: []
-			type: string: {
-				default: null
-				syntax:  "literal"
-			}
-		}
-		argument_key: {
-			category:    "Context"
-			common:      false
-			description: "The key name added to each event representing the arguments that were provided to the command."
-			required:    false
-			warnings: []
-			type: string: {
-				default: null
-				syntax:  "literal"
-			}
-		}
 	}
 
 	output: logs: line: {
@@ -212,20 +148,18 @@ components: sources: exec: {
 				}
 			}
 			exec_duration_millis: {
-				common:        false
-				description:   "The duration in milliseconds a scheduled command took to complete."
-				relevant_when: "mode = `scheduled`"
-				required:      false
+				common:      false
+				description: "The duration in milliseconds a scheduled command took to complete."
+				required:    false
 				type: uint: {
 					default: null
 					unit:    "milliseconds"
 				}
 			}
 			exit_status: {
-				common:        false
-				description:   "The exit status of a scheduled command."
-				relevant_when: "mode = `scheduled`"
-				required:      false
+				common:      false
+				description: "The exit status of a scheduled command."
+				required:    false
 				type: uint: {
 					default: null
 					unit:    null
@@ -240,11 +174,9 @@ components: sources: exec: {
 				}
 			}
 			command: {
-				common:      false
 				description: "The command that was run to generate this event."
-				required:    false
+				required:    true
 				type: string: {
-					default: null
 					examples: ["echo", "./myscript.sh"]
 					syntax: "literal"
 				}
@@ -256,7 +188,7 @@ components: sources: exec: {
 				type: array: {
 					default: null
 					items: type: string: {
-						examples: ["Hello World!"]
+						examples: ["Hello World!", "-la"]
 						syntax: "literal"
 					}
 				}
@@ -279,12 +211,11 @@ components: sources: exec: {
 				```
 				"""
 			output: log: {
-				data_stream:          "stdout"
-				exec_duration_millis: 1500
-				exit_status:          0
-				timestamp:            _timestamp
-				host:                 _values.local_host
-				message:              _line
+				data_stream: "stdout"
+				pid:         5678
+				timestamp:   _timestamp
+				host:        _values.local_host
+				message:     _line
 			}
 		},
 	]
