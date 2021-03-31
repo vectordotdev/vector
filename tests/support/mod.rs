@@ -427,7 +427,7 @@ pub fn fork_test<T: std::future::Future<Output = ()>>(test_name: &'static str, f
         |child, _| {
             println!("fork_test parent 1: {}", test_name);
             let status = child
-                .wait_timeout(std::time::Duration::from_secs(30))
+                .wait_timeout(std::time::Duration::from_secs(5 * 60))
                 .expect("Couldn't wait for child process")
                 .expect("Test timed out");
             println!("fork_test parent 2: {}", test_name);
