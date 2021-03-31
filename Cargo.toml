@@ -631,6 +631,7 @@ splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 
 disable-resolv-conf = []
 shutdown-tests = ["rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "unix"]
+cli-tests = ["sinks-blackhole", "sinks-socket", "sources-generator", "sources-file"]
 
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions
