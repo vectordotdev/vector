@@ -78,6 +78,7 @@ impl FunctionTransform for Remap {
         // The `drop_on_{error, abort}` transform config allows operators to
         // ignore events if their failed/aborted, in which case we can skip the
         // cloning, since any mutations made by VRL will be ignored regardless.
+        #[allow(clippy::if_same_then_else)]
         let original_event = if !self.drop_on_error && self.program.can_fail() {
             Some(event.clone())
         } else if !self.drop_on_abort && self.program.can_abort() {
