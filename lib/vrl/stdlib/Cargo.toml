@@ -97,6 +97,7 @@ default = [
     "parse_key_value",
     "parse_linux_authorization",
     "parse_logfmt",
+    "parse_nginx_log",
     "parse_query_string",
     "parse_regex",
     "parse_regex_all",
@@ -191,6 +192,7 @@ parse_json = ["serde_json"]
 parse_key_value = ["nom"]
 parse_linux_authorization = ["parse_syslog"]
 parse_logfmt = ["parse_key_value"]
+parse_nginx_log = ["chrono", "regex"]
 parse_query_string = []
 parse_regex = ["regex"]
 parse_regex_all = ["regex"]

@@ -80,7 +80,11 @@ mod join;
 mod length;
 #[cfg(feature = "log")]
 mod log;
-#[cfg(any(feature = "parse_common_log", feature = "parse_apache_log"))]
+#[cfg(any(
+    feature = "parse_common_log",
+    feature = "parse_apache_log",
+    feature = "parse_nginx_log"
+))]
 mod log_util;
 #[cfg(feature = "match")]
 mod r#match;
@@ -120,6 +124,8 @@ mod parse_key_value;
 mod parse_linux_authorization;
 #[cfg(feature = "parse_logfmt")]
 mod parse_logfmt;
+#[cfg(feature = "parse_nginx_log")]
+mod parse_nginx_log;
 #[cfg(feature = "parse_regex")]
 mod parse_regex;
 #[cfg(feature = "parse_regex_all")]
@@ -500,6 +506,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseLinuxAuthorization),
         #[cfg(feature = "parse_logfmt")]
         Box::new(ParseLogFmt),
+        #[cfg(feature = "parse_nginx_log")]
+        Box::new(ParseNginxLog),
         #[cfg(feature = "parse_query_string")]
         Box::new(ParseQueryString),
         #[cfg(feature = "parse_regex")]

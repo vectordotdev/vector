@@ -73,6 +73,27 @@ lazy_static! {
     "#)
     .expect("failed compiling regex for error log");
 
+    // - Nginx HTTP Server docs: http://nginx.org/en/docs/http/ngx_http_log_module.html
+    pub static ref REGEX_NGINX_COMBINED_LOG: Regex = Regex::new(
+        r#"(?x)                                 # Ignore whitespace and comments in the regex expression.
+        ^\s*                                    # Start with any number of whitespaces.
+        (-|(?P<client>\S+))\s+                  # Match `-` or any non space character
+        (-|(?P<user>\S+))\s+                    # Match `-` or any non space character
+        \-\s+                                   # Always a dash
+        \[(?P<timestamp>.+)\]\s+                # Match date between brackets
+        "(?P<request>
+        (?P<method>\w+)\s+                      # Match at least a word
+        (?P<path>\S+)\s+                        # Match any non space character
+        (?P<protocol>\S+)
+        )"\s+                                   # Match any non space character
+        (?P<status>\d+)\s+                      # Match numbers
+        (?P<size>\d+)\s+                        # Match numbers
+        "(-|(?P<referer>.+))"\s+                # Match `-` or any non space character
+        "(-|(?P<agent>.+))"\s+                  # Match `-` or any non space character
+        "(-|(?P<compression>\S+))"              # Match `-` or any non space character
+        \s*$                                    # Match any number of whitespaces (to be discarded).
+    "#)
+    .expect("failed compiling regex for Nginx combined log");
 }
 
 // Parse the time as Utc if we can extract the timezone.
