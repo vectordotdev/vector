@@ -227,7 +227,7 @@ seahash = { version = "4.0.1", optional = true }
 semver = { version = "0.11.0", features = ["serde"], optional = true }
 snafu = { version = "0.6.10", features = ["futures", "futures-01"] }
 snap = { version = "1.0.3", optional = true }
-socket2 = { version = "0.3.19", optional = true }
+socket2 = { version = "0.4.0", optional = true }
 stream-cancel = "0.6.2"
 strip-ansi-escapes = "0.1.0"
 structopt = "0.3.21"
