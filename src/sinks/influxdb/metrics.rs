@@ -842,6 +842,7 @@ mod integration_tests {
     };
     use chrono::Utc;
     use futures::stream;
+    use pretty_assertions::assert_eq;
 
     #[tokio::test]
     async fn inserts_metrics_v1_over_https() {
@@ -886,12 +887,9 @@ mod integration_tests {
 
         let events: Vec<_> = (0..10).map(create_event).collect();
         let (sink, _) = config.build(cx).await.expect("error when building config");
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run(stream::iter(events.clone())).await.unwrap();
 
-        let res = query_v1(url, &format!("show series on {}", database)).await;
-        let string = res.text().await.unwrap();
-        let res: serde_json::Value =
-            serde_json::from_str(&string).expect("error when parsing InfluxDB response JSON");
+        let res = query_v1_json(url, &format!("show series on {}", database)).await;
 
         //
         // {"results":[{"statement_id":0,"series":[{"columns":["key"],"values":
@@ -914,10 +912,49 @@ mod integration_tests {
                 .as_array()
                 .unwrap()
                 .len(),
-            10
+            events.len()
         );
 
+        for event in events {
+            let metric = event.into_metric();
+            let name = format!("{}.{}", metric.namespace().unwrap(), metric.name());
+            let value = match metric.data.value {
+                MetricValue::Counter { value } => value,
+                _ => unreachable!(),
+            };
+            let timestamp = metric
+                .data
+                .timestamp
+                .unwrap()
+                .to_rfc3339_opts(chrono::SecondsFormat::Nanos, true);
+            let res =
+                query_v1_json(url, &format!("select * from {}..\"{}\"", database, name)).await;
+
+            assert_eq!(
+                res,
+                serde_json::json! {
+                    {"results": [{
+                        "statement_id": 0,
+                        "series": [{
+                            "name": name,
+                            "columns": ["time", "metric_type", "production", "region", "value"],
+                            "values": [[timestamp, "counter", "true", "us-west-1", value as isize]]
+                        }]
+                    }]}
+                }
+            );
+        }
+
         cleanup_v1(url, &database).await;
+    }
+
+    async fn query_v1_json(url: &str, query: &str) -> serde_json::Value {
+        let string = query_v1(url, query)
+            .await
+            .text()
+            .await
+            .expect("Fetching text from InfluxDB query failed");
+        serde_json::from_str(&string).expect("Error when parsing InfluxDB response JSON")
     }
 
     #[tokio::test]
@@ -1045,7 +1082,8 @@ mod integration_tests {
                 ]
                 .into_iter()
                 .collect(),
-            )),
+            ))
+            .with_timestamp(Some(Utc::now())),
         )
     }
 }
