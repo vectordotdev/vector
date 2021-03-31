@@ -3,22 +3,16 @@ mod log;
 mod notification;
 mod output;
 
+use encoding::EventEncodingType;
 use output::OutputEventsPayload;
 
 use crate::{api::tap::TapSink, topology::WatchRx};
 
-use async_graphql::{validators::IntRange, Context, Enum, Subscription};
+use async_graphql::{validators::IntRange, Context, Subscription};
 use futures::StreamExt;
 use itertools::Itertools;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use tokio::{select, stream::Stream, sync::mpsc, time};
-
-#[derive(Enum, Copy, Clone, PartialEq, Eq)]
-/// Encoding format for the event
-pub enum EventEncodingType {
-    Json,
-    Yaml,
-}
 
 #[derive(Debug, Default)]
 pub struct EventsSubscription;
