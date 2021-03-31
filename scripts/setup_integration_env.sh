@@ -27,4 +27,4 @@ fi
 
 echo "Setting up Test Integration environment for ${INTEGRATION}..."
 
-(  ./scripts/setup_integration/"${INTEGRATION}"_integration_env.sh "${ACTION}" )
+exec ./scripts/setup_integration/"${INTEGRATION}"_integration_env.sh "${ACTION}"
