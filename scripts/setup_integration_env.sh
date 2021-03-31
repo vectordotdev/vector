@@ -20,7 +20,7 @@ ACTION=$2
 # Check container tool and default to podman
 if [ -z "${CONTAINER_TOOL}" ]; then
 	echo "Container tool is unset, defaulting to podman"
-	CONTAINER_TOOL="podman"
+	export CONTAINER_TOOL="podman"
 else
 	echo "Container tool is ${CONTAINER_TOOL}..."
 fi
