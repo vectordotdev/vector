@@ -283,6 +283,7 @@ mod tests {
     /// Tests links between components
     fn api_graphql_component_links() {
         fork_test("tests::api_graphql_component_links", async {
+            println!("api_graphql_component_links 0");
             let mut config_builder = Config::builder();
             config_builder.add_source("in1", source_with_event_counter().1);
             config_builder.add_transform("t1", &["in1"], transform("t1_", 1.1));
@@ -292,14 +293,18 @@ mod tests {
             config_builder.api.address = Some(next_addr());
 
             let config = config_builder.build().unwrap();
+            println!("api_graphql_component_links 1");
             let server = api::Server::start(&config);
+            println!("api_graphql_component_links 2");
 
             let client = make_client(server.addr());
+            println!("api_graphql_component_links 3");
 
             let res = client
                 .component_links_query(None, None, None, None)
                 .await
                 .unwrap();
+            println!("api_graphql_component_links 4");
 
             let data = res.data.unwrap();
             let sources = data
@@ -325,6 +330,8 @@ mod tests {
                 .flatten()
                 .flatten()
                 .collect::<Vec<_>>();
+
+            println!("api_graphql_component_links 5");
 
             // should be a single source named "in1"
             assert!(sources.len() == 1);
@@ -383,6 +390,8 @@ mod tests {
             assert!(sinks[0].node.transforms[0].name == "t2");
 
             assert_eq!(res.errors, None);
+
+            println!("api_graphql_component_links 6 END");
         })
     }
 
@@ -401,10 +410,14 @@ mod tests {
     /// Tests that the heartbeat subscription returns a UTC payload every 1/2 second
     fn api_graphql_heartbeat() {
         metrics_test("tests::api_graphql_heartbeat", async {
+            println!("api_graphql_heartbeat 0");
             let server = start_server();
+            println!("api_graphql_heartbeat 1");
             let client = new_subscription_client(server.addr()).await;
+            println!("api_graphql_heartbeat 2");
 
             new_heartbeat_subscription(&client, 3, 500).await;
+            println!("api_graphql_heartbeat 3 END");
         })
     }
 
@@ -412,10 +425,14 @@ mod tests {
     /// Tests for Vector instance uptime in seconds
     fn api_graphql_uptime_metrics() {
         metrics_test("tests::api_graphql_uptime_metrics", async {
+            println!("api_graphql_uptime_metrics 0");
             let server = start_server();
+            println!("api_graphql_uptime_metrics 1");
             let client = new_subscription_client(server.addr()).await;
+            println!("api_graphql_uptime_metrics 2");
 
             new_uptime_subscription(&client).await;
+            println!("api_graphql_uptime_metrics 3 END");
         })
     }
 
@@ -423,10 +440,14 @@ mod tests {
     /// Tests for events processed metrics, using fake generator events
     fn api_graphql_event_processed_total_metrics() {
         metrics_test("tests::api_graphql_event_processed_total_metrics", async {
+            println!("api_graphql_event_processed_total_metrics 0");
             let server = start_server();
+            println!("api_graphql_event_processed_total_metrics 1");
             let client = new_subscription_client(server.addr()).await;
+            println!("api_graphql_event_processed_total_metrics 2");
 
             new_processed_events_total_subscription(&client, 3, 100).await;
+            println!("api_graphql_event_processed_total_metrics 3 END");
         })
     }
 
@@ -434,13 +455,18 @@ mod tests {
     /// Tests whether 2 disparate subscriptions can run against a single client
     fn api_graphql_combined_heartbeat_uptime() {
         metrics_test("tests::api_graphql_combined_heartbeat_uptime", async {
+            println!("api_graphql_combined_heartbeat_uptime 0");
             let server = start_server();
+            println!("api_graphql_combined_heartbeat_uptime 1");
             let client = new_subscription_client(server.addr()).await;
+            println!("api_graphql_combined_heartbeat_uptime 2");
 
             futures::join! {
                 new_uptime_subscription(&client),
                 new_heartbeat_subscription(&client, 3, 500),
             };
+
+            println!("api_graphql_combined_heartbeat_uptime 3 END");
         })
     }
 
@@ -452,6 +478,7 @@ mod tests {
         metrics_test(
             "tests::api_graphql_component_processed_events_totals",
             async {
+                println!("api_graphql_component_processed_events_totals 0");
                 let conf = r#"
                     [api]
                       enabled = true
@@ -470,12 +497,17 @@ mod tests {
                 "#;
 
                 let topology = from_str_config(conf).await;
+                println!("api_graphql_component_processed_events_totals 1");
 
                 tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                println!("api_graphql_component_processed_events_totals 2");
 
                 let server = api::Server::start(topology.config());
+                println!("api_graphql_component_processed_events_totals 3");
                 let client = new_subscription_client(server.addr()).await;
+                println!("api_graphql_component_processed_events_totals 4");
                 let subscription = client.component_processed_events_totals_subscription(500);
+                println!("api_graphql_component_processed_events_totals 5");
 
                 let data = subscription
                     .stream()
@@ -485,6 +517,7 @@ mod tests {
                     .next()
                     .await
                     .expect("Didn't return results");
+                println!("api_graphql_component_processed_events_totals 6");
 
                 for name in &[
                     "processed_events_total_batch_source",
@@ -492,6 +525,8 @@ mod tests {
                 ] {
                     assert!(data.iter().any(|d| d.name == *name));
                 }
+
+                println!("api_graphql_component_processed_events_totals 7 END");
             },
         )
     }
@@ -504,6 +539,7 @@ mod tests {
         metrics_test(
             "tests::api_graphql_component_processed_bytes_totals",
             async {
+                println!("api_graphql_component_processed_bytes_totals 0");
                 let conf = r#"
                     [api]
                       enabled = true
@@ -522,10 +558,14 @@ mod tests {
                 "#;
 
                 let topology = from_str_config(conf).await;
+                println!("api_graphql_component_processed_bytes_totals 1");
 
                 let server = api::Server::start(topology.config());
+                println!("api_graphql_component_processed_bytes_totals 2");
                 let client = new_subscription_client(server.addr()).await;
+                println!("api_graphql_component_processed_bytes_totals 3");
                 let subscription = client.component_processed_bytes_totals_subscription(500);
+                println!("api_graphql_component_processed_bytes_totals 4");
 
                 let data = subscription
                     .stream()
@@ -535,10 +575,13 @@ mod tests {
                     .next()
                     .await
                     .expect("Didn't return results");
+                println!("api_graphql_component_processed_bytes_totals 5");
 
                 // Bytes are currently only relevant on sinks
                 assert_eq!(data[0].name, "processed_bytes_total_batch_sink");
                 assert!(data[0].metric.processed_bytes_total > 0.00);
+
+                println!("api_graphql_component_processed_bytes_totals 6 END");
             },
         )
     }
@@ -547,6 +590,7 @@ mod tests {
     /// Tests componentAdded receives an added component
     fn api_graphql_component_added_subscription() {
         metrics_test("tests::api_graphql_component_added_subscription", async {
+            println!("api_graphql_component_added_subscription 0");
             let conf = r#"
                 [api]
                   enabled = true
@@ -565,13 +609,18 @@ mod tests {
             "#;
 
             let mut topology = from_str_config(conf).await;
+            println!("api_graphql_component_added_subscription 1");
 
             let server = api::Server::start(topology.config());
+            println!("api_graphql_component_added_subscription 2");
             let client = new_subscription_client(server.addr()).await;
+            println!("api_graphql_component_added_subscription 3");
 
             // Spawn a handler for listening to changes
             let handle = tokio::spawn(async move {
                 let subscription = client.component_added();
+
+                println!("api_graphql_component_added_subscription 4");
 
                 tokio::pin! {
                     let component_added = subscription.stream();
@@ -589,10 +638,13 @@ mod tests {
                         .component_added
                         .name,
                 );
+
+                println!("api_graphql_component_added_subscription 5");
             });
 
             // After a short delay, update the config to include `gen2`
             tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+            println!("api_graphql_component_added_subscription 6");
 
             let conf = r#"
                 [api]
@@ -618,12 +670,16 @@ mod tests {
             "#;
 
             let c = config::load_from_str(conf, Some(Format::TOML)).unwrap();
+            println!("api_graphql_component_added_subscription 7");
 
             topology.reload_config_and_respawn(c).await.unwrap();
+            println!("api_graphql_component_added_subscription 8");
             server.update_config(topology.config());
+            println!("api_graphql_component_added_subscription 9");
 
             // Await the join handle
             handle.await.unwrap();
+            println!("api_graphql_component_added_subscription 10 END");
         })
     }
 
@@ -631,6 +687,7 @@ mod tests {
     /// Tests componentRemoves detects when a component has been removed
     fn api_graphql_component_removed_subscription() {
         metrics_test("tests::api_graphql_component_removed_subscription", async {
+            println!("api_graphql_component_removed_subscription 0");
             let mut conf = r#"
                 [api]
                   enabled = true
@@ -653,8 +710,6 @@ mod tests {
                   inputs = ["component_removed_source_1", "component_removed_source_2"]
                   print_amount = 100000
             "#;
-
-            println!("api_graphql_component_removed_subscription 0");
 
             let mut topology = from_str_config(conf).await;
 
@@ -733,13 +788,14 @@ mod tests {
             // Await the join handle
             handle.await.unwrap();
 
-            println!("api_graphql_component_removed_subscription 11");
+            println!("api_graphql_component_removed_subscription 11 END");
         })
     }
 
     #[test]
     fn api_graphql_errors_total() {
         metrics_test("tests::api_graphql_errors_total", async {
+            println!("api_graphql_errors_total 0");
             let conf = r#"
                 [api]
                   enabled = true
@@ -758,13 +814,17 @@ mod tests {
             "#;
 
             let topology = from_str_config(conf).await;
+            println!("api_graphql_errors_total 1");
 
             let server = api::Server::start(topology.config());
+            println!("api_graphql_errors_total 2");
             let client = new_subscription_client(server.addr()).await;
+            println!("api_graphql_errors_total 3");
 
             // Spawn a handler for listening to changes
             let handle = tokio::spawn(async move {
                 let subscription = client.errors_total_subscription(50);
+                println!("api_graphql_errors_total 4");
 
                 tokio::pin! {
                     let stream = subscription.stream();
@@ -783,18 +843,22 @@ mod tests {
                         .errors_total
                         > 0.00
                 );
+
+                println!("api_graphql_errors_total 5");
             });
 
             // Emit an error metric
             counter!("processing_errors_total", 1);
 
-            handle.await.unwrap()
+            handle.await.unwrap();
+            println!("api_graphql_errors_total 6 END");
         });
     }
 
     #[test]
     fn api_grahql_component_errors_total() {
         metrics_test("tests::api_grahql_component_errors_total", async {
+            println!("api_grahql_component_errors_total 0");
             let conf = r#"
                 [api]
                   enabled = true
@@ -813,13 +877,18 @@ mod tests {
             "#;
 
             let topology = from_str_config(conf).await;
+            println!("api_grahql_component_errors_total 1");
 
             let server = api::Server::start(topology.config());
+            println!("api_grahql_component_errors_total 2");
             let client = new_subscription_client(server.addr()).await;
+            println!("api_grahql_component_errors_total 3");
 
             // Spawn a handler for listening to changes
             let handle = tokio::spawn(async move {
+                println!("api_grahql_component_errors_total 4");
                 let subscription = client.errors_total_subscription(50);
+                println!("api_grahql_component_errors_total 5");
 
                 tokio::pin! {
                     let stream = subscription.stream();
@@ -838,12 +907,15 @@ mod tests {
                         .errors_total
                         > 0.00
                 );
+
+                println!("api_grahql_component_errors_total 6");
             });
 
             // Emit an error metric
             counter!("processing_errors_total", 1);
 
-            handle.await.unwrap()
+            handle.await.unwrap();
+            println!("api_grahql_component_errors_total 7 END");
         });
     }
 
@@ -854,12 +926,14 @@ mod tests {
         use tempfile::{tempdir, NamedTempFile};
 
         metrics_test("tests::api_graphql_files_source_metrics", async {
+            println!("api_graphql_files_source_metrics 0");
             let lines = vec!["test1", "test2", "test3"];
 
             let checkpoints = tempdir().unwrap();
             let mut named_file = NamedTempFile::new().unwrap();
             let path = named_file.path().to_str().unwrap().to_string();
             let mut file = named_file.as_file_mut();
+            println!("api_graphql_files_source_metrics 1");
 
             for line in &lines {
                 writeln!(&mut file, "{}", line).unwrap();
@@ -885,15 +959,19 @@ mod tests {
             );
 
             let topology = from_str_config(&conf).await;
+            println!("api_graphql_files_source_metrics 2");
             let server = api::Server::start(topology.config());
+            println!("api_graphql_files_source_metrics 3");
 
             // Short delay to ensure logs are picked up
             tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+            println!("api_graphql_files_source_metrics 4");
 
             let client = make_client(server.addr());
             let res = client
                 .file_source_metrics_query(None, None, None, None)
                 .await;
+            println!("api_graphql_files_source_metrics 5");
 
             match &res.unwrap().data.unwrap().sources.edges.into_iter().flatten().next().unwrap().unwrap().node.metrics.on {
                 file_source_metrics_query::FileSourceMetricsQuerySourcesEdgesNodeMetricsOn::FileSourceMetrics(
@@ -904,13 +982,16 @@ mod tests {
                     assert_eq!(node.processed_events_total.as_ref().unwrap().processed_events_total as usize, lines.len());
                 }
                 _ => panic!("not a file source"),
-            }
+            };
+
+            println!("api_graphql_files_source_metrics 6 END");
         })
     }
 
     #[test]
     fn api_graphql_component_by_name() {
         metrics_test("tests::api_graphql_component_by_name", async {
+            println!("api_graphql_component_by_name 0");
             let conf = r#"
                 [api]
                   enabled = true
@@ -928,25 +1009,33 @@ mod tests {
             "#;
 
             let topology = from_str_config(&conf).await;
+            println!("api_graphql_component_by_name 1");
             let server = api::Server::start(topology.config());
+            println!("api_graphql_component_by_name 2");
             let client = make_client(server.addr());
+            println!("api_graphql_component_by_name 3");
 
             // Retrieving a component that doesn't exist should return None
             let res = client.component_by_name_query("xxx").await;
+            println!("api_graphql_component_by_name 4");
             assert!(res.unwrap().data.unwrap().component_by_name.is_none());
+            println!("api_graphql_component_by_name 5");
 
             // The `gen1` name should exist
             let res = client.component_by_name_query("gen1").await;
+            println!("api_graphql_component_by_name 6");
             assert_eq!(
                 res.unwrap().data.unwrap().component_by_name.unwrap().name,
                 "gen1"
             );
+            println!("api_graphql_component_by_name 7 END");
         })
     }
 
     #[test]
     fn api_graphql_components_connection() {
         metrics_test("tests::api_graphql_components_connection", async {
+            println!("api_graphql_components_connection 0");
             // Config with a total of 5 components
             let conf = r#"
                 [api]
@@ -983,9 +1072,12 @@ mod tests {
             "#;
 
             let topology = from_str_config(&conf).await;
+            println!("api_graphql_components_connection 1");
 
             let server = api::Server::start(topology.config());
+            println!("api_graphql_components_connection 2");
             let client = make_client(server.addr());
+            println!("api_graphql_components_connection 3");
 
             // Test after/first with a page size of 2, exhausting all results
             let mut cursor: Option<String> = None;
@@ -999,6 +1091,8 @@ mod tests {
                     .data
                     .unwrap()
                     .components;
+
+                println!("api_graphql_components_connection 4-{}", i);
 
                 // Total count should match the # of components
                 assert_eq!(components.total_count, 5);
@@ -1038,6 +1132,8 @@ mod tests {
                     .unwrap()
                     .components;
 
+                println!("api_graphql_components_connection 5-{}", i);
+
                 // Total count should match the # of components
                 assert_eq!(components.total_count, 5);
 
@@ -1065,6 +1161,8 @@ mod tests {
                 // Set the before cursor for the next iteration
                 cursor = page_info.start_cursor;
             }
+
+            println!("api_graphql_components_connection 6 END");
         });
     }
 }
