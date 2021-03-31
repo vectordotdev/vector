@@ -1,0 +1,124 @@
+// Root ------------------------------------------------------------------------
+
+program     = _{ SOI ~ NEWLINE* ~ expressions ~ NEWLINE* ~ EOI }
+expressions = _{ (expression ~ (EOE+ ~ expression)*)+ ~ EOE? }
+expression  = _{ assignment | if_statement | boolean_expr | block }
+
+// Program Rules ---------------------------------------------------------------
+
+rule_path         = _{ SOI ~ path ~ EOI }
+rule_ident        = _{ SOI ~ ident ~ EOI }
+rule_string_inner = _{ SOI ~ string_inner ~ EOI }
+
+// Statements ------------------------------------------------------------------
+
+assignment   = { target ~ "=" ~ expression }
+if_statement = { "if" ~ if_condition ~ block ~ ("else if" ~ if_condition ~ block)* ~ ("else" ~ block)? }
+if_condition = { boolean_expr | ("(" ~ expressions ~ ")") }
+
+// Primary ---------------------------------------------------------------------
+
+primary  =  { value | variable | path | group }
+value    =  { string | float | integer | boolean | null | array | map | regex }
+variable = ${ "$" ~ ident ~ path_index* ~ ("." ~ path_segments)?  }
+group    =  { "(" ~ expression ~ ")" }
+
+// Function Calls --------------------------------------------------------------
+
+call           = ${ ident ~ bang? ~ "(" ~ arguments? ~ ")"  }
+arguments      = !{ argument ~ ("," ~ argument)* }
+argument       =  { (ident ~ "=")? ~ expression }
+
+// Operations ------------------------------------------------------------------
+
+boolean_expr   = { equality ~ (operator_boolean_expr ~ equality)* }
+equality       = { comparison ~ (operator_equality ~ comparison)* }
+comparison     = { addition ~ (operator_comparison ~ addition)* }
+addition       = { multiplication ~ (operator_addition ~ multiplication)* }
+multiplication = { not ~ (operator_multiplication ~ not)* }
+not            = { operator_not* ~ (call | primary) }
+
+// Operators -------------------------------------------------------------------
+
+operator_boolean_expr   = { "??" | "||" | "&&" }
+operator_equality       = { "!=" | "==" }
+operator_comparison     = { ">=" | ">" | "<=" | "<" }
+operator_addition       = { "-" | "+" }
+operator_multiplication = { "//" | "/" | "*" | "%" }
+operator_not            = { "!" }
+
+// Paths -----------------------------------------------------------------------
+
+path             = ${ "." ~ path_segments? ~ !(WHITESPACE* ~ ("." | "\"")) }
+path_segments    = ${
+    (
+        ((path_segment | path_index+) ~ path_index*)
+        ~ ("." ~ path_segment ~ path_index*)*
+    )
+    | path_index+
+}
+path_segment     = ${ path_field | path_coalesce }
+path_field       = ${ ident | string }
+path_coalesce    = !{ "(" ~ path_field ~ ("|" ~ path_field)+ ~ ")" }
+path_index       =  { "[" ~ path_index_inner ~ "]" }
+path_index_inner =  { ("0" | ASCII_NONZERO_DIGIT) ~ ASCII_DIGIT* }
+
+// Literals --------------------------------------------------------------------
+
+null    =  { "null" }
+boolean =  { "true" | "false" }
+string  = ${ "\"" ~ string_inner ~ "\"" }
+array   =  { "[" ~ NEWLINE* ~ (expression ~ "," ~ NEWLINE*)* ~ expression? ~ NEWLINE* ~ "]" }
+map     =  { "{" ~ NEWLINE* ~ (kv_pair ~ "," ~ NEWLINE*)* ~ kv_pair? ~ NEWLINE* ~ "}" }
+integer = ${ "-"? ~ ("0" | ASCII_NONZERO_DIGIT) ~ ASCII_DIGIT* }
+float   = ${
+    "-"?
+    ~ ("0" | ASCII_NONZERO_DIGIT) ~ ASCII_DIGIT*
+    ~ ("." ~ ASCII_DIGIT* ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?)
+        | (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)
+}
+
+regex       = ${ "/" ~ regex_inner ~ "/" ~ regex_flags }
+regex_flags =  { ("i" | "x" | "m")* }
+
+// Other ----------------------------------------------------------------------
+
+ident  = @{ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
+bang   =  { "!" }
+target = _{ variable | path }
+block  =  { "{" ~ NEWLINE* ~ expressions ~ NEWLINE* ~ "}" }
+
+string_inner = @{ char* }
+char         =  { !("\"" | "\\") ~ ANY | "\\" ~ ("\"" | "\\" | "n" | "t") }
+
+regex_inner = @{ regex_char* }
+regex_char  =  { !("/" | "\\") ~ ANY | "\\" ~ ANY }
+
+kv_pair = { string ~ ":" ~ expression }
+
+WHITESPACE  = _{ " " | "\t" | ("\\" ~ NEWLINE) }
+
+// end of expression
+EOE = _{ NEWLINE | ";" }
+
+// Lookups -----------------------------------------------------------------------
+// Used by `lib/shared/lookup/*.rs`.
+// Changing this will have far reaching impacts on Vector's core event API.
+lookup         = ${
+  // Paths originating from the Remap-lang have a root `.` in front, so we support this.
+  (LOOKUP_PERIOD ~ (lookup_segment ~ (LOOKUP_PERIOD ~ lookup_segment)*)?)
+  // Other paths (internal to Vector) do not necessarily have this distinction, despite mapping the same way.
+  | (lookup_segment ~ (LOOKUP_PERIOD ~ lookup_segment)*)
+}
+lookup_segment = ${ (lookup_field | lookup_field_quoted | lookup_array | lookup_coalesce) ~ lookup_array* }
+lookup_coalesce = !{ "(" ~ lookup ~ ("|" ~ lookup)+ ~ ")" }
+lookup_field = { (ASCII_ALPHANUMERIC | "_" | "-" | "@" | "#" | "\\\"" | (LOOKUP_ESCAPE ~ ".") | (LOOKUP_ESCAPE ~ "[") | (LOOKUP_ESCAPE ~ "]"))+ }
+lookup_field_quoted = @{ LOOKUP_QUOTE ~ lookup_field_quoted_content ~ LOOKUP_QUOTE }
+lookup_field_quoted_content  = ${ (ASCII_ALPHANUMERIC | "_" | "-" | "@" | "#" | " " | "." | "\\\"" | "[" | "]" | (LOOKUP_ESCAPE ~ "."))+ }
+lookup_array = @{ LOOKUP_OPEN_BRACKET ~ lookup_array_index ~ LOOKUP_CLOSE_BRACKET }
+lookup_array_index =  ${ ASCII_DIGIT+ }
+LOOKUP_QUOTE = _{ "\""}
+LOOKUP_OPEN_BRACKET = _{ "[" }
+LOOKUP_CLOSE_BRACKET = _{ "]" }
+LOOKUP_PERIOD = _{ "." }
+LOOKUP_ESCAPE = _{ "\\" }

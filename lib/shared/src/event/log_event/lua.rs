@@ -1,5 +1,8 @@
 use crate::event::lua::type_name;
-use crate::{event::{LogEvent, Value}, lookup::*};
+use crate::{
+    event::{LogEvent, Value},
+    lookup::*,
+};
 use rlua::prelude::*;
 
 impl<'a> ToLua<'a> for LogEvent {
@@ -33,6 +36,7 @@ impl<'a> FromLua<'a> for LogEvent {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::event::Event;
     use rlua::Lua;
 
     #[test_env_log::test]

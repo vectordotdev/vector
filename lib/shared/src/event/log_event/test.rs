@@ -602,7 +602,6 @@ fn entry() {
 
 mod remap {
     use super::*;
-    use remap_lang::Object;
     use std::collections::BTreeMap;
 
     #[test_env_log::test]
@@ -616,14 +615,14 @@ mod remap {
             ),
             (
                 map!["foo": "bar"],
-                vec![remap_lang::Segment::Field(remap_lang::Field::Regular(
+                vec![vrl::Segment::Field(vrl::Field::Regular(
                     "foo".to_owned(),
                 ))],
                 Ok(Some("bar".into())),
             ),
             (
                 map!["foo": "bar"],
-                vec![remap_lang::Segment::Field(remap_lang::Field::Regular(
+                vec![vrl::Segment::Field(vrl::Field::Regular(
                     "bar".to_owned(),
                 ))],
                 Ok(None),
@@ -631,21 +630,21 @@ mod remap {
             (
                 map!["foo": vec![map!["bar": true]]],
                 vec![
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
-                    remap_lang::Segment::Index(0),
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("bar".to_owned())),
+                    vrl::Segment::Field(vrl::Field::Regular("foo".to_owned())),
+                    vrl::Segment::Index(0),
+                    vrl::Segment::Field(vrl::Field::Regular("bar".to_owned())),
                 ],
                 Ok(Some(true.into())),
             ),
             (
                 map!["foo": map!["bar baz": map!["baz": 2]]],
                 vec![
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
-                    remap_lang::Segment::Coalesce(vec![
-                        remap_lang::Field::Regular("qux".to_owned()),
-                        remap_lang::Field::Quoted("bar baz".to_owned()),
+                    vrl::Segment::Field(vrl::Field::Regular("foo".to_owned())),
+                    vrl::Segment::Coalesce(vec![
+                        vrl::Field::Regular("qux".to_owned()),
+                        vrl::Field::Quoted("bar baz".to_owned()),
                     ]),
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("baz".to_owned())),
+                    vrl::Segment::Field(vrl::Field::Regular("baz".to_owned())),
                 ],
                 Ok(Some(2.into())),
             ),
@@ -654,10 +653,10 @@ mod remap {
         for (value, segments, expect) in cases {
             let value: BTreeMap<String, Value> = value;
             let event = LogEvent::from(value);
-            let path = remap_lang::Path::new_unchecked(segments);
+            let path = vrl::Path::new_unchecked(segments);
 
             assert_eq!(
-                Object::get(&event, &path),
+                vrl::Target::get(&event, &path),
                 expect,
                 "Expected {:?} to return {:?} in {:?}",
                 path,
@@ -679,7 +678,7 @@ mod remap {
             ),
             (
                 map!["foo": "bar"],
-                vec![remap_lang::Segment::Field(remap_lang::Field::Regular(
+                vec![vrl::Segment::Field(vrl::Field::Regular(
                     "foo".to_owned(),
                 ))],
                 "baz".into(),
@@ -689,11 +688,11 @@ mod remap {
             (
                 map!["foo": "bar"],
                 vec![
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
-                    remap_lang::Segment::Index(2),
-                    remap_lang::Segment::Field(remap_lang::Field::Quoted("bar baz".to_owned())),
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("a".to_owned())),
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("b".to_owned())),
+                    vrl::Segment::Field(vrl::Field::Regular("foo".to_owned())),
+                    vrl::Segment::Index(2),
+                    vrl::Segment::Field(vrl::Field::Quoted("bar baz".to_owned())),
+                    vrl::Segment::Field(vrl::Field::Regular("a".to_owned())),
+                    vrl::Segment::Field(vrl::Field::Regular("b".to_owned())),
                 ],
                 true.into(),
                 map![
@@ -709,8 +708,8 @@ mod remap {
             (
                 map!["foo": vec![0, 1, 2]],
                 vec![
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
-                    remap_lang::Segment::Index(5),
+                    vrl::Segment::Field(vrl::Field::Regular("foo".to_owned())),
+                    vrl::Segment::Index(5),
                 ],
                 "baz".into(),
                 map![
@@ -729,8 +728,8 @@ mod remap {
             (
                 map!["foo": "bar"],
                 vec![
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
-                    remap_lang::Segment::Index(0),
+                    vrl::Segment::Field(vrl::Field::Regular("foo".to_owned())),
+                    vrl::Segment::Index(0),
                 ],
                 "baz".into(),
                 map!["foo": vec!["baz"]],
@@ -739,8 +738,8 @@ mod remap {
             (
                 map!["foo": Value::Array(vec![])],
                 vec![
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
-                    remap_lang::Segment::Index(0),
+                    vrl::Segment::Field(vrl::Field::Regular("foo".to_owned())),
+                    vrl::Segment::Index(0),
                 ],
                 "baz".into(),
                 map!["foo": vec!["baz"]],
@@ -749,8 +748,8 @@ mod remap {
             (
                 map!["foo": Value::Array(vec![0.into()])],
                 vec![
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
-                    remap_lang::Segment::Index(0),
+                    vrl::Segment::Field(vrl::Field::Regular("foo".to_owned())),
+                    vrl::Segment::Index(0),
                 ],
                 "baz".into(),
                 map!["foo": vec!["baz"]],
@@ -759,8 +758,8 @@ mod remap {
             (
                 map!["foo": Value::Array(vec![0.into(), 1.into()])],
                 vec![
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
-                    remap_lang::Segment::Index(0),
+                    vrl::Segment::Field(vrl::Field::Regular("foo".to_owned())),
+                    vrl::Segment::Index(0),
                 ],
                 "baz".into(),
                 map!["foo": Value::Array(vec!["baz".into(), 1.into()])],
@@ -769,8 +768,8 @@ mod remap {
             (
                 map!["foo": Value::Array(vec![0.into(), 1.into()])],
                 vec![
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
-                    remap_lang::Segment::Index(1),
+                    vrl::Segment::Field(vrl::Field::Regular("foo".to_owned())),
+                    vrl::Segment::Index(1),
                 ],
                 "baz".into(),
                 map!["foo": Value::Array(vec![0.into(), "baz".into()])],
@@ -782,11 +781,11 @@ mod remap {
             let object: BTreeMap<String, Value> = object;
             let mut event = LogEvent::from(object);
             let expect = LogEvent::from(expect);
-            let value: remap::Value = value;
-            let path = remap_lang::Path::new_unchecked(segments);
+            let value: vrl::Value = value;
+            let path = vrl::Path::new_unchecked(segments);
 
             assert_eq!(
-                remap_lang::Object::insert(&mut event, &path, value.clone().into()),
+                vrl::Target::insert(&mut event, &path, value.clone().into()),
                 result,
                 "Result of {:?}::insert({:?},{:?}) was not {:?}.",
                 event,
@@ -795,7 +794,7 @@ mod remap {
                 result
             );
             assert_eq!(event, expect);
-            assert_eq!(remap::Object::get(&event, &path), Ok(Some(value.into())));
+            assert_eq!(vrl::Target::get(&event, &path), Ok(Some(value.into())));
         }
     }
 
@@ -804,7 +803,7 @@ mod remap {
         let cases = vec![
             (
                 map!["foo": "bar"],
-                vec![remap_lang::Segment::Field(remap_lang::Field::Regular(
+                vec![vrl::Segment::Field(vrl::Field::Regular(
                     "foo".to_owned(),
                 ))],
                 false,
@@ -812,9 +811,9 @@ mod remap {
             ),
             (
                 map!["foo": "bar"],
-                vec![remap_lang::Segment::Coalesce(vec![
-                    remap_lang::Field::Quoted("foo bar".to_owned()),
-                    remap_lang::Field::Regular("foo".to_owned()),
+                vec![vrl::Segment::Coalesce(vec![
+                    vrl::Field::Quoted("foo bar".to_owned()),
+                    vrl::Field::Regular("foo".to_owned()),
                 ])],
                 false,
                 Some(map![].into()),
@@ -834,8 +833,8 @@ mod remap {
             (
                 map!["foo": vec![0]],
                 vec![
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
-                    remap_lang::Segment::Index(0),
+                    vrl::Segment::Field(vrl::Field::Regular("foo".to_owned())),
+                    vrl::Segment::Index(0),
                 ],
                 false,
                 Some(map!["foo": Value::Array(vec![])].into()),
@@ -843,8 +842,8 @@ mod remap {
             (
                 map!["foo": vec![0]],
                 vec![
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
-                    remap_lang::Segment::Index(0),
+                    vrl::Segment::Field(vrl::Field::Regular("foo".to_owned())),
+                    vrl::Segment::Index(0),
                 ],
                 true,
                 Some(map![].into()),
@@ -852,9 +851,9 @@ mod remap {
             (
                 map! {"foo": map!{"bar baz": vec![0]}, "bar": "baz"},
                 vec![
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
-                    remap_lang::Segment::Field(remap_lang::Field::Quoted("bar baz".to_owned())),
-                    remap_lang::Segment::Index(0),
+                    vrl::Segment::Field(vrl::Field::Regular("foo".to_owned())),
+                    vrl::Segment::Field(vrl::Field::Quoted("bar baz".to_owned())),
+                    vrl::Segment::Index(0),
                 ],
                 false,
                 Some(map!["foo": map!["bar baz": Value::Array(vec![])], "bar": "baz"].into()),
@@ -862,9 +861,9 @@ mod remap {
             (
                 map!["foo": map!["bar baz": vec![0]], "bar": "baz"],
                 vec![
-                    remap_lang::Segment::Field(remap_lang::Field::Regular("foo".to_owned())),
-                    remap_lang::Segment::Field(remap_lang::Field::Quoted("bar baz".to_owned())),
-                    remap_lang::Segment::Index(0),
+                    vrl::Segment::Field(vrl::Field::Regular("foo".to_owned())),
+                    vrl::Segment::Field(vrl::Field::Quoted("bar baz".to_owned())),
+                    vrl::Segment::Index(0),
                 ],
                 true,
                 Some(map!["bar": "baz"].into()),
@@ -873,72 +872,17 @@ mod remap {
 
         for (object, segments, compact, expect) in cases {
             let mut event = LogEvent::from(object);
-            let path = remap_lang::Path::new_unchecked(segments);
-            let removed = Object::get(&event, &path).unwrap();
+            let path = vrl::Path::new_unchecked(segments);
+            let removed = vrl::Target::get(&event, &path).unwrap();
 
             assert_eq!(
-                remap_lang::Object::remove(&mut event, &path, compact),
+                vrl::Target::remove(&mut event, &path, compact),
                 Ok(removed)
             );
             assert_eq!(
-                remap_lang::Object::get(&event, &remap_lang::Path::root()),
+                vrl::Target::get(&event, &vrl::Path::root()),
                 Ok(expect)
             )
-        }
-    }
-
-    #[test_env_log::test]
-    fn object_paths() {
-        use remap_lang::Object;
-        use std::str::FromStr;
-
-        let cases = vec![
-            (map! {}, Ok(vec!["."])),
-            (
-                map! { "\"foo bar baz\"": "bar" },
-                Ok(vec![r#"."foo bar baz""#]),
-            ),
-            (
-                map! { "foo": "bar", "baz": "qux" },
-                Ok(vec![".baz", ".foo"]),
-            ),
-            (map! { "foo": map!{ "bar": "baz" }}, Ok(vec![".foo.bar"])),
-            (map! { "a": vec![0, 1] }, Ok(vec![".a[0]", ".a[1]"])),
-            (
-                map! {
-                    "a": map!{ "b": "c" },
-                    "d": 12,
-                    "e": vec![
-                        map!{"f": 1},
-                        map!{"g": 2},
-                        map!{"h": 3},
-                    ],
-                },
-                Ok(vec![".a.b", ".d", ".e[0].f", ".e[1].g", ".e[2].h"]),
-            ),
-            (
-                map! {
-                    "a": vec![
-                        map!{
-                            "b": vec![map!{"c": map!{"d": map!{"e": vec![vec![0, 1]]}}}],
-                        },
-                    ],
-                },
-                Ok(vec![".a[0].b[0].c.d.e[0][0]", ".a[0].b[0].c.d.e[0][1]"]),
-            ),
-        ];
-
-        for (object, expect) in cases {
-            let object: BTreeMap<String, Value> = object;
-            let event = LogEvent::from(object);
-
-            assert_eq!(
-                event.paths(),
-                expect.map(|vec| vec
-                    .iter()
-                    .map(|s| remap_lang::Path::from_str(s).unwrap())
-                    .collect())
-            );
         }
     }
 }

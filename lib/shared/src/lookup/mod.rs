@@ -9,6 +9,7 @@ pub use lookup_view::{Lookup, Segment};
 mod error;
 mod lookup_buf;
 mod lookup_view;
+mod parser;
 
 // This trait, while it is not necessarily imported and used, exists
 // to enforce parity among view/buf types.

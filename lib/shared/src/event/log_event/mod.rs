@@ -12,7 +12,6 @@ use std::{
     convert::{TryFrom, TryInto},
     fmt::Debug,
     iter::FromIterator,
-    str::FromStr,
 };
 use tracing::{debug, info, instrument, trace, trace_span};
 
@@ -433,8 +432,8 @@ impl LogEvent {
     }
 }
 
-impl remap_lang::Object for LogEvent {
-    fn get(&self, path: &remap_lang::Path) -> Result<Option<remap_lang::Value>, String> {
+impl vrl::Target for LogEvent {
+    fn get(&self, path: &vrl::Path) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             Ok(Some(self.inner().clone().into()))
         } else {
@@ -448,9 +447,9 @@ impl remap_lang::Object for LogEvent {
 
     fn remove(
         &mut self,
-        path: &remap_lang::Path,
+        path: &vrl::Path,
         compact: bool,
-    ) -> Result<Option<remap_lang::Value>, String> {
+    ) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             Ok(Some({
                 let mut value = LogEvent::default();
@@ -467,7 +466,7 @@ impl remap_lang::Object for LogEvent {
         }
     }
 
-    fn insert(&mut self, path: &remap_lang::Path, value: remap_lang::Value) -> Result<(), String> {
+    fn insert(&mut self, path: &vrl::Path, value: vrl::Value) -> Result<(), String> {
         let mut value = Value::from(value);
         if path.is_root() {
             if let Value::Map(_) = value {
@@ -485,17 +484,6 @@ impl remap_lang::Object for LogEvent {
             // TODO: Why does this not return?
             Ok(())
         }
-    }
-
-    fn paths(&self) -> Result<Vec<remap_lang::Path>, String> {
-        self.keys(true)
-            .into_iter()
-            .map(|v| {
-                remap_lang::Path::from_str(v.to_string().as_str())
-                    // TODO: We should not degrade the error to a string here.
-                    .map_err(|v| format!("{:?}", v))
-            })
-            .collect()
     }
 }
 

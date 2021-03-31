@@ -7,7 +7,7 @@ pub mod visitors;
 
 pub use error::EventError;
 pub use log_event::LogEvent;
-pub use metric::{Metric, MetricKind, MetricValue};
+pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use std::{
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
@@ -135,36 +135,29 @@ impl From<Metric> for Event {
     }
 }
 
-impl remap_lang::Object for Event {
-    fn get(&self, path: &remap_lang::Path) -> Result<Option<remap_lang::Value>, String> {
+impl vrl::Target for Event {
+    fn get(&self, path: &vrl::Path) -> Result<Option<vrl::Value>, String> {
         match self {
-            Event::Log(log) => remap_lang::Object::get(log, path),
-            Event::Metric(metric) => remap_lang::Object::get(metric, path),
+            Event::Log(log) => vrl::Target::get(log, path),
+            Event::Metric(metric) => vrl::Target::get(metric, path),
         }
     }
 
     fn remove(
         &mut self,
-        path: &remap_lang::Path,
+        path: &vrl::Path,
         compact: bool,
-    ) -> Result<Option<remap_lang::Value>, String> {
+    ) -> Result<Option<vrl::Value>, String> {
         match self {
-            Event::Log(log) => remap_lang::Object::remove(log, path, compact),
-            Event::Metric(metric) => remap_lang::Object::remove(metric, path, compact),
+            Event::Log(log) => vrl::Target::remove(log, path, compact),
+            Event::Metric(metric) => vrl::Target::remove(metric, path, compact),
         }
     }
 
-    fn insert(&mut self, path: &remap_lang::Path, value: remap_lang::Value) -> Result<(), String> {
+    fn insert(&mut self, path: &vrl::Path, value: vrl::Value) -> Result<(), String> {
         match self {
-            Event::Log(log) => remap_lang::Object::insert(log, path, value),
-            Event::Metric(metric) => remap_lang::Object::insert(metric, path, value),
-        }
-    }
-
-    fn paths(&self) -> Result<Vec<remap_lang::Path>, String> {
-        match self {
-            Event::Log(log) => remap_lang::Object::paths(log),
-            Event::Metric(metric) => remap_lang::Object::paths(metric),
+            Event::Log(log) => vrl::Target::insert(log, path, value),
+            Event::Metric(metric) => vrl::Target::insert(metric, path, value),
         }
     }
 }

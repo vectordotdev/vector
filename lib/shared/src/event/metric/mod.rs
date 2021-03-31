@@ -6,14 +6,13 @@ use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::str::FromStr;
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryFrom,
     fmt::{self, Display, Formatter},
     iter::FromIterator,
 };
-use vrl::{path::Segment, Target};
+use vrl::path::Segment;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Metric {
@@ -726,7 +725,7 @@ enum MetricPathError<'a> {
     InvalidPath { path: &'a str, expected: &'a str },
 }
 
-impl Target for Metric {
+impl vrl::Target for Metric {
     fn insert(&mut self, path: &vrl::Path, value: vrl::Value) -> Result<(), String> {
         if path.is_root() {
             return Err(MetricPathError::SetPathError.to_string());
@@ -754,17 +753,17 @@ impl Target for Metric {
                 );
                 Ok(())
             }
-            [remap_lang::Segment::Field(name)] if name.as_str() == "name" => {
+            [Segment::Field(name)] if name.as_str() == "name" => {
                 let value = value.try_bytes().map_err(|e| e.to_string())?;
                 self.series.name.name = String::from_utf8_lossy(&value).into_owned();
                 Ok(())
             }
-            [remap_lang::Segment::Field(namespace)] if namespace.as_str() == "namespace" => {
+            [Segment::Field(namespace)] if namespace.as_str() == "namespace" => {
                 let value = value.try_bytes().map_err(|e| e.to_string())?;
                 self.series.name.namespace = Some(String::from_utf8_lossy(&value).into_owned());
                 Ok(())
             }
-            [remap_lang::Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {
+            [Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {
                 let value = value.try_timestamp().map_err(|e| e.to_string())?;
                 self.data.timestamp = Some(value);
                 Ok(())

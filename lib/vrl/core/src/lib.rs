@@ -3,7 +3,7 @@ mod runtime;
 
 pub use compiler::{
     function,
-    path::{self, Path},
+    path::{self, Path, Segment, Field},
     state, value, Context, Expression, Function, Program, Target, Value,
 };
 pub use diagnostic;
