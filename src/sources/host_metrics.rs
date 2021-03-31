@@ -568,12 +568,21 @@ impl HostMetricsConfig {
                         heim::disk::usage(partition.mount_point())
                             .await
                             .map_err(|error| {
-                                error!(
-                                    message = "Failed to load partition usage data.",
-                                    mount_point = ?partition.mount_point(),
-                                    %error,
-                                    internal_log_rate_secs = 60,
-                                )
+                                // A common system configuration issue
+                                // causes a symlink loop error when
+                                // calling `statvfs` to load the
+                                // partition usage data. This is a
+                                // nuisance condition only seen on
+                                // pseudo-filesystems, so just silence
+                                // the error message for it.
+                                if !error_is_eloop(&error) {
+                                    error!(
+                                        message = "Failed to load partition usage data.",
+                                        mount_point = ?partition.mount_point(),
+                                        %error,
+                                        internal_log_rate_secs = 60,
+                                    )
+                                }
                             })
                             .map(|usage| (partition, usage))
                             .ok()
@@ -721,6 +730,17 @@ fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
         (metric.series.tags.as_mut().unwrap()).insert("collector".into(), collector.into());
     }
     metrics
+}
+
+fn error_is_eloop(error: &Error) -> bool {
+    #[cfg(unix)]
+    // This uses `fn heim::Error::raw_os_error` that is documented as
+    // "considered to be an internal API". However, there is no other
+    // way to get at the actual error to be able to selectively ignore
+    // certain errors.
+    return matches!(error.raw_os_error(), Some(libc::ELOOP));
+    #[cfg(not(unix))]
+    return false;
 }
 
 pub fn init_roots() {
