@@ -33,7 +33,16 @@ criterion_group!(
               ip_subnet,
               ip_to_ipv6,
               ipv6_to_ipv4,
+              is_array,
+              is_boolean,
+              is_float,
+              is_integer,
+              is_null,
               is_nullish,
+              is_object,
+              is_regex,
+              is_string,
+              is_timestamp,
               join,
               length,
               log,
@@ -355,6 +364,76 @@ bench_function! {
 }
 
 bench_function! {
+    is_array => vrl_stdlib::IsArray;
+
+    string {
+        args: func_args![value: "foobar"],
+        want: Ok(false),
+    }
+
+    array {
+        args: func_args![value: value!([1, 2, 3])],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
+    is_boolean => vrl_stdlib::IsBoolean;
+
+    string {
+        args: func_args![value: "foobar"],
+        want: Ok(false),
+    }
+
+    boolean {
+        args: func_args![value: true],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
+    is_float => vrl_stdlib::IsFloat;
+
+    array {
+        args: func_args![value: value!([1, 2, 3])],
+        want: Ok(false),
+    }
+
+    float {
+        args: func_args![value: 0.577],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
+    is_integer => vrl_stdlib::IsInteger;
+
+    integer {
+        args: func_args![value: 1701],
+        want: Ok(true),
+    }
+
+    object {
+        args: func_args![value: value!({"foo": "bar"})],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
+    is_null => vrl_stdlib::IsNull;
+
+    string {
+        args: func_args![value: "foobar"],
+        want: Ok(false),
+    }
+
+    null {
+        args: func_args![value: value!(null)],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
     is_nullish => vrl_stdlib::IsNullish;
 
     whitespace {
@@ -374,6 +453,62 @@ bench_function! {
 
     not_empty {
         args: func_args![value: "foo"],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
+    is_object => vrl_stdlib::IsObject;
+
+    integer {
+        args: func_args![value: 1701],
+        want: Ok(false),
+    }
+
+    object {
+        args: func_args![value: value!({"foo": "bar"})],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
+    is_regex => vrl_stdlib::IsRegex;
+
+    regex {
+        args: func_args![value: value!(Regex::new(r"\d+").unwrap())],
+        want: Ok(true),
+    }
+
+    object {
+        args: func_args![value: value!({"foo": "bar"})],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
+    is_string => vrl_stdlib::IsString;
+
+    string {
+        args: func_args![value: "foobar"],
+        want: Ok(true),
+    }
+
+    array {
+        args: func_args![value: value!([1, 2, 3])],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
+    is_timestamp => vrl_stdlib::IsTimestamp;
+
+    string {
+        args: func_args![value: Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)],
+        want: Ok(true),
+    }
+
+    array {
+        args: func_args![value: value!([1, 2, 3])],
         want: Ok(false),
     }
 }

@@ -54,8 +54,26 @@ mod ip_subnet;
 mod ip_to_ipv6;
 #[cfg(feature = "ipv6_to_ipv4")]
 mod ipv6_to_ipv4;
+#[cfg(feature = "is_array")]
+mod is_array;
+#[cfg(feature = "is_boolean")]
+mod is_boolean;
+#[cfg(feature = "is_float")]
+mod is_float;
+#[cfg(feature = "is_integer")]
+mod is_integer;
+#[cfg(feature = "is_null")]
+mod is_null;
 #[cfg(feature = "is_nullish")]
 mod is_nullish;
+#[cfg(feature = "is_object")]
+mod is_object;
+#[cfg(feature = "is_regex")]
+mod is_regex;
+#[cfg(feature = "is_string")]
+mod is_string;
+#[cfg(feature = "is_timestamp")]
+mod is_timestamp;
 #[cfg(feature = "join")]
 mod join;
 #[cfg(feature = "length")]
@@ -229,8 +247,26 @@ pub use ip_subnet::IpSubnet;
 pub use ip_to_ipv6::IpToIpv6;
 #[cfg(feature = "ipv6_to_ipv4")]
 pub use ipv6_to_ipv4::Ipv6ToIpV4;
+#[cfg(feature = "is_array")]
+pub use is_array::IsArray;
+#[cfg(feature = "is_boolean")]
+pub use is_boolean::IsBoolean;
+#[cfg(feature = "is_float")]
+pub use is_float::IsFloat;
+#[cfg(feature = "is_integer")]
+pub use is_integer::IsInteger;
+#[cfg(feature = "is_null")]
+pub use is_null::IsNull;
 #[cfg(feature = "is_nullish")]
 pub use is_nullish::IsNullish;
+#[cfg(feature = "is_object")]
+pub use is_object::IsObject;
+#[cfg(feature = "is_regex")]
+pub use is_regex::IsRegex;
+#[cfg(feature = "is_string")]
+pub use is_string::IsString;
+#[cfg(feature = "is_timestamp")]
+pub use is_timestamp::IsTimestamp;
 #[cfg(feature = "join")]
 pub use join::Join;
 #[cfg(feature = "length")]
@@ -394,8 +430,26 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(IpToIpv6),
         #[cfg(feature = "ipv6_to_ipv4")]
         Box::new(Ipv6ToIpV4),
+        #[cfg(feature = "is_array")]
+        Box::new(IsArray),
+        #[cfg(feature = "is_boolean")]
+        Box::new(IsBoolean),
+        #[cfg(feature = "is_float")]
+        Box::new(IsFloat),
+        #[cfg(feature = "is_integer")]
+        Box::new(IsInteger),
+        #[cfg(feature = "is_null")]
+        Box::new(IsNull),
         #[cfg(feature = "is_nullish")]
         Box::new(IsNullish),
+        #[cfg(feature = "is_object")]
+        Box::new(IsObject),
+        #[cfg(feature = "is_regex")]
+        Box::new(IsRegex),
+        #[cfg(feature = "is_string")]
+        Box::new(IsString),
+        #[cfg(feature = "is_timestamp")]
+        Box::new(IsTimestamp),
         #[cfg(feature = "join")]
         Box::new(Join),
         #[cfg(feature = "length")]

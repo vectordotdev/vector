@@ -65,7 +65,16 @@ default = [
     "ip_subnet",
     "ip_to_ipv6",
     "ipv6_to_ipv4",
+    "is_array",
+    "is_boolean",
+    "is_float",
+    "is_integer",
+    "is_null",
     "is_nullish",
+    "is_object",
+    "is_regex",
+    "is_string",
+    "is_timestamp",
     "join",
     "length",
     "log",
@@ -149,7 +158,16 @@ ip_cidr_contains = ["cidr-utils"]
 ip_subnet = ["lazy_static", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []
+is_array = []
+is_boolean = []
+is_float = []
+is_integer = []
+is_null = []
 is_nullish = []
+is_object = []
+is_regex = []
+is_string = []
+is_timestamp = []
 join = []
 length = []
 log = ["tracing"]
