@@ -94,6 +94,23 @@ lazy_static! {
         \s*$                                    # Match any number of whitespaces (to be discarded).
     "#)
     .expect("failed compiling regex for Nginx combined log");
+
+    pub static ref REGEX_NGINX_ERROR_LOG: Regex = Regex::new(
+        r#"(?x)                                         # Ignore whitespace and comments in the regex expression.
+        ^\s*                                            # Start with any number of whitespaces.
+        (?P<timestamp>.+)\s+                            # Match any character until [
+        \[(?P<severity>\w+)\]\s+                        # Match any word character
+        (?P<pid>\d+)\#                                  # Match any number
+        (?P<tid>\d+):\s+                                # Match any number
+        \*(?P<cid>\d+)                                  # Match any number
+        \s+(?P<message>.*)                              # Match any character
+        (,\s+client:\s+(?P<client>.+))                  # Match any character after ', client: '
+        (,\s+server:\s+(?P<server>.+))                  # Match any character after ', server: '
+        (,\s+request:\s+"(?P<request>.+)")              # Match any character after ', request: '
+        (,\s+host:\s+"(?P<host>.+)")    # Match any character then ':' then any character after ', host: '
+        \s*$                                            # Match any number of whitespaces (to be discarded).
+    "#)
+    .expect("failed compiling regex for Nginx error log");
 }
 
 // Parse the time as Utc if we can extract the timezone.
@@ -129,7 +146,7 @@ fn capture_value(
 ) -> std::result::Result<Value, String> {
     Ok(match name {
         "timestamp" => Value::Timestamp(parse_time(&value, &timestamp_format)?),
-        "status" | "size" | "pid" | "port" => Value::Integer(
+        "status" | "size" | "pid" | "tid" | "cid" | "port" => Value::Integer(
             value
                 .parse()
                 .map_err(|_| format!("failed parsing {}", name))?,

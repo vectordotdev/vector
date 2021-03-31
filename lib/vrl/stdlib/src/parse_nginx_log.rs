@@ -1,4 +1,5 @@
 use crate::log_util;
+use regex::Regex;
 use std::collections::BTreeMap;
 use vrl::prelude::*;
 
@@ -54,17 +55,33 @@ impl Function for ParseNginxLog {
                 title: "parse nginx combined log",
                 source: r#"encode_json(parse_nginx_log!(s'172.17.0.1 - - [31/Mar/2021:12:04:07 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/7.75.0" "-"', "combined"))"#,
                 result: Ok(
-                    r#"s'{"client":"172.17.0.1","timestamp":"2032-03-31T12:04:07Z","method":"GET","path":"/","protocol":"HTTP/1.0","status":200,"size":612,"agent":"curl/7.75.0"}'"#,
+                    r#"s'{"agent":"curl/7.75.0","client":"172.17.0.1","method":"GET","path":"/","protocol":"HTTP/1.1","request":"GET / HTTP/1.1","size":612,"status":200,"timestamp":"2021-03-31T12:04:07Z"}'"#,
                 ),
             },
             Example {
                 title: "parse nginx error log",
-                source: r#"encode_json(parse_nginx_log!(s'2021/03/31 12:07:30 [error] 31#31: *6 open() "/usr/share/nginx/html/not-found" failed (2: No such file or directory), client: 172.17.0.1, server: localhost, request: "POST /not-found HTTP/1.1", host: "localhost:8081"', "error"))"#,
+                source: r#"encode_json(parse_nginx_log!(s'2021/04/01 13:02:31 [error] 31#31: *1 open() "/usr/share/nginx/html/not-found" failed (2: No such file or directory), client: 172.17.0.1, server: localhost, request: "POST /not-found HTTP/1.1", host: "localhost:8081"', "error"))"#,
                 result: Ok(
-                    r#"s'{"client":"172.17.0.1","message":"I will bypass the haptic COM bandwidth, that should matrix the CSS driver!","module":"ab","pid":4803,"port":24259,"severity":"alert","thread":"3814","timestamp":"2021-03-01T12:00:19Z"}'"#,
+                    r#"s'{"cid":1,"client":"172.17.0.1","host":"localhost:8081","message":"open() \"/usr/share/nginx/html/not-found\" failed (2: No such file or directory)","pid":31,"request":"POST /not-found HTTP/1.1","server":"localhost","severity":"error","tid":31,"timestamp":"2021-04-01T13:02:31Z"}'"#,
                 ),
             },
         ]
+    }
+}
+
+fn regex_for_format(format: &[u8]) -> &Regex {
+    match format {
+        b"combined" => &*log_util::REGEX_NGINX_COMBINED_LOG,
+        b"error" => &*log_util::REGEX_NGINX_ERROR_LOG,
+        _ => unreachable!(),
+    }
+}
+
+fn time_format_for_format(format: &[u8]) -> String {
+    match format {
+        b"combined" => "%d/%b/%Y:%T %z".to_owned(),
+        b"error" => "%Y/%m/%d %H:%M:%S".to_owned(),
+        _ => unreachable!(),
     }
 }
 
@@ -80,18 +97,14 @@ impl Expression for ParseNginxLogFn {
         let bytes = self.value.resolve(ctx)?;
         let message = bytes.try_bytes_utf8_lossy()?;
         let timestamp_format = match &self.timestamp_format {
-            None => "%d/%b/%Y:%T %z".to_owned(),
+            None => time_format_for_format(self.format.as_ref()),
             Some(timestamp_format) => timestamp_format
                 .resolve(ctx)?
                 .try_bytes_utf8_lossy()?
                 .to_string(),
         };
 
-        let regex = match self.format.as_ref() {
-            b"combined" => &*log_util::REGEX_NGINX_COMBINED_LOG,
-            b"error" => &*log_util::REGEX_APACHE_ERROR_LOG,
-            _ => unreachable!(),
-        };
+        let regex = regex_for_format(self.format.as_ref());
 
         let captures = regex.captures(&message).ok_or("failed parsing log line")?;
 
@@ -111,15 +124,15 @@ impl Expression for ParseNginxLogFn {
 
 fn type_def_combined() -> BTreeMap<&'static str, TypeDef> {
     map! {
-         "client": Kind::Bytes | Kind::Null,
+         "client": Kind::Bytes,
          "user": Kind::Bytes | Kind::Null,
-         "timestamp": Kind::Timestamp | Kind::Null,
-         "request": Kind::Bytes | Kind::Null,
-         "method": Kind::Bytes | Kind::Null,
-         "path": Kind::Bytes | Kind::Null,
-         "protocol": Kind::Bytes | Kind::Null,
-         "status": Kind::Integer | Kind::Null,
-         "size": Kind::Integer | Kind::Null,
+         "timestamp": Kind::Timestamp,
+         "request": Kind::Bytes,
+         "method": Kind::Bytes,
+         "path": Kind::Bytes,
+         "protocol": Kind::Bytes,
+         "status": Kind::Integer,
+         "size": Kind::Integer,
          "referrer": Kind::Bytes | Kind::Null,
          "agent": Kind::Bytes | Kind::Null,
          "compression": Kind::Bytes | Kind::Null,
@@ -128,12 +141,17 @@ fn type_def_combined() -> BTreeMap<&'static str, TypeDef> {
 
 fn type_def_error() -> BTreeMap<&'static str, TypeDef> {
     map! {
-         "timestamp": Kind::Timestamp | Kind::Null,
-         "severity": Kind::Bytes | Kind::Null,
-         "module": Kind::Bytes | Kind::Null,
-         "thread": Kind::Bytes | Kind::Null,
+         "timestamp": Kind::Timestamp,
+         "severity": Kind::Bytes,
+         "pid": Kind::Integer,
+         "tid": Kind::Integer,
+         "cid": Kind::Integer,
+         "message": Kind::Bytes,
+         "client": Kind::Bytes | Kind::Null,
+         "server": Kind::Bytes | Kind::Null,
+         "request": Kind::Bytes | Kind::Null,
+         "host": Kind::Bytes | Kind::Null,
          "port": Kind::Bytes | Kind::Null,
-         "message": Kind::Bytes | Kind::Null,
     }
 }
 
@@ -183,6 +201,25 @@ mod tests {
                 "compression" => "2.75",
             }),
             tdef: TypeDef::new().fallible().object(type_def_combined()),
+        }
+
+        error_line_valid {
+            args: func_args![value: r#"2021/04/01 13:02:31 [error] 31#31: *1 open() "/usr/share/nginx/html/not-found" failed (2: No such file or directory), client: 172.17.0.1, server: localhost, request: "POST /not-found HTTP/1.1", host: "localhost:8081""#,
+            format: "error"
+            ],
+            want: Ok(btreemap! {
+                "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339("2021-04-01T13:02:31Z").unwrap().into()),
+                "severity" => "error",
+                "pid" => 31,
+                "tid" => 31,
+                "cid" => 1,
+                "message" => "open() \"/usr/share/nginx/html/not-found\" failed (2: No such file or directory)",
+                "client" => "172.17.0.1",
+                "server" => "localhost",
+                "request" => "POST /not-found HTTP/1.1",
+                "host" => "localhost:8081",
+            }),
+            tdef: TypeDef::new().fallible().object(type_def_error()),
         }
     ];
 }
