@@ -654,18 +654,28 @@ mod tests {
                   print_amount = 100000
             "#;
 
+            println!("api_graphql_component_removed_subscription 0");
+
             let mut topology = from_str_config(conf).await;
+
+            println!("api_graphql_component_removed_subscription 1");
 
             let server = api::Server::start(topology.config());
             let client = new_subscription_client(server.addr()).await;
 
+            println!("api_graphql_component_removed_subscription 2");
+
             // Spawn a handler for listening to changes
             let handle = tokio::spawn(async move {
+                println!("api_graphql_component_removed_subscription 3");
+
                 let subscription = client.component_removed();
 
                 tokio::pin! {
                     let component_removed = subscription.stream();
                 }
+
+                println!("api_graphql_component_removed_subscription 4");
 
                 assert_eq!(
                     "component_removed_source_2",
@@ -679,10 +689,16 @@ mod tests {
                         .component_removed
                         .name,
                 );
+
+                println!("api_graphql_component_removed_subscription 5");
             });
+
+            println!("api_graphql_component_removed_subscription 6");
 
             // After a short delay, update the config to remove `gen2`
             tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+            println!("api_graphql_component_removed_subscription 7");
 
             // New configuration that will be reloaded
             conf = r#"
@@ -704,11 +720,20 @@ mod tests {
 
             let c = config::load_from_str(conf, Some(Format::TOML)).unwrap();
 
+            println!("api_graphql_component_removed_subscription 8");
+
             topology.reload_config_and_respawn(c).await.unwrap();
+
+            println!("api_graphql_component_removed_subscription 9");
+
             server.update_config(topology.config());
+
+            println!("api_graphql_component_removed_subscription 10");
 
             // Await the join handle
             handle.await.unwrap();
+
+            println!("api_graphql_component_removed_subscription 11");
         })
     }
 
