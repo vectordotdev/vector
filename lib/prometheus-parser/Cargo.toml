@@ -13,7 +13,7 @@ indexmap = "1.6.2"
 nom = "6.0.1"
 num_enum = "0.5.1"
 prost = "0.6.1"
-prost-types = "0.6.1"
+prost-types = "0.7.0"
 snafu = { version = "0.6" }
 
 [build-dependencies]

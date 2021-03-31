@@ -141,7 +141,7 @@ serde_yaml = { version ="0.8.13" }
 
 # Prost
 prost = "0.6.1"
-prost-types = "0.6.1"
+prost-types = "0.7.0"
 
 # GCP
 goauth = { version = "0.8.1", optional = true }
