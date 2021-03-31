@@ -102,46 +102,65 @@ mod tests {
     // Returns the result of a URL test against the API. Wraps the test in retry_until
     // to guard against the race condition of the TCP listener not being ready
     async fn url_test(config: Config, url: &'static str) -> reqwest::Response {
+        println!("url_test 0");
         let addr = config.api.address.unwrap();
         let url = format!("http://{}:{}/{}", addr.ip(), addr.port(), url);
 
         let _server = api::Server::start(&config);
+        println!("url_test 1");
 
         // Build the request
         let client = reqwest::Client::new();
 
-        retry_until(
+        let response = retry_until(
             || client.get(&url).send(),
             Duration::from_millis(100),
             Duration::from_secs(10),
         )
-        .await
+        .await;
+        println!("url_test 2 END");
+
+        response
     }
 
     // Creates and returns a new subscription client. Connection is re-attempted until
     // the specified timeout
     async fn new_subscription_client(addr: SocketAddr) -> SubscriptionClient {
+        println!("new_subscription_client 0");
         let url = Url::parse(&*format!("ws://{}/graphql", addr)).unwrap();
 
-        retry_until(
+        let response = retry_until(
             || connect_subscription_client(url.clone()),
             Duration::from_millis(50),
             Duration::from_secs(10),
         )
-        .await
+        .await;
+
+        println!("new_subscription_client 1 END");
+
+        response
     }
 
     // Emits fake generate events every 10ms until the returned shutdown falls out of scope
     fn emit_fake_generator_events() -> oneshot::Sender<()> {
+        println!("emit_fake_generator_events 0");
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
         tokio::spawn(async move {
+            println!("emit_fake_generator_events 1");
             IntervalStream::new(tokio::time::interval(Duration::from_millis(10)))
                 .take_until(shutdown_rx)
                 .for_each(|_| async { emit(GeneratorEventProcessed) })
-                .await
+                .await;
+            println!("emit_fake_generator_events 2");
         });
 
-        shutdown_tx
+        println!("emit_fake_generator_events 3");
+
+        let sender = shutdown_tx;
+
+        println!("emit_fake_generator_events 4 END");
+
+        sender
     }
 
     async fn new_heartbeat_subscription(
@@ -149,7 +168,9 @@ mod tests {
         num_results: usize,
         interval: i64,
     ) {
+        println!("new_heartbeat_subscription 0");
         let subscription = client.heartbeat_subscription(interval);
+        println!("new_heartbeat_subscription 1");
 
         tokio::pin! {
             let heartbeats = subscription.stream().take(num_results);
@@ -171,15 +192,23 @@ mod tests {
                 .utc
                 - now;
 
+            println!("new_heartbeat_subscription 2 {}/{}", mul, num_results);
+
             assert!(diff.num_milliseconds() >= mul as i64 * interval);
         }
 
+        println!("new_heartbeat_subscription 3");
+
         // Stream should have stopped after `num_results`
         assert_matches!(heartbeats.next().await, None);
+
+        println!("new_heartbeat_subscription 4 END");
     }
 
     async fn new_uptime_subscription(client: &SubscriptionClient) {
+        println!("new_uptime_subscription 0");
         let subscription = client.uptime_subscription();
+        println!("new_uptime_subscription 1");
 
         tokio::pin! {
             let uptime = subscription.stream().skip(1);
@@ -198,7 +227,9 @@ mod tests {
                 .uptime
                 .seconds
                 > 0.00
-        )
+        );
+
+        println!("new_uptime_subscription 2 END");
     }
 
     async fn new_processed_events_total_subscription(
@@ -206,10 +237,13 @@ mod tests {
         num_results: usize,
         interval: i64,
     ) {
+        println!("new_processed_events_total_subscription 0");
         // Emit events for the duration of the test
         let _shutdown = emit_fake_generator_events();
+        println!("new_processed_events_total_subscription 1");
 
         let subscription = client.processed_events_total_subscription(interval);
+        println!("new_processed_events_total_subscription 2");
 
         tokio::pin! {
             let processed_events_total = subscription.stream().take(num_results);
@@ -217,7 +251,7 @@ mod tests {
 
         let mut last_result = 0.0;
 
-        for _ in 0..num_results {
+        for i in 0..num_results {
             let ep = processed_events_total
                 .next()
                 .await
@@ -228,55 +262,83 @@ mod tests {
                 .processed_events_total
                 .processed_events_total;
 
+            println!(
+                "new_processed_events_total_subscription 3 {}/{}",
+                i, num_results
+            );
+
             assert!(ep > last_result);
-            last_result = ep
+            last_result = ep;
+
+            println!("new_processed_events_total_subscription 4");
         }
+
+        println!("new_processed_events_total_subscription 5 END");
     }
 
     #[tokio::test]
     /// Tests the /health endpoint returns a 200 responses (non-GraphQL)
     async fn api_health() {
+        println!("api_health 0");
         let res = url_test(api_enabled_config(), "health")
             .await
             .text()
             .await
             .unwrap();
 
+        println!("api_health 1");
+
         assert!(res.contains("ok"));
+
+        println!("api_health 2 END");
     }
 
     #[tokio::test]
     /// Tests that the API playground is enabled when playground = true (implicit)
     async fn api_playground_enabled() {
+        println!("api_playground_enabled 0");
         let mut config = api_enabled_config();
         config.api.playground = true;
+        println!("api_playground_enabled 1");
 
         let res = url_test(config, "playground").await.status();
+        println!("api_playground_enabled 2");
 
         assert!(res.is_success());
+
+        println!("api_playground_enabled 3 END");
     }
 
     #[tokio::test]
     /// Tests that the /playground URL is inaccessible if it's been explicitly disabled
     async fn api_playground_disabled() {
+        println!("api_playground_disabled 0");
         let mut config = api_enabled_config();
         config.api.playground = false;
+        println!("api_playground_disabled 1");
 
         let res = url_test(config, "playground").await.status();
+        println!("api_playground_disabled 2");
 
         assert!(res.is_client_error());
+        println!("api_playground_disabled 3 END");
     }
 
     #[tokio::test]
     /// Tests the health query
     async fn api_graphql_health() {
+        println!("api_graphql_health 0");
         let server = start_server();
         let client = make_client(server.addr());
+        println!("api_graphql_health 1");
 
         let res = client.health_query().await.unwrap();
+        println!("api_graphql_health 2");
 
         assert!(res.data.unwrap().health);
         assert_eq!(res.errors, None);
+
+        println!("api_graphql_health 3 END");
     }
 
     #[test]
