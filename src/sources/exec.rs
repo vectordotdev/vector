@@ -474,7 +474,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
         // in other methods to end the reading
         while let Ok(bytes_read) = reader.read(&mut read_buffer).await {
             if bytes_read == 0 {
-                info!("End of input reached, stop reading");
+                info!("End of input reached, stop reading.");
                 break;
             } else {
                 let read_byte = read_buffer[0];
@@ -491,7 +491,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
                             break;
                         }
                     } else {
-                        info!("Invalid utf8, stop reading");
+                        info!("Invalid utf8, stop reading.");
                         break;
                     }
                 } else {
@@ -503,7 +503,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
                                 break;
                             }
                         } else {
-                            info!("Invalid utf8, stop reading");
+                            info!("Invalid utf8, stop reading.");
                             break;
                         }
                     }
@@ -516,10 +516,10 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
             if let Some(buffer_string) = buffer_to_string(&mut buffer, true) {
                 let _ = sender.send((buffer_string, stream)).await;
                 if !buffer.is_empty() {
-                    info!("Invalid utf8, left in buffer");
+                    info!("Invalid utf8, left in buffer.");
                 }
             } else {
-                info!("Invalid utf8, left in buffer");
+                info!("Invalid utf8, left in buffer.");
             }
         }
 
@@ -807,89 +807,6 @@ mod tests {
             assert_eq!(9, counter);
         } else {
             panic!("Expected to receive an end of process linux event");
-        }
-    }
-
-    #[tokio::test]
-    #[cfg(target_os = "windows")]
-    async fn test_run_command_windows() {
-        trace_init();
-        let config = standard_scheduled_windows_test_config();
-
-        let (tx, mut rx) = Pipeline::new_test();
-        let shutdown = ShutdownSignal::noop();
-
-        // Wait for our task to finish, wrapping it in a timeout
-        let timeout = tokio::time::timeout(
-            time::Duration::from_secs(5),
-            run_command(config.clone(), shutdown, tx),
-        );
-
-        let timeout_result = timeout.await;
-
-        match timeout_result {
-            Ok(output) => match output {
-                Ok(exit_status) => assert_eq!(0_i32, exit_status.unwrap().code().unwrap()),
-                Err(_) => panic!("Unable to run windows command"),
-            },
-            Err(_) => panic!("Timed out during test of run windows command."),
-        }
-
-        if let Ok(event) = rx.try_recv() {
-            let log = event.as_log();
-            assert_eq!(log[COMMAND_KEY], config.command.clone().into());
-            assert_eq!(log[DATA_STREAM_KEY], STDOUT.into());
-            assert_eq!(log[log_schema().source_type_key()], "exec".into());
-            assert_ne!(log[log_schema().message_key()], "".into());
-            assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
-            assert_ne!(log[PID_KEY], "".into());
-            assert_ne!(log[log_schema().timestamp_key()], "".into());
-
-            let mut counter = 0;
-            for _ in log.all_fields() {
-                counter += 1;
-            }
-
-            assert_eq!(8, counter);
-        } else {
-            panic!("Expected to receive a windows event");
-        }
-
-        if let Ok(event) = rx.try_recv() {
-            let log = event.as_log();
-            assert_eq!(log[COMMAND_KEY], config.command.clone().into());
-            assert_eq!(log[log_schema().source_type_key()], "exec".into());
-            assert_eq!(log[log_schema().message_key()], "".into());
-            assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
-            assert_eq!(log[EXIT_STATUS_KEY], (0_i64).into());
-            assert_ne!(log[PID_KEY], "".into());
-            assert_ne!(log[EXEC_DURATION_MILLIS_KEY], "".into());
-            assert_ne!(log[log_schema().timestamp_key()], "".into());
-
-            let mut counter = 0;
-            for _ in log.all_fields() {
-                counter += 1;
-            }
-
-            assert_eq!(9, counter);
-        } else {
-            panic!("Expected to receive an end of process windows event");
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    fn standard_scheduled_windows_test_config() -> ExecConfig {
-        ExecConfig {
-            mode: Mode::Scheduled {
-                exec_interval_secs: default_exec_interval_secs(),
-            },
-            command: "dir".to_owned(),
-            arguments: None,
-            current_dir: None,
-            include_stderr: Some(true),
-            event_per_line: false,
-            maximum_buffer_size: default_maximum_buffer_size(),
-            hostname: Some("Some.Machine".to_string()),
         }
     }
 
