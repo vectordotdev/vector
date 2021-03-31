@@ -66,7 +66,7 @@ mod tests {
         is_null => IsNull;
 
         array {
-            args: func_args![value: value!([1, 2, 3])],
+            args: func_args![value: value!(null)],
             want: Ok(value!(true)),
             tdef: TypeDef::new().infallible().boolean(),
         }
