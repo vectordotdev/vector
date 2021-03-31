@@ -844,14 +844,30 @@ mod integration_tests {
     use futures::stream;
 
     #[tokio::test]
-    async fn insert_metrics_over_https() {
+    async fn inserts_metrics_v1_over_https() {
+        insert_metrics_v1(
+            "https://localhost:8087",
+            Some(TlsOptions {
+                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+                ..Default::default()
+            }),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn inserts_metrics_v1_over_http() {
+        insert_metrics_v1("http://localhost:8086", None).await
+    }
+
+    async fn insert_metrics_v1(url: &str, tls: Option<TlsOptions>) {
         crate::test_util::trace_init();
-        let database = onboarding_v1("https://localhost:8087").await;
+        let database = onboarding_v1(url).await;
 
         let cx = SinkContext::new_test();
 
         let config = InfluxDbConfig {
-            endpoint: "https://localhost:8087".to_string(),
+            endpoint: url.to_string(),
             influxdb1_settings: Some(InfluxDb1Settings {
                 consistency: None,
                 database: database.clone(),
@@ -862,10 +878,7 @@ mod integration_tests {
             influxdb2_settings: None,
             batch: Default::default(),
             request: Default::default(),
-            tls: Some(TlsOptions {
-                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
-                ..Default::default()
-            }),
+            tls,
             quantiles: default_summary_quantiles(),
             tags: None,
             default_namespace: None,
@@ -875,11 +888,7 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.expect("error when building config");
         sink.run(stream::iter(events)).await.unwrap();
 
-        let res = query_v1(
-            "https://localhost:8087",
-            &format!("show series on {}", database),
-        )
-        .await;
+        let res = query_v1(url, &format!("show series on {}", database)).await;
         let string = res.text().await.unwrap();
         let res: serde_json::Value =
             serde_json::from_str(&string).expect("error when parsing InfluxDB response JSON");
@@ -908,7 +917,7 @@ mod integration_tests {
             10
         );
 
-        cleanup_v1("https://localhost:8087", &database).await;
+        cleanup_v1(url, &database).await;
     }
 
     #[tokio::test]
