@@ -9,7 +9,7 @@ use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Validator};
 use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
-use vrl::{diagnostic::Formatter, state, value, Abort, Runtime, RuntimeResult, Target, Value};
+use vrl::{diagnostic::Formatter, state, value, Runtime, RuntimeResult, Target, Terminate, Value};
 
 // Create a list of all possible error values for potential docs lookup
 lazy_static! {
@@ -132,7 +132,7 @@ fn resolve(
     let program = match vrl::compile_with_state(program, &stdlib::all(), state) {
         Ok(program) => program,
         Err(diagnostics) => {
-            return Err(Abort(
+            return Err(Terminate::Error(
                 Formatter::new(program, diagnostics).colored().to_string(),
             ))
         }
