@@ -2,6 +2,7 @@ use crate::metrics::registry::VectorRegistry;
 use metrics::{GaugeValue, Key, Recorder, Unit};
 use metrics_util::{CompositeKey, Handle, MetricKind};
 use std::sync::mpsc;
+use std::time::Duration;
 
 pub(crate) enum Recording {
     RegisterCounter(Key),
@@ -73,6 +74,42 @@ pub(crate) struct InnerRecorder {
     registry: VectorRegistry<CompositeKey, Handle>,
 }
 
+fn populate<'a>(buffer: &mut Vec<Recording>, registry: &mut VectorRegistry<CompositeKey, Handle>) {
+    use Recording::*;
+    let mut map = registry.map.lock().expect("metrics map poisoned");
+    for recording in buffer.drain(..) {
+        match recording {
+            RegisterCounter(key) => {
+                let ckey = CompositeKey::new(MetricKind::COUNTER, key);
+                map.entry(ckey).or_insert_with(|| Handle::counter());
+            }
+            RegisterGauge(key) => {
+                let ckey = CompositeKey::new(MetricKind::GAUGE, key);
+                map.entry(ckey).or_insert_with(|| Handle::gauge());
+            }
+            RegisterHistogram(key) => {
+                let ckey = CompositeKey::new(MetricKind::HISTOGRAM, key);
+                map.entry(ckey).or_insert_with(|| Handle::histogram());
+            }
+            IncrementCounter(key, value) => {
+                let ckey = CompositeKey::new(MetricKind::COUNTER, key);
+                let counter = map.entry(ckey).or_insert_with(|| Handle::counter());
+                counter.increment_counter(value);
+            }
+            UpdateGauge(key, value) => {
+                let ckey = CompositeKey::new(MetricKind::GAUGE, key);
+                let gauge = map.entry(ckey).or_insert_with(|| Handle::gauge());
+                gauge.update_gauge(value);
+            }
+            RecordHistogram(key, value) => {
+                let ckey = CompositeKey::new(MetricKind::HISTOGRAM, key);
+                let histogram = map.entry(ckey).or_insert_with(|| Handle::histogram());
+                histogram.record_histogram(value);
+            }
+        }
+    }
+}
+
 impl InnerRecorder {
     pub(crate) fn new(
         chan: mpsc::Receiver<Recording>,
@@ -81,38 +118,19 @@ impl InnerRecorder {
         Self { chan, registry }
     }
 
-    pub(crate) fn run(self) {
-        while let Ok(recording) = self.chan.recv() {
-            use Recording::*;
-            let mut map = self.registry.map.lock().expect("metrics map poisoned");
-            match recording {
-                RegisterCounter(key) => {
-                    let ckey = CompositeKey::new(MetricKind::COUNTER, key);
-                    map.entry(ckey).or_insert_with(|| Handle::counter());
-                }
-                RegisterGauge(key) => {
-                    let ckey = CompositeKey::new(MetricKind::GAUGE, key);
-                    map.entry(ckey).or_insert_with(|| Handle::gauge());
-                }
-                RegisterHistogram(key) => {
-                    let ckey = CompositeKey::new(MetricKind::HISTOGRAM, key);
-                    map.entry(ckey).or_insert_with(|| Handle::histogram());
-                }
-                IncrementCounter(key, value) => {
-                    let ckey = CompositeKey::new(MetricKind::COUNTER, key);
-                    let counter = map.entry(ckey).or_insert_with(|| Handle::counter());
-                    counter.increment_counter(value);
-                }
-                UpdateGauge(key, value) => {
-                    let ckey = CompositeKey::new(MetricKind::GAUGE, key);
-                    let gauge = map.entry(ckey).or_insert_with(|| Handle::gauge());
-                    gauge.update_gauge(value);
-                }
-                RecordHistogram(key, value) => {
-                    let ckey = CompositeKey::new(MetricKind::HISTOGRAM, key);
-                    let histogram = map.entry(ckey).or_insert_with(|| Handle::histogram());
-                    histogram.record_histogram(value);
-                }
+    pub(crate) fn run(mut self) {
+        let max_buffer = 1024;
+        let mut buffer = Vec::with_capacity(max_buffer);
+        loop {
+            if buffer.len() >= max_buffer {
+                populate(&mut buffer, &mut self.registry);
+            }
+
+            let resp = self.chan.recv_timeout(Duration::from_secs(10));
+            match resp {
+                Err(mpsc::RecvTimeoutError::Disconnected) => return,
+                Err(mpsc::RecvTimeoutError::Timeout) => populate(&mut buffer, &mut self.registry),
+                Ok(recording) => buffer.push(recording),
             }
         }
     }
