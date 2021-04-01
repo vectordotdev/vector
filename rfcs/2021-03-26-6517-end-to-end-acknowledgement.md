@@ -144,48 +144,50 @@ metadata required to track the event status.
 
 When instantiated, the topology will provide each source with a unique
 identifier for the token. The source may use this identifier to create
-one or more communication chnanels, each with their own unique
+one or more notification channels, each with their own unique
 identifier. This provides both a unique identifier of the source that
 needs to receive the event finalization status as well as the mechanism
 for delivering the event identifier and status.
 
-The finalization status is delivered when the last copy of the event is
+The finalization status is recorded when the last copy of the event is
 dropped. At that time, the finalization status stored in the event is
-delivered to all the sources. Since events may be internally dropped
-when they are merged, a special "no-op" status is used to indicate that
-no status needs to be delivered to prevent premature notifications.
+recorded in a batch status buffer. Since events may be internally
+dropped when they are merged, a special "no-op" status is used to
+indicate that no status needs to be recorded to prevent superfluous
+status updates. When the last copy of the batch status is dropped, it is
+sent to the source.
 
 ### Event metadata
 
 Given the channel above, the following source metadata will be added to events:
 
 1. A finalization status, to be delivered to all sources.
-2. An array of event sources, containing:
-   1. An event identifier, contained in a new enum type.
-   2. A reference to a source handle, which is a dual-purpose structure containing:
-      1. The finalization channel, to be used when actually delivering the status.
-      2. The unique source identifier, to be used when serializing the metadata.
+2. An array of event sources.
+
+Each event source is a shared reference to a batch notifier, containing:
+
+1. The final status indicator. This will default to a success indicator,
+   but may be set to indicate failure if any event in the batch fails
+   delivery.
+2. A one-shot notification channel to the source.
+3. The unique identifier used to recreate the channel after deserialization.
 
 ### Data structures
 
 ```rust
 struct EventMetadata {
-    // existing fields
-    finalizer: Arc<EventFinalizer>,
+    // … existing fields …
+    finalizer: Option<Arc<EventFinalizer>>,
 }
 
 struct EventFinalizer {
     status: EventStatus,
-    sources: Box<[EventSource]>,
+    sources: Box<[Arc<BatchNotifier>]>,
 }
 
-struct EventSource {
-    source: SourceHandle,
-    id: EventId,
-}
-
-struct SourceHandle {
-    receiver: tokio::sync::mpsc::Sender<EventFinalization>,
+struct BatchNotifier {
+    status: Mutex<BatchStatus>,
+    notifier: tokio::sync::oneshot::Sender<BatchStatus>,
     identifier: ImmStr,
 }
 
@@ -194,10 +196,9 @@ struct EventFinalization {
     status: EventStatus,
 }
 
-enum EventId {
-    Number(u64),
-    SenderNumber(u64, u64),
-    // additional variants as required
+enum BatchStatus {
+    Delivered,
+    Failed,
 }
 
 enum EventStatus {
@@ -251,7 +252,7 @@ event.
 
 ```rust
 struct SinkOuter {
-    // …existing fields…
+    // … existing fields …
 
     #[serde(default)]
     authoritative: bool,
@@ -278,10 +279,11 @@ We would also need to document when acknowledgement happens for each source.
 The above structure provides for several considerations:
 
 1.  This the minimum amount of data that can be added to the metadata to
-    fully support this feature.
+    fully support this feature, amounting to a single shared reference
+    as the `Option` is optimized into the `Arc`.
 
-2.  Each source element is fixed size and requires no additional
-    allocations.
+2.  The use of `Arc` reference counting for finalization prevents events
+    from "escaping" without providing a status indication.
 
 3.  If a source does not need or is not configured to require
     finalization, it will not contribute to the list of sources and so
@@ -297,32 +299,21 @@ The above structure provides for several considerations:
 
 ## Drawbacks
 
-1.  This adds a substantial base size overhead to each event (minimum of
-    two words), even for configurations that do not support or require
-    end-to-end acknowledgement.
+1.  This adds a base size overhead to each event, even for
+    configurations that do not support or require end-to-end
+    acknowledgement.
 
 ## Alternatives
 
-1.  The set of sources could be stored in a more customary
-    `Vec<EventSource>`. This provides for merging multiple sources with
-    a minimum of code. However, the data added to the event structure
-    then grows by an additional word.
+1.  The set of sources could be stored in a more customary `Vec`. This
+    provides for merging multiple sources with a minimum of
+    code. However, merged events already have other overhead, and it
+    increases the data required for this array by an additional word.
 
-2.  The source could be stored as simply the unique
-    identifier string. This requires that all reporting of finalization
-    status proceed through a dictionary lookup instead of simply sending
-    it through a channel, increasing the run-time overhead.
-
-3.  Due to the variety of source event identifiers, two other
-    possibilities for the `SourceId` type would be either a `Box<dyn
-    SourceIdTrait>` or a `Box<str>`. Both of these are only two words
-    long, which will likely be smaller than the final size of `enum
-    SourceId` once all required variants are covered. However, since
-    both of these are variably sized, they would require an additional
-    allocation, negating any benefits they would provide in flexibility.
-    Additionally, while a string is a simple and well understood data
-    type, storing the required data in a string requires additional
-    serializing and deserializing steps to use the data.
+2.  The source could be stored as simply the unique identifier
+    string. This requires that all reporting of finalization status
+    proceed through a dictionary lookup instead of simply sending it
+    through a channel, increasing the run-time overhead.
 
 ## Outstanding Questions
 
@@ -338,8 +329,16 @@ The above structure provides for several considerations:
    it is difficult to measure the effects of data layout changes and
    other secondary effects.
 
+3. Does the batch status indicator need to be multi-valued instead of a
+   single indicator? This may be handled by decomposing the shared
+   status indicator into a shared array and an index into that
+   array. However, I am not aware that any source requires
+   distinguishing which part of a batch failed to deliver.
+
 ## Plan Of Attack
 
   * [ ] Introduce `struct SourceContext`
   * [ ] Set up unique source identifiers
-  * [ ] _TBD_
+  * [ ] Set up source metadata and event drop handling
+  * [ ] Modify sinks to provide finalization notification
+  * [ ] Modify sources to provide finalization handling
