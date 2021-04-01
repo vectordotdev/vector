@@ -337,8 +337,8 @@ The above structure provides for several considerations:
 
 ## Plan Of Attack
 
-  * [ ] Introduce `struct SourceContext`
-  * [ ] Set up unique source identifiers
-  * [ ] Set up source metadata and event drop handling
-  * [ ] Modify sinks to provide finalization notification
-  * [ ] Modify sources to provide finalization handling
+* [ ] Introduce `struct SourceContext`
+* [ ] Set up unique source identifiers
+* [ ] Set up source metadata and event drop handling
+* [ ] Modify sinks to provide finalization notification
+* [ ] Modify sources to provide finalization handling
