@@ -2,19 +2,19 @@
 extern crate tracing;
 
 use tracing::Dispatch;
-use tracing_limit::RateLimitedLayer;
-use tracing_subscriber::layer::SubscriberExt;
+use tracing_limit::RateLimitedSubscriber;
+use tracing_subscriber::prelude::*;
 
 fn main() {
     let subscriber = tracing_subscriber::registry::Registry::default()
-        .with(RateLimitedLayer::new(
-            tracing_subscriber::fmt::Layer::default().without_time(),
+        .with(RateLimitedSubscriber::new(
+            tracing_subscriber::fmt::Subscriber::default().without_time(),
         ))
         .with(tracing_subscriber::filter::EnvFilter::from("trace"));
 
     let dispatch = Dispatch::new(subscriber);
 
-    tracing::dispatcher::with_default(&dispatch, || {
+    tracing::dispatch::with_default(&dispatch, || {
         for i in 0..40 {
             trace!("This field is not rate limited!");
             info!(

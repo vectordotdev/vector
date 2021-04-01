@@ -6,10 +6,11 @@ mod support;
 
 #[cfg(all(feature = "api", feature = "vector-api-client"))]
 mod tests {
-    use crate::support::{fork_test, sink, source_with_event_counter, transform};
+    use crate::support::{sink, source_with_event_counter, transform};
     use chrono::Utc;
     use futures::StreamExt;
     use metrics::counter;
+    use serial_test::serial;
     use std::{
         collections::HashMap,
         net::SocketAddr,
@@ -37,6 +38,7 @@ mod tests {
 
     // Initialize the metrics system.
     fn init_metrics() -> oneshot::Sender<()> {
+        println!("--- init metrics");
         vector::trace::init(true, true, "info");
         let _ = vector::metrics::init();
 
@@ -52,12 +54,27 @@ mod tests {
         shutdown_tx
     }
 
+    fn reset_metrics() {
+        println!("--- reset metrics");
+        vector::trace::reset();
+        vector::metrics::reset();
+    }
+
     /// Invokes `fork_test`, and initializes metrics
-    fn metrics_test<T: std::future::Future>(test_name: &'static str, fut: T) {
-        fork_test(test_name, async move {
-            let _metrics = init_metrics();
-            fut.await;
-        })
+    async fn metrics_test<T: std::future::Future>(fut: T) {
+        reset_metrics();
+        let _metrics = init_metrics();
+
+        struct ResetMetrics;
+        impl Drop for ResetMetrics {
+            fn drop(&mut self) {
+                reset_metrics();
+            }
+        }
+
+        let _reset_metrics = ResetMetrics;
+
+        fut.await;
     }
 
     // Provides a config that enables the API server, assigned to a random port. Implicitly
@@ -277,6 +294,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     /// Tests the /health endpoint returns a 200 responses (non-GraphQL)
     async fn api_health() {
         println!("api_health 0");
@@ -294,6 +312,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     /// Tests that the API playground is enabled when playground = true (implicit)
     async fn api_playground_enabled() {
         println!("api_playground_enabled 0");
@@ -310,6 +329,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     /// Tests that the /playground URL is inaccessible if it's been explicitly disabled
     async fn api_playground_disabled() {
         println!("api_playground_disabled 0");
@@ -325,6 +345,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     /// Tests the health query
     async fn api_graphql_health() {
         println!("api_graphql_health 0");
@@ -341,123 +362,123 @@ mod tests {
         println!("api_graphql_health 3 END");
     }
 
-    #[test]
+    #[tokio::test]
+    #[serial]
     /// Tests links between components
-    fn api_graphql_component_links() {
-        fork_test("tests::api_graphql_component_links", async {
-            println!("api_graphql_component_links 0");
-            let mut config_builder = Config::builder();
-            config_builder.add_source("in1", source_with_event_counter().1);
-            config_builder.add_transform("t1", &["in1"], transform("t1_", 1.1));
-            config_builder.add_transform("t2", &["t1"], transform("t2_", 1.1));
-            config_builder.add_sink("out1", &["in1", "t2"], sink(10).1);
-            config_builder.api.enabled = true;
-            config_builder.api.address = Some(next_addr());
+    async fn api_graphql_component_links() {
+        println!("api_graphql_component_links 0");
+        let mut config_builder = Config::builder();
+        config_builder.add_source("in1", source_with_event_counter().1);
+        config_builder.add_transform("t1", &["in1"], transform("t1_", 1.1));
+        config_builder.add_transform("t2", &["t1"], transform("t2_", 1.1));
+        config_builder.add_sink("out1", &["in1", "t2"], sink(10).1);
+        config_builder.api.enabled = true;
+        config_builder.api.address = Some(next_addr());
 
-            let config = config_builder.build().unwrap();
-            println!("api_graphql_component_links 1");
-            let server = api::Server::start(&config);
-            println!("api_graphql_component_links 2");
+        let config = config_builder.build().unwrap();
+        println!("api_graphql_component_links 1");
+        let server = api::Server::start(&config);
+        println!("api_graphql_component_links 2");
 
-            let client = make_client(server.addr());
-            println!("api_graphql_component_links 3");
+        let client = make_client(server.addr());
+        println!("api_graphql_component_links 3");
 
-            let res = client
-                .component_links_query(None, None, None, None)
-                .await
-                .unwrap();
-            println!("api_graphql_component_links 4");
+        let res = client
+            .component_links_query(None, None, None, None)
+            .await
+            .unwrap();
+        println!("api_graphql_component_links 4");
 
-            let data = res.data.unwrap();
-            let sources = data
-                .sources
-                .edges
-                .into_iter()
-                .flatten()
-                .flatten()
-                .collect::<Vec<_>>();
+        let data = res.data.unwrap();
+        let sources = data
+            .sources
+            .edges
+            .into_iter()
+            .flatten()
+            .flatten()
+            .collect::<Vec<_>>();
 
-            let transforms = data
-                .transforms
-                .edges
-                .into_iter()
-                .flatten()
-                .flatten()
-                .collect::<Vec<_>>();
+        let transforms = data
+            .transforms
+            .edges
+            .into_iter()
+            .flatten()
+            .flatten()
+            .collect::<Vec<_>>();
 
-            let sinks = data
-                .sinks
-                .edges
-                .into_iter()
-                .flatten()
-                .flatten()
-                .collect::<Vec<_>>();
+        let sinks = data
+            .sinks
+            .edges
+            .into_iter()
+            .flatten()
+            .flatten()
+            .collect::<Vec<_>>();
 
-            println!("api_graphql_component_links 5");
+        println!("api_graphql_component_links 5");
 
-            // should be a single source named "in1"
-            assert!(sources.len() == 1);
-            assert!(sources[0].node.name == "in1");
+        // should be a single source named "in1"
+        assert!(sources.len() == 1);
+        assert!(sources[0].node.name == "in1");
 
-            // "in1" source should link to exactly one transform named "t1"
-            assert!(sources[0].node.transforms.len() == 1);
-            assert!(sources[0].node.transforms[0].name == "t1");
+        // "in1" source should link to exactly one transform named "t1"
+        assert!(sources[0].node.transforms.len() == 1);
+        assert!(sources[0].node.transforms[0].name == "t1");
 
-            // "in1" source should link to exactly one sink named "out2"
-            assert!(sources[0].node.sinks.len() == 1);
-            assert!(sources[0].node.sinks[0].name == "out1");
+        // "in1" source should link to exactly one sink named "out2"
+        assert!(sources[0].node.sinks.len() == 1);
+        assert!(sources[0].node.sinks[0].name == "out1");
 
-            // there should be 2 transforms
-            assert!(transforms.len() == 2);
+        // there should be 2 transforms
+        assert!(transforms.len() == 2);
 
-            // get a reference to "t1" and "t2"
-            let mut t1 = &transforms[0];
-            let mut t2 = &transforms[1];
+        // get a reference to "t1" and "t2"
+        let mut t1 = &transforms[0];
+        let mut t2 = &transforms[1];
 
-            // swap if needed
-            if t1.node.name == "t2" {
-                t1 = &transforms[1];
-                t2 = &transforms[0];
-            }
+        // swap if needed
+        if t1.node.name == "t2" {
+            t1 = &transforms[1];
+            t2 = &transforms[0];
+        }
 
-            // "t1" transform should link to exactly one source named "in1"
-            assert!(t1.node.sources.len() == 1);
-            assert!(t1.node.sources[0].name == "in1");
+        // "t1" transform should link to exactly one source named "in1"
+        assert!(t1.node.sources.len() == 1);
+        assert!(t1.node.sources[0].name == "in1");
 
-            // "t1" transform should link to exactly one transform named "t2"
-            assert!(t1.node.transforms.len() == 1);
-            assert!(t1.node.transforms[0].name == "t2");
+        // "t1" transform should link to exactly one transform named "t2"
+        assert!(t1.node.transforms.len() == 1);
+        assert!(t1.node.transforms[0].name == "t2");
 
-            // "t1" transform should NOT link to any sinks
-            assert!(t1.node.sinks.is_empty());
+        // "t1" transform should NOT link to any sinks
+        assert!(t1.node.sinks.is_empty());
 
-            // "t2" transform should link to exactly one sink named "out1"
-            assert!(t2.node.sinks.len() == 1);
-            assert!(t2.node.sinks[0].name == "out1");
+        // "t2" transform should link to exactly one sink named "out1"
+        assert!(t2.node.sinks.len() == 1);
+        assert!(t2.node.sinks[0].name == "out1");
 
-            // "t2" transform should NOT link to any sources or transforms
-            assert!(t2.node.sources.is_empty());
-            assert!(t2.node.transforms.is_empty());
+        // "t2" transform should NOT link to any sources or transforms
+        assert!(t2.node.sources.is_empty());
+        assert!(t2.node.transforms.is_empty());
 
-            // should be a single sink named "out1"
-            assert!(sinks.len() == 1);
-            assert!(sinks[0].node.name == "out1");
+        // should be a single sink named "out1"
+        assert!(sinks.len() == 1);
+        assert!(sinks[0].node.name == "out1");
 
-            // "out1" sink should link to exactly one source named "in1"
-            assert!(sinks[0].node.sources.len() == 1);
-            assert!(sinks[0].node.sources[0].name == "in1");
+        // "out1" sink should link to exactly one source named "in1"
+        assert!(sinks[0].node.sources.len() == 1);
+        assert!(sinks[0].node.sources[0].name == "in1");
 
-            // "out1" sink should link to exactly one transform named "t2"
-            assert!(sinks[0].node.transforms.len() == 1);
-            assert!(sinks[0].node.transforms[0].name == "t2");
+        // "out1" sink should link to exactly one transform named "t2"
+        assert!(sinks[0].node.transforms.len() == 1);
+        assert!(sinks[0].node.transforms[0].name == "t2");
 
-            assert_eq!(res.errors, None);
+        assert_eq!(res.errors, None);
 
-            println!("api_graphql_component_links 6 END");
-        })
+        println!("api_graphql_component_links 6 END");
     }
 
     #[tokio::test]
+    #[serial]
     /// tests that version_string meta matches the current Vector version
     async fn api_graphql_meta_version_string() {
         let server = start_server();
@@ -468,10 +489,11 @@ mod tests {
         assert_eq!(res.data.unwrap().meta.version_string, vector::get_version());
     }
 
-    #[test]
+    #[tokio::test]
+    #[serial]
     /// Tests that the heartbeat subscription returns a UTC payload every 1/2 second
-    fn api_graphql_heartbeat() {
-        metrics_test("tests::api_graphql_heartbeat", async {
+    async fn api_graphql_heartbeat() {
+        metrics_test(async {
             println!("api_graphql_heartbeat 0");
             let server = start_server();
             println!("api_graphql_heartbeat 1");
@@ -481,12 +503,14 @@ mod tests {
             new_heartbeat_subscription(&client, 3, 500).await;
             println!("api_graphql_heartbeat 3 END");
         })
+        .await;
     }
 
-    #[test]
+    #[tokio::test]
+    #[serial]
     /// Tests for Vector instance uptime in seconds
-    fn api_graphql_uptime_metrics() {
-        metrics_test("tests::api_graphql_uptime_metrics", async {
+    async fn api_graphql_uptime_metrics() {
+        metrics_test(async {
             println!("api_graphql_uptime_metrics 0");
             let server = start_server();
             println!("api_graphql_uptime_metrics 1");
@@ -496,12 +520,14 @@ mod tests {
             new_uptime_subscription(&client).await;
             println!("api_graphql_uptime_metrics 3 END");
         })
+        .await;
     }
 
-    #[test]
+    #[tokio::test]
+    #[serial]
     /// Tests for events processed metrics, using fake generator events
-    fn api_graphql_event_processed_total_metrics() {
-        metrics_test("tests::api_graphql_event_processed_total_metrics", async {
+    async fn api_graphql_event_processed_total_metrics() {
+        metrics_test(async {
             println!("api_graphql_event_processed_total_metrics 0");
             let server = start_server();
             println!("api_graphql_event_processed_total_metrics 1");
@@ -511,12 +537,14 @@ mod tests {
             new_processed_events_total_subscription(&client, 3, 100).await;
             println!("api_graphql_event_processed_total_metrics 3 END");
         })
+        .await;
     }
 
-    #[test]
+    #[tokio::test]
+    #[serial]
     /// Tests whether 2 disparate subscriptions can run against a single client
-    fn api_graphql_combined_heartbeat_uptime() {
-        metrics_test("tests::api_graphql_combined_heartbeat_uptime", async {
+    async fn api_graphql_combined_heartbeat_uptime() {
+        metrics_test(async {
             println!("api_graphql_combined_heartbeat_uptime 0");
             let server = start_server();
             println!("api_graphql_combined_heartbeat_uptime 1");
@@ -530,18 +558,18 @@ mod tests {
 
             println!("api_graphql_combined_heartbeat_uptime 3 END");
         })
+        .await;
     }
 
-    #[test]
+    #[tokio::test]
+    #[serial]
     #[allow(clippy::float_cmp)]
     /// Tests componentProcessedEventsTotals returns increasing metrics, ordered by
     /// source -> transform -> sink
-    fn api_graphql_component_processed_events_totals() {
-        metrics_test(
-            "tests::api_graphql_component_processed_events_totals",
-            async {
-                println!("api_graphql_component_processed_events_totals 0");
-                let conf = r#"
+    async fn api_graphql_component_processed_events_totals() {
+        metrics_test(async {
+            println!("api_graphql_component_processed_events_totals 0");
+            let conf = r#"
                     [api]
                       enabled = true
 
@@ -558,51 +586,50 @@ mod tests {
                       print_amount = 100000
                 "#;
 
-                let topology = from_str_config(conf).await;
-                println!("api_graphql_component_processed_events_totals 1");
+            let topology = from_str_config(conf).await;
+            println!("api_graphql_component_processed_events_totals 1");
 
-                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                println!("api_graphql_component_processed_events_totals 2");
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            println!("api_graphql_component_processed_events_totals 2");
 
-                let server = api::Server::start(topology.config());
-                println!("api_graphql_component_processed_events_totals 3");
-                let client = new_subscription_client(server.addr()).await;
-                println!("api_graphql_component_processed_events_totals 4");
-                let subscription = client.component_processed_events_totals_subscription(500);
-                println!("api_graphql_component_processed_events_totals 5");
+            let server = api::Server::start(topology.config());
+            println!("api_graphql_component_processed_events_totals 3");
+            let client = new_subscription_client(server.addr()).await;
+            println!("api_graphql_component_processed_events_totals 4");
+            let subscription = client.component_processed_events_totals_subscription(500);
+            println!("api_graphql_component_processed_events_totals 5");
 
-                let data = subscription
-                    .stream()
-                    .skip(1)
-                    .take(1)
-                    .map(|r| r.unwrap().data.unwrap().component_processed_events_totals)
-                    .next()
-                    .await
-                    .expect("Didn't return results");
-                println!("api_graphql_component_processed_events_totals 6");
+            let data = subscription
+                .stream()
+                .skip(1)
+                .take(1)
+                .map(|r| r.unwrap().data.unwrap().component_processed_events_totals)
+                .next()
+                .await
+                .expect("Didn't return results");
+            println!("api_graphql_component_processed_events_totals 6");
 
-                for name in &[
-                    "processed_events_total_batch_source",
-                    "processed_events_total_batch_sink",
-                ] {
-                    assert!(data.iter().any(|d| d.name == *name));
-                }
+            for name in &[
+                "processed_events_total_batch_source",
+                "processed_events_total_batch_sink",
+            ] {
+                assert!(data.iter().any(|d| d.name == *name));
+            }
 
-                println!("api_graphql_component_processed_events_totals 7 END");
-            },
-        )
+            println!("api_graphql_component_processed_events_totals 7 END");
+        })
+        .await;
     }
 
-    #[test]
+    #[tokio::test]
+    #[serial]
     #[allow(clippy::float_cmp)]
     /// Tests componentProcessedBytesTotals returns increasing metrics, ordered by
     /// source -> transform -> sink
-    fn api_graphql_component_processed_bytes_totals() {
-        metrics_test(
-            "tests::api_graphql_component_processed_bytes_totals",
-            async {
-                println!("api_graphql_component_processed_bytes_totals 0");
-                let conf = r#"
+    async fn api_graphql_component_processed_bytes_totals() {
+        metrics_test(async {
+            println!("api_graphql_component_processed_bytes_totals 0");
+            let conf = r#"
                     [api]
                       enabled = true
 
@@ -619,39 +646,40 @@ mod tests {
                       print_amount = 100000
                 "#;
 
-                let topology = from_str_config(conf).await;
-                println!("api_graphql_component_processed_bytes_totals 1");
+            let topology = from_str_config(conf).await;
+            println!("api_graphql_component_processed_bytes_totals 1");
 
-                let server = api::Server::start(topology.config());
-                println!("api_graphql_component_processed_bytes_totals 2");
-                let client = new_subscription_client(server.addr()).await;
-                println!("api_graphql_component_processed_bytes_totals 3");
-                let subscription = client.component_processed_bytes_totals_subscription(500);
-                println!("api_graphql_component_processed_bytes_totals 4");
+            let server = api::Server::start(topology.config());
+            println!("api_graphql_component_processed_bytes_totals 2");
+            let client = new_subscription_client(server.addr()).await;
+            println!("api_graphql_component_processed_bytes_totals 3");
+            let subscription = client.component_processed_bytes_totals_subscription(500);
+            println!("api_graphql_component_processed_bytes_totals 4");
 
-                let data = subscription
-                    .stream()
-                    .skip(1)
-                    .take(1)
-                    .map(|r| r.unwrap().data.unwrap().component_processed_bytes_totals)
-                    .next()
-                    .await
-                    .expect("Didn't return results");
-                println!("api_graphql_component_processed_bytes_totals 5");
+            let data = subscription
+                .stream()
+                .skip(1)
+                .take(1)
+                .map(|r| r.unwrap().data.unwrap().component_processed_bytes_totals)
+                .next()
+                .await
+                .expect("Didn't return results");
+            println!("api_graphql_component_processed_bytes_totals 5");
 
-                // Bytes are currently only relevant on sinks
-                assert_eq!(data[0].name, "processed_bytes_total_batch_sink");
-                assert!(data[0].metric.processed_bytes_total > 0.00);
+            // Bytes are currently only relevant on sinks
+            assert_eq!(data[0].name, "processed_bytes_total_batch_sink");
+            assert!(data[0].metric.processed_bytes_total > 0.00);
 
-                println!("api_graphql_component_processed_bytes_totals 6 END");
-            },
-        )
+            println!("api_graphql_component_processed_bytes_totals 6 END");
+        })
+        .await;
     }
 
-    #[test]
+    #[tokio::test]
+    #[serial]
     /// Tests componentAdded receives an added component
-    fn api_graphql_component_added_subscription() {
-        metrics_test("tests::api_graphql_component_added_subscription", async {
+    async fn api_graphql_component_added_subscription() {
+        metrics_test(async {
             println!("api_graphql_component_added_subscription 0");
             let conf = r#"
                 [api]
@@ -743,12 +771,14 @@ mod tests {
             handle.await.unwrap();
             println!("api_graphql_component_added_subscription 10 END");
         })
+        .await;
     }
 
-    #[test]
+    #[tokio::test]
+    #[serial]
     /// Tests componentRemoves detects when a component has been removed
-    fn api_graphql_component_removed_subscription() {
-        metrics_test("tests::api_graphql_component_removed_subscription", async {
+    async fn api_graphql_component_removed_subscription() {
+        metrics_test(async {
             println!("api_graphql_component_removed_subscription 0");
             let mut conf = r#"
                 [api]
@@ -852,11 +882,13 @@ mod tests {
 
             println!("api_graphql_component_removed_subscription 11 END");
         })
+        .await;
     }
 
-    #[test]
-    fn api_graphql_errors_total() {
-        metrics_test("tests::api_graphql_errors_total", async {
+    #[tokio::test]
+    #[serial]
+    async fn api_graphql_errors_total() {
+        metrics_test(async {
             println!("api_graphql_errors_total 0");
             let conf = r#"
                 [api]
@@ -914,12 +946,14 @@ mod tests {
 
             handle.await.unwrap();
             println!("api_graphql_errors_total 6 END");
-        });
+        })
+        .await;
     }
 
-    #[test]
-    fn api_grahql_component_errors_total() {
-        metrics_test("tests::api_grahql_component_errors_total", async {
+    #[tokio::test]
+    #[serial]
+    async fn api_grahql_component_errors_total() {
+        metrics_test(async {
             println!("api_grahql_component_errors_total 0");
             let conf = r#"
                 [api]
@@ -978,16 +1012,18 @@ mod tests {
 
             handle.await.unwrap();
             println!("api_grahql_component_errors_total 7 END");
-        });
+        })
+        .await;
     }
 
     #[cfg(unix)]
-    #[test]
-    fn api_graphql_files_source_metrics() {
+    #[tokio::test]
+    #[serial]
+    async fn api_graphql_files_source_metrics() {
         use std::io::Write;
         use tempfile::{tempdir, NamedTempFile};
 
-        metrics_test("tests::api_graphql_files_source_metrics", async {
+        metrics_test(async {
             println!("api_graphql_files_source_metrics 0");
             let lines = vec!["test1", "test2", "test3"];
 
@@ -1047,12 +1083,13 @@ mod tests {
             };
 
             println!("api_graphql_files_source_metrics 6 END");
-        })
+        }).await;
     }
 
-    #[test]
-    fn api_graphql_component_by_name() {
-        metrics_test("tests::api_graphql_component_by_name", async {
+    #[tokio::test]
+    #[serial]
+    async fn api_graphql_component_by_name() {
+        metrics_test(async {
             println!("api_graphql_component_by_name 0");
             let conf = r#"
                 [api]
@@ -1092,11 +1129,13 @@ mod tests {
             );
             println!("api_graphql_component_by_name 7 END");
         })
+        .await;
     }
 
-    #[test]
-    fn api_graphql_components_connection() {
-        metrics_test("tests::api_graphql_components_connection", async {
+    #[tokio::test]
+    #[serial]
+    async fn api_graphql_components_connection() {
+        metrics_test(async {
             println!("api_graphql_components_connection 0");
             // Config with a total of 5 components
             let conf = r#"
@@ -1225,6 +1264,7 @@ mod tests {
             }
 
             println!("api_graphql_components_connection 6 END");
-        });
+        })
+        .await;
     }
 }

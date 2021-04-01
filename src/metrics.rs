@@ -13,7 +13,7 @@ use std::sync::{
 };
 use twox_hash::XxHash64;
 
-static CONTROLLER: OnceCell<Controller> = OnceCell::new();
+static mut CONTROLLER: OnceCell<Controller> = OnceCell::new();
 
 // Cardinality counter parameters, expose the internal metrics registry
 // cardinality.
@@ -65,9 +65,7 @@ pub fn init() -> crate::Result<()> {
         registry: Arc::clone(&registry),
     };
     // Register the controller globally.
-    CONTROLLER
-        .set(controller)
-        .map_err(|_| "controller already initialized")?;
+    unsafe { CONTROLLER.set(controller) }.map_err(|_| "controller already initialized")?;
 
     // Initialize the recorder.
     let recorder = VectorRecorder {
@@ -87,6 +85,11 @@ pub fn init() -> crate::Result<()> {
 
     // Done.
     Ok(())
+}
+
+pub fn reset() {
+    let _ = unsafe { CONTROLLER.take() };
+    metrics::clear_recorder();
 }
 
 /// [`VectorRegistry`] is a vendored version of [`metrics_util::Registry`].
@@ -223,9 +226,7 @@ pub struct Controller {
 
 /// Get a handle to the globally registered controller, if it's initialized.
 pub fn get_controller() -> crate::Result<&'static Controller> {
-    CONTROLLER
-        .get()
-        .ok_or_else(|| "metrics system not initialized".into())
+    unsafe { CONTROLLER.get() }.ok_or_else(|| "metrics system not initialized".into())
 }
 
 fn snapshot(controller: &Controller) -> Vec<Event> {
@@ -238,7 +239,7 @@ fn snapshot(controller: &Controller) -> Vec<Event> {
 }
 
 /// Clear all metrics from the registry.
-pub fn reset(controller: &Controller) {
+pub fn reset_registry(controller: &Controller) {
     controller.registry.map.clear()
 }
 

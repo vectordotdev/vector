@@ -24,7 +24,7 @@ fn benchmark(c: &mut Criterion) {
 fn prepare_metrics(cardinality: usize) -> &'static vector::metrics::Controller {
     let _ = vector::metrics::init();
     let controller = vector::metrics::get_controller().unwrap();
-    vector::metrics::reset(controller);
+    vector::metrics::reset_registry(controller);
 
     for idx in 0..cardinality {
         metrics::counter!("test", 1, "idx" => format!("{}", idx));

@@ -2,12 +2,11 @@ use dashmap::DashMap;
 use std::fmt;
 use tracing_core::{
     callsite::Identifier,
+    collect::Collect,
     field::{display, Field, Value, Visit},
-    span,
-    subscriber::Interest,
-    Event, Metadata, Subscriber,
+    span, Event, Interest, Metadata,
 };
-use tracing_subscriber::layer::{Context, Layer};
+use tracing_subscriber::subscribe::{Context, Subscribe};
 
 #[cfg(test)]
 #[macro_use]
@@ -34,35 +33,35 @@ struct RateKeyIdentifier {
     rate_limit_key_values: RateLimitedSpanKeys,
 }
 
-pub struct RateLimitedLayer<S, L>
+pub struct RateLimitedSubscriber<C, S>
 where
-    L: Layer<S> + Sized,
-    S: Subscriber,
+    S: Subscribe<C> + Sized,
+    C: Collect,
 {
     events: DashMap<RateKeyIdentifier, State>,
-    inner: L,
+    inner: S,
 
-    _subscriber: std::marker::PhantomData<S>,
+    _collect: std::marker::PhantomData<C>,
 }
 
-impl<S, L> RateLimitedLayer<S, L>
+impl<C, S> RateLimitedSubscriber<C, S>
 where
-    L: Layer<S> + Sized,
-    S: Subscriber,
+    S: Subscribe<C> + Sized,
+    C: Collect,
 {
-    pub fn new(layer: L) -> Self {
-        RateLimitedLayer {
+    pub fn new(subscriber: S) -> Self {
+        RateLimitedSubscriber {
             events: Default::default(),
-            inner: layer,
-            _subscriber: std::marker::PhantomData,
+            inner: subscriber,
+            _collect: std::marker::PhantomData,
         }
     }
 }
 
-impl<S, L> Layer<S> for RateLimitedLayer<S, L>
+impl<C, S> Subscribe<C> for RateLimitedSubscriber<C, S>
 where
-    L: Layer<S>,
-    S: Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+    S: Subscribe<C>,
+    C: Collect + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
 {
     #[inline]
     fn register_callsite(&self, metadata: &'static Metadata<'static>) -> Interest {
@@ -70,12 +69,12 @@ where
     }
 
     #[inline]
-    fn enabled(&self, metadata: &Metadata<'_>, ctx: Context<'_, S>) -> bool {
+    fn enabled(&self, metadata: &Metadata<'_>, ctx: Context<'_, C>) -> bool {
         self.inner.enabled(metadata, ctx)
     }
 
     // keep track of any span fields we use for grouping rate limiting
-    fn new_span(&self, attrs: &span::Attributes<'_>, id: &span::Id, ctx: Context<'_, S>) {
+    fn new_span(&self, attrs: &span::Attributes<'_>, id: &span::Id, ctx: Context<'_, C>) {
         {
             let span = ctx.span(id).expect("Span not found, this is a bug");
             let mut extensions = span.extensions_mut();
@@ -90,7 +89,7 @@ where
     }
 
     // keep track of any span fields we use for grouping rate limiting
-    fn on_record(&self, id: &span::Id, values: &span::Record<'_>, ctx: Context<'_, S>) {
+    fn on_record(&self, id: &span::Id, values: &span::Record<'_>, ctx: Context<'_, C>) {
         {
             let span = ctx.span(id).expect("Span not found, this is a bug");
             let mut extensions = span.extensions_mut();
@@ -110,11 +109,11 @@ where
     }
 
     #[inline]
-    fn on_follows_from(&self, span: &span::Id, follows: &span::Id, ctx: Context<'_, S>) {
+    fn on_follows_from(&self, span: &span::Id, follows: &span::Id, ctx: Context<'_, C>) {
         self.inner.on_follows_from(span, follows, ctx);
     }
 
-    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
+    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, C>) {
         let metadata = event.metadata();
 
         // if the event is not rate limited, just pass through
@@ -202,34 +201,34 @@ where
     }
 
     #[inline]
-    fn on_enter(&self, id: &span::Id, ctx: Context<'_, S>) {
+    fn on_enter(&self, id: &span::Id, ctx: Context<'_, C>) {
         self.inner.on_enter(id, ctx);
     }
 
     #[inline]
-    fn on_exit(&self, id: &span::Id, ctx: Context<'_, S>) {
+    fn on_exit(&self, id: &span::Id, ctx: Context<'_, C>) {
         self.inner.on_exit(id, ctx);
     }
 
     #[inline]
-    fn on_close(&self, id: span::Id, ctx: Context<'_, S>) {
+    fn on_close(&self, id: span::Id, ctx: Context<'_, C>) {
         self.inner.on_close(id, ctx);
     }
 
     #[inline]
-    fn on_id_change(&self, old: &span::Id, new: &span::Id, ctx: Context<'_, S>) {
+    fn on_id_change(&self, old: &span::Id, new: &span::Id, ctx: Context<'_, C>) {
         self.inner.on_id_change(old, new, ctx);
     }
 }
 
-impl<S, L> RateLimitedLayer<S, L>
+impl<C, S> RateLimitedSubscriber<C, S>
 where
-    S: Subscriber,
-    L: Layer<S>,
+    C: Collect,
+    S: Subscribe<C>,
 {
     fn create_event(
         &self,
-        ctx: &Context<S>,
+        ctx: &Context<C>,
         metadata: &'static Metadata<'static>,
         message: String,
         rate_limit: u64,
@@ -400,38 +399,38 @@ mod test {
         sync::{Arc, Mutex},
         time::Duration,
     };
-    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::prelude::*;
 
     #[derive(Default)]
-    struct RecordingLayer<S> {
+    struct RecordingSubscriber<C> {
         events: Arc<Mutex<Vec<String>>>,
 
-        _subscriber: std::marker::PhantomData<S>,
+        _collect: std::marker::PhantomData<C>,
     }
 
-    impl<S> RecordingLayer<S> {
+    impl<S> RecordingSubscriber<S> {
         fn new(events: Arc<Mutex<Vec<String>>>) -> Self {
-            RecordingLayer {
+            RecordingSubscriber {
                 events,
 
-                _subscriber: std::marker::PhantomData,
+                _collect: std::marker::PhantomData,
             }
         }
     }
 
-    impl<S> Layer<S> for RecordingLayer<S>
+    impl<C> Subscribe<C> for RecordingSubscriber<C>
     where
-        S: Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+        C: Collect + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
     {
         fn register_callsite(&self, _metadata: &'static Metadata<'static>) -> Interest {
             Interest::always()
         }
 
-        fn enabled(&self, _metadata: &Metadata<'_>, _ctx: Context<'_, S>) -> bool {
+        fn enabled(&self, _metadata: &Metadata<'_>, _ctx: Context<'_, C>) -> bool {
             true
         }
 
-        fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+        fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, C>) {
             let mut visitor = LimitVisitor::default();
             event.record(&mut visitor);
 
@@ -444,10 +443,10 @@ mod test {
     fn rate_limits() {
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
-        let recorder = RecordingLayer::new(Arc::clone(&events));
-        let sub =
-            tracing_subscriber::registry::Registry::default().with(RateLimitedLayer::new(recorder));
-        tracing::subscriber::with_default(sub, || {
+        let recorder = RecordingSubscriber::new(Arc::clone(&events));
+        let sub = tracing_subscriber::registry::Registry::default()
+            .with(RateLimitedSubscriber::new(recorder));
+        tracing::collect::with_default(sub, || {
             for _ in 0..21 {
                 info!(message = "Hello world!", internal_log_rate_secs = 1);
                 MockClock::advance(Duration::from_millis(100));
@@ -477,10 +476,10 @@ mod test {
     fn rate_limit_by_span_key() {
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
-        let recorder = RecordingLayer::new(Arc::clone(&events));
-        let sub =
-            tracing_subscriber::registry::Registry::default().with(RateLimitedLayer::new(recorder));
-        tracing::subscriber::with_default(sub, || {
+        let recorder = RecordingSubscriber::new(Arc::clone(&events));
+        let sub = tracing_subscriber::registry::Registry::default()
+            .with(RateLimitedSubscriber::new(recorder));
+        tracing::collect::with_default(sub, || {
             for _ in 0..21 {
                 for key in &["foo", "bar"] {
                     for line_number in &[1, 2] {

@@ -9,10 +9,13 @@ use std::{
     fmt,
     sync::{Mutex, MutexGuard},
 };
-use tracing::{field, span, subscriber::Interest, Event, Metadata, Subscriber};
-use tracing_limit::RateLimitedLayer;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::layer::{Context, Layer};
+use tracing::{field, span, Event, Metadata};
+use tracing_core::{collect::Collect, Interest};
+use tracing_limit::RateLimitedSubscriber;
+use tracing_subscriber::{
+    prelude::*,
+    subscribe::{Context, Subscribe},
+};
 
 const INPUTS: &[usize] = &[1, 100, 500, 1000];
 
@@ -21,10 +24,10 @@ fn bench(c: &mut Criterion) {
     for input in INPUTS {
         group.bench_with_input(input.to_string(), input, |b, n| {
             let sub = tracing_subscriber::registry::Registry::default().with(
-                RateLimitedLayer::new(VisitingLayer::new(Mutex::new(String::from("")))),
+                RateLimitedSubscriber::new(VisitingSubscriber::new(Mutex::new(String::from("")))),
             );
             let n = black_box(n);
-            tracing::subscriber::with_default(sub, || {
+            tracing::collect::with_default(sub, || {
                 b.iter(|| {
                     for _ in 0..*n {
                         info!(
@@ -45,10 +48,10 @@ fn bench(c: &mut Criterion) {
     for input in INPUTS {
         group.bench_with_input(input.to_string(), input, |b, n| {
             let sub = tracing_subscriber::registry::Registry::default().with(
-                RateLimitedLayer::new(VisitingLayer::new(Mutex::new(String::from("")))),
+                RateLimitedSubscriber::new(VisitingSubscriber::new(Mutex::new(String::from("")))),
             );
             let n = black_box(n);
-            tracing::subscriber::with_default(sub, || {
+            tracing::collect::with_default(sub, || {
                 b.iter(|| {
                     for _ in 0..*n {
                         info!(
@@ -68,24 +71,24 @@ fn bench(c: &mut Criterion) {
 }
 
 /// Simulates a layer that records span data.
-struct VisitingLayer<S>
+struct VisitingSubscriber<C>
 where
-    S: Subscriber,
+    C: Collect,
 {
     mutex: Mutex<String>,
 
-    _subscriber: std::marker::PhantomData<S>,
+    _collect: std::marker::PhantomData<C>,
 }
 
-impl<S> VisitingLayer<S>
+impl<C> VisitingSubscriber<C>
 where
-    S: Subscriber,
+    C: Collect,
 {
     fn new(mutex: Mutex<String>) -> Self {
-        VisitingLayer {
+        VisitingSubscriber {
             mutex,
 
-            _subscriber: std::marker::PhantomData,
+            _collect: std::marker::PhantomData,
         }
     }
 }
@@ -99,51 +102,51 @@ impl<'a> field::Visit for Visitor<'a> {
     }
 }
 
-impl<S> Layer<S> for VisitingLayer<S>
+impl<C> Subscribe<C> for VisitingSubscriber<C>
 where
-    S: Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+    C: Collect + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
 {
     fn register_callsite(&self, _metadata: &'static Metadata<'static>) -> Interest {
         Interest::always()
     }
 
-    fn enabled(&self, metadata: &Metadata<'_>, _ctx: Context<'_, S>) -> bool {
+    fn enabled(&self, metadata: &Metadata<'_>, _ctx: Context<'_, C>) -> bool {
         let _ = metadata;
         true
     }
 
-    fn new_span(&self, span: &span::Attributes<'_>, _id: &span::Id, _ctx: Context<'_, S>) {
+    fn new_span(&self, span: &span::Attributes<'_>, _id: &span::Id, _ctx: Context<'_, C>) {
         let mut visitor = Visitor(self.mutex.lock().unwrap());
         span.record(&mut visitor);
     }
 
-    fn on_record(&self, _id: &span::Id, values: &span::Record<'_>, _ctx: Context<'_, S>) {
+    fn on_record(&self, _id: &span::Id, values: &span::Record<'_>, _ctx: Context<'_, C>) {
         let mut visitor = Visitor(self.mutex.lock().unwrap());
         values.record(&mut visitor);
     }
 
-    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
+    fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, C>) {
         let mut visitor = Visitor(self.mutex.lock().unwrap());
         event.record(&mut visitor);
     }
 
-    fn on_follows_from(&self, id: &span::Id, follows: &span::Id, _ctx: Context<'_, S>) {
+    fn on_follows_from(&self, id: &span::Id, follows: &span::Id, _ctx: Context<'_, C>) {
         let _ = (id, follows);
     }
 
-    fn on_enter(&self, id: &span::Id, _ctx: Context<'_, S>) {
+    fn on_enter(&self, id: &span::Id, _ctx: Context<'_, C>) {
         let _ = id;
     }
 
-    fn on_exit(&self, id: &span::Id, _ctx: Context<'_, S>) {
+    fn on_exit(&self, id: &span::Id, _ctx: Context<'_, C>) {
         let _ = id;
     }
 
-    fn on_close(&self, id: span::Id, _ctx: Context<'_, S>) {
+    fn on_close(&self, id: span::Id, _ctx: Context<'_, C>) {
         let _ = id;
     }
 
-    fn on_id_change(&self, old: &span::Id, new: &span::Id, _ctx: Context<'_, S>) {
+    fn on_id_change(&self, old: &span::Id, new: &span::Id, _ctx: Context<'_, C>) {
         let _ = (old, new);
     }
 }
