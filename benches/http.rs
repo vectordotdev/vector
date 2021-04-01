@@ -94,7 +94,7 @@ fn serve(addr: SocketAddr) -> Runtime {
 
         Server::bind(&addr)
             .serve(make_service)
-            .map_err(|e| panic!(e))
+            .map_err(|e| panic!("{}", e))
             .await
     });
     rt

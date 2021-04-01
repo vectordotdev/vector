@@ -283,7 +283,7 @@ impl MetadataClient {
             .map_err(crate::Error::from)
             .and_then(|res| match res.status() {
                 StatusCode::OK => Ok(res),
-                status_code => Err(UnexpectedHTTPStatusError {
+                status_code => Err(UnexpectedHttpStatusError {
                     status: status_code,
                 }
                 .into()),
@@ -433,7 +433,7 @@ impl MetadataClient {
             .map_err(crate::Error::from)
             .and_then(|res| match res.status() {
                 StatusCode::OK => Ok(res),
-                status_code => Err(UnexpectedHTTPStatusError {
+                status_code => Err(UnexpectedHttpStatusError {
                     status: status_code,
                 }
                 .into()),
@@ -482,17 +482,17 @@ impl Keys {
 }
 
 #[derive(Debug)]
-struct UnexpectedHTTPStatusError {
+struct UnexpectedHttpStatusError {
     status: http::StatusCode,
 }
 
-impl fmt::Display for UnexpectedHTTPStatusError {
+impl fmt::Display for UnexpectedHttpStatusError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "got unexpected status code: {}", self.status)
     }
 }
 
-impl error::Error for UnexpectedHTTPStatusError {}
+impl error::Error for UnexpectedHttpStatusError {}
 
 #[derive(Debug, snafu::Snafu)]
 enum Ec2MetadataError {

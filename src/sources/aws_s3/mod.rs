@@ -2,7 +2,7 @@ use super::util::MultilineConfig;
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     line_agg,
-    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
+    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -49,7 +49,7 @@ struct AwsS3Config {
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
-    auth: AWSAuthentication,
+    auth: AwsAuthentication,
 
     multiline: Option<MultilineConfig>,
 }

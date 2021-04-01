@@ -1,6 +1,6 @@
 use crate::{
     event::Event,
-    internal_events::{HTTPBadRequest, HTTPDecompressError, HTTPEventsReceived},
+    internal_events::{HttpBadRequest, HttpDecompressError, HttpEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -163,7 +163,7 @@ pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMe
 }
 
 fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
-    emit!(HTTPDecompressError {
+    emit!(HttpDecompressError {
         encoding,
         error: &error
     });
@@ -244,7 +244,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         async move {
                             match events {
                                 Ok((events,body_size)) => {
-                                    emit!(HTTPEventsReceived {
+                                    emit!(HttpEventsReceived {
                                         events_count: events.len(),
                                         byte_size: body_size,
                                     });
@@ -260,7 +260,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                         .await
                                 }
                                 Err(error) => {
-                                    emit!(HTTPBadRequest {
+                                    emit!(HttpBadRequest {
                                         error_code: error.code,
                                         error_message: error.message.as_str(),
                                     });

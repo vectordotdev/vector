@@ -23,7 +23,7 @@ pub enum Conversion {
     Boolean,
     Timestamp(TimeZone),
     TimestampFmt(String, TimeZone),
-    TimestampTZFmt(String),
+    TimestampTzFmt(String),
 }
 
 #[derive(Debug, Eq, PartialEq, Snafu)]
@@ -99,7 +99,7 @@ impl Conversion {
                 // convert with tone zones, so this has to distinguish
                 // between the two types of formats.
                 if format_has_zone(fmt) {
-                    Ok(Self::TimestampTZFmt(fmt.into()))
+                    Ok(Self::TimestampTzFmt(fmt.into()))
                 } else {
                     Ok(Self::TimestampFmt(fmt.into(), tz.to_owned()))
                 }
@@ -137,7 +137,7 @@ impl Conversion {
 
                 datetime_to_utc(dt).into()
             }
-            Self::TimestampTZFmt(format) => {
+            Self::TimestampTzFmt(format) => {
                 let s = String::from_utf8_lossy(&bytes);
                 let dt = DateTime::parse_from_str(&s, &format)
                     .with_context(|| TimestampParseError { s })?;

@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
     fs::{create_dir, OpenOptions},
-    io::{self, Write},
+    io::Write,
     path::PathBuf,
     pin::Pin,
     sync::{
@@ -36,7 +36,7 @@ use vector::{
     shutdown::ShutdownSignal,
     sinks::{util::StreamSink, Healthcheck, VectorSink},
     sources::Source,
-    test_util::{runtime_constrained, temp_dir, temp_file},
+    test_util::{temp_dir, temp_file},
     transforms::{FunctionTransform, Transform},
     Event, Pipeline,
 };

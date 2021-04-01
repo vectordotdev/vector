@@ -49,7 +49,7 @@ fn benchmark_batching(c: &mut Criterion) {
                             Duration::from_secs(1),
                             acker,
                         )
-                        .sink_map_err(|error| panic!(error));
+                        .sink_map_err(|error| panic!("{}", error));
 
                         (
                             rt,
@@ -82,7 +82,7 @@ fn benchmark_batching(c: &mut Criterion) {
                         Duration::from_secs(1),
                         acker,
                     )
-                    .sink_map_err(|error| panic!(error));
+                    .sink_map_err(|error| panic!("{}", error));
 
                     (rt, stream::iter(input.clone()).map(Ok), batch_sink)
                 },

@@ -112,7 +112,7 @@ mod tests {
     }
 
     async fn from_str_config(conf: &str) -> vector::topology::RunningTopology {
-        let mut c = config::load_from_str(conf, Some(Format::TOML)).unwrap();
+        let mut c = config::load_from_str(conf, Some(Format::Toml)).unwrap();
         c.api.address = Some(next_addr());
 
         let diff = config::ConfigDiff::initial(&c);
@@ -656,7 +656,7 @@ mod tests {
                   print_amount = 100000
             "#;
 
-            let c = config::load_from_str(conf, Some(Format::TOML)).unwrap();
+            let c = config::load_from_str(conf, Some(Format::Toml)).unwrap();
 
             topology.reload_config_and_respawn(c).await.unwrap();
             server.update_config(topology.config());
@@ -741,7 +741,7 @@ mod tests {
                   print_amount = 100000
             "#;
 
-            let c = config::load_from_str(conf, Some(Format::TOML)).unwrap();
+            let c = config::load_from_str(conf, Some(Format::Toml)).unwrap();
 
             topology.reload_config_and_respawn(c).await.unwrap();
             server.update_config(topology.config());

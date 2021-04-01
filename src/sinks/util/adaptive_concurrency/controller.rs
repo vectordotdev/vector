@@ -10,7 +10,7 @@ use crate::{
         AdaptiveConcurrencyObservedRtt,
     },
     sinks::util::retries::{RetryAction, RetryLogic},
-    stats::{Mean, EWMA},
+    stats::{Ewma, Mean},
 };
 use std::future::Future;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -35,7 +35,7 @@ pub(super) struct Controller<L> {
 pub(super) struct Inner {
     pub(super) current_limit: usize,
     in_flight: usize,
-    past_rtt: EWMA,
+    past_rtt: Ewma,
     next_update: Instant,
     current_rtt: Mean,
     had_back_pressure: bool,
@@ -70,7 +70,7 @@ impl<L> Controller<L> {
             inner: Arc::new(Mutex::new(Inner {
                 current_limit,
                 in_flight: 0,
-                past_rtt: EWMA::new(settings.ewma_alpha),
+                past_rtt: Ewma::new(settings.ewma_alpha),
                 next_update: instant_now(),
                 current_rtt: Default::default(),
                 had_back_pressure: false,

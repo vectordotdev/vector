@@ -79,44 +79,44 @@ components: sources: kafka: {
 		}
 		key_field: {
 			common:      true
-			description: "The log field name to use for the Kafka message key. If unspecified, the key would not be added to the log event. If the message has null key, then this field would not be added to the log event."
+			description: "The log field name to use for the Kafka message key."
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
+				default: "message_key"
 				examples: ["message_key"]
 				syntax: "literal"
 			}
 		}
 		topic_key: {
 			common:      false
-			description: "The log field name to use for the Kafka topic. If unspecified, the key would not be added to the log event."
+			description: "The log field name to use for the Kafka topic."
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
+				default: "topic"
 				examples: ["topic"]
 				syntax: "literal"
 			}
 		}
 		partition_key: {
 			common:      false
-			description: "The log field name to use for the Kafka partition name. If unspecified, the key would not be added to the log event."
+			description: "The log field name to use for the Kafka partition name."
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
+				default: "partition"
 				examples: ["partition"]
 				syntax: "literal"
 			}
 		}
 		offset_key: {
 			common:      false
-			description: "The log field name to use for the Kafka offset. If unspecified, the key would not be added to the log event."
+			description: "The log field name to use for the Kafka offset."
 			required:    false
 			warnings: []
 			type: string: {
-				default: null
+				default: "offset"
 				examples: ["offset"]
 				syntax: "literal"
 			}

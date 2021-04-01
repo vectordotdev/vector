@@ -287,15 +287,6 @@ pub fn runtime() -> runtime::Runtime {
         .unwrap()
 }
 
-pub fn runtime_constrained(num_threads: usize) -> runtime::Runtime {
-    runtime::Builder::new_multi_thread()
-        .enable_all()
-        .worker_threads(num_threads)
-        .max_blocking_threads(num_threads)
-        .build()
-        .unwrap()
-}
-
 // Wait for a Future to resolve, or the duration to elapse (will panic)
 pub async fn wait_for_duration<F, Fut>(mut f: F, duration: Duration)
 where

@@ -10,12 +10,12 @@ use std::{
 
 lazy_static! {
     pub static ref DEFAULT_UNIX_CONFIG_PATHS: Vec<(PathBuf, FormatHint)> =
-        vec![("/etc/vector/vector.toml".into(), Some(Format::TOML))];
+        vec![("/etc/vector/vector.toml".into(), Some(Format::Toml))];
     pub static ref DEFAULT_WINDOWS_CONFIG_PATHS: Vec<(PathBuf, FormatHint)> = {
         let program_files = std::env::var("ProgramFiles")
             .expect("%ProgramFiles% environment variable must be defined");
         let config_path = format!("{}\\Vector\\config\\vector.toml", program_files);
-        vec![(PathBuf::from(config_path), Some(Format::TOML))]
+        vec![(PathBuf::from(config_path), Some(Format::Toml))]
     };
     pub static ref CONFIG_PATHS: Mutex<Vec<(PathBuf, FormatHint)>> = Mutex::default();
 }
