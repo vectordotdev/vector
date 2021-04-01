@@ -25,36 +25,41 @@ maintain information on each event tying it back to the source that originated
 the event, so that source can correctly acknowledge those incoming events at
 the right time.
 
-## Examples
+## Discussion
 
 Vector contains a number of features that can cause complications with a naïve
 implementation. As such, we need to itemize a number of scenarios to ensure our
 proposed solution covers all the edge cases. These will start with the simplest
 scenario and then introduce complicating factors.
 
+In the discussion, the term "finalization" is used to describe the point
+at which an event completes its trip through the pipeline, which may be
+caused by its acknowledged delivery, a permanent failure, or a situation
+causing the event to be dropped in processing.
+
 ### Single source through linear transforms to a single sink
 
-This is the simplest of cases. For each event the source produces, the event is
-only modified on its transport through the system. The set of transforms
-represented here are all those not listed explicitly below. When the
-destination sink finishes handling the event, a notification needs to be
-delivered to the originating source indicating the delivery status. Thus, the
-event needs to contain a reference to the originating source and a unique
-message identifier. Different sources will have varying requirements on the
-message identifier.
+This is the simplest of cases. For each event the source produces, the
+event is only modified on its transport through the system. The set of
+transforms represented here are all those not listed explicitly
+below. When the destination sink finishes handling the event, a
+notification needs to be delivered to the source indicating the
+finalization status. Thus, the event needs to contain a reference to the
+source and a unique message identifier. Different sources will have
+varying requirements on the message identifier.
 
 ### Multiple sources to a single sink
 
 When multiple sources are configured to feed into a single sink, that sink may
 end up producing batches containing events from multiple sources. This does not
 really require any additional data tracking, but it is necessary to model the
-acknowledgements as flowing back to the source independently for each event,
+statuses as flowing back to the source independently for each event,
 not at a batch level.
 
 ### Single source to multiple sinks
 
-If an event is to be sent to multiple sinks, we want the acknowledgement to
-only be issued once it has been acknowledged by all of the sinks. This will
+If an event is to be sent to multiple sinks, we want the finalization status to
+only be issued once it has been finalized by all of the sinks. This will
 require the tracking be shared across all the relevant sinks (as opposed to
 being cloned with the event), as well as having a counter or some other
 mechanism for determining when all of the deliveries are completed. The
@@ -67,7 +72,7 @@ earlier sink concluding that all deliveries are completed.
 If the `merge` transform is configured in a topology, it can produce
 events that are a combination of multiple events merged together. As
 such, their tracking information will also have to be merged, containing
-a reference to all of the events that were combined to produce the
+a reference to all the sources of the events that were combined to produce the
 transformed event. As a complication, this transform may be fed from
 more than one source, resulting in merged events coming from multiple
 sources as well.
@@ -106,8 +111,8 @@ Some sources are unable to provide acknowledgements at a protocol level
 Further, users of Vector may wish to selectively enable this feature
 only selectively on certain sources. To minimize the overhead of this
 feature, sources that cannot or should not provide acknowledgements
-should not be required to participate in delivery notifications, as they
-would only be discarding the acknowledgement.
+should not be required to participate in finalization handling, as they
+would only be discarding the status.
 
 ### Sinks using a disk buffer
 
@@ -115,8 +120,8 @@ In order to deal with longer delivery delays and backpressure, sinks may
 be configured to store events temporarily in a disk buffer. Since the
 events are not actually delivered when they are buffered, the final
 delivery status will have to be confirmed after the event is loaded back
-from the buffer. The originating source, to be used to determine where
-to provide the delivery status indicator, must be converted into a form
+from the buffer. The source, to be used to determine where
+to provide the finalization status indicator, must be converted into a form
 that may be serialized (ie string or integer index). However, the
 configuration may be reloaded while the event is buffered in such a way
 that the source name provided in the configuration may change, or a
@@ -132,7 +137,7 @@ each run of Vector.
 ## Internal Proposal
 
 There are two components to the proposal: the communication between
-event finalization and the originating sources, and the resulting event
+event finalization and the sources, and the resulting event
 metadata required to track the event status.
 
 ### Event finalization
@@ -146,7 +151,7 @@ delivering the event identifier and status.
 
 Given the channel above, the following metadata will be added to events:
 
-1.  A reference (`Arc`) to a originating source, which is a dual-purpose structure containing:
+1.  A reference (`Arc`) to a source, which is a dual-purpose structure containing:
 
     1.  The finalization channel, to be used when actually delivering the status.
 
@@ -168,8 +173,8 @@ enum EventId {
 }
 
 enum EventStatus {
+    Dropped, // default status
     Delivered,
-    Dropped,
     Failed,
 }
 
@@ -178,13 +183,13 @@ struct EventFinalization {
     status: EventStatus,
 }
 
-struct OriginatingSource {
+struct SourceHandle {
     receiver: tokio::sync::mpsc::Sender<EventFinalization>,
     identifier: Arc<Box<str>>,
 }
 
 struct EventSource {
-    source: OriginatingSource,
+    source: SourceHandle,
     id: EventId,
 }
 
@@ -201,7 +206,7 @@ struct EventMetadata {
 ### Source configuration
 
 When building a source, the topology system will provide it with an
-originating source identifier. The source is responsible for creating
+unique source identifier. The source is responsible for creating
 its own MPSC channel pair to provide to events. This allows sources that
 receive events in batches to create a separate channel for each batch,
 and then `await` on the receiver to collect the finalization
@@ -278,8 +283,8 @@ The above structure provides for several considerations:
     a minimum of code. However, the data added to the event structure
     then grows by an additional word.
 
-2.  The originating source could be stored as simply the unique
-    identifier string. This requires that all reporting of delivery
+2.  The source could be stored as simply the unique
+    identifier string. This requires that all reporting of finalization
     status proceed through a dictionary lookup instead of simply sending
     it through a channel, increasing the run-time overhead.
 
@@ -311,5 +316,5 @@ The above structure provides for several considerations:
 ## Plan Of Attack
 
   * [ ] Introduce `struct SourceContext`
-  * [ ] Set up originating source identifiers
+  * [ ] Set up unique source identifiers
   * [ ] _TBD_
