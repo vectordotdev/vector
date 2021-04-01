@@ -13,6 +13,7 @@ base64 = { version = "0.13", optional = true }
 bytes = { version = "0.5.6", optional = true }
 chrono = { version = "0.4", optional = true }
 cidr-utils = { version = "0.5", optional = true }
+csv = { version = "1.1", optional = true }
 grok = { version = "1", optional = true }
 hex = { version = "0.4", optional = true }
 hostname = { version = "0.3", optional = true }
@@ -88,6 +89,7 @@ default = [
     "parse_aws_vpc_flow_log",
     "parse_apache_log",
     "parse_common_log",
+    "parse_csv",
     "parse_duration",
     "parse_glog",
     "parse_grok",
@@ -181,6 +183,7 @@ parse_aws_alb_log = ["nom"]
 parse_aws_cloudwatch_log_subscription_message = ["serde_json", "shared/aws_cloudwatch_logs_subscription", "shared/btreemap"]
 parse_aws_vpc_flow_log = []
 parse_common_log = ["chrono"]
+parse_csv = ["csv"]
 parse_duration = ["rust_decimal"]
 parse_glog = ["chrono"]
 parse_grok = ["grok"]

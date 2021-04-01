@@ -8394,6 +8394,7 @@ dependencies = [
  "chrono",
  "cidr-utils",
  "criterion",
+ "csv",
  "grok",
  "hex",
  "hostname",

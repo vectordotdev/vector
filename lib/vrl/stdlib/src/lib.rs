@@ -104,6 +104,8 @@ mod parse_aws_cloudwatch_log_subscription_message;
 mod parse_aws_vpc_flow_log;
 #[cfg(feature = "parse_common_log")]
 mod parse_common_log;
+#[cfg(feature = "parse_csv")]
+mod parse_csv;
 #[cfg(feature = "parse_duration")]
 mod parse_duration;
 #[cfg(feature = "parse_glog")]
@@ -291,6 +293,8 @@ pub use parse_aws_cloudwatch_log_subscription_message::ParseAwsCloudWatchLogSubs
 pub use parse_aws_vpc_flow_log::ParseAwsVpcFlowLog;
 #[cfg(feature = "parse_common_log")]
 pub use parse_common_log::ParseCommonLog;
+#[cfg(feature = "parse_csv")]
+pub use parse_csv::ParseCsv;
 #[cfg(feature = "parse_duration")]
 pub use parse_duration::ParseDuration;
 #[cfg(feature = "parse_glog")]
@@ -488,6 +492,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseApacheLog),
         #[cfg(feature = "parse_common_log")]
         Box::new(ParseCommonLog),
+        #[cfg(feature = "parse_csv")]
+        Box::new(ParseCsv),
         #[cfg(feature = "parse_key_value")]
         Box::new(ParseKeyValue),
         #[cfg(feature = "parse_linux_authorization")]
