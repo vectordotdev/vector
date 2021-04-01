@@ -1,13 +1,13 @@
 use crate::{
     config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::RemapMappingError,
+    internal_events::{RemapMappingAbort, RemapMappingError},
     transforms::{FunctionTransform, Transform},
     Result,
 };
 use serde::{Deserialize, Serialize};
 use vrl::diagnostic::Formatter;
-use vrl::{Program, Runtime};
+use vrl::{Program, Runtime, Terminate};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -15,6 +15,8 @@ use vrl::{Program, Runtime};
 pub struct RemapConfig {
     pub source: String,
     pub drop_on_error: bool,
+    #[serde(default = "crate::serde::default_true")]
+    pub drop_on_abort: bool,
 }
 
 inventory::submit! {
@@ -47,6 +49,7 @@ impl TransformConfig for RemapConfig {
 pub struct Remap {
     program: Program,
     drop_on_error: bool,
+    drop_on_abort: bool,
 }
 
 impl Remap {
@@ -60,16 +63,25 @@ impl Remap {
         Ok(Remap {
             program,
             drop_on_error: config.drop_on_error,
+            drop_on_abort: config.drop_on_abort,
         })
     }
 }
 
 impl FunctionTransform for Remap {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        let original_event = if !self.drop_on_error && self.program.is_fallible() {
-            // We need to clone the original event, since it might be mutated by
-            // the program before it aborts, while we want to return the
-            // unmodified event when an error occurs.
+        // If a program can fail or abort at runtime, we need to clone the
+        // original event and keep it around, to allow us to discard any
+        // mutations made to the event while the VRL program runs, before it
+        // failed or aborted.
+        //
+        // The `drop_on_{error, abort}` transform config allows operators to
+        // ignore events if their failed/aborted, in which case we can skip the
+        // cloning, since any mutations made by VRL will be ignored regardless.
+        #[allow(clippy::if_same_then_else)]
+        let original_event = if !self.drop_on_error && self.program.can_fail() {
+            Some(event.clone())
+        } else if !self.drop_on_abort && self.program.can_abort() {
             Some(event.clone())
         } else {
             None
@@ -84,17 +96,24 @@ impl FunctionTransform for Remap {
 
         match result {
             Ok(_) => output.push(event),
-            Err(error) => {
+            Err(Terminate::Abort) => {
+                emit!(RemapMappingAbort {
+                    event_dropped: self.drop_on_abort,
+                });
+
+                if !self.drop_on_abort {
+                    output.push(original_event.unwrap_or(event))
+                }
+            }
+            Err(Terminate::Error(error)) => {
                 emit!(RemapMappingError {
-                    error: error.to_string(),
+                    error,
                     event_dropped: self.drop_on_error,
                 });
 
-                if self.drop_on_error {
-                    return;
+                if !self.drop_on_error {
+                    output.push(original_event.unwrap_or(event))
                 }
-
-                output.push(original_event.unwrap_or(event))
             }
         }
     }
@@ -134,6 +153,7 @@ mod tests {
 "#
             .to_string(),
             drop_on_error: true,
+            drop_on_abort: false,
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -160,15 +180,37 @@ mod tests {
                 .baz = 12
             "#},
             drop_on_error: false,
+            drop_on_abort: false,
         };
         let mut tform = Remap::new(conf).unwrap();
 
         let event = tform.transform_one(event).unwrap();
 
         assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
-
         assert!(event.as_log().get("foo").is_none());
         assert!(event.as_log().get("baz").is_none());
+    }
+
+    #[test]
+    fn check_remap_error_drop() {
+        let event = {
+            let mut event = Event::from("augment me");
+            event.as_mut_log().insert("bar", "is a string");
+            event
+        };
+
+        let conf = RemapConfig {
+            source: formatdoc! {r#"
+                .foo = "foo"
+                .not_an_int = int!(.bar)
+                .baz = 12
+            "#},
+            drop_on_error: true,
+            drop_on_abort: false,
+        };
+        let mut tform = Remap::new(conf).unwrap();
+
+        assert!(tform.transform_one(event).is_none())
     }
 
     #[test]
@@ -185,6 +227,7 @@ mod tests {
                 .baz = 12
             "#},
             drop_on_error: false,
+            drop_on_abort: false,
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -193,6 +236,54 @@ mod tests {
         assert_eq!(event.as_log().get("foo"), Some(&Value::from("foo")));
         assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
         assert_eq!(event.as_log().get("baz"), Some(&Value::from(12)));
+    }
+
+    #[test]
+    fn check_remap_abort() {
+        let event = {
+            let mut event = Event::from("augment me");
+            event.as_mut_log().insert("bar", "is a string");
+            event
+        };
+
+        let conf = RemapConfig {
+            source: formatdoc! {r#"
+                .foo = "foo"
+                abort
+                .baz = 12
+            "#},
+            drop_on_error: false,
+            drop_on_abort: false,
+        };
+        let mut tform = Remap::new(conf).unwrap();
+
+        let event = tform.transform_one(event).unwrap();
+
+        assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
+        assert!(event.as_log().get("foo").is_none());
+        assert!(event.as_log().get("baz").is_none());
+    }
+
+    #[test]
+    fn check_remap_abort_drop() {
+        let event = {
+            let mut event = Event::from("augment me");
+            event.as_mut_log().insert("bar", "is a string");
+            event
+        };
+
+        let conf = RemapConfig {
+            source: formatdoc! {r#"
+                .foo = "foo"
+                abort
+                .baz = 12
+            "#},
+            drop_on_error: false,
+            drop_on_abort: true,
+        };
+        let mut tform = Remap::new(conf).unwrap();
+
+        assert!(tform.transform_one(event).is_none())
     }
 
     #[test]
@@ -210,6 +301,7 @@ mod tests {
                        .kind = "incremental""#
                 .to_string(),
             drop_on_error: true,
+            drop_on_abort: false,
         };
         let mut tform = Remap::new(conf).unwrap();
 

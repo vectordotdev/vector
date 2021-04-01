@@ -1,5 +1,10 @@
-use crate::event::{lookup::Segment, util, Lookup, PathComponent, Value};
+use super::{lookup::Segment, util, EventMetadata, Lookup, PathComponent, Value};
+use crate::config::log_schema;
+use bytes::Bytes;
+use chrono::Utc;
+use getset::Getters;
 use serde::{Serialize, Serializer};
+use shared::EventDataEq;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
@@ -7,9 +12,11 @@ use std::{
     iter::FromIterator,
 };
 
-#[derive(PartialEq, Debug, Clone, Default)]
+#[derive(Clone, Debug, Default, Getters, PartialEq)]
 pub struct LogEvent {
     fields: BTreeMap<String, Value>,
+    #[getset(get = "pub")]
+    metadata: EventMetadata,
 }
 
 impl LogEvent {
@@ -135,11 +142,60 @@ impl LogEvent {
         trace!(entry = ?current_pointer, "Result.");
         Ok(current_pointer)
     }
+
+    /// Merge all fields specified at `fields` from `incoming` to `current`.
+    pub fn merge(&mut self, mut incoming: LogEvent, fields: &[impl AsRef<str>]) {
+        for field in fields {
+            let incoming_val = match incoming.remove(field) {
+                None => continue,
+                Some(val) => val,
+            };
+            match self.get_mut(&field) {
+                None => {
+                    self.insert(field, incoming_val);
+                }
+                Some(current_val) => current_val.merge(incoming_val),
+            }
+        }
+        self.metadata.merge(incoming.metadata());
+    }
+}
+
+impl EventDataEq for LogEvent {
+    fn event_data_eq(&self, other: &Self) -> bool {
+        self.fields == other.fields && self.metadata.event_data_eq(&other.metadata)
+    }
+}
+
+impl From<Bytes> for LogEvent {
+    fn from(message: Bytes) -> Self {
+        let mut log = LogEvent::default();
+
+        log.insert(log_schema().message_key(), message);
+        log.insert(log_schema().timestamp_key(), Utc::now());
+
+        log
+    }
+}
+
+impl From<&str> for LogEvent {
+    fn from(message: &str) -> Self {
+        message.to_owned().into()
+    }
+}
+
+impl From<String> for LogEvent {
+    fn from(message: String) -> Self {
+        Bytes::from(message).into()
+    }
 }
 
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
-        LogEvent { fields: map }
+        LogEvent {
+            fields: map,
+            metadata: EventMetadata,
+        }
     }
 }
 
@@ -153,6 +209,7 @@ impl From<HashMap<String, Value>> for LogEvent {
     fn from(map: HashMap<String, Value>) -> Self {
         LogEvent {
             fields: map.into_iter().collect(),
+            metadata: EventMetadata,
         }
     }
 }
@@ -185,8 +242,7 @@ impl TryInto<serde_json::Value> for LogEvent {
     type Error = crate::Error;
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
-        let Self { fields } = self;
-        Ok(serde_json::to_value(fields)?)
+        Ok(serde_json::to_value(self.fields)?)
     }
 }
 
@@ -667,5 +723,93 @@ mod test {
             assert_eq!(vrl::Target::remove(&mut event, &path, compact), Ok(removed));
             assert_eq!(vrl::Target::get(&event, &vrl::Path::root()), Ok(expect))
         }
+    }
+
+    fn assert_merge_value(
+        current: impl Into<Value>,
+        incoming: impl Into<Value>,
+        expected: impl Into<Value>,
+    ) {
+        let mut merged = current.into();
+        merged.merge(incoming.into());
+        assert_eq!(merged, expected.into());
+    }
+
+    #[test]
+    fn merge_value_works_correctly() {
+        assert_merge_value("hello ", "world", "hello world");
+
+        assert_merge_value(true, false, false);
+        assert_merge_value(false, true, true);
+
+        assert_merge_value("my_val", true, true);
+        assert_merge_value(true, "my_val", "my_val");
+
+        assert_merge_value(1, 2, 2);
+    }
+
+    #[test]
+    fn merge_event_combines_values_accordingly() {
+        // Specify the fields that will be merged.
+        // Only the ones listed will be merged from the `incoming` event
+        // to the `current`.
+        let fields_to_merge = vec![
+            "merge".to_string(),
+            "merge_a".to_string(),
+            "merge_b".to_string(),
+            "merge_c".to_string(),
+        ];
+
+        let current = {
+            let mut log = LogEvent::default();
+
+            log.insert("merge", "hello "); // will be concatenated with the `merged` from `incoming`.
+            log.insert("do_not_merge", "my_first_value"); // will remain as is, since it's not selected for merging.
+
+            log.insert("merge_a", true); // will be overwritten with the `merge_a` from `incoming` (since it's a non-bytes kind).
+            log.insert("merge_b", 123); // will be overwritten with the `merge_b` from `incoming` (since it's a non-bytes kind).
+
+            log.insert("a", true); // will remain as is since it's not selected for merge.
+            log.insert("b", 123); // will remain as is since it's not selected for merge.
+
+            // `c` is not present in the `current`, and not selected for merge,
+            // so it won't be included in the final event.
+
+            log
+        };
+
+        let incoming = {
+            let mut log = LogEvent::default();
+
+            log.insert("merge", "world"); // will be concatenated to the `merge` from `current`.
+            log.insert("do_not_merge", "my_second_value"); // will be ignored, since it's not selected for merge.
+
+            log.insert("merge_b", 456); // will be merged in as `456`.
+            log.insert("merge_c", false); // will be merged in as `false`.
+
+            // `a` will remain as-is, since it's not marked for merge and
+            // neither is it specified in the `incoming` event.
+            log.insert("b", 456); // `b` not marked for merge, will not change.
+            log.insert("c", true); // `c` not marked for merge, will be ignored.
+
+            log
+        };
+
+        let mut merged = current;
+        merged.merge(incoming, &fields_to_merge);
+
+        let expected = {
+            let mut log = LogEvent::default();
+            log.insert("merge", "hello world");
+            log.insert("do_not_merge", "my_first_value");
+            log.insert("a", true);
+            log.insert("b", 123);
+            log.insert("merge_a", true);
+            log.insert("merge_b", 456);
+            log.insert("merge_c", false);
+            log
+        };
+
+        shared::assert_event_data_eq!(merged, expected);
     }
 }

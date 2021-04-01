@@ -9,8 +9,11 @@ pub mod conversion;
 #[cfg(feature = "conversion")]
 pub mod datetime;
 
-#[cfg(feature = "tokenize")]
-pub mod tokenize;
-
 #[cfg(feature = "conversion")]
 pub use datetime::TimeZone;
+
+pub mod event_data_eq;
+pub use event_data_eq::EventDataEq;
+
+#[cfg(feature = "tokenize")]
+pub mod tokenize;
