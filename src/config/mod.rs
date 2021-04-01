@@ -55,7 +55,7 @@ pub struct Config {
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
     #[cfg(feature = "providers")]
-    pub provider: provider::Options,
+    pub provider: Option<Box<dyn provider::ProviderConfig>>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<String, Vec<String>>,
 }

@@ -29,7 +29,7 @@ pub struct ConfigBuilder {
     pub tests: Vec<TestDefinition>,
     #[cfg(feature = "providers")]
     #[serde(default)]
-    pub provider: provider::Options,
+    pub provider: Option<Box<dyn provider::ProviderConfig>>,
 }
 
 impl Clone for ConfigBuilder {

@@ -1,16 +1,24 @@
-use crate::config::provider::ProviderDescription;
+use crate::config::provider::{ProviderConfig, ProviderDescription};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct HttpConfig {
-    host_key: Option<Url>,
+    url: Option<Url>,
 }
 
 impl Default for HttpConfig {
     fn default() -> Self {
-        Self { host_key: None }
+        Self { url: None }
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "http")]
+impl ProviderConfig for HttpConfig {
+    fn provider_type(&self) -> &'static str {
+        "http"
     }
 }
 
