@@ -63,10 +63,23 @@ pub fn init() -> crate::Result<()> {
         .set(controller)
         .map_err(|_| "controller already initialized")?;
 
-    // Initialize the recorder.
-    let (snd, rcv) = mpsc::channel();
+    ////
+    //// Initialize the recorder.
+    ////
 
+    let (snd, rcv) = mpsc::sync_channel(u16::MAX as usize);
+    let outer_recorder = OuterRecorder::new(snd);
     let inner_recorder = InnerRecorder::new(rcv, registry);
+    // If enabled, apply a layer to capture tracing span fields as labels.
+    let outer_recorder: Box<dyn metrics::Recorder> = if tracing_context_layer_enabled() {
+        Box::new(TracingContextLayer::new(VectorLabelFilter).layer(outer_recorder))
+    } else {
+        Box::new(outer_recorder)
+    };
+
+    // Register the recorder globally.
+    metrics::set_boxed_recorder(outer_recorder).map_err(|_| "recorder already initialized")?;
+
     // Create a thread to handle the loop for `InnerRecorder`. This populates
     // the `registry` from information provided by `OuterRecorder`, the
     // interface with metrics-rs.
@@ -76,17 +89,6 @@ pub fn init() -> crate::Result<()> {
     let _ = thread::Builder::new()
         .name("metrics_recorder".to_string())
         .spawn(|| inner_recorder.run())?;
-    let recorder = OuterRecorder::new(snd);
-
-    // If enabled, apply a layer to capture tracing span fields as labels.
-    let recorder: Box<dyn metrics::Recorder> = if tracing_context_layer_enabled() {
-        Box::new(TracingContextLayer::new(VectorLabelFilter).layer(recorder))
-    } else {
-        Box::new(recorder)
-    };
-
-    // Register the recorder globally.
-    metrics::set_boxed_recorder(recorder).map_err(|_| "recorder already initialized")?;
 
     // Done.
     Ok(())

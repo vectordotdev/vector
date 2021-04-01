@@ -31,7 +31,7 @@ pub struct BlackholeConfig {
 }
 
 fn default_print_amount() -> usize {
-    1000
+    1_000
 }
 
 inventory::submit! {

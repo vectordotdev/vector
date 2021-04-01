@@ -4,6 +4,7 @@ use metrics_util::{CompositeKey, Handle, MetricKind};
 use std::sync::mpsc;
 use std::time::Duration;
 
+#[derive(Debug)]
 pub(crate) enum Recording {
     RegisterCounter(Key),
     RegisterGauge(Key),
@@ -17,26 +18,26 @@ pub(crate) enum Recording {
 /// inbound recordings and batches them up for actual recording by the
 /// [`InnerRecorder`].
 pub(crate) struct OuterRecorder {
-    chan: mpsc::Sender<Recording>,
+    chan: mpsc::SyncSender<Recording>,
 }
 
 impl OuterRecorder {
-    pub(crate) fn new(chan: mpsc::Sender<Recording>) -> Self {
+    pub(crate) fn new(chan: mpsc::SyncSender<Recording>) -> Self {
         Self { chan }
+    }
+
+    fn send(&self, recording: Recording) {
+        self.chan.send(recording).expect("receiver hung up");
     }
 }
 
 impl Recorder for OuterRecorder {
     fn register_counter(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
-        self.chan
-            .send(Recording::RegisterCounter(key))
-            .expect("receiver hung up");
+        self.send(Recording::RegisterCounter(key));
     }
 
     fn register_gauge(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
-        self.chan
-            .send(Recording::RegisterGauge(key))
-            .expect("receiver hung up");
+        self.send(Recording::RegisterGauge(key));
     }
 
     fn register_histogram(
@@ -45,27 +46,19 @@ impl Recorder for OuterRecorder {
         _unit: Option<Unit>,
         _description: Option<&'static str>,
     ) {
-        self.chan
-            .send(Recording::RegisterHistogram(key))
-            .expect("receiver hung up");
+        self.send(Recording::RegisterHistogram(key));
     }
 
     fn increment_counter(&self, key: Key, value: u64) {
-        self.chan
-            .send(Recording::IncrementCounter(key, value))
-            .expect("receiver hung up");
+        self.send(Recording::IncrementCounter(key, value));
     }
 
     fn update_gauge(&self, key: Key, value: GaugeValue) {
-        self.chan
-            .send(Recording::UpdateGauge(key, value))
-            .expect("receiver hung up");
+        self.send(Recording::UpdateGauge(key, value));
     }
 
     fn record_histogram(&self, key: Key, value: f64) {
-        self.chan
-            .send(Recording::RecordHistogram(key, value))
-            .expect("receiver hung up");
+        self.send(Recording::RecordHistogram(key, value));
     }
 }
 
@@ -119,7 +112,7 @@ impl InnerRecorder {
     }
 
     pub(crate) fn run(mut self) {
-        let max_buffer = 1024;
+        let max_buffer = u16::MAX as usize / 4;
         let mut buffer = Vec::with_capacity(max_buffer);
         loop {
             if buffer.len() >= max_buffer {
@@ -128,7 +121,7 @@ impl InnerRecorder {
 
             let resp = self.chan.recv_timeout(Duration::from_secs(10));
             match resp {
-                Err(mpsc::RecvTimeoutError::Disconnected) => return,
+                Err(mpsc::RecvTimeoutError::Disconnected) => unreachable!(),
                 Err(mpsc::RecvTimeoutError::Timeout) => populate(&mut buffer, &mut self.registry),
                 Ok(recording) => buffer.push(recording),
             }
