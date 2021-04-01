@@ -142,30 +142,58 @@ metadata required to track the event status.
 
 ### Event finalization
 
-When instantiated, the topology will provide each source with a channel…
-This provides both a unique identifier of the source that needs to
-receive the event finalization status, but also the mechanism for
-delivering the event identifier and status.
+When instantiated, the topology will provide each source with a unique
+identifier for the token. The source may use this identifier to create
+one or more communication chnanels, each with their own unique
+identifier. This provides both a unique identifier of the source that
+needs to receive the event finalization status as well as the mechanism
+for delivering the event identifier and status.
+
+The finalization status is delivered when the last copy of the event is
+dropped. At that time, the finalization status stored in the event is
+delivered to all the sources. Since events may be internally dropped
+when they are merged, a special "no-op" status is used to indicate that
+no status needs to be delivered to prevent premature notifications.
 
 ### Event metadata
 
-Given the channel above, the following metadata will be added to events:
+Given the channel above, the following source metadata will be added to events:
 
-1.  A reference (`Arc`) to a source, which is a dual-purpose structure containing:
-
-    1.  The finalization channel, to be used when actually delivering the status.
-
-    2.  The unique source identifier, to be used when serializing the metadata.
-
-2.  A event identifier, contained in a new enum type.
-
+1. A finalization status, to be delivered to all sources.
+2. An array of event sources, containing:
+   1. An event identifier, contained in a new enum type.
+   2. A reference to a source handle, which is a dual-purpose structure containing:
+      1. The finalization channel, to be used when actually delivering the status.
+      2. The unique source identifier, to be used when serializing the metadata.
 
 ### Data structures
 
-Since a given event may actually be a composition of multiple source
-events, this must be a set of the above pairs of data.
-
 ```rust
+struct EventMetadata {
+    // existing fields
+    finalizer: Arc<EventFinalizer>,
+}
+
+struct EventFinalizer {
+    status: EventStatus,
+    sources: Box<[EventSource]>,
+}
+
+struct EventSource {
+    source: SourceHandle,
+    id: EventId,
+}
+
+struct SourceHandle {
+    receiver: tokio::sync::mpsc::Sender<EventFinalization>,
+    identifier: ImmStr,
+}
+
+struct EventFinalization {
+    id: EventId,
+    status: EventStatus,
+}
+
 enum EventId {
     Number(u64),
     SenderNumber(u64, u64),
@@ -176,40 +204,17 @@ enum EventStatus {
     Dropped, // default status
     Delivered,
     Failed,
-}
-
-struct EventFinalization {
-    id: EventId,
-    status: EventStatus,
-}
-
-struct SourceHandle {
-    receiver: tokio::sync::mpsc::Sender<EventFinalization>,
-    identifier: Arc<Box<str>>,
-}
-
-struct EventSource {
-    source: SourceHandle,
-    id: EventId,
-}
-
-impl EventSource {
-    fn acknowledge(&self, status: EventStatus);
-}
-
-struct EventMetadata {
-    // existing fields
-    sources: Box<[EventSource]>,
+    NoOp,
 }
 ```
 
 ### Source configuration
 
 When building a source, the topology system will provide it with an
-unique source identifier. The source is responsible for creating
-its own MPSC channel pair to provide to events. This allows sources that
-receive events in batches to create a separate channel for each batch,
-and then `await` on the receiver to collect the finalization
+unique source identifier. The source is responsible for creating its own
+MPSC channel pair to provide to events. This allows sources to create a
+separate channel for each sender or batch, as convenient for the source
+protocol, and then `await` on the receiver to collect the finalization
 events. Since the size of each batch is known in advance, this may be a
 bounded channel with the length fixed to the size of the source batch.
 When the last event in the batch is dropped, the sender will be closed
@@ -222,7 +227,7 @@ carry the data.
 ```rust
 struct SourceContext<'a> {
     name: &'a str,
-    identifier: Arc<Box<str>>,
+    identifier: Box<str>,
     globals: &'a GlobalOptions,
     shutdown: ShutdownSignal,
     out: Pipeline,
@@ -230,6 +235,26 @@ struct SourceContext<'a> {
 
 trait SourceConfig {
     async fn build(&self, context: SourceContext<'_>) -> crate::Result<sources::Source>;
+}
+```
+
+### Sink configuration
+
+A new global configuration setting will be added to all sources,
+flagging one or more sinks as "authoritative". This setting will change
+the behavior of finalization as described above. When an event is
+delivered to an authoritative sink, its finalization status is
+immediately delivered to all sources of the event. In order to prevent
+another status from being delivered at a later point, the status of the
+event is changed to "no-op", the same as if it was merged into another
+event.
+
+```rust
+struct SinkOuter {
+    // …existing fields…
+
+    #[serde(default)]
+    authoritative: bool,
 }
 ```
 
