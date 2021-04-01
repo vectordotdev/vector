@@ -40,13 +40,13 @@ enum ConfigError {
         v2_settings
     ))]
     BothConfiguration {
-        v1_settings: InfluxDB1Settings,
-        v2_settings: InfluxDB2Settings,
+        v1_settings: InfluxDb1Settings,
+        v2_settings: InfluxDb2Settings,
     },
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct InfluxDB1Settings {
+pub struct InfluxDb1Settings {
     database: String,
     consistency: Option<String>,
     retention_policy_name: Option<String>,
@@ -55,20 +55,20 @@ pub struct InfluxDB1Settings {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct InfluxDB2Settings {
+pub struct InfluxDb2Settings {
     org: String,
     bucket: String,
     token: String,
 }
 
-trait InfluxDBSettings: std::fmt::Debug {
+trait InfluxDbSettings: std::fmt::Debug {
     fn write_uri(&self, endpoint: String) -> crate::Result<Uri>;
     fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri>;
     fn token(&self) -> String;
     fn protocol_version(&self) -> ProtocolVersion;
 }
 
-impl InfluxDBSettings for InfluxDB1Settings {
+impl InfluxDbSettings for InfluxDb1Settings {
     fn write_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(
             &endpoint,
@@ -97,7 +97,7 @@ impl InfluxDBSettings for InfluxDB1Settings {
     }
 }
 
-impl InfluxDBSettings for InfluxDB2Settings {
+impl InfluxDbSettings for InfluxDb2Settings {
     fn write_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(
             &endpoint,
@@ -124,9 +124,9 @@ impl InfluxDBSettings for InfluxDB2Settings {
 }
 
 fn influxdb_settings(
-    influxdb1_settings: Option<InfluxDB1Settings>,
-    influxdb2_settings: Option<InfluxDB2Settings>,
-) -> Result<Box<dyn InfluxDBSettings>, crate::Error> {
+    influxdb1_settings: Option<InfluxDb1Settings>,
+    influxdb2_settings: Option<InfluxDb2Settings>,
+) -> Result<Box<dyn InfluxDbSettings>, crate::Error> {
     match (influxdb1_settings, influxdb2_settings) {
         (Some(v1_settings), Some(v2_settings)) => Err(ConfigError::BothConfiguration {
             v1_settings,
@@ -143,8 +143,8 @@ fn influxdb_settings(
 // V2: https://v2.docs.influxdata.com/v2.0/api/#operation/GetHealth
 fn healthcheck(
     endpoint: String,
-    influxdb1_settings: Option<InfluxDB1Settings>,
-    influxdb2_settings: Option<InfluxDB2Settings>,
+    influxdb1_settings: Option<InfluxDb1Settings>,
+    influxdb2_settings: Option<InfluxDb2Settings>,
     mut client: HttpClient,
 ) -> crate::Result<super::Healthcheck> {
     let settings = influxdb_settings(influxdb1_settings, influxdb2_settings)?;
@@ -344,7 +344,9 @@ pub mod test_util {
         for field in fields.into_iter() {
             assert!(
                 encoded_fields.contains(&field),
-                format!("Fields: {} has to have: {}", value, field)
+                "Fields: {} has to have: {}",
+                value,
+                field
             )
         }
     }
@@ -468,11 +470,11 @@ mod tests {
 
     #[derive(Deserialize, Serialize, Debug, Clone, Default)]
     #[serde(deny_unknown_fields)]
-    pub struct InfluxDBTestConfig {
+    pub struct InfluxDbTestConfig {
         #[serde(flatten)]
-        pub influxdb1_settings: Option<InfluxDB1Settings>,
+        pub influxdb1_settings: Option<InfluxDb1Settings>,
         #[serde(flatten)]
-        pub influxdb2_settings: Option<InfluxDB2Settings>,
+        pub influxdb2_settings: Option<InfluxDb2Settings>,
     }
 
     #[test]
@@ -483,11 +485,11 @@ mod tests {
         token = "my-token"
         database = "my-database"
     "#;
-        let config: InfluxDBTestConfig = toml::from_str(&config).unwrap();
+        let config: InfluxDbTestConfig = toml::from_str(&config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(
             format!("{}", settings.expect_err("expected error")),
-            "Unclear settings. Both version configured v1: InfluxDB1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDB2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"my-token\" }.".to_owned()
+            "Unclear settings. Both version configured v1: InfluxDb1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDb2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"my-token\" }.".to_owned()
         );
     }
 
@@ -495,7 +497,7 @@ mod tests {
     fn test_influxdb_settings_missing() {
         let config = r#"
     "#;
-        let config: InfluxDBTestConfig = toml::from_str(&config).unwrap();
+        let config: InfluxDbTestConfig = toml::from_str(&config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
         assert_eq!(
             format!("{}", settings.expect_err("expected error")),
@@ -508,7 +510,7 @@ mod tests {
         let config = r#"
         database = "my-database"
     "#;
-        let config: InfluxDBTestConfig = toml::from_str(&config).unwrap();
+        let config: InfluxDbTestConfig = toml::from_str(&config).unwrap();
         let _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
     }
 
@@ -519,13 +521,13 @@ mod tests {
         org = "my-org"
         token = "my-token"
     "#;
-        let config: InfluxDBTestConfig = toml::from_str(&config).unwrap();
+        let config: InfluxDbTestConfig = toml::from_str(&config).unwrap();
         let _ = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings).unwrap();
     }
 
     #[test]
     fn test_influxdb1_test_write_uri() {
-        let settings = InfluxDB1Settings {
+        let settings = InfluxDb1Settings {
             consistency: Some("quorum".to_owned()),
             database: "vector_db".to_owned(),
             retention_policy_name: Some("autogen".to_owned()),
@@ -541,7 +543,7 @@ mod tests {
 
     #[test]
     fn test_influxdb2_test_write_uri() {
-        let settings = InfluxDB2Settings {
+        let settings = InfluxDb2Settings {
             org: "my-org".to_owned(),
             bucket: "my-bucket".to_owned(),
             token: "my-token".to_owned(),
@@ -558,7 +560,7 @@ mod tests {
 
     #[test]
     fn test_influxdb1_test_healthcheck_uri() {
-        let settings = InfluxDB1Settings {
+        let settings = InfluxDb1Settings {
             consistency: Some("quorum".to_owned()),
             database: "vector_db".to_owned(),
             retention_policy_name: Some("autogen".to_owned()),
@@ -574,7 +576,7 @@ mod tests {
 
     #[test]
     fn test_influxdb2_test_healthcheck_uri() {
-        let settings = InfluxDB2Settings {
+        let settings = InfluxDb2Settings {
             org: "my-org".to_owned(),
             bucket: "my-bucket".to_owned(),
             token: "my-token".to_owned(),
@@ -802,7 +804,7 @@ mod integration_tests {
         sinks::influxdb::{
             healthcheck,
             test_util::{next_database, onboarding_v2, BUCKET, ORG, TOKEN},
-            InfluxDB1Settings, InfluxDB2Settings,
+            InfluxDb1Settings, InfluxDb2Settings,
         },
     };
 
@@ -812,7 +814,7 @@ mod integration_tests {
 
         let endpoint = "http://localhost:9999".to_string();
         let influxdb1_settings = None;
-        let influxdb2_settings = Some(InfluxDB2Settings {
+        let influxdb2_settings = Some(InfluxDb2Settings {
             org: ORG.to_string(),
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
@@ -831,7 +833,7 @@ mod integration_tests {
 
         let endpoint = "http://not_exist:9999".to_string();
         let influxdb1_settings = None;
-        let influxdb2_settings = Some(InfluxDB2Settings {
+        let influxdb2_settings = Some(InfluxDb2Settings {
             org: ORG.to_string(),
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
@@ -847,7 +849,7 @@ mod integration_tests {
     #[tokio::test]
     async fn influxdb1_healthchecks_ok() {
         let endpoint = "http://localhost:8086".to_string();
-        let influxdb1_settings = Some(InfluxDB1Settings {
+        let influxdb1_settings = Some(InfluxDb1Settings {
             database: next_database(),
             consistency: None,
             retention_policy_name: None,
@@ -866,7 +868,7 @@ mod integration_tests {
     #[tokio::test]
     async fn influxdb1_healthchecks_fail() {
         let endpoint = "http://not_exist:8086".to_string();
-        let influxdb1_settings = Some(InfluxDB1Settings {
+        let influxdb1_settings = Some(InfluxDb1Settings {
             database: next_database(),
             consistency: None,
             retention_policy_name: None,

@@ -373,7 +373,7 @@ fn benchmark_configs(
                     config.push_str(&transform_config);
                     config.push_str(&sink_config);
 
-                    let config = config::load_from_str(&config, Some(config::Format::TOML))
+                    let config = config::load_from_str(&config, Some(config::Format::Toml))
                         .expect(&format!("invalid TOML configuration: {}", &config));
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {

@@ -2,8 +2,8 @@ use crate::{
     config::{log_schema, DataType, GlobalOptions, Resource, SourceConfig, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{
-        SplunkHECEventReceived, SplunkHECRequestBodyInvalid, SplunkHECRequestError,
-        SplunkHECRequestReceived,
+        SplunkHecEventReceived, SplunkHecRequestBodyInvalid, SplunkHecRequestError,
+        SplunkHecRequestReceived,
     },
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -95,7 +95,7 @@ impl SourceConfig for SplunkConfig {
             .and(
                 warp::path::full()
                     .map(|path: warp::filters::path::FullPath| {
-                        emit!(SplunkHECRequestReceived {
+                        emit!(SplunkHecRequestReceived {
                             path: path.as_str()
                         });
                     })
@@ -378,7 +378,7 @@ impl<R: Read> Stream for EventStream<R> {
                 };
             }
             Err(error) => {
-                emit!(SplunkHECRequestBodyInvalid {
+                emit!(SplunkHecRequestBodyInvalid {
                     error: error.into()
                 });
                 return Err(ApiError::InvalidDataFormat { event: self.events }.into());
@@ -479,7 +479,7 @@ impl<R: Read> Stream for EventStream<R> {
             de.extract(log, &mut json);
         }
 
-        emit!(SplunkHECEventReceived);
+        emit!(SplunkHecEventReceived);
         self.events += 1;
 
         Ok(Async::Ready(Some(event)))
@@ -582,7 +582,7 @@ fn raw_event(
             Ok(0) => return Err(ApiError::NoData.into()),
             Ok(_) => Value::from(Bytes::from(data)),
             Err(error) => {
-                emit!(SplunkHECRequestBodyInvalid { error });
+                emit!(SplunkHecRequestBodyInvalid { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }
@@ -613,7 +613,7 @@ fn raw_event(
         .as_mut_log()
         .try_insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
 
-    emit!(SplunkHECEventReceived);
+    emit!(SplunkHecEventReceived);
 
     Ok(event)
 }
@@ -674,7 +674,7 @@ fn finish_ok(_: ()) -> Response {
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
     if let Some(&error) = rejection.find::<ApiError>() {
-        emit!(SplunkHECRequestError { error });
+        emit!(SplunkHecRequestError { error });
         Ok((match error {
             ApiError::MissingAuthorization => response_json(
                 StatusCode::UNAUTHORIZED,

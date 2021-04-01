@@ -4,8 +4,11 @@ use crate::{
     event::{Event, LogEvent},
     topology::{fanout, WatchRx},
 };
-use futures::{channel::mpsc as futures_mpsc, future::try_join_all, FutureExt, SinkExt, StreamExt};
+use futures::{future::try_join_all, FutureExt, Sink};
 use itertools::Itertools;
+use std::collections::VecDeque;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use std::{
     collections::{HashMap, HashSet},
     iter::FromIterator,
@@ -56,14 +59,92 @@ impl TapPayload {
     }
 }
 
-/// A tap sink spawns a process for listening for topology changes. If topology changes,
-/// sinks are rewired to accommodate matched/unmatched patterns.
-#[derive(Debug)]
+/// A `TapSink` is used as an output channel for a topology component, and receives
+/// `Event`s. If these are of type `Event::LogEvent`, they are relayed to the tap client.
 pub struct TapSink {
-    _shutdown: ShutdownTx,
+    tap_tx: TapSender,
+    component_name: String,
+    buffer: VecDeque<LogEvent>,
 }
 
 impl TapSink {
+    pub fn new(tap_tx: TapSender, component_name: String) -> Self {
+        Self {
+            tap_tx,
+            component_name,
+            // Pre-allocate space of 100 events, which matches the default `limit` typically
+            // provided to a tap subscription. If there's a higher log volume, this will block
+            // until the upstream event handler has processed the event. Generally, there should
+            // be little upstream pressure in the processing pipeline.
+            buffer: VecDeque::with_capacity(100),
+        }
+    }
+}
+
+impl Sink<Event> for TapSink {
+    type Error = ();
+
+    /// The sink is ready to accept events if buffer capacity hasn't been reached.
+    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if self.buffer.len() == self.buffer.capacity() {
+            Poll::Pending
+        } else {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    /// If the sink is ready, and the event is of type `LogEvent`, add to the buffer.
+    fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
+        // If we have an event, push it onto the buffer.
+        if let Event::Log(ev) = item {
+            self.buffer.push_back(ev);
+        }
+
+        Ok(())
+    }
+
+    /// Flushing means FIFO dequeuing. This is an O(1) operation on the `VecDeque` buffer.
+    fn poll_flush(
+        mut self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        let mut tap_tx = self.tap_tx.clone();
+
+        // Loop over the buffer events, pulling from the front. This will terminate when
+        // the buffer is empty.
+        while let Some(ev) = self.buffer.pop_front() {
+            // Attempt to send upstream. If the channel is closed, log and break. If it's
+            // full, return pending to reattempt later.
+            match tap_tx.try_send(TapPayload::Log(self.component_name.clone(), ev)) {
+                Err(tokio_mpsc::error::TrySendError::Closed(payload)) => {
+                    debug!(
+                        message = "Couldn't send log event.",
+                        payload = ?payload,
+                        component_name = ?self.component_name);
+
+                    break;
+                }
+                Err(tokio_mpsc::error::TrySendError::Full(_)) => return Poll::Pending,
+                _ => continue,
+            }
+        }
+
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.poll_flush(cx)
+    }
+}
+
+/// A tap sink spawns a process for listening for topology changes. If topology changes,
+/// sinks are rewired to accommodate matched/unmatched patterns.
+#[derive(Debug)]
+pub struct TapController {
+    _shutdown: ShutdownTx,
+}
+
+impl TapController {
     /// Creates a new tap sink, and spawns a handler for watching for topology changes
     /// and a separate inner handler for events. Uses a oneshot channel to trigger shutdown
     /// of handlers when the `TapSink` drops out of scope.
@@ -81,6 +162,25 @@ impl TapSink {
     }
 }
 
+/// Provides a `ShutdownTx` that disconnects a component sink when it drops out of scope.
+fn shutdown_trigger(control_tx: ControlChannel, sink_id: String) -> ShutdownTx {
+    let (shutdown_tx, shutdown_rx) = oneshot::channel();
+
+    tokio::spawn(async move {
+        let _ = shutdown_rx.await;
+        if control_tx
+            .send(fanout::ControlMessage::Remove(sink_id.clone()))
+            .is_err()
+        {
+            debug!(message = "Couldn't disconnect sink.", sink_id = ?sink_id);
+        } else {
+            debug!(message = "Disconnected sink.", sink_id = ?sink_id);
+        }
+    });
+
+    shutdown_tx
+}
+
 /// Sends a 'matched' tap payload.
 async fn send_matched(mut tx: TapSender, pattern: &str) -> Result<(), SendError<TapPayload>> {
     debug!(message = "Sending matched notification.", pattern = ?pattern);
@@ -93,44 +193,6 @@ async fn send_not_matched(mut tx: TapSender, pattern: &str) -> Result<(), SendEr
     tx.send(TapPayload::not_matched(pattern)).await
 }
 
-/// Makes a `RouterSink` that relays `Log` as `TapPayload::Log` to a client.
-fn make_router(
-    mut tx: TapSender,
-    control_tx: ControlChannel,
-    sink_id: String,
-    component_name: String,
-) -> (fanout::RouterSink, ShutdownTx) {
-    let (shutdown_tx, mut shutdown_rx) = oneshot::channel();
-    let (event_tx, mut event_rx) = futures_mpsc::unbounded();
-
-    tokio::spawn(async move {
-        debug!(message = "Spawned event handler.", component_name = ?component_name);
-
-        loop {
-            tokio::select! {
-                _ = &mut shutdown_rx => {
-                    let _ = control_tx.send(fanout::ControlMessage::Remove(sink_id.to_string()));
-                    break;
-                },
-                Some(ev) = event_rx.next() => {
-                    if let Event::Log(ev) = ev {
-                        if let Err(err) = tx.send(TapPayload::Log(component_name.clone(), ev)).await {
-                            debug!(
-                                message = "Couldn't send log event.",
-                                error = ?err,
-                                component_name = ?component_name);
-                        }
-                    }
-                }
-            }
-        }
-
-        debug!(message = "Stopped event handler.", component_name = ?component_name);
-    });
-
-    (Box::new(event_tx.sink_map_err(|_| ())), shutdown_tx)
-}
-
 /// Returns a tap handler that listens for topology changes, and connects sinks to observe
 /// `LogEvent`s` when a component matches one or more of the provided patterns.
 async fn tap_handler(
@@ -141,7 +203,8 @@ async fn tap_handler(
 ) {
     debug!(message = "Started tap.", patterns = ?patterns);
 
-    // Sinks register for the current tap. Will be updated as new components match.
+    // Sinks register for the current tap. Contains the name of the matched component, and
+    // a shutdown trigger for sending a remove control message when matching sinks change.
     let mut sinks = HashMap::new();
 
     loop {
@@ -174,26 +237,28 @@ async fn tap_handler(
                                 // reconfigured with the same name as a previous, and we are not
                                 // getting involved in config diffing at this point.
                                 let id = Uuid::new_v4().to_string();
-                                let (sink, shutdown_tx) = make_router(
-                                    tx.clone(),
-                                    control_tx.clone(),
-                                    id.to_string(),
-                                    name.to_string(),
-                                );
+                                let sink = TapSink::new(tx.clone(), name.to_string());
 
-                                match control_tx.send(fanout::ControlMessage::Add(id.to_string(), sink)) {
+                                // Attempt to connect the sink.
+                                match control_tx
+                                    .send(fanout::ControlMessage::Add(id.clone(), Box::new(sink)))
+                                {
                                     Ok(_) => {
-                                        // (Over)write the sink entry.
-                                        sinks.insert(name.to_string(), shutdown_tx);
-
                                         debug!(
-                                            message = "Component connected.",
-                                            component_name = ?name, id = ?id
+                                            message = "Sink connected.",
+                                            sink_id = ?id, component_name = ?name,
+                                        );
+
+                                        // Create a sink shutdown trigger to remove the sink
+                                        // when matched components change.
+                                        sinks.insert(
+                                            name.to_string(),
+                                            shutdown_trigger(control_tx.clone(), id),
                                         );
                                     }
                                     Err(err) => {
                                         error!(
-                                            message = "Couldn't connect component.",
+                                            message = "Couldn't connect sink.",
                                             error = ?err,
                                             component_name = ?name, id = ?id
                                         );
@@ -254,6 +319,7 @@ mod tests {
     use super::*;
 
     use crate::event::{Metric, MetricKind, MetricValue};
+    use futures::SinkExt;
     use tokio::sync::watch;
 
     #[test]
@@ -287,7 +353,7 @@ mod tests {
         let (_watch_tx, watch_rx) = watch::channel(outputs);
         let (sink_tx, mut sink_rx) = tokio_mpsc::channel(10);
 
-        let _sink = TapSink::new(
+        let _controller = TapController::new(
             watch_rx,
             sink_tx,
             &[pattern_matched.to_string(), pattern_not_matched.to_string()],

@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
-    internal_events::{HTTPEventEncoded, HTTPEventMissingMessage},
+    internal_events::{HttpEventEncoded, HttpEventMissingMessage},
     sinks::util::{
         buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -183,7 +183,7 @@ impl HttpSink for HttpSinkConfig {
                     b.push(b'\n');
                     b
                 } else {
-                    emit!(HTTPEventMissingMessage);
+                    emit!(HttpEventMissingMessage);
                     return None;
                 }
             }
@@ -205,7 +205,7 @@ impl HttpSink for HttpSinkConfig {
             }
         };
 
-        emit!(HTTPEventEncoded {
+        emit!(HttpEventEncoded {
             byte_size: body.len(),
         });
 

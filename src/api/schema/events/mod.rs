@@ -3,22 +3,16 @@ mod log;
 mod notification;
 mod output;
 
+use encoding::EventEncodingType;
 use output::OutputEventsPayload;
 
-use crate::{api::tap::TapSink, topology::WatchRx};
+use crate::{api::tap::TapController, topology::WatchRx};
 
-use async_graphql::{validators::IntRange, Context, Enum, Subscription};
+use async_graphql::{validators::IntRange, Context, Subscription};
 use futures::StreamExt;
 use itertools::Itertools;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use tokio::{select, stream::Stream, sync::mpsc, time};
-
-#[derive(Enum, Copy, Clone, PartialEq, Eq)]
-/// Encoding format for the event
-pub enum EventEncodingType {
-    Json,
-    Yaml,
-}
 
 #[derive(Debug, Default)]
 pub struct EventsSubscription;
@@ -59,9 +53,9 @@ fn create_events_stream(
     let (mut event_tx, event_rx) = mpsc::channel::<Vec<OutputEventsPayload>>(10);
 
     tokio::spawn(async move {
-        // Create a tap sink. When this drops out of scope, clean up will be performed on the
-        // event handlers and topology observation that the tap sink provides.
-        let _tap_sink = TapSink::new(watch_rx, tap_tx, &component_names);
+        // Create a tap controller. When this drops out of scope, clean up will be performed on the
+        // event handlers and topology observation that the tap controller provides.
+        let _tap_controller = TapController::new(watch_rx, tap_tx, &component_names);
 
         // A tick interval to represent when to 'cut' the results back to the client.
         let mut interval = time::interval(time::Duration::from_millis(interval));
