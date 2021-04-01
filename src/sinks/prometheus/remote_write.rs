@@ -21,6 +21,7 @@ use futures::{future::BoxFuture, stream, FutureExt, SinkExt};
 use http::Uri;
 use prost::Message;
 use serde::{Deserialize, Serialize};
+use shared::lookup::LookupBuf;
 use snafu::{ResultExt, Snafu};
 use std::task;
 use tower::ServiceBuilder;
@@ -112,7 +113,7 @@ impl SinkConfig for RemoteWriteConfig {
                                 .map_err(|error| {
                                     emit!(TemplateRenderingFailed {
                                         error,
-                                        field: Some("tenant_id"),
+                                        field: Some(&LookupBuf::from("tenant_id")),
                                         drop_event: false,
                                     })
                                 })

@@ -40,6 +40,7 @@ impl TransformConfig for LogfmtConfig {
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.clone()))
                 .collect(),
+            timezone,
         )?
         .into_iter()
         .map(|(k, v)| {
@@ -124,9 +125,9 @@ impl FunctionTransform for Logfmt {
 mod tests {
     use super::LogfmtConfig;
     use crate::{
-        config::{GlobalOptions, TransformConfig},
+        config::{log_schema, GlobalOptions, TransformConfig},
         event::{LogEvent, Lookup, Value},
-        Event,
+        log_event,
     };
 
     #[test]

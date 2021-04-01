@@ -204,7 +204,7 @@ mod test {
                 "histogram_3",
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
-                    buckets: crate::buckets![ 2.3 => 11, 4.2 => 85 ],
+                    buckets: shared::buckets![ 2.3 => 11, 4.2 => 85 ],
                     count: 96,
                     sum: 156.2,
                 },
@@ -215,7 +215,7 @@ mod test {
                 "summary_4",
                 MetricKind::Absolute,
                 MetricValue::AggregatedSummary {
-                    quantiles: crate::quantiles![ 0.1 => 1.2, 0.5 => 3.6, 0.9 => 5.2 ],
+                    quantiles: shared::quantiles![ 0.1 => 1.2, 0.5 => 3.6, 0.9 => 5.2 ],
                     count: 23,
                     sum: 8.6,
                 },

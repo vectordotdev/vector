@@ -166,7 +166,7 @@ fn render_tags(
                         emit!(TemplateRenderingFailed {
                             error,
                             drop_event: false,
-                            field: Some(name.as_str()),
+                            field: Some(&LookupBuf::from(name.as_ref())),
                         });
                     }
                     Err(other) => return Err(other),
@@ -261,7 +261,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 name,
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![value => 1],
+                    samples: shared::samples![value => 1],
                     statistic: StatisticKind::Histogram,
                 },
             )
@@ -287,7 +287,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 name,
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![value => 1],
+                    samples: shared::samples![value => 1],
                     statistic: StatisticKind::Summary,
                 },
             )
@@ -368,7 +368,7 @@ impl FunctionTransform for LogToMetric {
                     emit!(TemplateRenderingFailed {
                         error,
                         drop_event: false,
-                        field: None,
+                        field: None as Option<&LookupBuf>,
                     })
                 }
                 Err(TransformError::TemplateParseError(error)) => {
@@ -771,7 +771,7 @@ mod tests {
                 "response_time",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![2.5 => 1],
+                    samples: shared::samples![2.5 => 1],
                     statistic: StatisticKind::Histogram
                 },
             )
@@ -799,7 +799,7 @@ mod tests {
                 "response_time",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![2.5 => 1],
+                    samples: shared::samples![2.5 => 1],
                     statistic: StatisticKind::Summary
                 },
             )

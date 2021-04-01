@@ -292,9 +292,9 @@ impl TaskTransform for Reduce {
 mod test {
     use super::*;
     use crate::{
-        config::TransformConfig,
+        config::{log_schema, TransformConfig},
         event::{Lookup, Value},
-        Event,
+        log_event,
     };
     use serde_json::json;
 
@@ -434,7 +434,7 @@ merge_strategies.baz = "max"
         let in_stream = Box::pin(stream::iter(inputs));
         let mut out_stream = reduce.transform(in_stream);
 
-        let output_1 = out_stream.next().await.unwrap().unwrap();
+        let output_1 = out_stream.next().await.unwrap();
         assert_eq!(
             output_1.as_log()[Lookup::from("message")],
             "test message 1".into()

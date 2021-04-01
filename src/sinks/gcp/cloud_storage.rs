@@ -28,6 +28,7 @@ use hyper::{
 use indoc::indoc;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use shared::lookup::LookupBuf;
 use snafu::{ResultExt, Snafu};
 use std::{collections::HashMap, convert::TryFrom, task::Poll};
 use tower::{Service, ServiceBuilder};
@@ -408,7 +409,7 @@ fn encode_event(
         .map_err(|error| {
             emit!(TemplateRenderingFailed {
                 error,
-                field: Some("key_prefix"),
+                field: Some(&LookupBuf::from("key_prefix")),
                 drop_event: true,
             });
         })

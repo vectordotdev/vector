@@ -45,6 +45,7 @@ impl TransformConfig for KeyValueConfig {
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.clone()))
                 .collect(),
+            timezone,
         )?
         .into_iter()
         .map(|(k, v)| (k.into(), v))
@@ -200,9 +201,9 @@ impl FunctionTransform for KeyValue {
 mod tests {
     use super::KeyValueConfig;
     use crate::{
-        config::{GlobalOptions, TransformConfig},
+        config::{log_schema, GlobalOptions, TransformConfig},
         event::{LogEvent, Lookup, LookupBuf, Value},
-        log_event, Event,
+        log_event,
     };
 
     async fn parse_log(

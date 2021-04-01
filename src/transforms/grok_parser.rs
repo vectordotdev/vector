@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GlobalOptions, TransformConfig, TransformDescription},
-    event::{Event, LookupBuf, PathComponent, PathIter, Value},
+    event::{Event, LookupBuf, Value},
     internal_events::{GrokParserConversionFailed, GrokParserFailedMatch, GrokParserMissingField},
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
@@ -55,6 +55,7 @@ impl TransformConfig for GrokParserConfig {
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.clone()))
                 .collect(),
+            timezone,
         )?
         .into_iter()
         .map(|(k, v)| (k.into(), v))
@@ -158,9 +159,8 @@ mod tests {
     use super::GrokParserConfig;
     use crate::{
         config::{log_schema, GlobalOptions, TransformConfig},
-        event,
         event::{LogEvent, Value},
-        log_event, Event,
+        log_event,
     };
     use pretty_assertions::assert_eq;
     use serde_json::json;

@@ -1,7 +1,6 @@
 use super::InternalEvent;
 use crate::event::metric::Metric;
 use metrics::counter;
-use shared::event::metric::{MetricKind, MetricValue};
 
 #[derive(Debug)]
 pub struct SematextMetricsInvalidMetricReceived<'a> {

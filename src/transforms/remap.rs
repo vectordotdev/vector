@@ -159,7 +159,10 @@ mod tests {
     #[test]
     fn check_remap_error() {
         let event = {
-            let mut event = Event::from("augment me");
+            let mut event = log_event! {
+                log_schema().message_key().clone() => "augment me".to_string(),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            };
             event.as_mut_log().insert("bar", "is a string");
             event
         };
@@ -185,7 +188,10 @@ mod tests {
     #[test]
     fn check_remap_error_infallible() {
         let event = {
-            let mut event = Event::from("augment me");
+            let mut event = log_event! {
+                log_schema().message_key().clone() => "augment me".to_string(),
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            };
             event.as_mut_log().insert("bar", "is a string");
             event
         };

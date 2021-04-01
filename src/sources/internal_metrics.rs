@@ -116,14 +116,14 @@ mod tests {
         );
         assert_eq!(
             MetricValue::Distribution {
-                samples: crate::samples![5.0 => 1, 6.0 => 1],
+                samples: shared::samples![5.0 => 1, 6.0 => 1],
                 statistic: StatisticKind::Histogram
             },
             output["baz"].data.value
         );
         assert_eq!(
             MetricValue::Distribution {
-                samples: crate::samples![7.0 => 1, 8.0 => 1],
+                samples: shared::samples![7.0 => 1, 8.0 => 1],
                 statistic: StatisticKind::Histogram
             },
             output["quux"].data.value

@@ -1,6 +1,5 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, LogEvent, LookupBuf, Value},
     http::HttpClient,
     internal_events::{SplunkEventEncodeError, SplunkEventSent, TemplateRenderingFailed},
     sinks::util::{
@@ -17,6 +16,10 @@ use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use shared::{
+    event::{Event, LogEvent, Value},
+    lookup::LookupBuf,
+};
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
 
@@ -146,7 +149,7 @@ impl HttpSink for HecSinkConfig {
                 .map_err(|error| {
                     emit!(TemplateRenderingFailed {
                         error,
-                        field: Some("sourcetype"),
+                        field: Some(&LookupBuf::from("sourcetype")),
                         drop_event: false,
                     });
                 })
@@ -159,7 +162,7 @@ impl HttpSink for HecSinkConfig {
                 .map_err(|error| {
                     emit!(TemplateRenderingFailed {
                         error,
-                        field: Some("source"),
+                        field: Some(&LookupBuf::from("source")),
                         drop_event: false,
                     });
                 })
@@ -172,7 +175,7 @@ impl HttpSink for HecSinkConfig {
                 .map_err(|error| {
                     emit!(TemplateRenderingFailed {
                         error,
-                        field: Some("index"),
+                        field: Some(&LookupBuf::from("index")),
                         drop_event: false,
                     });
                 })

@@ -1,7 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
-    event::{Event, LookupBuf},
     http::{Auth, HttpClient, HttpError, MaybeAuth},
     internal_events::{ElasticSearchEventEncoded, TemplateRenderingFailed},
     rusoto::{self, region_from_endpoint, AWSAuthentication, RegionOrEndpoint},
@@ -29,6 +28,7 @@ use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use shared::{event::Event, lookup::LookupBuf};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -202,7 +202,7 @@ impl HttpSink for ElasticSearchCommon {
             .map_err(|error| {
                 emit!(TemplateRenderingFailed {
                     error,
-                    field: Some("index"),
+                    field: Some(&LookupBuf::from("index")),
                     drop_event: true,
                 });
             })

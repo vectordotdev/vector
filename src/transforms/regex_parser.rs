@@ -1,6 +1,5 @@
 use crate::{
     config::{log_schema, DataType, GlobalOptions, TransformConfig, TransformDescription},
-    event::{Event, LookpBuf, Lookup, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserFailedMatch, RegexParserMissingField,
         RegexParserTargetExists,
@@ -11,7 +10,11 @@ use crate::{
 use bytes::Bytes;
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
 use serde::{Deserialize, Serialize};
-use shared::TimeZone;
+use shared::{
+    event::{Event, Value},
+    lookup::{Lookup, LookupBuf},
+    TimeZone,
+};
 use snafu::ResultExt;
 use std::{collections::HashMap, str};
 
@@ -321,7 +324,6 @@ mod tests {
     use crate::{
         config::{log_schema, GlobalOptions, TransformConfig},
         event::{LogEvent, Lookup, Value},
-        Event,
     };
 
     #[test]
@@ -330,7 +332,7 @@ mod tests {
     }
 
     async fn do_transform(event: &str, patterns: &str, config: &str) -> Option<LogEvent> {
-        let event = log_event! {
+        let event = shared::log_event! {
             log_schema().message_key().clone() => event.to_string(),
             log_schema().timestamp_key().clone() => chrono::Utc::now(),
         };

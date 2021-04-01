@@ -99,7 +99,7 @@ pub struct Config {
     /// This is useful to compute the latency between important event processing
     /// stages, i.e. the time delta between log line was written and when it was
     /// processed by the `kubernetes_logs` source.
-    ingestion_timestamp_field: Option<LookupBufString>,
+    ingestion_timestamp_field: Option<LookupBuf>,
 
     /// The default time zone for timestamps without an explicit zone.
     timezone: Option<TimeZone>,
@@ -327,7 +327,7 @@ impl Source {
         let events = events.flatten();
         let events = events.map(move |(bytes, file)| {
             let byte_size = bytes.len();
-            let mut event = create_event(bytes, &file, ingestion_timestamp_field.as_deref());
+            let mut event = create_event(bytes, &file, ingestion_timestamp_field.clone());
             let file_info = annotator.annotate(&mut event, &file);
 
             emit!(KubernetesLogsEventReceived {

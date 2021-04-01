@@ -327,45 +327,6 @@ impl From<proto::SummaryQuantile> for metric::Quantile {
     }
 }
 
-impl From<Bytes> for Event {
-    fn from(message: Bytes) -> Self {
-        let mut event = Event::Log(LogEvent::from(BTreeMap::new()));
-
-        event
-            .as_mut_log()
-            .insert(log_schema().message_key(), message);
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), Utc::now());
-
-        event
-    }
-}
-
-impl From<&str> for Event {
-    fn from(line: &str) -> Self {
-        line.to_owned().into()
-    }
-}
-
-impl From<String> for Event {
-    fn from(line: String) -> Self {
-        Bytes::from(line).into()
-    }
-}
-
-impl From<LogEvent> for Event {
-    fn from(log: LogEvent) -> Self {
-        Event::Log(log)
-    }
-}
-
-impl From<Metric> for Event {
-    fn from(metric: Metric) -> Self {
-        Event::Metric(metric)
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;

@@ -144,7 +144,7 @@ impl<S: Subscriber + 'static> Subscriber for BroadcastSubscriber<S> {
     #[inline]
     fn event(&self, event: &tracing::Event<'_>) {
         if let Some(buffer) = early_buffer().as_mut() {
-            buffer.push(event.into());
+            buffer.push(from_tracing_event(event, crate::config::log_schema()));
         }
         if let Some(sender) = SENDER.get() {
             let _ = sender.send(from_tracing_event(event, crate::config::log_schema()));

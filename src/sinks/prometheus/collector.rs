@@ -258,7 +258,7 @@ impl StringCollector {
     }
 
     fn encode_header(name: &str, fullname: &str, value: &MetricValue) -> String {
-        let r#type = metric_value_to_prometheus_metric_type(value);
+        let r#type = metric_value_to_prometheus_metric_type(value).as_str();
         format!(
             "# HELP {} {}\n# TYPE {} {}\n",
             fullname, name, fullname, r#type
@@ -616,7 +616,7 @@ mod tests {
             "requests".to_owned(),
             MetricKind::Absolute,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                samples: shared::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -663,7 +663,7 @@ mod tests {
             "requests".to_owned(),
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
+                buckets: shared::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
@@ -708,7 +708,7 @@ mod tests {
             "requests".to_owned(),
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
+                quantiles: shared::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
@@ -765,7 +765,7 @@ mod tests {
             "requests".to_owned(),
             MetricKind::Absolute,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                samples: shared::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Summary,
             },
         )

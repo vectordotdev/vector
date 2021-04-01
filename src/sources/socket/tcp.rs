@@ -1,12 +1,12 @@
 use crate::{
     config::log_schema,
-    event::{Event, LookupBuf},
     internal_events::{SocketEventReceived, SocketMode},
     log_event,
     sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
+use shared::{event:: Event, lookup::LookupBuf};
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use getset::{CopyGetters, Getters, Setters};
@@ -46,7 +46,7 @@ impl TcpConfig {
         keepalive: Option<TcpKeepaliveConfig>,
         max_length: usize,
         shutdown_timeout_secs: u64,
-        host_key: Option<String>,
+        host_key: Option<LookupBuf>,
         tls: Option<TlsConfig>,
         receive_buffer_bytes: Option<usize>,
     ) -> Self {

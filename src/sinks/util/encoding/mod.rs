@@ -170,11 +170,6 @@ mod tests {
         encoding: EncodingConfig<TestEncoding>,
     }
 
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn as_path_components(a: &str) -> Vec<PathComponent> {
-        PathIter::new(a).collect()
-    }
-
     const TOML_SIMPLE_STRING: &str = r#"encoding = "Snoot""#;
     #[test]
     fn config_string() {

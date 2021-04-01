@@ -131,13 +131,12 @@ mod tests {
         assert_eq!(events.len(), 1);
 
         let log = events[0].as_log();
-        assert_eq!(log[Lookup::from_str("message")], ERROR_TEXT.into());
+        assert_eq!(log[Lookup::from_str("message").unwrap()], ERROR_TEXT.into());
         let timestamp = *log["timestamp"]
-            .as_timestamp()
-            .expect("timestamp isn't a timestamp");
+            .as_timestamp();
         assert!(timestamp >= start);
         assert!(timestamp <= end);
-        assert_eq!(log[Lookup::from_str("metadata.kind")], "event".into());
-        assert_eq!(log[Lookup::from_str("metadata.level")], "ERROR".into());
+        assert_eq!(log[Lookup::from_str("metadata.kind").unwrap()], "event".into());
+        assert_eq!(log[Lookup::from_str("metadata.level").unwrap()], "ERROR".into());
     }
 }

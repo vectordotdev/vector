@@ -11,8 +11,8 @@ use std::{
 
 use crate::{event::*, lookup::*};
 use indexmap::map::IndexMap;
-// use pest::iterators::Pair;
-// use remap_lang::parser::ParserRule;
+use pest::iterators::Pair;
+use crate::lookup::parser::ParserRule;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use toml::Value as TomlValue;
@@ -88,7 +88,6 @@ pub struct LookupBuf {
     pub segments: VecDeque<SegmentBuf>,
 }
 
-/*
 impl<'a> TryFrom<Pair<'a, ParserRule>> for LookupBuf {
     type Error = LookupError;
 
@@ -103,7 +102,6 @@ impl<'a> TryFrom<Pair<'a, ParserRule>> for LookupBuf {
         Ok(retval)
     }
 }
-*/
 
 // TODO: Added in https://github.com/timberio/vector/pull/5374, Path will eventually become Lookup.
 impl TryFrom<&vrl::Path> for LookupBuf {

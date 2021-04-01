@@ -29,6 +29,7 @@ use std::{
     convert::{TryFrom, TryInto},
     task::{Context, Poll},
 };
+use shared::lookup::LookupBuf;
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
 use uuid::Uuid;
@@ -401,7 +402,7 @@ fn encode_event(
         .map_err(|error| {
             emit!(TemplateRenderingFailed {
                 error,
-                field: Some("key_prefix"),
+                field: Some(&LookupBuf::from("key_prefix")),
                 drop_event: true,
             });
         })

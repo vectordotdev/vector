@@ -123,7 +123,7 @@ mod test {
     use super::VectorConfig;
     use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
+        config::{log_schema, GlobalOptions, SinkConfig, SinkContext, SourceConfig},
         event::{
             metric::{MetricKind, MetricValue},
             Metric,
@@ -301,7 +301,11 @@ mod test {
             .unwrap();
         tokio::spawn(server);
 
-        let event = proto::EventWrapper::from(Event::from("short"));
+        let event = log_event! {
+            log_schema().message_key().clone() => "short",
+            log_schema().timestamp_key().clone() => chrono::Utc::now(),
+        };
+        let event = proto::EventWrapper::from(event);
         let event_len = event.encoded_len();
         let full_len = event_len + 4;
 

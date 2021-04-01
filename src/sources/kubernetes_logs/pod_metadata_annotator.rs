@@ -175,7 +175,7 @@ fn annotate_from_container_status(
 ) {
     for (ref key, ref val) in [(&fields_spec.container_id, &container_status.container_id)].iter() {
         if let Some(val) = val {
-            log.insert(key, val.to_owned());
+            log.insert((*key).clone(), val.to_owned());
         }
     }
 }
@@ -545,7 +545,7 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.container_id", "container_id_foo");
+                    log.insert(LookupBuf::from_str("kubernetes.container_id").unwrap(), "container_id_foo");
                     log
                 },
             ),

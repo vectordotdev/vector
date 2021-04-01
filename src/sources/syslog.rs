@@ -166,7 +166,7 @@ impl SourceConfig for SyslogConfig {
                 host_key,
                 shutdown,
                 out,
-                |host_key, default_host, line| Some(event_from_str(host_key, default_host, line)),
+                |host_key, default_host, line| Some(event_from_str(&host_key, default_host, line)),
             )),
         }
     }
@@ -204,7 +204,7 @@ impl TcpSource for SyslogTcpSource {
     }
 
     fn build_event(&self, frame: String, host: Bytes) -> Option<Event> {
-        Some(event_from_str(&self.host_key.clone(), Some(host), &frame))
+        Some(event_from_str(&self.host_key, Some(host), &frame))
     }
 }
 
@@ -348,7 +348,7 @@ pub fn udp(
                             std::str::from_utf8(&bytes)
                                 .map_err(|error| emit!(SyslogUdpUtf8Error { error }))
                                 .ok()
-                                .map(|s| Ok(event_from_str(host_key, Some(received_from), s)))
+                                .map(|s| Ok(event_from_str(&host_key, Some(received_from), s)))
                         }
                         Err(error) => {
                             emit!(SyslogUdpReadError { error });
@@ -384,7 +384,7 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
 // TODO: many more cases to handle:
 // octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
 // null byte delimiter in place of newline
-fn event_from_str(host_key: LookupBuf, default_host: Option<Bytes>, line: &str) -> Event {
+fn event_from_str(host_key: &LookupBuf, default_host: Option<Bytes>, line: &str) -> Event {
     let line = line.trim();
     let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
     let mut event = log_event! {
@@ -406,7 +406,7 @@ fn event_from_str(host_key: LookupBuf, default_host: Option<Bytes>, line: &str) 
 
     let parsed_hostname = parsed.hostname.map(|x| Bytes::from(x.to_owned()));
     if let Some(parsed_host) = parsed_hostname.or(default_host) {
-        event.as_mut_log().insert(host_key, parsed_host);
+        event.as_mut_log().insert(host_key.clone(), parsed_host);
     }
 
     let timestamp = parsed
@@ -647,7 +647,7 @@ mod test {
         }
 
         assert_eq!(
-            event_from_str(LookupBuf::from("host"), None, &raw),
+            event_from_str(&LookupBuf::from("host"), None, &raw),
             expected
         );
     }
@@ -681,7 +681,7 @@ mod test {
             expected.insert("procid", 8449);
         }
 
-        let event = event_from_str(LookupBuf::from("host"), None, &raw);
+        let event = event_from_str(&LookupBuf::from("host"), None, &raw);
         assert_eq!(event, expected.clone());
 
         let raw = format!(
@@ -689,7 +689,7 @@ mod test {
             r#"[incorrect x=]"#, msg
         );
 
-        let event = event_from_str(LookupBuf::from("host"), None, &raw);
+        let event = event_from_str(&LookupBuf::from("host"), None, &raw);
         assert_eq!(event, expected);
     }
 
@@ -709,7 +709,7 @@ mod test {
             r#"[empty]"#
         );
 
-        let event = event_from_str(LookupBuf::from("host"), None, &msg);
+        let event = event_from_str(&LookupBuf::from("host"), None, &msg);
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -717,7 +717,7 @@ mod test {
             r#"[non_empty x="1"][empty]"#
         );
 
-        let event = event_from_str(LookupBuf::from("host"), None, &msg);
+        let event = event_from_str(&LookupBuf::from("host"), None, &msg);
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -725,7 +725,7 @@ mod test {
             r#"[empty][non_empty x="1"]"#
         );
 
-        let event = event_from_str(LookupBuf::from("host"), None, &msg);
+        let event = event_from_str(&LookupBuf::from("host"), None, &msg);
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -733,7 +733,7 @@ mod test {
             r#"[empty not_really="testing the test"]"#
         );
 
-        let event = event_from_str(LookupBuf::from("host"), None, &msg);
+        let event = event_from_str(&LookupBuf::from("host"), None, &msg);
         assert!(!there_is_map_called_empty(event));
     }
 
@@ -747,8 +747,8 @@ mod test {
         let cleaned = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
         assert_eq!(
-            event_from_str(LookupBuf::from("host"), None, raw),
-            event_from_str(LookupBuf::from("host"), None, cleaned)
+            event_from_str(&LookupBuf::from("host"), None, raw),
+            event_from_str(&LookupBuf::from("host"), None, cleaned)
         );
     }
 
@@ -757,7 +757,7 @@ mod test {
         crate::test_util::trace_init();
         let msg = "i am foobar";
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
-        let event = event_from_str(LookupBuf::from("host"), None, &raw);
+        let event = event_from_str(&LookupBuf::from("host"), None, &raw);
 
         let mut expected = log_event! {
             log_schema().message_key().clone() => msg.to_string(),
@@ -791,7 +791,7 @@ mod test {
             r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] {}"#,
             msg
         );
-        let event = event_from_str(LookupBuf::from("host"), None, &raw);
+        let event = event_from_str(&LookupBuf::from("host"), None, &raw);
 
         let mut expected = log_event! {
             log_schema().message_key().clone() => msg.to_string(),
@@ -860,7 +860,7 @@ mod test {
         }
 
         assert_eq!(
-            event_from_str(LookupBuf::from("host"), None, &raw),
+            event_from_str(&LookupBuf::from("host"), None, &raw),
             expected
         );
     }

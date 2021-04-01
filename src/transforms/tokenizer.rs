@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
-    event::{Event, LookupBuf, PathComponent, PathIter, Value},
+    event::{Event, LookupBuf, Value},
     internal_events::{TokenizerConvertFailed, TokenizerFieldMissing},
     transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
@@ -56,12 +56,12 @@ impl TransformConfig for TokenizerConfig {
         .collect();
 
         // don't drop the source field if it's getting overwritten by a parsed value
-        let drop_field = self.drop_field && !self.field_names.iter().any(|f| **f == *field);
+        let drop_field = self.drop_field && !self.field_names.iter().any(|f| *f == field);
 
         Ok(Transform::function(Tokenizer::new(
             self.field_names.clone(),
             field,
-            self.drop_field,
+            drop_field,
             types,
         )))
     }
@@ -146,8 +146,8 @@ mod tests {
     use super::TokenizerConfig;
     use crate::{
         config::{GlobalOptions, TransformConfig},
-        event::{LogEvent, Lookup, Value},
-        log_event, Event,
+        event::{LogEvent, Lookup, LookupBuf, Value},
+        log_event,
     };
 
     #[test]

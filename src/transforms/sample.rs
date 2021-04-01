@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn handles_key_field() {
-        for key_field in &[None, Some(log_schema().timestamp_key().into())] {
+        for key_field in &[None, Some(log_schema().timestamp_key().clone().into())] {
             let event = log_event! {
                 log_schema().message_key().clone() => "nananana".to_string(),
                 log_schema().timestamp_key().clone() => chrono::Utc::now(),

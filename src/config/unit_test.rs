@@ -1,5 +1,5 @@
 use super::{Config, ConfigBuilder, TestDefinition, TestInput, TestInputValue};
-use crate::config::{self, GlobalOptions, TransformConfig};
+use crate::config::{self, log_schema, GlobalOptions, TransformConfig};
 use crate::{
     conditions::Condition,
     event::{Event, LookupBuf, Value},
@@ -541,7 +541,7 @@ async fn build_unit_test(
                     Err(e) => errors.push(format!(
                         "failed to create test condition '{}': {}",
                         index, e,
-                    )),
+                    ).into()),
                 }
             }
 

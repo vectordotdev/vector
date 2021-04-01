@@ -10,7 +10,6 @@ use crate::{
         BatchConfig,
     },
     template::{Template, TemplateParseError},
-    Event,
 };
 use futures::{
     channel::oneshot::Canceled, future::BoxFuture, ready, stream::FuturesUnordered, FutureExt,
@@ -27,7 +26,7 @@ use snafu::{ResultExt, Snafu};
 use std::{
     borrow::Borrow,
     collections::{HashMap, HashSet},
-    convert::{TryFrom, TryInto},
+    convert::TryFrom,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -283,7 +282,7 @@ impl Sink<Event> for KafkaSink {
         let topic = self.topic.render_string(&item).map_err(|error| {
             emit!(TemplateRenderingFailed {
                 error,
-                field: Some("topic"),
+                field: Some(&LookupBuf::from("topic")),
                 drop_event: true,
             });
         })?;
@@ -291,7 +290,7 @@ impl Sink<Event> for KafkaSink {
         let timestamp_ms = match &item {
             Event::Log(log) => log
                 .get(log_schema().timestamp_key())
-                .and_then(|v| v.clone().try_into().ok()),
+                .and_then(|v| Some(v.as_timestamp())),
             Event::Metric(metric) => metric.data.timestamp.as_ref(),
         }
         .map(|ts| ts.timestamp_millis());
@@ -415,7 +414,7 @@ fn encode_event(
         .and_then(|f| match &event {
             Event::Log(log) => log.get(f).map(|value| value.clone_into_bytes().to_vec()),
             Event::Metric(metric) => metric
-                .tags
+                .tags()
                 .as_ref()
                 .and_then(|tags| tags.get(&f.to_string()))
                 .map(|value| value.clone().into_bytes()),

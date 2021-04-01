@@ -244,7 +244,7 @@ mod tests {
             "distro",
             MetricKind::Absolute,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 10, 2.0 => 20],
+                samples: shared::samples![1.0 => 10, 2.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -289,7 +289,7 @@ mod tests {
             "histo",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![1.0 => 10, 2.0 => 20],
+                buckets: shared::buckets![1.0 => 10, 2.0 => 20],
                 count: 30,
                 sum: 50.0,
             },
@@ -339,7 +339,7 @@ mod tests {
             "summary",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![50.0 => 10.0, 90.0 => 20.0],
+                quantiles: shared::quantiles![50.0 => 10.0, 90.0 => 20.0],
                 count: 30,
                 sum: 50.0,
             },
@@ -352,6 +352,10 @@ mod tests {
         assert_eq!(
             collected,
             vec![
+                (
+                    Lookup::from_str("aggregated_summary.count").unwrap(),
+                    &Value::from(30)
+                ),
                 (
                     Lookup::from_str("aggregated_summary.quantiles[0].upper_limit").unwrap(),
                     &Value::from(50.0)

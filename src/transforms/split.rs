@@ -49,6 +49,7 @@ impl TransformConfig for SplitConfig {
                 .iter()
                 .map(|k| k.to_string())
                 .collect::<Vec<_>>(),
+            timezone
         )?
         .into_iter()
         .map(|(k, v)| (k.into(), v))

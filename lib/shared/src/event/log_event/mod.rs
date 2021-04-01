@@ -14,6 +14,7 @@ use std::{
     iter::FromIterator,
 };
 use tracing::{debug, info, instrument, trace, trace_span};
+use std::fmt::Display;
 
 /// A map of [`crate::event::Value`].
 ///
@@ -205,6 +206,28 @@ impl LogEvent {
                 debug!(%error, "Error while inserting.");
                 None
             }
+        }
+    }
+
+    #[instrument(level = "trace", skip(self, key), fields(key = %key))]
+    pub fn insert_flat<K, V>(&mut self, key: K, value: V)
+    where
+        K: Into<String> + Display,
+        V: Into<Value> + Debug,
+    {
+        // TODO We may not want to ignore this..
+        let _ = self.fields.insert(key.into(), value.into());
+    }
+
+    pub fn try_insert<'a>(
+        &mut self,
+        key: impl Into<Lookup<'a>> + Debug,
+        value: impl Into<Value> + Debug,
+    ) {
+        let key = key.into();
+        // TODO can we get away with this clone?
+        if !self.contains(key.clone()) {
+            self.insert(key, value);
         }
     }
 
@@ -445,11 +468,7 @@ impl vrl::Target for LogEvent {
         }
     }
 
-    fn remove(
-        &mut self,
-        path: &vrl::Path,
-        compact: bool,
-    ) -> Result<Option<vrl::Value>, String> {
+    fn remove(&mut self, path: &vrl::Path, compact: bool) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             Ok(Some({
                 let mut value = LogEvent::default();

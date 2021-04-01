@@ -13,6 +13,7 @@ use crate::{
 use async_trait::async_trait;
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
+use shared::lookup::LookupBuf;
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
 
@@ -163,7 +164,7 @@ impl StreamSink for NatsSink {
                 Err(error) => {
                     emit!(TemplateRenderingFailed {
                         error,
-                        field: Some("subject"),
+                        field: Some(&LookupBuf::from("subject")),
                         drop_event: true,
                     });
                     self.acker.ack(1);

@@ -36,6 +36,7 @@ impl TransformConfig for CoercerConfig {
                 // Bit of a hack here, `parse_conversion_map` should ideally take LookupBufs.
                 .map(|(k, v)| (k.to_string(), v.clone()))
                 .collect(),
+            timezone
         )?
         .into_iter()
         .map(|(k, v)| LookupBuf::from_str(&k).map(|k| (k, v)))

@@ -104,8 +104,8 @@ impl Default for DockerLogsConfig {
     }
 }
 
-fn host_key() -> String {
-    log_schema().host_key().to_string()
+fn host_key() -> LookupBuf {
+    log_schema().host_key().clone()
 }
 
 impl DockerLogsConfig {

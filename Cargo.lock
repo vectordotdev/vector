@@ -5978,18 +5978,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rlua"
-version = "0.17.1-alpha.0"
-source = "git+https://github.com/kyren/rlua?rev=25bd7e6bffef9597466a98bfca80a3056c9e6320#25bd7e6bffef9597466a98bfca80a3056c9e6320"
-dependencies = [
- "bitflags",
- "bstr",
- "cc",
- "libc",
- "num-traits",
-]
-
-[[package]]
 name = "rpassword"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6741,7 +6729,7 @@ dependencies = [
  "nom 6.1.2",
  "pest",
  "pest_derive",
- "rlua 0.17.1-alpha.0",
+ "rlua",
  "serde",
  "serde_json",
  "snafu",
@@ -8384,7 +8372,7 @@ dependencies = [
  "rdkafka",
  "regex",
  "reqwest 0.10.10",
- "rlua 0.17.0",
+ "rlua",
  "rusoto_cloudwatch",
  "rusoto_core",
  "rusoto_credential",

@@ -1,5 +1,7 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+    },
     event::{LookupBuf, Value},
     internal_events::{ANSIStripperFailed, ANSIStripperFieldInvalid, ANSIStripperFieldMissing},
     transforms::{FunctionTransform, Transform},

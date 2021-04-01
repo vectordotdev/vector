@@ -1,4 +1,5 @@
 use crate::{config::log_schema, event::Event, sources::util::http::ErrorMessage};
+use shared::log_event;
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use codec::BytesDelimitedCodec;
@@ -44,7 +45,10 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>
 pub fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
     match enc {
         Encoding::Text => body_to_lines(body)
-            .map(|r| Ok(Event::from(r?)))
+            .map(|r| Ok(log_event! {
+                log_schema().message_key().clone() => r?,
+                log_schema().timestamp_key().clone() => chrono::Utc::now(),
+            }))
             .collect::<Result<_, _>>(),
         Encoding::Ndjson => body_to_lines(body)
             .map(|j| {
@@ -65,7 +69,7 @@ pub fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessag
 fn json_parse_object(value: JsonValue) -> Result<Event, ErrorMessage> {
     let mut event = Event::new_empty_log();
     let log = event.as_mut_log();
-    log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
+    log.insert(log_schema().timestamp_key().clone(), Utc::now()); // Add timestamp
     match value {
         JsonValue::Object(map) => {
             for (k, v) in map {

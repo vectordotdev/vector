@@ -276,8 +276,7 @@ mod tests {
                 log_schema().message_key().clone() => message.clone(),
             },
             &Encoding::Text.into(),
-        )
-        .unwrap();
+        );
 
         assert_eq!(&event.data[..], message.as_bytes());
     }
@@ -289,7 +288,7 @@ mod tests {
             log_schema().message_key().clone() => message.clone(),
         };
         event.as_mut_log().insert(LookupBuf::from("key"), "value");
-        let event = encode_event(event, &Encoding::Json.into()).unwrap();
+        let event = encode_event(event, &Encoding::Json.into());
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 

@@ -243,7 +243,7 @@ mod test {
             "glork",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![10.0 => 1],
+                samples: shared::samples![10.0 => 1],
                 statistic: StatisticKind::Histogram,
             },
         ));

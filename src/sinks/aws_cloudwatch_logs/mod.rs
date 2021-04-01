@@ -22,6 +22,7 @@ use rusoto_logs::{
     DescribeLogGroupsRequest, DescribeLogStreamsError, InputLogEvent, PutLogEventsError,
 };
 use serde::{Deserialize, Serialize};
+use shared::lookup::LookupBuf;
 use snafu::Snafu;
 use std::{
     collections::HashMap,
@@ -446,7 +447,7 @@ fn partition_encode(
         Err(error) => {
             emit!(TemplateRenderingFailed {
                 error,
-                field: Some("group"),
+                field: Some(&LookupBuf::from("group")),
                 drop_event: true,
             });
             return None;
@@ -458,7 +459,7 @@ fn partition_encode(
         Err(error) => {
             emit!(TemplateRenderingFailed {
                 error,
-                field: Some("stream"),
+                field: Some(&LookupBuf::from("stream")),
                 drop_event: true,
             });
             return None;

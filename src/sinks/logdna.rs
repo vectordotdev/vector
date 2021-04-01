@@ -144,7 +144,7 @@ impl HttpSink for LogdnaConfig {
             .map_err(|(field, error)| {
                 emit!(TemplateRenderingFailed {
                     error,
-                    field,
+                    field: field.map(|field| LookupBuf::from(field)).as_ref(),
                     drop_event: true,
                 });
             })

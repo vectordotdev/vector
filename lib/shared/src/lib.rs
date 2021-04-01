@@ -6,8 +6,12 @@ pub mod btreemap;
 
 #[cfg(feature = "conversion")]
 pub mod conversion;
+
 #[cfg(feature = "conversion")]
 pub mod datetime;
+
+#[cfg(feature = "conversion")]
+pub use datetime::TimeZone;
 
 #[cfg(feature = "tokenize")]
 pub mod tokenize;

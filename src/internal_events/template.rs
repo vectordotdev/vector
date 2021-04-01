@@ -1,9 +1,10 @@
 use super::InternalEvent;
 use crate::template::TemplateRenderingError;
 use metrics::counter;
+use shared::lookup::LookupBuf;
 
 pub struct TemplateRenderingFailed<'a> {
-    pub field: Option<&'a str>,
+    pub field: Option<&'a LookupBuf>,
     pub drop_event: bool,
     pub error: TemplateRenderingError,
 }

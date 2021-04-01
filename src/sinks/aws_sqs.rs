@@ -19,6 +19,7 @@ use rusoto_sqs::{
     SendMessageResult, Sqs, SqsClient,
 };
 use serde::{Deserialize, Serialize};
+use shared::lookup::LookupBuf;
 use snafu::{ResultExt, Snafu};
 use std::{
     convert::{TryFrom, TryInto},
@@ -261,7 +262,7 @@ fn encode_event(
             Err(error) => {
                 emit!(TemplateRenderingFailed {
                     error,
-                    field: Some("message_group_id"),
+                    field: Some(&LookupBuf::from("message_group_id")),
                     drop_event: true
                 });
                 return None;

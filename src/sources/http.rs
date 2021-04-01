@@ -3,8 +3,7 @@ use crate::{
         log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
         SourceDescription,
     },
-    event::{Event, LogEvent, LookupBuf, Value},
-    log_event,
+    event::{Event, LookupBuf, Value},
     shutdown::ShutdownSignal,
     sources::util::{
         add_query_parameters, decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
@@ -12,8 +11,7 @@ use crate::{
     tls::TlsConfig,
     Pipeline,
 };
-use bytes::{Bytes, BytesMut};
-use codec::BytesDelimitedCodec;
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr};
 
@@ -166,81 +164,6 @@ fn add_headers(
 
     events
 }
-
-/*
-
-TODO:
-These were changed in the lookup PR and moved out from under us.
-Check what changes were made in the lookup PR and apply them to the new positon.
-
-
-fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>> {
-    let mut body = BytesMut::new();
-    body.extend_from_slice(&buf);
-
-    let mut decoder = BytesDelimitedCodec::new(b'\n');
-    std::iter::from_fn(move || {
-        match decoder.decode_eof(&mut body) {
-            Err(error) => Some(Err(ErrorMessage::new(
-                StatusCode::BAD_REQUEST,
-                format!("Bad request: {}", error),
-            ))),
-            Ok(Some(b)) => Some(Ok(b)),
-            Ok(None) => None, // actually done
-        }
-    })
-    .filter(|s| match s {
-        // filter empty lines
-        Ok(b) => !b.is_empty(),
-        _ => true,
-    })
-}
-
-// A handy helper to let you decode an array, or a single thing.
-#[derive(Serialize, Deserialize)]
-#[serde(untagged)]
-enum ArrayOrNot<T> {
-    Not(T),
-    Array(Vec<T>),
-}
-
-fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
-    let annotater = |mut event: LogEvent| {
-        event.insert(log_schema().timestamp_key().clone(), chrono::Utc::now());
-        event
-    };
-    let converter = |event: LogEvent| Event::Log(event);
-    match enc {
-        Encoding::Text => body_to_lines(body)
-            .map(|r| {
-                Ok(log_event! {
-                    crate::config::log_schema().message_key().clone() => r?,
-                    crate::config::log_schema().timestamp_key().clone() => chrono::Utc::now(),
-                })
-            })
-            .collect::<Result<_, _>>(),
-        Encoding::Ndjson => body_to_lines(body)
-            .map(|j| {
-                serde_json::from_slice::<LogEvent>(&j?)
-                    .map(annotater)
-                    .map(converter)
-                    .map_err(|error| json_error(format!("Error parsing Ndjson: {:?}", error)))
-            })
-            .collect::<Result<Vec<_>, _>>(),
-        Encoding::Json => serde_json::from_slice::<ArrayOrNot<LogEvent>>(&body)
-            .map(|array_or_not| match array_or_not {
-                ArrayOrNot::Array(vec) => vec.into_iter().map(annotater).map(converter).collect(),
-                ArrayOrNot::Not(item) => vec![converter(annotater(item))],
-            })
-            .map_err(|error| json_error(format!("Error parsing Json: {:?}", error))),
-    }
-}
-
-fn json_error(s: String) -> ErrorMessage {
-    ErrorMessage::new(StatusCode::BAD_REQUEST, format!("Bad JSON: {}", s))
-}
-
-*/
 
 #[cfg(test)]
 mod tests {

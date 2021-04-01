@@ -20,6 +20,7 @@ use futures::{
     FutureExt,
 };
 use serde::{Deserialize, Serialize};
+use shared::lookup::LookupBuf;
 use std::time::{Duration, Instant};
 
 use tokio::{
@@ -174,7 +175,7 @@ impl FileSink {
             Err(error) => {
                 emit!(TemplateRenderingFailed {
                     error,
-                    field: Some("path"),
+                    field: Some(&LookupBuf::from("path")),
                     drop_event: true,
                 });
                 return None;
