@@ -6,17 +6,16 @@
 ///
 /// The suspicion is that the atomics usage in the generational somehow causes
 /// permanent cache invalidation starvation at some scenarios - however, it's
-/// based on the empiric observations, and we currently don't have
-/// a comprehensive mental model to back up this behaviour.
-/// It was decided to just eliminate the generationals - for now.
-/// Maybe in the long term too - we don't need them, so why pay the price?
-/// They're not zero-cost.
-use std::collections::HashMap;
+/// based on the empiric observations, and we currently don't have a
+/// comprehensive mental model to back up this behaviour.  It was decided to
+/// just eliminate the generationals - for now.  Maybe in the long term too - we
+/// don't need them, so why pay the price?  They're not zero-cost.
+use dashmap::DashMap;
 use std::hash::{BuildHasherDefault, Hash};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use twox_hash::XxHash64;
 
-type Map<K, H> = HashMap<K, H, BuildHasherDefault<XxHash64>>;
+type Map<K, H> = DashMap<K, H, BuildHasherDefault<XxHash64>>;
 
 #[derive(Debug)]
 pub(crate) struct VectorRegistry<K, H>
@@ -24,7 +23,28 @@ where
     K: Eq + Hash + Clone + 'static,
     H: 'static,
 {
-    pub map: Arc<Mutex<Map<K, H>>>,
+    pub(crate) map: Arc<Map<K, H>>,
+}
+
+impl<K, H> VectorRegistry<K, H>
+where
+    K: Eq + Hash + Clone + 'static,
+    H: 'static,
+{
+    /// Perform an operation on a given key.
+    ///
+    /// The `op` function will be called for the handle under the given `key`.
+    ///
+    /// If the `key` is not already mapped, the `init` function will be
+    /// called, and the resulting handle will be stored in the registry.
+    pub fn op<I, O, V>(&self, key: K, op: O, init: I) -> V
+    where
+        I: FnOnce() -> H,
+        O: FnOnce(&H) -> V,
+    {
+        let valref = self.map.entry(key).or_insert_with(init);
+        op(valref.value())
+    }
 }
 
 impl<K, H> Default for VectorRegistry<K, H>
@@ -34,7 +54,7 @@ where
 {
     fn default() -> Self {
         Self {
-            map: Arc::new(Mutex::new(HashMap::default())),
+            map: Arc::new(Map::default()),
         }
     }
 }
