@@ -32,6 +32,8 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
                 sources: builder.sources,
                 sinks: builder.sinks,
                 transforms: builder.transforms,
+                #[cfg(feature = "providers")]
+                provider: builder.provider,
                 tests: builder.tests,
                 expansions,
             },

@@ -27,6 +27,8 @@ mod diff;
 pub mod format;
 mod loading;
 mod log_schema;
+#[cfg(feature = "providers")]
+pub mod provider;
 mod unit_test;
 mod validation;
 mod vars;
@@ -52,6 +54,8 @@ pub struct Config {
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
+    #[cfg(feature = "providers")]
+    pub provider: provider::Options,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<String, Vec<String>>,
 }
@@ -188,7 +192,6 @@ macro_rules! impl_generate_config_from_default {
     };
 }
 
-#[async_trait::async_trait]
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {

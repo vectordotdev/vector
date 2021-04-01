@@ -1,5 +1,7 @@
 #[cfg(feature = "api")]
 use super::api;
+#[cfg(feature = "providers")]
+use super::provider;
 use super::{
     compiler, default_data_dir, Config, GlobalOptions, HealthcheckOptions, SinkConfig, SinkOuter,
     SourceConfig, TestDefinition, TransformConfig, TransformOuter,
@@ -25,6 +27,9 @@ pub struct ConfigBuilder {
     pub transforms: IndexMap<String, TransformOuter>,
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
+    #[cfg(feature = "providers")]
+    #[serde(default)]
+    pub provider: provider::Options,
 }
 
 impl Clone for ConfigBuilder {
@@ -49,6 +54,8 @@ impl From<Config> for ConfigBuilder {
             sources: c.sources,
             sinks: c.sinks,
             transforms: c.transforms,
+            #[cfg(feature = "providers")]
+            provider: c.provider,
             tests: c.tests,
         }
     }
