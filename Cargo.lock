@@ -8274,7 +8274,7 @@ dependencies = [
  "futures 0.3.13",
  "graphql_client",
  "indoc",
- "reqwest 0.10.10",
+ "reqwest",
  "serde",
  "serde_json",
  "tokio 0.2.25",
