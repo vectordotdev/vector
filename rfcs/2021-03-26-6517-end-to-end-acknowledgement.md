@@ -179,18 +179,52 @@ struct EventFinalization {
 }
 
 struct OriginatingSource {
-    receiver: tokio::sync::mpsc::Receiver<EventFinalization>,
-    identifier: String,
+    receiver: tokio::sync::mpsc::Sender<EventFinalization>,
+    identifier: Arc<Box<str>>,
 }
 
 struct EventSource {
-    source: Arc<OriginatingSource>,
+    source: OriginatingSource,
     id: EventId,
+}
+
+impl EventSource {
+    fn acknowledge(&self, status: EventStatus);
 }
 
 struct EventMetadata {
     // existing fields
-    sources: Box<\[EventSource\]>,
+    sources: Box<[EventSource]>,
+}
+```
+
+### Source configuration
+
+When building a source, the topology system will provide it with an
+originating source identifier. The source is responsible for creating
+its own MPSC channel pair to provide to events. This allows sources that
+receive events in batches to create a separate channel for each batch,
+and then `await` on the receiver to collect the finalization
+events. Since the size of each batch is known in advance, this may be a
+bounded channel with the length fixed to the size of the source batch.
+When the last event in the batch is dropped, the sender will be closed
+and the receiver will be signalled that all events are completed.
+
+Since this is making the parameter list for `trait SourceConfig::build`
+increasingly unweidly, a new context structure will be introduced to
+carry the data.
+
+```rust
+struct SourceContext<'a> {
+    name: &'a str,
+    identifier: Arc<Box<str>>,
+    globals: &'a GlobalOptions,
+    shutdown: ShutdownSignal,
+    out: Pipeline,
+}
+
+trait SourceConfig {
+    async fn build(&self, context: SourceContext<'_>) -> crate::Result<sources::Source>;
 }
 ```
 
@@ -276,4 +310,6 @@ The above structure provides for several considerations:
 
 ## Plan Of Attack
 
-_TBD_
+  * [ ] Introduce `struct SourceContext`
+  * [ ] Set up originating source identifiers
+  * [ ] _TBD_
