@@ -5,7 +5,7 @@ mod registry;
 mod tests;
 
 use crate::metrics::label_filter::VectorLabelFilter;
-use crate::metrics::recorder::VectorRecorder;
+use crate::metrics::recorder::{InnerRecorder, OuterRecorder};
 use crate::metrics::registry::VectorRegistry;
 use crate::{event::Metric, Event};
 use metrics::{Key, KeyData, SharedString};
@@ -13,7 +13,8 @@ use metrics_tracing_context::TracingContextLayer;
 use metrics_util::layers::Layer;
 use metrics_util::{CompositeKey, Handle, MetricKind};
 use once_cell::sync::OnceCell;
-use std::sync::{atomic::AtomicU64, Arc};
+use std::sync::{atomic::AtomicU64, mpsc, Arc};
+use std::thread;
 
 static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 // Cardinality counter parameters, expose the internal metrics registry
@@ -28,7 +29,7 @@ static CARDINALITY_KEY: CompositeKey =
 
 /// Controller allows capturing metric snapshots.
 pub struct Controller {
-    registry: Arc<VectorRegistry<CompositeKey, Handle>>,
+    registry: VectorRegistry<CompositeKey, Handle>,
 }
 
 fn metrics_enabled() -> bool {
@@ -51,20 +52,11 @@ pub fn init() -> crate::Result<()> {
     }
 
     // Prepare the registry.
-    let registry = Arc::new(VectorRegistry::default());
-
-    // Init the cardinality counter.
-    let cardinality_counter = Arc::new(AtomicU64::new(1));
-    // Inject the cardinality counter into the registry.
-    registry.op(
-        CARDINALITY_KEY.clone(),
-        |_| {},
-        || Handle::Counter(Arc::clone(&cardinality_counter)),
-    );
+    let registry = VectorRegistry::default();
 
     // Initialize the controller.
     let controller = Controller {
-        registry: Arc::clone(&registry),
+        registry: registry.clone(),
     };
     // Register the controller globally.
     CONTROLLER
@@ -72,7 +64,19 @@ pub fn init() -> crate::Result<()> {
         .map_err(|_| "controller already initialized")?;
 
     // Initialize the recorder.
-    let recorder = VectorRecorder::new(Arc::clone(&registry), Arc::clone(&cardinality_counter));
+    let (snd, rcv) = mpsc::channel();
+
+    let inner_recorder = InnerRecorder::new(rcv, registry);
+    // Create a thread to handle the loop for `InnerRecorder`. This populates
+    // the `registry` from information provided by `OuterRecorder`, the
+    // interface with metrics-rs.
+    //
+    // We immediately drop the handle and so the thread becomes a detatched
+    // background thread.
+    let _ = thread::Builder::new()
+        .name("metrics_recorder".to_string())
+        .spawn(|| inner_recorder.run())?;
+    let recorder = OuterRecorder::new(snd);
 
     // If enabled, apply a layer to capture tracing span fields as labels.
     let recorder: Box<dyn metrics::Recorder> = if tracing_context_layer_enabled() {
@@ -90,7 +94,12 @@ pub fn init() -> crate::Result<()> {
 
 /// Clear all metrics from the registry.
 pub fn reset(controller: &Controller) {
-    controller.registry.map.clear()
+    controller
+        .registry
+        .map
+        .lock()
+        .expect("metric map poisoned")
+        .clear()
 }
 
 /// Take a snapshot of all gathered metrics and expose them as metric
@@ -107,10 +116,16 @@ pub fn get_controller() -> crate::Result<&'static Controller> {
 }
 
 fn snapshot(controller: &Controller) -> Vec<Event> {
-    controller
+    let mut events: Vec<Event> = controller
         .registry
         .map
+        .lock()
+        .expect("metric map poisoned")
         .iter()
-        .map(|valref| Metric::from_metric_kv(valref.key().key(), valref.value()).into())
-        .collect()
+        .map(|(k, v)| Metric::from_metric_kv(k.key(), v).into())
+        .collect();
+    let cardinality = Handle::Counter(Arc::new(AtomicU64::new(events.len() as u64)));
+    let metric = Metric::from_metric_kv(CARDINALITY_KEY.key(), &cardinality);
+    events.push(metric.into());
+    events
 }

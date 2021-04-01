@@ -11,9 +11,12 @@
 /// It was decided to just eliminate the generationals - for now.
 /// Maybe in the long term too - we don't need them, so why pay the price?
 /// They're not zero-cost.
-use dashmap::DashMap;
+use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hash};
+use std::sync::{Arc, Mutex};
 use twox_hash::XxHash64;
+
+type Map<K, H> = HashMap<K, H, BuildHasherDefault<XxHash64>>;
 
 #[derive(Debug)]
 pub(crate) struct VectorRegistry<K, H>
@@ -21,34 +24,29 @@ where
     K: Eq + Hash + Clone + 'static,
     H: 'static,
 {
-    pub map: DashMap<K, H, BuildHasherDefault<XxHash64>>,
+    pub map: Arc<Mutex<Map<K, H>>>,
 }
 
-impl<K, H> Default for VectorRegistry<K, H> {
-    fn default() -> Self {
-        Self {
-            map: DashMap::default(),
-        }
-    }
-}
-
-impl<K, H> VectorRegistry<K, H>
+impl<K, H> Default for VectorRegistry<K, H>
 where
     K: Eq + Hash + Clone + 'static,
     H: 'static,
 {
-    /// Perform an operation on a given key.
-    ///
-    /// The `op` function will be called for the handle under the given `key`.
-    ///
-    /// If the `key` is not already mapped, the `init` function will be
-    /// called, and the resulting handle will be stored in the registry.
-    pub fn op<I, O, V>(&self, key: K, op: O, init: I) -> V
-    where
-        I: FnOnce() -> H,
-        O: FnOnce(&H) -> V,
-    {
-        let valref = self.map.entry(key).or_insert_with(init);
-        op(valref.value())
+    fn default() -> Self {
+        Self {
+            map: Arc::new(Mutex::new(HashMap::default())),
+        }
+    }
+}
+
+impl<K, H> Clone for VectorRegistry<K, H>
+where
+    K: Eq + Hash + Clone + 'static,
+    H: 'static,
+{
+    fn clone(&self) -> Self {
+        Self {
+            map: Arc::clone(&self.map),
+        }
     }
 }
