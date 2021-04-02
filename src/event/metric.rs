@@ -97,7 +97,7 @@ pub enum MetricValue {
     /// A Gauge represents a sampled numerical value.
     Gauge { value: f64 },
     /// A Set contains a set of (unordered) unique values for a key.
-    Set { values: BTreeSet<String> },
+    Set { values: BTreeSet<ImStr> },
     /// A Distribution contains a set of sampled values.
     Distribution {
         samples: Vec<Sample>,
@@ -495,7 +495,7 @@ impl MetricValue {
                 *value += value2;
             }
             (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
-                values.extend(values2.iter().map(Into::into));
+                values.extend(values2.iter().map(|s| s.clone()));
             }
             (
                 Self::Distribution {

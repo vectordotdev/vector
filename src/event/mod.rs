@@ -3,6 +3,7 @@ use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use shared::EventDataEq;
 use std::collections::{BTreeMap, HashMap};
+use std::str::FromStr;
 
 pub mod discriminant;
 pub mod merge_state;
@@ -232,7 +233,7 @@ impl From<proto::EventWrapper> for Event {
                     },
                     MetricProto::Gauge(gauge) => MetricValue::Gauge { value: gauge.value },
                     MetricProto::Set(set) => MetricValue::Set {
-                        values: set.values.into_iter().collect(),
+                        values: set.values.into_iter().map(|s| s.into_boxed_str()).collect(),
                     },
                     MetricProto::Distribution1(dist) => MetricValue::Distribution {
                         statistic: dist.statistic().into(),
@@ -345,7 +346,10 @@ impl From<Event> for proto::EventWrapper {
                     }
                     MetricValue::Gauge { value } => MetricProto::Gauge(proto::Gauge { value }),
                     MetricValue::Set { values } => MetricProto::Set(proto::Set {
-                        values: values.into_iter().collect(),
+                        values: values
+                            .into_iter()
+                            .map(|s| String::from_str(&s).expect("should never fail"))
+                            .collect(),
                     }),
                     MetricValue::Distribution { samples, statistic } => {
                         MetricProto::Distribution2(proto::Distribution2 {
