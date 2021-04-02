@@ -305,7 +305,7 @@ mod integration_tests {
     use rusoto_es::{CreateElasticsearchDomainRequest, Es, EsClient};
     use rusoto_firehose::{CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration};
     use serde_json::{json, Value};
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn firehose_put_records() {
@@ -349,7 +349,7 @@ mod integration_tests {
 
         let _ = sink.send_all(&mut events).await.unwrap();
 
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let config = ElasticSearchConfig {
             auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),

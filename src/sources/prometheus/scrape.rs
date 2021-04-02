@@ -20,6 +20,7 @@ use std::{
     future::ready,
     time::{Duration, Instant},
 };
+use tokio_stream::wrappers::IntervalStream;
 
 #[derive(Debug, Snafu)]
 enum ConfigError {
@@ -156,7 +157,7 @@ fn prometheus(
 ) -> sources::Source {
     let out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
 
-    Box::pin(tokio::time::interval(Duration::from_secs(interval))
+    Box::pin(IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
         .take_until(shutdown)
         .map(move |_| stream::iter(urls.clone()))
         .flatten()
@@ -261,7 +262,7 @@ mod test {
         {Body, Client, Response, Server},
     };
     use pretty_assertions::assert_eq;
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[test]
     fn genreate_config() {
@@ -338,7 +339,7 @@ mod test {
         );
 
         let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let response = Client::new()
             .get(format!("http://{}/metrics", out_addr).parse().unwrap())
@@ -416,7 +417,7 @@ mod integration_tests {
             .unwrap();
 
         tokio::spawn(source);
-        tokio::time::delay_for(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
         let events = test_util::collect_ready(rx).await;
         assert!(!events.is_empty());

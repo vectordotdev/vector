@@ -17,7 +17,7 @@ use futures::{
 };
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
-    error::{KafkaError, RDKafkaError},
+    error::{KafkaError, RDKafkaErrorCode},
     producer::{DeliveryFuture, FutureProducer, FutureRecord},
     ClientConfig,
 };
@@ -30,7 +30,7 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use tokio::time::{delay_for, Duration};
+use tokio::time::{sleep, Duration};
 
 // Maximum number of futures blocked by [send_result](https://docs.rs/rdkafka/0.24.0/rdkafka/producer/future_producer/struct.FutureProducer.html#method.send_result)
 const SEND_RESULT_LIMIT: usize = 5;
@@ -313,11 +313,11 @@ impl Sink<Event> for KafkaSink {
                     // See item 4 on GitHub: https://github.com/timberio/vector/pull/101#issue-257150924
                     // https://docs.rs/rdkafka/0.24.0/src/rdkafka/producer/future_producer.rs.html#296
                     Err((error, future_record))
-                        if error == KafkaError::MessageProduction(RDKafkaError::QueueFull) =>
+                        if error == KafkaError::MessageProduction(RDKafkaErrorCode::QueueFull) =>
                     {
                         debug!(message = "The rdkafka queue full.", %error, %seqno, internal_log_rate_secs = 1);
                         record = future_record;
-                        delay_for(Duration::from_millis(10)).await;
+                        sleep(Duration::from_millis(10)).await;
                     }
                     Err((error, _)) => break Err(error),
                 }
@@ -798,7 +798,9 @@ mod integration_test {
         let _ = kafka_auth.apply(&mut client_config).unwrap();
 
         let mut tpl = TopicPartitionList::new();
-        tpl.add_partition(&topic, 0).set_offset(Offset::Beginning);
+        tpl.add_partition(&topic, 0)
+            .set_offset(Offset::Beginning)
+            .unwrap();
 
         let consumer: BaseConsumer = client_config.create().unwrap();
         consumer.assign(&tpl).unwrap();

@@ -6,7 +6,7 @@ use crate::{
     Pipeline,
 };
 use fakedata::logs::*;
-use futures::{stream::StreamExt, SinkExt};
+use futures::SinkExt;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -118,7 +118,7 @@ impl GeneratorConfig {
             }
 
             if let Some(interval) = &mut interval {
-                interval.next().await;
+                interval.tick().await;
             }
 
             let event = self.format.generate_event(n);
@@ -167,8 +167,8 @@ impl SourceConfig for GeneratorConfig {
 mod tests {
     use super::*;
     use crate::{config::log_schema, shutdown::ShutdownSignal, Pipeline};
+    use futures::{channel::mpsc, poll, StreamExt};
     use std::time::{Duration, Instant};
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {
@@ -213,13 +213,16 @@ mod tests {
         let lines = &["one", "two", "three", "four"];
 
         for _ in 0..5 {
-            let event = rx.try_recv().unwrap();
+            let event = match poll!(rx.next()) {
+                Poll::Ready(event) => event.unwrap(),
+                _ => unreachable!(),
+            };
             let log = event.as_log();
             let message = log[&message_key].to_string_lossy();
             assert!(lines.contains(&&*message));
         }
 
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
@@ -232,9 +235,9 @@ mod tests {
         .await;
 
         for _ in 0..5 {
-            assert!(matches!(rx.try_recv(), Ok(_)));
+            assert!(poll!(rx.next()).is_ready());
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
@@ -249,13 +252,16 @@ mod tests {
         .await;
 
         for n in 0..5 {
-            let event = rx.try_recv().unwrap();
+            let event = match poll!(rx.next()) {
+                Poll::Ready(event) => event.unwrap(),
+                _ => unreachable!(),
+            };
             let log = event.as_log();
             let message = log[&message_key].to_string_lossy();
             assert!(message.starts_with(&n.to_string()));
         }
 
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
@@ -270,9 +276,9 @@ mod tests {
         .await;
 
         for _ in 0..3 {
-            assert!(matches!(rx.try_recv(), Ok(_)));
+            assert!(poll!(rx.next()).is_ready());
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
 
         let duration = start.elapsed();
         assert!(duration >= Duration::from_secs(2));
@@ -287,9 +293,9 @@ mod tests {
         .await;
 
         for _ in 0..5 {
-            assert!(matches!(rx.try_recv(), Ok(_)));
+            assert!(poll!(rx.next()).is_ready());
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
@@ -301,9 +307,9 @@ mod tests {
         .await;
 
         for _ in 0..5 {
-            assert!(matches!(rx.try_recv(), Ok(_)));
+            assert!(poll!(rx.next()).is_ready());
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
@@ -315,9 +321,9 @@ mod tests {
         .await;
 
         for _ in 0..5 {
-            assert!(matches!(rx.try_recv(), Ok(_)));
+            assert!(poll!(rx.next()).is_ready());
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
@@ -329,9 +335,9 @@ mod tests {
         .await;
 
         for _ in 0..5 {
-            assert!(matches!(rx.try_recv(), Ok(_)));
+            assert!(poll!(rx.next()).is_ready());
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 
     #[tokio::test]
@@ -344,11 +350,14 @@ mod tests {
         .await;
 
         for _ in 0..5 {
-            let event = rx.try_recv().unwrap();
+            let event = match poll!(rx.next()) {
+                Poll::Ready(event) => event.unwrap(),
+                _ => unreachable!(),
+            };
             let log = event.as_log();
             let message = log[&message_key].to_string_lossy();
             assert!(serde_json::from_str::<serde_json::Value>(&message).is_ok());
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
+        assert_eq!(poll!(rx.next()), Poll::Ready(None));
     }
 }

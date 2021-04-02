@@ -134,14 +134,11 @@ mod test {
         Event, Pipeline,
     };
     use futures::stream;
-    use std::{
-        net::{Shutdown, SocketAddr},
-        thread,
-    };
+    use std::net::SocketAddr;
     use tokio::{
         io::AsyncWriteExt,
         net::TcpStream,
-        time::{delay_for, Duration},
+        time::{sleep, Duration},
     };
 
     #[cfg(not(target_os = "windows"))]
@@ -194,7 +191,7 @@ mod test {
 
         sink.run(stream::iter(events.clone())).await.unwrap();
 
-        delay_for(Duration::from_millis(50)).await;
+        sleep(Duration::from_millis(50)).await;
 
         let output = collect_ready(rx).await;
         assert_eq!(events, output);
@@ -258,8 +255,8 @@ mod test {
         let mut stream = TcpStream::connect(&addr).await.unwrap();
         stream.write(b"hello world \n").await.unwrap();
 
-        thread::sleep(Duration::from_secs(2));
-        stream.shutdown(Shutdown::Both).unwrap();
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        stream.shutdown().await.unwrap();
         drop(trigger_shutdown);
         shutdown_down.await;
 
@@ -298,13 +295,13 @@ mod test {
         let mut sink = FramedWrite::new(stream, encoder);
         sink.send(out.into()).await.unwrap();
 
-        let stream = sink.into_inner();
-        thread::sleep(Duration::from_secs(2));
-        stream.shutdown(Shutdown::Both).unwrap();
+        let mut stream = sink.into_inner();
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        stream.shutdown().await.unwrap();
         drop(trigger_shutdown);
         shutdown_down.await;
 
         let output = collect_ready(rx).await;
-        assert_eq!(Event::from(event), output[0]);
+        assert_eq!(vec![Event::from(event)], output);
     }
 }

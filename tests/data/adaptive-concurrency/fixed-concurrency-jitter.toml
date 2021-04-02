@@ -13,7 +13,7 @@ mode = [10, 10]
 mean = [8.0, 10.0]
 
 [stats.rate]
-max = [65, 82]
+max = [65, 84]
 mean = [55, 66]
 
 [controller.in_flight]

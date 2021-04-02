@@ -303,15 +303,14 @@ mod tests {
         },
         test_util::{next_addr, random_lines_with_stream},
     };
-    use bytes::{buf::BufExt, Bytes};
+    use bytes::{Buf, Bytes};
     use flate2::read::GzDecoder;
-    use futures::{stream, StreamExt};
+    use futures::{channel::mpsc, stream, StreamExt};
     use headers::{Authorization, HeaderMapExt};
     use http::request::Parts;
     use hyper::Method;
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};
-    use tokio::sync::mpsc::Receiver;
 
     #[test]
     fn generate_config() {
@@ -575,7 +574,7 @@ mod tests {
         // its accepting socket. The delay below ensures that the sink
         // attempts to connect at least once before creating the
         // listening socket.
-        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
         let (rx, trigger, server) = build_test_server(in_addr);
         tokio::spawn(server);
 
@@ -650,7 +649,7 @@ mod tests {
     }
 
     async fn get_received(
-        rx: Receiver<(Parts, Bytes)>,
+        rx: mpsc::Receiver<(Parts, Bytes)>,
         assert_parts: impl Fn(Parts),
     ) -> Vec<String> {
         rx.flat_map(|(parts, body)| {

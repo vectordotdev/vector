@@ -12,6 +12,7 @@ use hyper::{Body, Client, Request};
 use serde::{Deserialize, Serialize};
 use std::{env, time::Instant};
 use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
 
 mod parser;
 
@@ -128,7 +129,7 @@ async fn aws_ecs_metrics(
     let mut out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
 
     let interval = time::Duration::from_secs(interval);
-    let mut interval = time::interval(interval).take_until(shutdown);
+    let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     while interval.next().await.is_some() {
         let client = Client::new();
 
@@ -199,7 +200,7 @@ mod test {
         service::{make_service_fn, service_fn},
         {Body, Response, Server},
     };
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn test_aws_ecs_metrics_source() {
@@ -529,7 +530,7 @@ mod test {
         .unwrap();
         tokio::spawn(source);
 
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let metrics = collect_ready(rx)
             .await
@@ -565,7 +566,7 @@ mod test {
 mod integration_tests {
     use super::*;
     use crate::test_util::collect_ready;
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     async fn scrape_metrics(endpoint: String, version: Version) {
         let (tx, rx) = Pipeline::new_test();
@@ -586,7 +587,7 @@ mod integration_tests {
         .unwrap();
         tokio::spawn(source);
 
-        delay_for(Duration::from_secs(5)).await;
+        sleep(Duration::from_secs(5)).await;
 
         let metrics = collect_ready(rx).await;
 

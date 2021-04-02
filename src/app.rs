@@ -4,12 +4,12 @@ use crate::topology::RunningTopology;
 use crate::{
     config, generate, heartbeat, list, metrics, signal, topology, trace, unit_test, validate,
 };
-use std::cmp::max;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 use futures::StreamExt;
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "sources-host_metrics")]
 use crate::sources::host_metrics;
@@ -93,12 +93,9 @@ impl Application {
             }
         }
 
-        let mut rt = {
-            let threads = root_opts.threads.unwrap_or_else(|| max(1, num_cpus::get()));
-            runtime::Builder::new()
-                .threaded_scheduler()
+        let rt = {
+            runtime::Builder::new_multi_thread()
                 .enable_all()
-                .core_threads(threads)
                 .build()
                 .expect("Unable to create async runtime")
         };
@@ -186,9 +183,9 @@ impl Application {
     }
 
     pub fn run(self) {
-        let mut rt = self.runtime;
+        let rt = self.runtime;
 
-        let mut graceful_crash = self.config.graceful_crash;
+        let mut graceful_crash = UnboundedReceiverStream::new(self.config.graceful_crash);
         let mut topology = self.config.topology;
 
         let mut config_paths = self.config.config_paths;

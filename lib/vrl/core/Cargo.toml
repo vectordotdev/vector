@@ -10,7 +10,7 @@ compiler = { package = "vrl-compiler", path = "../compiler" }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
 
-bytes = "0.5.6"
+bytes = "1.0.0"
 indoc = "1"
 ordered-float = "2"
 thiserror = "1"

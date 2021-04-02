@@ -36,6 +36,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
 use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -145,7 +146,7 @@ impl HostMetricsConfig {
             out.sink_map_err(|error| error!(message = "Error sending host metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
-        let mut interval = time::interval(duration).take_until(shutdown);
+        let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
         while interval.next().await.is_some() {
             let metrics = self.capture_metrics().await;
             out.send_all(&mut stream::iter(metrics).map(Ok)).await?;

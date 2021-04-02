@@ -30,9 +30,9 @@ use tokio_util::codec::FramedRead;
 
 use tokio::{
     fs::{File, OpenOptions},
-    io::{self, AsyncReadExt, AsyncWriteExt},
+    io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
     process::Command,
-    time::delay_for,
+    time::sleep,
 };
 use tracing_futures::Instrument;
 
@@ -242,7 +242,7 @@ impl JournaldSource {
 
             // journalctl process should never stop,
             // so it is an error if we reach here.
-            delay_for(BACKOFF_DURATION).await;
+            sleep(BACKOFF_DURATION).await;
         }
     }
 
@@ -373,7 +373,7 @@ fn start_journalctl(
     )
     .boxed();
 
-    let pid = Pid::from_raw(child.id() as i32);
+    let pid = Pid::from_raw(child.id().unwrap() as _);
     let stop = Box::new(move || {
         let _ = kill(pid, Signal::SIGTERM);
     });
@@ -586,7 +586,7 @@ mod tests {
     use tempfile::tempdir;
     use tokio::{
         io,
-        time::{delay_for, timeout, Duration},
+        time::{sleep, timeout, Duration},
     };
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
@@ -680,7 +680,7 @@ mod tests {
         );
         tokio::spawn(source);
 
-        delay_for(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(100)).await;
         drop(trigger);
 
         timeout(Duration::from_secs(1), rx.collect()).await.unwrap()

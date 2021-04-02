@@ -59,7 +59,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                     },
                 );
 
-                let mut rt = runtime();
+                let rt = runtime();
                 let (topology, input) = rt.block_on(async move {
                     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
@@ -74,7 +74,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                 });
                 (rt, topology, input)
             },
-            |(mut rt, topology, input)| {
+            |(rt, topology, input)| {
                 rt.block_on(async move {
                     let lines = random_lines(line_size).take(num_lines).map(|mut line| {
                         line.push('\n');
