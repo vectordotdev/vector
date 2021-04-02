@@ -806,12 +806,15 @@ mod integration_test {
         consumer.assign(&tpl).unwrap();
 
         // wait for messages to show up
-        wait_for(|| {
-            let (_low, high) = consumer
-                .fetch_watermarks(&topic, 0, Duration::from_secs(3))
-                .unwrap();
-            ready(high > 0)
-        })
+        wait_for(
+            || match consumer.fetch_watermarks(&topic, 0, Duration::from_secs(3)) {
+                Ok((_low, high)) => ready(high > 0),
+                Err(err) => {
+                    println!("retrying due to error fetching watermarks: {}", err);
+                    ready(false)
+                }
+            },
+        )
         .await;
 
         // check we have the expected number of messages in the topic
