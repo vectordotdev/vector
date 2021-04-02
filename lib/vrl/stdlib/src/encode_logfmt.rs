@@ -1,7 +1,5 @@
 use vrl::prelude::*;
 
-use std::fmt::Write;
-
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeLogfmt;
 
@@ -40,114 +38,103 @@ impl Function for EncodeLogfmt {
     }
 }
 
-fn format_logfmt_string(f: &mut fmt::Formatter<'_>, str: &str) -> fmt::Result {
-    let needs_quotting = match str.find(' ') {
-        Some(_) => true,
-        None => false
-    };
+mod logfmt {
+    use std::collections::BTreeMap;
+    use std::fmt::{self, Write};
+    use std::result::Result;
 
-    if needs_quotting {
-        f.write_char('"')?;
-    }
+    use vrl::prelude::*;
 
-    for c in str.chars() {
-        let needs_escaping = match c {
-            '\\' | '"' => true,
-            _ => false
+    fn encode_string(output: &mut String, str: &str) -> fmt::Result {
+        let needs_quotting = match str.find(' ') {
+            Some(_) => true,
+            None => false
         };
 
-        if needs_escaping {
-            f.write_char('\\')?;
+        if needs_quotting {
+            output.write_char('"')?;
         }
 
-        f.write_char(c)?;
+        for c in str.chars() {
+            let needs_escaping = match c {
+                '\\' | '"' => true,
+                _ => false
+            };
+
+            if needs_escaping {
+                output.write_char('\\')?;
+            }
+
+            output.write_char(c)?;
+        }
+
+        if needs_quotting {
+            output.write_char('"')?;
+        }
+
+        Ok(())
     }
 
-    if needs_quotting {
-        f.write_char('"')?;
-    }
-
-    Ok(())
-}
-
-struct LogFmtFieldValueFormatter<'a> {
-    value: &'a Value,
-}
-
-impl std::fmt::Display for LogFmtFieldValueFormatter<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.value {
+    fn encode_value(output: &mut String, value: &Value) -> fmt::Result {
+        match value {
             Value::Bytes(b) => {
                 let val = String::from_utf8_lossy(b);
-                format_logfmt_string(f, &val)
+                encode_string(output, &val)
             }
             _ => {
-                let val = format!("{}", self.value);
-                format_logfmt_string(f, &val)
+                let val = format!("{}", value);
+                encode_string(output, &val)
             }
         }
     }
-}
 
-struct LogFmtFieldFormatter<'a> {
-    key: &'a str,
-    value: &'a Value,
-}
-
-impl std::fmt::Display for LogFmtFieldFormatter<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        format_logfmt_string(f, self.key)?;
-        let value_format = LogFmtFieldValueFormatter { value: self.value };
-        write!(f, "={}", value_format)
+    fn encode_field(output: &mut String, key: &str, value: &Value) -> fmt::Result {
+        encode_string(output, key)?;
+        output.write_char('=')?;
+        encode_value(output, value)
     }
-}
 
-struct LogFmtFormatter {
-    value: Value,
-}
+    pub fn encode_object(input: &BTreeMap<String, Value>) -> Result<String, String> {
+        let mut output = String::new();
 
-impl std::fmt::Display for LogFmtFormatter {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.value {
-            Value::Object(map) => {
-                for (idx, (key, value)) in map.iter().enumerate() {
-                    let field_formatter = LogFmtFieldFormatter { key, value };
-                    if idx > 0 {
-                        f.write_char(' ')?;
-                    }
-                    write!(f, "{}", field_formatter)?;
-                }
-
-                Ok(())
+        for (idx, (key, value)) in input.iter().enumerate() {
+            if idx > 0 {
+                output.write_char(' ').map_err(|_| "write error")?;
             }
-            Value::Array(arr) => {
-                for (idx, value) in arr.iter().enumerate() {
-                    if idx > 0 {
-                        f.write_char(' ')?;
-                    }
 
-                    match value {
-                        Value::Array(arr) if arr.len() == 2 => {
-                            let (key, value) = (&arr[0], &arr[1]);
-                            if let Value::Bytes(b) = key {
-                                let key_str = String::from_utf8_lossy(b);
-                                let field_formatter = LogFmtFieldFormatter {
-                                    key: &key_str,
-                                    value,
-                                };
-                                write!(f, "{}", field_formatter)?;
-                            }
-                        }
-                        _ => return Err(fmt::Error),
-                    }
-                }
-
-                Ok(())
-            }
-            _ => Err(fmt::Error),
+            encode_field(&mut output, key, value).map_err(|_| "write error")?;
         }
+
+        Ok(output)
+    }
+
+    pub fn encode_array(input: &Vec<Value>) -> std::result::Result<String, String> {
+        let mut output = String::new();
+
+        for (idx, value) in input.iter().enumerate() {
+            if idx > 0 {
+                output.write_char(' ').map_err(|_| "write error")?;
+            }
+
+            match value {
+                Value::Array(arr) if arr.len() == 2 => {
+                    let (key, value) = (&arr[0], &arr[1]);
+                    if let Value::Bytes(b) = key {
+                        let key_str = String::from_utf8_lossy(b);
+                        encode_field(&mut output, &key_str, value).map_err(|_| "write error")?;
+                    } else {
+                        return Err(format!("invalid key type at index {}", idx))
+                    }
+
+                }
+                _ => return Err(format!("invalid key-value pair at index {}", idx))
+            }
+        }
+
+        Ok(output)
     }
 }
+
 
 #[derive(Clone, Debug)]
 struct EncodeLogfmtFn {
@@ -157,13 +144,16 @@ struct EncodeLogfmtFn {
 impl Expression for EncodeLogfmtFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let formatter = LogFmtFormatter { value };
 
-        let mut output = String::new();
-        match std::fmt::write(&mut output, format_args!("{}", formatter)) {
-            Ok(_) => Ok(output.into()),
-            Err(_) => Err("Failed to encode logfmt".into()),
-        }
+        let logfmt = match value {
+            Value::Object(map) => logfmt::encode_object(&map),
+            Value::Array(arr) => logfmt::encode_array(&arr),
+            _ => Err("unsupported value-type".into())
+        };
+
+        logfmt
+            .map_err(|err| format!("failed to encode logfmt: {}", err).into())
+            .map(Into::into)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -205,7 +195,7 @@ mod tests {
                           value!(vec![value!("log_id"), value!(12345)]),
                       ]
                   )],
-            want: Err("Failed to encode logfmt"),
+            want: Err("failed to encode logfmt: invalid key-value pair at index 0"),
             tdef: TypeDef::new().bytes().infallible(),
         }
 
@@ -216,7 +206,7 @@ mod tests {
                           value!(vec![value!("lvl")]),
                       ]
                   )],
-            want: Err("Failed to encode logfmt"),
+            want: Err("failed to encode logfmt: invalid key-value pair at index 1"),
             tdef: TypeDef::new().bytes().infallible(),
         }
 
