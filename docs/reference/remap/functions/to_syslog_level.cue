@@ -4,7 +4,7 @@ remap: functions: to_syslog_level: {
 	category:    "Convert"
 	description: """
 		Converts the `value`, a Syslog [severity level](\(urls.syslog_levels)), into its corresponding keyword,
-		i.e. 0 into `"emerg"`, 1 into `"alert", etc.
+		i.e. 0 into `"emerg"`, 1 into `"alert"`, etc.
 		"""
 
 	arguments: [
