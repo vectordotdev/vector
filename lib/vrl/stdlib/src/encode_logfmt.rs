@@ -26,12 +26,12 @@ impl Function for EncodeLogfmt {
         &[
             Example {
                 title: "encode object",
-                source: r#"encode_logfmt({"lvl": "info", "msg": "This is a message", "log_id": 12345}"#,
+                source: r#"encode_logfmt({"lvl": "info", "msg": "This is a message", "log_id": 12345})"#,
                 result: Ok(r#"s'log_id=12345 lvl=info msg="This is a message"'"#),
             },
             Example {
                 title: "encode array",
-                source: r#"encode_logfmt([ ["lvl", "info"], ["msg", "This is a message"], ["log_id", 12345]]"#,
+                source: r#"encode_logfmt([["lvl", "info"], ["msg", "This is a message"], ["log_id", 12345]])"#,
                 result: Ok(r#"s'lvl=info msg="This is a message" log_id=12345'"#),
             },
         ]
