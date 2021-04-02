@@ -1,13 +1,13 @@
 use super::state;
 use std::sync::Arc;
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 use vector_api_client::{
     gql::{ComponentsQueryExt, ComponentsSubscriptionExt, MetricsSubscriptionExt},
     Client, SubscriptionClient,
 };
 
 /// Components that have been added
-async fn component_added(client: Arc<SubscriptionClient>, mut tx: state::EventTx) {
+async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
     let res = client.component_added();
 
     tokio::pin! {
@@ -34,7 +34,7 @@ async fn component_added(client: Arc<SubscriptionClient>, mut tx: state::EventTx
 }
 
 /// Components that have been removed
-async fn component_removed(client: Arc<SubscriptionClient>, mut tx: state::EventTx) {
+async fn component_removed(client: Arc<SubscriptionClient>, tx: state::EventTx) {
     let res = client.component_removed();
 
     tokio::pin! {
@@ -51,7 +51,7 @@ async fn component_removed(client: Arc<SubscriptionClient>, mut tx: state::Event
 
 async fn processed_events_totals(
     client: Arc<SubscriptionClient>,
-    mut tx: state::EventTx,
+    tx: state::EventTx,
     interval: i64,
 ) {
     let res = client.component_processed_events_totals_subscription(interval);
@@ -76,7 +76,7 @@ async fn processed_events_totals(
 
 async fn processed_events_throughputs(
     client: Arc<SubscriptionClient>,
-    mut tx: state::EventTx,
+    tx: state::EventTx,
     interval: i64,
 ) {
     let res = client.component_processed_events_throughputs_subscription(interval);
@@ -100,7 +100,7 @@ async fn processed_events_throughputs(
 
 async fn processed_bytes_totals(
     client: Arc<SubscriptionClient>,
-    mut tx: state::EventTx,
+    tx: state::EventTx,
     interval: i64,
 ) {
     let res = client.component_processed_bytes_totals_subscription(interval);
@@ -125,7 +125,7 @@ async fn processed_bytes_totals(
 
 async fn processed_bytes_throughputs(
     client: Arc<SubscriptionClient>,
-    mut tx: state::EventTx,
+    tx: state::EventTx,
     interval: i64,
 ) {
     let res = client.component_processed_bytes_throughputs_subscription(interval);

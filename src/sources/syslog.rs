@@ -1,7 +1,6 @@
 use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
-#[cfg(unix)]
 use crate::udp;
 use crate::{
     config::{
@@ -54,7 +53,6 @@ pub enum Mode {
     },
     Udp {
         address: SocketAddr,
-        #[cfg(unix)]
         receive_buffer_bytes: Option<usize>,
     },
     #[cfg(unix)]
@@ -133,7 +131,6 @@ impl SourceConfig for SyslogConfig {
                     out,
                 )
             }
-            #[cfg(unix)]
             Mode::Udp {
                 address,
                 receive_buffer_bytes,
@@ -145,8 +142,6 @@ impl SourceConfig for SyslogConfig {
                 shutdown,
                 out,
             )),
-            #[cfg(not(unix))]
-            Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, shutdown, out)),
             #[cfg(unix)]
             Mode::Unix { path } => Ok(build_unix_stream_source(
                 path,
@@ -408,7 +403,7 @@ pub fn udp(
     addr: SocketAddr,
     _max_length: usize,
     host_key: String,
-    #[cfg(unix)] receive_buffer_bytes: Option<usize>,
+    receive_buffer_bytes: Option<usize>,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
@@ -419,9 +414,10 @@ pub fn udp(
             .await
             .expect("Failed to bind to UDP listener socket");
 
-        #[cfg(unix)]
         if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-            udp::set_receive_buffer_size(&socket, receive_buffer_bytes);
+            if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+                warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
+            }
         }
 
         info!(
@@ -654,7 +650,6 @@ mod test {
         assert!(config.mode.is_udp());
     }
 
-    #[cfg(unix)]
     #[test]
     fn config_udp_with_receive_buffer_size() {
         let config: SyslogConfig = toml::from_str(

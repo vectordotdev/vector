@@ -131,9 +131,11 @@ fn kafka_source(
     let consumer = Arc::new(create_consumer(config)?);
 
     Ok(Box::pin(async move {
+        let shutdown = shutdown;
+
         Arc::clone(&consumer)
-            .start()
-            .take_until(shutdown.clone())
+            .stream()
+            .take_until(shutdown)
             .then(move |message| {
                 let key_field = key_field.clone();
                 let topic_key = topic_key.clone();
@@ -278,14 +280,14 @@ mod test {
         }
     }
 
-    #[test]
-    fn kafka_source_create_ok() {
+    #[tokio::test]
+    async fn kafka_source_create_ok() {
         let config = make_config();
         assert!(kafka_source(&config, ShutdownSignal::noop(), Pipeline::new_test().0).is_ok());
     }
 
-    #[test]
-    fn kafka_source_create_incorrect_auto_offset_reset() {
+    #[tokio::test]
+    async fn kafka_source_create_incorrect_auto_offset_reset() {
         let config = KafkaSourceConfig {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
             ..make_config()

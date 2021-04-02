@@ -12,7 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 vrl = { path = "../core" }
-bytes = "0.5.6"
+bytes = "1.0.0"
 exitcode = "1"
 prettytable-rs = { version = "0.8", default-features = false, optional = true }
 regex = { version = "1", default-features = false, optional = true }

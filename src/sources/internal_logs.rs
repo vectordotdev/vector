@@ -5,7 +5,7 @@ use crate::{
 };
 use futures::{stream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use tokio::sync::broadcast::RecvError;
+use tokio::sync::broadcast::error::RecvError;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -39,10 +39,10 @@ impl SourceConfig for InternalLogsConfig {
     }
 }
 
-async fn run(out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
+async fn run(out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
     let mut out = out.sink_map_err(|error| error!(message = "Error sending log.", %error));
     let subscription = trace::subscribe();
-    let mut subscriber = subscription.receiver.take_until(shutdown);
+    let mut rx = subscription.receiver;
 
     out.send_all(&mut stream::iter(subscription.buffer).map(Ok))
         .await?;
@@ -50,14 +50,19 @@ async fn run(out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
     // Note: This loop, or anything called within it, MUST NOT generate
     // any logs that don't break the loop, as that could cause an
     // infinite loop since it receives all such logs.
-
-    while let Some(receive) = subscriber.next().await {
-        match receive {
-            Ok(event) => out.send(event).await?,
-            Err(RecvError::Lagged(_)) => (),
-            Err(RecvError::Closed) => break,
+    loop {
+        tokio::select! {
+            receive = rx.recv() => {
+                match receive {
+                    Ok(event) => out.send(event).await?,
+                    Err(RecvError::Lagged(_)) => (),
+                    Err(RecvError::Closed) => break,
+                }
+            }
+            _ = &mut shutdown => break,
         }
     }
+
     Ok(())
 }
 
@@ -65,10 +70,8 @@ async fn run(out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
 mod tests {
     use super::*;
     use crate::{config::GlobalOptions, test_util::collect_ready, trace, Event};
-    use tokio::{
-        sync::mpsc::Receiver,
-        time::{delay_for, Duration},
-    };
+    use futures::channel::mpsc;
+    use tokio::time::{sleep, Duration};
 
     #[test]
     fn generates_config() {
@@ -102,7 +105,7 @@ mod tests {
         check_events(logs, start);
     }
 
-    async fn start_source() -> Receiver<Event> {
+    async fn start_source() -> mpsc::Receiver<Event> {
         let (tx, rx) = Pipeline::new_test();
 
         let source = InternalLogsConfig {}
@@ -115,13 +118,13 @@ mod tests {
             .await
             .unwrap();
         tokio::spawn(source);
-        delay_for(Duration::from_millis(1)).await;
+        sleep(Duration::from_millis(1)).await;
         trace::stop_buffering();
         rx
     }
 
-    async fn collect_output(rx: Receiver<Event>) -> Vec<Event> {
-        delay_for(Duration::from_millis(1)).await;
+    async fn collect_output(rx: mpsc::Receiver<Event>) -> Vec<Event> {
+        sleep(Duration::from_millis(1)).await;
         collect_ready(rx).await
     }
 

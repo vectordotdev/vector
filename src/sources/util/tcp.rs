@@ -10,10 +10,11 @@ use bytes::Bytes;
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
+use socket2::SockRef;
 use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
 use tokio::{
     net::{TcpListener, TcpStream},
-    time::delay_for,
+    time::sleep,
 };
 use tokio_util::codec::{Decoder, FramedRead, LinesCodecError};
 use tracing_futures::Instrument;
@@ -86,7 +87,7 @@ where
         shutdown_timeout_secs: u64,
         tls: MaybeTlsSettings,
         receive_buffer_bytes: Option<usize>,
-        shutdown: ShutdownSignal,
+        shutdown_signal: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
         let out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));
@@ -107,20 +108,21 @@ where
                     .unwrap_or(addr)
             );
 
-            let tripwire = shutdown.clone();
+            let tripwire = shutdown_signal.clone();
             let tripwire = async move {
                 let _ = tripwire.await;
-                delay_for(Duration::from_secs(shutdown_timeout_secs)).await;
+                sleep(Duration::from_secs(shutdown_timeout_secs)).await;
             }
             .shared();
 
             let connection_gauge = OpenGauge::new();
+            let shutdown_clone = shutdown_signal.clone();
 
             listener
                 .accept_stream()
-                .take_until(shutdown.clone())
-                .for_each(|connection| {
-                    let shutdown = shutdown.clone();
+                .take_until(shutdown_clone)
+                .for_each(move |connection| {
+                    let shutdown_signal = shutdown_signal.clone();
                     let tripwire = tripwire.clone();
                     let source = self.clone();
                     let out = out.clone();
@@ -159,7 +161,7 @@ where
                                 connection_gauge.open(|count| emit!(ConnectionOpen { count }));
 
                             let fut = handle_stream(
-                                shutdown,
+                                shutdown_signal,
                                 socket,
                                 keepalive,
                                 receive_buffer_bytes,
@@ -182,7 +184,7 @@ where
 }
 
 async fn handle_stream<T>(
-    mut shutdown: ShutdownSignal,
+    mut shutdown_signal: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
@@ -201,7 +203,7 @@ async fn handle_stream<T>(
                 return;
             }
         },
-        _ = &mut shutdown => {
+        _ = &mut shutdown_signal => {
             return;
         }
     };
@@ -218,18 +220,19 @@ async fn handle_stream<T>(
         }
     }
 
-    let mut _token = None;
-    let mut shutdown = Some(shutdown);
+    let mut shutdown_token = None;
     let mut reader = FramedRead::new(socket, source.decoder());
-    stream::poll_fn(move |cx| {
-        if let Some(fut) = shutdown.as_mut() {
-            match fut.poll_unpin(cx) {
+
+    stream::poll_fn(|cx| {
+        if shutdown_token.is_none() {
+            match shutdown_signal.poll_unpin(cx) {
                 Poll::Ready(token) => {
                     debug!("Start graceful shutdown.");
                     // Close our write part of TCP socket to signal the other side
                     // that it should stop writing and close the channel.
-                    let socket: Option<&TcpStream> = reader.get_ref().get_ref();
-                    if let Some(socket) = socket {
+                    let socket = reader.get_ref().get_ref();
+                    if let Some(stream) = socket {
+                        let socket = SockRef::from(stream);
                         if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
                             warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
                         }
@@ -239,8 +242,7 @@ async fn handle_stream<T>(
                         return Poll::Ready(None);
                     }
 
-                    _token = Some(token);
-                    shutdown = None;
+                    shutdown_token = Some(token);
                 }
                 Poll::Pending => {}
             }

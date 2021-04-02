@@ -56,6 +56,7 @@ criterion_group!(
               parse_aws_cloudwatch_log_subscription_message,
               parse_aws_vpc_flow_log,
               parse_common_log,
+              parse_csv,
               parse_duration,
               parse_glog,
               parse_grok,
@@ -818,6 +819,15 @@ bench_function! {
             "status": 200,
             "size": 2326,
         })),
+    }
+}
+
+bench_function! {
+    parse_csv => vrl_stdlib::ParseCsv;
+
+    literal {
+        args: func_args![value: "foo,bar"],
+        want: Ok(value!(["foo","bar"]))
     }
 }
 
