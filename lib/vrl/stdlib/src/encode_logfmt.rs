@@ -48,7 +48,7 @@ mod logfmt {
     fn encode_string(output: &mut String, str: &str) -> fmt::Result {
         let needs_quotting = match str.find(' ') {
             Some(_) => true,
-            None => false
+            None => false,
         };
 
         if needs_quotting {
@@ -58,7 +58,7 @@ mod logfmt {
         for c in str.chars() {
             let needs_escaping = match c {
                 '\\' | '"' => true,
-                _ => false
+                _ => false,
             };
 
             if needs_escaping {
@@ -123,18 +123,21 @@ mod logfmt {
                         let key_str = String::from_utf8_lossy(b);
                         encode_field(&mut output, &key_str, value).map_err(|_| "write error")?;
                     } else {
-                        return Err(format!("invalid key type at index {}", idx))
+                        return Err(format!("invalid key type at index {} ({})", idx, key));
                     }
-
                 }
-                _ => return Err(format!("invalid key-value pair at index {}", idx))
+                _ => {
+                    return Err(format!(
+                        "invalid key-value pair at index {} ({})",
+                        idx, value
+                    ))
+                }
             }
         }
 
         Ok(output)
     }
 }
-
 
 #[derive(Clone, Debug)]
 struct EncodeLogfmtFn {
@@ -148,7 +151,7 @@ impl Expression for EncodeLogfmtFn {
         let logfmt = match value {
             Value::Object(map) => logfmt::encode_object(&map),
             Value::Array(arr) => logfmt::encode_array(&arr),
-            _ => Err("unsupported value-type".into())
+            _ => Err("unsupported value-type".into()),
         };
 
         logfmt
@@ -157,7 +160,7 @@ impl Expression for EncodeLogfmtFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value.type_def(state).infallible().bytes()
+        self.value.type_def(state).fallible().bytes()
     }
 }
 
@@ -174,7 +177,7 @@ mod tests {
                       )
                     ],
             want: Ok("lvl=info"),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::new().bytes().fallible(),
         }
 
         array_with_multiple_element_types {
@@ -185,29 +188,7 @@ mod tests {
                       ]
                   )],
             want: Ok("lvl=info log_id=12345"),
-            tdef: TypeDef::new().bytes().infallible(),
-        }
-
-        array_with_too_many_items_in_sub_array_error {
-            args: func_args![value: value!(
-                      vec![
-                          value!(vec![value!("lvl"), value!("info"), value!("error")]),
-                          value!(vec![value!("log_id"), value!(12345)]),
-                      ]
-                  )],
-            want: Err("failed to encode logfmt: invalid key-value pair at index 0"),
-            tdef: TypeDef::new().bytes().infallible(),
-        }
-
-        array_with_missing_items_in_sub_array_error {
-            args: func_args![value: value!(
-                      vec![
-                          value!(vec![value!("log_id"), value!(12345)]),
-                          value!(vec![value!("lvl")]),
-                      ]
-                  )],
-            want: Err("failed to encode logfmt: invalid key-value pair at index 1"),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::new().bytes().fallible(),
         }
 
         array_with_string_and_spaces {
@@ -218,7 +199,7 @@ mod tests {
                       ]
                   )],
             want: Ok(r#"lvl=info msg="This is a log message""#),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::new().bytes().fallible(),
         }
 
         array_with_string_and_characters_to_escape {
@@ -229,31 +210,64 @@ mod tests {
                       ]
                   )],
             want: Ok(r#"lvl=info msg="payload: {\"code\": 200}\\n""#),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::new().bytes().fallible(),
+        }
+
+        array_with_too_many_items_in_key_pair_error {
+            args: func_args![value: value!(
+                      vec![
+                          value!(vec![value!("lvl"), value!("info"), value!("error")]),
+                          value!(vec![value!("log_id"), value!(12345)]),
+                      ]
+                  )],
+            want: Err(r#"failed to encode logfmt: invalid key-value pair at index 0 (["lvl", "info", "error"])"#),
+            tdef: TypeDef::new().bytes().fallible(),
+        }
+
+        array_with_missing_items_key_pair_error {
+            args: func_args![value: value!(
+                      vec![
+                          value!(vec![value!("log_id"), value!(12345)]),
+                          value!(vec![value!("lvl")]),
+                      ]
+                  )],
+            want: Err(r#"failed to encode logfmt: invalid key-value pair at index 1 (["lvl"])"#),
+            tdef: TypeDef::new().bytes().fallible(),
+        }
+
+        array_with_invalid_key_type_error {
+            args: func_args![value: value!(
+                      vec![
+                          value!(vec![value!("lvl"), value!("info")]),
+                          value!(vec![value!(10), value!(20)]),
+                      ]
+                  )],
+            want: Err("failed to encode logfmt: invalid key type at index 1 (10)"),
+            tdef: TypeDef::new().bytes().fallible(),
         }
 
         map_with_single_element_type {
             args: func_args![value: value!(map!["lvl": value!("info")])],
             want: Ok("lvl=info"),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::new().bytes().fallible(),
         }
 
         map_with_multiple_element_types {
             args: func_args![value: value!(map!["lvl": value!("info"), "log_id": value!(12345)])],
             want: Ok("log_id=12345 lvl=info"),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::new().bytes().fallible(),
         }
 
         map_with_string_and_spaces {
             args: func_args![value: value!(map!["lvl": value!("info"), "msg": value!("This is a log message")])],
             want: Ok(r#"lvl=info msg="This is a log message""#),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::new().bytes().fallible(),
         }
 
         map_with_string_and_characters_to_escape {
             args: func_args![value: value!(map!["lvl": value!("info"), "msg": value!(r#"payload: {"code": 200}\n"#)])],
             want: Ok(r#"lvl=info msg="payload: {\"code\": 200}\\n""#),
-            tdef: TypeDef::new().bytes().infallible(),
+            tdef: TypeDef::new().bytes().fallible(),
         }
     ];
 }
