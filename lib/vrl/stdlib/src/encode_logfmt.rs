@@ -1,5 +1,7 @@
 use vrl::prelude::*;
 
+use std::fmt::Write;
+
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeLogfmt;
 
@@ -39,10 +41,33 @@ impl Function for EncodeLogfmt {
 }
 
 fn format_logfmt_string(f: &mut fmt::Formatter<'_>, str: &str) -> fmt::Result {
-    match str.find(' ') {
-        Some(_) => write!(f, r#""{}""#, str),
-        None => write!(f, "{}", str),
+    let needs_quotting = match str.find(' ') {
+        Some(_) => true,
+        None => false
+    };
+
+    if needs_quotting {
+        f.write_char('"')?;
     }
+
+    for c in str.chars() {
+        let needs_escaping = match c {
+            '\\' | '"' => true,
+            _ => false
+        };
+
+        if needs_escaping {
+            f.write_char('\\')?;
+        }
+
+        f.write_char(c)?;
+    }
+
+    if needs_quotting {
+        f.write_char('"')?;
+    }
+
+    Ok(())
 }
 
 struct LogFmtFieldValueFormatter<'a> {
@@ -88,7 +113,7 @@ impl std::fmt::Display for LogFmtFormatter {
                 for (idx, (key, value)) in map.iter().enumerate() {
                     let field_formatter = LogFmtFieldFormatter { key, value };
                     if idx > 0 {
-                        f.write_str(" ")?;
+                        f.write_char(' ')?;
                     }
                     write!(f, "{}", field_formatter)?;
                 }
@@ -98,7 +123,7 @@ impl std::fmt::Display for LogFmtFormatter {
             Value::Array(arr) => {
                 for (idx, value) in arr.iter().enumerate() {
                     if idx > 0 {
-                        f.write_str(" ")?;
+                        f.write_char(' ')?;
                     }
 
                     match value {
@@ -206,6 +231,17 @@ mod tests {
             tdef: TypeDef::new().bytes().infallible(),
         }
 
+        array_with_string_and_characters_to_escape {
+            args: func_args![value: value!(
+                      vec![
+                          value!(vec![value!("lvl"), value!("info")]),
+                          value!(vec![value!("msg"), value!(r#"payload: {"code": 200}\n"#)]),
+                      ]
+                  )],
+            want: Ok(r#"lvl=info msg="payload: {\"code\": 200}\\n""#),
+            tdef: TypeDef::new().bytes().infallible(),
+        }
+
         map_with_single_element_type {
             args: func_args![value: value!(map!["lvl": value!("info")])],
             want: Ok("lvl=info"),
@@ -221,6 +257,12 @@ mod tests {
         map_with_string_and_spaces {
             args: func_args![value: value!(map!["lvl": value!("info"), "msg": value!("This is a log message")])],
             want: Ok(r#"lvl=info msg="This is a log message""#),
+            tdef: TypeDef::new().bytes().infallible(),
+        }
+
+        map_with_string_and_characters_to_escape {
+            args: func_args![value: value!(map!["lvl": value!("info"), "msg": value!(r#"payload: {"code": 200}\n"#)])],
+            want: Ok(r#"lvl=info msg="payload: {\"code\": 200}\\n""#),
             tdef: TypeDef::new().bytes().infallible(),
         }
     ];
