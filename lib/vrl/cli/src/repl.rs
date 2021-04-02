@@ -1,75 +1,53 @@
-use crate::Error;
+use indoc::indoc;
+use lazy_static::lazy_static;
 use prettytable::{format, Cell, Row, Table};
 use regex::Regex;
 use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
 use rustyline::highlight::{Highlighter, MatchingBracketHighlighter};
 use rustyline::hint::{Hinter, HistoryHinter};
-use rustyline::validate::{self, MatchingBracketValidator, ValidationResult, Validator};
+use rustyline::validate::{self, ValidationResult, Validator};
 use rustyline::{Context, Editor, Helper};
 use std::borrow::Cow::{self, Borrowed, Owned};
-use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
+use vrl::{diagnostic::Formatter, state, value, Runtime, RuntimeResult, Target, Terminate, Value};
 
-const HELP_TEXT: &str = r#"
-VRL REPL commands:
-  help functions    Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
-  help docs         Navigate to the VRL docs on the Vector website
-  help docs <func>  Navigate to the VRL docs for the specified function
-  next              Load the next object or create a new one
-  prev              Load the previous object
-  exit              Terminate the program
-"#;
+// Create a list of all possible error values for potential docs lookup
+lazy_static! {
+    static ref ERRORS: Vec<String> = [
+        100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 203, 204, 205, 206, 207, 208, 209,
+        601, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 400, 401,
+        601, 620, 630, 640, 650, 660
+    ]
+    .iter()
+    .map(|i| i.to_string())
+    .collect();
+}
 
 const DOCS_URL: &str = "https://vector.dev/docs/reference/vrl";
+const ERRORS_URL_ROOT: &str = "https://errors.vrl.dev";
+const RESERVED_TERMS: &[&str] = &[
+    "next",
+    "prev",
+    "exit",
+    "quit",
+    "help",
+    "help functions",
+    "help funcs",
+    "help fs",
+    "help docs",
+];
 
-pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
+pub(crate) fn run(mut objects: Vec<Value>) {
     let mut index = 0;
     let func_docs_regex = Regex::new(r"^help\sdocs\s(\w{1,})$").unwrap();
+    let error_docs_regex = Regex::new(r"^help\serror\s(\w{1,})$").unwrap();
 
     let mut compiler_state = state::Compiler::default();
     let mut rt = Runtime::new(state::Runtime::default());
     let mut rl = Editor::<Repl>::new();
     rl.set_helper(Some(Repl::new()));
 
-    println!(
-        r#"
-> VVVVVVVV           VVVVVVVVRRRRRRRRRRRRRRRRR   LLLLLLLLLLL
-> V::::::V           V::::::VR::::::::::::::::R  L:::::::::L
-> V::::::V           V::::::VR::::::RRRRRR:::::R L:::::::::L
-> V::::::V           V::::::VRR:::::R     R:::::RLL:::::::LL
->  V:::::V           V:::::V   R::::R     R:::::R  L:::::L
->   V:::::V         V:::::V    R::::R     R:::::R  L:::::L
->    V:::::V       V:::::V     R::::RRRRRR:::::R   L:::::L
->     V:::::V     V:::::V      R:::::::::::::RR    L:::::L
->      V:::::V   V:::::V       R::::RRRRRR:::::R   L:::::L
->       V:::::V V:::::V        R::::R     R:::::R  L:::::L
->        V:::::V:::::V         R::::R     R:::::R  L:::::L
->         V:::::::::V          R::::R     R:::::R  L:::::L         LLLLLL
->          V:::::::V         RR:::::R     R:::::RLL:::::::LLLLLLLLL:::::L
->           V:::::V          R::::::R     R:::::RL::::::::::::::::::::::L
->            V:::V           R::::::R     R:::::RL::::::::::::::::::::::L
->             VVV            RRRRRRRR     RRRRRRRLLLLLLLLLLLLLLLLLLLLLLLL
->
->                     VECTOR    REMAP    LANGUAGE
->
->
-> Welcome!
->
-> The CLI is running in REPL (Read-eval-print loop) mode.
->
-> To run the CLI in regular mode, add a program to your command.
->
-> VRL REPL commands:
->   help              Learn more about VRL
->   next              Load the next object or create a new one
->   prev              Load the previous object
->   exit              Terminate the program
->
-> Any other value is resolved to a VRL expression.
->
-> Try it out now by typing `.` and hitting [enter] to see the result.
-"#
-    );
+    println!("{}", BANNER_TEXT);
 
     loop {
         let readline = rl.readline("$ ");
@@ -80,6 +58,8 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
                 print_function_list()
             }
             Ok(line) if line == "help docs" => open_url(DOCS_URL),
+            // Capture "help error <code>"
+            Ok(line) if error_docs_regex.is_match(line) => show_error_docs(line, &error_docs_regex),
             // Capture "help docs <func_name>"
             Ok(line) if func_docs_regex.is_match(line) => show_func_docs(line, &func_docs_regex),
             Ok(line) => {
@@ -113,13 +93,19 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
                     _ => line,
                 };
 
-                let value = resolve(
+                let result = resolve(
                     objects.get_mut(index),
                     &mut rt,
                     command,
                     &mut compiler_state,
                 );
-                println!("{}\n", value);
+
+                let string = match result {
+                    Ok(v) => v.to_string(),
+                    Err(v) => v.to_string(),
+                };
+
+                println!("{}\n", string);
             }
             Err(ReadlineError::Interrupted) => break,
             Err(ReadlineError::Eof) => break,
@@ -129,8 +115,6 @@ pub(crate) fn run(mut objects: Vec<Value>) -> Result<(), Error> {
             }
         }
     }
-
-    Ok(())
 }
 
 fn resolve(
@@ -138,39 +122,49 @@ fn resolve(
     runtime: &mut Runtime,
     program: &str,
     state: &mut state::Compiler,
-) -> String {
+) -> RuntimeResult {
+    let mut empty = value!({});
     let object = match object {
-        None => return Value::Null.to_string(),
+        None => &mut empty as &mut dyn Target,
         Some(object) => object,
     };
 
     let program = match vrl::compile_with_state(program, &stdlib::all(), state) {
         Ok(program) => program,
-        Err(diagnostics) => return Formatter::new(program, diagnostics).colored().to_string(),
+        Err(diagnostics) => {
+            return Err(Terminate::Error(
+                Formatter::new(program, diagnostics).colored().to_string(),
+            ))
+        }
     };
 
-    match runtime.resolve(object, &program) {
-        Ok(value) => value.to_string(),
-        Err(err) => err.to_string(),
-    }
+    runtime.resolve(object, &program)
 }
 
 struct Repl {
     highlighter: MatchingBracketHighlighter,
-    validator: MatchingBracketValidator,
-    hinter: HistoryHinter,
+    history_hinter: HistoryHinter,
     colored_prompt: String,
+    hints: Vec<&'static str>,
 }
 
 impl Repl {
     fn new() -> Self {
         Self {
             highlighter: MatchingBracketHighlighter::new(),
-            hinter: HistoryHinter {},
+            history_hinter: HistoryHinter {},
             colored_prompt: "$ ".to_owned(),
-            validator: MatchingBracketValidator::new(),
+            hints: initial_hints(),
         }
     }
+}
+
+fn initial_hints() -> Vec<&'static str> {
+    stdlib::all()
+        .into_iter()
+        .map(|f| f.identifier())
+        .chain(RESERVED_TERMS.iter().copied())
+        .collect()
 }
 
 impl Helper for Repl {}
@@ -182,7 +176,33 @@ impl Hinter for Repl {
     type Hint = String;
 
     fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
-        self.hinter.hint(line, pos, ctx)
+        if pos < line.len() {
+            return None;
+        }
+
+        let mut hints: Vec<String> = Vec::new();
+
+        // Add all function names to the hints
+        let mut func_names = stdlib::all()
+            .iter()
+            .map(|f| f.identifier().into())
+            .collect::<Vec<String>>();
+
+        hints.append(&mut func_names);
+
+        // Check history first
+        if let Some(hist) = self.history_hinter.hint(line, pos, ctx) {
+            return Some(hist);
+        }
+
+        // Then check the other built-in hints
+        self.hints.iter().find_map(|hint| {
+            if pos > 0 && hint.starts_with(&line[..pos]) {
+                Some(String::from(&hint[pos..]))
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -217,33 +237,41 @@ impl Validator for Repl {
         &self,
         ctx: &mut validate::ValidationContext,
     ) -> rustyline::Result<ValidationResult> {
-        self.validator.validate(ctx).map(|result| match result {
-            ValidationResult::Valid(_) => {
-                // support multi-line input by ending the line with a '\'
-                if ctx.input().ends_with('\\') {
-                    return ValidationResult::Incomplete;
-                }
+        let mut compiler_state = state::Compiler::default();
+        let mut rt = Runtime::new(state::Runtime::default());
+        let target: Option<&mut Value> = None;
 
-                result
+        let result = match resolve(target, &mut rt, ctx.input(), &mut compiler_state) {
+            Err(error) => {
+                let m = error.to_string();
+
+                // TODO: Ideally we'd used typed errors for this, but
+                // that requires some more work to the VRL compiler.
+                if m.contains("syntax error") && m.contains("unexpected end of program") {
+                    ValidationResult::Incomplete
+                } else {
+                    ValidationResult::Valid(None)
+                }
             }
-            result => result,
-        })
+
+            Ok(..) => ValidationResult::Valid(None),
+        };
+
+        Ok(result)
     }
 
     fn validate_while_typing(&self) -> bool {
-        self.validator.validate_while_typing()
+        false
     }
 }
 
 fn print_function_list() {
     let table_format = *format::consts::FORMAT_NO_LINESEP_WITH_TITLE;
-    let all_funcs = stdlib::all();
-
     let num_columns = 3;
 
     let mut func_table = Table::new();
     func_table.set_format(table_format);
-    all_funcs
+    stdlib::all()
         .chunks(num_columns)
         .map(|funcs| {
             // Because it's possible that some chunks are only partial, e.g. have only two Some(_)
@@ -285,9 +313,71 @@ fn show_func_docs(line: &str, pattern: &Regex) {
     let func_name = matches.get(1).unwrap().as_str();
 
     if stdlib::all().iter().any(|f| f.identifier() == func_name) {
-        let func_url = format!("{}/#{}", DOCS_URL, func_name);
+        let func_url = format!("{}/functions/#{}", DOCS_URL, func_name);
         open_url(&func_url);
     } else {
         println!("function name {} not recognized", func_name);
     }
 }
+
+fn show_error_docs(line: &str, pattern: &Regex) {
+    // As in show_func_docs, unwrap is okay here
+    let matches = pattern.captures(line).unwrap();
+    let error_code = matches.get(1).unwrap().as_str();
+
+    if ERRORS.iter().any(|e| e == error_code) {
+        let error_code_url = format!("{}/{}", ERRORS_URL_ROOT, error_code);
+        open_url(&error_code_url);
+    } else {
+        println!("error code {} not recognized", error_code);
+    }
+}
+
+const HELP_TEXT: &str = indoc! {r#"
+    VRL REPL commands:
+      help functions     Display a list of currently available VRL functions (aliases: ["help funcs", "help fs"])
+      help docs          Navigate to the VRL docs on the Vector website
+      help docs <func>   Navigate to the VRL docs for the specified function
+      help error <code>  Navigate to the docs for a specific error code
+      next               Load the next object or create a new one
+      prev               Load the previous object
+      exit               Terminate the program
+"#};
+
+const BANNER_TEXT: &str = indoc! {r#"
+    > VVVVVVVV           VVVVVVVVRRRRRRRRRRRRRRRRR   LLLLLLLLLLL
+    > V::::::V           V::::::VR::::::::::::::::R  L:::::::::L
+    > V::::::V           V::::::VR::::::RRRRRR:::::R L:::::::::L
+    > V::::::V           V::::::VRR:::::R     R:::::RLL:::::::LL
+    >  V:::::V           V:::::V   R::::R     R:::::R  L:::::L
+    >   V:::::V         V:::::V    R::::R     R:::::R  L:::::L
+    >    V:::::V       V:::::V     R::::RRRRRR:::::R   L:::::L
+    >     V:::::V     V:::::V      R:::::::::::::RR    L:::::L
+    >      V:::::V   V:::::V       R::::RRRRRR:::::R   L:::::L
+    >       V:::::V V:::::V        R::::R     R:::::R  L:::::L
+    >        V:::::V:::::V         R::::R     R:::::R  L:::::L
+    >         V:::::::::V          R::::R     R:::::R  L:::::L         LLLLLL
+    >          V:::::::V         RR:::::R     R:::::RLL:::::::LLLLLLLLL:::::L
+    >           V:::::V          R::::::R     R:::::RL::::::::::::::::::::::L
+    >            V:::V           R::::::R     R:::::RL::::::::::::::::::::::L
+    >             VVV            RRRRRRRR     RRRRRRRLLLLLLLLLLLLLLLLLLLLLLLL
+    >
+    >                     VECTOR    REMAP    LANGUAGE
+    >
+    >
+    > Welcome!
+    >
+    > The CLI is running in REPL (Read-eval-print loop) mode.
+    >
+    > To run the CLI in regular mode, add a program to your command.
+    >
+    > VRL REPL commands:
+    >   help              Learn more about VRL
+    >   next              Load the next object or create a new one
+    >   prev              Load the previous object
+    >   exit              Terminate the program
+    >
+    > Any other value is resolved to a VRL expression.
+    >
+    > Try it out now by typing `.` and hitting [enter] to see the result.
+"#};

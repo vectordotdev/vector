@@ -24,7 +24,7 @@ vector validate /etc/vector/vector.toml
 <TabItem value="config">
 
 ```bash
-vector validate --no-environment --no-topology /etc/vector/*.toml
+vector validate --no-environment /etc/vector/*.toml
 ```
 
 </TabItem>
@@ -37,8 +37,8 @@ within a configuration file, including:
    [sinks][docs.sinks] include all non-optional fields.
 2. All fields are of the proper [type][docs.setup.configuration#types].
 
-The following group of checks verifies that the configuration file contains a valid topology,
-and can be disabled with flags such as `--no-topology`, expanding the above checks with the following:
+The following group of checks verifies that the configuration file contains a valid topology
+expanding the above checks with the following:
 
 3. At least one [source][docs.sources] is defined.
 4. At least one [sink][docs.sinks] is defined.

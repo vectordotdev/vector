@@ -70,11 +70,11 @@ struct StartsWithFn {
 
 impl Expression for StartsWithFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let case_sensitive = self.case_sensitive.resolve(ctx)?.unwrap_boolean();
+        let case_sensitive = self.case_sensitive.resolve(ctx)?.try_boolean()?;
 
         let substring = {
             let value = self.substring.resolve(ctx)?;
-            let string = value.unwrap_bytes_utf8_lossy();
+            let string = value.try_bytes_utf8_lossy()?;
 
             match case_sensitive {
                 true => string.into_owned(),
@@ -84,7 +84,7 @@ impl Expression for StartsWithFn {
 
         let value = {
             let value = self.value.resolve(ctx)?;
-            let string = value.unwrap_bytes_utf8_lossy();
+            let string = value.try_bytes_utf8_lossy()?;
 
             match case_sensitive {
                 true => string.into_owned(),
@@ -100,108 +100,88 @@ impl Expression for StartsWithFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![
-//         value_string {
-//             expr: |_| StartsWithFn {
-//                 value: Literal::from("foo").boxed(),
-//                 substring: Literal::from("foo").boxed(),
-//                 case_sensitive: None,
-//             },
-//             def: TypeDef { kind: Kind::Boolean, ..Default::default() },
-//         }
+    test_function![
+        starts_with => StartsWith;
 
-//         value_non_string {
-//             expr: |_| StartsWithFn {
-//                 value: Literal::from(true).boxed(),
-//                 substring: Literal::from("foo").boxed(),
-//                 case_sensitive: None,
-//             },
-//             def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
-//         }
+        no {
+            args: func_args![value: "foo",
+                             substring: "bar"
+            ],
+            want: Ok(false),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//         substring_non_string {
-//             expr: |_| StartsWithFn {
-//                 value: Literal::from("foo").boxed(),
-//                 substring: Literal::from(true).boxed(),
-//                 case_sensitive: None,
-//             },
-//             def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
-//         }
+        subset {
+            args: func_args![value: "foo",
+                             substring: "foobar"
+            ],
+            want: Ok(false),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//         case_sensitive_non_boolean {
-//             expr: |_| StartsWithFn {
-//                 value: Literal::from("foo").boxed(),
-//                 substring: Literal::from("foo").boxed(),
-//                 case_sensitive: Some(Literal::from(1).boxed()),
-//             },
-//             def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
-//         }
-//     ];
+        total {
+            args: func_args![value: "foo",
+                             substring: "foo"
+            ],
+            want: Ok(true),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//     #[test]
-//     fn starts_with() {
-//         let cases = vec![
-//             (
-//                 map![],
-//                 Ok(false.into()),
-//                 StartsWithFn::new(Box::new(Literal::from("foo")), "bar", false),
-//             ),
-//             (
-//                 map![],
-//                 Ok(false.into()),
-//                 StartsWithFn::new(Box::new(Literal::from("foo")), "foobar", false),
-//             ),
-//             (
-//                 map![],
-//                 Ok(true.into()),
-//                 StartsWithFn::new(Box::new(Literal::from("foo")), "foo", false),
-//             ),
-//             (
-//                 map![],
-//                 Ok(false.into()),
-//                 StartsWithFn::new(Box::new(Literal::from("foobar")), "oba", false),
-//             ),
-//             (
-//                 map![],
-//                 Ok(true.into()),
-//                 StartsWithFn::new(Box::new(Literal::from("foobar")), "foo", false),
-//             ),
-//             (
-//                 map![],
-//                 Ok(false.into()),
-//                 StartsWithFn::new(Box::new(Literal::from("foobar")), "bar", false),
-//             ),
-//             (
-//                 map![],
-//                 Ok(true.into()),
-//                 StartsWithFn::new(Box::new(Literal::from("FOObar")), "FOO", true),
-//             ),
-//             (
-//                 map![],
-//                 Ok(false.into()),
-//                 StartsWithFn::new(Box::new(Literal::from("foobar")), "FOO", true),
-//             ),
-//             (
-//                 map![],
-//                 Ok(true.into()),
-//                 StartsWithFn::new(Box::new(Literal::from("foobar")), "FOO", false),
-//             ),
-//         ];
+        middle {
+            args: func_args![value: "foobar",
+                             substring: "oba"
+            ],
+            want: Ok(false),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//         let mut state = state::Program::default();
+        start {
+            args: func_args![value: "foobar",
+                             substring: "foo"
+            ],
+            want: Ok(true),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//         for (object, exp, func) in cases {
-//             let mut object: Value = object.into();
-//             let got = func
-//                 .resolve(&mut ctx)
-//                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+        end {
+            args: func_args![value: "foobar",
+                             substring: "bar"
+            ],
+            want: Ok(false),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
 
-//             assert_eq!(got, exp);
-//         }
-//     }
-// }
+
+        case_sensitive_same_case {
+            args: func_args![value: "FOObar",
+                             substring: "FOO",
+                             case_sensitive: true
+            ],
+            want: Ok(true),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
+
+        case_sensitive_different_case {
+            args: func_args![value: "foobar",
+                             substring: "FOO",
+                             case_sensitive: true
+            ],
+            want: Ok(false),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
+
+        case_insensitive_different_case {
+            args: func_args![value: "foobar",
+                             substring: "FOO",
+                             case_sensitive: false
+            ],
+            want: Ok(true),
+            tdef: TypeDef::new().infallible().boolean(),
+        }
+
+    ];
+}

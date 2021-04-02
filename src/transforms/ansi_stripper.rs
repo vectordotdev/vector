@@ -1,7 +1,7 @@
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     event::Value,
-    internal_events::{ANSIStripperFailed, ANSIStripperFieldInvalid, ANSIStripperFieldMissing},
+    internal_events::{AnsiStripperFailed, AnsiStripperFieldInvalid, AnsiStripperFieldMissing},
     transforms::{FunctionTransform, Transform},
     Event, Result,
 };
@@ -26,7 +26,7 @@ impl GenerateConfig for AnsiStripperConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "ansi_stripper")]
 impl TransformConfig for AnsiStripperConfig {
-    async fn build(&self) -> Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform> {
         let field = self
             .field
             .clone()
@@ -58,17 +58,17 @@ impl FunctionTransform for AnsiStripper {
         let log = event.as_mut_log();
 
         match log.get_mut(&self.field) {
-            None => emit!(ANSIStripperFieldMissing { field: &self.field }),
+            None => emit!(AnsiStripperFieldMissing { field: &self.field }),
             Some(Value::Bytes(ref mut bytes)) => {
                 match strip_ansi_escapes::strip(&bytes) {
                     Ok(b) => *bytes = b.into(),
-                    Err(error) => emit!(ANSIStripperFailed {
+                    Err(error) => emit!(AnsiStripperFailed {
                         field: &self.field,
                         error
                     }),
                 };
             }
-            _ => emit!(ANSIStripperFieldInvalid { field: &self.field }),
+            _ => emit!(AnsiStripperFieldInvalid { field: &self.field }),
         }
 
         output.push(event);

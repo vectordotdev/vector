@@ -1,5 +1,5 @@
-use chrono::{TimeZone, Utc};
-use shared::conversion::Conversion;
+use chrono::{TimeZone as _, Utc};
+use shared::{conversion::Conversion, TimeZone};
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -110,14 +110,30 @@ impl Expression for ToTimestampFn {
 
         let value = match self.value.resolve(ctx)? {
             v @ Timestamp(_) => v,
-            Integer(v) => Utc.timestamp(v, 0).into(),
-            Float(v) => Utc
-                .timestamp(
-                    v.trunc() as i64,
-                    (v.fract() * 1_000_000_000.0).round() as u32,
-                )
-                .into(),
-            Bytes(v) => Conversion::Timestamp
+            Integer(v) => {
+                let t = Utc.timestamp_opt(v, 0).single();
+                match t {
+                    Some(time) => time.into(),
+                    None => {
+                        return Err(format!(r#"unable to coerce {} into "timestamp""#, v).into())
+                    }
+                }
+            }
+            Float(v) => {
+                let t = Utc
+                    .timestamp_opt(
+                        v.trunc() as i64,
+                        (v.fract() * 1_000_000_000.0).round() as u32,
+                    )
+                    .single();
+                match t {
+                    Some(time) => time.into(),
+                    None => {
+                        return Err(format!(r#"unable to coerce {} into "timestamp""#, v).into())
+                    }
+                }
+            }
+            Bytes(v) => Conversion::Timestamp(TimeZone::Local)
                 .convert::<Value>(v)
                 .map_err(|err| err.to_string())?,
             v => return Err(format!(r#"unable to coerce {} into "timestamp""#, v.kind()).into()),
@@ -134,69 +150,53 @@ impl Expression for ToTimestampFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+#[allow(overflowing_literals)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+    use vrl::prelude::expression::Literal;
 
-//     vrl::test_type_def![
-//         timestamp_infallible {
-//             expr: |_| ToTimestampFn { value: Literal::from(chrono::Utc::now()).boxed() },
-//             def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
-//         }
+    #[test]
+    fn out_of_range_integer() {
+        let mut object: Value = BTreeMap::new().into();
+        let mut runtime_state = vrl::state::Runtime::default();
+        let mut ctx = Context::new(&mut object, &mut runtime_state);
+        let f = ToTimestampFn {
+            value: Box::new(Literal::Integer(9999999999999)),
+        };
+        let string = f.resolve(&mut ctx).err().unwrap().message();
+        assert_eq!(string, r#"unable to coerce 9999999999999 into "timestamp""#)
+    }
 
-//         integer_infallible {
-//             expr: |_| ToTimestampFn { value: lit!(1).boxed() },
-//             def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
-//         }
+    #[test]
+    fn out_of_range_float() {
+        let mut object: Value = BTreeMap::new().into();
+        let mut runtime_state = vrl::state::Runtime::default();
+        let mut ctx = Context::new(&mut object, &mut runtime_state);
+        let f = ToTimestampFn {
+            value: Box::new(Literal::Float(NotNan::new(9999999999999.9).unwrap())),
+        };
+        let string = f.resolve(&mut ctx).err().unwrap().message();
+        assert_eq!(
+            string,
+            r#"unable to coerce 9999999999999.9 into "timestamp""#
+        )
+    }
 
-//         float_infallible {
-//             expr: |_| ToTimestampFn { value: lit!(1.0).boxed() },
-//             def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
-//         }
+    test_function![
+        to_timestamp => ToTimestamp;
 
-//         null_fallible {
-//             expr: |_| ToTimestampFn { value: lit!(null).boxed() },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Timestamp,
-//                 ..Default::default()
-//             },
-//         }
+        integer {
+             args: func_args![value: 1431648000],
+             want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms(0, 0, 0)),
+             tdef: TypeDef::new().timestamp(),
+        }
 
-//         string_fallible {
-//             expr: |_| ToTimestampFn { value: lit!("foo").boxed() },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Timestamp,
-//                 ..Default::default()
-//             },
-//         }
-
-//         map_fallible {
-//             expr: |_| ToTimestampFn { value: map!{}.boxed() },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Timestamp,
-//                 ..Default::default()
-//             },
-//         }
-
-//         array_fallible {
-//             expr: |_| ToTimestampFn { value: array![].boxed() },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Timestamp,
-//                 ..Default::default()
-//             },
-//         }
-
-//         boolean_fallible {
-//             expr: |_| ToTimestampFn { value: lit!(true).boxed() },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Timestamp,
-//                 ..Default::default()
-//             },
-//         }
-//     ];
-// }
+        float {
+             args: func_args![value: 1431648000.5],
+             want: Ok(chrono::Utc.ymd(2015, 5, 15).and_hms_milli(0, 0, 0, 500)),
+             tdef: TypeDef::new().timestamp(),
+        }
+    ];
+}

@@ -1,8 +1,8 @@
-# result: ["foo", 2.5, "yes", false]
+# result: [2.5, "yes", false, "yes"]
 
 [
-    "foo" ?? "bar",
     5 / 2 ?? 0,
     parse_json(s'"yes"') ?? false,
     parse_json("nope") ?? false,
+    parse_json("nope") ?? parse_json("no") ?? parse_json(s'"yes"') ?? []
 ]

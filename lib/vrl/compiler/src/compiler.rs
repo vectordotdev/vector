@@ -1,9 +1,9 @@
 use crate::expression::*;
-use crate::{Function, Program, State};
+use crate::{Function, Program, State, Value};
 use chrono::{TimeZone, Utc};
 use diagnostic::DiagnosticError;
 use ordered_float::NotNan;
-use parser::ast::{self, Node};
+use parser::ast::{self, AssignmentOp, Node};
 use std::convert::TryFrom;
 
 pub type Errors = Vec<Box<dyn DiagnosticError>>;
@@ -12,6 +12,8 @@ pub struct Compiler<'a> {
     fns: &'a [Box<dyn Function>],
     state: &'a mut State,
     errors: Errors,
+    fallible: bool,
+    abortable: bool,
 }
 
 impl<'a> Compiler<'a> {
@@ -20,6 +22,8 @@ impl<'a> Compiler<'a> {
             fns,
             state,
             errors: vec![],
+            fallible: false,
+            abortable: false,
         }
     }
 
@@ -34,7 +38,11 @@ impl<'a> Compiler<'a> {
             return Err(self.errors);
         }
 
-        Ok(Program(expressions))
+        Ok(Program {
+            expressions,
+            fallible: self.fallible,
+            abortable: self.abortable,
+        })
     }
 
     fn compile_root_exprs(
@@ -88,6 +96,7 @@ impl<'a> Compiler<'a> {
             FunctionCall(node) => self.compile_function_call(node).into(),
             Variable(node) => self.compile_variable(node).into(),
             Unary(node) => self.compile_unary(node).into(),
+            Abort(node) => self.compile_abort(node).into(),
         }
     }
 
@@ -192,13 +201,36 @@ impl<'a> Compiler<'a> {
         let op = node.into_inner();
         let ast::Op(lhs, opcode, rhs) = op;
 
-        let lhs = self.compile_expr(*lhs);
-        let rhs = self.compile_expr(*rhs);
+        let lhs_span = lhs.span();
+        let lhs = Node::new(lhs_span, self.compile_expr(*lhs));
 
-        Op::new(lhs, opcode, rhs).unwrap_or_else(|err| {
+        let rhs_span = rhs.span();
+        let rhs = Node::new(rhs_span, self.compile_expr(*rhs));
+
+        Op::new(lhs, opcode, rhs, &self.state).unwrap_or_else(|err| {
             self.errors.push(Box::new(err));
             Op::noop()
         })
+    }
+
+    /// Rewrites the ast for `a |= b` to be `a = a | b`.
+    fn rewrite_to_merge(
+        &mut self,
+        span: diagnostic::Span,
+        target: &Node<ast::AssignmentTarget>,
+        expr: Box<Node<ast::Expr>>,
+    ) -> Box<Node<Expr>> {
+        Box::new(Node::new(
+            span,
+            Expr::Op(self.compile_op(Node::new(
+                span,
+                ast::Op(
+                    Box::new(Node::new(target.span(), target.inner().to_expr(span))),
+                    Node::new(span, ast::Opcode::Merge),
+                    expr,
+                ),
+            ))),
+        ))
     }
 
     fn compile_assignment(&mut self, node: Node<ast::Assignment>) -> Assignment {
@@ -206,21 +238,54 @@ impl<'a> Compiler<'a> {
         use ast::Assignment::*;
 
         self.state.snapshot();
+        let assignment = node.into_inner();
 
-        let node = node.map(|assignment| match assignment {
-            Single { target, expr } => {
+        let node = match assignment {
+            Single { target, op, expr } => {
                 let span = expr.span();
-                let expr = Box::new(expr.map(|node| self.compile_expr(Node::new(span, node))));
 
-                Variant::Single { target, expr }
+                match op {
+                    AssignmentOp::Assign => {
+                        let expr =
+                            Box::new(expr.map(|node| self.compile_expr(Node::new(span, node))));
+
+                        Node::new(span, Variant::Single { target, expr })
+                    }
+                    AssignmentOp::Merge => {
+                        let expr = self.rewrite_to_merge(span, &target, expr);
+                        Node::new(span, Variant::Single { target, expr })
+                    }
+                }
             }
-            Infallible { ok, err, expr } => {
+            Infallible { ok, err, op, expr } => {
                 let span = expr.span();
-                let expr = Box::new(expr.map(|node| self.compile_expr(Node::new(span, node))));
 
-                Variant::Infallible { ok, err, expr }
+                match op {
+                    AssignmentOp::Assign => {
+                        let expr =
+                            Box::new(expr.map(|node| self.compile_expr(Node::new(span, node))));
+                        let node = Variant::Infallible {
+                            ok,
+                            err,
+                            expr,
+                            default: Value::Null,
+                        };
+                        Node::new(span, node)
+                    }
+                    AssignmentOp::Merge => {
+                        let expr = self.rewrite_to_merge(span, &ok, expr);
+                        let node = Variant::Infallible {
+                            ok,
+                            err,
+                            expr,
+                            default: Value::Null,
+                        };
+
+                        Node::new(span, node)
+                    }
+                }
             }
-        });
+        };
 
         Assignment::new(node, &mut self.state).unwrap_or_else(|err| {
             self.state.rollback();
@@ -238,7 +303,6 @@ impl<'a> Compiler<'a> {
 
     fn compile_query_target(&mut self, node: Node<ast::QueryTarget>) -> query::Target {
         use ast::QueryTarget::*;
-        use query::Target;
 
         let span = node.span();
 
@@ -271,6 +335,10 @@ impl<'a> Compiler<'a> {
             .into_iter()
             .map(|node| Node::new(node.span(), self.compile_function_argument(node)))
             .collect();
+
+        if abort_on_error {
+            self.fallible = true;
+        }
 
         FunctionCall::new(
             call_span,
@@ -315,6 +383,11 @@ impl<'a> Compiler<'a> {
             self.errors.push(Box::new(err));
             Not::noop()
         })
+    }
+
+    fn compile_abort(&mut self, _: Node<()>) -> Abort {
+        self.abortable = true;
+        Abort
     }
 
     fn handle_parser_error(&mut self, error: parser::Error) {

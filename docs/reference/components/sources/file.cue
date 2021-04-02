@@ -40,7 +40,14 @@ components: sources: file: {
 			"x86_64-unknown-linux-gnu":       true
 			"x86_64-unknown-linux-musl":      true
 		}
-		requirements: []
+		requirements: [
+			"""
+				The `vector` process must have the ability to read the files
+				listed in `include` and execute any of the parent directories
+				for these files. Please see [File
+				permissions](#file-permissions) for more details.
+				""",
+		]
 		warnings: []
 		notices: []
 	}
@@ -103,7 +110,7 @@ components: sources: file: {
 				}
 			}
 		}
-		glob_minimum_cooldown: {
+		glob_minimum_cooldown_ms: {
 			common:      false
 			description: "Delay between file discovery calls. This controls the interval at which Vector searches for files."
 			required:    false
@@ -128,9 +135,9 @@ components: sources: file: {
 			required:    false
 			type: bool: default: false
 		}
-		ignore_older: {
+		ignore_older_secs: {
 			common:      true
-			description: "Ignore files with a data modification date that does not exceed this age."
+			description: "Ignore files with a data modification date older than the specified number of seconds."
 			required:    false
 			type: uint: {
 				default: null
@@ -183,7 +190,7 @@ components: sources: file: {
 			required:    false
 			type: bool: default: false
 		}
-		remove_after: {
+		remove_after_secs: {
 			common:      false
 			description: "Timeout from reaching `eof` after which file will be removed from filesystem, unless new data is written in the meantime. If not specified, files will not be removed."
 			required:    false
@@ -539,9 +546,49 @@ components: sources: file: {
 				starting read position of a file.
 				"""
 		}
+
+		permissions: {
+			title: "File permissions"
+			body:  """
+				To be able to source events from the files, Vector must be able
+				to read the files and execute their parent directories.
+
+				If you have deployed Vector as using one our distributed
+				packages, then you will find Vector running as the `vector`
+				user. You should ensure this user has read access to the desired
+				files used as `include`. Strategies for this include:
+
+				* Create a new unix group, make it the group owner of the
+				  target files, with read access, and  add `vector` to that
+				  group
+				* Use [POSIX ACLs](\(urls.posix_acls)) to grant access to the
+				  files to the `vector` user
+				* Grant the `CAP_DAC_READ_SEARCH` [Linux
+				  capability](\(urls.linux_capability)]. This capability
+				  bypasses the file system permissions checks to allow
+				  Vector to read any file. This is not recommended as it gives
+				  Vector more permissions than it requires, but it is
+				  recommended over running Vector as `root` which would grant it
+				  even broader permissions. This can be granted via SystemD by
+				  creating an override file using `systemctl edit vector` and
+				  adding:
+
+				  ```
+				  AmbientCapabilities=CAP_DAC_READ_SEARCH
+				  CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+				  ```
+
+				On Debian-based distributions, the `vector` user is
+				automatically added to the [`adm`
+				group](\(urls.debian_system_groups)), if it exists, which has
+				permissions to read `/var/log`.
+				"""
+		}
+
 	}
 
 	telemetry: metrics: {
+		events_in_total:               components.sources.internal_metrics.output.metrics.events_in_total
 		checkpoint_write_errors_total: components.sources.internal_metrics.output.metrics.checkpoint_write_errors_total
 		checkpoints_total:             components.sources.internal_metrics.output.metrics.checkpoints_total
 		checksum_errors_total:         components.sources.internal_metrics.output.metrics.checksum_errors_total

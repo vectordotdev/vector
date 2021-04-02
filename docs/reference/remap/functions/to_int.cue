@@ -17,13 +17,14 @@ remap: functions: to_int: {
 		},
 	]
 	internal_failure_reasons: [
-		"`value` is not a supported integer representation",
+		"`value` is a string but the text is not an integer",
+		"`value` is not a string, int, or timestamp",
 	]
 	return: {
 		types: ["integer"]
 		rules: [
 			"If `value` is a string, it must be the string representation of an integer or else an error is raised.",
-			"If `value` is a boolean, `0` will be returned for `false` and `1` will be returned for `true`.",
+			"If `value` is a boolean, `0` is returned for `false` and `1` is returned for `true`.",
 			"If `value` is a timestamp, a [Unix timestamp](\(urls.unix_timestamp)) (in seconds) is returned.",
 		]
 	}
@@ -32,14 +33,14 @@ remap: functions: to_int: {
 		{
 			title: "Coerce to an int (string)"
 			source: """
-				to_int("2")
+				to_int!("2")
 				"""
 			return: 2
 		},
 		{
 			title: "Coerce to an int (timestamp)"
 			source: """
-				to_int(to_timestamp("2020-12-30 22:20:53.824727 UTC"))
+				to_int(t'2020-12-30T22:20:53.824727Z')
 				"""
 			return: 1609366853
 		},

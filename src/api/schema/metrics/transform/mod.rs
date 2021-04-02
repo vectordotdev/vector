@@ -14,11 +14,11 @@ pub enum TransformMetrics {
 }
 
 pub trait IntoTransformMetrics {
-    fn to_transform_metrics(self, component_type: &str) -> TransformMetrics;
+    fn into_transform_metrics(self, component_type: &str) -> TransformMetrics;
 }
 
 impl IntoTransformMetrics for Vec<Metric> {
-    fn to_transform_metrics(self, _component_type: &str) -> TransformMetrics {
+    fn into_transform_metrics(self, _component_type: &str) -> TransformMetrics {
         TransformMetrics::GenericTransformMetrics(generic::GenericTransformMetrics::new(self))
     }
 }

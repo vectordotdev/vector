@@ -1,13 +1,15 @@
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+    },
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::LogEvent,
     event::Value,
     internal_events::{
         LogToMetricFieldNotFound, LogToMetricParseFloatError, LogToMetricTemplateParseError,
-        LogToMetricTemplateRenderError,
+        TemplateRenderingFailed,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError, TemplateRenderingError},
     transforms::{FunctionTransform, Transform},
     Event,
 };
@@ -106,7 +108,7 @@ impl GenerateConfig for LogToMetricConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         Ok(Transform::function(LogToMetric::new(self.clone())))
     }
 
@@ -133,10 +135,8 @@ enum TransformError {
     FieldNotFound {
         field: String,
     },
-    TemplateParseError(TemplateError),
-    TemplateRenderError {
-        missing_keys: Vec<String>,
-    },
+    TemplateParseError(TemplateParseError),
+    TemplateRenderingError(TemplateRenderingError),
     ParseFloatError {
         field: String,
         error: ParseFloatError,
@@ -147,7 +147,7 @@ fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
     let template = Template::try_from(s).map_err(TransformError::TemplateParseError)?;
     template
         .render_string(&event)
-        .map_err(|missing_keys| TransformError::TemplateRenderError { missing_keys })
+        .map_err(TransformError::TemplateRenderingError)
 }
 
 fn render_tags(
@@ -163,8 +163,12 @@ fn render_tags(
                     Ok(tag) => {
                         map.insert(name.to_string(), tag);
                     }
-                    Err(TransformError::TemplateRenderError { missing_keys }) => {
-                        emit!(LogToMetricTemplateRenderError { missing_keys });
+                    Err(TransformError::TemplateRenderingError(error)) => {
+                        emit!(TemplateRenderingFailed {
+                            error,
+                            drop_event: false,
+                            field: Some(name.as_str()),
+                        });
                     }
                     Err(other) => return Err(other),
                 }
@@ -356,8 +360,12 @@ impl FunctionTransform for LogToMetric {
                         error
                     })
                 }
-                Err(TransformError::TemplateRenderError { missing_keys }) => {
-                    emit!(LogToMetricTemplateRenderError { missing_keys })
+                Err(TransformError::TemplateRenderingError(error)) => {
+                    emit!(TemplateRenderingFailed {
+                        error,
+                        drop_event: false,
+                        field: None,
+                    })
                 }
                 Err(TransformError::TemplateParseError(error)) => {
                     emit!(LogToMetricTemplateParseError { error })

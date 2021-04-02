@@ -8,7 +8,7 @@ remap: expressions: assignment: {
 		"""
 	return: """
 		Returns the value of the right-hand-side expression only if the expression succeeds. If the expression errors,
-		the error must be [handled](\(urls.vrl_errors_reference)) and null is returned.
+		the error must be [handled](\(urls.vrl_errors_reference)).
 		"""
 
 	grammar: {
@@ -54,7 +54,7 @@ remap: expressions: assignment: {
 				description: """
 					If the `target` is a variable, the `expression` can be any expression.
 
-					If the `target` is a path, the `expression` can be any expression that returns a supported map
+					If the `target` is a path, the `expression` can be any expression that returns a supported object
 					value type (i.e. not a regular expression).
 					"""
 			}
@@ -67,7 +67,6 @@ remap: expressions: assignment: {
 			source: #"""
 				.message = "Hello, World!"
 				"""#
-			return: "Hello, World!"
 			output: log: message: "Hello, World!"
 		},
 		{
@@ -75,7 +74,6 @@ remap: expressions: assignment: {
 			source: #"""
 				.parent.child = "Hello, World!"
 				"""#
-			return: "Hello, World!"
 			output: log: parent: child: "Hello, World!"
 		},
 		{
@@ -83,7 +81,6 @@ remap: expressions: assignment: {
 			source: #"""
 				.first = .second = "Hello, World!"
 				"""#
-			return: "Hello, World!"
 			output: log: {
 				first:  "Hello, World!"
 				second: "Hello, World!"
@@ -94,7 +91,6 @@ remap: expressions: assignment: {
 			source: #"""
 				.array[1] = "Hello, World!"
 				"""#
-			return: "Hello, World!"
 			output: log: array: [null, "Hello, World!"]
 		},
 		{
@@ -107,16 +103,22 @@ remap: expressions: assignment: {
 		{
 			title: "Fallible assignment (success)"
 			source: #"""
-				parsed, err = parse_json("{\"Hello\": \"World!\"}")
+				.parsed, .err = parse_json("{\"Hello\": \"World!\"}")
 				"""#
-			return: Hello: "World!"
+			output: log: {
+				parsed: {"Hello": "World!"}
+				err: null
+			}
 		},
 		{
 			title: "Fallible assignment (error)"
 			source: #"""
-				parsed, err = parse_json("malformed")
+				.parsed, .err = parse_json("malformed")
 				"""#
-			return: null
+			output: log: {
+				parsed: null
+				err:    #"function call error for "parse_json" at (16:39): unable to parse json: expected value at line 1 column 1"#
+			}
 		},
 	]
 }

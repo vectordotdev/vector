@@ -56,7 +56,7 @@ fn test_buffering() {
         config.build().unwrap()
     };
 
-    let mut rt = runtime();
+    let rt = runtime();
     let (topology, input_events) = rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
         let (input_events, input_events_stream) =
@@ -64,7 +64,7 @@ fn test_buffering() {
         let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
-            .sink_map_err(|error| panic!(error))
+            .sink_map_err(|error| panic!("{}", error))
             .send_all(&mut input_events_stream)
             .await
             .unwrap();
@@ -105,7 +105,7 @@ fn test_buffering() {
         config.build().unwrap()
     };
 
-    let mut rt = runtime();
+    let rt = runtime();
     rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
 
@@ -114,7 +114,7 @@ fn test_buffering() {
         let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
-            .sink_map_err(|error| panic!(error))
+            .sink_map_err(|error| panic!("{}", error))
             .send_all(&mut input_events_stream)
             .await
             .unwrap();

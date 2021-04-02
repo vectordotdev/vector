@@ -97,7 +97,7 @@ pub struct RootOpts {
     pub quiet: u8,
 
     /// Set the logging format
-    #[structopt(long, default_value = "text", possible_values = &["text", "json"])]
+    #[structopt(long, default_value = "text", env = "VECTOR_LOG_FORMAT", possible_values = &["text", "json"])]
     pub log_format: LogFormat,
 
     /// Control when ANSI terminal formatting is used.
@@ -107,7 +107,7 @@ pub struct RootOpts {
     /// the `--color always` option will always enable ANSI terminal formatting. `--color never`
     /// will disable all ANSI terminal formatting. `--color auto` will attempt
     /// to detect it automatically.
-    #[structopt(long, default_value = "auto", possible_values = &["auto", "always", "never"])]
+    #[structopt(long, default_value = "auto", env = "VECTOR_COLOR", possible_values = &["auto", "always", "never"])]
     pub color: Color,
 
     /// Watch for changes in configuration file, and reload accordingly.
@@ -120,9 +120,9 @@ impl RootOpts {
     pub fn config_paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
         config::merge_path_lists(vec![
             (&self.config_paths, None),
-            (&self.config_paths_toml, Some(config::Format::TOML)),
-            (&self.config_paths_json, Some(config::Format::JSON)),
-            (&self.config_paths_yaml, Some(config::Format::YAML)),
+            (&self.config_paths_toml, Some(config::Format::Toml)),
+            (&self.config_paths_json, Some(config::Format::Json)),
+            (&self.config_paths_yaml, Some(config::Format::Yaml)),
         ])
     }
 }
@@ -153,7 +153,7 @@ pub enum SubCommand {
 
     /// Vector Remap Language CLI
     #[cfg(feature = "vrl-cli")]
-    VRL(vrl_cli::Opts),
+    Vrl(vrl_cli::Opts),
 }
 
 #[derive(Debug, Clone, PartialEq)]

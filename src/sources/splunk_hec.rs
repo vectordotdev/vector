@@ -2,14 +2,14 @@ use crate::{
     config::{log_schema, DataType, GlobalOptions, Resource, SourceConfig, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{
-        SplunkHECEventReceived, SplunkHECRequestBodyInvalid, SplunkHECRequestError,
-        SplunkHECRequestReceived,
+        SplunkHecEventReceived, SplunkHecRequestBodyInvalid, SplunkHecRequestError,
+        SplunkHecRequestReceived,
     },
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use bytes::{buf::BufExt, Bytes};
+use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
@@ -95,7 +95,7 @@ impl SourceConfig for SplunkConfig {
             .and(
                 warp::path::full()
                     .map(|path: warp::filters::path::FullPath| {
-                        emit!(SplunkHECRequestReceived {
+                        emit!(SplunkHecRequestReceived {
                             path: path.as_str()
                         });
                     })
@@ -116,14 +116,13 @@ impl SourceConfig for SplunkConfig {
         let listener = tls.bind(&self.address).await?;
 
         Ok(Box::pin(async move {
-            let _ = warp::serve(services)
+            warp::serve(services)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
-                    shutdown.clone().map(|_| ()),
+                    shutdown.map(|_| ()),
                 )
                 .await;
-            // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
-            drop(shutdown);
+
             Ok(())
         }))
     }
@@ -378,7 +377,7 @@ impl<R: Read> Stream for EventStream<R> {
                 };
             }
             Err(error) => {
-                emit!(SplunkHECRequestBodyInvalid {
+                emit!(SplunkHecRequestBodyInvalid {
                     error: error.into()
                 });
                 return Err(ApiError::InvalidDataFormat { event: self.events }.into());
@@ -479,7 +478,7 @@ impl<R: Read> Stream for EventStream<R> {
             de.extract(log, &mut json);
         }
 
-        emit!(SplunkHECEventReceived);
+        emit!(SplunkHecEventReceived);
         self.events += 1;
 
         Ok(Async::Ready(Some(event)))
@@ -582,7 +581,7 @@ fn raw_event(
             Ok(0) => return Err(ApiError::NoData.into()),
             Ok(_) => Value::from(Bytes::from(data)),
             Err(error) => {
-                emit!(SplunkHECRequestBodyInvalid { error });
+                emit!(SplunkHecRequestBodyInvalid { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }
@@ -613,7 +612,7 @@ fn raw_event(
         .as_mut_log()
         .try_insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
 
-    emit!(SplunkHECEventReceived);
+    emit!(SplunkHecEventReceived);
 
     Ok(event)
 }
@@ -630,12 +629,6 @@ pub(crate) enum ApiError {
     EmptyEventField { event: usize },
     MissingEventField { event: usize },
     BadRequest,
-}
-
-impl From<ApiError> for Rejection {
-    fn from(error: ApiError) -> Self {
-        warp::reject::custom(error)
-    }
 }
 
 impl warp::reject::Reject for ApiError {}
@@ -674,7 +667,7 @@ fn finish_ok(_: ()) -> Response {
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
     if let Some(&error) = rejection.find::<ApiError>() {
-        emit!(SplunkHECRequestError { error });
+        emit!(SplunkHecRequestError { error });
         Ok((match error {
             ApiError::MissingAuthorization => response_json(
                 StatusCode::UNAUTHORIZED,
@@ -762,9 +755,8 @@ mod tests {
         Pipeline,
     };
     use chrono::{TimeZone, Utc};
-    use futures::{stream, StreamExt};
+    use futures::{channel::mpsc, stream, StreamExt};
     use std::{future::ready, net::SocketAddr};
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {

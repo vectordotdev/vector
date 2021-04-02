@@ -198,7 +198,7 @@ impl fmt::Display for RootExpr {
 // -----------------------------------------------------------------------------
 
 #[allow(clippy::large_enum_variant)]
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Expr {
     Literal(Node<Literal>),
     Container(Node<Container>),
@@ -209,6 +209,7 @@ pub enum Expr {
     FunctionCall(Node<FunctionCall>),
     Variable(Node<Ident>),
     Unary(Node<Unary>),
+    Abort(Node<()>),
 }
 
 impl fmt::Debug for Expr {
@@ -225,6 +226,7 @@ impl fmt::Debug for Expr {
             FunctionCall(v) => format!("{:?}", v),
             Variable(v) => format!("{:?}", v),
             Unary(v) => format!("{:?}", v),
+            Abort(_) => "abort".to_owned(),
         };
 
         write!(f, "Expr({})", value)
@@ -245,6 +247,7 @@ impl fmt::Display for Expr {
             FunctionCall(v) => v.fmt(f),
             Variable(v) => v.fmt(f),
             Unary(v) => v.fmt(f),
+            Abort(_) => f.write_str("abort"),
         }
     }
 }
@@ -288,7 +291,7 @@ impl fmt::Debug for Ident {
 // literals
 // -----------------------------------------------------------------------------
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Literal {
     String(String),
     Integer(i64),
@@ -325,7 +328,7 @@ impl fmt::Debug for Literal {
 // container
 // -----------------------------------------------------------------------------
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Container {
     Group(Box<Node<Group>>),
     Block(Node<Block>),
@@ -365,7 +368,7 @@ impl fmt::Debug for Container {
 // block
 // -----------------------------------------------------------------------------
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Block(pub Vec<Node<Expr>>);
 
 impl Block {
@@ -421,7 +424,7 @@ impl fmt::Debug for Block {
 // group
 // -----------------------------------------------------------------------------
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Group(pub Node<Expr>);
 
 impl Group {
@@ -446,7 +449,7 @@ impl fmt::Debug for Group {
 // array
 // -----------------------------------------------------------------------------
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Array(pub(crate) Vec<Node<Expr>>);
 
 impl fmt::Display for Array {
@@ -488,7 +491,7 @@ impl IntoIterator for Array {
 // object
 // -----------------------------------------------------------------------------
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Object(pub(crate) BTreeMap<Node<String>, Node<Expr>>);
 
 impl fmt::Display for Object {
@@ -530,7 +533,7 @@ impl IntoIterator for Object {
 // if statement
 // -----------------------------------------------------------------------------
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct IfStatement {
     pub predicate: Node<Predicate>,
     pub consequent: Node<Block>,
@@ -566,7 +569,7 @@ impl fmt::Display for IfStatement {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Predicate {
     One(Box<Node<Expr>>),
     Many(Vec<Node<Expr>>),
@@ -620,7 +623,7 @@ impl fmt::Debug for Predicate {
 // operation
 // -----------------------------------------------------------------------------
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Op(pub Box<Node<Expr>>, pub Node<Opcode>, pub Box<Node<Expr>>);
 
 impl fmt::Display for Op {
@@ -651,6 +654,7 @@ pub enum Opcode {
     Gt,
     Le,
     Lt,
+    Merge,
 }
 
 impl fmt::Display for Opcode {
@@ -669,6 +673,7 @@ impl Opcode {
             Add => "+",
             Sub => "-",
             Rem => "%",
+            Merge => "|",
 
             Or => "||",
             And => "&&",
@@ -711,6 +716,7 @@ impl FromStr for Opcode {
             ">" => Gt,
             "<=" => Le,
             "<" => Lt,
+            "|" => Merge,
 
             _ => return std::result::Result::Err(()),
         };
@@ -723,15 +729,17 @@ impl FromStr for Opcode {
 // assignment
 // -----------------------------------------------------------------------------
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Assignment {
     Single {
         target: Node<AssignmentTarget>,
+        op: AssignmentOp,
         expr: Box<Node<Expr>>,
     },
     Infallible {
         ok: Node<AssignmentTarget>,
         err: Node<AssignmentTarget>,
+        op: AssignmentOp,
         expr: Box<Node<Expr>>,
     },
     // TODO
@@ -742,13 +750,41 @@ pub enum Assignment {
     // }
 }
 
+#[derive(Clone, PartialEq)]
+pub enum AssignmentOp {
+    Assign,
+    Merge,
+}
+
+impl fmt::Display for AssignmentOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use AssignmentOp::*;
+
+        match self {
+            Assign => write!(f, "="),
+            Merge => write!(f, "|="),
+        }
+    }
+}
+
+impl fmt::Debug for AssignmentOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use AssignmentOp::*;
+
+        match self {
+            Assign => write!(f, "AssignmentOp(=)"),
+            Merge => write!(f, "AssignmentOp(|=)"),
+        }
+    }
+}
+
 impl fmt::Display for Assignment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Assignment::*;
 
         match self {
-            Single { target, expr } => write!(f, "{} = {}", target, expr),
-            Infallible { ok, err, expr } => write!(f, "{}, {} = {}", ok, err, expr),
+            Single { target, op, expr } => write!(f, "{} {} {}", target, op, expr),
+            Infallible { ok, err, op, expr } => write!(f, "{}, {} {} {}", ok, err, op, expr),
         }
     }
 }
@@ -758,18 +794,46 @@ impl fmt::Debug for Assignment {
         use Assignment::*;
 
         match self {
-            Single { target, expr } => write!(f, "{:?} = {:?}", target, expr),
-            Infallible { ok, err, expr } => write!(f, "Ok({:?}), Err({:?}) = {:?}", ok, err, expr),
+            Single { target, op, expr } => write!(f, "{:?} {:?} {:?}", target, op, expr),
+            Infallible { ok, err, op, expr } => {
+                write!(f, "Ok({:?}), Err({:?}) {:?} {:?}", ok, err, op, expr)
+            }
         }
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum AssignmentTarget {
     Noop,
     Query(Query),
     Internal(Ident, Option<Path>),
     External(Option<Path>),
+}
+
+impl AssignmentTarget {
+    pub fn to_expr(&self, span: Span) -> Expr {
+        match self {
+            AssignmentTarget::Noop => Expr::Literal(Node::new(span, Literal::Null)),
+            AssignmentTarget::Query(query) => Expr::Query(Node::new(span, query.clone())),
+            AssignmentTarget::Internal(ident, Some(path)) => Expr::Query(Node::new(
+                span,
+                Query {
+                    target: Node::new(span, QueryTarget::Internal(ident.clone())),
+                    path: Node::new(span, path.clone()),
+                },
+            )),
+            AssignmentTarget::Internal(ident, None) => {
+                Expr::Variable(Node::new(span, ident.clone()))
+            }
+            AssignmentTarget::External(path) => Expr::Query(Node::new(
+                span,
+                Query {
+                    target: Node::new(span, QueryTarget::External),
+                    path: Node::new(span, path.clone().unwrap_or_else(|| Path(Vec::new()))),
+                },
+            )),
+        }
+    }
 }
 
 impl fmt::Display for AssignmentTarget {
@@ -806,7 +870,7 @@ impl fmt::Debug for AssignmentTarget {
 // query
 // -----------------------------------------------------------------------------
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Query {
     pub target: Node<QueryTarget>,
     pub path: Node<Path>,
@@ -824,7 +888,7 @@ impl fmt::Debug for Query {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum QueryTarget {
     Internal(Ident),
     External,
@@ -952,7 +1016,7 @@ impl fmt::Debug for Field {
 ///
 /// It contains the identifier of the function, and any arguments passed into
 /// the function call.
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct FunctionCall {
     pub ident: Node<Ident>,
     pub abort_on_error: bool,
@@ -1003,7 +1067,7 @@ impl fmt::Debug for FunctionCall {
 /// it a _keyword argument_ as opposed to a _positional argument_.
 ///
 /// The second value is the expression provided as the argument.
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct FunctionArgument {
     pub ident: Option<Node<Ident>>,
     pub expr: Node<Expr>,
@@ -1033,7 +1097,7 @@ impl fmt::Debug for FunctionArgument {
 // unary
 // -----------------------------------------------------------------------------
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Unary {
     Not(Node<Not>),
 }
@@ -1064,7 +1128,7 @@ impl fmt::Debug for Unary {
 // not
 // -----------------------------------------------------------------------------
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Not(pub(crate) Node<()>, pub(crate) Box<Node<Expr>>);
 
 impl Not {
@@ -1110,7 +1174,7 @@ macro_rules! test_enum {
                 pub fn [<$func>](self) -> $ret {
                     match self {
                         Test::$variant(v) => v,
-                        v => panic!(v),
+                        v => panic!("{:?}", v),
                     }
                 }
             })+

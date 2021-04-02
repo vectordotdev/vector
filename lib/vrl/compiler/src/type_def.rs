@@ -1,6 +1,9 @@
 use crate::value::Kind;
 use crate::{map, path, Path};
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::Sub,
+};
 
 /// Properties for a given expression that express the expected outcome of the
 /// expression.
@@ -17,6 +20,22 @@ pub struct TypeDef {
     /// This is wrapped in a [`TypeKind`] enum, such that we encode details
     /// about potential inner kinds for collections (arrays or objects).
     kind: KindInfo,
+}
+
+impl Sub<Kind> for TypeDef {
+    type Output = Self;
+
+    /// Removes the given kinds from this type definition.
+    fn sub(mut self, other: Kind) -> Self::Output {
+        self.kind = match self.kind {
+            KindInfo::Unknown => KindInfo::Unknown,
+            KindInfo::Known(kinds) => {
+                KindInfo::Known(kinds.into_iter().filter(|k| k.to_kind() != other).collect())
+            }
+        };
+
+        self
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
@@ -157,18 +176,16 @@ impl KindInfo {
                     self = KindInfo::Known(set);
                 }
                 Segment::Index(index) => {
-                    let index = *index as usize;
+                    // For negative indices, we have to mark the array contents
+                    // as unknown.
+                    let (index, info) = if index.is_negative() {
+                        (Index::Any, KindInfo::Unknown)
+                    } else {
+                        (Index::Index(*index as usize), self)
+                    };
+
                     let mut map = BTreeMap::default();
-
-                    let mut i = 0;
-                    while i < index {
-                        let mut set = BTreeSet::new();
-                        set.insert(TypeKind::Null);
-                        map.insert(Index::Index(i), Self::Known(set));
-                        i += 1;
-                    }
-
-                    map.insert(Index::Index(index), self);
+                    map.insert(index, info);
 
                     let mut set = BTreeSet::new();
                     set.insert(TypeKind::Array(map));
@@ -263,7 +280,7 @@ impl KindInfo {
         info.at_path(iter.collect())
     }
 
-    fn merge(self, rhs: Self, shallow: bool) -> Self {
+    fn merge(self, rhs: Self, shallow: bool, overwrite: bool) -> Self {
         use KindInfo::*;
 
         match (self, rhs) {
@@ -301,18 +318,20 @@ impl KindInfo {
                 let array = lhs_array
                     .clone()
                     .zip(rhs_array.clone())
-                    .map(|(mut l, r)| {
-                        let r_start = l
-                            .keys()
-                            .filter_map(|i| i.to_inner())
-                            .max()
-                            .map(|i| i + 1)
-                            .unwrap_or_default();
+                    .map(|(mut l, mut r)| {
+                        if !overwrite {
+                            let r_start = l
+                                .keys()
+                                .filter_map(|i| i.to_inner())
+                                .max()
+                                .map(|i| i + 1)
+                                .unwrap_or_default();
 
-                        let mut r = r
-                            .into_iter()
-                            .map(|(i, v)| (i.shift(r_start), v))
-                            .collect::<BTreeMap<_, _>>();
+                            r = r
+                                .into_iter()
+                                .map(|(i, v)| (i.shift(r_start), v))
+                                .collect::<BTreeMap<_, _>>();
+                        };
 
                         l.append(&mut r);
                         l
@@ -356,7 +375,7 @@ impl KindInfo {
                             for (k1, v1) in l.iter_mut() {
                                 for (k2, v2) in r.iter_mut() {
                                     if k1 == k2 {
-                                        *v2 = v1.clone().merge(v2.clone(), false);
+                                        *v2 = v1.clone().merge(v2.clone(), false, false);
                                     }
                                 }
                             }
@@ -617,7 +636,7 @@ impl TypeDef {
     pub fn add_scalar(mut self, kind: Kind) -> Self {
         debug_assert!(kind.is_scalar());
 
-        self.kind = self.kind.merge(kind.into(), false);
+        self.kind = self.kind.merge(kind.into(), false, false);
         self
     }
 
@@ -735,7 +754,7 @@ impl TypeDef {
         let mut set = BTreeSet::default();
         set.insert(kind);
 
-        self.kind = self.kind.merge(KindInfo::Known(set), false);
+        self.kind = self.kind.merge(KindInfo::Known(set), false, false);
         self
     }
 
@@ -868,7 +887,7 @@ impl TypeDef {
     pub fn merge(self, rhs: Self) -> Self {
         Self {
             fallible: self.fallible | rhs.fallible,
-            kind: self.kind.merge(rhs.kind, false),
+            kind: self.kind.merge(rhs.kind, false, false),
         }
     }
 
@@ -877,7 +896,16 @@ impl TypeDef {
     pub fn merge_shallow(self, rhs: Self) -> Self {
         Self {
             fallible: self.fallible | rhs.fallible,
-            kind: self.kind.merge(rhs.kind, true),
+            kind: self.kind.merge(rhs.kind, true, false),
+        }
+    }
+
+    /// Merge two type definitions, where the rhs type definition should
+    /// overwrite any conflicting values in the lhs type definition.
+    pub fn merge_overwrite(self, rhs: Self) -> Self {
+        Self {
+            fallible: self.fallible | rhs.fallible,
+            kind: self.kind.merge(rhs.kind, false, true),
         }
     }
 }
@@ -896,6 +924,126 @@ impl From<Kind> for TypeDef {
         Self {
             fallible: false,
             kind: kind.into(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use path::{self, Segment};
+    use std::str::FromStr;
+
+    mod kind_info {
+        use super::*;
+
+        #[test]
+        fn for_path() {
+            struct TestCase {
+                info: KindInfo,
+                path: Vec<Segment>,
+                want: KindInfo,
+            }
+
+            let cases: Vec<TestCase> = vec![
+                // overwrite unknown
+                TestCase {
+                    info: KindInfo::Unknown,
+                    path: vec![Segment::Index(0)],
+                    want: KindInfo::Known({
+                        let mut map = BTreeMap::new();
+                        map.insert(Index::Index(0), KindInfo::Unknown);
+
+                        let mut set = BTreeSet::new();
+                        set.insert(TypeKind::Array(map));
+                        set
+                    }),
+                },
+                // insert scalar at root
+                TestCase {
+                    info: KindInfo::Known({
+                        let mut set = BTreeSet::new();
+                        set.insert(TypeKind::Integer);
+                        set
+                    }),
+                    path: vec![],
+                    want: KindInfo::Known({
+                        let mut set = BTreeSet::new();
+                        set.insert(TypeKind::Integer);
+                        set
+                    }),
+                },
+                // insert scalar at nested path
+                TestCase {
+                    info: KindInfo::Known({
+                        let mut set = BTreeSet::new();
+                        set.insert(TypeKind::Integer);
+                        set
+                    }),
+                    path: vec![Segment::Field(path::Field::from_str("foo").unwrap())],
+                    want: KindInfo::Known({
+                        let map = {
+                            let mut set = BTreeSet::new();
+                            set.insert(TypeKind::Integer);
+
+                            let mut map = BTreeMap::new();
+                            map.insert(Field::Field("foo".to_owned()), KindInfo::Known(set));
+                            map
+                        };
+
+                        let mut set = BTreeSet::new();
+                        set.insert(TypeKind::Object(map));
+                        set
+                    }),
+                },
+                // insert non-negative index
+                TestCase {
+                    info: KindInfo::Known({
+                        let mut set = BTreeSet::new();
+                        set.insert(TypeKind::Integer);
+                        set
+                    }),
+                    path: vec![Segment::Index(1)],
+                    want: KindInfo::Known({
+                        let map = {
+                            let mut set = BTreeSet::new();
+                            set.insert(TypeKind::Integer);
+
+                            let mut map = BTreeMap::new();
+                            map.insert(Index::Index(1), KindInfo::Known(set));
+                            map
+                        };
+
+                        let mut set = BTreeSet::new();
+                        set.insert(TypeKind::Array(map));
+                        set
+                    }),
+                },
+                // insert negative index
+                TestCase {
+                    info: KindInfo::Known({
+                        let mut set = BTreeSet::new();
+                        set.insert(TypeKind::Integer);
+                        set
+                    }),
+                    path: vec![Segment::Index(-1)],
+                    want: KindInfo::Known({
+                        let mut set = BTreeSet::new();
+                        set.insert(TypeKind::Array({
+                            let mut map = BTreeMap::new();
+                            map.insert(Index::Any, KindInfo::Unknown);
+                            map
+                        }));
+                        set
+                    }),
+                },
+            ];
+
+            for TestCase { info, path, want } in cases {
+                let path = Path::new_unchecked(path);
+
+                assert_eq!(info.for_path(path), want);
+            }
         }
     }
 }

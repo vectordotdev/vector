@@ -94,57 +94,9 @@ impl Expression for EncodeBase64Fn {
     }
 }
 
-/*
 #[cfg(test)]
 mod test {
     use super::*;
-
-    test_type_def![
-        value_string_padding_unspecified_charset_unspecified_infallible {
-
-                value: lit!("foo").boxed(),
-                padding: None,
-                charset: None,
-            },
-            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-        }
-
-        valid_charset_fallible {
-            expr: |_| EncodeBase64Fn {
-                value: lit!("foo").boxed(),
-                padding: Some(lit!(false).boxed()),
-                charset: Some(lit!("standard").boxed()),
-            },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-        }
-
-        padding_non_boolean_fallible {
-            expr: |_| EncodeBase64Fn {
-                value: lit!("foo").boxed(),
-                padding: Some(lit!("foo").boxed()),
-                charset: None,
-            },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-        }
-
-        value_non_string_fallible {
-            expr: |_| EncodeBase64Fn {
-                value: Literal::from(127).boxed(),
-                padding: None,
-                charset: None,
-            },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-        }
-
-        all_types_wrong_fallible {
-            expr: |_| EncodeBase64Fn {
-                value: Literal::from(127).boxed(),
-                padding: Some(lit!("foo").boxed()),
-                charset: Some(lit!(127).boxed()),
-            },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
-        }
-    ];
 
     test_function![
         encode_base64 => EncodeBase64;
@@ -152,42 +104,49 @@ mod test {
         with_defaults {
             args: func_args![value: value!("some+=string/value")],
             want: Ok(value!("c29tZSs9c3RyaW5nL3ZhbHVl")),
+            tdef: TypeDef::new().bytes().infallible(),
         }
 
         with_padding_standard_charset {
             args: func_args![value: value!("some+=string/value"), padding: value!(true), charset: value!("standard")],
             want: Ok(value!("c29tZSs9c3RyaW5nL3ZhbHVl")),
+            tdef: TypeDef::new().bytes().infallible(),
         }
 
         no_padding_standard_charset {
             args: func_args![value: value!("some+=string/value"), padding: value!(false), charset: value!("standard")],
             want: Ok(value!("c29tZSs9c3RyaW5nL3ZhbHVl")),
+            tdef: TypeDef::new().bytes().infallible(),
         }
 
         with_padding_urlsafe_charset {
             args: func_args![value: value!("some+=string/value"), padding: value!(true), charset: value!("url_safe")],
             want: Ok(value!("c29tZSs9c3RyaW5nL3ZhbHVl")),
+            tdef: TypeDef::new().bytes().infallible(),
         }
 
         no_padding_urlsafe_charset {
             args: func_args![value: value!("some+=string/value"), padding: value!(false), charset: value!("url_safe")],
             want: Ok(value!("c29tZSs9c3RyaW5nL3ZhbHVl")),
+            tdef: TypeDef::new().bytes().infallible(),
         }
 
         empty_string_standard_charset {
             args: func_args![value: value!(""), charset: value!("standard")],
             want: Ok(value!("")),
+            tdef: TypeDef::new().bytes().infallible(),
         }
 
         empty_string_urlsafe_charset {
             args: func_args![value: value!(""), charset: value!("url_safe")],
             want: Ok(value!("")),
+            tdef: TypeDef::new().bytes().infallible(),
         }
 
         invalid_charset_error {
             args: func_args![value: value!("some string value"), padding: value!(false), charset: value!("foo")],
-            want: Err("function call error: unknown charset"),
+            want: Err("unknown charset"),
+            tdef: TypeDef::new().bytes().infallible(),
         }
     ];
 }
-*/

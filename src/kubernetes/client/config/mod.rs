@@ -4,6 +4,8 @@ use crate::tls::TlsOptions;
 use http::Uri;
 
 pub mod in_cluster;
+pub mod kubeconfig;
+mod kubeconfig_types;
 
 /// A k8s client configuration.
 ///
@@ -20,7 +22,7 @@ pub struct Config {
     pub base: Uri,
 
     /// The bearer token to use at the `Authorization` header.
-    pub token: String,
+    pub token: Option<String>,
 
     /// The TLS configuration parameters to use at the HTTP client.
     pub tls_options: TlsOptions,

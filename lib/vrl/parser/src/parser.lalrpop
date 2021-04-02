@@ -14,6 +14,7 @@ extern {
 
     enum Tok<'input> {
         "identifier" => Token::Identifier(<&'input str>),
+        "path field" => Token::PathField(<&'input str>),
         "string literal" => Token::StringLiteral(<StringLiteral<&'input str>>),
         "integer literal" => Token::IntegerLiteral(<i64>),
         "float literal" => Token::FloatLiteral(<NotNan<f64>>),
@@ -34,12 +35,14 @@ extern {
         "null" => Token::Null,
         "true" => Token::True,
         "false" => Token::False,
+        "abort" => Token::Abort,
 
         ";" => Token::SemiColon,
         "\n" => Token::Newline,
         "?" => Token::Question,
         "|" => Token::Pipe,
         "=" => Token::Equals,
+        "|=" => Token::MergeEquals,
         "," => Token::Comma,
         "_" => Token::Underscore,
         ":" => Token::Colon,
@@ -58,6 +61,7 @@ extern {
         ">=" => Token::Operator(">="),
         "==" => Token::Operator("=="),
         "!=" => Token::Operator("!="),
+        "|" => Token::Operator("|"),
 
         "&&" => Token::Operator("&&"),
         "||" => Token::Operator("||"),
@@ -71,14 +75,14 @@ extern {
         "}" => Token::RBrace,
         ")" => Token::RParen,
 
-        "_r" => Token::InternalTest("_r"),
-        "_e" => Token::InternalTest("_e"),
-        "_m" => Token::InternalTest("_m"),
-        "_a" => Token::InternalTest("_a"),
-        "_q" => Token::InternalTest("_q"),
-        "_c" => Token::InternalTest("_c"),
-        "_as" => Token::InternalTest("_as"),
-        "_fn" => Token::InternalTest("_fn"),
+        "?r" => Token::InternalTest("?r"),
+        "?e" => Token::InternalTest("?e"),
+        "?m" => Token::InternalTest("?m"),
+        "?a" => Token::InternalTest("?a"),
+        "?q" => Token::InternalTest("?q"),
+        "?c" => Token::InternalTest("?c"),
+        "?as" => Token::InternalTest("?as"),
+        "?fn" => Token::InternalTest("?fn"),
     }
 }
 
@@ -97,32 +101,32 @@ pub Program: Program = NonterminalNewline* <RootExprs> => Program(<>);
 // and exposes entries into the parser that we don't want or need.
 pub Test: Test = {
     // root
-    "_r" <Expr> => Test::Expr(<>),
+    "?r" <Expr> => Test::Expr(<>),
 
     // expressions
-    "_e" <Literal> => Test::Literal(<>),
-    "_e" <Container> => Test::Container(<>),
+    "?e" <Literal> => Test::Literal(<>),
+    "?e" <Container> => Test::Container(<>),
 
     // arithmetic (math)
-    "_m" <ArithmeticExpr> => Test::Arithmetic(<>),
+    "?m" <ArithmeticExpr> => Test::Arithmetic(<>),
 
     // atoms
-    "_a" <String> => Test::String(<>),
-    "_a" <Integer> => Test::Integer(<>),
-    "_a" <Float> => Test::Float(<>),
-    "_a" <Boolean> => Test::Boolean(<>),
-    "_a" <Null> => Test::Null(()),
-    "_a" <Regex> => Test::Regex(<>),
+    "?a" <String> => Test::String(<>),
+    "?a" <Integer> => Test::Integer(<>),
+    "?a" <Float> => Test::Float(<>),
+    "?a" <Boolean> => Test::Boolean(<>),
+    "?a" <Null> => Test::Null(()),
+    "?a" <Regex> => Test::Regex(<>),
 
     // collections
-    "_c" <Block> => Test::Block(<>),
-    "_c" <Array> => Test::Array(<>),
-    "_c" <Object> => Test::Object(<>),
+    "?c" <Block> => Test::Block(<>),
+    "?c" <Array> => Test::Array(<>),
+    "?c" <Object> => Test::Object(<>),
 
     // other
-    "_as" <Assignment> => Test::Assignment(<>),
-    "_fn" <FunctionCall> => Test::FunctionCall(<>),
-    "_q" <Query> => Test::Query(<>),
+    "?as" <Assignment> => Test::Assignment(<>),
+    "?fn" <FunctionCall> => Test::FunctionCall(<>),
+    "?q" <Query> => Test::Query(<>),
 };
 
 // -----------------------------------------------------------------------------
@@ -205,6 +209,7 @@ Exprs: Vec<Node<Expr>> = {
 
 Expr: Node<Expr> = {
     Sp<IfStatement> => Node::new(<>.span(), Expr::IfStatement(<>)),
+    Sp<AbortExpr>,
     AssignmentExpr,
 };
 
@@ -217,6 +222,10 @@ NonterminalNewline: () = "\n";
 
 Ident: Ident = "identifier" => Ident(<>.to_owned());
 
+PathField: Ident = "path field" => Ident(<>.to_owned());
+
+AbortExpr: Expr = Sp<"abort"> => Expr::Abort(<>.map(|_| ()));
+
 // An identifier that is allowed to include reserved keywords.
 AnyIdent: Ident = {
     "identifier" => Ident(<>.to_owned()),
@@ -226,6 +235,7 @@ AnyIdent: Ident = {
     "null" => Ident("null".to_owned()),
     "true" => Ident("true".to_owned()),
     "false" => Ident("false".to_owned()),
+    "abort" => Ident("abort".to_owned()),
 };
 
 // -----------------------------------------------------------------------------
@@ -242,15 +252,24 @@ Assignment: Node<Assignment> = {
     Sp<AssignmentInfallible>,
 };
 
+AssignmentOp: AssignmentOp = {
+    "=" => AssignmentOp::Assign,
+    "|=" => AssignmentOp::Merge,
+}
+
 AssignmentSingle: Assignment = {
-    <target: Sp<AssignmentTarget>> "="
-        <expr: Box<Expr>> => Assignment::Single { target, expr },
+    <target: Sp<AssignmentTarget>>
+        <op: AssignmentOp>
+        NonterminalNewline*
+        <expr: Box<Expr>> => Assignment::Single { target, op, expr },
 }
 
 AssignmentInfallible: Assignment = {
     <ok: Sp<AssignmentTarget>> ","
-        <err: Sp<AssignmentTarget>> "="
-        <expr: Box<Expr>> => Assignment::Infallible{ ok, err, expr},
+        <err: Sp<AssignmentTarget>>
+        <op: AssignmentOp>
+        NonterminalNewline*
+        <expr: Box<Expr>> => Assignment::Infallible{ ok, err, op, expr},
 }
 
 #[inline]
@@ -286,12 +305,17 @@ Equal: Expr = {
 };
 
 Compare: Expr = {
-    Op<Compare, ">=", Add>,
-    Op<Compare, ">", Add>,
-    Op<Compare, "<=", Add>,
-    Op<Compare, "<", Add>,
-    Add,
+    Op<Compare, ">=", Merge>,
+    Op<Compare, ">", Merge>,
+    Op<Compare, "<=", Merge>,
+    Op<Compare, "<", Merge>,
+    Merge,
 };
+
+Merge: Expr = {
+    Op<Merge, "|", Add>,
+    Add,
+}
 
 Add: Expr = {
     Op<Add, "+", Factor>,
@@ -363,6 +387,7 @@ PathSegment: PathSegment = {
 
 pub Field: Field = {
     AnyIdent => Field::Regular(<>),
+    PathField => Field::Regular(<>),
     String => Field::Quoted(<>),
 };
 
@@ -393,9 +418,12 @@ FunctionArgument: FunctionArgument = {
 // -----------------------------------------------------------------------------
 
 IfStatement: IfStatement =
-    "if" <predicate: Sp<Predicate>> <consequent: Sp<Block>>
+    "if"
+    <predicate: Sp<Predicate>>
+    NonterminalNewline*
+    <consequent: Sp<Block>>
     <alternatives: (Sp<ElseIf>)*>
-    <alternative: ("else" <Sp<Block>>)?> => {
+    <alternative: ("else" NonterminalNewline* <Sp<Block>>)?> => {
         let mut alternative = alternative;
 
         for Node { span, mut node } in alternatives {
@@ -408,7 +436,11 @@ IfStatement: IfStatement =
         IfStatement { predicate, consequent, alternative }
 };
 
-ElseIf: IfStatement = "else" "if" <predicate: Sp<Predicate>> <consequent: Sp<Block>> => {
+ElseIf: IfStatement =
+    "else" NonterminalNewline* "if"
+    <predicate: Sp<Predicate>>
+    NonterminalNewline*
+    <consequent: Sp<Block>> => {
     IfStatement { predicate, consequent, alternative: None }
 };
 

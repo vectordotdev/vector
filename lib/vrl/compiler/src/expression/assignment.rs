@@ -43,7 +43,7 @@ impl Assignment {
                 // Single-target no-op assignments are useless.
                 if matches!(target.as_ref(), ast::AssignmentTarget::Noop) {
                     return Err(Error {
-                        variant: ErrorVariant::UnneededNoop(target_span),
+                        variant: ErrorVariant::UnnecessaryNoop(target_span),
                         span,
                         expr_span,
                         assignment_span,
@@ -67,7 +67,7 @@ impl Assignment {
                 Ok(Self { variant })
             }
 
-            Variant::Infallible { ok, err, expr } => {
+            Variant::Infallible { ok, err, expr, .. } => {
                 let ok_span = ok.span();
                 let err_span = err.span();
                 let expr_span = expr.span();
@@ -95,7 +95,7 @@ impl Assignment {
                 // Infallible-target no-op assignments are useless.
                 if ok_noop && err_noop {
                     return Err(Error {
-                        variant: ErrorVariant::UnneededNoop(ok_span),
+                        variant: ErrorVariant::UnnecessaryNoop(ok_span),
                         span,
                         expr_span,
                         assignment_span,
@@ -108,7 +108,8 @@ impl Assignment {
                 // set to being infallible, as the error will be captured by the
                 // "err" target.
                 let ok = Target::try_from(ok.into_inner())?;
-                let type_def = type_def.add_null().infallible();
+                let type_def = type_def.infallible();
+                let default = type_def.kind().default_value();
                 let value = match &expr {
                     Expr::Literal(v) => Some(v.to_value()),
                     _ => None,
@@ -127,6 +128,7 @@ impl Assignment {
                     ok,
                     err,
                     expr: Box::new(expr),
+                    default,
                 };
 
                 Ok(Self { variant })
@@ -159,7 +161,7 @@ impl fmt::Display for Assignment {
 
         match &self.variant {
             Single { target, expr } => write!(f, "{} = {}", target, expr),
-            Infallible { ok, err, expr } => write!(f, "{}, {} = {}", ok, err, expr),
+            Infallible { ok, err, expr, .. } => write!(f, "{}, {} = {}", ok, err, expr),
         }
     }
 }
@@ -170,7 +172,9 @@ impl fmt::Debug for Assignment {
 
         match &self.variant {
             Single { target, expr } => write!(f, "{:?} = {:?}", target, expr),
-            Infallible { ok, err, expr } => write!(f, "Ok({:?}), Err({:?}) = {:?}", ok, err, expr),
+            Infallible { ok, err, expr, .. } => {
+                write!(f, "Ok({:?}), Err({:?}) = {:?}", ok, err, expr)
+            }
         }
     }
 }
@@ -188,6 +192,26 @@ impl Target {
     fn insert_type_def(&self, state: &mut State, type_def: TypeDef, value: Option<Value>) {
         use Target::*;
 
+        fn set_type_def(
+            current_type_def: &TypeDef,
+            new_type_def: TypeDef,
+            path: &Option<Path>,
+        ) -> TypeDef {
+            // If the assignment is into a specific index, we want to keep the
+            // existing type def, and only update the type def at the provided
+            // index.
+            let is_index_assignment = path
+                .as_ref()
+                .and_then(|p| p.segments().last().map(|s| s.is_index()))
+                .unwrap_or_default();
+
+            if is_index_assignment {
+                current_type_def.clone().merge_overwrite(new_type_def)
+            } else {
+                new_type_def
+            }
+        }
+
         match self {
             Noop => {}
             Internal(ident, path) => {
@@ -198,7 +222,7 @@ impl Target {
 
                 let type_def = match state.variable(ident) {
                     None => td,
-                    Some(&Details { ref type_def, .. }) => type_def.clone().merge(td),
+                    Some(&Details { ref type_def, .. }) => set_type_def(type_def, td, path),
                 };
 
                 let details = Details { type_def, value };
@@ -214,7 +238,7 @@ impl Target {
 
                 let type_def = match state.target() {
                     None => td,
-                    Some(&Details { ref type_def, .. }) => type_def.clone().merge(td),
+                    Some(&Details { ref type_def, .. }) => set_type_def(type_def, td, path),
                 };
 
                 let details = Details { type_def, value };
@@ -325,8 +349,18 @@ impl TryFrom<ast::AssignmentTarget> for Target {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Variant<T, U> {
-    Single { target: T, expr: Box<U> },
-    Infallible { ok: T, err: T, expr: Box<U> },
+    Single {
+        target: T,
+        expr: Box<U>,
+    },
+    Infallible {
+        ok: T,
+        err: T,
+        expr: Box<U>,
+
+        /// The default `ok` value used when the expression results in an error.
+        default: Value,
+    },
 }
 
 impl<U> Expression for Variant<Target, U>
@@ -342,14 +376,19 @@ where
                 target.insert(value.clone(), ctx);
                 value
             }
-            Infallible { ok, err, expr } => match expr.resolve(ctx) {
+            Infallible {
+                ok,
+                err,
+                expr,
+                default,
+            } => match expr.resolve(ctx) {
                 Ok(value) => {
                     ok.insert(value.clone(), ctx);
                     err.insert(Value::Null, ctx);
                     value
                 }
                 Err(error) => {
-                    ok.insert(Value::Null, ctx);
+                    ok.insert(default.clone(), ctx);
                     let value = Value::from(error.to_string());
                     err.insert(value.clone(), ctx);
                     value
@@ -380,7 +419,7 @@ where
 
         match self {
             Single { target, expr } => write!(f, "{} = {}", target, expr),
-            Infallible { ok, err, expr } => write!(f, "{}, {} = {}", ok, err, expr),
+            Infallible { ok, err, expr, .. } => write!(f, "{}, {} = {}", ok, err, expr),
         }
     }
 }
@@ -405,13 +444,13 @@ pub struct Error {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ErrorVariant {
-    #[error("useless no-op assignment")]
-    UnneededNoop(Span),
+    #[error("unnecessary no-op assignment")]
+    UnnecessaryNoop(Span),
 
     #[error("unhandled fallible assignment")]
     FallibleAssignment(String, String),
 
-    #[error("unneeded error assignment")]
+    #[error("unnecessary error assignment")]
     InfallibleAssignment(String, String, Span, Span),
 
     #[error("invalid assignment target")]
@@ -435,7 +474,7 @@ impl DiagnosticError for Error {
         use ErrorVariant::*;
 
         match &self.variant {
-            UnneededNoop(..) => 640,
+            UnnecessaryNoop(..) => 640,
             FallibleAssignment(..) => 103,
             InfallibleAssignment(..) => 104,
             InvalidTarget(..) => 641,
@@ -446,8 +485,8 @@ impl DiagnosticError for Error {
         use ErrorVariant::*;
 
         match &self.variant {
-            UnneededNoop(target_span) => vec![
-                Label::primary("this no-op assignment is useless", self.expr_span),
+            UnnecessaryNoop(target_span) => vec![
+                Label::primary("this no-op assignment has no effect", self.expr_span),
                 Label::context("either assign to a path or variable here", *target_span),
                 Label::context("or remove the assignment", self.assignment_span),
             ],
@@ -461,8 +500,8 @@ impl DiagnosticError for Error {
                 Label::context(format!("{}, err = {}", target, expr), self.assignment_span),
             ],
             InfallibleAssignment(target, expr, ok_span, err_span) => vec![
-                Label::primary("this error assignment is unneeded", err_span),
-                Label::context("because this expression cannot fail", self.expr_span),
+                Label::primary("this error assignment is unnecessary", err_span),
+                Label::context("because this expression can't fail", self.expr_span),
                 Label::context(format!("use: {} = {}", target, expr), ok_span),
             ],
             InvalidTarget(span) => vec![

@@ -6,7 +6,7 @@ use crate::{
     },
     internal_events::HostMetricsEventReceived,
     shutdown::ShutdownSignal,
-    BoolAndSome, Pipeline,
+    Pipeline,
 };
 use chrono::{DateTime, Utc};
 use futures::{stream, SinkExt, StreamExt};
@@ -36,6 +36,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
 use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -145,7 +146,7 @@ impl HostMetricsConfig {
             out.sink_map_err(|error| error!(message = "Error sending host metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
-        let mut interval = time::interval(duration).take_until(shutdown);
+        let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
         while interval.next().await.is_some() {
             let metrics = self.capture_metrics().await;
             out.send_all(&mut stream::iter(metrics).map(Ok)).await?;
@@ -461,7 +462,7 @@ impl HostMetricsConfig {
                         self.network
                             .devices
                             .contains_str(counter.interface())
-                            .and_some(counter)
+                            .then(|| counter)
                     })
                     .filter_map(|counter| async { counter })
                     .map(|counter| {
@@ -540,7 +541,7 @@ impl HostMetricsConfig {
                         self.filesystem
                             .mountpoints
                             .contains_path(partition.mount_point())
-                            .and_some(partition)
+                            .then(|| partition)
                     })
                     .filter_map(|partition| async { partition })
                     // Filter on configured devices
@@ -552,7 +553,7 @@ impl HostMetricsConfig {
                                     self.filesystem.devices.contains_path(device.as_ref())
                                 })
                                 .unwrap_or(true))
-                        .and_some(partition)
+                        .then(|| partition)
                     })
                     .filter_map(|partition| async { partition })
                     // Filter on configured filesystems
@@ -560,7 +561,7 @@ impl HostMetricsConfig {
                         self.filesystem
                             .filesystems
                             .contains_str(partition.file_system().as_str())
-                            .and_some(partition)
+                            .then(|| partition)
                     })
                     .filter_map(|partition| async { partition })
                     // Load usage from the partition mount point
@@ -634,7 +635,7 @@ impl HostMetricsConfig {
                         self.disk
                             .devices
                             .contains_path(counter.device_name().as_ref())
-                            .and_some(counter)
+                            .then(|| counter)
                     })
                     .filter_map(|counter| async { counter })
                     .map(|counter| {

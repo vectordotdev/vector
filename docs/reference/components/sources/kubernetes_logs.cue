@@ -153,6 +153,15 @@ components: sources: kubernetes_logs: {
 			required:    false
 			type: bool: default: true
 		}
+		kube_config_file: {
+			common:      false
+			description: "Optional path to a kubeconfig file readable by Vector. If not set, Vector will try to connect to Kubernetes using in-cluster configuration."
+			required:    false
+			type: string: {
+				default: null
+				syntax:  "literal"
+			}
+		}
 		self_node_name: {
 			common:      false
 			description: "The name of the Kubernetes `Node` this Vector instance runs at. Configured to use an env var by default, to be evaluated to a value provided by Kubernetes at Pod deploy time."
@@ -202,6 +211,7 @@ components: sources: kubernetes_logs: {
 				syntax: "literal"
 			}
 		}
+		timezone: configuration._timezone
 	}
 
 	output: logs: line: {
@@ -546,6 +556,7 @@ components: sources: kubernetes_logs: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:                        components.sources.internal_metrics.output.metrics.events_in_total
 		k8s_format_picker_edge_cases_total:     components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
 		k8s_docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
 		k8s_event_annotation_failures_total:    components.sources.internal_metrics.output.metrics.k8s_event_annotation_failures_total

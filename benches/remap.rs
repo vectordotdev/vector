@@ -9,7 +9,7 @@ use vector::transforms::{
     FunctionTransform,
 };
 use vector::{
-    config::TransformConfig,
+    config::{GlobalOptions, TransformConfig},
     event::{Event, Value},
     test_util::runtime,
 };
@@ -20,39 +20,12 @@ criterion_group!(
     // encapsulates CI noise we saw in
     // https://github.com/timberio/vector/issues/5394
     config = Criterion::default().noise_threshold(0.02);
-    targets = benchmark_remap, upcase, downcase, parse_json
+    targets = benchmark_remap
 );
 criterion_main!(benches);
 
-bench_function! {
-    upcase => vrl_stdlib::Upcase;
-
-    literal_value {
-        args: func_args![value: "foo"],
-        want: Ok("FOO")
-    }
-}
-
-bench_function! {
-    downcase => vrl_stdlib::Downcase;
-
-    literal_value {
-        args: func_args![value: "FOO"],
-        want: Ok("foo")
-    }
-}
-
-bench_function! {
-    parse_json => vrl_stdlib::ParseJson;
-
-    literal_value {
-        args: func_args![value: r#"{"key": "value"}"#],
-        want: Ok(value!({"key": "value"})),
-    }
-}
-
 fn benchmark_remap(c: &mut Criterion) {
-    let mut rt = runtime();
+    let rt = runtime();
     let add_fields_runner = |tform: &mut Box<dyn FunctionTransform>, event: Event| {
         let mut result = Vec::with_capacity(1);
         tform.transform(&mut result, event);
@@ -68,11 +41,13 @@ fn benchmark_remap(c: &mut Criterion) {
     c.bench_function("remap: add fields with remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
-                source: r#".foo = "bar"
-            .bar = "baz"
-            .copy = string!(.copy_from)"#
-                    .to_string(),
-                drop_on_err: true,
+                source: indoc! {r#".foo = "bar"
+                    .bar = "baz"
+                    .copy = string!(.copy_from)
+                "#}
+                .to_string(),
+                drop_on_error: true,
+                drop_on_abort: true,
             })
             .unwrap(),
         );
@@ -132,7 +107,8 @@ fn benchmark_remap(c: &mut Criterion) {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
                 source: ".bar = parse_json!(string!(.foo))".to_owned(),
-                drop_on_err: false,
+                drop_on_error: true,
+                drop_on_abort: true,
             })
             .unwrap(),
         );
@@ -195,13 +171,14 @@ fn benchmark_remap(c: &mut Criterion) {
     c.bench_function("remap: coerce with remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
-                source: r#"
-                .number = to_int!(.number)
-                .bool = to_bool!(.bool)
-                .timestamp = parse_timestamp!(string!(.timestamp), format: "%d/%m/%Y:%H:%M:%S %z")
-                "#
+                source: indoc! {r#"
+                    .number = to_int!(.number)
+                    .bool = to_bool!(.bool)
+                    .timestamp = parse_timestamp!(string!(.timestamp), format: "%d/%m/%Y:%H:%M:%S %z")
+                "#}
                 .to_owned(),
-                drop_on_err: true,
+                drop_on_error: true,
+                drop_on_abort: true,
             })
             .unwrap(),
         );
@@ -230,17 +207,16 @@ fn benchmark_remap(c: &mut Criterion) {
     c.bench_function("remap: coerce with coercer", |b| {
         let mut tform: Box<dyn FunctionTransform> = rt
             .block_on(async move {
-                toml::from_str::<CoercerConfig>(
-                    r#"drop_unspecified = false
+                toml::from_str::<CoercerConfig>(indoc! {r#"
+                        drop_unspecified = false
 
-                   [types]
-                   number = "int"
-                   bool = "bool"
-                   timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
-                   "#,
-                )
+                        [types]
+                        number = "int"
+                        bool = "bool"
+                        timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
+                   "#})
                 .unwrap()
-                .build()
+                .build(&GlobalOptions::default())
                 .await
                 .unwrap()
             })

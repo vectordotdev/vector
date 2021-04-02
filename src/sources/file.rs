@@ -66,12 +66,15 @@ pub struct FileConfig {
     pub start_at_beginning: Option<bool>,
     pub ignore_checkpoints: Option<bool>,
     pub read_from: Option<ReadFromConfig>,
-    pub ignore_older: Option<u64>, // secs
+    // Deprecated name
+    #[serde(alias = "ignore_older")]
+    pub ignore_older_secs: Option<u64>,
     #[serde(default = "default_max_line_bytes")]
     pub max_line_bytes: usize,
     pub host_key: Option<String>,
     pub data_dir: Option<PathBuf>,
-    pub glob_minimum_cooldown: u64, // millis
+    #[serde(alias = "glob_minimum_cooldown")]
+    pub glob_minimum_cooldown_ms: u64,
     // Deprecated name
     #[serde(alias = "fingerprinting")]
     pub fingerprint: FingerprintConfig,
@@ -81,7 +84,8 @@ pub struct FileConfig {
     pub multiline: Option<MultilineConfig>,
     pub max_read_bytes: usize,
     pub oldest_first: bool,
-    pub remove_after: Option<u64>,
+    #[serde(alias = "remove_after")]
+    pub remove_after_secs: Option<u64>,
     pub line_delimiter: String,
     pub encoding: Option<EncodingConfig>,
 }
@@ -152,7 +156,7 @@ impl Default for FileConfig {
             start_at_beginning: None,
             ignore_checkpoints: None,
             read_from: None,
-            ignore_older: None,
+            ignore_older_secs: None,
             max_line_bytes: default_max_line_bytes(),
             fingerprint: FingerprintConfig::Checksum {
                 bytes: None,
@@ -161,13 +165,13 @@ impl Default for FileConfig {
             ignore_not_found: false,
             host_key: None,
             data_dir: None,
-            glob_minimum_cooldown: 1000, // millis
+            glob_minimum_cooldown_ms: 1000, // millis
             message_start_indicator: None,
             multi_line_timeout: 1000, // millis
             multiline: None,
             max_read_bytes: 2048,
             oldest_first: false,
-            remove_after: None,
+            remove_after_secs: None,
             line_delimiter: "\n".to_string(),
             encoding: None,
         }
@@ -228,9 +232,9 @@ pub fn file_source(
     mut out: Pipeline,
 ) -> super::Source {
     let ignore_before = config
-        .ignore_older
+        .ignore_older_secs
         .map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64));
-    let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown);
+    let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown_ms);
     let (ignore_checkpoints, read_from) = reconcile_position_options(
         config.start_at_beginning,
         config.ignore_checkpoints,
@@ -270,7 +274,7 @@ pub fn file_source(
             ignore_not_found: config.ignore_not_found,
         },
         oldest_first: config.oldest_first,
-        remove_after: config.remove_after.map(Duration::from_secs),
+        remove_after: config.remove_after_secs.map(Duration::from_secs),
         emitter: FileSourceInternalEventsEmitter,
         handle: tokio::runtime::Handle::current(),
     };
@@ -427,9 +431,8 @@ mod tests {
         future::Future,
         io::{Seek, Write},
     };
-
     use tempfile::tempdir;
-    use tokio::time::{delay_for, timeout, Duration};
+    use tokio::time::{sleep, timeout, Duration};
 
     #[test]
     fn generate_config() {
@@ -443,15 +446,15 @@ mod tests {
                 ignored_header_bytes: 0,
             },
             data_dir: Some(dir.path().to_path_buf()),
-            glob_minimum_cooldown: 0, // millis
+            glob_minimum_cooldown_ms: 0, // millis
             ..Default::default()
         }
     }
 
     async fn wait_with_timeout<F, R>(future: F) -> R
     where
-        F: Future<Output = R> + Send + 'static,
-        R: Send + 'static,
+        F: Future<Output = R> + Send,
+        R: Send,
     {
         timeout(Duration::from_secs(5), future)
             .await
@@ -461,7 +464,7 @@ mod tests {
     }
 
     async fn sleep_500_millis() {
-        delay_for(Duration::from_millis(500)).await;
+        sleep(Duration::from_millis(500)).await;
     }
 
     #[test]
@@ -820,7 +823,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test();
+            let (tx, mut rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -842,7 +845,7 @@ mod tests {
             drop(trigger_shutdown);
             shutdown_done.await;
 
-            let received = wait_with_timeout(rx.into_future()).await.0.unwrap();
+            let received = wait_with_timeout(rx.next()).await.unwrap();
             assert_eq!(
                 received.as_log()["file"].to_string_lossy(),
                 path.to_str().unwrap()
@@ -853,7 +856,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test();
+            let (tx, mut rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -876,7 +879,7 @@ mod tests {
             drop(trigger_shutdown);
             shutdown_done.await;
 
-            let received = wait_with_timeout(rx.into_future()).await.0.unwrap();
+            let received = wait_with_timeout(rx.next()).await.unwrap();
             assert_eq!(
                 received.as_log()["source"].to_string_lossy(),
                 path.to_str().unwrap()
@@ -887,7 +890,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test();
+            let (tx, mut rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -910,7 +913,7 @@ mod tests {
             drop(trigger_shutdown);
             shutdown_done.await;
 
-            let received = wait_with_timeout(rx.into_future()).await.0.unwrap();
+            let received = wait_with_timeout(rx.next()).await.unwrap();
             assert_eq!(
                 received.as_log().keys().collect::<HashSet<_>>(),
                 vec![
@@ -1082,7 +1085,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            ignore_older: Some(5),
+            ignore_older_secs: Some(5),
             ..test_default_file_config(&dir)
         };
 
@@ -1679,7 +1682,7 @@ mod tests {
     #[tokio::test]
     async fn remove_file() {
         let n = 5;
-        let remove_after = 1;
+        let remove_after_secs = 1;
 
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -1687,8 +1690,8 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            remove_after: Some(remove_after),
-            glob_minimum_cooldown: 100,
+            remove_after_secs: Some(remove_after_secs),
+            glob_minimum_cooldown_ms: 100,
             ..test_default_file_config(&dir)
         };
 
@@ -1707,7 +1710,7 @@ mod tests {
 
         for _ in 0..10 {
             // Wait for remove grace period to end.
-            delay_for(Duration::from_secs(remove_after + 1)).await;
+            sleep(Duration::from_secs(remove_after_secs + 1)).await;
 
             if File::open(&path).is_err() {
                 break;

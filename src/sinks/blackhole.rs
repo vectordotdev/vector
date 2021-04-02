@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
-use tokio::time::delay_until;
+use tokio::time::sleep_until;
 
 pub struct BlackholeSink {
     total_events: usize,
@@ -85,7 +85,7 @@ impl StreamSink for BlackholeSink {
             if let Some(rate) = self.config.rate {
                 let until = self.last.unwrap_or_else(Instant::now)
                     + Duration::from_secs_f32(1.0 / rate as f32);
-                delay_until(until.into()).await;
+                sleep_until(until.into()).await;
                 self.last = Some(until);
             }
 

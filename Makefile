@@ -1,6 +1,9 @@
 # .PHONY: $(MAKECMDGOALS) all
 .DEFAULT_GOAL := help
 
+mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+mkfile_dir := $(dir $(mkfile_path))
+
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
@@ -16,6 +19,8 @@ endif
 export SCOPE ?= ""
 # Override this with any extra flags for cargo bench
 export CARGO_BENCH_FLAGS ?= ""
+# override this to put criterion output elsewhere
+export CRITERION_HOME ?= "$(mkfile_dir)target/criterion"
 # Override to false to disable autospawning services on integration tests.
 export AUTOSPAWN ?= true
 # Override to control if services are turned off after integration tests.
@@ -277,9 +282,9 @@ test: ## Run the unit test suite
 
 .PHONY: test-components
 test-components: ## Test with all components enabled
-# TODO(jesse) add `wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
+# TODO(jesse) add `language-benches wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
 # test-components: $(WASM_MODULE_OUTPUTS)
-test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches remap-benches"
+test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches metrics-benches remap-benches"
 test-components: test
 
 .PHONY: test-all
@@ -510,7 +515,7 @@ endif
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --test cli -- --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features cli-tests --test cli -- --test-threads 4
 
 .PHONY: test-wasm-build-modules
 test-wasm-build-modules: $(WASM_MODULE_OUTPUTS) ### Build all WASM test modules
@@ -538,6 +543,11 @@ bench: ## Run benchmarks in /benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
+.PHONY: bench-remap-functions
+bench-remap-functions: ## Run remap-functions benches
+	${MAYBE_ENVIRONMENT_EXEC} CRITERION_HOME="$(CRITERION_HOME)" cargo bench --manifest-path lib/vrl/stdlib/Cargo.toml ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
 .PHONY: bench-remap
 bench-remap: ## Run remap benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "remap-benches" --bench remap ${CARGO_BENCH_FLAGS}
@@ -560,7 +570,7 @@ bench-metrics: ## Run metrics benches
 
 .PHONY: bench-all
 bench-all: ### Run all benches
-bench-all: $(WASM_MODULE_OUTPUTS)
+bench-all: $(WASM_MODULE_OUTPUTS) bench-remap-functions
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches metrics-benches language-benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
@@ -633,6 +643,11 @@ check-kubernetes-yaml: ## Check that the generated Kubernetes YAML configs are u
 check-events: ## Check that events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events.sh
 
+##@ Rustdoc
+build-rustdoc: ## Build Vector's Rustdocs
+	# This command is mostly intended for use by the build process in timberio/vector-rustdoc
+	${MAYBE_ENVIRONMENT_EXEC} cargo doc --no-deps
+
 ##@ Packaging
 
 # archives
@@ -656,10 +671,10 @@ package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-d
 package-x86_64-unknown-linux-musl-all: package-x86_64-unknown-linux-musl # Build all x86_64 MUSL packages
 
 .PHONY: package-aarch64-unknown-linux-musl-all
-package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
+package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl # Build all aarch64 MUSL packages
 
 .PHONY: package-aarch64-unknown-linux-gnu-all
-package-aarch64-unknown-linux-gnu-all: package-aarch64-unknown-linux-gnu # Build all aarch64 GNU packages
+package-aarch64-unknown-linux-gnu-all: package-aarch64-unknown-linux-gnu package-deb-aarch64 package-rpm-aarch64 # Build all aarch64 GNU packages
 
 .PHONY: package-armv7-unknown-linux-gnueabihf-all
 package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
@@ -699,8 +714,8 @@ package-deb-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Buil
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-musl timberio/ci_image ./scripts/package-deb.sh
 
 .PHONY: package-deb-aarch64
-package-deb-aarch64: package-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-musl timberio/ci_image ./scripts/package-deb.sh
+package-deb-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 deb package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-gnu timberio/ci_image ./scripts/package-deb.sh
 
 .PHONY: package-deb-armv7-gnu
 package-deb-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf deb package
@@ -717,8 +732,8 @@ package-rpm-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Buil
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-musl timberio/ci_image ./scripts/package-rpm.sh
 
 .PHONY: package-rpm-aarch64
-package-rpm-aarch64: package-aarch64-unknown-linux-musl ## Build the aarch64 rpm package
-	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-musl timberio/ci_image ./scripts/package-rpm.sh
+package-rpm-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 rpm package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-gnu timberio/ci_image ./scripts/package-rpm.sh
 
 .PHONY: package-rpm-armv7-gnu
 package-rpm-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf rpm package
@@ -768,6 +783,12 @@ release-helm: ## Package and release Helm Chart
 .PHONY: sync-install
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
+
+##@ Vector Remap Language
+
+.PHONY: test-vrl
+test-vrl: ## Run the VRL test suite
+	@scripts/test-vrl.sh
 
 ##@ Utility
 

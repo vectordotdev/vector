@@ -17,7 +17,6 @@ use crate::{
         start_topology,
         stats::{HistogramStats, LevelTimeHistogram, TimeHistogram, WeightedSumStats},
     },
-    BoolAndSome,
 };
 use core::task::Context;
 use futures::{
@@ -38,7 +37,7 @@ use std::{
     sync::{Arc, Mutex},
     task::Poll,
 };
-use tokio::time::{self, delay_for, Duration, Instant};
+use tokio::time::{self, sleep, Duration, Instant};
 use tower::Service;
 
 #[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -78,7 +77,7 @@ struct LimitParams {
 impl LimitParams {
     fn action_at_level(&self, level: usize) -> Option<Action> {
         self.limit
-            .and_then(|limit| (level > limit).and_some(self.action))
+            .and_then(|limit| (level > limit).then(|| self.action))
     }
 
     fn scale(&self, level: usize) -> f64 {
@@ -264,7 +263,7 @@ fn respond_after(
     stats: Arc<Mutex<Statistics>>,
 ) -> BoxFuture<'static, Result<Response, Error>> {
     Box::pin(async move {
-        delay_for(Duration::from_secs_f64(delay)).await;
+        sleep(Duration::from_secs_f64(delay)).await;
         let mut stats = stats.lock().expect("Poisoned stats lock");
         stats.end_request(Instant::now(), matches!(response, Ok(Response::Ok)));
         response
@@ -383,7 +382,7 @@ async fn run_test(params: TestParams) -> TestResults {
     // This is crude and dumb, but it works, and the tests run fast and
     // the results are highly repeatable.
     while stats.lock().expect("Poisoned stats lock").completed < params.requests {
-        time::advance(Duration::from_millis(1)).await;
+        time::advance(Duration::from_millis(0)).await;
     }
     topology.stop().await;
 
@@ -406,24 +405,40 @@ async fn run_test(params: TestParams) -> TestResults {
         .map(|event| (event.name().to_string(), event))
         .collect::<HashMap<_, _>>();
     // Ensure basic statistics are captured, don't actually examine them
-    assert!(
-        matches!(metrics.get("adaptive_concurrency_observed_rtt").unwrap().data.value,
-                 MetricValue::Distribution { .. })
-    );
-    assert!(
-        matches!(metrics.get("adaptive_concurrency_averaged_rtt").unwrap().data.value,
-                 MetricValue::Distribution { .. })
-    );
+    assert!(matches!(
+        metrics
+            .get("adaptive_concurrency_observed_rtt")
+            .unwrap()
+            .data
+            .value,
+        MetricValue::Distribution { .. }
+    ));
+    assert!(matches!(
+        metrics
+            .get("adaptive_concurrency_averaged_rtt")
+            .unwrap()
+            .data
+            .value,
+        MetricValue::Distribution { .. }
+    ));
     if params.concurrency == Concurrency::Adaptive {
-        assert!(
-            matches!(metrics.get("adaptive_concurrency_limit").unwrap().data.value,
-                     MetricValue::Distribution { .. })
-        );
+        assert!(matches!(
+            metrics
+                .get("adaptive_concurrency_limit")
+                .unwrap()
+                .data
+                .value,
+            MetricValue::Distribution { .. }
+        ));
     }
-    assert!(
-        matches!(metrics.get("adaptive_concurrency_in_flight").unwrap().data.value,
-                 MetricValue::Distribution { .. })
-    );
+    assert!(matches!(
+        metrics
+            .get("adaptive_concurrency_in_flight")
+            .unwrap()
+            .data
+            .value,
+        MetricValue::Distribution { .. }
+    ));
 
     TestResults { stats, cstats }
 }
@@ -508,7 +523,7 @@ impl ResultTest {
                 .and_then(|range| range.assert_usize(stat.mode, name, "mode")),
         ]
         .into_iter()
-        .filter_map(|f| f)
+        .flatten()
         .collect::<Vec<_>>()
     }
 
@@ -522,7 +537,7 @@ impl ResultTest {
                 .and_then(|range| range.assert_f64(stat.mean, name, "mean")),
         ]
         .into_iter()
-        .filter_map(|f| f)
+        .flatten()
         .collect::<Vec<_>>()
     }
 }
@@ -629,7 +644,7 @@ async fn all_tests() {
     // The first delay takes just slightly longer than all the rest,
     // which causes the first test to run differently than all the
     // others. Throw in a dummy delay to take up this delay "slack".
-    delay_for(Duration::from_millis(1)).await;
+    sleep(Duration::from_millis(1)).await;
     time::advance(Duration::from_millis(1)).await;
 
     // Then run all the tests

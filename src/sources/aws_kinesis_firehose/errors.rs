@@ -82,9 +82,3 @@ impl RequestError {
         }
     }
 }
-
-impl From<RequestError> for warp::reject::Rejection {
-    fn from(error: RequestError) -> Self {
-        warp::reject::custom(error)
-    }
-}

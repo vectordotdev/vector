@@ -24,8 +24,8 @@ where
 
         pin_mut!(body);
         while let Some(buf) = body.data().await {
-            let mut buf = buf.context(Reading)?;
-            let chunk = buf.to_bytes();
+            let buf = buf.context(Reading)?;
+            let chunk = buf.chunk();
             let responses = decoder.process_next_chunk(chunk.as_ref());
             emit!(internal_events::ChunkProcessed{ byte_size: chunk.len() });
             for response in responses {
@@ -121,7 +121,12 @@ mod tests {
 
         {
             let err = out_stream.next().await.unwrap().unwrap_err();
-            assert!(matches!(err, Error::Reading { source: hyper::Error { .. } }));
+            assert!(matches!(
+                err,
+                Error::Reading {
+                    source: hyper::Error { .. }
+                }
+            ));
         }
 
         assert!(out_stream.next().await.is_none());
@@ -139,7 +144,12 @@ mod tests {
 
         {
             let err = out_stream.next().await.unwrap().unwrap_err();
-            assert!(matches!(err, Error::Parsing { source: response::Error::Json(_) }));
+            assert!(matches!(
+                err,
+                Error::Parsing {
+                    source: response::Error::Json(_)
+                }
+            ));
         }
 
         assert!(out_stream.next().await.is_none());

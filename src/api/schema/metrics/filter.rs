@@ -6,10 +6,8 @@ use crate::{
 use async_stream::stream;
 use lazy_static::lazy_static;
 use std::{collections::BTreeMap, sync::Arc};
-use tokio::{
-    stream::{Stream, StreamExt},
-    time::Duration,
-};
+use tokio::time::Duration;
+use tokio_stream::{Stream, StreamExt};
 
 lazy_static! {
     static ref GLOBAL_CONTROLLER: Arc<&'static Controller> =
@@ -129,10 +127,7 @@ pub fn component_counter_metrics(
     get_all_metrics(interval).map(move |m| {
         m.into_iter()
             .filter(filter_fn)
-            .filter_map(|m| match m.tag_value("component_name") {
-                Some(name) => Some((name, m)),
-                _ => None,
-            })
+            .filter_map(|m| m.tag_value("component_name").map(|name| (name, m)))
             .fold(BTreeMap::new(), |mut map, (name, m)| {
                 map.entry(name).or_insert_with(Vec::new).push(m);
                 map
@@ -193,10 +188,7 @@ pub fn component_counter_throughputs(
         .map(move |m| {
             m.into_iter()
                 .filter(filter_fn)
-                .filter_map(|m| match m.tag_value("component_name") {
-                    Some(name) => Some((name, m)),
-                    _ => None,
-                })
+                .filter_map(|m| m.tag_value("component_name").map(|name| (name, m)))
                 .fold(BTreeMap::new(), |mut map, (name, m)| {
                     map.entry(name).or_insert_with(Vec::new).push(m);
                     map

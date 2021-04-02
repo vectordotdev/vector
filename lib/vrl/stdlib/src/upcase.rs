@@ -40,7 +40,7 @@ impl Expression for UpcaseFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
 
-        Ok(value.unwrap_bytes_utf8_lossy().to_uppercase().into())
+        Ok(value.try_bytes_utf8_lossy()?.to_uppercase().into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -48,25 +48,17 @@ impl Expression for UpcaseFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use crate::map;
-//     use std::convert::TryFrom;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     vrl::test_type_def![
-//         string {
-//             expr: |_| UpcaseFn { value: Literal::from("foo").boxed() },
-//             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
-//         }
+    test_function![
+        upcase => Upcase;
 
-//         non_string {
-//             expr: |_| UpcaseFn { value: Literal::from(true).boxed() },
-//             def: TypeDef {
-//                 fallible: true,
-//                 kind: Kind::Bytes,
-//                 ..Default::default()
-//             },
-//         }
-//     ];
-// }
+        simple {
+            args: func_args![value: "FOO 2 bar"],
+            want: Ok(value!("FOO 2 BAR")),
+            tdef: TypeDef::new().bytes(),
+        }
+    ];
+}

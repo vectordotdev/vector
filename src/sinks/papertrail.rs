@@ -65,7 +65,7 @@ impl SinkConfig for PapertrailConfig {
 
         let sink_config = TcpSinkConfig::new(address, self.keepalive, tls, self.send_buffer_bytes);
 
-        sink_config.build(cx, move |event| encode_event(event, pid, &encoding))
+        sink_config.build(cx, move |event| Some(encode_event(event, pid, &encoding)))
     }
 
     fn input_type(&self) -> DataType {
@@ -77,12 +77,11 @@ impl SinkConfig for PapertrailConfig {
     }
 }
 
-fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
-    let host = if let Some(host) = event.as_mut_log().remove(log_schema().host_key()) {
-        Some(host.to_string_lossy())
-    } else {
-        None
-    };
+fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>) -> Bytes {
+    let host = event
+        .as_mut_log()
+        .remove(log_schema().host_key())
+        .map(|host| host.to_string_lossy());
 
     let formatter = Formatter3164 {
         facility: Facility::LOG_USER,
@@ -110,7 +109,7 @@ fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>)
 
     s.push(b'\n');
 
-    Some(Bytes::from(s))
+    Bytes::from(s)
 }
 
 #[cfg(test)]
@@ -137,8 +136,7 @@ mod tests {
                 except_fields: Some(vec!["magic".into()]),
                 timestamp_format: None,
             },
-        )
-        .unwrap();
+        );
 
         let msg =
             bytes.slice(String::from_utf8_lossy(&bytes).find(": ").unwrap() + 2..bytes.len() - 1);

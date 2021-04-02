@@ -1,4 +1,5 @@
 use futures::{SinkExt, StreamExt};
+use indoc::indoc;
 use k8s_e2e_tests::*;
 use k8s_test_framework::{
     lock, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
@@ -8,44 +9,44 @@ use std::str::FromStr;
 
 const HELM_CHART_VECTOR_AGENT: &str = "vector-agent";
 
-const HELM_VALUES_STDOUT_SINK: &str = r#"
-sinks:
-  stdout:
-    type: "console"
-    inputs: ["kubernetes_logs"]
-    target: "stdout"
-    encoding: "json"
-"#;
+const HELM_VALUES_STDOUT_SINK: &str = indoc! {r#"
+    sinks:
+      stdout:
+        type: "console"
+        inputs: ["kubernetes_logs"]
+        target: "stdout"
+        encoding: "json"
+"#};
 
-const HELM_VALUES_STDOUT_SINK_RAW_CONFIG: &str = r#"
-sinks:
-  stdout:
-    type: "console"
-    inputs: ["kubernetes_logs"]
-    rawConfig: |
-      target = "stdout"
-      encoding = "json"
-"#;
+const HELM_VALUES_STDOUT_SINK_RAW_CONFIG: &str = indoc! {r#"
+    sinks:
+      stdout:
+        type: "console"
+        inputs: ["kubernetes_logs"]
+        rawConfig: |
+          target = "stdout"
+          encoding = "json"
+"#};
 
-const HELM_VALUES_ADDITIONAL_CONFIGMAP: &str = r#"
-extraConfigDirSources:
-- configMap:
-    name: vector-agent-config
-"#;
+const HELM_VALUES_ADDITIONAL_CONFIGMAP: &str = indoc! {r#"
+    extraConfigDirSources:
+    - configMap:
+        name: vector-agent-config
+"#};
 
-const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = r#"
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: vector-agent-config
-data:
-  vector.toml: |
-    [sinks.stdout]
-        type = "console"
-        inputs = ["kubernetes_logs"]
-        target = "stdout"
-        encoding = "json"
-"#;
+const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = indoc! {r#"
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: vector-agent-config
+    data:
+      vector.toml: |
+        [sinks.stdout]
+            type = "console"
+            inputs = ["kubernetes_logs"]
+            target = "stdout"
+            encoding = "json"
+"#};
 
 /// This test validates that vector-agent picks up logs at the simplest case
 /// possible - a new pod is deployed and prints to stdout, and we assert that
@@ -325,7 +326,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Wait for some extra time to ensure pod completes.
-    tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     let vector = framework
         .vector(
@@ -561,6 +562,10 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap()
             .is_empty());
         assert_eq!(val["kubernetes"]["container_name"], "test-pod");
+        assert!(!val["kubernetes"]["container_id"]
+            .as_str()
+            .unwrap()
+            .is_empty());
         assert_eq!(val["kubernetes"]["container_image"], BUSYBOX_IMAGE);
 
         // Request to stop the flow.
@@ -652,7 +657,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         let line = tokio::select! {
             result = stop_rx.next() => {
                 result.unwrap();
-                log_reader.kill()?;
+                log_reader.kill().await?;
                 continue;
             }
             line = log_reader.read_line() => line,
@@ -666,7 +671,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
             println!("Giving up");
-            log_reader.kill()?;
+            log_reader.kill().await?;
             break;
         }
 
@@ -713,7 +718,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(120);
             println!("Starting stop timer, due in {} seconds", duration.as_secs());
-            tokio::time::delay_for(duration).await;
+            tokio::time::sleep(duration).await;
             println!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
@@ -738,12 +743,12 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    const CONFIG: &str = r#"
-kubernetesLogsSource:
-  rawConfig: |
-    extra_label_selector = "my_custom_negative_label_selector!=my_val"
-    extra_field_selector = "metadata.name!=test-pod-excluded-by-name"
-"#;
+    const CONFIG: &str = indoc! {r#"
+        kubernetesLogsSource:
+          rawConfig: |
+            extra_label_selector = "my_custom_negative_label_selector!=my_val"
+            extra_field_selector = "metadata.name!=test-pod-excluded-by-name"
+    "#};
 
     let vector = framework
         .vector(
@@ -832,7 +837,7 @@ kubernetesLogsSource:
         let line = tokio::select! {
             result = stop_rx.next() => {
                 result.unwrap();
-                log_reader.kill()?;
+                log_reader.kill().await?;
                 continue;
             }
             line = log_reader.read_line() => line,
@@ -846,7 +851,7 @@ kubernetesLogsSource:
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
             println!("Giving up");
-            log_reader.kill()?;
+            log_reader.kill().await?;
             break;
         }
 
@@ -893,7 +898,7 @@ kubernetesLogsSource:
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(120);
             println!("Starting stop timer, due in {} seconds", duration.as_secs());
-            tokio::time::delay_for(duration).await;
+            tokio::time::sleep(duration).await;
             println!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
@@ -973,7 +978,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         let line = tokio::select! {
             result = stop_rx.next() => {
                 result.unwrap();
-                log_reader.kill()?;
+                log_reader.kill().await?;
                 continue;
             }
             line = log_reader.read_line() => line,
@@ -987,7 +992,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
             println!("Giving up");
-            log_reader.kill()?;
+            log_reader.kill().await?;
             break;
         }
 
@@ -1038,7 +1043,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(30);
             println!("Starting stop timer, due in {} seconds", duration.as_secs());
-            tokio::time::delay_for(duration).await;
+            tokio::time::sleep(duration).await;
             println!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
@@ -1063,11 +1068,11 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    const CONFIG: &str = r#"
-kubernetesLogsSource:
-  rawConfig: |
-    exclude_paths_glob_patterns = ["/var/log/pods/test-vector-test-pod_test-pod_*/excluded/**"]
-"#;
+    const CONFIG: &str = indoc! {r#"
+        kubernetesLogsSource:
+          rawConfig: |
+            exclude_paths_glob_patterns = ["/var/log/pods/test-vector-test-pod_test-pod_*/excluded/**"]
+    "#};
 
     let vector = framework
         .vector(
@@ -1123,7 +1128,7 @@ kubernetesLogsSource:
         let line = tokio::select! {
             result = stop_rx.next() => {
                 result.unwrap();
-                log_reader.kill()?;
+                log_reader.kill().await?;
                 continue;
             }
             line = log_reader.read_line() => line,
@@ -1137,7 +1142,7 @@ kubernetesLogsSource:
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
             println!("Giving up");
-            log_reader.kill()?;
+            log_reader.kill().await?;
             break;
         }
 
@@ -1187,7 +1192,7 @@ kubernetesLogsSource:
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(30);
             println!("Starting stop timer, due in {} seconds", duration.as_secs());
-            tokio::time::delay_for(duration).await;
+            tokio::time::sleep(duration).await;
             println!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
@@ -1434,7 +1439,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     // We give Vector some reasonable time to perform this initial bootstrap,
     // and capture the `processed_events` value afterwards.
     println!("Waiting for Vector bootstrap");
-    tokio::time::delay_for(std::time::Duration::from_secs(30)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
     println!("Done waiting for Vector bootstrap");
 
     // Capture events processed before deploying the test pod.
@@ -1494,7 +1499,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     // Due to how `internal_metrics` are implemented, we have to wait for it's
     // scraping period to pass before we can observe the updates.
     println!("Waiting for `internal_metrics` to update");
-    tokio::time::delay_for(std::time::Duration::from_secs(6)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(6)).await;
     println!("Done waiting for `internal_metrics` to update");
 
     // Capture events processed after the test pod has finished.
@@ -1557,7 +1562,7 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     // collecting them takes some time to boot (15s roughly).
     // We wait twice as much, so the bootstrap is guaranteed.
     println!("Waiting for Vector bootstrap");
-    tokio::time::delay_for(std::time::Duration::from_secs(30)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
     println!("Done waiting for Vector bootstrap");
 
     // Ensure the host metrics are exposed in the Prometheus endpoint.

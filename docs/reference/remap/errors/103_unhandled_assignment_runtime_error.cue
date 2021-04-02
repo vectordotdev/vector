@@ -1,33 +1,23 @@
 package metadata
 
 remap: errors: "103": {
-	title:       "Unhandled assignment runtime error"
+	title:       "Unhandled fallible assignment"
 	description: """
-		The right-hand side of an [assignment expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor))
-		is fallible and can produce a [runtime error](\(urls.vrl_runtime_errors)), but the error isn't being
+		The right-hand side of this [assignment](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor))
+		is fallible (that is, it can produce a [runtime error](\(urls.vrl_runtime_errors))), but the error isn't
 		[handled](\(urls.vrl_error_handling)).
 		"""
 	rationale:   remap._fail_safe_blurb
 	resolution:  """
-		[Handle](\(urls.vrl_error_handling)) the runtime error by [assigning](\(urls.vrl_error_handling_assigning)),
-		[coalescing](\(urls.vrl_error_handling_coalescing)), or [raising](\(urls.vrl_error_handling_raising)) the
-		error.
+		[Handle](\(urls.vrl_error_handling)) the runtime error by either
+		[assigning](\(urls.vrl_error_handling_assigning)) it, [coalescing](\(urls.vrl_error_handling_coalescing)) it, or
+		[raising](\(urls.vrl_error_handling_raising)) it.
 		"""
 
 	examples: [...{
 		input: log: message: "key=value"
 		source: #"""
-			. |= parse_key_value(.message)
-			"""#
-		raises: compiletime: #"""
-			error: \#(title)
-			  ┌─ :1:1
-			  │
-			1 │ . |= parse_key_value(.message)
-			  │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-			  │ │
-			  │ This assingment does not handle errors
-			  │
+			. = parse_key_value(.message)
 			"""#
 	}]
 
@@ -35,22 +25,22 @@ remap: errors: "103": {
 		{
 			"title": "\(title) (coalescing)"
 			diff: #"""
-				-. |= parse_key_value(.message)
-				+. |= parse_key_value(.message) ?? {}
+				-. = parse_key_value(.message)
+				+. = parse_key_value(.message) ?? {}
 				"""#
 		},
 		{
 			"title": "\(title) (raising)"
 			diff: #"""
-				-. |= parse_key_value(.message)
-				+. |= parse_key_value!(.message)
+				-. = parse_key_value(.message)
+				+. = parse_key_value!(.message)
 				"""#
 		},
 		{
 			"title": "\(title) (assigning)"
 			diff: #"""
-				-. |= parse_key_value(.message)
-				+., err |= parse_key_value(.message)
+				-. = parse_key_value(.message)
+				+., err = parse_key_value(.message)
 				"""#
 		},
 	]

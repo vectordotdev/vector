@@ -3,7 +3,7 @@ use crate::{
     config::{self, SinkConfig, SinkDescription},
     event::{Event, Metric},
     http::{Auth, HttpClient},
-    internal_events::PrometheusTemplateRenderingError,
+    internal_events::TemplateRenderingFailed,
     sinks::{
         self,
         util::{
@@ -109,8 +109,12 @@ impl SinkConfig for RemoteWriteConfig {
                         let tenant_id = tenant_id.as_ref().and_then(|template| {
                             template
                                 .render_string(&event)
-                                .map_err(|fields| {
-                                    emit!(PrometheusTemplateRenderingError { fields })
+                                .map_err(|error| {
+                                    emit!(TemplateRenderingFailed {
+                                        error,
+                                        field: Some("tenant_id"),
+                                        drop_event: false,
+                                    })
                                 })
                                 .ok()
                         });
@@ -244,6 +248,7 @@ mod tests {
     };
     use futures::StreamExt;
     use http::HeaderMap;
+    use indoc::indoc;
     use prometheus_parser::proto;
 
     #[test]
@@ -283,13 +288,13 @@ mod tests {
     #[tokio::test]
     async fn sends_authenticated_request() {
         let outputs = send_request(
-            r#"
-            tenant_id = "tenant-%Y"
-            [auth]
-            strategy = "basic"
-            user = "user"
-            password = "password"
-            "#,
+            indoc! {r#"
+                tenant_id = "tenant-%Y"
+                [auth]
+                strategy = "basic"
+                user = "user"
+                password = "password"
+            "#},
             vec![create_event("gauge-2".into(), 32.0)],
         )
         .await;

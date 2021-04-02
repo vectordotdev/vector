@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformDescription},
+    config::{log_schema, DataType, GlobalOptions, TransformConfig, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
     internal_events::{GrokParserConversionFailed, GrokParserFailedMatch, GrokParserMissingField},
     transforms::{FunctionTransform, Transform},
@@ -8,6 +8,7 @@ use crate::{
 use bytes::Bytes;
 use grok::Pattern;
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::str;
@@ -27,6 +28,7 @@ pub struct GrokParserConfig {
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
     pub types: HashMap<String, String>,
+    pub timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -38,7 +40,7 @@ impl_generate_config_from_default!(GrokParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
@@ -46,7 +48,8 @@ impl TransformConfig for GrokParserConfig {
 
         let mut grok = grok::Grok::with_patterns();
 
-        let types = parse_conversion_map(&self.types)?;
+        let timezone = self.timezone.unwrap_or(globals.timezone);
+        let types = parse_conversion_map(&self.types, timezone)?;
 
         Ok(grok
             .compile(&self.pattern, true)
@@ -146,10 +149,11 @@ impl FunctionTransform for GrokParser {
 #[cfg(test)]
 mod tests {
     use super::GrokParserConfig;
-    use crate::event::LogEvent;
     use crate::{
-        config::{log_schema, TransformConfig},
-        event, Event,
+        config::{log_schema, GlobalOptions, TransformConfig},
+        event,
+        event::LogEvent,
+        Event,
     };
     use pretty_assertions::assert_eq;
     use serde_json::json;
@@ -172,8 +176,9 @@ mod tests {
             field: field.map(|s| s.into()),
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
+            timezone: Default::default(),
         }
-        .build()
+        .build(&GlobalOptions::default())
         .await
         .unwrap();
         let parser = parser.as_function();

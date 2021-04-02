@@ -12,10 +12,9 @@ impl Function for ParseTokens {
     fn examples(&self) -> &'static [Example] {
         &[Example {
             title: "valid",
-            // TODO: Remove `encode_json` hack.
-            source: r#"encode_json(parse_tokens(s'A sentence "with \"a\" sentence inside" and [some brackets]'))"#,
+            source: r#"parse_tokens(s'A sentence "with \"a\" sentence inside" and [some brackets]')"#,
             result: Ok(
-                r##"s'["A","sentence","with \\\"a\\\" sentence inside","and","some brackets"]'"##,
+                r#"["A", "sentence", "with \\\"a\\\" sentence inside", "and", "some brackets"]"#,
             ),
         }]
     }
@@ -40,19 +39,10 @@ struct ParseTokensFn {
     value: Box<dyn Expression>,
 }
 
-impl ParseTokensFn {
-    /*
-    #[cfg(test)]
-    fn new(value: Box<dyn Expression>) -> Self {
-        Self { value }
-    }
-    */
-}
-
 impl Expression for ParseTokensFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.unwrap_bytes_utf8_lossy();
+        let string = value.try_bytes_utf8_lossy()?;
 
         let tokens: Value = tokenize::parse(&string)
             .into_iter()
@@ -75,31 +65,14 @@ impl Expression for ParseTokensFn {
 
 #[cfg(test)]
 mod tests {
-    /*
     use super::*;
-    use crate::map;
 
-    vrl::test_type_def![
-        value_string {
-            expr: |_| ParseTokensFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { kind: Kind::Array, ..Default::default() },
-        }
+    test_function![
+        parse_tokens => ParseTokens;
 
-        value_non_string {
-            expr: |_| ParseTokensFn { value: Literal::from(10).boxed() },
-            def: TypeDef {
-                fallible: true,
-                kind: Kind::Array,
-                ..Default::default()
-            },
-        }
-    ];
-
-    #[test]
-    fn parse_tokens() {
-        let cases = vec![(
-                    btreemap!{},
-                    Ok(vec![
+        parses {
+            args: func_args![value: "217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"],
+            want: Ok(vec![
                             "217.250.207.207".into(),
                             Value::Null,
                             Value::Null,
@@ -108,20 +81,10 @@ mod tests {
                             "205".into(),
                             "11881".into(),
 
-                    ].into()),
-                    ParseTokensFn::new(Box::new(Literal::from("217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"))),
-                )];
-
-        let mut state = state::Program::default();
-
-        for (object, exp, func) in cases {
-            let mut object: Value = object.into();
-            let got = func
-                .resolve(&mut ctx)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
+                    ]),
+            tdef: TypeDef::new().array_mapped::<(), Kind>(map! {
+                (): Kind::Bytes
+            }),
         }
-    }
-    */
+    ];
 }

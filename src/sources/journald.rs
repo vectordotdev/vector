@@ -17,11 +17,11 @@ use nix::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
+use std::path::{Path, PathBuf};
 use std::{
     collections::{HashMap, HashSet},
     io::SeekFrom,
     iter::FromIterator,
-    path::PathBuf,
     process::Stdio,
     str::FromStr,
     time::Duration,
@@ -30,9 +30,9 @@ use tokio_util::codec::FramedRead;
 
 use tokio::{
     fs::{File, OpenOptions},
-    io::{self, AsyncReadExt, AsyncWriteExt},
+    io::{self, AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
     process::Command,
-    time::delay_for,
+    time::sleep,
 };
 use tracing_futures::Instrument;
 
@@ -242,7 +242,7 @@ impl JournaldSource {
 
             // journalctl process should never stop,
             // so it is an error if we reach here.
-            delay_for(BACKOFF_DURATION).await;
+            sleep(BACKOFF_DURATION).await;
         }
     }
 
@@ -343,7 +343,7 @@ type StartJournalctlFn = Box<
 type StopJournalctlFn = Box<dyn FnOnce() + Send>;
 
 fn start_journalctl(
-    path: &PathBuf,
+    path: &Path,
     current_boot_only: bool,
     cursor: &Option<String>,
 ) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {
@@ -373,7 +373,7 @@ fn start_journalctl(
     )
     .boxed();
 
-    let pid = Pid::from_raw(child.id() as i32);
+    let pid = Pid::from_raw(child.id().unwrap() as _);
     let stop = Box::new(move || {
         let _ = kill(pid, Signal::SIGTERM);
     });
@@ -391,18 +391,16 @@ fn create_event(record: Record) -> Event {
         log.insert(log_schema().host_key(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
-    if let Some(timestamp) = log
+    if let Some(Value::Bytes(timestamp)) = log
         .get(&*SOURCE_TIMESTAMP)
         .or_else(|| log.get(RECEIVED_TIMESTAMP))
     {
-        if let Value::Bytes(timestamp) = timestamp {
-            if let Ok(timestamp) = String::from_utf8_lossy(&timestamp).parse::<u64>() {
-                let timestamp = chrono::Utc.timestamp(
-                    (timestamp / 1_000_000) as i64,
-                    (timestamp % 1_000_000) as u32 * 1_000,
-                );
-                log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
-            }
+        if let Ok(timestamp) = String::from_utf8_lossy(&timestamp).parse::<u64>() {
+            let timestamp = chrono::Utc.timestamp(
+                (timestamp / 1_000_000) as i64,
+                (timestamp % 1_000_000) as u32 * 1_000,
+            );
+            log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
         }
     }
     // Add source type
@@ -588,7 +586,7 @@ mod tests {
     use tempfile::tempdir;
     use tokio::{
         io,
-        time::{delay_for, timeout, Duration},
+        time::{sleep, timeout, Duration},
     };
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
@@ -629,7 +627,7 @@ mod tests {
     impl FakeJournal {
         fn new(
             checkpoint: &Option<String>,
-        ) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {
+        ) -> (BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn) {
             let cursor = Cursor::new(FAKE_JOURNAL);
             let reader = BufReader::new(cursor);
             let mut journal = FakeJournal { reader };
@@ -642,7 +640,7 @@ mod tests {
                 }
             }
 
-            Ok((Box::pin(journal), Box::new(|| ())))
+            (Box::pin(journal), Box::new(|| ()))
         }
     }
 
@@ -676,10 +674,13 @@ mod tests {
             remap_priority: true,
             out: tx,
         }
-        .run_shutdown(shutdown, Box::new(FakeJournal::new));
+        .run_shutdown(
+            shutdown,
+            Box::new(|checkpoint| Ok(FakeJournal::new(checkpoint))),
+        );
         tokio::spawn(source);
 
-        delay_for(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(100)).await;
         drop(trigger);
 
         timeout(Duration::from_secs(1), rx.collect()).await.unwrap()

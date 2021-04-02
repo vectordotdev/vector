@@ -38,7 +38,7 @@ remap: expressions: coalesce: {
 		{
 			title: "Error coalescing"
 			source: #"""
-				parse_syslog("not syslog") ?? parse_apache_log("not apache") ?? "malformed"
+				parse_syslog("not syslog") ?? parse_common_log("not common") ?? "malformed"
 				"""#
 			return: "malformed"
 		},

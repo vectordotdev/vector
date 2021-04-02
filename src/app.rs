@@ -4,12 +4,12 @@ use crate::topology::RunningTopology;
 use crate::{
     config, generate, heartbeat, list, metrics, signal, topology, trace, unit_test, validate,
 };
-use std::cmp::max;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 use futures::StreamExt;
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "sources-host_metrics")]
 use crate::sources::host_metrics;
@@ -93,12 +93,9 @@ impl Application {
             }
         }
 
-        let mut rt = {
-            let threads = root_opts.threads.unwrap_or_else(|| max(1, num_cpus::get()));
-            runtime::Builder::new()
-                .threaded_scheduler()
+        let rt = {
+            runtime::Builder::new_multi_thread()
                 .enable_all()
-                .core_threads(threads)
                 .build()
                 .expect("Unable to create async runtime")
         };
@@ -120,7 +117,7 @@ impl Application {
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
                         #[cfg(feature = "vrl-cli")]
-                        SubCommand::VRL(s) => vrl_cli::cmd::cmd(&s),
+                        SubCommand::Vrl(s) => vrl_cli::cmd::cmd(&s),
                     };
 
                     return Err(code);
@@ -147,12 +144,10 @@ impl Application {
                     path = ?config_paths
                 );
 
-                let mut config =
-                    config::load_from_paths(&config_paths, false).map_err(handle_config_errors)?;
+                config::init_log_schema(&config_paths, true).map_err(handle_config_errors)?;
 
-                config::LOG_SCHEMA
-                    .set(config.global.log_schema.clone())
-                    .expect("Couldn't set schema");
+                let mut config =
+                    config::load_from_paths(&config_paths).map_err(handle_config_errors)?;
 
                 if !config.healthchecks.enabled {
                     info!("Health checks are disabled.");
@@ -188,9 +183,9 @@ impl Application {
     }
 
     pub fn run(self) {
-        let mut rt = self.runtime;
+        let rt = self.runtime;
 
-        let mut graceful_crash = self.config.graceful_crash;
+        let mut graceful_crash = UnboundedReceiverStream::new(self.config.graceful_crash);
         let mut topology = self.config.topology;
 
         let mut config_paths = self.config.config_paths;
@@ -233,7 +228,7 @@ impl Application {
                         // Reload paths
                         config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
                         // Reload config
-                        let new_config = config::load_from_paths(&config_paths, false).map_err(handle_config_errors).ok();
+                        let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
 
                         if let Some(mut new_config) = new_config {
                             new_config.healthchecks.set_require_healthy(opts.require_healthy);

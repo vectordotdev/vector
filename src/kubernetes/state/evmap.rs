@@ -23,7 +23,7 @@ where
     T: Metadata<Ty = ObjectMeta> + Send,
 {
     /// Take a [`WriteHandle`], initialize it and return it wrapped with
-    /// [`Self`].
+    /// [`Writer`].
     pub fn new(
         mut inner: WriteHandle<String, Value<T>>,
         flush_debounce_timeout: Option<Duration>,
@@ -214,7 +214,7 @@ mod tests {
 
         assert_eq!(state_reader.is_empty(), true);
 
-        tokio::time::delay_for(flush_debounce_timeout * 2).await;
+        tokio::time::sleep(flush_debounce_timeout * 2).await;
         let mut state_writer = join.await.unwrap();
 
         assert_eq!(state_reader.is_empty(), false);

@@ -1,0 +1,25 @@
+# This Action triggers a build of Vector's rustdoc each time a PR is merged
+# to `master`.
+#
+# Netlify account for the Vector rustdoc site: https://app.netlify.com/sites/vector-rustdoc
+# Repo that builds the site: https://github.com/timberio/vector-rustdoc
+# Root URL for rustdoc site: https://vector-rustdoc.netlify.app
+# Pretty URL for the published docs: https://rustdoc.vector.dev
+name: Publish Vector Rustdoc
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  trigger-site-build:
+    name: Trigger a build of Vector's Rustdoc site (hosted by Netlify)
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Trigger via CURL request
+        # https://github.com/wei/curl
+        uses: wei/curl@012398a392d02480afa2720780031f8621d5f94c
+        with:
+          # Trigger a new build via webhook
+          args: -X POST -d {} ${{ secrets.NETLIFY_RUSTDOC_HOOK }}

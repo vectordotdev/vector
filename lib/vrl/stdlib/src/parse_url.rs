@@ -53,7 +53,7 @@ struct ParseUrlFn {
 impl Expression for ParseUrlFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let string = value.unwrap_bytes_utf8_lossy();
+        let string = value.try_bytes_utf8_lossy()?;
 
         Url::parse(&string)
             .map_err(|e| format!("unable to parse url: {}", e).into())

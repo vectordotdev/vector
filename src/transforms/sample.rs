@@ -1,6 +1,6 @@
 use crate::{
     conditions::{CheckFieldsConfig, Condition, ConditionConfig},
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
     internal_events::SampleEventDiscarded,
     transforms::{FunctionTransform, Transform},
@@ -37,7 +37,7 @@ impl GenerateConfig for SampleConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "sample")]
 impl TransformConfig for SampleConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         Ok(Transform::function(Sample::new(
             self.rate,
             self.key_field.clone(),
@@ -68,8 +68,8 @@ struct SampleCompatConfig(SampleConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "sampler")]
 impl TransformConfig for SampleCompatConfig {
-    async fn build(&self) -> crate::Result<Transform> {
-        self.0.build().await
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+        self.0.build(globals).await
     }
 
     fn input_type(&self) -> DataType {
