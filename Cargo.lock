@@ -3108,7 +3108,7 @@ dependencies = [
  "hyper 0.14.4",
  "native-tls",
  "tokio 1.3.0",
- "tokio-native-tls 0.3.0",
+ "tokio-native-tls",
 ]
 
 [[package]]
@@ -4082,18 +4082,6 @@ dependencies = [
  "log",
  "mio 0.6.23",
  "slab",
-]
-
-[[package]]
-name = "mio-named-pipes"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0840c1c50fd55e521b247f949c241c9997709f23bd7f023b9762cd561e935656"
-dependencies = [
- "log",
- "mio 0.6.23",
- "miow 0.3.6",
- "winapi 0.3.9",
 ]
 
 [[package]]
@@ -5218,12 +5206,12 @@ dependencies = [
 
 [[package]]
 name = "pulsar"
-version = "1.1.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e0358b82bdc3076324c58c4078577a4d2f0cf25f62fe88bdd6b959ec891a205"
+checksum = "d4fa9f6799cf9e1d4114415180cd49d9411c8cd049bda3a6b6b73a7c376565a7"
 dependencies = [
  "bit-vec 0.6.3",
- "bytes 0.5.6",
+ "bytes 1.0.1",
  "chrono",
  "crc",
  "futures 0.3.13",
@@ -5238,9 +5226,9 @@ dependencies = [
  "prost-derive",
  "rand 0.8.3",
  "regex",
- "tokio 0.2.25",
- "tokio-native-tls 0.1.0",
- "tokio-util 0.3.1",
+ "tokio 1.3.0",
+ "tokio-native-tls",
+ "tokio-util 0.6.3",
  "url",
 ]
 
@@ -5775,7 +5763,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded 0.7.0",
  "tokio 1.3.0",
- "tokio-native-tls 0.3.0",
+ "tokio-native-tls",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -7212,14 +7200,11 @@ dependencies = [
  "libc",
  "memchr",
  "mio 0.6.23",
- "mio-named-pipes",
  "mio-uds",
  "num_cpus",
  "pin-project-lite 0.1.11",
- "signal-hook-registry",
  "slab",
  "tokio-macros 0.2.6",
- "winapi 0.3.9",
 ]
 
 [[package]]
@@ -7283,16 +7268,6 @@ dependencies = [
  "proc-macro2 1.0.24",
  "quote 1.0.9",
  "syn 1.0.62",
-]
-
-[[package]]
-name = "tokio-native-tls"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd608593a919a8e05a7d1fc6df885e40f6a88d3a70a3a7eff23ff27964eda069"
-dependencies = [
- "native-tls",
- "tokio 0.2.25",
 ]
 
 [[package]]
@@ -7442,7 +7417,7 @@ dependencies = [
  "native-tls",
  "pin-project 1.0.6",
  "tokio 1.3.0",
- "tokio-native-tls 0.3.0",
+ "tokio-native-tls",
  "tungstenite",
 ]
 
