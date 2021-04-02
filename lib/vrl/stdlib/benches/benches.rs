@@ -19,6 +19,7 @@ criterion_group!(
               downcase,
               encode_base64,
               encode_json,
+              encode_logfmt,
               ends_with,
               // TODO: Cannot pass a Path to bench_function
               //exists
@@ -190,6 +191,30 @@ bench_function! {
     map {
         args: func_args![value: value![{"field": "value"}]],
         want: Ok(r#"{"field":"value"}"#),
+    }
+}
+
+bench_function! {
+    encode_logfmt => vrl_stdlib::EncodeLogfmt;
+
+    map {
+        args: func_args![value: value!(
+                  vec![
+                      value!(vec![value!("lvl"), value!("info")]),
+                      value!(vec![value!("msg"), value!("This is a log message")]),
+                  ]
+              )],
+        want: Ok(r#"lvl=info msg="This is a log message""#),
+    }
+
+    array {
+        args: func_args![value: value!(
+                  vec![
+                      value!(vec![value!("lvl"), value!("info")]),
+                      value!(vec![value!("log_id"), value!(12345)]),
+                  ]
+              )],
+        want: Ok("lvl=info log_id=12345"),
     }
 }
 
