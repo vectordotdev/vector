@@ -21,7 +21,7 @@ fn benchmark_regex(c: &mut Criterion) {
     let input: Vec<Event> = lines.into_iter().map(|l| l.into()).collect();
 
     group.bench_function("regex", |b| {
-        let mut rt = runtime();
+        let rt = runtime();
 
         let mut parser = rt.block_on(async move {
             transforms::regex_parser::RegexParserConfig {

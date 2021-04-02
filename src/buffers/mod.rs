@@ -15,7 +15,7 @@ use std::{
     task::{Context, Poll},
 };
 #[cfg(feature = "leveldb")]
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 
 #[cfg(feature = "leveldb")]
 pub mod disk;
@@ -249,22 +249,21 @@ impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
 #[cfg(test)]
 mod test {
     use super::{Acker, BufferConfig, DropWhenFull, WhenFull};
-    use crate::sink::BoundedSink;
+    use futures::channel::mpsc;
     use futures::{future, Sink, Stream};
     use futures01::task::AtomicTask;
     use std::{
         sync::{atomic::AtomicUsize, Arc},
         task::Poll,
     };
-    use tokio::sync::mpsc;
     use tokio01_test::task::MockTask;
 
     #[tokio::test]
     async fn drop_when_full() {
         future::lazy(|cx| {
-            let (tx, rx) = mpsc::channel(3);
+            let (tx, rx) = mpsc::channel(2);
 
-            let mut tx = Box::pin(DropWhenFull::new(BoundedSink::new(tx)));
+            let mut tx = Box::pin(DropWhenFull::new(tx));
 
             assert_eq!(tx.as_mut().poll_ready(cx), Poll::Ready(Ok(())));
             assert_eq!(tx.as_mut().start_send(1), Ok(()));

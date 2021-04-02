@@ -1,11 +1,10 @@
 use crate::Event;
-use futures::{future, Sink, Stream};
+use futures::{channel::mpsc, future, stream::Fuse, Sink, Stream, StreamExt};
 use std::{
     fmt,
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::sync::mpsc;
 
 type RouterSink = Box<dyn Sink<Event, Error = ()> + 'static + Send>;
 
@@ -32,17 +31,17 @@ pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
 pub struct Fanout {
     sinks: Vec<(String, Option<Pin<RouterSink>>)>,
     i: usize,
-    control_channel: mpsc::UnboundedReceiver<ControlMessage>,
+    control_channel: Fuse<mpsc::UnboundedReceiver<ControlMessage>>,
 }
 
 impl Fanout {
     pub fn new() -> (Self, ControlChannel) {
-        let (control_tx, control_rx) = mpsc::unbounded_channel();
+        let (control_tx, control_rx) = mpsc::unbounded();
 
         let fanout = Self {
             sinks: vec![],
             i: 0,
-            control_channel: control_rx,
+            control_channel: control_rx.fuse(),
         };
 
         (fanout, control_tx)
@@ -192,23 +191,22 @@ impl Sink<Event> for Fanout {
 #[cfg(test)]
 mod tests {
     use super::{ControlMessage, Fanout};
-    use crate::{sink::BoundedSink, test_util::collect_ready, Event};
-    use futures::{stream, Sink, SinkExt, StreamExt};
+    use crate::{test_util::collect_ready, Event};
+    use futures::{channel::mpsc, stream, FutureExt, Sink, SinkExt, StreamExt};
     use std::{
         pin::Pin,
         task::{Context, Poll},
     };
-    use tokio::sync::mpsc;
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn fanout_writes_to_all() {
-        let (tx_a, rx_a) = unbounded_channel();
+        let (tx_a, rx_a) = mpsc::unbounded();
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = unbounded_channel();
+        let (tx_b, rx_b) = mpsc::unbounded();
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
 
-        let mut fanout = Fanout::new().0;
+        let (mut fanout, _fanout_control) = Fanout::new();
 
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
@@ -223,14 +221,14 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_notready() {
-        let (tx_a, rx_a) = channel(2);
+        let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = channel(1);
+        let (tx_b, rx_b) = mpsc::channel(0);
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
-        let (tx_c, rx_c) = channel(2);
+        let (tx_c, rx_c) = mpsc::channel(1);
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
 
-        let mut fanout = Fanout::new().0;
+        let (mut fanout, _fanout_control) = Fanout::new();
 
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
@@ -240,7 +238,7 @@ mod tests {
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
         tokio::spawn(send);
 
-        delay_for(Duration::from_millis(50)).await;
+        sleep(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec1 because of b right now.
 
         let collect_a = tokio::spawn(rx_a.collect::<Vec<_>>());
@@ -254,12 +252,12 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_grow() {
-        let (tx_a, rx_a) = unbounded_channel();
+        let (tx_a, rx_a) = mpsc::unbounded();
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = unbounded_channel();
+        let (tx_b, rx_b) = mpsc::unbounded();
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
 
-        let mut fanout = Fanout::new().0;
+        let (mut fanout, _fanout_control) = Fanout::new();
 
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
@@ -269,7 +267,7 @@ mod tests {
         fanout.send(recs[0].clone()).await.unwrap();
         fanout.send(recs[1].clone()).await.unwrap();
 
-        let (tx_c, rx_c) = unbounded_channel();
+        let (tx_c, rx_c) = mpsc::unbounded();
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
         fanout.add("c".to_string(), tx_c);
 
@@ -282,12 +280,12 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_shrink() {
-        let (tx_a, rx_a) = unbounded_channel();
+        let (tx_a, rx_a) = mpsc::unbounded();
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = unbounded_channel();
+        let (tx_b, rx_b) = mpsc::unbounded();
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
 
-        let (mut fanout, fanout_control) = Fanout::new();
+        let (mut fanout, mut fanout_control) = Fanout::new();
 
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
@@ -299,6 +297,7 @@ mod tests {
 
         fanout_control
             .send(ControlMessage::Remove("b".to_string()))
+            .await
             .unwrap();
 
         fanout.send(recs[2].clone()).await.unwrap();
@@ -309,14 +308,14 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_shrink_after_notready() {
-        let (tx_a, rx_a) = channel(2);
+        let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = channel(1);
+        let (tx_b, rx_b) = mpsc::channel(0);
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
-        let (tx_c, rx_c) = channel(2);
+        let (tx_c, rx_c) = mpsc::channel(1);
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
 
-        let (mut fanout, fanout_control) = Fanout::new();
+        let (mut fanout, mut fanout_control) = Fanout::new();
 
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
@@ -326,10 +325,11 @@ mod tests {
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
         tokio::spawn(send);
 
-        delay_for(Duration::from_millis(50)).await;
+        sleep(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec1 because of b right now.
         fanout_control
             .send(ControlMessage::Remove("c".to_string()))
+            .await
             .unwrap();
 
         let collect_a = tokio::spawn(rx_a.collect::<Vec<_>>());
@@ -343,14 +343,14 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_shrink_at_notready() {
-        let (tx_a, rx_a) = channel(2);
+        let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = channel(1);
+        let (tx_b, rx_b) = mpsc::channel(0);
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
-        let (tx_c, rx_c) = channel(2);
+        let (tx_c, rx_c) = mpsc::channel(1);
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
 
-        let (mut fanout, fanout_control) = Fanout::new();
+        let (mut fanout, mut fanout_control) = Fanout::new();
 
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
@@ -360,10 +360,11 @@ mod tests {
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
         tokio::spawn(send);
 
-        delay_for(Duration::from_millis(50)).await;
+        sleep(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec1 because of b right now.
         fanout_control
             .send(ControlMessage::Remove("b".to_string()))
+            .await
             .unwrap();
 
         let collect_a = tokio::spawn(rx_a.collect::<Vec<_>>());
@@ -377,14 +378,14 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_shrink_before_notready() {
-        let (tx_a, rx_a) = channel(2);
+        let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = channel(1);
+        let (tx_b, rx_b) = mpsc::channel(0);
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
-        let (tx_c, rx_c) = channel(2);
+        let (tx_c, rx_c) = mpsc::channel(1);
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
 
-        let (mut fanout, fanout_control) = Fanout::new();
+        let (mut fanout, mut fanout_control) = Fanout::new();
 
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
@@ -394,11 +395,12 @@ mod tests {
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
         tokio::spawn(send);
 
-        delay_for(Duration::from_millis(50)).await;
+        sleep(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec1 because of b right now.
 
         fanout_control
             .send(ControlMessage::Remove("a".to_string()))
+            .await
             .unwrap();
 
         let collect_a = tokio::spawn(rx_a.collect::<Vec<_>>());
@@ -412,7 +414,7 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_no_sinks() {
-        let mut fanout = Fanout::new().0;
+        let (mut fanout, _fanout_control) = Fanout::new();
 
         let recs = make_events(2);
 
@@ -422,12 +424,12 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_replace() {
-        let (tx_a1, rx_a1) = unbounded_channel();
+        let (tx_a1, rx_a1) = mpsc::unbounded();
         let tx_a1 = Box::new(tx_a1.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = unbounded_channel();
+        let (tx_b, rx_b) = mpsc::unbounded();
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
 
-        let mut fanout = Fanout::new().0;
+        let (mut fanout, _fanout_control) = Fanout::new();
 
         fanout.add("a".to_string(), tx_a1);
         fanout.add("b".to_string(), tx_b);
@@ -437,7 +439,7 @@ mod tests {
         fanout.send(recs[0].clone()).await.unwrap();
         fanout.send(recs[1].clone()).await.unwrap();
 
-        let (tx_a2, rx_a2) = unbounded_channel();
+        let (tx_a2, rx_a2) = mpsc::unbounded();
         let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
         fanout.replace("a".to_string(), Some(tx_a2));
 
@@ -450,12 +452,12 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_wait() {
-        let (tx_a1, rx_a1) = unbounded_channel();
+        let (tx_a1, rx_a1) = mpsc::unbounded();
         let tx_a1 = Box::new(tx_a1.sink_map_err(|_| unreachable!()));
-        let (tx_b, rx_b) = unbounded_channel();
+        let (tx_b, rx_b) = mpsc::unbounded();
         let tx_b = Box::new(tx_b.sink_map_err(|_| unreachable!()));
 
-        let (mut fanout, cc) = Fanout::new();
+        let (mut fanout, mut fanout_control) = Fanout::new();
 
         fanout.add("a".to_string(), tx_a1);
         fanout.add("b".to_string(), tx_b);
@@ -465,17 +467,20 @@ mod tests {
         fanout.send(recs[0].clone()).await.unwrap();
         fanout.send(recs[1].clone()).await.unwrap();
 
-        let (tx_a2, rx_a2) = unbounded_channel();
+        let (tx_a2, rx_a2) = mpsc::unbounded();
         let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
         fanout.replace("a".to_string(), None);
 
-        tokio::spawn(async move {
-            delay_for(Duration::from_millis(100)).await;
-            cc.send(ControlMessage::Replace("a".to_string(), Some(tx_a2)))
-                .unwrap();
-        });
-
-        fanout.send(recs[2].clone()).await.unwrap();
+        futures::join!(
+            async {
+                sleep(Duration::from_millis(100)).await;
+                fanout_control
+                    .send(ControlMessage::Replace("a".to_string(), Some(tx_a2)))
+                    .await
+                    .unwrap();
+            },
+            fanout.send(recs[2].clone()).map(|_| ())
+        );
 
         assert_eq!(collect_ready(rx_a1).await, &recs[..2]);
         assert_eq!(collect_ready(rx_b).await, recs);
@@ -523,7 +528,7 @@ mod tests {
     }
 
     async fn fanout_error(modes: &[Option<ErrorWhen>]) {
-        let mut fanout = Fanout::new().0;
+        let (mut fanout, _fanout_control) = Fanout::new();
         let mut rx_channels = vec![];
 
         for (i, mode) in modes.iter().enumerate() {
@@ -535,7 +540,7 @@ mod tests {
                     fanout.add(name, tx);
                 }
                 None => {
-                    let (tx, rx) = channel(1);
+                    let (tx, rx) = mpsc::channel(0);
                     let tx = Box::new(tx.sink_map_err(|_| unreachable!()));
                     fanout.add(name, tx);
                     rx_channels.push(rx);
@@ -547,13 +552,14 @@ mod tests {
         let send = stream::iter(recs.clone()).map(Ok).forward(fanout);
         tokio::spawn(send);
 
-        delay_for(Duration::from_millis(50)).await;
+        sleep(Duration::from_millis(50)).await;
 
         // Start collecting from all at once
         let collectors = rx_channels
             .into_iter()
             .map(|rx| tokio::spawn(rx.collect::<Vec<_>>()))
             .collect::<Vec<_>>();
+
         for collect in collectors {
             assert_eq!(collect.await.unwrap(), recs);
         }
@@ -605,35 +611,5 @@ mod tests {
         (0..count)
             .map(|i| Event::from(format!("line {}", i)))
             .collect()
-    }
-
-    fn unbounded_channel<T>() -> (UnboundedSink<T>, mpsc::UnboundedReceiver<T>) {
-        let (sender, recv) = mpsc::unbounded_channel();
-        (UnboundedSink { sender }, recv)
-    }
-
-    fn channel<T>(capacity: usize) -> (BoundedSink<T>, mpsc::Receiver<T>) {
-        let (sender, recv) = mpsc::channel(capacity);
-        (BoundedSink::new(sender), recv)
-    }
-
-    struct UnboundedSink<T> {
-        sender: mpsc::UnboundedSender<T>,
-    }
-
-    impl<T> Sink<T> for UnboundedSink<T> {
-        type Error = mpsc::error::SendError<T>;
-        fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
-        fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-            self.sender.send(item)
-        }
-        fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
-        fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
     }
 }

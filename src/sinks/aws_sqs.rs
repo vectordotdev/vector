@@ -320,7 +320,7 @@ mod integration_tests {
     use rusoto_core::Region;
     use rusoto_sqs::{CreateQueueRequest, GetQueueUrlRequest, ReceiveMessageRequest};
     use std::collections::HashMap;
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn sqs_send_message_batch() {
@@ -354,7 +354,7 @@ mod integration_tests {
         let (mut input_lines, events) = random_lines_with_stream(100, 10);
         sink.send_all(&mut events.map(Ok)).await.unwrap();
 
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let response = client
             .receive_message(ReceiveMessageRequest {

@@ -8,7 +8,8 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::time::{delay_for, Duration};
+use tokio::time::{sleep, Duration};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use vector::{
     config::{self, GlobalOptions, SinkConfig, SinkContext, SourceConfig},
     shutdown::ShutdownSignal,
@@ -84,22 +85,22 @@ async fn test_sink_panic() {
     let mut output_lines = CountReceiver::receive_lines(out_addr);
 
     std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-    let (topology, mut crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, crash) = start_topology(config.build().unwrap(), false).await;
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
-    delay_for(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
 
     // Wait for output to connect
     output_lines.connected().await;
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     send_lines(in_addr, input_lines.clone()).await.unwrap();
-    delay_for(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
 
     let _ = std::panic::take_hook();
-    assert!(crash.next().await.is_some());
+    assert!(UnboundedReceiverStream::new(crash).next().await.is_some());
     topology.stop().await;
-    delay_for(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
 
     let output_lines = output_lines.await;
     assert_eq!(num_lines, output_lines.len());
@@ -169,21 +170,21 @@ async fn test_sink_error() {
 
     let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-    let (topology, mut crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, crash) = start_topology(config.build().unwrap(), false).await;
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
-    delay_for(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
 
     // Wait for output to connect
     output_lines.connected().await;
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     send_lines(in_addr, input_lines.clone()).await.unwrap();
-    delay_for(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
 
-    assert!(crash.next().await.is_some());
+    assert!(UnboundedReceiverStream::new(crash).next().await.is_some());
     topology.stop().await;
-    delay_for(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
 
     let output_lines = output_lines.await;
     assert_eq!(num_lines, output_lines.len());
@@ -236,21 +237,21 @@ async fn test_source_error() {
 
     let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-    let (topology, mut crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, crash) = start_topology(config.build().unwrap(), false).await;
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
-    delay_for(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
 
     // Wait for output to connect
     output_lines.connected().await;
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     send_lines(in_addr, input_lines.clone()).await.unwrap();
-    delay_for(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
 
-    assert!(crash.next().await.is_some());
+    assert!(UnboundedReceiverStream::new(crash).next().await.is_some());
     topology.stop().await;
-    delay_for(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
 
     let output_lines = output_lines.await;
     assert_eq!(num_lines, output_lines.len());
@@ -304,22 +305,22 @@ async fn test_source_panic() {
     let mut output_lines = CountReceiver::receive_lines(out_addr);
 
     std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-    let (topology, mut crash) = start_topology(config.build().unwrap(), false).await;
+    let (topology, crash) = start_topology(config.build().unwrap(), false).await;
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
-    delay_for(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
 
     // Wait for output to connect
     output_lines.connected().await;
 
     let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
     send_lines(in_addr, input_lines.clone()).await.unwrap();
-    delay_for(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
     let _ = std::panic::take_hook();
 
-    assert!(crash.next().await.is_some());
+    assert!(UnboundedReceiverStream::new(crash).next().await.is_some());
     topology.stop().await;
-    delay_for(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
 
     let output_lines = output_lines.await;
     assert_eq!(num_lines, output_lines.len());

@@ -25,7 +25,7 @@ criterion_group!(
 criterion_main!(benches);
 
 fn benchmark_remap(c: &mut Criterion) {
-    let mut rt = runtime();
+    let rt = runtime();
     let add_fields_runner = |tform: &mut Box<dyn FunctionTransform>, event: Event| {
         let mut result = Vec::with_capacity(1);
         tform.transform(&mut result, event);
@@ -47,6 +47,7 @@ fn benchmark_remap(c: &mut Criterion) {
                 "#}
                 .to_string(),
                 drop_on_error: true,
+                drop_on_abort: true,
             })
             .unwrap(),
         );
@@ -106,7 +107,8 @@ fn benchmark_remap(c: &mut Criterion) {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
                 source: ".bar = parse_json!(string!(.foo))".to_owned(),
-                drop_on_error: false,
+                drop_on_error: true,
+                drop_on_abort: true,
             })
             .unwrap(),
         );
@@ -176,6 +178,7 @@ fn benchmark_remap(c: &mut Criterion) {
                 "#}
                 .to_owned(),
                 drop_on_error: true,
+                drop_on_abort: true,
             })
             .unwrap(),
         );

@@ -6,10 +6,8 @@ use std::{
     pin::Pin,
     sync::{Arc, Mutex, Weak},
 };
-use tokio::{
-    stream::{Stream, StreamExt},
-    sync::{broadcast, mpsc, oneshot},
-};
+use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use url::Url;
 use uuid::Uuid;
@@ -98,7 +96,7 @@ impl Subscription {
 
     /// Send a payload down the channel. This is synchronous because broadcast::Sender::send
     /// is also synchronous
-    fn receive(&self, payload: Payload) -> Result<usize, broadcast::SendError<Payload>> {
+    fn receive(&self, payload: Payload) -> Result<usize, broadcast::error::SendError<Payload>> {
         self.tx.send(payload)
     }
 
@@ -125,13 +123,15 @@ impl Drop for Subscription {
     }
 }
 
-impl<T: GraphQLQuery + Send + Sync> Receiver<T> for Subscription {
+impl<T> Receiver<T> for Subscription
+where
+    T: GraphQLQuery + Send + Sync,
+    <T as GraphQLQuery>::ResponseData: Unpin + Send + Sync + 'static,
+{
     /// Returns a stream of `Payload` responses, received from the GraphQL server
     fn stream(&self) -> StreamResponse<T> {
         Box::pin(
-            self.tx
-                .subscribe()
-                .into_stream()
+            BroadcastStream::new(self.tx.subscribe())
                 .filter(Result::is_ok)
                 .map(|p| p.unwrap().response::<T>()),
         )
@@ -166,7 +166,7 @@ impl SubscriptionClient {
                     _ = &mut shutdown_rx => break,
 
                     // Handle receiving payloads back _from_ the server
-                    Some(p) = rx.next() => {
+                    Some(p) = rx.recv() => {
                         let s = subscriptions_clone.lock().unwrap().get::<Uuid>(&p.id);
                         if let Some(s) = s
                             as Option<Arc<Subscription>>
@@ -186,10 +186,14 @@ impl SubscriptionClient {
     }
 
     /// Start a new subscription request
-    pub fn start<T: GraphQLQuery + Send + Sync>(
+    pub fn start<T>(
         &self,
         request_body: &graphql_client::QueryBody<T::Variables>,
-    ) -> BoxedSubscription<T> {
+    ) -> BoxedSubscription<T>
+    where
+        T: GraphQLQuery + Send + Sync,
+        <T as GraphQLQuery>::ResponseData: Unpin + Send + Sync + 'static,
+    {
         // Generate a unique ID for the subscription. Subscriptions can be multiplexed
         // over a single connection, so we'll keep a copy of this against the client to
         // handling routing responses back to the relevant subscriber.
@@ -229,7 +233,7 @@ pub async fn connect_subscription_client(
     // Forwarded received messages back upstream to the GraphQL server
     tokio::spawn(async move {
         loop {
-            if let Some(p) = send_rx.next().await {
+            if let Some(p) = send_rx.recv().await {
                 let _ = ws_tx
                     .send(Message::Text(serde_json::to_string(&p).unwrap()))
                     .await;

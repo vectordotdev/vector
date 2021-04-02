@@ -7,7 +7,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 use std::time::{Duration, Instant};
-use tokio::time::{delay_queue, DelayQueue, Error};
+use tokio::time::error::Error;
+use tokio_util::time::{delay_queue, DelayQueue};
 
 /// An expired item, holding the value and the key with an expiration
 /// information.
@@ -154,7 +155,7 @@ where
     /// # Examples
     ///
     /// ```rust
-    /// # let mut rt = tokio::runtime::Runtime::new().unwrap();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
     /// use vector::expiring_hash_map::ExpiringHashMap;
     /// use std::time::Duration;
@@ -173,7 +174,7 @@ where
     ///             }
     ///             Some(Err(error)) => panic!(format!("Timer error: {:?}", error)),
     ///         },
-    ///         _ = tokio::time::delay_for(Duration::from_millis(100)) => map.insert(
+    ///         _ = tokio::time::sleep(Duration::from_millis(100)) => map.insert(
     ///             "key".to_owned(),
     ///             "val".to_owned(),
     ///             Duration::from_millis(30),
@@ -275,7 +276,7 @@ mod tests {
 
         // Sleep twice the ttl, to guarantee we're over the deadline.
         assert_eq!(fut.is_woken(), false);
-        tokio::time::delay_for(ttl * 2).await;
+        tokio::time::sleep(ttl * 2).await;
         assert_eq!(fut.is_woken(), true);
 
         // Then, after deadline, has to be ready.
