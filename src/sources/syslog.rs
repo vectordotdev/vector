@@ -1,7 +1,6 @@
 use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_stream_source;
-#[cfg(unix)]
 use crate::udp;
 use crate::{
     config::{
@@ -54,7 +53,6 @@ pub enum Mode {
     },
     Udp {
         address: SocketAddr,
-        #[cfg(unix)]
         receive_buffer_bytes: Option<usize>,
     },
     #[cfg(unix)]
@@ -133,7 +131,6 @@ impl SourceConfig for SyslogConfig {
                     out,
                 )
             }
-            #[cfg(unix)]
             Mode::Udp {
                 address,
                 receive_buffer_bytes,
@@ -145,8 +142,6 @@ impl SourceConfig for SyslogConfig {
                 shutdown,
                 out,
             )),
-            #[cfg(not(unix))]
-            Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, shutdown, out)),
             #[cfg(unix)]
             Mode::Unix { path } => Ok(build_unix_stream_source(
                 path,
@@ -200,7 +195,7 @@ impl TcpSource for SyslogTcpSource {
 enum State {
     NotDiscarding,
     Discarding(usize),
-    DiscardingToEOL,
+    DiscardingToEol,
 }
 
 /// Decodes according to `Octet Counting` in https://tools.ietf.org/html/rfc6587
@@ -258,7 +253,7 @@ impl SyslogDecoder {
                 Ok(None)
             }
 
-            (State::DiscardingToEOL, Some(offset), _) => {
+            (State::DiscardingToEol, Some(offset), _) => {
                 // When discarding we keep discarding to the next newline.
                 src.advance(offset + 1);
                 self.octet_decoding = None;
@@ -268,7 +263,7 @@ impl SyslogDecoder {
                 )))
             }
 
-            (State::DiscardingToEOL, None, _) => {
+            (State::DiscardingToEol, None, _) => {
                 // There is no newline in this frame. Since we don't have a set number of
                 // chars we want to discard, we need to discard to the next newline.
                 // Advance as far as we can to discard the entire frame.
@@ -355,7 +350,7 @@ impl SyslogDecoder {
             (State::NotDiscarding, None, _) => {
                 // There is no newline in this frame and we have more data than we want to handle.
                 // Advance as far as we can to discard the entire frame.
-                self.octet_decoding = Some(State::DiscardingToEOL);
+                self.octet_decoding = Some(State::DiscardingToEol);
                 src.advance(src.len());
                 Ok(None)
             }
@@ -408,7 +403,7 @@ pub fn udp(
     addr: SocketAddr,
     _max_length: usize,
     host_key: String,
-    #[cfg(unix)] receive_buffer_bytes: Option<usize>,
+    receive_buffer_bytes: Option<usize>,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
@@ -419,9 +414,10 @@ pub fn udp(
             .await
             .expect("Failed to bind to UDP listener socket");
 
-        #[cfg(unix)]
         if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-            udp::set_receive_buffer_size(&socket, receive_buffer_bytes);
+            if let Err(error) = udp::set_receive_buffer_size(&socket, receive_buffer_bytes) {
+                warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
+            }
         }
 
         info!(
@@ -654,7 +650,6 @@ mod test {
         assert!(config.mode.is_udp());
     }
 
-    #[cfg(unix)]
     #[test]
     fn config_udp_with_receive_buffer_size() {
         let config: SyslogConfig = toml::from_str(
@@ -1028,7 +1023,7 @@ mod test {
         buffer.put(&b"32thisshouldbelongerthanthmaxframeasizewhichmeansthesyslogparserwillnotbeabletodecodeit"[..]);
         let _ = decoder.decode(&mut buffer);
 
-        assert_eq!(decoder.octet_decoding, Some(State::DiscardingToEOL));
+        assert_eq!(decoder.octet_decoding, Some(State::DiscardingToEol));
         buffer.put(&b"wemustcontinuetodiscard\n32 something valid"[..]);
         let result = decoder.decode(&mut buffer);
 

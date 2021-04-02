@@ -1,7 +1,8 @@
-use super::{tls_connector, Connect, Handshake, MaybeTlsSettings, MaybeTlsStream};
+use super::{tls_connector, Connect, Handshake, MaybeTlsSettings, MaybeTlsStream, SslBuildError};
 use snafu::ResultExt;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, pin::Pin};
 use tokio::net::TcpStream;
+use tokio_openssl::SslStream;
 
 impl MaybeTlsSettings {
     pub(crate) async fn connect(
@@ -15,9 +16,10 @@ impl MaybeTlsSettings {
             MaybeTlsSettings::Raw(()) => Ok(MaybeTlsStream::Raw(stream)),
             MaybeTlsSettings::Tls(_) => {
                 let config = tls_connector(self)?;
-                let stream = tokio_openssl::connect(config, host, stream)
-                    .await
-                    .context(Handshake)?;
+                let ssl = config.into_ssl(host).context(SslBuildError)?;
+
+                let mut stream = SslStream::new(ssl, stream).context(SslBuildError)?;
+                Pin::new(&mut stream).connect().await.context(Handshake)?;
 
                 debug!(message = "Negotiated TLS.");
 

@@ -33,8 +33,7 @@ where
     let mut out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
 
     Box::pin(async move {
-        let mut socket =
-            UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
+        let socket = UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
         info!(message = "Listening.", path = ?listen_path, r#type = "unix_datagram");
 
         let mut buf = BytesMut::with_capacity(max_length);

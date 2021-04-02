@@ -1,11 +1,10 @@
 use pin_project::pin_project;
 use std::{
     future::Future,
-    mem::MaybeUninit,
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::io::{AsyncRead, Result as IoResult};
+use tokio::io::{AsyncRead, ReadBuf, Result as IoResult};
 
 pub trait VecAsyncReadExt: AsyncRead {
     /// Read data from this reader until the given future resolves.
@@ -37,6 +36,10 @@ impl<S, F> AllowReadUntil<S, F> {
     pub fn get_ref(&self) -> &S {
         &self.reader
     }
+
+    pub fn get_mut(&mut self) -> &mut S {
+        &mut self.reader
+    }
 }
 
 impl<S, F> AsyncRead for AllowReadUntil<S, F>
@@ -44,15 +47,15 @@ where
     S: AsyncRead,
     F: Future<Output = ()>,
 {
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context, buf: &mut [u8]) -> Poll<IoResult<usize>> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<IoResult<()>> {
         let this = self.project();
         match this.until.poll(cx) {
-            Poll::Ready(_) => Poll::Ready(Ok(0)),
+            Poll::Ready(_) => Poll::Ready(Ok(())),
             Poll::Pending => this.reader.poll_read(cx, buf),
         }
-    }
-
-    unsafe fn prepare_uninitialized_buffer(&self, buf: &mut [MaybeUninit<u8>]) -> bool {
-        self.reader.prepare_uninitialized_buffer(buf)
     }
 }

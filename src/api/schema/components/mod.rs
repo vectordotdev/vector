@@ -18,7 +18,7 @@ use std::{
     cmp,
     collections::{HashMap, HashSet},
 };
-use tokio::stream::{Stream, StreamExt};
+use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
 
 #[derive(Debug, Clone, Interface)]
 #[graphql(
@@ -229,24 +229,18 @@ pub struct ComponentsSubscription;
 impl ComponentsSubscription {
     /// Subscribes to all newly added components
     async fn component_added(&self) -> impl Stream<Item = Component> {
-        COMPONENT_CHANGED
-            .subscribe()
-            .into_stream()
-            .filter_map(|c| match c {
-                Ok(ComponentChanged::Added(c)) => Some(c),
-                _ => None,
-            })
+        BroadcastStream::new(COMPONENT_CHANGED.subscribe()).filter_map(|c| match c {
+            Ok(ComponentChanged::Added(c)) => Some(c),
+            _ => None,
+        })
     }
 
     /// Subscribes to all removed components
     async fn component_removed(&self) -> impl Stream<Item = Component> {
-        COMPONENT_CHANGED
-            .subscribe()
-            .into_stream()
-            .filter_map(|c| match c {
-                Ok(ComponentChanged::Removed(c)) => Some(c),
-                _ => None,
-            })
+        BroadcastStream::new(COMPONENT_CHANGED.subscribe()).filter_map(|c| match c {
+            Ok(ComponentChanged::Removed(c)) => Some(c),
+            _ => None,
+        })
     }
 }
 

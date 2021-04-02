@@ -418,9 +418,12 @@ FunctionArgument: FunctionArgument = {
 // -----------------------------------------------------------------------------
 
 IfStatement: IfStatement =
-    "if" <predicate: Sp<Predicate>> <consequent: Sp<Block>>
+    "if"
+    <predicate: Sp<Predicate>>
+    NonterminalNewline*
+    <consequent: Sp<Block>>
     <alternatives: (Sp<ElseIf>)*>
-    <alternative: ("else" <Sp<Block>>)?> => {
+    <alternative: ("else" NonterminalNewline* <Sp<Block>>)?> => {
         let mut alternative = alternative;
 
         for Node { span, mut node } in alternatives {
@@ -433,7 +436,11 @@ IfStatement: IfStatement =
         IfStatement { predicate, consequent, alternative }
 };
 
-ElseIf: IfStatement = "else" "if" <predicate: Sp<Predicate>> <consequent: Sp<Block>> => {
+ElseIf: IfStatement =
+    "else" NonterminalNewline* "if"
+    <predicate: Sp<Predicate>>
+    NonterminalNewline*
+    <consequent: Sp<Block>> => {
     IfStatement { predicate, consequent, alternative: None }
 };
 

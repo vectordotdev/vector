@@ -346,6 +346,7 @@ mod tests {
     use indoc::indoc;
     use pretty_assertions::assert_eq;
     use tokio::{sync::mpsc, time};
+    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -407,13 +408,13 @@ mod tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(rx)));
+        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
 
         for event in events {
             tx.send(event).expect("Failed to send event.");
         }
 
-        time::delay_for(time::Duration::from_millis(100)).await;
+        time::sleep(time::Duration::from_millis(100)).await;
 
         let request = Request::get(format!("{}://{}/metrics", proto, address))
             .body(Body::empty())
@@ -542,6 +543,7 @@ mod integration_tests {
     use chrono::Utc;
     use serde_json::Value;
     use tokio::{sync::mpsc, time};
+    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     const PROMETHEUS_ADDRESS: &str = "127.0.0.1:9101";
 
@@ -550,7 +552,7 @@ mod integration_tests {
         trace_init();
 
         prometheus_scrapes_metrics().await;
-        time::delay_for(time::Duration::from_millis(500)).await;
+        time::sleep(time::Duration::from_millis(500)).await;
         reset_on_flush_period().await;
     }
 
@@ -563,13 +565,13 @@ mod integration_tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(rx)));
+        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
 
         let (name, event) = tests::create_metric_gauge(None, 123.4);
         tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
-        time::delay_for(time::Duration::from_secs(2)).await;
+        time::sleep(time::Duration::from_secs(2)).await;
 
         // Now try to download them from prometheus
         let result = prometheus_query(&name).await;
@@ -596,7 +598,7 @@ mod integration_tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(rx)));
+        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
 
         let (name1, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         tx.send(event).expect("Failed to send.");
@@ -604,7 +606,7 @@ mod integration_tests {
         tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
-        time::delay_for(time::Duration::from_secs(2)).await;
+        time::sleep(time::Duration::from_secs(2)).await;
 
         // Now try to download them from prometheus
         let result = prometheus_query(&name1).await;
@@ -619,7 +621,7 @@ mod integration_tests {
         );
 
         // Wait a bit for expired metrics
-        time::delay_for(time::Duration::from_secs(3)).await;
+        time::sleep(time::Duration::from_secs(3)).await;
 
         let (name1, event) = tests::create_metric_set(Some(name1), vec!["6", "7"]);
         tx.send(event).expect("Failed to send.");
@@ -627,7 +629,7 @@ mod integration_tests {
         tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
-        time::delay_for(time::Duration::from_secs(2)).await;
+        time::sleep(time::Duration::from_secs(2)).await;
 
         // Now try to download them from prometheus
         let result = prometheus_query(&name1).await;
