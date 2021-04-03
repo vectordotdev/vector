@@ -2,6 +2,7 @@ use super::{Error, Value};
 use crate::ExpressionError;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
+use structures::str::immutable::ImStr;
 
 impl Value {
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).
@@ -198,7 +199,7 @@ impl Value {
                 .iter()
                 .chain(rhv.iter())
                 .map(|(k, v)| (k.clone(), v.clone()))
-                .collect::<BTreeMap<String, Value>>()
+                .collect::<BTreeMap<ImStr, Value>>()
                 .into(),
             _ => return Err(err()),
         };

@@ -1,6 +1,7 @@
 use crate::config::component::ComponentDescription;
 use crate::Event;
 use serde::{Deserialize, Serialize};
+use structures::str::immutable::ImStr;
 
 pub mod check_fields;
 pub mod is_log;
@@ -16,7 +17,7 @@ pub trait Condition: Send + Sync + dyn_clone::DynClone {
 
     /// Provides context for a failure. This is potentially mildly expensive if
     /// it involves string building and so should be avoided in hot paths.
-    fn check_with_context(&self, e: &Event) -> Result<(), String> {
+    fn check_with_context(&self, e: &Event) -> Result<(), ImStr> {
         if self.check(e) {
             Ok(())
         } else {

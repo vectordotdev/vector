@@ -1,5 +1,6 @@
 use shared::btreemap;
 use std::collections::BTreeMap;
+use structures::str::immutable::ImStr;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -96,7 +97,7 @@ fn tag_type_externally(value: Value) -> Value {
             object
                 .into_iter()
                 .map(|(key, value)| (key, tag_type_externally(value)))
-                .collect::<BTreeMap<String, Value>>()
+                .collect::<BTreeMap<ImStr, Value>>()
                 .into(),
         ),
         Value::Array(array) => (
@@ -113,10 +114,8 @@ fn tag_type_externally(value: Value) -> Value {
     };
 
     if let Some(key) = key {
-        (btreemap! {
-            key => value
-        })
-        .into()
+        let map: BTreeMap<ImStr, Value> = btreemap! {key => value};
+        map.into()
     } else {
         value
     }

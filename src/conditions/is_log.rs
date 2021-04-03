@@ -1,9 +1,9 @@
-use serde::{Deserialize, Serialize};
-
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
     Event,
 };
+use serde::{Deserialize, Serialize};
+use structures::str::immutable::ImStr;
 
 //------------------------------------------------------------------------------
 
@@ -33,11 +33,11 @@ impl Condition for IsLog {
         matches!(e, Event::Log(_))
     }
 
-    fn check_with_context(&self, e: &Event) -> Result<(), String> {
+    fn check_with_context(&self, e: &Event) -> Result<(), ImStr> {
         if self.check(e) {
             Ok(())
         } else {
-            Err("event is not a log type".to_string())
+            Err("event is not a log type".into())
         }
     }
 }

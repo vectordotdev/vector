@@ -1,5 +1,6 @@
 use crate::util;
 use std::collections::BTreeMap;
+use structures::str::immutable::ImStr;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -202,7 +203,7 @@ fn recurse_compact(value: Value, options: &CompactOptions) -> Value {
     }
 }
 
-fn compact_map(map: BTreeMap<String, Value>, options: &CompactOptions) -> BTreeMap<String, Value> {
+fn compact_map(map: BTreeMap<ImStr, Value>, options: &CompactOptions) -> BTreeMap<ImStr, Value> {
     map.into_iter()
         .filter_map(|(key, value)| {
             let value = recurse_compact(value, options);

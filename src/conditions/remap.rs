@@ -5,6 +5,7 @@ use crate::{
     Event,
 };
 use serde::{Deserialize, Serialize};
+use structures::str::immutable::ImStr;
 use vrl::diagnostic::Formatter;
 use vrl::{Program, Runtime, Value};
 
@@ -93,7 +94,7 @@ impl Condition for Remap {
             })
     }
 
-    fn check_with_context(&self, event: &Event) -> Result<(), String> {
+    fn check_with_context(&self, event: &Event) -> Result<(), ImStr> {
         let value = self
             .run(event)
             .map_err(|err| format!("source execution failed: {:#}", err))?;

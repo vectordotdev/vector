@@ -1,4 +1,5 @@
 use std::collections::btree_map;
+use structures::str::immutable::ImStr;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -75,13 +76,13 @@ impl Expression for FlattenFn {
 
 /// An iterator to walk over maps allowing us to flatten nested maps to a single level.
 struct MapFlatten<'a> {
-    values: btree_map::Iter<'a, String, Value>,
+    values: btree_map::Iter<'a, ImStr, Value>,
     inner: Option<Box<MapFlatten<'a>>>,
-    parent: Option<String>,
+    parent: Option<ImStr>,
 }
 
 impl<'a> MapFlatten<'a> {
-    fn new(values: btree_map::Iter<'a, String, Value>) -> Self {
+    fn new(values: btree_map::Iter<'a, ImStr, Value>) -> Self {
         Self {
             values,
             inner: None,
@@ -89,7 +90,7 @@ impl<'a> MapFlatten<'a> {
         }
     }
 
-    fn new_from_parent(parent: String, values: btree_map::Iter<'a, String, Value>) -> Self {
+    fn new_from_parent(parent: ImStr, values: btree_map::Iter<'a, ImStr, Value>) -> Self {
         Self {
             values,
             inner: None,
@@ -98,16 +99,16 @@ impl<'a> MapFlatten<'a> {
     }
 
     /// Returns the key with the parent prepended.
-    fn new_key(&self, key: &str) -> String {
+    fn new_key(&self, key: &str) -> ImStr {
         match self.parent {
-            None => key.to_string(),
-            Some(ref parent) => format!("{}.{}", parent, key),
+            None => key.to_owned().into_boxed_str(),
+            Some(ref parent) => format!("{}.{}", parent, key).into_boxed_str(),
         }
     }
 }
 
 impl<'a> std::iter::Iterator for MapFlatten<'a> {
-    type Item = (String, &'a Value);
+    type Item = (ImStr, &'a Value);
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(ref mut inner) = self.inner {

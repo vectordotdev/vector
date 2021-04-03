@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::iter::FromIterator;
+use structures::str::immutable::ImStr;
 use toml::value::Value as TomlValue;
 
 #[derive(PartialEq, Debug, Clone, Deserialize, is_enum_variant)]
@@ -197,7 +198,9 @@ impl TryInto<serde_json::Value> for Value {
             Value::Map(v) => Ok(serde_json::to_value(v)?),
             Value::Array(v) => Ok(serde_json::to_value(v)?),
             Value::Null => Ok(serde_json::Value::Null),
-            Value::Timestamp(v) => Ok(serde_json::Value::from(timestamp_to_string(&v))),
+            Value::Timestamp(v) => Ok(serde_json::Value::from(String::from(timestamp_to_string(
+                &v,
+            )))),
         }
     }
 }
@@ -211,10 +214,12 @@ impl From<vrl::Value> for Value {
             Integer(v) => Value::Integer(v),
             Float(v) => Value::Float(*v),
             Boolean(v) => Value::Boolean(v),
-            Object(v) => Value::Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
+            Object(v) => Value::Map(v.into_iter().map(|(k, v)| (k.into(), v.into())).collect()),
             Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),
             Timestamp(v) => Value::Timestamp(v),
-            Regex(v) => Value::Bytes(bytes::Bytes::copy_from_slice(v.to_string().as_bytes())),
+            Regex(v) => Value::Bytes(bytes::Bytes::copy_from_slice(
+                String::from(v.to_string()).as_bytes(),
+            )),
             Null => Value::Null,
         }
     }
@@ -229,7 +234,7 @@ impl From<Value> for vrl::Value {
             Value::Integer(v) => v.into(),
             Value::Float(v) => v.into(),
             Value::Boolean(v) => v.into(),
-            Value::Map(v) => Object(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
+            Value::Map(v) => Object(v.into_iter().map(|(k, v)| (k.into(), v.into())).collect()),
             Value::Array(v) => Array(v.into_iter().map(Into::into).collect()),
             Value::Timestamp(v) => v.into(),
             Value::Null => ().into(),
@@ -238,24 +243,29 @@ impl From<Value> for vrl::Value {
 }
 
 impl Value {
-    // TODO: return Cow
-    pub fn to_string_lossy(&self) -> String {
+    pub fn to_string_lossy(&self) -> ImStr {
         match self {
-            Value::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+            Value::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned().into(),
             Value::Timestamp(timestamp) => timestamp_to_string(timestamp),
-            Value::Integer(num) => format!("{}", num),
-            Value::Float(num) => format!("{}", num),
-            Value::Boolean(b) => format!("{}", b),
-            Value::Map(map) => serde_json::to_string(map).expect("Cannot serialize map"),
-            Value::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
-            Value::Null => "<null>".to_string(),
+            Value::Integer(num) => format!("{}", num).into(),
+            Value::Float(num) => format!("{}", num).into(),
+            Value::Boolean(b) => format!("{}", b).into(),
+            Value::Map(map) => serde_json::to_string(map)
+                .expect("Cannot serialize map")
+                .into(),
+            Value::Array(arr) => serde_json::to_string(arr)
+                .expect("Cannot serialize array")
+                .into(),
+            Value::Null => "<null>".to_string().into(),
         }
     }
 
     pub fn as_bytes(&self) -> Bytes {
         match self {
             Value::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
-            Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
+            Value::Timestamp(timestamp) => {
+                Bytes::from(String::from(timestamp_to_string(timestamp)))
+            }
             Value::Integer(num) => Bytes::from(format!("{}", num)),
             Value::Float(num) => Bytes::from(format!("{}", num)),
             Value::Boolean(b) => Bytes::from(format!("{}", b)),

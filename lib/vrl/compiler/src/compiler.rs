@@ -153,7 +153,7 @@ impl<'a> Compiler<'a> {
         let exprs = node
             .into_inner()
             .into_iter()
-            .map(|(k, expr)| (k.into_inner(), self.compile_expr(expr)))
+            .map(|(k, expr)| (k.into_inner().into_boxed_str(), self.compile_expr(expr)))
             .collect::<BTreeMap<_, _>>();
 
         Object::new(exprs)

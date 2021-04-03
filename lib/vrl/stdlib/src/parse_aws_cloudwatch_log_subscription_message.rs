@@ -1,5 +1,6 @@
 use shared::aws_cloudwatch_logs_subscription::AwsCloudWatchLogsSubscriptionMessage;
 use std::collections::BTreeMap;
+use structures::str::immutable::ImStr;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -75,7 +76,7 @@ impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
         let message = serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(&bytes)
             .map_err(|e| format!("unable to parse: {}", e))?;
 
-        Ok(map![
+        let map: BTreeMap<ImStr, Value> = map![
             "owner": message.owner,
             "message_type": message.message_type.as_str(),
             "log_group": message.log_group,
@@ -85,9 +86,10 @@ impl Expression for ParseAwsCloudWatchLogSubscriptionMessageFn {
                 "id": event.id,
                 "timestamp": event.timestamp,
                 "message": event.message,
-            ]).collect::<Vec<_>>(),
-        ]
-        .into())
+            ]).collect::<Vec<BTreeMap<ImStr, Value>>>(),
+        ];
+
+        Ok(map.into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

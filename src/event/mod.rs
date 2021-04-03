@@ -4,6 +4,7 @@ use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use shared::EventDataEq;
 use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
+use structures::str::immutable::ImStr;
 
 pub mod discriminant;
 pub mod merge_state;
@@ -101,8 +102,10 @@ impl EventDataEq for Event {
     }
 }
 
-fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
-    timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
+fn timestamp_to_string(timestamp: &DateTime<Utc>) -> ImStr {
+    timestamp
+        .to_rfc3339_opts(SecondsFormat::AutoSi, true)
+        .into()
 }
 
 fn decode_map(fields: BTreeMap<String, proto::Value>) -> Option<Value> {
@@ -268,7 +271,9 @@ impl From<proto::EventWrapper> for Event {
                 Event::Metric(
                     Metric::new(name, kind, value)
                         .with_namespace(namespace)
-                        .with_tags(tags)
+                        .with_tags(
+                            tags.map(|t| t.into_iter().map(|(k, v)| (k.into(), v)).collect()),
+                        )
                         .with_timestamp(timestamp),
                 )
             }
@@ -385,7 +390,10 @@ impl From<Event> for proto::EventWrapper {
                     name: name.into(),
                     namespace: namespace.into(),
                     timestamp,
-                    tags,
+                    tags: tags
+                        .into_iter()
+                        .map(|(k, v)| (String::from(k), v))
+                        .collect(),
                     kind,
                     value: Some(metric),
                 });

@@ -34,7 +34,7 @@ pub struct MetricSeries {
     pub tags: Option<MetricTags>,
 }
 
-pub type MetricTags = BTreeMap<String, String>;
+pub type MetricTags = BTreeMap<ImStr, String>;
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct MetricName {
@@ -324,7 +324,7 @@ impl Metric {
 
         let labels = key
             .labels()
-            .map(|label| (String::from(label.key()), String::from(label.value())))
+            .map(|label| (label.key().to_owned().into(), String::from(label.value())))
             .collect::<MetricTags>();
 
         Self::new(key.name().to_string(), MetricKind::Absolute, value)
@@ -369,7 +369,7 @@ impl Metric {
     pub fn set_tag_value(&mut self, name: String, value: String) {
         self.tags_mut()
             .get_or_insert_with(MetricTags::new)
-            .insert(name, value);
+            .insert(name.into(), value);
     }
 
     /// Deletes the tag, if it exists, returns the old tag value.
@@ -762,7 +762,7 @@ impl Target for Metric {
                 let value = value.try_object().map_err(|e| e.to_string())?;
                 for (field, value) in value.iter() {
                     self.set_tag_value(
-                        field.as_str().to_owned(),
+                        field.to_owned().into(),
                         value
                             .try_bytes_utf8_lossy()
                             .map_err(|e| e.to_string())?

@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use structures::str::immutable::ImStr;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -163,7 +164,7 @@ macro_rules! create_match {
 }
 
 fn parse_log(input: &str, format: Option<&str>) -> ParseResult<Value> {
-    let mut log = BTreeMap::new();
+    let mut log: BTreeMap<ImStr, Value> = BTreeMap::new();
 
     let mut input = input.split(' ');
     let mut format = format

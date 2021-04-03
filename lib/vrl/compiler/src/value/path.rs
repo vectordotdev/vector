@@ -13,13 +13,13 @@ impl Value {
             match segment {
                 Field(field) => {
                     let mut map = BTreeMap::default();
-                    map.insert(field.as_str().to_owned(), self);
+                    map.insert(field.as_str().to_owned().into_boxed_str(), self);
                     self = Value::Object(map);
                 }
                 Coalesce(fields) => {
                     let field = fields.last().unwrap();
                     let mut map = BTreeMap::default();
-                    map.insert(field.as_str().to_owned(), self);
+                    map.insert(field.as_str().to_owned().into_boxed_str(), self);
                     self = Value::Object(map);
                 }
                 Index(index) => {

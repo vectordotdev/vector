@@ -3,6 +3,7 @@ use crate::{
     Path, Target, Value,
 };
 use std::collections::BTreeMap;
+use structures::str::immutable::ImStr;
 
 impl Target for Value {
     fn insert(&mut self, path: &Path, value: Value) -> Result<(), String> {
@@ -291,12 +292,12 @@ impl Value {
         };
 
         let mut handle_field = |field: &Field, new| {
-            let key = field.as_str().to_owned();
+            let key: ImStr = field.as_str().to_owned().into_boxed_str();
 
             // `handle_field` is used to update map values, if the current value
             // isn't a map, we need to make it one.
             if !matches!(self, Value::Object(_)) {
-                *self = BTreeMap::default().into()
+                *self = BTreeMap::<ImStr, Value>::default().into()
             }
 
             let map = match self {
@@ -316,7 +317,7 @@ impl Value {
                 // to add the next segment.
                 Some(next) => match next {
                     Index(_) => map.insert(key, Value::Array(vec![])),
-                    _ => map.insert(key, BTreeMap::default().into()),
+                    _ => map.insert(key, BTreeMap::<ImStr, Value>::default().into()),
                 },
             };
 
@@ -370,7 +371,7 @@ impl Value {
                         }
                         Some(next) => match next {
                             Index(_) => array.insert(0, Value::Array(vec![])),
-                            _ => array.insert(0, BTreeMap::default().into()),
+                            _ => array.insert(0, BTreeMap::<ImStr, Value>::default().into()),
                         },
                     };
 
@@ -393,7 +394,7 @@ impl Value {
                         }
                         Some(next) => match next {
                             Index(_) => array.push(Value::Array(vec![])),
-                            _ => array.push(BTreeMap::default().into()),
+                            _ => array.push(BTreeMap::<ImStr, Value>::default().into()),
                         },
                     }
 

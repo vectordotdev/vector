@@ -19,6 +19,7 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
 use std::path::PathBuf;
+use structures::str::immutable::ImStr;
 
 lazy_static! {
     static ref RE: Regex = Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap();
@@ -103,12 +104,13 @@ fn is_dynamic(item: &Item) -> bool {
 
 impl Template {
     pub fn render(&self, event: &Event) -> Result<Bytes, TemplateRenderingError> {
-        self.render_string(event).map(Into::into)
+        self.render_string(event)
+            .map(|imstr| String::from(imstr).into())
     }
 
-    pub fn render_string(&self, event: &Event) -> Result<String, TemplateRenderingError> {
+    pub fn render_string(&self, event: &Event) -> Result<ImStr, TemplateRenderingError> {
         match (self.has_fields, self.has_ts) {
-            (false, false) => Ok(self.src.clone()),
+            (false, false) => Ok(self.src.clone().into()),
             (true, false) => render_fields(&self.src, event),
             (false, true) => Ok(render_timestamp(&self.src, event)),
             (true, true) => {
@@ -142,7 +144,7 @@ impl Template {
     }
 }
 
-fn render_fields(src: &str, event: &Event) -> Result<String, TemplateRenderingError> {
+fn render_fields(src: &str, event: &Event) -> Result<ImStr, TemplateRenderingError> {
     let mut missing_keys = Vec::new();
     let out = RE
         .replace_all(src, |caps: &Captures<'_>| {
@@ -156,18 +158,18 @@ fn render_fields(src: &str, event: &Event) -> Result<String, TemplateRenderingEr
             }
             .unwrap_or_else(|| {
                 missing_keys.push(key.to_owned());
-                String::new()
+                String::new().into()
             })
         })
         .into_owned();
     if missing_keys.is_empty() {
-        Ok(out)
+        Ok(out.into())
     } else {
         Err(TemplateRenderingError::MissingKeys { missing_keys })
     }
 }
 
-fn render_metric_field(key: &str, metric: &Metric) -> Option<String> {
+fn render_metric_field(key: &str, metric: &Metric) -> Option<ImStr> {
     match key {
         "name" => Some(metric.name().into()),
         "namespace" => metric.namespace().map(Into::into),
@@ -175,12 +177,13 @@ fn render_metric_field(key: &str, metric: &Metric) -> Option<String> {
             .series
             .tags
             .as_ref()
-            .and_then(|tags| tags.get(&key[5..]).cloned()),
+            .and_then(|tags| tags.get(&key[5..]).cloned())
+            .map(Into::into),
         _ => None,
     }
 }
 
-fn render_timestamp(src: &str, event: &Event) -> String {
+fn render_timestamp(src: &str, event: &Event) -> ImStr {
     let timestamp = match event {
         Event::Log(log) => log
             .get(log_schema().timestamp_key())
@@ -188,9 +191,9 @@ fn render_timestamp(src: &str, event: &Event) -> String {
         Event::Metric(metric) => metric.data.timestamp.as_ref(),
     };
     if let Some(ts) = timestamp {
-        ts.format(src).to_string()
+        ts.format(src).to_string().into()
     } else {
-        Utc::now().format(src).to_string()
+        Utc::now().format(src).to_string().into()
     }
 }
 

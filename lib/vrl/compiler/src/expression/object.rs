@@ -2,14 +2,15 @@ use crate::expression::{Expr, Resolved};
 use crate::{Context, Expression, State, TypeDef, Value};
 use std::collections::BTreeMap;
 use std::fmt;
+use structures::str::immutable::ImStr;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Object {
-    inner: BTreeMap<String, Expr>,
+    inner: BTreeMap<ImStr, Expr>,
 }
 
 impl Object {
-    pub fn new(inner: BTreeMap<String, Expr>) -> Self {
+    pub fn new(inner: BTreeMap<ImStr, Expr>) -> Self {
         Self { inner }
     }
 }
@@ -53,6 +54,17 @@ impl fmt::Display for Object {
 
 impl From<BTreeMap<String, Expr>> for Object {
     fn from(inner: BTreeMap<String, Expr>) -> Self {
+        Self {
+            inner: inner
+                .into_iter()
+                .map(|(k, v)| (k.into_boxed_str(), v))
+                .collect(),
+        }
+    }
+}
+
+impl From<BTreeMap<ImStr, Expr>> for Object {
+    fn from(inner: BTreeMap<ImStr, Expr>) -> Self {
         Self { inner }
     }
 }

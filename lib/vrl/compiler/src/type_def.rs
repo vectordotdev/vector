@@ -4,6 +4,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Sub,
 };
+use structures::str::immutable::ImStr;
 
 /// Properties for a given expression that express the expected outcome of the
 /// expression.
@@ -158,7 +159,10 @@ impl KindInfo {
             match segment {
                 Segment::Field(field) => {
                     let mut map = BTreeMap::default();
-                    map.insert(Field::Field(field.as_str().to_owned()), self);
+                    map.insert(
+                        Field::Field(field.as_str().to_owned().into_boxed_str()),
+                        self,
+                    );
 
                     let mut set = BTreeSet::new();
                     set.insert(TypeKind::Object(map));
@@ -168,7 +172,10 @@ impl KindInfo {
                 Segment::Coalesce(fields) => {
                     let field = fields.last().unwrap();
                     let mut map = BTreeMap::default();
-                    map.insert(Field::Field(field.as_str().to_owned()), self);
+                    map.insert(
+                        Field::Field(field.as_str().to_owned().into_boxed_str()),
+                        self,
+                    );
 
                     let mut set = BTreeSet::new();
                     set.insert(TypeKind::Object(map));
@@ -228,7 +235,8 @@ impl KindInfo {
                             Some(kind) => fields
                                 .into_iter()
                                 .find_map(|field| {
-                                    let field = Field::Field(field.as_str().to_owned());
+                                    let field =
+                                        Field::Field(field.as_str().to_owned().into_boxed_str());
                                     kind.get(&field).cloned()
                                 })
                                 .unwrap_or_else(|| {
@@ -242,7 +250,8 @@ impl KindInfo {
                         Segment::Field(field) => match kind.object() {
                             None => KindInfo::Unknown,
                             Some(kind) => {
-                                let field = Field::Field(field.as_str().to_owned());
+                                let field =
+                                    Field::Field(field.as_str().to_owned().into_boxed_str());
 
                                 if let Some(kind) = kind.get(&field) {
                                     kind.clone()
@@ -481,18 +490,24 @@ impl From<()> for Index {
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Field {
     Any,
-    Field(String),
+    Field(ImStr),
 }
 
 impl From<String> for Field {
     fn from(k: String) -> Self {
+        Self::Field(k.into_boxed_str())
+    }
+}
+
+impl From<ImStr> for Field {
+    fn from(k: ImStr) -> Self {
         Self::Field(k)
     }
 }
 
 impl From<&'static str> for Field {
     fn from(k: &'static str) -> Self {
-        Self::Field(k.to_owned())
+        Self::Field(k.to_owned().into_boxed_str())
     }
 }
 

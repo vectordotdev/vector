@@ -8,15 +8,16 @@ mod regex;
 mod serde;
 mod target;
 
+pub use self::regex::Regex;
+pub use error::Error;
+pub use kind::Kind;
+
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, Utc};
 use ordered_float::NotNan;
 use std::collections::BTreeMap;
 use std::fmt;
-
-pub use self::regex::Regex;
-pub use error::Error;
-pub use kind::Kind;
+use structures::str::immutable::ImStr;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -24,7 +25,7 @@ pub enum Value {
     Integer(i64),
     Float(NotNan<f64>),
     Boolean(bool),
-    Object(BTreeMap<String, Value>),
+    Object(BTreeMap<ImStr, Value>),
     Array(Vec<Value>),
     Timestamp(DateTime<Utc>),
     Regex(Regex),

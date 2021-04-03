@@ -6,6 +6,7 @@ edition = "2018"
 publish = false
 
 [dependencies]
+structures = { path = "../../structures" }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
 

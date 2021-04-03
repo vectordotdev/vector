@@ -8,6 +8,7 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::iter::FromIterator;
+use structures::str::immutable::ImStr;
 
 impl Value {
     /// Convert a given [`Value`] into a [`Expression`] trait object.
@@ -433,21 +434,21 @@ impl Value {
         matches!(self, Value::Object(_))
     }
 
-    pub fn as_object(&self) -> Option<&BTreeMap<String, Value>> {
+    pub fn as_object(&self) -> Option<&BTreeMap<ImStr, Value>> {
         match self {
             Value::Object(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn as_object_mut(&mut self) -> Option<&mut BTreeMap<String, Value>> {
+    pub fn as_object_mut(&mut self) -> Option<&mut BTreeMap<ImStr, Value>> {
         match self {
             Value::Object(v) => Some(v),
             _ => None,
         }
     }
 
-    pub fn try_object(self) -> Result<BTreeMap<String, Value>, Error> {
+    pub fn try_object(self) -> Result<BTreeMap<ImStr, Value>, Error> {
         match self {
             Value::Object(v) => Ok(v),
             _ => Err(Error::Expected {
@@ -460,12 +461,33 @@ impl Value {
 
 impl From<BTreeMap<String, Value>> for Value {
     fn from(value: BTreeMap<String, Value>) -> Self {
-        Value::Object(value)
+        Value::Object(
+            value
+                .into_iter()
+                .map(|(k, v)| (k.into_boxed_str(), v))
+                .collect(),
+        )
+    }
+}
+
+impl From<BTreeMap<ImStr, Value>> for Value {
+    fn from(value: BTreeMap<ImStr, Value>) -> Self {
+        Value::Object(value.into_iter().collect())
     }
 }
 
 impl FromIterator<(String, Value)> for Value {
     fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {
+        Value::Object(
+            iter.into_iter()
+                .map(|(k, v)| (k.into_boxed_str(), v))
+                .collect::<BTreeMap<_, _>>(),
+        )
+    }
+}
+
+impl FromIterator<(ImStr, Value)> for Value {
+    fn from_iter<I: IntoIterator<Item = (Box<str>, Value)>>(iter: I) -> Self {
         Value::Object(iter.into_iter().collect::<BTreeMap<_, _>>())
     }
 }

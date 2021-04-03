@@ -350,7 +350,7 @@ impl vrl::Target for LogEvent {
                 vrl::Value::Object(map) => {
                     *self = map
                         .into_iter()
-                        .map(|(k, v)| (k, v.into()))
+                        .map(|(k, v)| (k.into(), v.into()))
                         .collect::<BTreeMap<_, _>>()
                         .into();
 

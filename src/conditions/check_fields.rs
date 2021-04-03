@@ -9,15 +9,16 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use std::str::FromStr;
+use structures::str::immutable::ImStr;
 
 #[derive(Deserialize, Serialize, Clone, Derivative)]
 #[serde(untagged)]
 #[derivative(Debug)]
 pub enum CheckFieldsPredicateArg {
     #[derivative(Debug = "transparent")]
-    String(String),
+    String(ImStr),
     #[derivative(Debug = "transparent")]
-    VecString(Vec<String>),
+    VecString(Vec<ImStr>),
     #[derivative(Debug = "transparent")]
     Integer(i64),
     #[derivative(Debug = "transparent")]
@@ -36,15 +37,15 @@ dyn_clone::clone_trait_object!(CheckFieldsPredicate);
 
 #[derive(Debug, Clone)]
 pub(crate) struct EqualsPredicate {
-    target: String,
+    target: ImStr,
     arg: CheckFieldsPredicateArg,
 }
 
 impl EqualsPredicate {
     pub fn new(
-        target: String,
+        target: ImStr,
         arg: &CheckFieldsPredicateArg,
-    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+    ) -> Result<Box<dyn CheckFieldsPredicate>, ImStr> {
         Ok(Box::new(Self {
             target,
             arg: arg.clone(),
@@ -90,15 +91,15 @@ impl CheckFieldsPredicate for EqualsPredicate {
 
 #[derive(Debug, Clone)]
 struct ContainsPredicate {
-    target: String,
-    arg: Vec<String>,
+    target: ImStr,
+    arg: Vec<ImStr>,
 }
 
 impl ContainsPredicate {
     pub fn new(
-        target: String,
+        target: ImStr,
         arg: &CheckFieldsPredicateArg,
-    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+    ) -> Result<Box<dyn CheckFieldsPredicate>, ImStr> {
         match arg {
             CheckFieldsPredicateArg::String(s) => Ok(Box::new(Self {
                 target,
@@ -108,7 +109,11 @@ impl ContainsPredicate {
                 target,
                 arg: ss.clone(),
             })),
-            _ => Err("contains predicate requires a string or list of string argument".to_owned()),
+            _ => Err(
+                "contains predicate requires a string or list of string argument"
+                    .to_owned()
+                    .into(),
+            ),
         }
     }
 }
@@ -118,7 +123,7 @@ impl CheckFieldsPredicate for ContainsPredicate {
         match event {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| {
                 let v = v.to_string_lossy();
-                self.arg.iter().any(|s| v.contains(s))
+                self.arg.iter().any(|s| v.contains(s.as_ref()))
             }),
             _ => false,
         }
@@ -129,15 +134,15 @@ impl CheckFieldsPredicate for ContainsPredicate {
 
 #[derive(Debug, Clone)]
 struct StartsWithPredicate {
-    target: String,
-    arg: Vec<String>,
+    target: ImStr,
+    arg: Vec<ImStr>,
 }
 
 impl StartsWithPredicate {
     pub fn new(
-        target: String,
+        target: ImStr,
         arg: &CheckFieldsPredicateArg,
-    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+    ) -> Result<Box<dyn CheckFieldsPredicate>, ImStr> {
         match arg {
             CheckFieldsPredicateArg::String(s) => Ok(Box::new(Self {
                 target,
@@ -147,9 +152,11 @@ impl StartsWithPredicate {
                 target,
                 arg: ss.clone(),
             })),
-            _ => {
-                Err("starts_with predicate requires a string or list of string argument".to_owned())
-            }
+            _ => Err(
+                "starts_with predicate requires a string or list of string argument"
+                    .to_owned()
+                    .into(),
+            ),
         }
     }
 }
@@ -158,8 +165,8 @@ impl CheckFieldsPredicate for StartsWithPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| {
-                let v = v.to_string_lossy();
-                self.arg.iter().any(|s| v.starts_with(s))
+                let v: &str = &v.to_string_lossy();
+                self.arg.iter().any(|s| v.starts_with(s.as_ref()))
             }),
             _ => false,
         }
@@ -170,15 +177,15 @@ impl CheckFieldsPredicate for StartsWithPredicate {
 
 #[derive(Debug, Clone)]
 struct EndsWithPredicate {
-    target: String,
-    arg: Vec<String>,
+    target: ImStr,
+    arg: Vec<ImStr>,
 }
 
 impl EndsWithPredicate {
     pub fn new(
-        target: String,
+        target: ImStr,
         arg: &CheckFieldsPredicateArg,
-    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+    ) -> Result<Box<dyn CheckFieldsPredicate>, ImStr> {
         match arg {
             CheckFieldsPredicateArg::String(s) => Ok(Box::new(Self {
                 target,
@@ -188,7 +195,9 @@ impl EndsWithPredicate {
                 target,
                 arg: ss.clone(),
             })),
-            _ => Err("ends_with predicate requires a string argument".to_owned()),
+            _ => Err("ends_with predicate requires a string argument"
+                .to_owned()
+                .into()),
         }
     }
 }
@@ -197,8 +206,8 @@ impl CheckFieldsPredicate for EndsWithPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| {
-                let v = v.to_string_lossy();
-                self.arg.iter().any(|s| v.ends_with(s))
+                let v: &str = &v.to_string_lossy();
+                self.arg.iter().any(|s| v.ends_with(s.as_ref()))
             }),
             _ => false,
         }
@@ -209,23 +218,23 @@ impl CheckFieldsPredicate for EndsWithPredicate {
 
 #[derive(Debug, Clone)]
 struct NotEqualsPredicate {
-    target: String,
-    arg: Vec<String>,
+    target: ImStr,
+    arg: Vec<ImStr>,
 }
 
 impl NotEqualsPredicate {
     pub fn new(
-        target: String,
+        target: ImStr,
         arg: &CheckFieldsPredicateArg,
-    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+    ) -> Result<Box<dyn CheckFieldsPredicate>, ImStr> {
         Ok(Box::new(Self {
             target,
             arg: match arg {
                 CheckFieldsPredicateArg::String(s) => vec![s.clone()],
                 CheckFieldsPredicateArg::VecString(ss) => ss.clone(),
-                CheckFieldsPredicateArg::Integer(a) => vec![format!("{}", a)],
-                CheckFieldsPredicateArg::Float(a) => vec![format!("{}", a)],
-                CheckFieldsPredicateArg::Boolean(a) => vec![format!("{}", a)],
+                CheckFieldsPredicateArg::Integer(a) => vec![format!("{}", a).into()],
+                CheckFieldsPredicateArg::Float(a) => vec![format!("{}", a).into()],
+                CheckFieldsPredicateArg::Boolean(a) => vec![format!("{}", a).into()],
             },
         }))
     }
@@ -255,18 +264,22 @@ impl CheckFieldsPredicate for NotEqualsPredicate {
 
 #[derive(Debug, Clone)]
 struct RegexPredicate {
-    target: String,
+    target: ImStr,
     regex: Regex,
 }
 
 impl RegexPredicate {
     pub fn new(
-        target: String,
+        target: ImStr,
         arg: &CheckFieldsPredicateArg,
-    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+    ) -> Result<Box<dyn CheckFieldsPredicate>, ImStr> {
         let pattern = match arg {
             CheckFieldsPredicateArg::String(s) => s.clone(),
-            _ => return Err("regex predicate requires a string argument".to_owned()),
+            _ => {
+                return Err("regex predicate requires a string argument"
+                    .to_owned()
+                    .into())
+            }
         };
         let regex = Regex::new(&pattern)
             .map_err(|error| format!("Invalid regex \"{}\": {}", pattern, error))?;
@@ -293,18 +306,20 @@ impl CheckFieldsPredicate for RegexPredicate {
 
 #[derive(Debug, Clone)]
 struct ExistsPredicate {
-    target: String,
+    target: ImStr,
     arg: bool,
 }
 
 impl ExistsPredicate {
     pub fn new(
-        target: String,
+        target: ImStr,
         arg: &CheckFieldsPredicateArg,
-    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+    ) -> Result<Box<dyn CheckFieldsPredicate>, ImStr> {
         match arg {
             CheckFieldsPredicateArg::Boolean(b) => Ok(Box::new(Self { target, arg: *b })),
-            _ => Err("exists predicate requires a boolean argument".to_owned()),
+            _ => Err("exists predicate requires a boolean argument"
+                .to_owned()
+                .into()),
         }
     }
 }
@@ -322,28 +337,29 @@ impl CheckFieldsPredicate for ExistsPredicate {
 
 #[derive(Debug, Clone)]
 struct IpCidrPredicate {
-    target: String,
+    target: ImStr,
     cidrs: Vec<IpCidr>,
 }
 
 impl IpCidrPredicate {
     pub fn new(
-        target: String,
+        target: ImStr,
         arg: &CheckFieldsPredicateArg,
-    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+    ) -> Result<Box<dyn CheckFieldsPredicate>, ImStr> {
         let cidr_strings = match arg {
             CheckFieldsPredicateArg::String(s) => vec![s.clone()],
             CheckFieldsPredicateArg::VecString(ss) => ss.clone(),
             _ => {
                 return Err(
                     "ip_cidr_contains predicate requires a string or list of string argument"
-                        .to_owned(),
+                        .to_owned()
+                        .into(),
                 )
             }
         };
         let cidrs = match cidr_strings.iter().map(IpCidr::from_str).collect() {
             Ok(v) => v,
-            Err(error) => return Err(format!("Invalid IP CIDR: {}", error)),
+            Err(error) => return Err(format!("Invalid IP CIDR: {}", error).into()),
         };
         Ok(Box::new(Self { target, cidrs }))
     }
@@ -373,9 +389,9 @@ struct NegatePredicate {
 impl NegatePredicate {
     pub fn new(
         predicate: &str,
-        target: String,
+        target: ImStr,
         arg: &CheckFieldsPredicateArg,
-    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+    ) -> Result<Box<dyn CheckFieldsPredicate>, ImStr> {
         let subpred = build_predicate(predicate, target, arg)?;
         Ok(Box::new(Self { subpred }))
     }
@@ -391,24 +407,28 @@ impl CheckFieldsPredicate for NegatePredicate {
 
 #[derive(Debug, Clone)]
 struct LengthEqualsPredicate {
-    target: String,
+    target: ImStr,
     arg: i64,
 }
 
 impl LengthEqualsPredicate {
     pub fn new(
-        target: String,
+        target: ImStr,
         arg: &CheckFieldsPredicateArg,
-    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+    ) -> Result<Box<dyn CheckFieldsPredicate>, ImStr> {
         match arg {
             CheckFieldsPredicateArg::Integer(i) => {
                 if *i < 0 {
-                    return Err("length_eq predicate integer cannot be negative".to_owned());
+                    return Err("length_eq predicate integer cannot be negative"
+                        .to_owned()
+                        .into());
                 }
 
                 Ok(Box::new(Self { target, arg: *i }))
             }
-            _ => Err("length_eq predicate requires an integer argument".to_owned()),
+            _ => Err("length_eq predicate requires an integer argument"
+                .to_owned()
+                .into()),
         }
     }
 }
@@ -436,9 +456,9 @@ impl CheckFieldsPredicate for LengthEqualsPredicate {
 
 fn build_predicate(
     predicate: &str,
-    target: String,
+    target: ImStr,
     arg: &CheckFieldsPredicateArg,
-) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+) -> Result<Box<dyn CheckFieldsPredicate>, ImStr> {
     match predicate {
         "eq" | "equals" => EqualsPredicate::new(target, arg),
         "neq" | "not_equals" => NotEqualsPredicate::new(target, arg),
@@ -457,15 +477,15 @@ fn build_predicate(
         "ip_cidr_contains" => IpCidrPredicate::new(target, arg),
         "length_eq" => LengthEqualsPredicate::new(target, arg),
         _ if predicate.starts_with("not_") => NegatePredicate::new(&predicate[4..], target, arg),
-        _ => Err(format!("predicate type '{}' not recognized", predicate)),
+        _ => Err(format!("predicate type '{}' not recognized", predicate).into()),
     }
 }
 
 fn build_predicates(
     map: &IndexMap<String, CheckFieldsPredicateArg>,
-) -> Result<IndexMap<String, Box<dyn CheckFieldsPredicate>>, Vec<String>> {
+) -> Result<IndexMap<String, Box<dyn CheckFieldsPredicate>>, Vec<ImStr>> {
     let mut predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>> = IndexMap::new();
-    let mut errors = Vec::new();
+    let mut errors: Vec<ImStr> = Vec::new();
 
     for (target_pred, arg) in map {
         if target_pred
@@ -481,16 +501,16 @@ fn build_predicates(
                 let mut target = target_pred.clone();
                 let pred = target.split_off(i + 1);
                 target.truncate(target.len() - 1);
-                match build_predicate(&pred, target, arg) {
+                match build_predicate(&pred, target.into(), arg) {
                     Ok(pred) => {
                         predicates.insert(format!("{}: {:?}", target_pred, arg), pred);
                     }
-                    Err(err) => errors.push(err),
+                    Err(err) => errors.push(err.into()),
                 };
             })
             .is_none()
         {
-            errors.push(format!("predicate not found in check_fields value '{}', format must be <target>.<predicate>", target_pred));
+            errors.push(format!("predicate not found in check_fields value '{}', format must be <target>.<predicate>", target_pred).into());
         }
     }
 
@@ -534,7 +554,7 @@ impl ConditionConfig for CheckFieldsConfig {
                     err_fmt.insert_str(0, "failed to parse predicates:\n");
                     err_fmt
                 } else {
-                    errs[0].clone()
+                    String::from(errs[0].clone())
                 }
                 .into()
             })
@@ -560,20 +580,17 @@ impl Condition for CheckFields {
         self.predicates.iter().find(|(_, p)| !p.check(e)).is_none()
     }
 
-    fn check_with_context(&self, e: &Event) -> Result<(), String> {
+    fn check_with_context(&self, e: &Event) -> Result<(), ImStr> {
         let failed_preds = self
             .predicates
             .iter()
             .filter(|(_, p)| !p.check(e))
-            .map(|(n, _)| n.to_owned())
-            .collect::<Vec<_>>();
+            .map(|(n, _)| n.to_owned().into())
+            .collect::<Vec<ImStr>>();
         if failed_preds.is_empty() {
             Ok(())
         } else {
-            Err(format!(
-                "predicates failed: [ {} ]",
-                failed_preds.join(", ")
-            ))
+            Err(format!("predicates failed: [ {} ]", failed_preds.join(", ")).into())
         }
     }
 }
@@ -666,7 +683,7 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ other_thing.eq: \"bar\", third_thing.eq: [\"hello\", \"world\"] ]".to_owned())
+            Err("predicates failed: [ other_thing.eq: \"bar\", third_thing.eq: [\"hello\", \"world\"] ]".to_owned().into())
         );
 
         event.as_mut_log().insert("other_thing", "bar");
@@ -682,7 +699,9 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ message.equals: \"foo\" ]".to_owned())
+            Err("predicates failed: [ message.equals: \"foo\" ]"
+                .to_owned()
+                .into())
         );
     }
 
@@ -719,7 +738,9 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ other_thing.contains: \"bar\" ]".to_owned())
+            Err("predicates failed: [ other_thing.contains: \"bar\" ]"
+                .to_owned()
+                .into())
         );
 
         event.as_mut_log().insert("other_thing", "hello bar world");
@@ -732,7 +753,11 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ third_thing.contains: [\"hello\", \"world\"] ]".to_owned()),
+            Err(
+                "predicates failed: [ third_thing.contains: [\"hello\", \"world\"] ]"
+                    .to_owned()
+                    .into()
+            ),
         );
 
         event.as_mut_log().insert("third_thing", "world");
@@ -743,7 +768,9 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ message.contains: \"foo\" ]".to_owned())
+            Err("predicates failed: [ message.contains: \"foo\" ]"
+                .to_owned()
+                .into())
         );
     }
 
@@ -775,7 +802,9 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ other_thing.prefix: \"bar\" ]".to_owned())
+            Err("predicates failed: [ other_thing.prefix: \"bar\" ]"
+                .to_owned()
+                .into())
         );
 
         event.as_mut_log().insert("other_thing", "bar hello world");
@@ -786,7 +815,9 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ message.prefix: \"foo\" ]".to_owned())
+            Err("predicates failed: [ message.prefix: \"foo\" ]"
+                .to_owned()
+                .into())
         );
     }
 
@@ -823,7 +854,9 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ other_thing.starts_with: \"bar\" ]".to_owned())
+            Err("predicates failed: [ other_thing.starts_with: \"bar\" ]"
+                .to_owned()
+                .into())
         );
 
         event.as_mut_log().insert("other_thing", "bar hello world");
@@ -849,7 +882,9 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ message.starts_with: \"foo\" ]".to_owned())
+            Err("predicates failed: [ message.starts_with: \"foo\" ]"
+                .to_owned()
+                .into())
         );
     }
 
@@ -886,7 +921,9 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ other_thing.ends_with: \"bar\" ]".to_owned())
+            Err("predicates failed: [ other_thing.ends_with: \"bar\" ]"
+                .to_owned()
+                .into())
         );
 
         event.as_mut_log().insert("other_thing", "hello world bar");
@@ -897,7 +934,11 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ third_thing.ends_with: [\"hello\", \"world\"] ]".to_owned()),
+            Err(
+                "predicates failed: [ third_thing.ends_with: [\"hello\", \"world\"] ]"
+                    .to_owned()
+                    .into()
+            ),
         );
 
         event.as_mut_log().insert("third_thing", "world hello");
@@ -908,7 +949,9 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ message.ends_with: \"foo\" ]".to_owned())
+            Err("predicates failed: [ message.ends_with: \"foo\" ]"
+                .to_owned()
+                .into())
         );
     }
 
@@ -934,7 +977,7 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ other_thing.neq: \"bar\", third_thing.neq: [\"hello\", \"world\"] ]".to_owned())
+            Err("predicates failed: [ other_thing.neq: \"bar\", third_thing.neq: [\"hello\", \"world\"] ]".to_owned().into())
         );
 
         event.as_mut_log().insert("other_thing", "not bar");
@@ -948,14 +991,22 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ third_thing.neq: [\"hello\", \"world\"] ]".to_owned()),
+            Err(
+                "predicates failed: [ third_thing.neq: [\"hello\", \"world\"] ]"
+                    .to_owned()
+                    .into()
+            ),
         );
 
         event.as_mut_log().insert("third_thing", "hello");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ third_thing.neq: [\"hello\", \"world\"] ]".to_owned()),
+            Err(
+                "predicates failed: [ third_thing.neq: [\"hello\", \"world\"] ]"
+                    .to_owned()
+                    .into()
+            ),
         );
 
         event.as_mut_log().insert("third_thing", "safe");
@@ -963,7 +1014,9 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ other_thing.neq: \"bar\" ]".to_owned())
+            Err("predicates failed: [ other_thing.neq: \"bar\" ]"
+                .to_owned()
+                .into())
         );
 
         event.as_mut_log().insert("message", "foo");
@@ -995,7 +1048,7 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err(r#"predicates failed: [ other_thing.regex: "end$" ]"#.to_owned())
+            Err(r#"predicates failed: [ other_thing.regex: "end$" ]"#.to_owned().into())
         );
 
         event.as_mut_log().insert("other_thing", "at the end");
@@ -1006,7 +1059,7 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err(r#"predicates failed: [ other_thing.regex: "end$" ]"#.to_owned())
+            Err(r#"predicates failed: [ other_thing.regex: "end$" ]"#.to_owned().into())
         );
 
         event.as_mut_log().insert("message", "foo");
@@ -1038,7 +1091,7 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\", bar.ip_cidr_contains: [\"2000::/3\", \"192.168.0.0/16\"] ]".to_owned()),
+            Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\", bar.ip_cidr_contains: [\"2000::/3\", \"192.168.0.0/16\"] ]".to_owned().into()),
         );
 
         event.as_mut_log().insert("foo", "10.1.2.3");
@@ -1063,14 +1116,22 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\" ]".to_owned()),
+            Err(
+                "predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\" ]"
+                    .to_owned()
+                    .into()
+            ),
         );
 
         event.as_mut_log().insert("foo", "not an ip");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\" ]".to_owned()),
+            Err(
+                "predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\" ]"
+                    .to_owned()
+                    .into()
+            ),
         );
     }
 
@@ -1086,7 +1147,7 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ foo.exists: true ]".to_owned())
+            Err("predicates failed: [ foo.exists: true ]".to_owned().into())
         );
 
         event.as_mut_log().insert("foo", "not ignored");
@@ -1097,7 +1158,7 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ bar.exists: false ]".to_owned())
+            Err("predicates failed: [ bar.exists: false ]".to_owned().into())
         );
     }
 
@@ -1113,14 +1174,16 @@ mod test {
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ foo.length_eq: 10, bar.length_eq: 4 ]".to_owned())
+            Err("predicates failed: [ foo.length_eq: 10, bar.length_eq: 4 ]"
+                .to_owned()
+                .into())
         );
 
         event.as_mut_log().insert("foo", "helloworld");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
-            Err("predicates failed: [ bar.length_eq: 4 ]".to_owned())
+            Err("predicates failed: [ bar.length_eq: 4 ]".to_owned().into())
         );
 
         event.as_mut_log().insert("bar", vec![0, 1, 2, 3]);
