@@ -141,10 +141,10 @@ mod tests {
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
+    use futures::channel::mpsc;
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {

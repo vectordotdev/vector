@@ -128,10 +128,10 @@ impl SwapMetrics {
     }
 }
 
-pub struct CPUMetrics(Vec<Metric>);
+pub struct CpuMetrics(Vec<Metric>);
 
 #[Object]
-impl CPUMetrics {
+impl CpuMetrics {
     /// CPU seconds total
     async fn cpu_seconds_total(&self) -> f64 {
         filter_host_metric(&self.0, "cpu_seconds_total")
@@ -280,8 +280,8 @@ impl HostMetrics {
     }
 
     /// CPU metrics
-    async fn cpu(&self) -> CPUMetrics {
-        CPUMetrics(self.0.cpu_metrics().await)
+    async fn cpu(&self) -> CpuMetrics {
+        CpuMetrics(self.0.cpu_metrics().await)
     }
 
     /// Load average metrics (*nix only)

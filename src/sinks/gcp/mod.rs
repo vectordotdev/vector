@@ -15,6 +15,7 @@ use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use tokio_stream::wrappers::IntervalStream;
 
 pub mod cloud_storage;
 pub mod pubsub;
@@ -142,7 +143,7 @@ impl GcpCredentials {
         let this = self.clone();
 
         let period = this.token.read().unwrap().expires_in() as u64 / 2;
-        let interval = tokio::time::interval(Duration::from_secs(period));
+        let interval = IntervalStream::new(tokio::time::interval(Duration::from_secs(period)));
         let task = interval.for_each(move |_| {
             let this = this.clone();
             async move {

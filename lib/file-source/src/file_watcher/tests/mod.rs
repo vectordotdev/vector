@@ -15,7 +15,7 @@ use std::str;
 // behaviour of the file_watcher in the presence of arbitrary file-system
 // actions. These actions we call `FWAction`.
 #[derive(Clone, Debug)]
-pub enum FWAction {
+pub enum FileWatcherAction {
     WriteLine(String),
     RotateFile,
     DeleteFile,
@@ -31,7 +31,7 @@ pub enum FWAction {
 // this way we can drive the behaviour of file_watcher. Validation requires
 // a model, which we scattered between the interpreters -- as the model
 // varies slightly in the presence of truncation vs. not -- and FWFile.
-pub struct FWFile {
+pub struct FileWatcherFile {
     contents: Vec<u8>,
     read_idx: usize,
     previous_read_size: usize,
@@ -42,9 +42,9 @@ pub struct FWFile {
 // truncation and resets, which mimic a delete/create cycle on the file
 // system. The function `FWFile::read_line` is the most complex and you're
 // warmly encouraged to read the documentation present there.
-impl FWFile {
-    pub fn new() -> FWFile {
-        FWFile {
+impl FileWatcherFile {
+    pub fn new() -> FileWatcherFile {
+        FileWatcherFile {
             contents: vec![],
             read_idx: 0,
             previous_read_size: 0,
@@ -139,8 +139,8 @@ impl FWFile {
     }
 }
 
-impl Arbitrary for FWAction {
-    fn arbitrary(g: &mut Gen) -> FWAction {
+impl Arbitrary for FileWatcherAction {
+    fn arbitrary(g: &mut Gen) -> FileWatcherAction {
         let i: usize = *g.choose(&(0..100).collect::<Vec<_>>()).unwrap();
         match i {
             // These weights are more or less arbitrary. 'Pause' maybe
@@ -150,22 +150,22 @@ impl Arbitrary for FWAction {
                 const GEN_ASCII_STR_CHARSET: &[u8] =
                     b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
                 let ln_sz = *g.choose(&(1..32).collect::<Vec<_>>()).unwrap();
-                FWAction::WriteLine(
+                FileWatcherAction::WriteLine(
                     std::iter::repeat_with(|| *g.choose(&GEN_ASCII_STR_CHARSET).unwrap())
                         .take(ln_sz)
                         .map(|v| -> char { v.into() })
                         .collect(),
                 )
             }
-            51..=69 => FWAction::Read,
+            51..=69 => FileWatcherAction::Read,
             70..=75 => {
                 let pause = *g.choose(&(1..3).collect::<Vec<_>>()).unwrap();
-                FWAction::Pause(pause)
+                FileWatcherAction::Pause(pause)
             }
-            76..=85 => FWAction::RotateFile,
-            86..=90 => FWAction::TruncateFile,
-            91..=95 => FWAction::DeleteFile,
-            _ => FWAction::Exit,
+            76..=85 => FileWatcherAction::RotateFile,
+            86..=90 => FileWatcherAction::TruncateFile,
+            91..=95 => FileWatcherAction::DeleteFile,
+            _ => FileWatcherAction::Exit,
         }
     }
 }

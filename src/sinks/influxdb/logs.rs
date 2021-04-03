@@ -5,7 +5,7 @@ use crate::{
     sinks::{
         influxdb::{
             encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
-            InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
+            InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion,
         },
         util::{
             encode_namespace,
@@ -26,15 +26,15 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
-pub struct InfluxDBLogsConfig {
+pub struct InfluxDbLogsConfig {
     pub namespace: String,
     pub endpoint: String,
     #[serde(default)]
     pub tags: Vec<String>,
     #[serde(flatten)]
-    pub influxdb1_settings: Option<InfluxDB1Settings>,
+    pub influxdb1_settings: Option<InfluxDb1Settings>,
     #[serde(flatten)]
-    pub influxdb2_settings: Option<InfluxDB2Settings>,
+    pub influxdb2_settings: Option<InfluxDb2Settings>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -48,7 +48,7 @@ pub struct InfluxDBLogsConfig {
 }
 
 #[derive(Debug)]
-struct InfluxDBLogsSink {
+struct InfluxDbLogsSink {
     uri: Uri,
     token: String,
     protocol_version: ProtocolVersion,
@@ -73,10 +73,10 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new::<InfluxDBLogsConfig>("influxdb_logs")
+    SinkDescription::new::<InfluxDbLogsConfig>("influxdb_logs")
 }
 
-impl GenerateConfig for InfluxDBLogsConfig {
+impl GenerateConfig for InfluxDbLogsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
             endpoint = "http://localhost:8086/"
@@ -92,7 +92,7 @@ impl GenerateConfig for InfluxDBLogsConfig {
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_logs")]
-impl SinkConfig for InfluxDBLogsConfig {
+impl SinkConfig for InfluxDbLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let mut tags: HashSet<String> = self.tags.clone().into_iter().collect();
         tags.insert(log_schema().host_key().to_string());
@@ -121,7 +121,7 @@ impl SinkConfig for InfluxDBLogsConfig {
         let protocol_version = settings.protocol_version();
         let namespace = self.namespace.clone();
 
-        let sink = InfluxDBLogsSink {
+        let sink = InfluxDbLogsSink {
             uri,
             token,
             protocol_version,
@@ -153,7 +153,7 @@ impl SinkConfig for InfluxDBLogsConfig {
 }
 
 #[async_trait::async_trait]
-impl HttpSink for InfluxDBLogsSink {
+impl HttpSink for InfluxDbLogsSink {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
@@ -212,7 +212,7 @@ impl HttpSink for InfluxDBLogsSink {
     }
 }
 
-impl InfluxDBLogsConfig {
+impl InfluxDbLogsConfig {
     fn healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
         let config = self.clone();
 
@@ -256,7 +256,7 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<InfluxDBLogsConfig>();
+        crate::test_util::test_generate_config::<InfluxDbLogsConfig>();
     }
 
     #[test]
@@ -269,7 +269,7 @@ mod tests {
             token = "my-token"
         "#};
 
-        toml::from_str::<InfluxDBLogsConfig>(&config).unwrap();
+        toml::from_str::<InfluxDbLogsConfig>(&config).unwrap();
     }
 
     #[test]
@@ -490,7 +490,7 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_v1() {
-        let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(indoc! {r#"
+        let (mut config, cx) = load_sink::<InfluxDbLogsConfig>(indoc! {r#"
             namespace = "ns"
             endpoint = "http://localhost:9999"
             database = "my-database"
@@ -549,7 +549,7 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_v2() {
-        let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(indoc! {r#"
+        let (mut config, cx) = load_sink::<InfluxDbLogsConfig>(indoc! {r#"
             namespace = "ns"
             endpoint = "http://localhost:9999"
             bucket = "my-bucket"
@@ -632,12 +632,12 @@ mod tests {
         protocol_version: ProtocolVersion,
         namespace: &str,
         tags: Vec<&str>,
-    ) -> InfluxDBLogsSink {
+    ) -> InfluxDbLogsSink {
         let uri = uri.parse::<Uri>().unwrap();
         let token = token.to_string();
         let namespace = namespace.to_string();
         let tags: HashSet<String> = tags.into_iter().map(|tag| tag.to_string()).collect();
-        InfluxDBLogsSink {
+        InfluxDbLogsSink {
             uri,
             token,
             protocol_version,
@@ -655,9 +655,9 @@ mod integration_tests {
     use crate::{
         config::SinkContext,
         sinks::influxdb::{
-            logs::InfluxDBLogsConfig,
+            logs::InfluxDbLogsConfig,
             test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
-            InfluxDB2Settings,
+            InfluxDb2Settings,
         },
     };
     use chrono::Utc;
@@ -671,12 +671,12 @@ mod integration_tests {
 
         let cx = SinkContext::new_test();
 
-        let config = InfluxDBLogsConfig {
+        let config = InfluxDbLogsConfig {
             namespace: ns.clone(),
             endpoint: "http://localhost:9999".to_string(),
             tags: Default::default(),
             influxdb1_settings: None,
-            influxdb2_settings: Some(InfluxDB2Settings {
+            influxdb2_settings: Some(InfluxDb2Settings {
                 org: ORG.to_string(),
                 bucket: BUCKET.to_string(),
                 token: TOKEN.to_string(),

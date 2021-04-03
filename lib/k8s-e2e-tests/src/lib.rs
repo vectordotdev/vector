@@ -127,7 +127,7 @@ where
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up <= 0 {
             println!("Giving up");
-            log_reader.kill()?;
+            log_reader.kill().await?;
             break;
         }
 
@@ -157,7 +157,7 @@ where
                 // killed.
                 // This doesn't immediately stop the reading because we want to
                 // process the pending buffers first.
-                log_reader.kill()?;
+                log_reader.kill().await?;
             }
         }
     }

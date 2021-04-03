@@ -10,7 +10,7 @@ diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
 
 bitflags = "1"
-bytes = "0.5.6"
+bytes = "1.0.0"
 chrono = "0.4"
 lalrpop-util = "0.19"
 ngrammatic = "0.3"
@@ -27,4 +27,8 @@ criterion = "0.3"
 
 [[bench]]
 name = "path"
+harness = false
+
+[[bench]]
+name = "kind"
 harness = false

@@ -548,7 +548,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::TOML),
+            Some(Format::Toml),
         )
         .unwrap();
 
@@ -571,7 +571,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::TOML),
+            Some(Format::Toml),
         )
         .unwrap();
 
@@ -604,7 +604,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::TOML),
+            Some(Format::Toml),
         )
         .unwrap();
 
@@ -626,7 +626,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::TOML),
+            Some(Format::Toml),
         )
         .unwrap();
 
@@ -652,7 +652,7 @@ mod test {
                               type = "check_fields"
                               "message.equals" = "Sorry, I'm busy this week Cecil"
                     "#},
-                    Some(Format::TOML),
+                    Some(Format::Toml),
                 )
                 .unwrap()
             ),
@@ -679,7 +679,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::TOML),
+            Some(Format::Toml),
         )
         .unwrap();
 
@@ -700,7 +700,7 @@ mod test {
                           inputs = ["in"]
                           encoding = "json"
                     "#},
-                    Some(Format::TOML),
+                    Some(Format::Toml),
                 )
                 .unwrap()
             ),
@@ -844,7 +844,7 @@ mod resource_tests {
                   inputs = ["in0","in1"]
                   encoding = "json"
             "#},
-            Some(Format::TOML),
+            Some(Format::Toml),
         )
         .is_err());
     }

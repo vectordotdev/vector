@@ -75,7 +75,6 @@ pub mod trace;
 pub mod transforms;
 pub mod trigger;
 pub mod types;
-#[cfg(any(feature = "sources-utils-udp", feature = "sinks-utils-udp"))]
 pub mod udp;
 pub mod unit_test;
 pub(crate) mod utilization;

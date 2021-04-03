@@ -22,7 +22,7 @@ use futures::{stream::BoxStream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{path::PathBuf, pin::Pin, sync::Arc, time::Duration};
-use tokio::{net::UnixStream, time::delay_for};
+use tokio::{net::UnixStream, time::sleep};
 
 #[derive(Debug, Snafu)]
 pub enum UnixError {
@@ -89,7 +89,7 @@ impl UnixConnector {
                         error,
                         path: &self.path
                     });
-                    delay_for(backoff.next().unwrap()).await;
+                    sleep(backoff.next().unwrap()).await;
                 }
             }
         }
