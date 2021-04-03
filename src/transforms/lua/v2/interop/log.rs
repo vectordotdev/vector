@@ -1,3 +1,4 @@
+use super::util::type_name;
 use crate::event::{LogEvent, Value};
 use rlua::prelude::*;
 
@@ -20,7 +21,7 @@ impl<'a> FromLua<'a> for LogEvent {
                 Ok(log)
             }
             _ => Err(rlua::Error::FromLuaConversionError {
-                from: value.type_name(),
+                from: type_name(&value),
                 to: "LogEvent",
                 message: Some("LogEvent should ba a Lua table".to_string()),
             }),
@@ -60,7 +61,7 @@ mod test {
                     .load(assertion)
                     .eval()
                     .unwrap_or_else(|_| panic!("Failed to verify assertion {:?}", assertion));
-                assert!(result, assertion);
+                assert!(result, "{}", assertion);
             }
         });
     }

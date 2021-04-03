@@ -105,26 +105,39 @@ impl Expression for ParseJsonFn {
     }
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    test_type_def![value_string {
-        expr: |_| ParseJsonFn {
-            value: lit!("foo").boxed(),
-        },
-        def: TypeDef {
-            fallible: true,
-            kind: Kind::Bytes
-                | Kind::Boolean
-                | Kind::Integer
-                | Kind::Float
-                | Kind::Array
-                | Kind::Map
-                | Kind::Null,
-            ..Default::default()
-        },
-    }];
+    test_function![
+        parse_json => ParseJson;
+
+        parses {
+            args: func_args![ value: r#"{"field": "value"}"# ],
+            want: Ok(value!({ field: "value" })),
+            tdef: TypeDef::new()
+                .fallible()
+                .bytes()
+                .add_boolean()
+                .add_integer()
+                .add_float()
+                .add_null()
+                .add_array_mapped::<(), Kind>(map! { (): Kind::all() })
+                .add_object::<(), Kind>(map! { (): Kind::all() }),
+        }
+
+        invalid_json_errors {
+            args: func_args![ value: r#"{"field": "value"# ],
+            want: Err("unable to parse json: EOF while parsing a string at line 1 column 16"),
+            tdef: TypeDef::new()
+                .fallible()
+                .bytes()
+                .add_boolean()
+                .add_integer()
+                .add_float()
+                .add_null()
+                .add_array_mapped::<(), Kind>(map! { (): Kind::all() })
+                .add_object::<(), Kind>(map! { (): Kind::all() }),
+        }
+    ];
 }
-*/

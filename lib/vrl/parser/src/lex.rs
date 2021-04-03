@@ -245,6 +245,7 @@ pub enum Token<S> {
     Null,
     False,
     True,
+    Abort,
 
     // tokens
     Colon,
@@ -325,6 +326,7 @@ impl<S> Token<S> {
             If => If,
             Null => Null,
             True => True,
+            Abort => Abort,
 
             // tokens
             Colon => Colon,
@@ -378,6 +380,7 @@ where
             If => "If",
             Null => "Null",
             True => "True",
+            Abort => "Abort",
 
             // tokens
             Colon => "Colon",
@@ -418,13 +421,15 @@ impl<'input> Token<&'input str> {
             "true" => True,
             "false" => False,
             "null" => Null,
+            "abort" => Abort,
 
             // reserved identifiers
-            "abort" | "array" | "bool" | "boolean" | "break" | "continue" | "do" | "emit"
-            | "float" | "for" | "forall" | "foreach" | "all" | "each" | "any" | "try"
-            | "undefined" | "int" | "integer" | "iter" | "object" | "regex" | "return"
-            | "string" | "traverse" | "timestamp" | "duration" | "unless" | "walk" | "while"
-            | "loop" => ReservedIdentifier(s),
+            "array" | "bool" | "boolean" | "break" | "continue" | "do" | "emit" | "float"
+            | "for" | "forall" | "foreach" | "all" | "each" | "any" | "try" | "undefined"
+            | "int" | "integer" | "iter" | "object" | "regex" | "return" | "string"
+            | "traverse" | "timestamp" | "duration" | "unless" | "walk" | "while" | "loop" => {
+                ReservedIdentifier(s)
+            }
 
             _ if s.contains('@') => PathField(s),
 
@@ -812,6 +817,7 @@ impl<'input> Lexer<'input> {
                 '.' if last_char == Some(')') => valid = true,
                 '.' if last_char == Some('}') => valid = true,
                 '.' if last_char == Some(']') => valid = true,
+                '.' if last_char == Some('"') => valid = true,
                 '.' if last_char.map(is_ident_continue) == Some(true) => {
                     // we need to make sure we're not dealing with a float here
                     let digits = self.input[..pos]
@@ -1134,7 +1140,7 @@ mod test {
 
     fn lexer(input: &str) -> impl Iterator<Item = SpannedResult<'_, usize>> + '_ {
         let mut lexer = Lexer::new(input);
-        Box::new(std::iter::from_fn(move || Some(lexer.next()?)))
+        Box::new(std::iter::from_fn(move || lexer.next()))
     }
 
     // only exists to visually align assertions with inputs in tests
@@ -1695,6 +1701,25 @@ mod test {
                 ("        ~       ", RQuery),
                 ("          ~     ", Equals),
                 ("            ~~~~", True),
+            ],
+        );
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn quoted_path_queries() {
+        use StringLiteral as S;
+        use Token::StringLiteral as L;
+
+        test(
+            data(r#"."parent.key.with.special characters".child"#),
+            vec![
+                (r#"~                                          "#, LQuery),
+                (r#"~                                          "#, Dot),
+                (r#" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      "#, L(S::Escaped("parent.key.with.special characters"))),
+                (r#"                                     ~     "#, Dot),
+                (r#"                                      ~~~~~"#, Identifier("child")),
+                (r#"                                          ~"#, RQuery),
             ],
         );
     }

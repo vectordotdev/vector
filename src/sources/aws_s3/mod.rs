@@ -2,7 +2,7 @@ use super::util::MultilineConfig;
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     line_agg,
-    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
+    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -49,7 +49,7 @@ struct AwsS3Config {
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
-    auth: AWSAuthentication,
+    auth: AwsAuthentication,
 
     multiline: Option<MultilineConfig>,
 }
@@ -160,7 +160,7 @@ fn s3_object_decoder(
     content_type: Option<&str>,
     body: rusoto_s3::StreamingBody,
 ) -> Box<dyn tokio::io::AsyncRead + Send + Unpin> {
-    use async_compression::tokio_02::bufread;
+    use async_compression::tokio::bufread;
 
     let r = tokio::io::BufReader::new(body.into_async_read());
 
@@ -436,6 +436,7 @@ mod integration_tests {
         client
             .put_bucket_notification_configuration(PutBucketNotificationConfigurationRequest {
                 bucket: bucket_name.clone(),
+                expected_bucket_owner: None,
                 notification_configuration: NotificationConfiguration {
                     queue_configurations: Some(vec![QueueConfiguration {
                         events: vec!["s3:ObjectCreated:*".to_string()],

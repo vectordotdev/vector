@@ -32,12 +32,12 @@ impl Reader {
 
     /// Wait for the `kubectl logs` process to exit and return the exit code.
     pub async fn wait(&mut self) -> std::io::Result<ExitStatus> {
-        (&mut self.child).await
+        (&mut self.child).wait().await
     }
 
     /// Send a termination signal to the `kubectl logs` process.
-    pub fn kill(&mut self) -> std::io::Result<()> {
-        self.child.kill()
+    pub async fn kill(&mut self) -> std::io::Result<()> {
+        self.child.kill().await
     }
 
     /// Read one line from the stdout of the `kubectl logs` process.
@@ -47,7 +47,7 @@ impl Reader {
         match result {
             Ok(0) => None,
             Ok(_) => Some(s),
-            Err(err) => panic!(err),
+            Err(err) => panic!("{}", err),
         }
     }
 }
@@ -98,7 +98,7 @@ mod tests {
 
             // On line 100 issue a `kill` to stop the infinite stream.
             if expected_num == 100 {
-                reader.kill().expect("process already stopped")
+                reader.kill().await.expect("process already stopped")
             }
 
             // If we are past 200 it means we issued `kill` at 100 and it wasn't

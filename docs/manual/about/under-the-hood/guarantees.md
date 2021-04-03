@@ -1,12 +1,7 @@
 ---
 title: Guarantees
-description: Vector's gaurantees. Covering delivery and reliability guarantees for each Vector component.
+description: Vector's gaurantees. Covering delivery and stability guarantees for each Vector component.
 ---
-
-Faults in distributed systems are like green Skittles, we all wish they'd never
-happen but in reality the best we can do is understand and control the damage
-they cause. In event streaming pipelines that means understanding delivery
-and stability guarantees and their implications on your overall system.
 
 Vector attempts to make it clear which guarantees you can expect from it. We
 categorize all components by their targeted delivery guarantee and also by
@@ -25,13 +20,13 @@ support specific guarantees.
 
 ### At-Least-Once
 
-The `at-least-once` delivery guarantee ensures that an
-[event][docs.data-model] received by Vector will be delivered at least
-once to the configured destination(s). While rare, it is possible for an event
-to be delivered more than once. See the [Does Vector support exactly once
-delivery](#does-vector-support-exactly-once-delivery) FAQ below).
+The `at-least-once` delivery guarantee ensures that an [event][docs.data-model]
+received by a Vector component will be delivered at least once. While rare, it
+is possible for an event to be delivered more than once. See the
+[Does Vector support exactly once delivery](#does-vector-support-exactly-once-delivery)
+FAQ below).
 
-<Alert type="warning">
+<Alert variant="outlined" severity="warning">
 
 In order to achieve at least once delivery between restarts your source must
 be configured to use `disk` based buffers:
@@ -50,19 +45,18 @@ Refer to each [sink's][docs.sinks] documentation for further guidance on its
 buffer options.
 
 </Alert>
+
 <Jump to="/components/?at-least-once=true">View all at-least-once components</Jump>
+
 </li>
 <li>
 
 ### Best-Effort
 
-A `best-effort` delivery guarantee means that Vector will make a best effort to
-deliver each event, but cannot _guarantee_ delivery. This is usually due to
-limitations of the underlying protocol; which are outside the scope of Vector. It's
-important to note that while data loss is possible, it is usually rare and
-Vector does everything within its control to ensure data is not lost. For more
-info, see the
-["Do I need at least once delivery?"](#do-i-need-at-least-once-delivery) FAQ.
+A `best-effort` delivery guarantee means that a Vector component will make a
+best effort to deliver each event, but cannot _guarantee_ delivery. This is
+usually due to limitations of the underlying protocol; which are outside the
+control of Vector.
 
 Note that this is _not_ the same as `at-most-once` delivery, as it is still
 possible for Vector to introduce duplicates under extreme circumstances.
@@ -70,16 +64,16 @@ possible for Vector to introduce duplicates under extreme circumstances.
 </li>
 </ul>
 
-## Reliability Guarantee
+## Stability Guarantees
 
 <ul class="connected-list">
 <li>
 
-### Prod-Ready
+### Stable
 
-The `prod-ready` status is a _subjective_ status defined by the Vector team. It is
-intended to give you a general idea of a feature's reliability for production
-environments. A feature is `prod-ready` if it meets the following criteria:
+The `stable` status is a _subjective_ status defined by the Vector team. It is
+intended to give you a general idea of a feature's stability for production
+environments. A feature is `stable` if it meets the following criteria:
 
 1. A meaningful amount of users (generally >50) have been using the feature in
    a production environment for sustained periods without issue.
@@ -88,7 +82,7 @@ environments. A feature is `prod-ready` if it meets the following criteria:
 3. The feature API is stable and unlikely to change.
 4. There are no major [open bugs][urls.vector_bug_issues] for the feature.
 
-<Jump to="/components/?prod-ready=true">View all prod-ready components</Jump>
+<Jump to="/components/?stable=true">View all stable components</Jump>
 
 </li>
 <li>
@@ -96,8 +90,17 @@ environments. A feature is `prod-ready` if it meets the following criteria:
 ### Beta
 
 The `beta` status means that a feature has not met the criteria outlined in
-the [Prod-Ready](#prod-ready) section and therefore should be used with caution
+the [stable](#stable) section and therefore should be used with caution
 in production environments.
+
+</li>
+<li>
+
+### Deprecated
+
+The `deprecated` status means that a feature will be removed in the next major
+version of Vector. We will provide ample time to transition and, when possible,
+we will strive to retain backward compatibility.
 
 </li>
 </ul>
@@ -125,7 +128,7 @@ limitations of the underlying protocol.
 No, Vector does not support exactly once delivery. There are future plans to
 partially support this for sources and sinks that support it, for example Kafka,
 but it remains unclear if Vector will ever be able to achieve this.
-We recommend [subscribing to our mailing list](https://vector.dev/community),
+We recommend [subscribing to our mailing list](/community),
 which will keep you in the loop if this ever changes.
 
 ### How can I find components that meet these guarantees?
@@ -133,7 +136,7 @@ which will keep you in the loop if this ever changes.
 Head over to the [components section][pages.components] and use the guarantee
 filters.
 
-[docs.data-model]: /docs/about/data-model/
-[docs.sinks]: /docs/reference/sinks/
+[docs.data-model]: /docs/about/under-the-hood/architecture/data-model/
+[docs.sinks]: /docs/reference/configuration/sinks/
 [pages.components]: /components/
 [urls.vector_bug_issues]: https://github.com/timberio/vector/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22

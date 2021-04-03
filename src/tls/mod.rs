@@ -1,4 +1,4 @@
-use crate::tcp::TcpKeepaliveConfig;
+use crate::tcp::{self, TcpKeepaliveConfig};
 use openssl::{
     error::ErrorStack,
     ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
@@ -6,7 +6,7 @@ use openssl::{
 use snafu::{ResultExt, Snafu};
 use std::{fmt::Debug, net::SocketAddr, path::PathBuf, time::Duration};
 use tokio::net::TcpStream;
-use tokio_openssl::{HandshakeError, SslStream};
+use tokio_openssl::SslStream;
 
 #[cfg(feature = "sources-utils-tls")]
 mod incoming;
@@ -76,11 +76,13 @@ pub enum TlsError {
     #[snafu(display("TLS configuration requires a certificate when enabled"))]
     MissingRequiredIdentity,
     #[snafu(display("TLS handshake failed: {}", source))]
-    Handshake { source: HandshakeError<TcpStream> },
+    Handshake { source: openssl::ssl::Error },
     #[snafu(display("Incoming listener failed: {}", source))]
     IncomingListener { source: tokio::io::Error },
     #[snafu(display("Creating the TLS acceptor failed: {}", source))]
     CreateAcceptor { source: ErrorStack },
+    #[snafu(display("Error building SSL context: {}", source))]
+    SslBuildError { source: openssl::error::ErrorStack },
     #[snafu(display("Error setting up the TLS certificate: {}", source))]
     SetCertificate { source: ErrorStack },
     #[snafu(display("Error setting up the TLS private key: {}", source))]
@@ -132,7 +134,11 @@ impl MaybeTlsStream<TcpStream> {
             Self::Tls(tls) => tls.get_ref(),
         };
 
-        stream.set_keepalive(keepalive.time_secs.map(Duration::from_secs))?;
+        if let Some(time_secs) = keepalive.time_secs {
+            let config = socket2::TcpKeepalive::new().with_time(Duration::from_secs(time_secs));
+
+            tcp::set_keepalive(stream, &config)?;
+        }
 
         Ok(())
     }
@@ -143,9 +149,7 @@ impl MaybeTlsStream<TcpStream> {
             Self::Tls(tls) => tls.get_ref(),
         };
 
-        stream.set_send_buffer_size(bytes)?;
-
-        Ok(())
+        tcp::set_send_buffer_size(stream, bytes)
     }
 
     pub fn set_receive_buffer_bytes(&mut self, bytes: usize) -> std::io::Result<()> {
@@ -154,9 +158,7 @@ impl MaybeTlsStream<TcpStream> {
             Self::Tls(tls) => tls.get_ref(),
         };
 
-        stream.set_recv_buffer_size(bytes)?;
-
-        Ok(())
+        tcp::set_receive_buffer_size(stream, bytes)
     }
 }
 

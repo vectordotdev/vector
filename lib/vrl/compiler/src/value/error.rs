@@ -6,11 +6,7 @@ use diagnostic::DiagnosticError;
 pub enum Error {
     #[error(
         r#"expected {}, got {got}"#,
-        if .expected.is_many() {
-            format!("{}", .expected)
-        } else {
-            format!(r#""{}""#, .expected)
-        }
+        .expected
     )]
     Expected { got: Kind, expected: Kind },
 
@@ -87,9 +83,10 @@ impl DiagnosticError for Error {
 
 impl From<Error> for ExpressionError {
     fn from(err: Error) -> Self {
-        ExpressionError {
+        Self::Error {
             message: err.message(),
-            ..Default::default()
+            labels: vec![],
+            notes: vec![],
         }
     }
 }

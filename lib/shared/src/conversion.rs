@@ -23,7 +23,7 @@ pub enum Conversion {
     Boolean,
     Timestamp(TimeZone),
     TimestampFmt(String, TimeZone),
-    TimestampTZFmt(String),
+    TimestampTzFmt(String),
 }
 
 #[derive(Debug, Eq, PartialEq, Snafu)]
@@ -99,7 +99,7 @@ impl Conversion {
                 // convert with tone zones, so this has to distinguish
                 // between the two types of formats.
                 if format_has_zone(fmt) {
-                    Ok(Self::TimestampTZFmt(fmt.into()))
+                    Ok(Self::TimestampTzFmt(fmt.into()))
                 } else {
                     Ok(Self::TimestampFmt(fmt.into(), tz.to_owned()))
                 }
@@ -137,7 +137,7 @@ impl Conversion {
 
                 datetime_to_utc(dt).into()
             }
-            Self::TimestampTZFmt(format) => {
+            Self::TimestampTzFmt(format) => {
                 let s = String::from_utf8_lossy(&bytes);
                 let dt = DateTime::parse_from_str(&s, &format)
                     .with_context(|| TimestampParseError { s })?;
@@ -213,6 +213,7 @@ const TIMESTAMP_TZ_FORMATS: &[&str] = &[
     "%a %d %b %T %Z %Y",  // `date` command output
     "%a %d %b %T %z %Y",  // `date` command output, numeric TZ
     "%a %d %b %T %#z %Y", // `date` command output, numeric TZ
+    "%d/%b/%Y:%T %z",     // Common Log
 ];
 
 /// Parse a string into a timestamp using one of a set of formats
@@ -345,6 +346,7 @@ mod tests {
         assert_eq!(parse_timestamp(tz, "3-Feb-2001 14:05:06"), good);
         assert_eq!(parse_timestamp(tz, "2001-02-02T22:05:06-06:00"), good);
         assert_eq!(parse_timestamp(tz, "Sat, 03 Feb 2001 07:05:06 +0300"), good);
+        assert_eq!(parse_timestamp(tz, "03/Feb/2001:02:05:06 -0200"), good);
     }
 
     #[cfg(unix)] // see https://github.com/timberio/vector/issues/1201

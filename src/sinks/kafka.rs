@@ -1,13 +1,14 @@
 use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    internal_events::TemplateRenderingFailed,
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         BatchConfig,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     Event,
 };
 use futures::{
@@ -16,7 +17,7 @@ use futures::{
 };
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
-    error::{KafkaError, RDKafkaError},
+    error::{KafkaError, RDKafkaErrorCode},
     producer::{DeliveryFuture, FutureProducer, FutureRecord},
     ClientConfig,
 };
@@ -29,7 +30,7 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use tokio::time::{delay_for, Duration};
+use tokio::time::{sleep, Duration};
 
 // Maximum number of futures blocked by [send_result](https://docs.rs/rdkafka/0.24.0/rdkafka/producer/future_producer/struct.FutureProducer.html#method.send_result)
 const SEND_RESULT_LIMIT: usize = 5;
@@ -39,7 +40,7 @@ enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
     KafkaCreateFailed { source: KafkaError },
     #[snafu(display("invalid topic template: {}", source))]
-    TopicTemplate { source: TemplateError },
+    TopicTemplate { source: TemplateParseError },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -277,8 +278,12 @@ impl Sink<Event> for KafkaSink {
             "Expected `poll_ready` to be called first."
         );
 
-        let topic = self.topic.render_string(&item).map_err(|missing_keys| {
-            error!(message = "Missing keys for topic.", missing_keys = ?missing_keys);
+        let topic = self.topic.render_string(&item).map_err(|error| {
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("topic"),
+                drop_event: true,
+            });
         })?;
 
         let timestamp_ms = match &item {
@@ -308,11 +313,11 @@ impl Sink<Event> for KafkaSink {
                     // See item 4 on GitHub: https://github.com/timberio/vector/pull/101#issue-257150924
                     // https://docs.rs/rdkafka/0.24.0/src/rdkafka/producer/future_producer.rs.html#296
                     Err((error, future_record))
-                        if error == KafkaError::MessageProduction(RDKafkaError::QueueFull) =>
+                        if error == KafkaError::MessageProduction(RDKafkaErrorCode::QueueFull) =>
                     {
                         debug!(message = "The rdkafka queue full.", %error, %seqno, internal_log_rate_secs = 1);
                         record = future_record;
-                        delay_for(Duration::from_millis(10)).await;
+                        sleep(Duration::from_millis(10)).await;
                     }
                     Err((error, _)) => break Err(error),
                 }
@@ -371,10 +376,10 @@ async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
         .render_string(&Event::from(""))
     {
         Ok(topic) => Some(topic),
-        Err(missing_keys) => {
+        Err(error) => {
             warn!(
                 message = "Could not generate topic for healthcheck.",
-                ?missing_keys
+                %error,
             );
             None
         }
@@ -793,18 +798,23 @@ mod integration_test {
         let _ = kafka_auth.apply(&mut client_config).unwrap();
 
         let mut tpl = TopicPartitionList::new();
-        tpl.add_partition(&topic, 0).set_offset(Offset::Beginning);
+        tpl.add_partition(&topic, 0)
+            .set_offset(Offset::Beginning)
+            .unwrap();
 
         let consumer: BaseConsumer = client_config.create().unwrap();
         consumer.assign(&tpl).unwrap();
 
         // wait for messages to show up
-        wait_for(|| {
-            let (_low, high) = consumer
-                .fetch_watermarks(&topic, 0, Duration::from_secs(3))
-                .unwrap();
-            ready(high > 0)
-        })
+        wait_for(
+            || match consumer.fetch_watermarks(&topic, 0, Duration::from_secs(3)) {
+                Ok((_low, high)) => ready(high > 0),
+                Err(err) => {
+                    println!("retrying due to error fetching watermarks: {}", err);
+                    ready(false)
+                }
+            },
+        )
         .await;
 
         // check we have the expected number of messages in the topic

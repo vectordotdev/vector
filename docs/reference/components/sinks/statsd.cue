@@ -17,7 +17,7 @@ components: sinks: statsd: {
 			request: sinks.socket.features.send.request
 			send_buffer_bytes: {
 				enabled:       true
-				relevant_when: "mode = `tcp` or mode = `udp` && os = `unix`"
+				relevant_when: "mode = `tcp` or mode = `udp`"
 			}
 			tls: sinks.socket.features.send.tls
 			to: {

@@ -10,7 +10,7 @@ use crate::{
     tls::TlsConfig,
     Pipeline,
 };
-use bytes::{buf::BufExt, Bytes};
+use bytes::{Buf, Bytes};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -62,6 +62,7 @@ impl HttpSource for LogplexSource {
         body: Bytes,
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
+        _full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
         decode_message(body, header_map)
             .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
@@ -81,7 +82,15 @@ impl SourceConfig for LogplexConfig {
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
         };
-        source.run(self.address, "events", &self.tls, &self.auth, out, shutdown)
+        source.run(
+            self.address,
+            "events",
+            true,
+            &self.tls,
+            &self.auth,
+            out,
+            shutdown,
+        )
     }
 
     fn output_type(&self) -> DataType {
@@ -153,7 +162,7 @@ fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, Erro
         );
 
         if cfg!(test) {
-            panic!(error_msg);
+            panic!("{}", error_msg);
         }
         return Err(header_error_message("Logplex-Msg-Count", &error_msg));
     }
@@ -241,9 +250,9 @@ mod tests {
         Pipeline,
     };
     use chrono::{DateTime, Utc};
+    use futures::channel::mpsc;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {

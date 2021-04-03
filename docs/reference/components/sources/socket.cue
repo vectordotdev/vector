@@ -28,7 +28,7 @@ components: sources: socket: {
 			}
 			receive_buffer_bytes: {
 				enabled:       true
-				relevant_when: "mode = `tcp` or mode = `udp` && os = `unix`"
+				relevant_when: "mode = `tcp` or mode = `udp`"
 			}
 			keepalive: enabled: true
 			tls: {
@@ -159,6 +159,7 @@ components: sources: socket: {
 	]
 
 	telemetry: metrics: {
+		events_in_total:              components.sources.internal_metrics.output.metrics.events_in_total
 		connection_errors_total:      components.sources.internal_metrics.output.metrics.connection_errors_total
 		connection_failed_total:      components.sources.internal_metrics.output.metrics.connection_failed_total
 		connection_established_total: components.sources.internal_metrics.output.metrics.connection_established_total

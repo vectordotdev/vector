@@ -67,7 +67,7 @@ impl Assignment {
                 Ok(Self { variant })
             }
 
-            Variant::Infallible { ok, err, expr } => {
+            Variant::Infallible { ok, err, expr, .. } => {
                 let ok_span = ok.span();
                 let err_span = err.span();
                 let expr_span = expr.span();
@@ -108,7 +108,8 @@ impl Assignment {
                 // set to being infallible, as the error will be captured by the
                 // "err" target.
                 let ok = Target::try_from(ok.into_inner())?;
-                let type_def = type_def.add_null().infallible();
+                let type_def = type_def.infallible();
+                let default = type_def.kind().default_value();
                 let value = match &expr {
                     Expr::Literal(v) => Some(v.to_value()),
                     _ => None,
@@ -127,6 +128,7 @@ impl Assignment {
                     ok,
                     err,
                     expr: Box::new(expr),
+                    default,
                 };
 
                 Ok(Self { variant })
@@ -159,7 +161,7 @@ impl fmt::Display for Assignment {
 
         match &self.variant {
             Single { target, expr } => write!(f, "{} = {}", target, expr),
-            Infallible { ok, err, expr } => write!(f, "{}, {} = {}", ok, err, expr),
+            Infallible { ok, err, expr, .. } => write!(f, "{}, {} = {}", ok, err, expr),
         }
     }
 }
@@ -170,7 +172,9 @@ impl fmt::Debug for Assignment {
 
         match &self.variant {
             Single { target, expr } => write!(f, "{:?} = {:?}", target, expr),
-            Infallible { ok, err, expr } => write!(f, "Ok({:?}), Err({:?}) = {:?}", ok, err, expr),
+            Infallible { ok, err, expr, .. } => {
+                write!(f, "Ok({:?}), Err({:?}) = {:?}", ok, err, expr)
+            }
         }
     }
 }
@@ -345,8 +349,18 @@ impl TryFrom<ast::AssignmentTarget> for Target {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Variant<T, U> {
-    Single { target: T, expr: Box<U> },
-    Infallible { ok: T, err: T, expr: Box<U> },
+    Single {
+        target: T,
+        expr: Box<U>,
+    },
+    Infallible {
+        ok: T,
+        err: T,
+        expr: Box<U>,
+
+        /// The default `ok` value used when the expression results in an error.
+        default: Value,
+    },
 }
 
 impl<U> Expression for Variant<Target, U>
@@ -362,14 +376,19 @@ where
                 target.insert(value.clone(), ctx);
                 value
             }
-            Infallible { ok, err, expr } => match expr.resolve(ctx) {
+            Infallible {
+                ok,
+                err,
+                expr,
+                default,
+            } => match expr.resolve(ctx) {
                 Ok(value) => {
                     ok.insert(value.clone(), ctx);
                     err.insert(Value::Null, ctx);
                     value
                 }
                 Err(error) => {
-                    ok.insert(Value::Null, ctx);
+                    ok.insert(default.clone(), ctx);
                     let value = Value::from(error.to_string());
                     err.insert(value.clone(), ctx);
                     value
@@ -400,7 +419,7 @@ where
 
         match self {
             Single { target, expr } => write!(f, "{} = {}", target, expr),
-            Infallible { ok, err, expr } => write!(f, "{}, {} = {}", ok, err, expr),
+            Infallible { ok, err, expr, .. } => write!(f, "{}, {} = {}", ok, err, expr),
         }
     }
 }

@@ -2,6 +2,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::HttpClient,
+    internal_events::DatadogLogEventProcessed,
     sinks::{
         util::{
             batch::{Batch, BatchError},
@@ -231,6 +232,13 @@ impl HttpSink for DatadogLogsJsonService {
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let body = serde_json::to_vec(&events)?;
+        // check the number of events to ignore health-check requests
+        if !events.is_empty() {
+            emit!(DatadogLogEventProcessed {
+                byte_size: body.len(),
+                count: events.len(),
+            });
+        }
         self.config.build_request("application/json", body)
     }
 }
@@ -241,7 +249,13 @@ impl HttpSink for DatadogLogsTextService {
     type Output = Vec<Bytes>;
 
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
-        encode_event(event, &self.config.encoding)
+        encode_event(event, &self.config.encoding).map(|e| {
+            emit!(DatadogLogEventProcessed {
+                byte_size: e.len(),
+                count: 1,
+            });
+            e
+        })
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {

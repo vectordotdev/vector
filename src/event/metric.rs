@@ -1,6 +1,9 @@
+use super::EventMetadata;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
+use getset::Getters;
 use serde::{Deserialize, Serialize};
+use shared::EventDataEq;
 use snafu::Snafu;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -10,12 +13,15 @@ use std::{
 };
 use vrl::{path::Segment, Target};
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Getters, PartialEq, Serialize)]
 pub struct Metric {
     #[serde(flatten)]
     pub series: MetricSeries,
     #[serde(flatten)]
     pub data: MetricData,
+    #[getset(get = "pub")]
+    #[serde(skip)]
+    metadata: EventMetadata,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -239,6 +245,7 @@ impl Metric {
                 kind,
                 value,
             },
+            metadata: EventMetadata,
         }
     }
 
@@ -257,11 +264,17 @@ impl Metric {
         self
     }
 
+    pub fn with_value(mut self, value: MetricValue) -> Self {
+        self.data.value = value;
+        self
+    }
+
     /// Rewrite this into a Metric with the data marked as absolute.
     pub fn into_absolute(self) -> Self {
         Self {
             series: self.series,
             data: self.data.into_absolute(),
+            metadata: EventMetadata,
         }
     }
 
@@ -270,6 +283,7 @@ impl Metric {
         Self {
             series: self.series,
             data: self.data.into_incremental(),
+            metadata: EventMetadata,
         }
     }
 
@@ -361,7 +375,16 @@ impl Metric {
         Self {
             series: self.series.clone(),
             data: self.data.zero(),
+            metadata: EventMetadata,
         }
+    }
+}
+
+impl EventDataEq for Metric {
+    fn event_data_eq(&self, other: &Self) -> bool {
+        self.series == other.series
+            && self.data == other.data
+            && self.metadata.event_data_eq(&other.metadata)
     }
 }
 
@@ -386,7 +409,14 @@ impl MetricData {
 
     /// Update this MetricData by adding the value from another.
     pub fn update(&mut self, other: &Self) {
-        self.value.add(&other.value)
+        self.value.add(&other.value);
+        // Update the timestamp to the latest one
+        self.timestamp = match (self.timestamp, other.timestamp) {
+            (None, None) => None,
+            (Some(t), None) => Some(t),
+            (None, Some(t)) => Some(t),
+            (Some(t1), Some(t2)) => Some(t1.max(t2)),
+        };
     }
 
     /// Add the data from the other metric to this one. The `other` must
@@ -929,6 +959,7 @@ mod test {
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 3.0 },
             )
+            .with_timestamp(Some(ts()))
         )
     }
 
@@ -957,6 +988,7 @@ mod test {
                 MetricKind::Incremental,
                 MetricValue::Gauge { value: -1.0 },
             )
+            .with_timestamp(Some(ts()))
         )
     }
 
@@ -991,6 +1023,7 @@ mod test {
                     values: vec!["old".into(), "new".into()].into_iter().collect()
                 },
             )
+            .with_timestamp(Some(ts()))
         )
     }
 
@@ -1028,6 +1061,7 @@ mod test {
                     statistic: StatisticKind::Histogram
                 },
             )
+            .with_timestamp(Some(ts()))
         )
     }
 

@@ -70,77 +70,77 @@ impl Expression for ToSyslogLevelFn {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     test_type_def![value_non_integer_fallible {
-//         expr: |_| ToSyslogLevelFn {
-//             value: Literal::from("foo").boxed(),
-//         },
-//         def: TypeDef {
-//             fallible: true,
-//             kind: Kind::Bytes,
-//             ..Default::default()
-//         },
-//     }];
+    test_function![
+        to_syslog_level => ToSyslogLevel;
 
-//     test_function![
-//         to_syslog_level => ToSyslogLevel;
+        emergency {
+            args: func_args![value: value!(0)],
+            want: Ok(value!("emerg")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         emergency {
-//             args: func_args![value: value!(0)],
-//             want: Ok(value!("emerg")),
-//         }
+        alert {
+            args: func_args![value: value!(1)],
+            want: Ok(value!("alert")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         alert {
-//             args: func_args![value: value!(1)],
-//             want: Ok(value!("alert")),
-//         }
+        critical {
+            args: func_args![value: value!(2)],
+            want: Ok(value!("crit")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         critical {
-//             args: func_args![value: value!(2)],
-//             want: Ok(value!("crit")),
-//         }
+        error {
+            args: func_args![value: value!(3)],
+            want: Ok(value!("err")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         error {
-//             args: func_args![value: value!(3)],
-//             want: Ok(value!("err")),
-//         }
+        warning {
+            args: func_args![value: value!(4)],
+            want: Ok(value!("warning")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         warning {
-//             args: func_args![value: value!(4)],
-//             want: Ok(value!("warning")),
-//         }
+        notice {
+            args: func_args![value: value!(5)],
+            want: Ok(value!("notice")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         notice {
-//             args: func_args![value: value!(5)],
-//             want: Ok(value!("notice")),
-//         }
+        informational {
+            args: func_args![value: value!(6)],
+            want: Ok(value!("info")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         informational {
-//             args: func_args![value: value!(6)],
-//             want: Ok(value!("info")),
-//         }
+        debug {
+            args: func_args![value: value!(7)],
+            want: Ok(value!("debug")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         debug {
-//             args: func_args![value: value!(7)],
-//             want: Ok(value!("debug")),
-//         }
+        invalid_severity_next_int {
+            args: func_args![value: value!(8)],
+            want: Err("severity level 8 not valid"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         invalid_severity_next_int {
-//             args: func_args![value: value!(8)],
-//             want: Err("function call error: severity level 8 not valid"),
-//         }
+        invalid_severity_larger_int {
+            args: func_args![value: value!(475)],
+            want: Err("severity level 475 not valid"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
 
-//         invalid_severity_larger_int {
-//             args: func_args![value: value!(475)],
-//             want: Err("function call error: severity level 475 not valid"),
-//         }
-
-//         invalid_severity_negative_int {
-//             args: func_args![value: value!(-1)],
-//             want: Err("function call error: severity level -1 not valid"),
-//         }
-//     ];
-// }
+        invalid_severity_negative_int {
+            args: func_args![value: value!(-1)],
+            want: Err("severity level -1 not valid"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
+    ];
+}

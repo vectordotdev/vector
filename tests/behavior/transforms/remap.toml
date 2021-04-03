@@ -1,3 +1,45 @@
+[transforms.remap_abort]
+  inputs = []
+  type = "remap"
+  drop_on_abort = false
+  source = """
+    .foo = false
+    abort
+    .bar = false
+  """
+[[tests]]
+  name = "remap_abort"
+  [tests.input]
+    insert_at = "remap_abort"
+    type = "log"
+    [tests.input.log_fields]
+      foo = true
+      bar = true
+  [[tests.outputs]]
+    extract_from = "remap_abort"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = ".foo == true && .bar == true"
+
+[transforms.remap_abort_drop_on_abort]
+  inputs = []
+  type = "remap"
+  drop_on_abort = true
+  source = """
+    .foo = false
+    abort
+    .bar = false
+  """
+[[tests]]
+  name = "remap_abort_drop_on_abort"
+  no_outputs_from = ["remap_abort_drop_on_abort"]
+  [tests.input]
+    insert_at = "remap_abort_drop_on_abort"
+    type = "log"
+    [tests.input.log_fields]
+      foo = true
+      bar = true
+
 [transforms.remap_nested]
   inputs = []
   type = "remap"
@@ -83,7 +125,7 @@
 [transforms.remap_arithmetic_error]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     a = 10
     b = 0
@@ -99,7 +141,7 @@
     extract_from = "remap_arithmetic_error"
     [[tests.outputs.conditions]]
       type = "remap"
-      source = ".a == null"
+      source = ".a == 0.0"
 
 [transforms.remap_boolean_arithmetic]
   inputs = []
@@ -319,7 +361,7 @@
 [transforms.remap_function_upcase_error]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     .a = upcase(string!(.a))
     .b = upcase(string!(.b))
@@ -337,7 +379,7 @@
 [transforms.remap_function_downcase]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     .a = downcase(string!(.a))
     .b = downcase(string!(.b))
@@ -371,7 +413,7 @@
 [transforms.remap_function_downcase_error]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     .a = downcase(string!(.a))
     .b = downcase(string!(.b))
@@ -419,7 +461,7 @@
     .a = sha1(string!(.a))
 
     if sha1(string!(.b)) == "62cdb7020ff920e5aa642c3d4066950dd1f01f4d" {
-      .b = sha1(.a + .b + "baz")
+      .b = sha1(.a + string!(.b) + "baz")
     }
   """
 [[tests]]
@@ -442,7 +484,7 @@
 [transforms.remap_function_sha1_error]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     .a = sha1(string!(.a))
     .b = sha1(string!(.b))
@@ -464,7 +506,7 @@
     .a = md5(string!(.a))
 
     if md5(string!(.b)) == "37b51d194a7513e45b56f6524f2d51f2" {
-      .b = md5(.a + .b + "baz")
+      .b = md5(.a + string!(.b) + "baz")
     }
   """
 [[tests]]
@@ -487,7 +529,7 @@
 [transforms.remap_function_md5_error]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     .a = md5(string!(.a))
     .b = md5(string!(.b))
@@ -1039,6 +1081,42 @@
 #         .bar == "foob..."
 #       '''
 
+[transforms.remap_function_tag_types_externally]
+  inputs = []
+  type = "remap"
+  source = """
+    .string = tag_types_externally("foo")
+    .integer = tag_types_externally(123)
+    .float = tag_types_externally(123.45)
+    .boolean = tag_types_externally(true)
+    .map = tag_types_externally({ "foo": "bar" })
+    .array = tag_types_externally(["foo"])
+    .timestamp = tag_types_externally(to_timestamp!("2021-01-01T00:00:00.00Z"))
+    .regex = tag_types_externally(r'.*')
+    .null = tag_types_externally(null)
+  """
+[[tests]]
+  name = "remap_function_tag_types_externally"
+  [tests.input]
+    insert_at = "remap_function_tag_types_externally"
+    type = "log"
+    log_fields = {}
+  [[tests.outputs]]
+    extract_from = "remap_function_tag_types_externally"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = '''
+        .string == { "string": "foo" } &&
+        .integer == { "integer": 123 } &&
+        .float == { "float": 123.45 } &&
+        .boolean == { "boolean": true } &&
+        .map == { "foo": { "string": "bar" } } &&
+        .array == [{ "string": "foo" }] &&
+        .timestamp == { "timestamp": to_timestamp!("2021-01-01T00:00:00.00Z") } &&
+        .regex == { "regex": ".*" } &&
+        .null == null
+      '''
+
 # [transforms.remap_function_strip_whitespace]
 #   inputs = []
 #   type = "remap"
@@ -1295,7 +1373,7 @@
 # [transforms.remap_function_assert_pass]
 #   inputs = []
 #   type = "remap"
-#   drop_on_err = true
+#   drop_on_error = true
 #   source = """
 #     assert!(.foo, message: "assert failed")
 #     .check = "checked"
@@ -1318,7 +1396,7 @@
 # [transforms.remap_function_assert_fail]
 #   inputs = []
 #   type = "remap"
-#   drop_on_err = true
+#   drop_on_error = true
 #   source = """
 #     assert!(.foo, message: "assert failed")
 #   """

@@ -94,9 +94,10 @@ components: sinks: nats: {
 	}
 
 	telemetry: metrics: {
-		missing_keys_total:     components.sources.internal_metrics.output.metrics.missing_keys_total
-		processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
-		send_errors_total:      components.sources.internal_metrics.output.metrics.send_errors_total
+		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:  components.sources.internal_metrics.output.metrics.processed_events_total
+		send_errors_total:       components.sources.internal_metrics.output.metrics.send_errors_total
 	}
 }

@@ -6,7 +6,6 @@ remap: errors: "107": {
 		A [function call expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor)) fails to pass
 		a required argument.
 		"""
-	rationale:   null
 	resolution: """
 		Supply all of the required function arguments to adhere to the function's documented signature.
 		"""

@@ -3,15 +3,15 @@ use crate::{
     emit,
     event::Event,
     http::{Auth, HttpClient, HttpError, MaybeAuth},
-    internal_events::{ElasticSearchEventEncoded, ElasticSearchMissingKeys},
-    rusoto::{self, region_from_endpoint, AWSAuthentication, RegionOrEndpoint},
+    internal_events::{ElasticSearchEventEncoded, TemplateRenderingFailed},
+    rusoto::{self, region_from_endpoint, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
         retries::{RetryAction, RetryLogic},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
@@ -85,7 +85,7 @@ pub enum Encoding {
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum ElasticSearchAuth {
     Basic { user: String, password: String },
-    Aws(AWSAuthentication),
+    Aws(AwsAuthentication),
 }
 
 #[derive(Derivative, Deserialize, Serialize, Clone, Debug)]
@@ -185,9 +185,9 @@ enum ParseError {
     #[snafu(display("Host {:?} must include hostname", host))]
     HostMustIncludeHostname { host: String },
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
-    AWSCredentialsGenerateFailed { source: CredentialsError },
+    AwsCredentialsGenerateFailed { source: CredentialsError },
     #[snafu(display("Index template parse error: {}", source))]
-    IndexTemplate { source: TemplateError },
+    IndexTemplate { source: TemplateParseError },
 }
 
 #[async_trait::async_trait]
@@ -199,9 +199,11 @@ impl HttpSink for ElasticSearchCommon {
         let index = self
             .index
             .render_string(&event)
-            .map_err(|missing_keys| {
-                emit!(ElasticSearchMissingKeys {
-                    keys: &missing_keys
+            .map_err(|error| {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("index"),
+                    drop_event: true,
                 });
             })
             .ok()?;
@@ -290,32 +292,32 @@ impl HttpSink for ElasticSearchCommon {
 struct ElasticSearchRetryLogic;
 
 #[derive(Deserialize, Debug)]
-struct ESResultResponse {
-    items: Vec<ESResultItem>,
+struct EsResultResponse {
+    items: Vec<EsResultItem>,
 }
 #[derive(Deserialize, Debug)]
-enum ESResultItem {
+enum EsResultItem {
     #[serde(rename = "index")]
-    Index(ESIndexResult),
+    Index(EsIndexResult),
     #[serde(rename = "create")]
-    Create(ESIndexResult),
+    Create(EsIndexResult),
 }
 #[derive(Deserialize, Debug)]
-struct ESIndexResult {
-    error: Option<ESErrorDetails>,
+struct EsIndexResult {
+    error: Option<EsErrorDetails>,
 }
 #[derive(Deserialize, Debug)]
-struct ESErrorDetails {
+struct EsErrorDetails {
     reason: String,
     #[serde(rename = "type")]
     err_type: String,
 }
 
-impl ESResultItem {
-    fn result(self) -> ESIndexResult {
+impl EsResultItem {
+    fn result(self) -> EsIndexResult {
         match self {
-            ESResultItem::Index(r) => r,
-            ESResultItem::Create(r) => r,
+            EsResultItem::Index(r) => r,
+            EsResultItem::Create(r) => r,
         }
     }
 }
@@ -360,7 +362,7 @@ impl RetryLogic for ElasticSearchRetryLogic {
 }
 
 fn get_error_reason(body: &str) -> String {
-    match serde_json::from_str::<ESResultResponse>(&body) {
+    match serde_json::from_str::<EsResultResponse>(&body) {
         Err(json_error) => format!(
             "some messages failed, could not parse response, error: {}",
             json_error
@@ -494,7 +496,7 @@ async fn finish_signer(
     let credentials = credentials_provider
         .credentials()
         .await
-        .context(AWSCredentialsGenerateFailed)?;
+        .context(AwsCredentialsGenerateFailed)?;
 
     signer.sign(&credentials);
 
@@ -614,7 +616,7 @@ mod tests {
         let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
 {"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
 "#;
-        assert_eq!(std::str::from_utf8(&encoded).unwrap(), &expected[..]);
+        assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     }
 
     #[test]
@@ -666,13 +668,13 @@ mod tests {
         let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
 {"foo":"bar","message":"hello there"}
 "#;
-        assert_eq!(std::str::from_utf8(&encoded).unwrap(), &expected[..]);
+        assert_eq!(std::str::from_utf8(&encoded).unwrap(), expected);
     }
 
     #[test]
     fn validate_host_header_on_aws_requests() {
         let config = ElasticSearchConfig {
-            auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default {})),
+            auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
             endpoint: "http://abc-123.us-east-1.es.amazonaws.com".into(),
             batch: BatchConfig {
                 max_events: Some(1),
@@ -838,7 +840,7 @@ mod integration_tests {
 
         run_insert_tests(
             ElasticSearchConfig {
-                auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default {})),
+                auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
                 endpoint: "http://localhost:4571".into(),
                 ..config()
             },
@@ -853,7 +855,7 @@ mod integration_tests {
 
         run_insert_tests(
             ElasticSearchConfig {
-                auth: Some(ElasticSearchAuth::Aws(AWSAuthentication::Default {})),
+                auth: Some(ElasticSearchAuth::Aws(AwsAuthentication::Default {})),
                 endpoint: "http://localhost:4571".into(),
                 compression: Compression::gzip_default(),
                 ..config()

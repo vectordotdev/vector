@@ -268,6 +268,7 @@ components: sinks: elasticsearch: {
 	}
 
 	telemetry: metrics: {
-		missing_keys_total: components.sources.internal_metrics.output.metrics.missing_keys_total
+		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

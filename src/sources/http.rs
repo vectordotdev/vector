@@ -5,19 +5,17 @@ use crate::{
     },
     event::{Event, Value},
     shutdown::ShutdownSignal,
-    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+    sources::util::{
+        add_query_parameters, decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
+    },
     tls::TlsConfig,
     Pipeline,
 };
-use bytes::{Bytes, BytesMut};
-use chrono::Utc;
-use codec::BytesDelimitedCodec;
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
 use std::{collections::HashMap, net::SocketAddr};
 
-use tokio_util::codec::Decoder;
-use warp::http::{HeaderMap, HeaderValue, StatusCode};
+use warp::http::{HeaderMap, HeaderValue};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SimpleHttpConfig {
@@ -30,6 +28,12 @@ pub struct SimpleHttpConfig {
     query_parameters: Vec<String>,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
+    #[serde(default = "crate::serde::default_true")]
+    strict_path: bool,
+    #[serde(default = "default_path")]
+    path: String,
+    #[serde(default = "default_path_key")]
+    path_key: String,
 }
 
 inventory::submit! {
@@ -39,15 +43,26 @@ inventory::submit! {
 impl GenerateConfig for SimpleHttpConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            address: "0.0.0.0:80".parse().unwrap(),
+            address: "0.0.0.0:8080".parse().unwrap(),
             encoding: Default::default(),
             headers: Vec::new(),
             query_parameters: Vec::new(),
             tls: None,
             auth: None,
+            path_key: "path".to_string(),
+            path: "/".to_string(),
+            strict_path: true,
         })
         .unwrap()
     }
+}
+
+pub fn default_path() -> String {
+    "/".to_string()
+}
+
+pub fn default_path_key() -> String {
+    "path".to_string()
 }
 
 #[derive(Clone)]
@@ -55,16 +70,7 @@ struct SimpleHttpSource {
     encoding: Encoding,
     headers: Vec<String>,
     query_parameters: Vec<String>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative, Copy)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Text,
-    Ndjson,
-    Json,
+    path_key: String,
 }
 
 impl HttpSource for SimpleHttpSource {
@@ -73,10 +79,12 @@ impl HttpSource for SimpleHttpSource {
         body: Bytes,
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
+        request_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
         decode_body(body, self.encoding)
             .map(|events| add_headers(events, &self.headers, header_map))
             .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
+            .map(|events| add_path(events, self.path_key.as_str(), request_path))
             .map(|mut events| {
                 // Add source type
                 let key = log_schema().source_type_key();
@@ -102,8 +110,17 @@ impl SourceConfig for SimpleHttpConfig {
             encoding: self.encoding,
             headers: self.headers.clone(),
             query_parameters: self.query_parameters.clone(),
+            path_key: self.path_key.clone(),
         };
-        source.run(self.address, "", &self.tls, &self.auth, out, shutdown)
+        source.run(
+            self.address,
+            &self.path.as_str(),
+            self.strict_path,
+            &self.tls,
+            &self.auth,
+            out,
+            shutdown,
+        )
     }
 
     fn output_type(&self) -> DataType {
@@ -117,6 +134,16 @@ impl SourceConfig for SimpleHttpConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
+}
+
+fn add_path(mut events: Vec<Event>, key: &str, path: &str) -> Vec<Event> {
+    for event in events.iter_mut() {
+        event
+            .as_mut_log()
+            .insert(key, Value::from(path.to_string()));
+    }
+
+    events
 }
 
 fn add_headers(
@@ -138,102 +165,9 @@ fn add_headers(
     events
 }
 
-fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>> {
-    let mut body = BytesMut::new();
-    body.extend_from_slice(&buf);
-
-    let mut decoder = BytesDelimitedCodec::new(b'\n');
-    std::iter::from_fn(move || {
-        match decoder.decode_eof(&mut body) {
-            Err(error) => Some(Err(ErrorMessage::new(
-                StatusCode::BAD_REQUEST,
-                format!("Bad request: {}", error),
-            ))),
-            Ok(Some(b)) => Some(Ok(b)),
-            Ok(None) => None, // actually done
-        }
-    })
-    .filter(|s| match s {
-        // filter empty lines
-        Ok(b) => !b.is_empty(),
-        _ => true,
-    })
-}
-
-fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
-    match enc {
-        Encoding::Text => body_to_lines(body)
-            .map(|r| Ok(Event::from(r?)))
-            .collect::<Result<_, _>>(),
-        Encoding::Ndjson => body_to_lines(body)
-            .map(|j| {
-                let parsed_json = serde_json::from_slice(&j?)
-                    .map_err(|error| json_error(format!("Error parsing Ndjson: {:?}", error)))?;
-                json_parse_object(parsed_json)
-            })
-            .collect::<Result<_, _>>(),
-        Encoding::Json => {
-            let parsed_json = serde_json::from_slice(&body)
-                .map_err(|error| json_error(format!("Error parsing Json: {:?}", error)))?;
-            json_parse_array_of_object(parsed_json)
-        }
-    }
-}
-
-fn json_parse_object(value: JsonValue) -> Result<Event, ErrorMessage> {
-    let mut event = Event::new_empty_log();
-    let log = event.as_mut_log();
-    log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
-    match value {
-        JsonValue::Object(map) => {
-            for (k, v) in map {
-                log.insert_flat(k, v);
-            }
-            Ok(event)
-        }
-        _ => Err(json_error(format!(
-            "Expected Object, got {}",
-            json_value_to_type_string(&value)
-        ))),
-    }
-}
-
-fn json_parse_array_of_object(value: JsonValue) -> Result<Vec<Event>, ErrorMessage> {
-    match value {
-        JsonValue::Array(v) => v
-            .into_iter()
-            .map(json_parse_object)
-            .collect::<Result<_, _>>(),
-        JsonValue::Object(map) => {
-            //treat like an array of one object
-            Ok(vec![json_parse_object(JsonValue::Object(map))?])
-        }
-        _ => Err(json_error(format!(
-            "Expected Array or Object, got {}.",
-            json_value_to_type_string(&value)
-        ))),
-    }
-}
-
-fn json_error(s: String) -> ErrorMessage {
-    ErrorMessage::new(StatusCode::BAD_REQUEST, format!("Bad JSON: {}", s))
-}
-
-fn json_value_to_type_string(value: &JsonValue) -> &'static str {
-    match value {
-        JsonValue::Object(_) => "Object",
-        JsonValue::Array(_) => "Array",
-        JsonValue::String(_) => "String",
-        JsonValue::Number(_) => "Number",
-        JsonValue::Bool(_) => "Bool",
-        JsonValue::Null => "Null",
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{Encoding, SimpleHttpConfig};
-
     use crate::shutdown::ShutdownSignal;
     use crate::{
         config::{log_schema, GlobalOptions, SourceConfig},
@@ -245,12 +179,12 @@ mod tests {
         write::{DeflateEncoder, GzEncoder},
         Compression,
     };
+    use futures::channel::mpsc;
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
     use std::io::Write;
     use std::net::SocketAddr;
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {
@@ -261,9 +195,14 @@ mod tests {
         encoding: Encoding,
         headers: Vec<String>,
         query_parameters: Vec<String>,
+        path_key: &str,
+        path: &str,
+        strict_path: bool,
     ) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
+        let path = path.to_owned();
+        let path_key = path_key.to_owned();
         tokio::spawn(async move {
             SimpleHttpConfig {
                 address,
@@ -272,6 +211,9 @@ mod tests {
                 query_parameters,
                 tls: None,
                 auth: None,
+                strict_path,
+                path_key,
+                path,
             }
             .build(
                 "default",
@@ -322,6 +264,17 @@ mod tests {
             .as_u16()
     }
 
+    async fn send_with_path(address: SocketAddr, body: &str, path: &str) -> u16 {
+        reqwest::Client::new()
+            .post(&format!("http://{}{}", address, path))
+            .body(body.to_owned())
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .as_u16()
+    }
+
     async fn send_bytes(address: SocketAddr, body: Vec<u8>, headers: HeaderMap) -> u16 {
         reqwest::Client::new()
             .post(&format!("http://{}/", address))
@@ -340,7 +293,7 @@ mod tests {
 
         let body = "test body\n\ntest body 2";
 
-        let (rx, addr) = source(Encoding::default(), vec![], vec![]).await;
+        let (rx, addr) = source(Encoding::default(), vec![], vec![], "http_path", "/", true).await;
 
         assert_eq!(200, send(addr, body).await);
 
@@ -351,6 +304,7 @@ mod tests {
             assert_eq!(log[log_schema().message_key()], "test body".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(log["http_path"], "/".into());
         }
         {
             let event = events.remove(0);
@@ -358,6 +312,7 @@ mod tests {
             assert_eq!(log[log_schema().message_key()], "test body 2".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(log["http_path"], "/".into());
         }
     }
 
@@ -368,7 +323,7 @@ mod tests {
         //same as above test but with a newline at the end
         let body = "test body\n\ntest body 2\n";
 
-        let (rx, addr) = source(Encoding::default(), vec![], vec![]).await;
+        let (rx, addr) = source(Encoding::default(), vec![], vec![], "http_path", "/", true).await;
 
         assert_eq!(200, send(addr, body).await);
 
@@ -379,6 +334,7 @@ mod tests {
             assert_eq!(log[log_schema().message_key()], "test body".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(log["http_path"], "/".into());
         }
         {
             let event = events.remove(0);
@@ -386,6 +342,7 @@ mod tests {
             assert_eq!(log[log_schema().message_key()], "test body 2".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(log["http_path"], "/".into());
         }
     }
 
@@ -393,7 +350,7 @@ mod tests {
     async fn http_json_parsing() {
         trace_init();
 
-        let (rx, addr) = source(Encoding::Json, vec![], vec![]).await;
+        let (rx, addr) = source(Encoding::Json, vec![], vec![], "http_path", "/", true).await;
 
         assert_eq!(400, send(addr, "{").await); //malformed
         assert_eq!(400, send(addr, r#"{"key"}"#).await); //key without value
@@ -418,7 +375,7 @@ mod tests {
     async fn http_json_values() {
         trace_init();
 
-        let (rx, addr) = source(Encoding::Json, vec![], vec![]).await;
+        let (rx, addr) = source(Encoding::Json, vec![], vec![], "http_path", "/", true).await;
 
         assert_eq!(200, send(addr, r#"[{"key":"value"}]"#).await);
         assert_eq!(200, send(addr, r#"{"key2":"value2"}"#).await);
@@ -430,6 +387,7 @@ mod tests {
             assert_eq!(log["key"], "value".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(log["http_path"], "/".into());
         }
         {
             let event = events.remove(0);
@@ -437,6 +395,7 @@ mod tests {
             assert_eq!(log["key2"], "value2".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(log["http_path"], "/".into());
         }
     }
 
@@ -444,7 +403,7 @@ mod tests {
     async fn http_json_dotted_keys() {
         trace_init();
 
-        let (rx, addr) = source(Encoding::Json, vec![], vec![]).await;
+        let (rx, addr) = source(Encoding::Json, vec![], vec![], "http_path", "/", true).await;
 
         assert_eq!(200, send(addr, r#"[{"dotted.key":"value"}]"#).await);
         assert_eq!(
@@ -471,7 +430,7 @@ mod tests {
     async fn http_ndjson() {
         trace_init();
 
-        let (rx, addr) = source(Encoding::Ndjson, vec![], vec![]).await;
+        let (rx, addr) = source(Encoding::Ndjson, vec![], vec![], "http_path", "/", true).await;
 
         assert_eq!(400, send(addr, r#"[{"key":"value"}]"#).await); //one object per line
 
@@ -487,6 +446,7 @@ mod tests {
             assert_eq!(log["key1"], "value1".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(log["http_path"], "/".into());
         }
         {
             let event = events.remove(0);
@@ -494,6 +454,7 @@ mod tests {
             assert_eq!(log["key2"], "value2".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(log["http_path"], "/".into());
         }
     }
 
@@ -513,6 +474,9 @@ mod tests {
                 "AbsentHeader".to_string(),
             ],
             vec![],
+            "http_path",
+            "/",
+            true,
         )
         .await;
 
@@ -529,6 +493,7 @@ mod tests {
             assert_eq!(log["User-Agent"], "test_client".into());
             assert_eq!(log["Upgrade-Insecure-Requests"], "false".into());
             assert_eq!(log["AbsentHeader"], Value::Null);
+            assert_eq!(log["http_path"], "/".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
@@ -545,6 +510,9 @@ mod tests {
                 "region".to_string(),
                 "absent".to_string(),
             ],
+            "http_path",
+            "/",
+            true,
         )
         .await;
 
@@ -561,6 +529,7 @@ mod tests {
             assert_eq!(log["source"], "staging".into());
             assert_eq!(log["region"], "gb".into());
             assert_eq!(log["absent"], Value::Null);
+            assert_eq!(log["http_path"], "/".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
@@ -583,7 +552,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert("Content-Encoding", "gzip, deflate".parse().unwrap());
 
-        let (rx, addr) = source(Encoding::default(), vec![], vec![]).await;
+        let (rx, addr) = source(Encoding::default(), vec![], vec![], "http_path", "/", true).await;
 
         assert_eq!(200, send_bytes(addr, body, headers).await);
 
@@ -594,6 +563,96 @@ mod tests {
             assert_eq!(log[log_schema().message_key()], "test body".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(log["http_path"], "/".into());
         }
+    }
+
+    #[tokio::test]
+    async fn http_path() {
+        trace_init();
+        let (rx, addr) = source(
+            Encoding::Ndjson,
+            vec![],
+            vec![],
+            "vector_http_path",
+            "/event/path",
+            true,
+        )
+        .await;
+
+        assert_eq!(
+            200,
+            send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path").await
+        );
+
+        let mut events = collect_n(rx, 1).await;
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["key1"], "value1".into());
+            assert_eq!(log["vector_http_path"], "/event/path".into());
+            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
+        }
+    }
+
+    #[tokio::test]
+    async fn http_path_no_restriction() {
+        trace_init();
+        let (rx, addr) = source(
+            Encoding::Ndjson,
+            vec![],
+            vec![],
+            "vector_http_path",
+            "/event",
+            false,
+        )
+        .await;
+
+        assert_eq!(
+            200,
+            send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path1").await
+        );
+        assert_eq!(
+            200,
+            send_with_path(addr, "{\"key2\":\"value2\"}", "/event/path2").await
+        );
+
+        let mut events = collect_n(rx, 2).await;
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["key1"], "value1".into());
+            assert_eq!(log["vector_http_path"], "/event/path1".into());
+            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
+        }
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["key2"], "value2".into());
+            assert_eq!(log["vector_http_path"], "/event/path2".into());
+            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
+        }
+    }
+
+    #[tokio::test]
+    async fn http_wrong_path() {
+        trace_init();
+        let (_rx, addr) = source(
+            Encoding::Ndjson,
+            vec![],
+            vec![],
+            "vector_http_path",
+            "/",
+            true,
+        )
+        .await;
+
+        assert_eq!(
+            404,
+            send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path").await
+        );
     }
 }

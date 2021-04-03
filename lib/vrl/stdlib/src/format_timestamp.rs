@@ -47,17 +47,6 @@ struct FormatTimestampFn {
     format: Box<dyn Expression>,
 }
 
-/*
-impl FormatTimestampFn {
-    #[cfg(test)]
-    fn new(value: Box<dyn Expression>, format: &str) -> Self {
-        let format = Box::new(Literal::from(Value::from(format)));
-
-        Self { value, format }
-    }
-}
-*/
-
 impl Expression for FormatTimestampFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.format.resolve(ctx)?.try_bytes()?;
@@ -83,69 +72,33 @@ fn try_format(dt: &DateTime<Utc>, format: &str) -> Result<String> {
     Ok(dt.format_with_items(items.into_iter()).to_string())
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
     use chrono::TimeZone;
 
-    vrl::test_type_def![
-        value_and_format {
-            expr: |_| FormatTimestampFn {
-                value: Literal::from(chrono::Utc::now()).boxed(),
-                format: Literal::from("%s").boxed(),
-            },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+    test_function![
+        format_timestamp => FormatTimestamp;
+
+        invalid {
+            args: func_args![value: Utc.timestamp(10, 0),
+                             format: "%Q INVALID"],
+            want: Err("invalid format"),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
-        optional_value {
-            expr: |_| FormatTimestampFn {
-                value: Box::new(Noop),
-                format: Literal::from("%s").boxed(),
-            },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+        valid_secs {
+            args: func_args![value: Utc.timestamp(10, 0),
+                             format: "%s"],
+            want: Ok(value!("10")),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
+
+        date {
+            args: func_args![value: Utc.timestamp(10, 0),
+                             format: "%+"],
+            want: Ok(value!("1970-01-01T00:00:10+00:00")),
+            tdef: TypeDef::new().fallible().bytes(),
         }
     ];
-
-    #[test]
-    fn format_timestamp() {
-        let cases = vec![
-            (
-                btreemap! {},
-                Err("function call error: invalid format".into()),
-                FormatTimestampFn::new(
-                    Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),
-                    "%Q INVALID",
-                ),
-            ),
-            (
-                btreemap! {},
-                Ok("10".into()),
-                FormatTimestampFn::new(
-                    Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),
-                    "%s",
-                ),
-            ),
-            (
-                btreemap! {},
-                Ok("1970-01-01T00:00:10+00:00".into()),
-                FormatTimestampFn::new(
-                    Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),
-                    "%+",
-                ),
-            ),
-        ];
-
-        let mut state = state::Program::default();
-
-        for (object, exp, func) in cases {
-            let mut object: Value = object.into();
-            let got = func
-                .resolve(&mut ctx)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
-        }
-    }
 }
-*/

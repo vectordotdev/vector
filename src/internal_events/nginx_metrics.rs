@@ -4,6 +4,21 @@ use metrics::{counter, histogram};
 use std::time::Instant;
 
 #[derive(Debug)]
+pub(crate) struct NginxMetricsEventsReceived<'a> {
+    pub count: usize,
+    pub uri: &'a str,
+}
+
+impl<'a> InternalEvent for NginxMetricsEventsReceived<'a> {
+    fn emit_metrics(&self) {
+        counter!(
+            "events_in_total", self.count as u64,
+            "uri" => self.uri.to_owned(),
+        );
+    }
+}
+
+#[derive(Debug)]
 pub struct NginxMetricsCollectCompleted {
     pub start: Instant,
     pub end: Instant,

@@ -358,7 +358,10 @@ where
             let response = http_client.call(request).await?;
             let (parts, body) = response.into_parts();
             let mut body = body::aggregate(body).await?;
-            Ok(hyper::Response::from_parts(parts, body.to_bytes()))
+            Ok(hyper::Response::from_parts(
+                parts,
+                body.copy_to_bytes(body.remaining()),
+            ))
         })
     }
 }
@@ -481,10 +484,10 @@ mod test {
                 let mut tx = tx.clone();
 
                 async move {
-                    let body = hyper::body::aggregate(req.into_body())
+                    let mut body = hyper::body::aggregate(req.into_body())
                         .await
                         .map_err(|error| format!("error: {}", error))?;
-                    let string = String::from_utf8(body.bytes().into())
+                    let string = String::from_utf8(body.copy_to_bytes(body.remaining()).to_vec())
                         .map_err(|_| "Wasn't UTF-8".to_string())?;
                     tx.try_send(string).map_err(|_| "Send error".to_string())?;
 
@@ -501,7 +504,7 @@ mod test {
             }
         });
 
-        tokio::time::delay_for(std::time::Duration::from_millis(50)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         service.call(request).await.unwrap();
 
         let (body, _rest) = rx.into_future().await;

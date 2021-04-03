@@ -106,7 +106,7 @@ pub trait EncodingConfiguration<E> {
                             }
                         }
                         // RFC3339 is the default serialization of a timestamp.
-                        TimestampFormat::RFC3339 => (),
+                        TimestampFormat::Rfc3339 => (),
                     }
                 }
                 Event::Metric(_) => (), // Metrics don't get affected by this one!
@@ -150,7 +150,7 @@ pub trait EncodingConfiguration<E> {
 #[serde(rename_all = "lowercase")]
 pub enum TimestampFormat {
     Unix,
-    RFC3339,
+    Rfc3339,
 }
 
 #[cfg(test)]

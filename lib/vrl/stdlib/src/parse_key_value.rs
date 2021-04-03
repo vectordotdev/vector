@@ -76,9 +76,9 @@ impl Function for ParseKeyValue {
 
 #[derive(Clone, Debug)]
 pub(crate) struct ParseKeyValueFn {
-    value: Box<dyn Expression>,
-    key_value_delimiter: Box<dyn Expression>,
-    field_delimiter: Box<dyn Expression>,
+    pub(crate) value: Box<dyn Expression>,
+    pub(crate) key_value_delimiter: Box<dyn Expression>,
+    pub(crate) field_delimiter: Box<dyn Expression>,
 }
 
 impl Expression for ParseKeyValueFn {
