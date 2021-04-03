@@ -87,44 +87,36 @@ pub struct ExecCommandExecuted<'a> {
     pub exec_duration: Duration,
 }
 
+impl ExecCommandExecuted<'_> {
+    fn exit_status_string(&self) -> String {
+        match self.exit_status {
+            Some(exit_status) => exit_status.to_string(),
+            None => "unknown".to_string(),
+        }
+    }
+}
+
 impl InternalEvent for ExecCommandExecuted<'_> {
     fn emit_logs(&self) {
-        if self.exit_status.is_some() {
-            trace!(
-                message = "Executed command.",
-                command = %self.command,
-                exit_status = %self.exit_status.unwrap(),
-                elapsed_millis = %self.exec_duration.as_millis(),
-            );
-        } else {
-            trace!(
-                message = "Executed command.",
-                command = %self.command,
-                exit_status = "Unknown",
-                elapsed_millis = %self.exec_duration.as_millis(),
-            );
-        }
+        trace!(
+            message = "Executed command.",
+            command = %self.command,
+            exit_status = %self.exit_status_string(),
+            elapsed_millis = %self.exec_duration.as_millis(),
+        );
     }
 
     fn emit_metrics(&self) {
-        if self.exit_status.is_some() {
-            counter!(
-                "command_executed_total", 1,
-                "command" => self.command.to_owned(),
-                "exit_status" => self.exit_status.unwrap().to_string(),
-            );
+        counter!(
+            "command_executed_total", 1,
+            "command" => self.command.to_owned(),
+            "exit_status" => self.exit_status_string(),
+        );
 
-            histogram!(
-                "command_execution_duration_ns", self.exec_duration,
-                "command" => self.command.to_owned(),
-                "exit_status" => self.exit_status.unwrap().to_string(),
-            );
-        } else {
-            counter!(
-                "command_executed_total", 1,
-                "command" => self.command.to_owned(),
-                "exit_status" => "Unknown",
-            );
-        }
+        histogram!(
+            "command_execution_duration_ns", self.exec_duration,
+            "command" => self.command.to_owned(),
+            "exit_status" => self.exit_status_string(),
+        );
     }
 }

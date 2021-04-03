@@ -44,33 +44,12 @@ components: sources: exec: {
 	}
 
 	configuration: {
-		mode: {
-			description: "The type of exec mechanism."
-			required:    true
-			type: string: {
-				enum: {
-					scheduled: "Scheduled exec mechanism."
-					streaming: "Streaming exec mechanism."
-				}
-				syntax: "literal"
-			}
-		}
 		command: {
 			required:    true
-			description: "The command to be run."
-			type: string: {
-				examples: ["echo", "./myscript.sh"]
-				syntax: "literal"
-			}
-		}
-		arguments: {
-			common:      false
-			description: "Array of any arguments to pass to the command."
-			required:    false
+			description: "The command to be run, plus any arguments required."
 			type: array: {
-				default: null
-				items: type: [string]: {
-					examples: ["Hello World!", "-la"]
+				items: type: string: {
+					examples: ["echo", "Hello World!", "ls", "-la"]
 					syntax: "literal"
 				}
 			}
@@ -78,7 +57,7 @@ components: sources: exec: {
 		current_dir: {
 			common:      false
 			required:    false
-			description: "The directory from within which to run the command."
+			description: "The directory in which to run the command."
 			warnings: []
 			type: string: {
 				default: null
@@ -106,32 +85,51 @@ components: sources: exec: {
 				unit:    "bytes"
 			}
 		}
-		exec_interval_secs: {
-			common:        false
-			description:   "The interval in seconds between scheduled command runs. The command will be killed if it takes longer than exec_interval_secs to run."
-			relevant_when: "mode = `scheduled`"
-			required:      false
-			type: uint: {
-				default: 60
-				unit:    "seconds"
+		scheduled: {
+			common:      true
+			description: "The scheduled options."
+			required:    false
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					exec_interval_secs: {
+						common:      true
+						description: "The interval in seconds between scheduled command runs. The command will be killed if it takes longer than exec_interval_secs to run."
+						required:    false
+						type: uint: {
+							default: 60
+							unit:    "seconds"
+						}
+					}
+				}
 			}
 		}
-		respawn_on_exit: {
-			common:        false
-			description:   "Determine if a streaming command should be restarted if it exits."
-			relevant_when: "mode = `streaming`"
-			required:      false
-			type: bool: default: true
-		}
-		respawn_interval_secs: {
-			common:        false
-			description:   "The interval in seconds between restarting streaming commands if needed."
-			relevant_when: "mode = `streaming`"
-			required:      false
+		streaming: {
+			common:      true
+			description: "The streaming options."
+			required:    false
 			warnings: []
-			type: uint: {
-				default: 60
-				unit:    "seconds"
+			type: object: {
+				examples: []
+				options: {
+					respawn_on_exit: {
+						common:      true
+						description: "Determine if a streaming command should be restarted if it exits."
+						required:    false
+						type: bool: default: true
+					}
+					respawn_interval_secs: {
+						common:      false
+						description: "The interval in seconds between restarting streaming commands if needed."
+						required:    false
+						warnings: []
+						type: uint: {
+							default: 60
+							unit:    "seconds"
+						}
+					}
+				}
 			}
 		}
 	}
@@ -139,17 +137,40 @@ components: sources: exec: {
 	output: logs: line: {
 		description: "An individual event from exec."
 		fields: {
+			host:      fields._local_host
+			message:   fields._raw_line
+			timestamp: fields._current_timestamp
 			data_stream: {
+				common:      true
 				description: "The data stream from which the event originated."
-				required:    true
+				required:    false
 				type: string: {
 					examples: ["stdout", "stderr"]
-					syntax: "literal"
+					default: null
+					syntax:  "literal"
+				}
+			}
+			pid: {
+				description: "The process ID of the command."
+				required:    true
+				type: uint: {
+					examples: [60085, 668]
+					unit: null
+				}
+			}
+			command: {
+				required:    true
+				description: "The command that was run to generate this event."
+				type: array: {
+					items: type: string: {
+						examples: ["echo", "Hello World!", "ls", "-la"]
+						syntax: "literal"
+					}
 				}
 			}
 			exec_duration_millis: {
 				common:      false
-				description: "The duration in milliseconds a scheduled command took to complete."
+				description: "The duration in milliseconds a command took to complete. Only included in the event after the command has finished."
 				required:    false
 				type: uint: {
 					default: null
@@ -165,37 +186,6 @@ components: sources: exec: {
 					unit:    null
 				}
 			}
-			pid: {
-				description: "The process ID of the command."
-				required:    true
-				type: uint: {
-					examples: [0, 1]
-					unit: null
-				}
-			}
-			command: {
-				description: "The command that was run to generate this event."
-				required:    true
-				type: string: {
-					examples: ["echo", "./myscript.sh"]
-					syntax: "literal"
-				}
-			}
-			arguments: {
-				common:      false
-				description: "Array of any arguments that were passed to the command."
-				required:    false
-				type: array: {
-					default: null
-					items: type: string: {
-						examples: ["Hello World!", "-la"]
-						syntax: "literal"
-					}
-				}
-			}
-			host:      fields._local_host
-			message:   fields._raw_line
-			timestamp: fields._current_timestamp
 		}
 	}
 
@@ -224,14 +214,18 @@ components: sources: exec: {
 		line_delimiters: {
 			title: "Line Delimiters"
 			body: """
-				Each line is read until a new line delimiter, the `0xA` byte, is found.
+				Each line is read until a new line delimiter, the `0xA` byte, is found or the end of the
+				maximum_buffer_size is reached.
 				"""
 		}
 	}
 
 	telemetry: metrics: {
-		processed_bytes_total:   components.sources.internal_metrics.output.metrics.processed_bytes_total
-		processed_events_total:  components.sources.internal_metrics.output.metrics.processed_events_total
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+		events_in_total:               components.sources.internal_metrics.output.metrics.events_in_total
+		processed_bytes_total:         components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:        components.sources.internal_metrics.output.metrics.processed_events_total
+		processing_errors_total:       components.sources.internal_metrics.output.metrics.processing_errors_total
+		command_executed_total:        components.sources.internal_metrics.output.metrics.command_executed_total
+		command_execution_duration_ns: components.sources.internal_metrics.output.metrics.command_execution_duration_ns
 	}
 }

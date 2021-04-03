@@ -1,4 +1,4 @@
-use crate::async_read::VecAsyncReadExt;
+use crate::async_buf_read::VecAsyncBufReadExt;
 use crate::config::{DataType, GlobalOptions};
 use crate::internal_events::{ExecCommandExecuted, ExecTimeout};
 use crate::{
@@ -9,40 +9,37 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use derive_is_enum_variant::is_enum_variant;
 use futures::{FutureExt, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::task::Poll;
-use std::time::{Duration, Instant};
-use tokio::io::{AsyncRead, AsyncReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::mpsc::{channel, Sender};
-use tokio::time;
+use tokio::time::{self, delay_for, Duration, Instant};
+use crate::event::LogEvent;
+use chrono::Utc;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-// TODO: add back when serde-rs/serde#1358 is addressed (same as syslog)
-// #[serde(deny_unknown_fields)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct ExecConfig {
     #[serde(flatten)]
     pub mode: Mode,
-    pub command: String,
-    pub arguments: Option<Vec<String>>,
+    pub command: Vec<String>,
     pub current_dir: Option<PathBuf>,
-    pub include_stderr: Option<bool>,
+    #[serde(default = "default_include_stderr")]
+    pub include_stderr: bool,
     #[serde(default = "default_events_per_line")]
     pub event_per_line: bool,
     #[serde(default = "default_maximum_buffer_size")]
-    pub maximum_buffer_size: usize,
-    #[serde(skip, default = "get_hostname")]
-    pub hostname: Option<String>,
+    pub maximum_buffer_size: u64,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, is_enum_variant)]
-#[serde(tag = "mode", rename_all = "snake_case")]
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Mode {
     Scheduled {
         #[serde(default = "default_exec_interval_secs")]
@@ -56,25 +53,31 @@ pub enum Mode {
     },
 }
 
+#[derive(Debug, PartialEq, Snafu)]
+pub enum ExecConfigError {
+    #[snafu(display("A non-empty list for command must be provided"))]
+    CommandEmpty,
+    #[snafu(display("The maximum buffer size must be greater than zero"))]
+    ZeroBuffer,
+}
+
 impl Default for ExecConfig {
     fn default() -> Self {
         ExecConfig {
             mode: Mode::Scheduled {
                 exec_interval_secs: default_exec_interval_secs(),
             },
-            command: "echo".to_owned(),
-            arguments: Some(vec!["Hello World!".to_owned()]),
+            command: vec!["echo".to_owned(), "Hello World!".to_owned()],
             current_dir: None,
-            include_stderr: Some(true),
+            include_stderr: default_include_stderr(),
             event_per_line: default_events_per_line(),
             maximum_buffer_size: default_maximum_buffer_size(),
-            hostname: get_hostname(),
         }
     }
 }
 
-fn default_maximum_buffer_size() -> usize {
-    // 1GB
+fn default_maximum_buffer_size() -> u64 {
+    // 1MB
     1000000
 }
 
@@ -90,6 +93,10 @@ fn default_respawn_on_exit() -> bool {
     true
 }
 
+fn default_include_stderr() -> bool {
+    true
+}
+
 fn default_events_per_line() -> bool {
     true
 }
@@ -98,21 +105,36 @@ fn get_hostname() -> Option<String> {
     crate::get_hostname().ok()
 }
 
-pub const EXEC: &str = "exec";
-pub const STDOUT: &str = "stdout";
-pub const STDERR: &str = "stderr";
-pub const DATA_STREAM_KEY: &str = "data_stream";
-pub const PID_KEY: &str = "pid";
-pub const EXIT_STATUS_KEY: &str = "exit_status";
-pub const COMMAND_KEY: &str = "command";
-pub const ARGUMENTS_KEY: &str = "arguments";
-pub const EXEC_DURATION_MILLIS_KEY: &str = "exec_duration_millis";
+const EXEC: &str = "exec";
+const STDOUT: &str = "stdout";
+const STDERR: &str = "stderr";
+const DATA_STREAM_KEY: &str = "data_stream";
+const PID_KEY: &str = "pid";
+const EXIT_STATUS_KEY: &str = "exit_status";
+const COMMAND_KEY: &str = "command";
+const EXEC_DURATION_MILLIS_KEY: &str = "exec_duration_millis";
 
 inventory::submit! {
     SourceDescription::new::<ExecConfig>("exec")
 }
 
 impl_generate_config_from_default!(ExecConfig);
+
+impl ExecConfig {
+    pub(self) fn validate(&self) -> Result<(), ExecConfigError> {
+        if self.command.is_empty() {
+            Err(ExecConfigError::CommandEmpty)
+        } else if self.maximum_buffer_size == 0 {
+            Err(ExecConfigError::ZeroBuffer)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub(self) fn command_line(&self) -> String {
+        self.command.join(" ")
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "exec")]
@@ -124,15 +146,18 @@ impl SourceConfig for ExecConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
+        self.validate()?;
+        let hostname = get_hostname();
         match self.mode.clone() {
             Mode::Scheduled { exec_interval_secs } => {
-                run_scheduled(self.clone(), exec_interval_secs, shutdown, out)
+                run_scheduled(self.clone(), hostname, exec_interval_secs, shutdown, out)
             }
             Mode::Streaming {
                 respawn_on_exit,
                 respawn_interval_secs,
             } => run_streaming(
                 self.clone(),
+                hostname,
                 respawn_on_exit,
                 respawn_interval_secs,
                 shutdown,
@@ -152,13 +177,14 @@ impl SourceConfig for ExecConfig {
 
 pub fn run_scheduled(
     config: ExecConfig,
+    hostname: Option<String>,
     exec_interval_secs: u64,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> crate::Result<super::Source> {
     Ok(Box::pin(async move {
         info!("Starting scheduled exec runs.");
-        let schedule = time::Duration::from_secs(exec_interval_secs);
+        let schedule = Duration::from_secs(exec_interval_secs);
         let mut interval = time::interval(schedule).take_until(shutdown.clone());
 
         while interval.next().await.is_some() {
@@ -169,7 +195,12 @@ pub fn run_scheduled(
             // Wait for our task to finish, wrapping it in a timeout
             let timeout = tokio::time::timeout(
                 schedule,
-                run_command(config.clone(), shutdown.clone(), out.clone()),
+                run_command(
+                    config.clone(),
+                    hostname.clone(),
+                    shutdown.clone(),
+                    out.clone(),
+                ),
             );
 
             let timeout_result = timeout.await;
@@ -178,14 +209,14 @@ pub fn run_scheduled(
                 Ok(output) => {
                     if let Err(command_error) = output {
                         emit!(ExecFailed {
-                            command: config.command.as_str(),
+                            command: config.command_line().as_str(),
                             error: command_error,
                         });
                     }
                 }
                 Err(_) => {
                     emit!(ExecTimeout {
-                        command: config.command.as_str(),
+                        command: config.command_line().as_str(),
                         elapsed_seconds: now.elapsed().as_secs(),
                     });
                 }
@@ -199,6 +230,7 @@ pub fn run_scheduled(
 
 pub fn run_streaming(
     config: ExecConfig,
+    hostname: Option<String>,
     respawn_on_exit: bool,
     respawn_interval_secs: u64,
     shutdown: ShutdownSignal,
@@ -206,38 +238,36 @@ pub fn run_streaming(
 ) -> crate::Result<super::Source> {
     Ok(Box::pin(async move {
         if respawn_on_exit {
-            let duration = time::Duration::from_secs(respawn_interval_secs);
+            let duration = Duration::from_secs(respawn_interval_secs);
 
-            // Continue to loop while shutdown is pending
-            while futures::poll!(shutdown.clone()).is_pending() {
-                let output = run_command(config.clone(), shutdown.clone(), out.clone()).await;
-
-                if let Err(command_error) = output {
-                    emit!(ExecFailed {
-                        command: config.command.as_str(),
-                        error: command_error,
-                    });
+            // Continue to loop while not shutdown
+            loop {
+                tokio::select! {
+                    _ = shutdown.clone() => break, // will break early if a shutdown is started
+                    output = run_command(config.clone(), hostname.clone(), shutdown.clone(), out.clone()) => {
+                        // handle command finished
+                        if let Err(command_error) = output {
+                            emit!(ExecFailed {
+                                command: config.command_line().as_str(),
+                                error: command_error,
+                            });
+                        }
+                    }
                 }
 
-                if futures::poll!(shutdown.clone()).is_ready() {
-                    break;
-                } else {
-                    warn!("Streaming processed ended before shutdown.");
-
-                    // Using time interval so it can utilize the shutdown signal
-                    let mut interval = time::interval(duration).take_until(shutdown.clone());
-
-                    // Call next twice since the first is immediate
-                    interval.next().await;
-                    interval.next().await;
+                tokio::select! {
+                    _ = shutdown.clone() => break, // will break early if a shutdown is started
+                    _ = delay_for(duration) => {
+                        warn!("Streaming process ended before shutdown.");
+                    },
                 }
             }
         } else {
-            let output = run_command(config.clone(), shutdown, out).await;
+            let output = run_command(config.clone(), hostname, shutdown, out).await;
 
             if let Err(command_error) = output {
                 emit!(ExecFailed {
-                    command: config.command.as_str(),
+                    command: config.command_line().as_str(),
                     error: command_error,
                 });
             }
@@ -249,6 +279,7 @@ pub fn run_streaming(
 
 async fn run_command(
     config: ExecConfig,
+    hostname: Option<String>,
     shutdown: ShutdownSignal,
     mut out: Pipeline,
 ) -> Result<Option<ExitStatus>, Error> {
@@ -257,7 +288,7 @@ async fn run_command(
 
     // Mark the start time just before spawning the process as
     // this seems to be the best approximation of exec duration
-    let now = Instant::now();
+    let start = Instant::now();
 
     let mut child = command.spawn()?;
 
@@ -275,7 +306,7 @@ async fn run_command(
     let pid = child.id();
 
     // Optionally include stderr
-    if config.include_stderr.unwrap_or(true) {
+    if config.include_stderr {
         let stderr = child.stderr.take().ok_or_else(|| {
             Error::new(ErrorKind::Other, "Unable to take stderr of spawned process")
         })?;
@@ -305,7 +336,8 @@ async fn run_command(
     while let Some((line, stream)) = receiver.recv().await {
         let event = create_event(
             &config,
-            Bytes::from(line),
+            &hostname,
+            line,
             &Some(stream.to_string()),
             Some(pid),
             None,
@@ -320,45 +352,56 @@ async fn run_command(
             });
     }
 
-    let elapsed = now.elapsed();
+    let elapsed = start.elapsed();
 
     info!("Finished command run.");
     let _ = out.flush().await;
 
     // TODO: Tokio 1.0.1+ has a wait and try_wait method to get exit status
-    if let Poll::Ready(Ok(exit_status)) = futures::poll!(child) {
-        handle_exit_status(&config, pid, exit_status, elapsed, out).await;
-        Ok(Some(exit_status))
-    } else {
-        emit!(ExecCommandExecuted {
-            command: config.command.as_str(),
-            exit_status: None,
-            exec_duration: elapsed,
-        });
+    match futures::poll!(child) {
+        Poll::Ready(Ok(exit_status)) => {
+            handle_exit_status(&config, hostname, pid, Some(exit_status), elapsed, out).await;
+            Ok(Some(exit_status))
+        }
+        Poll::Ready(Err(error)) => {
+            error!(message = "Unable to obtain exit status.", %error);
 
-        Ok(None)
+            handle_exit_status(&config, hostname, pid, None, elapsed, out).await;
+            Ok(None)
+        }
+        Poll::Pending => {
+            handle_exit_status(&config, hostname, pid, None, elapsed, out).await;
+            Ok(None)
+        }
     }
 }
 
 async fn handle_exit_status(
     config: &ExecConfig,
+    hostname: Option<String>,
     pid: u32,
-    exit_status: ExitStatus,
+    exit_status: Option<ExitStatus>,
     exec_duration: Duration,
     mut out: Pipeline,
 ) {
+    let exit_status = match exit_status {
+        Some(exit_status) => exit_status.code(),
+        None => None,
+    };
+
     emit!(ExecCommandExecuted {
-        command: config.command.as_str(),
-        exit_status: exit_status.code(),
+        command: config.command_line().as_str(),
+        exit_status,
         exec_duration,
     });
 
     let event = create_event(
         config,
+        &hostname,
         Bytes::new(),
         &None,
         Some(pid),
-        exit_status.code(),
+        exit_status,
         &Some(exec_duration.as_millis()),
     );
 
@@ -371,7 +414,14 @@ async fn handle_exit_status(
 }
 
 fn build_command(config: &ExecConfig) -> Command {
-    let mut command = Command::new(config.command.as_str());
+    let command = &config.command[0];
+
+    let mut command = Command::new(command);
+
+    if config.command.len() > 1 {
+        command.args(&config.command[1..]);
+    };
+
     command.kill_on_drop(true);
 
     // Explicitly set the current dir if needed
@@ -383,17 +433,12 @@ fn build_command(config: &ExecConfig) -> Command {
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::piped());
 
-    if let Some(arguments) = &config.arguments {
-        if !arguments.is_empty() {
-            command.args(arguments);
-        }
-    }
-
     command
 }
 
 fn create_event(
     config: &ExecConfig,
+    hostname: &Option<String>,
     line: Bytes,
     data_stream: &Option<String>,
     pid: Option<u32>,
@@ -401,12 +446,16 @@ fn create_event(
     exec_duration_millis: &Option<u128>,
 ) -> Event {
     emit!(ExecEventReceived {
-        command: config.command.as_str(),
+        command: config.command_line().as_str(),
         byte_size: line.len(),
     });
+    let mut log_event = LogEvent::default();
 
-    let mut event = Event::from(line);
-    let log_event = event.as_mut_log();
+    // Add message
+    log_event.insert(log_schema().message_key(), line);
+
+    // Add timestamp
+    log_event.insert(log_schema().timestamp_key(), Utc::now());
 
     // Add source type
     log_event.insert(log_schema().source_type_key(), Bytes::from(EXEC));
@@ -432,126 +481,92 @@ fn create_event(
     }
 
     // Add hostname (if needed)
-    if let Some(hostname) = config.hostname.clone() {
-        log_event.insert(log_schema().host_key(), hostname);
+    if let Some(hostname) = hostname {
+        log_event.insert(log_schema().host_key(), hostname.clone());
     }
 
     // Add command
     log_event.insert(COMMAND_KEY, config.command.clone());
 
-    // Add arguments
-    log_event.insert(ARGUMENTS_KEY, config.arguments.clone());
-
-    event
+    Event::Log(log_event)
 }
 
 fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     reader: BufReader<R>,
     shutdown: ShutdownSignal,
     event_per_line: bool,
-    buf_size: usize,
+    buf_size: u64,
     stream: &'static str,
-    mut sender: Sender<(String, &'static str)>,
+    mut sender: Sender<(Bytes, &'static str)>,
 ) {
     // Start the green background thread for collecting
     Box::pin(tokio::spawn(async move {
         info!("Start capturing {} command output.", stream);
 
-        let mut buffer: Vec<u8> = Vec::new();
+        let mut read_buffer: Vec<u8> = Vec::new();
 
-        let mut reader = reader.allow_read_until(shutdown.clone().map(|_| ()));
+        let reader = reader.allow_read_until(shutdown.clone().map(|_| ()));
 
-        // Read one byte at a time so we don't block waiting for the buffer to
-        // fill up e.g. If a line filled up half the buffer we would not know about
-        // it until the buffer is returned. We could increase the read buffer if we are
-        // willing to accept some blocking waiting for it to fill up. I'm not sure if
-        // the underlying BufReader will read in larger chunks or not.
-        // Possibly could look into https://crates.io/crates/fixed-buffer-tokio but
-        // I don't know much about this library.
-        let mut read_buffer = [0_u8; 1];
+        let mut limited_reader = reader.take(buf_size);
 
-        // Not using the shutdown signal in this method so we need to shutdown
-        // in other methods to end the reading
-        while let Ok(bytes_read) = reader.read(&mut read_buffer).await {
-            if bytes_read == 0 {
-                info!("End of input reached, stop reading.");
-                break;
-            } else {
-                let read_byte = read_buffer[0];
+        if event_per_line {
+            // Keep reading lines (lines longer than the max buffer will be split)
+            while let Ok(bytes_read) = limited_reader.read_until(b'\n', &mut read_buffer).await {
+                if bytes_read == 0 {
+                    // If we get a continuous stream of \n the bytes_read will be at least 1
+                    info!("End of input reached, stop reading.");
+                    break;
+                } else {
+                    // Strip of the end of line bytes
+                    if read_buffer.ends_with(&[b'\n']) {
+                        let _ = read_buffer.pop();
 
-                // Could be enhanced to split 'lines' based on user defined
-                // delimiters in addition to newline.
-                if event_per_line && read_byte == b'\n' {
-                    if buffer.ends_with(&[b'\r']) {
-                        let _ = buffer.pop();
+                        if read_buffer.ends_with(&[b'\r']) {
+                            let _ = read_buffer.pop();
+                        }
                     }
 
-                    if let Some(buffer_string) = buffer_to_string(&mut buffer, false) {
-                        if sender.send((buffer_string, stream)).await.is_err() {
-                            break;
-                        }
-                    } else {
-                        info!("Invalid utf8, stop reading.");
+                    let read_bytes = Bytes::from(read_buffer.clone());
+                    if sender.send((read_bytes, stream)).await.is_err() {
                         break;
                     }
-                } else {
-                    buffer.push(read_byte);
 
-                    if buffer.len() == buf_size {
-                        if let Some(buffer_string) = buffer_to_string(&mut buffer, true) {
-                            if sender.send((buffer_string, stream)).await.is_err() {
-                                break;
-                            }
-                        } else {
-                            info!("Invalid utf8, stop reading.");
-                            break;
-                        }
+                    // Clear the read buffer ready for the next read
+                    read_buffer.clear();
+
+                    // Reset the limit for the next read (minus any left over if we do utf8 checks)
+                    limited_reader.set_limit(buf_size);
+                }
+            }
+        } else {
+            // Keep reading max buffer chunks
+            while let Ok(bytes_read) = limited_reader.read_to_end(&mut read_buffer).await {
+                if bytes_read == 0 {
+                    info!("End of input reached, stop reading.");
+                    break;
+                } else {
+                    let read_bytes = Bytes::from(read_buffer.clone());
+                    if sender.send((read_bytes, stream)).await.is_err() {
+                        break;
                     }
+
+                    // Clear the read buffer ready for the next read
+                    read_buffer.clear();
+
+                    // Reset the limit for the next read (minus any left over if we do utf8 checks)
+                    limited_reader.set_limit(buf_size);
                 }
             }
         }
 
         // Handle any left over buffer
-        if !buffer.is_empty() {
-            if let Some(buffer_string) = buffer_to_string(&mut buffer, true) {
-                let _ = sender.send((buffer_string, stream)).await;
-                if !buffer.is_empty() {
-                    info!("Invalid utf8, left in buffer.");
-                }
-            } else {
-                info!("Invalid utf8, left in buffer.");
-            }
+        if !read_buffer.is_empty() {
+            let read_bytes = Bytes::from(read_buffer.clone());
+            let _ = sender.send((read_bytes, stream)).await.is_err();
         }
 
         info!("Finished capturing {} command output.", stream);
     }));
-}
-
-fn buffer_to_string(buffer: &mut Vec<u8>, allow_shrinking: bool) -> Option<String> {
-    let mut left_over_buffer: Vec<u8> = Vec::new();
-    loop {
-        if let Ok(buffer_string) = String::from_utf8(buffer.clone()) {
-            buffer.clear();
-            buffer.append(&mut left_over_buffer);
-            return Some(buffer_string);
-        } else {
-            // Only try shrinking the buffer by at most 3 bytes as
-            // the maximum utf8 character is 4 bytes. If we shrink
-            // by 3 and it is still invalid then assume the whole thing
-            // is invalid utf8. Don't shrink to smaller than 1 byte.
-            if allow_shrinking && left_over_buffer.len() < 3 && buffer.len() > 1 {
-                if let Some(last_byte) = buffer.pop() {
-                    left_over_buffer.insert(0, last_byte);
-                } else {
-                    buffer.append(&mut left_over_buffer);
-                    return None;
-                }
-            } else {
-                buffer.append(&mut left_over_buffer);
-                return None;
-            }
-        }
-    }
 }
 
 #[cfg(test)]
@@ -568,6 +583,7 @@ mod tests {
     #[test]
     fn test_scheduled_create_event() {
         let config = standard_scheduled_test_config();
+        let hostname = Some("Some.Machine".to_string());
         let line = Bytes::from("hello world");
         let data_stream = Some(STDOUT.to_string());
         let pid = Some(8888_u32);
@@ -576,6 +592,7 @@ mod tests {
 
         let event = create_event(
             &config,
+            &hostname,
             line,
             &data_stream,
             pid,
@@ -587,8 +604,7 @@ mod tests {
         assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
         assert_eq!(log[DATA_STREAM_KEY], STDOUT.into());
         assert_eq!(log[PID_KEY], (8888_i64).into());
-        assert_eq!(log[COMMAND_KEY], config.command.clone().into());
-        assert_eq!(log[ARGUMENTS_KEY], config.arguments.unwrap().into());
+        assert_eq!(log[COMMAND_KEY], config.command.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
         assert_ne!(log[log_schema().timestamp_key()], "".into());
@@ -597,7 +613,7 @@ mod tests {
     #[test]
     fn test_streaming_create_event() {
         let config = standard_streaming_test_config();
-
+        let hostname = Some("Some.Machine".to_string());
         let line = Bytes::from("hello world");
         let data_stream = Some(STDOUT.to_string());
         let pid = Some(8888_u32);
@@ -606,6 +622,7 @@ mod tests {
 
         let event = create_event(
             &config,
+            &hostname,
             line,
             &data_stream,
             pid,
@@ -617,8 +634,7 @@ mod tests {
         assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
         assert_eq!(log[DATA_STREAM_KEY], STDOUT.into());
         assert_eq!(log[PID_KEY], (8888_i64).into());
-        assert_eq!(log[COMMAND_KEY], config.command.clone().into());
-        assert_eq!(log[ARGUMENTS_KEY], config.arguments.unwrap().into());
+        assert_eq!(log[COMMAND_KEY], config.command.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "exec".into());
         assert_ne!(log[log_schema().timestamp_key()], "".into());
@@ -631,13 +647,11 @@ mod tests {
                 respawn_on_exit: default_respawn_on_exit(),
                 respawn_interval_secs: default_respawn_interval_secs(),
             },
-            command: "./runner".to_owned(),
-            arguments: Some(vec!["arg1".to_owned(), "arg2".to_owned()]),
+            command: vec!["./runner".to_owned(), "arg1".to_owned(), "arg2".to_owned()],
             current_dir: Some(PathBuf::from("/tmp")),
-            include_stderr: None,
-            event_per_line: true,
+            include_stderr: default_include_stderr(),
+            event_per_line: default_events_per_line(),
             maximum_buffer_size: default_maximum_buffer_size(),
-            hostname: get_hostname(),
         };
 
         let command = build_command(&config);
@@ -654,46 +668,6 @@ mod tests {
         assert_eq!(expected_command_string, command_string);
     }
 
-    #[test]
-    fn test_buffer_to_string_no_leftover() {
-        let mut buffer: Vec<u8> = vec![0x46, 0x61, 0x73, 0x74, 0x20, 0xF0, 0x9F, 0x9A, 0x80];
-
-        if let Some(buffer_string) = buffer_to_string(&mut buffer, false) {
-            assert_eq!("Fast 🚀", buffer_string);
-            assert_eq!(0, buffer.len());
-        } else {
-            panic!("The buffer should be converted to a string");
-        }
-    }
-
-    #[test]
-    fn test_buffer_to_string_with_leftover() {
-        let mut buffer: Vec<u8> = vec![
-            0x46, 0x61, 0x73, 0x74, 0x20, 0xF0, 0x9F, 0x9A, 0x80, 0xF0, 0x9F,
-        ];
-
-        if let Some(buffer_string) = buffer_to_string(&mut buffer, true) {
-            assert_eq!("Fast 🚀", buffer_string);
-            assert_eq!(2, buffer.len());
-            assert_eq!(vec![0xF0, 0x9F], buffer);
-        } else {
-            panic!("The buffer should be converted to a string");
-        }
-    }
-
-    #[test]
-    fn test_buffer_to_string_invalid_utf8() {
-        let mut buffer: Vec<u8> = vec![
-            0x46, 0x61, 0x73, 0x74, 0x20, 0xF0, 0x9F, 0x9A, 0x80, 0xF0, 0x9F,
-        ];
-
-        if buffer_to_string(&mut buffer, false).is_some() {
-            panic!("The buffer should be not converted to a string");
-        } else {
-            assert_eq!(11, buffer.len());
-        }
-    }
-
     #[tokio::test]
     async fn test_spawn_reader_thread_per_line() {
         trace_init();
@@ -707,18 +681,57 @@ mod tests {
 
         let mut counter = 0;
         if let Some((line, stream)) = receiver.recv().await {
-            assert_eq!("hello world", line);
+            assert_eq!(Bytes::from("hello world"), line);
             assert_eq!(STDOUT, stream);
             counter += 1;
         }
 
         if let Some((line, stream)) = receiver.recv().await {
-            assert_eq!("hello rocket 🚀", line);
+            assert_eq!(Bytes::from("hello rocket 🚀"), line);
             assert_eq!(STDOUT, stream);
             counter += 1;
         }
 
         assert_eq!(counter, 2);
+    }
+
+    #[tokio::test]
+    async fn test_spawn_reader_thread_per_line_tiny_buffer() {
+        trace_init();
+
+        let buf = Cursor::new("hello world\n🚀 123");
+        let reader = BufReader::new(buf);
+        let shutdown = ShutdownSignal::noop();
+        let (sender, mut receiver) = channel(1024);
+
+        spawn_reader_thread(reader, shutdown, true, 6, STDOUT, sender);
+
+        let mut counter = 0;
+        if let Some((line, stream)) = receiver.recv().await {
+            assert_eq!(Bytes::from("hello "), line);
+            assert_eq!(STDOUT, stream);
+            counter += 1;
+        }
+
+        if let Some((line, stream)) = receiver.recv().await {
+            assert_eq!(Bytes::from("world"), line);
+            assert_eq!(STDOUT, stream);
+            counter += 1;
+        }
+
+        if let Some((line, stream)) = receiver.recv().await {
+            assert_eq!(Bytes::from("🚀 1"), line);
+            assert_eq!(STDOUT, stream);
+            counter += 1;
+        }
+
+        if let Some((line, stream)) = receiver.recv().await {
+            assert_eq!(Bytes::from("23"), line);
+            assert_eq!(STDOUT, stream);
+            counter += 1;
+        }
+
+        assert_eq!(counter, 4);
     }
 
     #[tokio::test]
@@ -734,7 +747,7 @@ mod tests {
 
         let mut counter = 0;
         if let Some((line, stream)) = receiver.recv().await {
-            assert_eq!("hello world\nhello rocket 🚀", line);
+            assert_eq!(Bytes::from("hello world\nhello rocket 🚀"), line);
             assert_eq!(STDOUT, stream);
             counter += 1;
         }
@@ -747,29 +760,26 @@ mod tests {
     async fn test_run_command_linux() {
         trace_init();
         let config = standard_scheduled_test_config();
+        let hostname = Some("Some.Machine".to_string());
         let (tx, mut rx) = Pipeline::new_test();
         let shutdown = ShutdownSignal::noop();
 
         // Wait for our task to finish, wrapping it in a timeout
         let timeout = tokio::time::timeout(
             time::Duration::from_secs(5),
-            run_command(config.clone(), shutdown, tx),
+            run_command(config.clone(), hostname, shutdown, tx),
         );
 
         let timeout_result = timeout.await;
 
-        match timeout_result {
-            Ok(output) => match output {
-                Ok(exit_status) => assert_eq!(0_i32, exit_status.unwrap().code().unwrap()),
-                Err(_) => panic!("Unable to run linux command"),
-            },
-            Err(_) => panic!("Timed out during test of run linux command."),
-        }
+        let exit_status = timeout_result
+            .expect("command timed out")
+            .expect("command error");
+        assert_eq!(0_i32, exit_status.unwrap().code().unwrap());
 
         if let Ok(event) = rx.try_recv() {
             let log = event.as_log();
             assert_eq!(log[COMMAND_KEY], config.command.clone().into());
-            assert_eq!(log[ARGUMENTS_KEY], config.arguments.clone().unwrap().into());
             assert_eq!(log[DATA_STREAM_KEY], STDOUT.into());
             assert_eq!(log[log_schema().source_type_key()], "exec".into());
             assert_eq!(log[log_schema().message_key()], "Hello World!".into());
@@ -777,12 +787,7 @@ mod tests {
             assert_ne!(log[PID_KEY], "".into());
             assert_ne!(log[log_schema().timestamp_key()], "".into());
 
-            let mut counter = 0;
-            for _ in log.all_fields() {
-                counter += 1;
-            }
-
-            assert_eq!(8, counter);
+            assert_eq!(8, log.all_fields().count());
         } else {
             panic!("Expected to receive a linux event");
         }
@@ -790,7 +795,6 @@ mod tests {
         if let Ok(event) = rx.try_recv() {
             let log = event.as_log();
             assert_eq!(log[COMMAND_KEY], config.command.clone().into());
-            assert_eq!(log[ARGUMENTS_KEY], config.arguments.clone().unwrap().into());
             assert_eq!(log[log_schema().source_type_key()], "exec".into());
             assert_eq!(log[log_schema().message_key()], "".into());
             assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
@@ -799,30 +803,14 @@ mod tests {
             assert_ne!(log[EXEC_DURATION_MILLIS_KEY], "".into());
             assert_ne!(log[log_schema().timestamp_key()], "".into());
 
-            let mut counter = 0;
-            for _ in log.all_fields() {
-                counter += 1;
-            }
-
-            assert_eq!(9, counter);
+            assert_eq!(9, log.all_fields().count());
         } else {
             panic!("Expected to receive an end of process linux event");
         }
     }
 
     fn standard_scheduled_test_config() -> ExecConfig {
-        ExecConfig {
-            mode: Mode::Scheduled {
-                exec_interval_secs: default_exec_interval_secs(),
-            },
-            command: "echo".to_owned(),
-            arguments: Some(vec!["Hello World!".to_owned()]),
-            current_dir: None,
-            include_stderr: Some(true),
-            event_per_line: true,
-            maximum_buffer_size: default_maximum_buffer_size(),
-            hostname: Some("Some.Machine".to_string()),
-        }
+        Default::default()
     }
 
     fn standard_streaming_test_config() -> ExecConfig {
@@ -831,13 +819,11 @@ mod tests {
                 respawn_on_exit: default_respawn_on_exit(),
                 respawn_interval_secs: default_respawn_interval_secs(),
             },
-            command: "streamer".to_owned(),
-            arguments: Some(vec!["Hello World!".to_owned()]),
+            command: vec!["yes".to_owned()],
             current_dir: None,
-            include_stderr: Some(true),
-            event_per_line: true,
+            include_stderr: default_include_stderr(),
+            event_per_line: default_events_per_line(),
             maximum_buffer_size: default_maximum_buffer_size(),
-            hostname: Some("Some.Machine".to_string()),
         }
     }
 }
