@@ -1,5 +1,6 @@
 use crate::async_buf_read::VecAsyncBufReadExt;
 use crate::config::{DataType, GlobalOptions};
+use crate::event::LogEvent;
 use crate::internal_events::{ExecCommandExecuted, ExecTimeout};
 use crate::{
     config::{log_schema, SourceConfig, SourceDescription},
@@ -9,6 +10,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
+use chrono::Utc;
 use futures::{FutureExt, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -18,9 +20,7 @@ use std::process::ExitStatus;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::mpsc::{channel, Sender};
-use tokio::time::{self, Duration, Instant, sleep};
-use crate::event::LogEvent;
-use chrono::Utc;
+use tokio::time::{self, sleep, Duration, Instant};
 use tokio_stream::wrappers::IntervalStream;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -186,7 +186,8 @@ pub fn run_scheduled(
         info!("Starting scheduled exec runs.");
         let schedule = Duration::from_secs(exec_interval_secs);
 
-        let mut interval = IntervalStream::new(time::interval(schedule)).take_until(shutdown.clone());
+        let mut interval =
+            IntervalStream::new(time::interval(schedule)).take_until(shutdown.clone());
 
         while interval.next().await.is_some() {
             // Mark the start time just before spawning the process as
