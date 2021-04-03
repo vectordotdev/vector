@@ -217,9 +217,7 @@ impl From<vrl::Value> for Value {
             Object(v) => Value::Map(v.into_iter().map(|(k, v)| (k.into(), v.into())).collect()),
             Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),
             Timestamp(v) => Value::Timestamp(v),
-            Regex(v) => Value::Bytes(bytes::Bytes::copy_from_slice(
-                String::from(v.to_string()).as_bytes(),
-            )),
+            Regex(v) => Value::Bytes(bytes::Bytes::copy_from_slice(v.to_string().as_bytes())),
             Null => Value::Null,
         }
     }

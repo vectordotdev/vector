@@ -495,7 +495,7 @@ impl MetricValue {
                 *value += value2;
             }
             (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
-                values.extend(values2.iter().map(|s| s.clone()));
+                values.extend(values2.iter().cloned());
             }
             (
                 Self::Distribution {

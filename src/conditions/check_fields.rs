@@ -505,7 +505,7 @@ fn build_predicates(
                     Ok(pred) => {
                         predicates.insert(format!("{}: {:?}", target_pred, arg), pred);
                     }
-                    Err(err) => errors.push(err.into()),
+                    Err(err) => errors.push(err),
                 };
             })
             .is_none()
