@@ -138,7 +138,7 @@ tower-layer = "0.3.1"
 
 # Serde
 serde = { version = "1.0.117", features = ["derive"] }
-serde_json = { version = "1.0.33", features = ["raw_value"] }
+serde_json = { version = "1.0.64", features = ["raw_value"] }
 serde_yaml = { version ="0.8.13" }
 
 # Prost
