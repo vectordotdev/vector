@@ -15,13 +15,13 @@ use snafu::Snafu;
 use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
 use std::process::ExitStatus;
-use std::task::Poll;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::mpsc::{channel, Sender};
-use tokio::time::{self, delay_for, Duration, Instant};
+use tokio::time::{self, Duration, Instant, sleep};
 use crate::event::LogEvent;
 use chrono::Utc;
+use tokio_stream::wrappers::IntervalStream;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(default, deny_unknown_fields)]
@@ -185,7 +185,8 @@ pub fn run_scheduled(
     Ok(Box::pin(async move {
         info!("Starting scheduled exec runs.");
         let schedule = Duration::from_secs(exec_interval_secs);
-        let mut interval = time::interval(schedule).take_until(shutdown.clone());
+
+        let mut interval = IntervalStream::new(time::interval(schedule)).take_until(shutdown.clone());
 
         while interval.next().await.is_some() {
             // Mark the start time just before spawning the process as
@@ -257,7 +258,7 @@ pub fn run_streaming(
 
                 tokio::select! {
                     _ = shutdown.clone() => break, // will break early if a shutdown is started
-                    _ = delay_for(duration) => {
+                    _ = sleep(duration) => {
                         warn!("Streaming process ended before shutdown.");
                     },
                 }
@@ -339,7 +340,7 @@ async fn run_command(
             &hostname,
             line,
             &Some(stream.to_string()),
-            Some(pid),
+            pid,
             None,
             &None,
         );
@@ -357,19 +358,18 @@ async fn run_command(
     info!("Finished command run.");
     let _ = out.flush().await;
 
-    // TODO: Tokio 1.0.1+ has a wait and try_wait method to get exit status
-    match futures::poll!(child) {
-        Poll::Ready(Ok(exit_status)) => {
+    match child.try_wait() {
+        Ok(Some(exit_status)) => {
             handle_exit_status(&config, hostname, pid, Some(exit_status), elapsed, out).await;
             Ok(Some(exit_status))
         }
-        Poll::Ready(Err(error)) => {
-            error!(message = "Unable to obtain exit status.", %error);
-
+        Ok(None) => {
             handle_exit_status(&config, hostname, pid, None, elapsed, out).await;
             Ok(None)
         }
-        Poll::Pending => {
+        Err(error) => {
+            error!(message = "Unable to obtain exit status.", %error);
+
             handle_exit_status(&config, hostname, pid, None, elapsed, out).await;
             Ok(None)
         }
@@ -379,7 +379,7 @@ async fn run_command(
 async fn handle_exit_status(
     config: &ExecConfig,
     hostname: Option<String>,
-    pid: u32,
+    pid: Option<u32>,
     exit_status: Option<ExitStatus>,
     exec_duration: Duration,
     mut out: Pipeline,
@@ -400,7 +400,7 @@ async fn handle_exit_status(
         &hostname,
         Bytes::new(),
         &None,
-        Some(pid),
+        pid,
         exit_status,
         &Some(exec_duration.as_millis()),
     );
@@ -497,7 +497,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     event_per_line: bool,
     buf_size: u64,
     stream: &'static str,
-    mut sender: Sender<(Bytes, &'static str)>,
+    sender: Sender<(Bytes, &'static str)>,
 ) {
     // Start the green background thread for collecting
     Box::pin(tokio::spawn(async move {
@@ -777,7 +777,7 @@ mod tests {
             .expect("command error");
         assert_eq!(0_i32, exit_status.unwrap().code().unwrap());
 
-        if let Ok(event) = rx.try_recv() {
+        if let Ok(Some(event)) = rx.try_next() {
             let log = event.as_log();
             assert_eq!(log[COMMAND_KEY], config.command.clone().into());
             assert_eq!(log[DATA_STREAM_KEY], STDOUT.into());
@@ -792,7 +792,7 @@ mod tests {
             panic!("Expected to receive a linux event");
         }
 
-        if let Ok(event) = rx.try_recv() {
+        if let Ok(Some(event)) = rx.try_next() {
             let log = event.as_log();
             assert_eq!(log[COMMAND_KEY], config.command.clone().into());
             assert_eq!(log[log_schema().source_type_key()], "exec".into());
