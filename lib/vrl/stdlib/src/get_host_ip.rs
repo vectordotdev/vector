@@ -33,7 +33,7 @@ impl Expression for GetHostIpFn {
         let default_ip = datalink::interfaces()
             .iter()
             .find(|e| e.is_up() && !e.is_loopback() && !e.ips.is_empty())
-            .and_then(|interface| interface.ips.iter().next())
+            .and_then(|interface| interface.ips.get(0))
             .map(|ip| ip.ip().to_string());
 
         Ok(default_ip.map(Into::into).unwrap_or(Value::Null))
