@@ -2,5 +2,8 @@
 public/
 resources/
 
+# JavaScript, Sass, CSS, etc.
+node_modules/
+
 # CUE-generated assets
 data/docs.json
