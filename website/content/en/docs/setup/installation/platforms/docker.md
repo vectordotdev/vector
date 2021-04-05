@@ -1,0 +1,9 @@
+---
+title: Install Vector on Docker
+short: Docker
+weight: 1
+---
+
+[Docker] is an open platform for developing, shipping, and running applications and services. Docker enables you to separate your services from your infrastructure so you can ship quickly. With Docker, you can manage your infrastructure in the same ways you manage your services. By taking advantage of Docker's methodologies for shipping, testing, and deploying code quickly, you can significantly reduce the delay between writing code and running it in production. This page will cover installing and managing Vector on the Docker platform.
+
+[docker]: https://docker.com

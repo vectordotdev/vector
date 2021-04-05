@@ -1,5 +1,11 @@
 ---
-title: Documentation
+title: The Vector documentation
+description: Probably more than you actually want to know about Vector
+short: Docs home
 ---
 
-Welcome to the Vector documentation!
+The Vector docs.
+
+## Heading 2
+
+Here is a heading.

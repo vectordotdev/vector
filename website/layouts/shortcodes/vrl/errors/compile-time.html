@@ -1,0 +1,46 @@
+{{ $errors := site.Data.docs.remap.errors }}
+{{ range $code, $error := $errors }}
+<div class="error" id="{{ $code }}" x-data="{ open: location.hash === '#{{ $code }}' }">
+  <header class="error-header">
+    <span>
+      <span class="error-code">
+        {{ $code }}
+      </span>
+  
+      <span class="error-title">
+        {{ $error.title }}
+      </span>
+    </span>
+
+    <a class="icon" @click="open = !open">
+      <i class="fas" :class="{ 'fa-minus': open, 'fa-plus': !open }"></i>
+    </a>
+  </header>
+
+  <div class="error-info" x-show="open">
+    <div class="error-description">
+      {{ $error.description | markdownify }}
+    </div>
+  
+    {{ with $error.examples }}
+    <div class="error-examples" x-data="{ open: location.hash == '#{{ $code }}' }">
+      <header class="error-examples-title">
+        <span>
+          Examples
+        </span>
+
+        <span class="icon is-small" @click="open = !open">
+          <i class="fas fa-sm" :class="{ 'fa-minus': open, 'fa-plus': !open }"></i>
+        </span>
+      </header>
+
+      <div x-show="open">
+        <span class="has-text-secondary">
+          TODO!
+        </span>
+      </div>
+    </div>
+    {{ end }}
+  </div>
+</div>
+{{ end }}

@@ -1,0 +1,24 @@
+{{ $link := .Get 0 }}
+{{ if not $link }}
+{{ errorf "No page title specified" }}
+{{ end }}
+
+{{ $page := site.GetPage $link }}
+{{ if not $page }}
+{{ errorf "Error in link shortcode at content/%s. No page found at %s." $.Page.File $link }}
+{{ end }}
+
+<a class="jump" href="{{ $link }}">
+  <span class="link">
+    <span class="icon">
+      <i class="fas fa-file-alt"></i>
+    </span>
+    <span class="text">
+      {{ $page.Title }}
+    </span>
+  </span>
+
+  <span class="icon right-icon">
+    <i class="fas fa-chevron-right"></i>
+  </span>
+</a>

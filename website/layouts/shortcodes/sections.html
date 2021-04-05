@@ -1,0 +1,7 @@
+{{ with $.Page.Sections }}
+<div class="columns is-variable is-1 is-multiline">
+  {{ range . }}
+  {{ .Render "section-card" }}
+  {{ end }}
+</div>
+{{ end }}

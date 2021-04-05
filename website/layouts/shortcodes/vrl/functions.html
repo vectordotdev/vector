@@ -1,0 +1,35 @@
+{{ $category := .Get 0 }}
+{{ $funcs := slice }}
+{{ range $k, $func := site.Data.docs.remap.functions }}
+{{ if eq $func.category $category }}
+{{ $funcs = $funcs | append . }}
+{{ end }}
+{{ end }}
+
+{{ $toc := $.Page.Scratch }}
+{{ $toc.Add "categories" (slice $category) }}
+
+{{ range $funcs }}
+{{ $name := .name }}
+{{ $toc.Add $category (slice .name) }}
+{{ $func := index site.Data.docs.remap.functions .name }}
+
+<div class="function" id="{{ .name }}">
+  <header class="function-header">
+    <span class="function-title">
+      {{ with $func.arguments }}
+      {{ $args := slice }}
+      {{ range . }}
+      {{ $args = $args | append .name }}
+      {{ end }}
+      {{ $lastArg := sub (len $args) 1 }}
+      <span class="name">
+        {{ $name }}(<span class="args">{{ range $idx, $arg := $args }}<span class="arg">{{ $arg }}</span>{{ if ne $idx $lastArg }}, {{ end }}{{ end }}</span>)
+      </span>
+      {{ else }}
+      {{ .name }}
+      {{ end }}
+    </span>
+  </header>
+</div>
+{{ end }}

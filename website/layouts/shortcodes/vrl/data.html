@@ -1,0 +1,25 @@
+{{ $key := .Get 0 }}
+{{ $data := index site.Data.docs.remap $key }}
+{{ range $k, $v := $data }}
+<h3 id="{{ $v.anchor }}">
+  {{ $v.title }}
+</h3>
+
+<p>
+  {{ $v.description | markdownify }}
+</p>
+
+{{ with $v.examples }}
+<h4>
+  Examples
+</h4>
+
+<ul>
+  {{ range . }}
+  <li>
+    <code>{{ . }}</code>
+  </li>
+  {{ end }}
+</ul>
+{{ end }}
+{{ end }}

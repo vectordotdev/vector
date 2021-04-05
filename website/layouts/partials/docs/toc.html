@@ -1,0 +1,18 @@
+{{/* A hack to check for the presence of a TOC */}}
+{{ if gt (len .TableOfContents) 32 }}
+<section class="section is-sticky">
+  <aside>
+    <p class="title is-size-4 is-size-5-mobile">
+      <span class="icon has-text-primary mr-2">
+        <i class="fas fa-sm fa-align-left"></i>
+      </span>
+  
+      <span class="has-text-weight-light">
+        Contents
+      </span>
+    </p>
+  
+    <div id="toc"></div>
+  </aside>
+</section>
+{{ end }}

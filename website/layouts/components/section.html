@@ -1,0 +1,60 @@
+{{ define "title" }}
+Components - Sources, Transforms, and Sinks | {{ site.Title }}
+{{ end }}
+
+{{ define "main" }}
+{{ $criteria := .Params.criteria }}
+{{ $types := slice "Sources" "Transforms" "Sinks" }}
+{{ partial "hero.html" . }}
+
+<section class="section my-4">
+  <div class="container">
+    <div class="columns is-variable is-6">
+      <div class="column is-one-quarter">
+        {{ range $map := $criteria }}
+        {{ range $k, $v := $map }}
+        <p>
+          {{ $k }}
+        </p>
+
+        {{ range $v }}
+        <label class="checkbox">
+          <input type="checkbox">
+          {{ . }}
+        </label>
+        <br />
+        {{ end }}
+        {{ end }}
+        {{ end }}
+      </div>
+
+      <div class="column">
+        {{ range $types }}
+        {{ $components := where site.RegularPages ".CurrentSection.Title" . }}
+        {{ template "components" (dict "type" . "components" $components) }}
+        {{ end }}
+      </div>
+    </div>
+  </div>
+</section>
+{{ end }}
+
+{{ define "components" }}
+{{ $type := .type }}
+{{ $kinds := dict "Sources" "source" "Transforms" "transform" "Sinks" "sink" }}
+<p class="title is-size-3 is-size-4-mobile">
+  <span class="has-text-weight-light">
+    {{ $type }} (<span class="has-text-primary has-text-weight-bold">
+      {{- len .components -}}
+    </span>)
+  </span>
+</p>
+
+<div class="columns is-variable is-multiline mb-6">
+  {{ range .components }}
+  <div class="column is-one-third">
+    {{ .Render "component-card" }}
+  </div>
+  {{ end }}
+</div>
+{{ end }}

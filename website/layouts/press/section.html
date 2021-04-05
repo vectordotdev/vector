@@ -1,0 +1,15 @@
+{{ define "title" }}
+Press | Vector
+{{ end }}
+
+{{ define "main" }}
+{{ partial "hero.html" . }}
+
+<section class="section">
+  <div class="container">
+    <div class="content">
+      {{ .Content }}
+    </div>
+  </div>
+</section>
+{{ end }}

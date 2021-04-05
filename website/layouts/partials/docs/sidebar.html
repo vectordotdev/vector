@@ -1,0 +1,117 @@
+{{ $sections := where site.Sections "Section" "docs" }}
+{{ $page := .ctx }}
+<section class="section is-sticky">
+  <aside class="sidebar pb-6" x-cloak>
+    {{ range $sections }}
+    {{ $isHere := eq $page.RelPermalink .RelPermalink }}
+    {{ $title := .Params.short | default .Title }}
+    <div class="sidebar-section">
+      <a class="sidebar-section-title{{ if $isHere }} is-active{{ end }}" href="{{ .RelPermalink }}">
+        {{ $title }}
+      </a>
+    </div>
+
+    {{ with .Sections }}
+    {{ range . }}
+    {{ template "section" (dict "ctx" . "page" $page) }}
+    {{ end }}
+    {{ end }}
+    {{ end }}
+  </aside>
+</section>
+
+{{ define "section" }}
+{{ $page := .page }}
+{{ $isHere := eq $page.RelPermalink .ctx.RelPermalink }}
+{{ $title := .ctx.Params.short | default .ctx.Title }}
+<div class="sidebar-section">
+  <a class="sidebar-section-title{{ if $isHere }} is-active{{ end }}" href="{{ .ctx.RelPermalink }}">
+    {{ $title }}
+  </a>
+
+  {{ with .ctx.RegularPages }}
+  {{ range . }}
+  {{ $isHere := eq $page.RelPermalink .RelPermalink }}
+  {{ $title := .Params.short | default .Title }}
+  <a class="sidebar-section-link{{ if $isHere }} is-active{{ end }}" href="{{ .RelPermalink }}">
+    {{ $title }}
+  </a>
+  {{ end }}
+  {{ end }}
+
+  {{ with .ctx.Sections }}
+  <div class="sidebar-subsection">
+    {{ range . }}
+    {{ $title := .Params.short | default .Title }}
+    {{ $isHere := eq $page.RelPermalink .RelPermalink }}
+    {{ $open := .IsAncestor $page.CurrentSection }}
+    <div class="sidebar-subsection-accordion" x-data="{ open: {{ $open }} }">
+      <p class="sidebar-subsection-title">
+        <a href="{{ .RelPermalink }}"{{ if $isHere }} class="is-active"{{ end }}>
+          {{ $title }}
+        </a>
+  
+        <a class="icon is-small has-text-primary" @click="open = !open">
+          <i :class="{ 'rotate-90': open }" class="fas fa-sm fa-chevron-right"></i>
+        </a>
+      </p>
+
+      <div class="sidebar-subsection-group" x-show.transition.duration.300ms="open">
+        {{ with .Sections }}
+        {{ range . }}
+        {{ template "subsection-group" (dict "ctx" . "page" $page) }}
+        {{ end }}
+        {{ end }}
+
+        {{ with .RegularPages }}
+        {{ range . }}
+        {{ $isHere := eq $page.RelPermalink .RelPermalink }}
+        {{ $title := .Params.short | default .Title }}
+        <a class="sidebar-subsection-group-link{{ if $isHere }} is-active{{ end }}" href="{{ .RelPermalink }}">
+          {{ $title }}
+        </a>
+        {{ end }}
+        {{ end }}
+      </div>
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+</div>
+{{ end }}
+
+{{ define "subsection-group" }}
+{{ $page := .page }}
+{{ $isHere := eq .page.RelPermalink .ctx.RelPermalink }}
+{{ $open := .ctx.IsAncestor $page.CurrentSection }}
+{{ $title := .ctx.Params.short | default .ctx.Title }}
+<div class="sidebar-subsection-subgroup" x-data="{ open: {{ $open }} }">
+  <p class="sidebar-subsection-subgroup-title">
+    <a href="{{ .ctx.RelPermalink }}"{{ if $isHere }} class="is-active"{{ end }}>
+      {{ $title }}
+    </a>
+
+    <a class="icon is-small has-text-primary" @click="open = !open">
+      <i :class="{ 'fa-chevron-down': open, 'fa-chevron-right': !open }" class="fas fa-sm"></i>
+    </a>
+  </p>
+
+  <div x-show.transition.duration.300ms="open">
+    {{ with .ctx.Sections }}
+    {{ range . }}
+    {{ template "subsection-group" (dict "ctx" . "page" $page) }}
+    {{ end }}
+    {{ end }}
+
+    {{ with .ctx.RegularPages }}
+    {{ range . }}
+    {{ $isHere := eq $page.RelPermalink .RelPermalink }}
+    {{ $title := .Params.short | default .Title }}
+    <a class="sidebar-subsection-subgroup-link{{ if $isHere }} is-active{{ end }}" href="{{ .RelPermalink }}">
+      {{ $title }}
+    </a>
+    {{ end }}
+    {{ end }}
+  </div>
+</div>
+{{ end }}

@@ -1,0 +1,9 @@
+{{ define "title" }}
+Community | {{ site.Title }}
+{{ end }}
+
+{{ define "main" }}
+{{ partial "navbar.html" . }}
+{{ partial "community/hero.html" . }}
+{{ partial "content.html" (dict "content" .Content) }}
+{{ end }}

@@ -1,0 +1,48 @@
+{{ define "toc" }}
+{{ $noop := .Content }}
+{{ $toc := .Page.Scratch }}
+{{ $categories := $toc.Get "categories" }}
+<section class="section is-sticky">
+  <aside>
+    <p class="title is-size-4 is-size-5-mobile">
+      <span class="icon has-text-primary mr-2">
+        <i class="fas fa-sm fa-align-left"></i>
+      </span>
+  
+      <span class="has-text-grey-dark has-text-weight-light">
+        Contents
+      </span>
+    </p>
+
+    <div class="toc is-scrollable">
+      <ul class="toc-1">
+        {{ range $categories }}
+        {{ $funcs := $toc.Get . }}
+        <li>
+          <a href="#{{ . | urlize }}-functions">
+            {{ . }}
+          </a>
+
+          {{ with $funcs }}
+          <ul class="toc-2">
+            {{ range . }}
+            <li>
+              <a href="#{{ . }}">
+                {{ . }}
+              </a>
+            </li>
+            {{ end }}
+          </ul>
+          {{ end }}
+        </li>
+        {{ end }}
+      </ul>
+    </div>
+  </aside>
+</section>
+{{ end }}
+
+{{ define "below" }}
+{{ partial "docs/pagination.html" . }}
+{{ partial "footer.html" . }}
+{{ end }}

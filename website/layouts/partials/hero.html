@@ -1,0 +1,18 @@
+{{/* Standard hero */}}
+{{ $desc := .Params.description }}
+
+<section class="hero is-black is-medium is-bold">
+  <div class="hero-body">
+    <div class="container">
+      <p class="title is-size-1 is-size-2-mobile has-text-weight-light{{ if $desc }} is-spaced{{ end }}">
+        {{ .Title }}
+      </p>
+
+      {{ with $desc }}
+      <p class="subtitle is-size-4 is-size-5-mobile has-text-grey-light">
+        {{ . | markdownify }}
+      </p>
+      {{ end }}
+    </div>
+  </div>
+</section>

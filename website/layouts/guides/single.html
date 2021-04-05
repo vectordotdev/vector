@@ -1,0 +1,33 @@
+{{ define "title" }}
+{{ .Title }} | {{ site.Title }}
+{{ end }}
+
+{{ define "main" }}
+{{ $desc := .Params.description }}
+
+<section class="section mt-6">
+  <div class="container">
+    <div class="columns is-variable is-8">
+      <div class="column is-one-third">
+        <p class="title is-size-2 is-size-3-mobile has-text-weight-light{{ if $desc }} is-spaced{{ end }}">
+          {{ .Title }}
+        </p>
+
+        {{ with $desc }}
+        <p class="subtitle has-text-grey">
+          {{ . }}
+        </p>
+        {{ end }}
+      </div>
+
+      <div class="column">
+        <section class="section">
+          <div class="content">
+            {{ .Content }}
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</section>
+{{ end }}

@@ -1,0 +1,41 @@
+{{ define "title" }}
+{{ .Title }} | {{ site.Title }}
+{{ end }}
+
+{{ define "main" }}
+{{ $desc := .Params.description }}
+
+<section class="section m-6">
+  <div class="container">
+    <div class="columns is-variable is-8">
+      <div class="column is-one-third">
+        <p class="title is-size-1 is-size-2-mobile has-text-weight-light is-spaced">
+          {{ .Title }}
+        </p>
+
+        <p class="subtitle has-text-grey has-text-weight-light">
+          {{ $desc }}
+        </p>
+      </div>
+
+      <div class="column">
+        <div class="container">
+          {{ range .Sections }}
+          <p class="title mb-6">
+            {{ .Title }}
+          </p>
+
+          {{ with .RegularPages }}
+          <div class="columns">
+            {{ range . }}
+            {{ .Render "guide-card" }}
+            {{ end }}
+          </div>
+          {{ end }}
+          {{ end }}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{{ end }}

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>
+      {{ .Title }} | {{ site.Title }}
+    </title>
+
+    {{ partial "css.html" . }}
+  </head>
+  <body class="page has-navbar-fixed-top" id="page" x-data="{ drawer: false }">
+    {{ partial "navbar.html" . }}
+
+    <main class="main">
+      <div class="dashboard">
+        <div class="container">
+          <div class="columns">
+            <div class="column is-one-fifth is-hidden-mobile">
+              {{ partial "docs/sidebar.html" (dict "ctx" .) }}
+            </div>
+      
+            <div class="column">
+              {{ partial "docs/hero.html" (dict "title" .Title "description" .Params.description) }}
+              {{ partial "docs/content.html" . }}
+            </div>
+      
+            <div class="column is-one-fifth is-hidden-mobile">
+              {{ block "toc". }}
+              {{ partial "docs/toc.html" . }}
+              {{ end }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    {{ block "below" . }}
+    {{ partial "footer.html" . }}
+    {{ end }}
+
+    {{ partial "javascript.html" . }}
+  </body>
+</html>
