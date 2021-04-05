@@ -1,3 +1,6 @@
+clean:
+	rm -rf public resources
+
 setup:
 	yarn
 
@@ -9,11 +12,19 @@ serve: setup build-cue
 	--buildDrafts \
 	--buildFuture
 
-ci-production-build: setup build-cue
+# Live site
+production-build:
 	hugo \
 	--minify
 
-ci-preview-build: setup build-cue
+ci-production-build: setup build-cue production-build
+
+# Preview site
+preview-build:
 	hugo \
 	--baseURL $(DEPLOY_PRIME_URL) \
+	--buildDrafts \
+	--buildFuture \
 	--minify
+
+ci-preview-build: setup build-cue preview-build
