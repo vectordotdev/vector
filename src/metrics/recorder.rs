@@ -34,7 +34,7 @@ impl VectorRecorder {
 }
 
 impl Recorder for VectorRecorder {
-    fn register_counter(&self, _key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
+    fn register_counter(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
         let ckey = CompositeKey::new(MetricKind::COUNTER, key);
         self.registry.op(
             ckey,
@@ -43,7 +43,7 @@ impl Recorder for VectorRecorder {
         );
     }
 
-    fn register_gauge(&self, _key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
+    fn register_gauge(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
         let ckey = CompositeKey::new(MetricKind::GAUGE, key);
         self.registry.op(
             ckey,
@@ -54,7 +54,7 @@ impl Recorder for VectorRecorder {
 
     fn register_histogram(
         &self,
-        _key: Key,
+        key: Key,
         _unit: Option<Unit>,
         _description: Option<&'static str>,
     ) {
