@@ -410,7 +410,7 @@ components: sinks: [Name=string]: {
 						buffers_batches: {
 							title: "Buffers & batches"
 							body: #"""
-									![Buffers and Batches](/optimized_svg/buffers-and-batches-serial_538_160.svg)
+									{{< svg "buffers-and-batches-serial.svg" }}
 
 									This component buffers & batches data as shown in the diagram above. You'll notice that Vector treats these concepts
 									differently, instead of treating them as global concepts, Vector treats them
@@ -420,7 +420,7 @@ components: sinks: [Name=string]: {
 									*Batches* are flushed when 1 of 2 conditions are met:
 
 									1. The batch age meets or exceeds the configured `timeout_secs`.
-									2. The batch size meets or exceeds the configured <% if component.options.batch.children.respond_to?(:max_size) %>`max_size`<% else %>`max_events`<% end %>.
+									2. The batch size meets or exceeds the configured `max_size` or `max_events`.
 
 									*Buffers* are controlled via the [`buffer.*`](#buffer) options.
 									"""#
@@ -433,7 +433,7 @@ components: sinks: [Name=string]: {
 				buffers: {
 					title: "Buffers"
 					body: """
-						<SVG src="/img/buffers.svg" />
+						{{< svg "buffers.svg" >}}
 
 						This component buffers events as shown in
 						the diagram above. This helps to smooth out data processing if the downstream
