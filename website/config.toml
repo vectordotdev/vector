@@ -1,0 +1,9 @@
+title = "Vector"
+baseURL = "https://vector.dev"
+disableKinds = ["taxonomy", "term"]
+copyright = "Datadog, Inc."
+languageCode = "en-us"
+
+[params]
+description = "A lightweight and ultra-fast tool for building observability pipelines"
+tagline = "Take control of your observability stack"

@@ -1,0 +1,13 @@
+[build]
+base = "website/"
+publish = "public"
+command = "make ci-production-build"
+
+[build.environment]
+HUGO_VERSION = "0.82.0"
+
+[context.deploy-preview]
+command = "make ci-preview-build"
+
+[context.branch-deploy]
+command = "make ci-preview-build"
