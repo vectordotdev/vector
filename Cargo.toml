@@ -275,7 +275,7 @@ libc = "0.2.92"
 libz-sys = "1.1.2"
 matches = "0.1.8"
 pretty_assertions = "0.7.1"
-reqwest = { version = "0.11.0", features = ["json"] }
+reqwest = { version = "0.11.2", features = ["json"] }
 rusty-fork = "0.3.0"
 tempfile = "3.0.6"
 tokio = { version = "1.4.0", features = ["test-util"] }
