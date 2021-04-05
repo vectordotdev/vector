@@ -1,0 +1,199 @@
+$sticky-top-margin: 2rem
+$sticky-top: $navbar-height + $sticky-top-margin
+
+=x-spaced
+  display: flex
+  flex-direction: row
+  justify-content: space-between
+
+// Ensure a sticky footer at the bottom
+.page
+  display: flex
+  flex-direction: column
+  min-height: 100vh
+
+  .main
+    flex: 1
+
+.navbar-item svg
+  margin-right: 0.5rem
+
+.footer
+  a, .icon
+    color: $primary
+
+    &:hover
+      color: $vector-magenta
+
+.has-bottom-margin
+  margin-bottom: 0.75rem
+
+.has-left-margin
+  margin-left: 1rem
+
+hr.narrow
+  width: 3em
+  height: 2.5px
+  background-color: $primary
+  margin: 0 0 2rem 0
+
+.svg-container
+  margin: 0 auto
+
+  svg
+    margin: 2rem 0 3rem 0
+    width: 90%
+    height: auto
+
+  &.distributed
+    width: 60%
+    height: auto
+
+    +mobile
+      width: 70%
+
+.menu-label.is-active
+  font-weight: 700
+  color: $vector-magenta
+
+sup.ml-tiny
+  margin-left: 0.1rem
+
+.card.is-hoverable
+  &:hover
+    background-color: $white-bis
+
+.is-sticky
+  position: sticky
+  position: -webkit-sticky
+  top: $sticky-top
+
+.dashboard
+  margin-top: $sticky-top-margin
+
+.is-horizontally-spaced
+  display: flex
+  flex-direction: row
+  justify-content: space-between
+
+.code
+  color: $dark
+  font-family: $family-monospace
+  font-weight: $weight-semibold
+
+.link-card
+  box-shadow: $card-shadow
+  padding: $card-content-padding
+  margin-bottom: 0
+
+  &:hover
+    background-color: $white-bis
+
+.content
+  .card + .card
+    margin-top: 0.5rem
+
+.metrics
+  .metric-tags
+    padding-left: 1rem
+
+.requirements
+  background-color: $black
+  color: $grey-lighter
+  font-size: 1rem
+
+  .highlight, code
+    //width: 10rem
+    overflow-x: scroll
+    border-radius: 5px
+    color: $vector-light-blue
+
+  a
+    color: $vector-light-blue
+
+  .requirement
+    padding: 0.75rem 1rem
+    display: flex
+    flex-direction: row
+    align-items: center
+
+    .icon
+      flex: 1
+
+    .text
+      flex: 19
+
+    & + .requirement
+      border-top: 1px solid $grey-lighter
+
+.component-card
+  background-color: $black
+  padding: 1rem 1.25rem
+  height: 100%
+
+  p
+    color: $light
+
+  &:hover
+    background-color: $grey-darker
+
+    .component-card-header
+      color: $vector-light-blue
+
+    p
+      color: $white-bis
+
+  .component-card-header
+    font-size: 1.25rem
+    line-height: 130%
+
+    & + .component-card-content
+      margin-top: 0.75rem
+
+  .component-card-content
+    color: $grey
+
+.jump
+  background-color: $white-bis
+  padding: 0.5rem 0.75rem
+  border-radius: 5px
+  +x-spaced
+
+  & + .jump
+    margin-top: 0.25rem
+
+  .link
+    font-size: 1rem
+    color: $black
+    font-weight: $weight-semibold
+
+    .icon
+      margin-right: 0.25rem
+      color: $primary
+
+  .icon
+    color: $red
+
+  &:hover
+    transition: background-color 0.5s ease-in-out
+    background-color: $black
+
+    .link
+      color: $white
+
+      .icon
+        transition: all 0.5s ease-in-out
+        color: $purple
+
+    .right-icon
+      color: $purple
+      transition: all 0.25s ease-in-out
+      padding-left: 0.75rem
+      font-size: 1.25rem
+
+[x-cloak]
+  display: none !important
+
+.rotate-90
+  transform: rotate(90deg)
+  transition-duration: 0.2s

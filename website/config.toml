@@ -1,13 +1,34 @@
 title = "Vector"
-baseURL = "https://vector.dev"
+baseURL = "/"
 disableKinds = ["taxonomy", "term"]
 copyright = "Datadog, Inc."
-languageCode = "en-us"
+
+# Syntax highlighting
+[markup.highlight]
+noClasses = false
+
+# Markup config overrides
+[markup.goldmark.renderer]
+unsafe = true
+
+# Language configuration
+defaultContentLanguage = "en"
+
+[languages.en]
+title = "Vector"
+contentDir = "content/en"
+weight = 1
 
 [params]
 description = "A lightweight and ultra-fast tool for building observability pipelines"
 tagline = "Take control of your observability stack"
+undertagline = "Collect, transform, and route all observability data with one simple tool"
+subtagline = "Vector is deployed over 1,000,000 times per month by Fortune 500 companies and startups"
+font_awesome_version = "5.15.3"
+alpine_js_version = "2.8.2"
+current_version = "0.12.1"
 
+# Aesthetics
 [[params.fonts]]
 name = "Segoe UI"
 sizes = [300, 400, 600, 700]
@@ -17,3 +38,150 @@ type = "sans_serif"
 name = "Source Code Pro"
 sizes = [300, 400, 600, 700]
 type = "monospace"
+
+[params.social]
+twitter_handle = "vectordotdev"
+github_repo = "timberio/vector"
+discord = "https://chat.vector.dev"
+
+## Menus
+
+# Navbar menu
+[[menu.navbar]]
+name = "Docs"
+url = "/docs"
+weight = 1
+
+[[menu.navbar]]
+name = "Guides"
+url = "/guides"
+weight = 2
+
+[[menu.navbar]]
+name = "Components"
+url = "/components"
+weight = 3
+
+[[menu.navbar]]
+name = "Releases"
+url = "/releases"
+weight = 4
+
+# Footer menu
+[[menu.footer]]
+name = "About"
+identifier = "about"
+weight = 1
+
+[[menu.footer]]
+name = "What is Vector?"
+url = "/docs/about"
+parent = "about"
+weight = 1
+
+
+[[menu.footer]]
+name = "Contact us"
+url = "/community"
+parent = "about"
+weight = 2
+
+[[menu.footer]]
+name = "Press"
+url = "/press"
+parent = "about"
+weight = 3
+
+[[menu.footer]]
+name = "Components"
+identifier = "components"
+weight = 2
+
+[[menu.footer]]
+name = "Sources"
+url = "/docs/reference/configuration/sources"
+parent = "components"
+weight = 1
+
+[[menu.footer]]
+name = "Transforms"
+url = "/docs/reference/configuration/transforms"
+parent = "components"
+weight = 2
+
+[[menu.footer]]
+name = "Sinks"
+url = "/docs/reference/configuration/sinks"
+parent = "components"
+weight = 3
+
+[[menu.footer]]
+name = "Setup"
+identifier = "setup"
+weight = 3
+
+[[menu.footer]]
+name = "Installation"
+url = "/docs/setup/installation"
+parent = "setup"
+weight = 1
+
+[[menu.footer]]
+name = "Deployment"
+url = "/docs/setup/deployment"
+parent = "setup"
+weight = 2
+
+[[menu.footer]]
+name = "Configuration"
+url = "/docs/reference/configuration"
+parent = "setup"
+weight = 3
+
+[[menu.footer]]
+name = "Administration"
+url = "/docs/administration"
+parent = "setup"
+weight = 4
+
+[[menu.footer]]
+name = "Community"
+identifier = "community"
+weight = 4
+
+[[menu.footer]]
+name = "GitHub"
+url = "https://github.com/timberio/vector"
+parent = "community"
+weight = 1
+
+[[menu.footer]]
+name = "Twitter"
+url = "https://twitter.com/vectordotdev"
+parent = "community"
+weight = 2
+
+[[menu.footer]]
+name = "Chat"
+url = "https://chat.vector.dev"
+parent = "community"
+weight = 3
+
+# Mini icons in footer
+[[menu.comms]]
+name = "Twitter"
+params = { icon = "fab fa-twitter" }
+url = "https://twitter.com/vectordotdev"
+weight = 1
+
+[[menu.comms]]
+name = "GitHub"
+params = { icon = "fab fa-github" }
+url = "https://github.com/timberio/vector"
+weight = 2
+
+[[menu.comms]]
+name = "Chat"
+params = { icon = "fab fa-discord" }
+url = "https://chat.vector.dev"
+weight = 3

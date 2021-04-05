@@ -1,0 +1,48 @@
+{{ $year := now.Year }}
+{{ $menu := site.Menus.footer }}
+{{ $buttons := site.Menus.comms }}
+<footer class="footer">
+  <section class="section">
+    <div class="container">
+      <div class="columns is-variable is-8">
+        <div class="column is-one-quarter">
+          <p class="title is-size-3 is-size-4-mobile has-text-light has-text-weight-bold">
+            {{ site.Title }}
+          </p>
+
+          <div>
+            {{ range $buttons }}
+            <a href="{{ .URL }}" target="_blank">
+              <span class="icon is-medium">
+                <i class="{{ .Params.icon }} fa-lg"></i>
+              </span>
+            </a>
+            {{ end }}
+          </div>
+        </div>
+
+        {{ range $menu }}
+        <div class="column">
+          <p class="is-size-5 is-size-6-mobile has-text-weight-medium has-bottom-margin">
+            {{ .Name }}
+          </p>
+
+          {{ range .Children }}
+          <p>
+            <a href="{{ .URL }}">
+              {{ .Name }}
+            </a>
+          </p>
+          {{ end }}
+        </div>
+        {{ end }}
+      </div>
+
+      <hr class="has-background-purple" />
+
+      <p class="has-text-weight-light has-text-centered">
+        Copyright &copy; {{ $year }} {{ site.Copyright }}
+      </p>
+    </div>
+  </section>
+</footer>

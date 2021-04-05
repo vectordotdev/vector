@@ -1,0 +1,4 @@
+{{ $file := printf "static/img/%s" .src }}
+<div>
+  {{ $file | readFile | safeHTML }}
+</div>

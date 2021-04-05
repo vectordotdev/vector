@@ -1,0 +1,35 @@
+{{ $menu := site.Menus.navbar }}
+{{ $here := .RelPermalink }}
+<nav class="navbar is-black is-fixed-top" role="navigation" aria-label="main navigation" x-data="{ open: false }">
+  <div class="container">
+    <div class="navbar-brand">
+      <a class="navbar-item has-text-weight-bold mr-3" href="{{ site.BaseURL }}">
+        {{ site.Title }}
+      </a>
+
+      <a role="button" class="navbar-burger burger" aria-label="menu" aria-expanded="false" data-target="navbar-menu" @click="open = !open" @click.away="open = false" :class="{ 'is-active': open }">
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </a>
+    </div>
+
+    <div class="navbar-menu" :class="{ 'is-active': open }">
+      <div class="navbar-start">
+        {{ range $menu }}
+        {{ $active := hasPrefix $here .URL }}
+
+        <a class="navbar-item has-text-weight-medium{{ if $active }} is-active{{ end }}" href="{{ .URL }}">
+          {{ .Name }}
+        </a>
+        {{ end }}
+      </div>
+
+      <div class="navbar-end">
+        <span class="navbar-item">
+          {{ partial "social-buttons.html" . }}
+        </span>
+      </div>
+    </div>
+  </div>
+</nav>

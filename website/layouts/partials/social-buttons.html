@@ -1,0 +1,21 @@
+{{ $social := site.Params.social }}
+{{ $twitter := printf "https://twitter.com/%s" $social.twitter_handle }}
+{{ $github := printf "https://github.com/%s" $social.github_repo }}
+{{ $discord := $social.discord }}
+<div class="buttons">
+  <a class="button is-twitter-blue" href="{{ $twitter }}" target="_blank">
+    <span class="icon">
+      <i class="fab fa-lg fa-twitter"></i>
+    </span>
+  </a>
+  <a class="button" href="{{ $github }}" target="_blank">
+    <span class="icon">
+      <i class="fab fa-lg fa-github"></i>
+    </span>
+  </a>
+  <a class="button is-discord-purple" href="{{ $discord }}" target="_blank">
+    <span class="icon">
+      <i class="fab fa-lg fa-discord"></i>
+    </span>
+  </a>
+</div>

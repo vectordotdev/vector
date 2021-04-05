@@ -1,15 +1,25 @@
+{{ $noop := .Content }}
 <!DOCTYPE html>
 <html>
   <head>
     <title>
       {{ block "title" . }}
+      {{ site.Title }} | {{ site.Params.description }}
       {{ end }}
     </title>
 
     {{ partial "css.html" . }}
   </head>
-  <body>
-    {{ block "main" . }}
+  <body class="page has-navbar-fixed-top" id="page" x-data="{ drawer: false }">
+    {{ partial "navbar.html" . }}
+
+    <main class="main">
+      {{ block "main" . }}
+      {{ end }}
+    </main>
+
+    {{ block "below" . }}
+    {{ partial "footer.html" . }}
     {{ end }}
 
     {{ partial "javascript.html" . }}
