@@ -748,16 +748,17 @@ pub fn init_roots() {
 }
 
 impl FilterList {
-    fn contains_str(&self, value: Option<&str>) -> bool {
+    fn contains<T, M>(&self, value: &Option<T>, matches: M) -> bool
+    where
+        M: Fn(&PatternWrapper, &T) -> bool,
+    {
         (match (&self.includes, value) {
             // No includes list includes everything
             (None, _) => true,
             // Includes list matched against empty value returns false
             (Some(_), None) => false,
             // Otherwise find the given value
-            (Some(includes), Some(value)) => {
-                includes.iter().any(|pattern| pattern.matches_str(value))
-            }
+            (Some(includes), Some(value)) => includes.iter().any(|pattern| matches(pattern, value)),
         }) && match (&self.excludes, value) {
             // No excludes, list excludes nothing
             (None, _) => true,
@@ -765,31 +766,17 @@ impl FilterList {
             (Some(_), None) => true,
             // Otherwise find the given value
             (Some(excludes), Some(value)) => {
-                !excludes.iter().any(|pattern| pattern.matches_str(value))
+                !excludes.iter().any(|pattern| matches(pattern, value))
             }
         }
     }
 
+    fn contains_str(&self, value: Option<&str>) -> bool {
+        self.contains(&value, |pattern, s| pattern.matches_str(s))
+    }
+
     fn contains_path(&self, value: Option<&Path>) -> bool {
-        (match (&self.includes, value) {
-            // No includes list includes everything
-            (None, _) => true,
-            // Includes list matched against empty value returns false
-            (Some(_), None) => false,
-            // Otherwise find the given value
-            (Some(includes), Some(value)) => {
-                includes.iter().any(|pattern| pattern.matches_path(value))
-            }
-        }) && match (&self.excludes, value) {
-            // No excludes, list excludes nothing
-            (None, _) => true,
-            // No value, never excluded
-            (Some(_), None) => true,
-            // Otherwise find the given value
-            (Some(excludes), Some(value)) => {
-                !excludes.iter().any(|pattern| pattern.matches_path(value))
-            }
-        }
+        self.contains(&value, |pattern, path| pattern.matches_path(path))
     }
 
     #[cfg(test)]
