@@ -25,6 +25,8 @@ criterion_group!(
 criterion_main!(benches);
 
 fn benchmark_remap(c: &mut Criterion) {
+    let mut group = c.benchmark_group("remap");
+
     let rt = runtime();
     let add_fields_runner = |tform: &mut Box<dyn FunctionTransform>, event: Event| {
         let mut result = Vec::with_capacity(1);
@@ -38,7 +40,7 @@ fn benchmark_remap(c: &mut Criterion) {
         result
     };
 
-    c.bench_function("remap: add fields with remap", |b| {
+    group.bench_function("add_fields/remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
                 source: indoc! {r#".foo = "bar"
@@ -65,7 +67,7 @@ fn benchmark_remap(c: &mut Criterion) {
         );
     });
 
-    c.bench_function("remap: add fields with add_fields", |b| {
+    group.bench_function("add_fields/native", |b| {
         let mut fields = IndexMap::new();
         fields.insert("foo".into(), String::from("bar").into());
         fields.insert("bar".into(), String::from("baz").into());
@@ -103,7 +105,7 @@ fn benchmark_remap(c: &mut Criterion) {
         result
     };
 
-    c.bench_function("remap: parse JSON with remap", |b| {
+    group.bench_function("parse_json/remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
                 source: ".bar = parse_json!(string!(.foo))".to_owned(),
@@ -128,7 +130,7 @@ fn benchmark_remap(c: &mut Criterion) {
         );
     });
 
-    c.bench_function("remap: parse JSON with json_parser", |b| {
+    group.bench_function("parse_json/native", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(JsonParser::from(JsonParserConfig {
             field: Some("foo".to_string()),
             target_field: Some("bar".to_owned()),
@@ -168,7 +170,7 @@ fn benchmark_remap(c: &mut Criterion) {
             result
         };
 
-    c.bench_function("remap: coerce with remap", |b| {
+    group.bench_function("coerce/remap", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
                 source: indoc! {r#"
@@ -204,7 +206,7 @@ fn benchmark_remap(c: &mut Criterion) {
         );
     });
 
-    c.bench_function("remap: coerce with coercer", |b| {
+    group.bench_function("coerce/native", |b| {
         let mut tform: Box<dyn FunctionTransform> = rt
             .block_on(async move {
                 toml::from_str::<CoercerConfig>(indoc! {r#"

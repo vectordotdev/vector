@@ -340,7 +340,7 @@ fn benchmark_configs(
         .take(num_lines)
         .collect();
 
-    let mut group = criterion.benchmark_group(format!("language/{}", benchmark_name));
+    let mut group = criterion.benchmark_group(format!("languages/{}", benchmark_name));
     group.sampling_mode(SamplingMode::Flat);
 
     let source_config = format!(

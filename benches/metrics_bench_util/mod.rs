@@ -50,9 +50,9 @@ pub enum Mode {
 impl Mode {
     fn as_str(&self) -> &'static str {
         match self {
-            Mode::MetricsOff => "metrics_off",
-            Mode::MetricsNoTracingIntegration => "metrics_no_tracing_integration",
-            Mode::MetricsOn => "metrics_on",
+            Mode::MetricsOff => "metrics/off",
+            Mode::MetricsNoTracingIntegration => "metrics/no_tracing_integration",
+            Mode::MetricsOn => "metrics/on",
         }
     }
 }
