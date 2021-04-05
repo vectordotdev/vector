@@ -1,0 +1,20 @@
+.function
+  box-shadow: $box-shadow
+  border-radius: $border-radius
+  padding: $padding
+
+  & + .function
+    margin-top: $vertical-spacing
+
+  .function-header
+    +x-spaced
+    font-weight: $weight-bold
+    font-family: $family-monospace
+
+    .function-title
+      .name
+        color: $black
+        .args
+          .arg
+            color: $primary
+    .icon

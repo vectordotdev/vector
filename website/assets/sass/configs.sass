@@ -1,0 +1,78 @@
+$border: 1px solid $grey-lighter
+$box-shadow: $card-shadow
+$border-radius: 10px
+$padding: 1rem 1.25rem
+$button-text-color: $light
+$button-bg-color: $dark
+$button-spacing: 0.25rem
+$button-font-size: 0.75rem
+$button-font-weight: $weight-bold
+$button-padding: 0.25rem 0.4rem
+$button-border-radius: 5px
+$title-font-size: 1.25rem
+$text-font-size: 1rem
+$title-font-weight: $weight-semibold
+$table-font-size: 0.9rem
+$table-head-bg-color: $white-bis
+$button-bg-color-default: $dark
+$button-bg-color-bold: $secondary
+$button-bg-color-light: $purple
+
+.configs
+  border-radius: $border-radius
+  box-shadow: $box-shadow
+
+  .config
+    padding: $padding
+
+    & + .config
+      border-top: $border
+
+    .config-title
+      +x-spaced
+      font-size: $title-font-size
+
+      .name
+        font-weight: $weight-bold
+        font-family: $family-monospace
+        color: $dark
+
+      .config-buttons
+        +x-spaced
+
+        .config-button
+          color: $button-text-color
+          background-color: $button-bg-color
+          font-size: $button-font-size
+          font-weight: $button-font-weight
+          padding: $button-padding
+          border-radius: $button-border-radius
+          background-color: $button-bg-color-default
+
+          & + .config-button
+            margin-left: $button-spacing
+
+          &.is-light
+            background-color: $button-bg-color-light
+
+          &.is-bold
+            background-color: $button-bg-color-bold
+
+    .config-description, .config-default
+      font-size: $text-font-size
+
+    .config-tags
+      .config-tags-title
+        font-weight: $title-font-weight
+
+      .config-tags-table
+        border: $border
+        font-size: $table-font-size
+
+        thead
+          background-color: $table-head-bg-color
+
+        code
+          padding: 0
+          font-weight: $weight-bold
+          background-color: $white

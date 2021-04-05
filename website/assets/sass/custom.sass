@@ -15,9 +15,6 @@ $sticky-top: $navbar-height + $sticky-top-margin
   .main
     flex: 1
 
-.navbar-item svg
-  margin-right: 0.5rem
-
 .footer
   a, .icon
     color: $primary
@@ -25,8 +22,9 @@ $sticky-top: $navbar-height + $sticky-top-margin
     &:hover
       color: $vector-magenta
 
-.has-bottom-margin
-  margin-bottom: 0.75rem
+  .social-buttons
+    a + a
+      margin-left: 0.5rem
 
 .has-left-margin
   margin-left: 1rem

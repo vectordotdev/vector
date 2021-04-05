@@ -1,0 +1,124 @@
+// TODO: make the sidebar Sass much tidier
+
+$section-title-color: $dark
+$active-link-color: $primary
+$link-hover-color: $secondary
+$indent: 0.75rem
+$margin-sm: 0.3rem
+$margin-md: 0.5rem
+$margin-lg: 1rem
+$margin-xl: 1.5rem
+$subsection-padding: 0.25rem
+
+=x
+  border: 1px solid red
+
+=spread-out
+  display: flex
+  flex-direction: row
+  justify-content: space-between
+
+=indent
+  padding-left: $indent
+
+=topped-sm
+  margin-top: $margin-sm
+
+=topped-md
+  margin-top: $margin-md
+
+=topped-lg
+  margin-top: $margin-lg
+
+=topped-xl
+  margin-top: $margin-xl
+
+=bold
+  font-weight: 600
+  text-transform: uppercase
+  letter-spacing: 0.02rem
+
+.sidebar
+  margin: 0
+  padding: 0
+
+  a
+    color: $grey
+    display: block
+    line-height: 1.3rem
+
+    &.is-active
+      font-weight: $weight-bold
+      color: $active-link-color
+
+    &:hover
+      color: $link-hover-color
+
+  .sidebar-section
+    &:first-child
+      margin-bottom: $margin-lg
+    
+    &:not(:first-child)
+      margin-bottom: $margin-xl
+
+    .sidebar-section-title
+      +bold
+      color: $section-title-color
+
+      &.is-active
+        font-weight: $weight-bold
+        color: $active-link-color
+
+      &:hover
+        color: $secondary
+
+      & + .sidebar-section-link, & + .sidebar-subsection
+        +topped-md
+
+    .sidebar-section-link
+      & + .sidebar-section-link, & + .sidebar-subsection
+        +topped-md
+
+    & + .sidebar-subsection
+      +topped-xl
+
+    .sidebar-subsection
+      +topped-sm
+
+      .sidebar-subsection-accordion
+        .sidebar-subsection-title
+          +spread-out
+
+        .sidebar-subsection-group
+          +topped-md
+          //padding-top: $subsection-padding
+          border-left: 2px solid $grey-lighter
+
+          .sidebar-subsection-group-link
+            +indent
+
+            & + .sidebar-subsection-group-link
+              +topped-sm
+
+          .sidebar-subsection-subgroup
+            +topped-sm
+            +indent
+
+            .sidebar-subsection-subgroup-link
+              +topped-sm
+              +indent
+
+              & + .sidebar-subsection-subgroup-link
+                +topped-sm
+
+            .sidebar-subsection-subgroup-title
+              +spread-out
+
+            & + .sidebar-subsection-group-link
+              +topped-sm
+
+          & + .sidebar-subsection-group
+            +topped-lg
+
+        & + .sidebar-subsection-accordion
+          +topped-md

@@ -1,0 +1,43 @@
+.error
+  box-shadow: $card-shadow
+
+  .error-header
+    +x-spaced
+    font-size: $header-font-size
+    background-color: $header-bg-color
+    padding: $padding
+
+    .error-code
+      color: $header-code-color
+      margin-right: $header-code-right-margin
+      font-weight: $weight-bold
+      font-family: $family-monospace
+
+    .error-title
+      color: $header-title-color
+      font-weight: $weight-bold
+    
+    .icon
+      color: $icon-color
+
+  .error-info
+    padding: $padding
+
+    .error-description
+  
+    .error-examples
+      border: $border
+      padding: $examples-padding
+      margin-top: $text-spacing
+      border-radius: $border-radius
+
+      .error-examples-title
+        +x-spaced
+        +y-centered-row
+        font-weight: $weight-semibold
+
+        .icon
+          color: $icon-color
+
+  & + .error
+    margin-top: $vertical-spacing

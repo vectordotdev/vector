@@ -92,8 +92,8 @@ $colors: mergeColorMaps(("secondary": ($secondary, $white), "twitter-blue": ($tw
 //@import "bulma/sass/elements/box"
 @import "bulma/sass/elements/button"
 @import "bulma/sass/elements/container"
-//@import "bulma/sass/elements/content"
-//@import "bulma/sass/elements/icon"
+@import "bulma/sass/elements/content"
+@import "bulma/sass/elements/icon"
 //@import "bulma/sass/elements/image"
 //@import "bulma/sass/elements/notification"
 //@import "bulma/sass/elements/other"
@@ -112,7 +112,7 @@ $colors: mergeColorMaps(("secondary": ($secondary, $white), "twitter-blue": ($tw
 
 // Bulma components
 //@import "bulma/sass/components/breadcrumb"
-//@import "bulma/sass/components/card"
+@import "bulma/sass/components/card"
 //@import "bulma/sass/components/dropdown"
 //@import "bulma/sass/components/level"
 //@import "bulma/sass/components/media"
@@ -144,4 +144,10 @@ $colors: mergeColorMaps(("secondary": ($secondary, $white), "twitter-blue": ($tw
 @import "bulma/sass/layout/section"
 
 // Non-vendored, site-specific Sass
+@import "helpers"
+@import "configs"
 @import "custom"
+@import "sidebar"
+@import "vrl/variables"
+@import "vrl/errors"
+@import "vrl/functions"
