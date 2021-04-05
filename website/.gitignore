@@ -1,3 +1,6 @@
 # Hugo-generated assets
 public/
 resources/
+
+# CUE-generated assets
+data/docs.json
