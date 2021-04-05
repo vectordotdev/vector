@@ -1,0 +1,3 @@
+tap "cuelang/tap"
+
+brew "cue"
