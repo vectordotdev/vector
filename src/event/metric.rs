@@ -298,16 +298,17 @@ impl Metric {
                 value: handle.read_gauge() as f64,
             },
             metrics_util::Handle::Histogram(_) => {
-                let values = handle.read_histogram();
-                // Each sample in the source measurement has an
-                // effective sample rate of 1.
-                let samples = values
-                    .into_iter()
-                    .map(|i| Sample {
-                        value: i as f64,
-                        rate: 1,
-                    })
-                    .collect();
+                let mut samples = Vec::with_capacity(128);
+                handle.read_histogram_with_clear(|values| {
+                    // Each sample in the source measurement has an effective
+                    // sample rate of 1.
+                    for value in values {
+                        samples.push(Sample {
+                            value: *value,
+                            rate: 1,
+                        });
+                    }
+                });
                 MetricValue::Distribution {
                     samples,
                     statistic: StatisticKind::Histogram,
