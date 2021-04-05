@@ -92,7 +92,7 @@ components: sinks: gcp_cloud_storage: {
 		acl: {
 			category:    "ACL"
 			common:      false
-			description: "Predefined ACL to apply to the created objects. For more information, see [Predefined ACLs][urls.gcs_predefined_acl]. If this is not set, GCS will apply a default ACL when the object is created."
+			description: "Predefined ACL to apply to the created objects. For more information, see [Predefined ACLs](\(urls.gcs_predefined_acl)). If this is not set, GCS will apply a default ACL when the object is created."
 			required:    false
 			warnings: []
 			type: string: {
