@@ -82,9 +82,8 @@ impl Application {
             LogFormat::Json => true,
         };
 
-        trace::init(color, json, &level);
-
         metrics::init().expect("metrics initialization failed");
+        trace::init(color, json, &level);
 
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
