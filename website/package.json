@@ -1,6 +1,7 @@
 {
   "private": true,
   "devDependencies": {
+    "alpinejs": "^2.8.2",
     "bulma": "^0.9.2"
   }
 }

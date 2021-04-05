@@ -7,3 +7,13 @@ languageCode = "en-us"
 [params]
 description = "A lightweight and ultra-fast tool for building observability pipelines"
 tagline = "Take control of your observability stack"
+
+[[params.fonts]]
+name = "Segoe UI"
+sizes = [300, 400, 600, 700]
+type = "sans_serif"
+
+[[params.fonts]]
+name = "Source Code Pro"
+sizes = [300, 400, 600, 700]
+type = "monospace"

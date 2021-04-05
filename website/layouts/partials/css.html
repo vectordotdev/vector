@@ -1,0 +1,13 @@
+{{ $serverMode   := site.IsServer }}
+{{ $includePaths := (slice "node_modules") }}
+{{ $sass         := "sass/style.sass" }}
+{{ $cssOutput    := "css/style.css" }}
+{{ $devOpts      := (dict "targetPath" $cssOutput "includePaths" $includePaths "enableSourceMap" true) }}
+{{ $prodOpts     := (dict "targetPath" $cssOutput "includePaths" $includePaths "outputStyle" "compressed") }}
+{{ $cssOpts      := cond $serverMode $devOpts $prodOpts }}
+{{ $css          := resources.Get $sass | resources.ExecuteAsTemplate $sass . | toCSS $cssOpts | fingerprint}}
+
+<link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
+
+{{ $favicon := "favicon.ico" | absURL }}
+<link rel="shortcut icon" href="{{ $favicon }}">

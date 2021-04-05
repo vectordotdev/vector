@@ -15,7 +15,7 @@ make serve
 
 [esbuild]: https://github.com/evanw/esbuild
 [hugo]: https://gohugo.io
-[netlify_toml]: ./netlify.toml
+[netlify_toml]: ../netlify.toml
 [sass]: https://sass-lang.com
 [vector]: https://vector.dev
 [yarn]: https://yarnpkg.com

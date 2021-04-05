@@ -5,9 +5,13 @@
       {{ block "title" . }}
       {{ end }}
     </title>
+
+    {{ partial "css.html" . }}
   </head>
   <body>
     {{ block "main" . }}
     {{ end }}
+
+    {{ partial "javascript.html" . }}
   </body>
 </html>
