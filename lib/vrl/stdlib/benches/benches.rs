@@ -27,6 +27,8 @@ criterion_group!(
               format_number,
               format_timestamp,
               get_env_var,
+              // TODO: dynamic value
+              //get_host_ip,,
               get_hostname,
               includes,
               ip_cidr_contains,

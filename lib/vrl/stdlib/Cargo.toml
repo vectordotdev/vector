@@ -20,6 +20,7 @@ hostname = { version = "0.3", optional = true }
 lazy_static = { version = "1", optional = true }
 md-5 = { version = "0.9", optional = true }
 nom = { version = "6", optional = true }
+pnet = { version = "0.27", optional = true }
 regex = { version = "1", optional = true }
 rust_decimal = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
@@ -60,6 +61,7 @@ default = [
     "format_timestamp",
     "get_env_var",
     "get_hostname",
+    "get_host_ip",
     "includes",
     "integer",
     "ip_cidr_contains",
@@ -154,6 +156,7 @@ format_number = ["rust_decimal"]
 format_timestamp = ["chrono"]
 get_env_var = []
 get_hostname = ["hostname"]
+get_host_ip = ["pnet"]
 includes = []
 integer = []
 ip_cidr_contains = ["cidr-utils"]

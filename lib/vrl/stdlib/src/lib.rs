@@ -40,6 +40,8 @@ mod format_number;
 mod format_timestamp;
 #[cfg(feature = "get_env_var")]
 mod get_env_var;
+#[cfg(feature = "get_host_ip")]
+mod get_host_ip;
 #[cfg(feature = "get_hostname")]
 mod get_hostname;
 #[cfg(feature = "includes")]
@@ -235,6 +237,8 @@ pub use format_number::FormatNumber;
 pub use format_timestamp::FormatTimestamp;
 #[cfg(feature = "get_env_var")]
 pub use get_env_var::GetEnvVar;
+#[cfg(feature = "get_host_ip")]
+pub use get_host_ip::GetHostIp;
 #[cfg(feature = "get_hostname")]
 pub use get_hostname::GetHostname;
 #[cfg(feature = "includes")]
@@ -420,6 +424,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(FormatTimestamp),
         #[cfg(feature = "get_env_var")]
         Box::new(GetEnvVar),
+        #[cfg(feature = "get_host_ip")]
+        Box::new(GetHostIp),
         #[cfg(feature = "get_hostname")]
         Box::new(GetHostname),
         #[cfg(feature = "includes")]
