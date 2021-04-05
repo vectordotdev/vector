@@ -461,7 +461,7 @@ impl HostMetricsConfig {
                     .map(|counter| {
                         self.network
                             .devices
-                            .contains(Some(counter.interface().into()))
+                            .contains_str(Some(counter.interface()))
                             .then(|| counter)
                     })
                     .filter_map(|counter| async { counter })
@@ -540,7 +540,7 @@ impl HostMetricsConfig {
                     .map(|partition| {
                         self.filesystem
                             .mountpoints
-                            .contains(Some(partition.mount_point().into()))
+                            .contains_path(Some(partition.mount_point()))
                             .then(|| partition)
                     })
                     .filter_map(|partition| async { partition })
@@ -548,7 +548,7 @@ impl HostMetricsConfig {
                     .map(|partition| {
                         self.filesystem
                             .devices
-                            .contains(partition.device().map(|d| FilterValue::Path(d.as_ref())))
+                            .contains_path(partition.device().map(|d| d.as_ref()))
                             .then(|| partition)
                     })
                     .filter_map(|partition| async { partition })
@@ -556,7 +556,7 @@ impl HostMetricsConfig {
                     .map(|partition| {
                         self.filesystem
                             .filesystems
-                            .contains(Some(partition.file_system().as_str().into()))
+                            .contains_str(Some(partition.file_system().as_str()))
                             .then(|| partition)
                     })
                     .filter_map(|partition| async { partition })
@@ -630,7 +630,7 @@ impl HostMetricsConfig {
                     .map(|counter| {
                         self.disk
                             .devices
-                            .contains(Some(FilterValue::Path(counter.device_name().as_ref())))
+                            .contains_path(Some(counter.device_name().as_ref()))
                             .then(|| counter)
                     })
                     .filter_map(|counter| async { counter })
@@ -747,46 +747,59 @@ pub fn init_roots() {
     };
 }
 
-enum FilterValue<'a> {
-    String(&'a str),
-    Path(&'a Path),
-}
-
-impl<'a> From<&'a str> for FilterValue<'a> {
-    fn from(s: &'a str) -> Self {
-        FilterValue::String(s)
-    }
-}
-
-impl<'a> From<&'a Path> for FilterValue<'a> {
-    fn from(path: &'a Path) -> Self {
-        FilterValue::Path(path)
-    }
-}
-
 impl FilterList {
-    fn contains(&self, value: Option<FilterValue>) -> bool {
-        (match (&self.includes, &value) {
+    fn contains_str(&self, value: Option<&str>) -> bool {
+        (match (&self.includes, value) {
             // No includes list includes everything
             (None, _) => true,
             // Includes list matched against empty value returns false
             (Some(_), None) => false,
             // Otherwise find the given value
-            (Some(includes), Some(value)) => includes.iter().any(|pattern| match value {
-                FilterValue::String(s) => pattern.matches_str(s),
-                FilterValue::Path(path) => pattern.matches_path(path),
-            }),
-        }) && match (&self.excludes, &value) {
+            (Some(includes), Some(value)) => {
+                includes.iter().any(|pattern| pattern.matches_str(value))
+            }
+        }) && match (&self.excludes, value) {
             // No excludes, list excludes nothing
             (None, _) => true,
             // No value, never excluded
             (Some(_), None) => true,
             // Otherwise find the given value
-            (Some(excludes), Some(value)) => !excludes.iter().any(|pattern| match value {
-                FilterValue::String(s) => pattern.matches_str(s),
-                FilterValue::Path(path) => pattern.matches_path(path),
-            }),
+            (Some(excludes), Some(value)) => {
+                !excludes.iter().any(|pattern| pattern.matches_str(value))
+            }
         }
+    }
+
+    fn contains_path(&self, value: Option<&Path>) -> bool {
+        (match (&self.includes, value) {
+            // No includes list includes everything
+            (None, _) => true,
+            // Includes list matched against empty value returns false
+            (Some(_), None) => false,
+            // Otherwise find the given value
+            (Some(includes), Some(value)) => {
+                includes.iter().any(|pattern| pattern.matches_path(value))
+            }
+        }) && match (&self.excludes, value) {
+            // No excludes, list excludes nothing
+            (None, _) => true,
+            // No value, never excluded
+            (Some(_), None) => true,
+            // Otherwise find the given value
+            (Some(excludes), Some(value)) => {
+                !excludes.iter().any(|pattern| pattern.matches_path(value))
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn contains_test(&self, value: Option<&str>) -> bool {
+        let result = self.contains_str(value);
+        assert_eq!(
+            result,
+            self.contains_path(value.map(|value| std::path::Path::new(value)))
+        );
+        result
     }
 }
 
@@ -844,10 +857,10 @@ mod tests {
     #[test]
     fn filterlist_default_includes_everything() {
         let filters = FilterList::default();
-        assert!(filters.contains(Some("anything")));
-        assert!(filters.contains(Some("should")));
-        assert!(filters.contains(Some("work")));
-        assert!(filters.contains(None));
+        assert!(filters.contains_test(Some("anything")));
+        assert!(filters.contains_test(Some("should")));
+        assert!(filters.contains_test(Some("work")));
+        assert!(filters.contains_test(None));
     }
 
     #[test]
@@ -859,13 +872,13 @@ mod tests {
             ]),
             excludes: None,
         };
-        assert!(!filters.contains(Some("sd")));
-        assert!(filters.contains(Some("sda")));
-        assert!(!filters.contains(Some("sda1")));
-        assert!(filters.contains(Some("dm-")));
-        assert!(filters.contains(Some("dm-5")));
-        assert!(!filters.contains(Some("xda")));
-        assert!(!filters.contains(None));
+        assert!(!filters.contains_test(Some("sd")));
+        assert!(filters.contains_test(Some("sda")));
+        assert!(!filters.contains_test(Some("sda1")));
+        assert!(filters.contains_test(Some("dm-")));
+        assert!(filters.contains_test(Some("dm-5")));
+        assert!(!filters.contains_test(Some("xda")));
+        assert!(!filters.contains_test(None));
     }
 
     #[test]
@@ -877,13 +890,13 @@ mod tests {
                 PatternWrapper::new("dm-*").unwrap(),
             ]),
         };
-        assert!(filters.contains(Some("sd")));
-        assert!(!filters.contains(Some("sda")));
-        assert!(filters.contains(Some("sda1")));
-        assert!(!filters.contains(Some("dm-")));
-        assert!(!filters.contains(Some("dm-5")));
-        assert!(filters.contains(Some("xda")));
-        assert!(filters.contains(None));
+        assert!(filters.contains_test(Some("sd")));
+        assert!(!filters.contains_test(Some("sda")));
+        assert!(filters.contains_test(Some("sda1")));
+        assert!(!filters.contains_test(Some("dm-")));
+        assert!(!filters.contains_test(Some("dm-5")));
+        assert!(filters.contains_test(Some("xda")));
+        assert!(filters.contains_test(None));
     }
 
     #[test]
@@ -895,14 +908,14 @@ mod tests {
             ]),
             excludes: Some(vec![PatternWrapper::new("dm-5").unwrap()]),
         };
-        assert!(!filters.contains(Some("sd")));
-        assert!(filters.contains(Some("sda")));
-        assert!(!filters.contains(Some("sda1")));
-        assert!(filters.contains(Some("dm-")));
-        assert!(filters.contains(Some("dm-1")));
-        assert!(!filters.contains(Some("dm-5")));
-        assert!(!filters.contains(Some("xda")));
-        assert!(!filters.contains(None));
+        assert!(!filters.contains_test(Some("sd")));
+        assert!(filters.contains_test(Some("sda")));
+        assert!(!filters.contains_test(Some("sda1")));
+        assert!(filters.contains_test(Some("dm-")));
+        assert!(filters.contains_test(Some("dm-1")));
+        assert!(!filters.contains_test(Some("dm-5")));
+        assert!(!filters.contains_test(Some("xda")));
+        assert!(!filters.contains_test(None));
     }
 
     #[tokio::test]
