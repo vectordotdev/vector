@@ -143,34 +143,48 @@ metadata required to track the event status.
 ### Event finalization
 
 When instantiated, the topology will provide each source with a unique
-identifier for the token. The source may use this identifier to create
+identifier token. The source may use this identifier to create
 one or more notification channels, each with their own unique
 identifier. This provides both a unique identifier of the source that
 needs to receive the event finalization status as well as the mechanism
 for delivering the event identifier and status.
 
-The finalization status is recorded when the last copy of the event is
-dropped. At that time, the finalization status stored in the event is
-recorded in a batch status buffer. Since events may be internally
-dropped when they are merged, a special "no-op" status is used to
-indicate that no status needs to be recorded to prevent superfluous
-status updates. When the last copy of the batch status is dropped, it is
-sent to the source.
+Event finalization is a three step process:
+
+1. When a sink completes delivery of an event, the delivery status is
+   recorded in the finalizer status that is shared across all clones of
+   the event. This may change that status from `Dropped` (the
+   initialization state) to either `Delivered` or `Failed`, or from
+   `Delivered` to `Failed`. The `NoOp` state is never changed.
+2. If one of those sinks is configured to be authoritative, it will
+   immediately update the status of all its source batches and update
+   the event status to `NoOp` that no extraneous updates happen.
+   Otherwise, the last copy of the event does this status update when
+   the shared finalizer is dropped.
+3. When the last event if a batch is finalized, the status of that batch
+   is sent *once* to the source via a one-shot channel. This signals the
+   source to acknowledge the batch.
 
 ### Event metadata
 
-Given the channel above, the following source metadata will be added to events:
+The structure added to the event metadata is as follows:
 
-1. A finalization status, to be delivered to all sources.
-2. An array of event sources.
-
-Each event source is a shared reference to a batch notifier, containing:
-
-1. The final status indicator. This will default to a success indicator,
-   but may be set to indicate failure if any event in the batch fails
-   delivery.
-2. A one-shot notification channel to the source.
-3. The unique identifier used to recreate the channel after deserialization.
+1. Each event has an optional finalizer. When an event is fanned out to
+   multiple transforms or sinks, the event is cloned to each
+   destination, but each destination will share the same
+   finalizer. Sources that do not handle acknowledgements will not
+   initialize this finalizer, but it may be set subsequently if the
+   event is merged with another that does require acknowledgements.
+2. Each finalizer contains a status marker for the event and one or more
+   shared references to source batch notifiers. When an event is merged
+   with another, their source batches will be combined here. All events
+   in the batch will be acknowledged when the last event in the batch is
+   finalized. Sources that receive events individually will need to
+   create a "batch" for each event.
+3. The batch notifier contains a one-shot channel to the source that
+   originated the batch, as well as the current status for the batch and
+   a unique identifier. The identifier is used to reinstantiate the
+   channel after an event is serialized.
 
 ### Data structures
 
@@ -188,7 +202,7 @@ struct EventFinalizer {
 struct BatchNotifier {
     status: Mutex<BatchStatus>,
     notifier: tokio::sync::oneshot::Sender<BatchStatus>,
-    identifier: ImmStr,
+    identifier: Box<str>,
 }
 
 struct EventFinalization {
@@ -261,7 +275,17 @@ struct SinkOuter {
 
 ## Doc-level Proposal
 
-The following additional source configuration will be added:
+A new `acknowledgements` setting will be added to the configuration, at
+both the global level and for each source, to control how
+acknowledgements are done for sources. It is a boolean defaulting to
+`true` indicating that the source will participate in end-to-end
+acknowledgements.
+
+Additionally, a new `authoritative` setting will be added to the
+configuration at the sink level to control which sink is authoritative
+for acknowledgements. It is a boolean defaulting to `false`. If no sink
+indicates it is authoritative, all sinks must finalize the event before
+an acknowledgement may be sent, as described above.
 
 ```toml
 # Global enable option
@@ -272,7 +296,9 @@ acknowledgements = true
   acknowledgements = true
 ```
 
-We would also need to document when acknowledgement happens for each source.
+A new class named `acknowledgements` will be added to the source
+reference documentation which will be used to describe if and how the
+source handles acknowledgements.
 
 ## Rationale
 
