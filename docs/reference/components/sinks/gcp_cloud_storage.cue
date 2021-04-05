@@ -151,7 +151,7 @@ components: sinks: gcp_cloud_storage: {
 		filename_time_format: {
 			category:    "File Naming"
 			common:      false
-			description: "The format of the resulting object file name. [`strftime` specifiers][urls.strptime_specifiers] are supported."
+			description: "The format of the resulting object file name. [`strftime` specifiers](\(urls.strptime_specifiers)) are supported."
 			required:    false
 			warnings: []
 			type: string: {
@@ -173,7 +173,7 @@ components: sinks: gcp_cloud_storage: {
 		}
 		metadata: {
 			common:      false
-			description: "The set of metadata `key:value` pairs for the created objects. See the [GCS custom metadata][urls.gcs_custom_metadata] documentation for more details."
+			description: "The set of metadata `key:value` pairs for the created objects. See the [GCS custom metadata](\(urls.gcs_custom_metadata)) documentation for more details."
 			required:    false
 			warnings: []
 			type: string: {
@@ -185,7 +185,7 @@ components: sinks: gcp_cloud_storage: {
 		storage_class: {
 			category:    "Storage"
 			common:      false
-			description: "The storage class for the created objects. See [the GCP storage classes][urls.gcs_storage_classes] for more details."
+			description: "The storage class for the created objects. See [the GCP storage classes](\(urls.gcs_storage_classes)) for more details."
 			required:    false
 			warnings: []
 			type: string: {

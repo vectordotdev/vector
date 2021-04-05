@@ -48,7 +48,7 @@ components: sources: mongodb_metrics: {
 		requirements: [
 			"""
 				User from endpoint should have enough privileges for running
-				[serverStatus][urls.mongodb_command_server_status] command.
+				[serverStatus](\(urls.mongodb_command_server_status)) command.
 				""",
 		]
 
@@ -62,7 +62,7 @@ components: sources: mongodb_metrics: {
 
 	configuration: {
 		endpoints: {
-			description: "MongoDB [Connection String URI Format][urls.mongodb_connection_string_uri_format]"
+			description: "MongoDB [Connection String URI Format](\(urls.mongodb_connection_string_uri_format))"
 			required:    true
 			type: array: {
 				items: type: string: {
@@ -95,7 +95,7 @@ components: sources: mongodb_metrics: {
 		mod_status: {
 			title: "MongoDB `serverStatus` command"
 			body: """
-				The [serverStatus][urls.mongodb_command_server_status] command
+				The [serverStatus](\(urls.mongodb_command_server_status)) command
 				returns a document that provides an overview of the database’s
 				state. The output fields vary depending on the version of
 				MongoDB, underlying operating system platform, the storage
