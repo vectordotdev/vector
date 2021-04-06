@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{collections::BTreeMap, convert::TryFrom, time::Instant};
 use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
 
 pub mod parser;
 use parser::NginxStubStatus;
@@ -106,7 +107,7 @@ impl SourceConfig for NginxMetricsConfig {
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         Ok(Box::pin(async move {
-            let mut interval = time::interval(duration).take_until(shutdown);
+            let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|nginx| nginx.collect())).await;

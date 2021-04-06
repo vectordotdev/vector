@@ -10,9 +10,10 @@ license = "MPL-2.0"
 vrl = { path = "../core" }
 
 base64 = { version = "0.13", optional = true }
-bytes = { version = "0.5.6", optional = true }
+bytes = { version = "1.0.0", optional = true }
 chrono = { version = "0.4", optional = true }
 cidr-utils = { version = "0.5", optional = true }
+csv = { version = "1.1", optional = true }
 grok = { version = "1", optional = true }
 hex = { version = "0.4", optional = true }
 hostname = { version = "0.3", optional = true }
@@ -65,7 +66,16 @@ default = [
     "ip_subnet",
     "ip_to_ipv6",
     "ipv6_to_ipv4",
+    "is_array",
+    "is_boolean",
+    "is_float",
+    "is_integer",
+    "is_null",
     "is_nullish",
+    "is_object",
+    "is_regex",
+    "is_string",
+    "is_timestamp",
     "join",
     "length",
     "log",
@@ -79,12 +89,15 @@ default = [
     "parse_aws_vpc_flow_log",
     "parse_apache_log",
     "parse_common_log",
+    "parse_csv",
     "parse_duration",
     "parse_glog",
     "parse_grok",
     "parse_json",
     "parse_key_value",
+    "parse_linux_authorization",
     "parse_logfmt",
+    "parse_query_string",
     "parse_regex",
     "parse_regex_all",
     "parse_syslog",
@@ -147,7 +160,16 @@ ip_cidr_contains = ["cidr-utils"]
 ip_subnet = ["lazy_static", "regex"]
 ip_to_ipv6 = []
 ipv6_to_ipv4 = []
+is_array = []
+is_boolean = []
+is_float = []
+is_integer = []
+is_null = []
 is_nullish = []
+is_object = []
+is_regex = []
+is_string = []
+is_timestamp = []
 join = []
 length = []
 log = ["tracing"]
@@ -161,12 +183,15 @@ parse_aws_alb_log = ["nom"]
 parse_aws_cloudwatch_log_subscription_message = ["serde_json", "shared/aws_cloudwatch_logs_subscription", "shared/btreemap"]
 parse_aws_vpc_flow_log = []
 parse_common_log = ["chrono"]
+parse_csv = ["csv"]
 parse_duration = ["rust_decimal"]
 parse_glog = ["chrono"]
 parse_grok = ["grok"]
 parse_json = ["serde_json"]
 parse_key_value = ["nom"]
+parse_linux_authorization = ["parse_syslog"]
 parse_logfmt = ["parse_key_value"]
+parse_query_string = []
 parse_regex = ["regex"]
 parse_regex_all = ["regex"]
 parse_syslog = ["syslog_loose"]

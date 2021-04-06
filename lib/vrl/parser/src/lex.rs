@@ -1140,7 +1140,7 @@ mod test {
 
     fn lexer(input: &str) -> impl Iterator<Item = SpannedResult<'_, usize>> + '_ {
         let mut lexer = Lexer::new(input);
-        Box::new(std::iter::from_fn(move || Some(lexer.next()?)))
+        Box::new(std::iter::from_fn(move || lexer.next()))
     }
 
     // only exists to visually align assertions with inputs in tests

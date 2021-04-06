@@ -45,3 +45,22 @@ impl InternalEvent for RemapConditionExecutionError {
         counter!("processing_errors_total", 1);
     }
 }
+
+#[derive(Debug)]
+pub struct RemapMappingAbort {
+    /// If set to true, the remap transform has dropped the event after an abort
+    /// during mapping. This internal event will reflect that in its messaging.
+    pub event_dropped: bool,
+}
+
+impl InternalEvent for RemapMappingAbort {
+    fn emit_logs(&self) {
+        let message = if self.event_dropped {
+            "Event mapping aborted; discarding event."
+        } else {
+            "Event mapping aborted."
+        };
+
+        debug!(message, internal_log_rate_secs = 30)
+    }
+}

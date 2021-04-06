@@ -19,6 +19,7 @@ use std::{
     future::ready,
     time::{Duration, Instant},
 };
+use tokio_stream::wrappers::IntervalStream;
 
 mod parser;
 
@@ -145,7 +146,7 @@ fn apache_metrics(
     let out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
 
     Box::pin(
-        tokio::time::interval(Duration::from_secs(interval))
+        IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
             .take_until(shutdown)
             .map(move |_| stream::iter(urls.clone()))
             .flatten()
@@ -277,7 +278,7 @@ mod test {
         {Body, Response, Server},
     };
     use pretty_assertions::assert_eq;
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[test]
     fn generate_config() {
@@ -358,7 +359,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         .unwrap();
         tokio::spawn(source);
 
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let metrics = collect_ready(rx)
             .await
@@ -424,7 +425,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         .unwrap();
         tokio::spawn(source);
 
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let metrics = collect_ready(rx)
             .await
@@ -463,7 +464,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         .unwrap();
         tokio::spawn(source);
 
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let metrics = collect_ready(rx)
             .await

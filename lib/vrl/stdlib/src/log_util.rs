@@ -54,7 +54,7 @@ lazy_static! {
         ")))                                    # Match the closing quote
         #\s*$                                   # Match any number of whitespaces (to be discarded).
     "#)
-    .expect("failed compiling regex for common log");
+    .expect("failed compiling regex for combined log");
 
     // It is possible to customise the format output by apache. This function just handles the default defined here.
     // https://github.com/mingrammer/flog/blob/9bc83b14408ca446e934c32e4a88a81a46e78d83/log.go#L16
@@ -71,7 +71,7 @@ lazy_static! {
         (-|(?P<message>.*))                         # Match `-` or any character.
         \s*$                                        # Match any number of whitespaces (to be discarded).
     "#)
-    .expect("failed compiling regex for common log");
+    .expect("failed compiling regex for error log");
 
 }
 

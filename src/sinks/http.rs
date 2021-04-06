@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient, MaybeAuth},
-    internal_events::{HTTPEventEncoded, HTTPEventMissingMessage},
+    internal_events::{HttpEventEncoded, HttpEventMissingMessage},
     sinks::util::{
         buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -85,8 +85,14 @@ lazy_static! {
 #[derivative(Default)]
 pub enum HttpMethod {
     #[derivative(Default)]
+    Get,
+    Head,
     Post,
     Put,
+    Delete,
+    Options,
+    Trace,
+    Patch,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
@@ -183,7 +189,7 @@ impl HttpSink for HttpSinkConfig {
                     b.push(b'\n');
                     b
                 } else {
-                    emit!(HTTPEventMissingMessage);
+                    emit!(HttpEventMissingMessage);
                     return None;
                 }
             }
@@ -205,7 +211,7 @@ impl HttpSink for HttpSinkConfig {
             }
         };
 
-        emit!(HTTPEventEncoded {
+        emit!(HttpEventEncoded {
             byte_size: body.len(),
         });
 
@@ -214,8 +220,14 @@ impl HttpSink for HttpSinkConfig {
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let method = match &self.method.clone().unwrap_or(HttpMethod::Post) {
+            HttpMethod::Get => Method::GET,
+            HttpMethod::Head => Method::HEAD,
             HttpMethod::Post => Method::POST,
             HttpMethod::Put => Method::PUT,
+            HttpMethod::Delete => Method::DELETE,
+            HttpMethod::Options => Method::OPTIONS,
+            HttpMethod::Trace => Method::TRACE,
+            HttpMethod::Patch => Method::PATCH,
         };
         let uri: Uri = self.uri.uri.clone();
 
@@ -303,15 +315,14 @@ mod tests {
         },
         test_util::{next_addr, random_lines_with_stream},
     };
-    use bytes::{buf::BufExt, Bytes};
+    use bytes::{Buf, Bytes};
     use flate2::read::GzDecoder;
-    use futures::{stream, StreamExt};
+    use futures::{channel::mpsc, stream, StreamExt};
     use headers::{Authorization, HeaderMapExt};
     use http::request::Parts;
     use hyper::Method;
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};
-    use tokio::sync::mpsc::Receiver;
 
     #[test]
     fn generate_config() {
@@ -575,7 +586,7 @@ mod tests {
         // its accepting socket. The delay below ensures that the sink
         // attempts to connect at least once before creating the
         // listening socket.
-        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
         let (rx, trigger, server) = build_test_server(in_addr);
         tokio::spawn(server);
 
@@ -650,7 +661,7 @@ mod tests {
     }
 
     async fn get_received(
-        rx: Receiver<(Parts, Bytes)>,
+        rx: mpsc::Receiver<(Parts, Bytes)>,
         assert_parts: impl Fn(Parts),
     ) -> Vec<String> {
         rx.flat_map(|(parts, body)| {

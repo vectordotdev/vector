@@ -48,8 +48,8 @@ impl Function for ParseSyslog {
 }
 
 #[derive(Debug, Clone)]
-struct ParseSyslogFn {
-    value: Box<dyn Expression>,
+pub(crate) struct ParseSyslogFn {
+    pub(crate) value: Box<dyn Expression>,
 }
 
 impl Expression for ParseSyslogFn {

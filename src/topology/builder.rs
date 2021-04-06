@@ -54,7 +54,7 @@ pub async fn build_pieces(
         .iter()
         .filter(|(name, _)| diff.sources.contains_new(&name))
     {
-        let (tx, rx) = tokio::sync::mpsc::channel(1000);
+        let (tx, rx) = futures::channel::mpsc::channel(1000);
         let pipeline = Pipeline::from_sender(tx, vec![]);
 
         let typetag = source.source_type();
