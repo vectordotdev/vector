@@ -4,14 +4,13 @@ use crate::{
     event::{Event, LogEvent},
     topology::{fanout, WatchRx},
 };
-use futures::{future::try_join_all, FutureExt, Sink};
+use futures::{future::try_join_all, FutureExt, Sink, SinkExt};
 use itertools::Itertools;
-use std::collections::VecDeque;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     iter::FromIterator,
+    pin::Pin,
+    task::{Context, Poll},
 };
 use tokio::sync::{mpsc as tokio_mpsc, mpsc::error::SendError, oneshot};
 use uuid::Uuid;
@@ -86,18 +85,16 @@ impl Sink<Event> for TapSink {
 
     /// The sink is ready to accept events if buffer capacity hasn't been reached.
     fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.buffer.len() == self.buffer.capacity() {
-            Poll::Pending
-        } else {
-            Poll::Ready(Ok(()))
-        }
+        Poll::Ready(Ok(()))
     }
 
     /// If the sink is ready, and the event is of type `LogEvent`, add to the buffer.
     fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        // If we have an event, push it onto the buffer.
+        // If we have a `LogEvent`, and space for it in the buffer, queue it.
         if let Event::Log(ev) = item {
-            self.buffer.push_back(ev);
+            if self.buffer.len() < self.buffer.capacity() {
+                self.buffer.push_back(ev);
+            }
         }
 
         Ok(())
@@ -108,14 +105,15 @@ impl Sink<Event> for TapSink {
         mut self: Pin<&mut Self>,
         _cx: &mut Context<'_>,
     ) -> Poll<Result<(), Self::Error>> {
-        let mut tap_tx = self.tap_tx.clone();
-
         // Loop over the buffer events, pulling from the front. This will terminate when
         // the buffer is empty.
         while let Some(ev) = self.buffer.pop_front() {
             // Attempt to send upstream. If the channel is closed, log and break. If it's
             // full, return pending to reattempt later.
-            match tap_tx.try_send(TapPayload::Log(self.component_name.clone(), ev)) {
+            match self
+                .tap_tx
+                .try_send(TapPayload::Log(self.component_name.clone(), ev))
+            {
                 Err(tokio_mpsc::error::TrySendError::Closed(payload)) => {
                     debug!(
                         message = "Couldn't send log event.",
@@ -124,7 +122,7 @@ impl Sink<Event> for TapSink {
 
                     break;
                 }
-                Err(tokio_mpsc::error::TrySendError::Full(_)) => return Poll::Pending,
+                Err(tokio_mpsc::error::TrySendError::Full(_)) => return Poll::Ready(Ok(())),
                 _ => continue,
             }
         }
@@ -163,13 +161,14 @@ impl TapController {
 }
 
 /// Provides a `ShutdownTx` that disconnects a component sink when it drops out of scope.
-fn shutdown_trigger(control_tx: ControlChannel, sink_id: String) -> ShutdownTx {
+fn shutdown_trigger(mut control_tx: ControlChannel, sink_id: String) -> ShutdownTx {
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
     tokio::spawn(async move {
         let _ = shutdown_rx.await;
         if control_tx
             .send(fanout::ControlMessage::Remove(sink_id.clone()))
+            .await
             .is_err()
         {
             debug!(message = "Couldn't disconnect sink.", sink_id = ?sink_id);
@@ -182,13 +181,13 @@ fn shutdown_trigger(control_tx: ControlChannel, sink_id: String) -> ShutdownTx {
 }
 
 /// Sends a 'matched' tap payload.
-async fn send_matched(mut tx: TapSender, pattern: &str) -> Result<(), SendError<TapPayload>> {
+async fn send_matched(tx: TapSender, pattern: &str) -> Result<(), SendError<TapPayload>> {
     debug!(message = "Sending matched notification.", pattern = ?pattern);
     tx.send(TapPayload::matched(pattern)).await
 }
 
 /// Sends a 'not matched' tap payload.
-async fn send_not_matched(mut tx: TapSender, pattern: &str) -> Result<(), SendError<TapPayload>> {
+async fn send_not_matched(tx: TapSender, pattern: &str) -> Result<(), SendError<TapPayload>> {
     debug!(message = "Sending not matched notification.", pattern = ?pattern);
     tx.send(TapPayload::not_matched(pattern)).await
 }
@@ -210,7 +209,7 @@ async fn tap_handler(
     loop {
         tokio::select! {
             _ = &mut shutdown_rx => break,
-            Some(outputs) = watch_rx.recv() => {
+            Ok(_) = watch_rx.changed() => {
                 // Get the patterns that matched on the last iteration, to compare with the latest
                 // round of matches when sending notifications.
                 let last_matches = patterns
@@ -218,66 +217,68 @@ async fn tap_handler(
                     .filter(|pattern| sinks.keys().any(|name: &String| pattern.matches_glob(name)))
                     .collect::<HashSet<_>>();
 
-                // Iterate over outputs, returning a set of matched patterns from this latest round.
-                let matched = outputs
-                    .iter()
-                    .filter_map(|(name, control_tx)| {
-                        match patterns
-                            .iter()
-                            .filter(|pattern| pattern.matches_glob(name))
-                            .collect_vec()
-                        {
-                            matched if !matched.is_empty() => {
-                                debug!(
-                                    message="Component matched.",
-                                    component_name = ?name, patterns = ?patterns, matched = ?matched
-                                );
+                // Cache of matched patterns. A `HashSet` is used here to ignore repetition.
+                let mut matched = HashSet::new();
 
-                                // (Re)connect the sink. This is necessary because a sink may be
-                                // reconfigured with the same name as a previous, and we are not
-                                // getting involved in config diffing at this point.
-                                let id = Uuid::new_v4().to_string();
-                                let sink = TapSink::new(tx.clone(), name.to_string());
+                // Borrow and clone the latest outputs to register sinks. Since this blocks the
+                // watch channel and the returned ref isn't `Send`, this requires a clone.
+                let outputs = watch_rx.borrow().clone();
 
-                                // Attempt to connect the sink.
-                                match control_tx
-                                    .send(fanout::ControlMessage::Add(id.clone(), Box::new(sink)))
-                                {
-                                    Ok(_) => {
-                                        debug!(
-                                            message = "Sink connected.",
-                                            sink_id = ?id, component_name = ?name,
-                                        );
+                // Loop over all outputs, and connect sinks for the components that match one
+                // or more patterns.
+                for (name, mut control_tx) in outputs.iter() {
+                    match patterns
+                        .iter()
+                        .filter(|pattern| pattern.matches_glob(name))
+                        .collect_vec()
+                    {
+                        found if !found.is_empty() => {
+                            debug!(
+                                message="Component matched.",
+                                component_name = ?name, patterns = ?patterns, matched = ?found
+                            );
 
-                                        // Create a sink shutdown trigger to remove the sink
-                                        // when matched components change.
-                                        sinks.insert(
-                                            name.to_string(),
-                                            shutdown_trigger(control_tx.clone(), id),
-                                        );
-                                    }
-                                    Err(err) => {
-                                        error!(
-                                            message = "Couldn't connect sink.",
-                                            error = ?err,
-                                            component_name = ?name, id = ?id
-                                        );
-                                    }
+                            // (Re)connect the sink. This is necessary because a sink may be
+                            // reconfigured with the same name as a previous, and we are not
+                            // getting involved in config diffing at this point.
+                            let id = Uuid::new_v4().to_string();
+                            let sink = TapSink::new(tx.clone(), name.to_string());
+
+                            // Attempt to connect the sink.
+                            match control_tx
+                                .send(fanout::ControlMessage::Add(id.clone(), Box::new(sink)))
+                                .await
+                            {
+                                Ok(_) => {
+                                    debug!(
+                                        message = "Sink connected.",
+                                        sink_id = ?id, component_name = ?name,
+                                    );
+
+                                    // Create a sink shutdown trigger to remove the sink
+                                    // when matched components change.
+                                    sinks
+                                        .insert(name.to_string(), shutdown_trigger(control_tx.clone(), id));
                                 }
+                                Err(err) => {
+                                    error!(
+                                        message = "Couldn't connect sink.",
+                                        error = ?err,
+                                        component_name = ?name, id = ?id
+                                    );
+                                }
+                            }
 
-                                Some(matched)
-                            }
-                            _ => {
-                                debug!(
-                                    message="Component not matched.",
-                                    component_name = ?name, patterns = ?patterns
-                                );
-                                None
-                            }
+                            matched.extend(found);
                         }
-                    })
-                    .flatten()
-                    .collect::<HashSet<_>>();
+                        _ => {
+                            debug!(
+                                message="Component not matched.",
+                                component_name = ?name, patterns = ?patterns
+                            );
+                        }
+                    }
+                }
 
                 // Remove components that have gone away.
                 sinks.retain(|name, _| {

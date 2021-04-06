@@ -30,7 +30,7 @@ use std::{
 };
 use tokio::{
     sync::{mpsc, watch},
-    time::{delay_until, interval, Duration, Instant},
+    time::{interval, sleep_until, Duration, Instant},
 };
 use tracing_futures::Instrument;
 
@@ -53,7 +53,7 @@ pub type WatchRx = watch::Receiver<Outputs>;
 #[allow(dead_code)]
 pub struct RunningTopology {
     inputs: HashMap<String, buffers::BufferInputCloner>,
-    outputs: Outputs,
+    outputs: HashMap<String, fanout::ControlChannel>,
     source_tasks: HashMap<String, TaskHandle>,
     tasks: HashMap<String, TaskHandle>,
     shutdown_coordinator: SourceShutdownCoordinator,
@@ -220,7 +220,7 @@ impl RunningTopology {
         if self.config.global != new_config.global {
             error!(
                 message =
-                    "Global options can't be changed while reloading config file; reload aborted. Please restart vector to reload the configuration file."
+                "Global options can't be changed while reloading config file; reload aborted. Please restart vector to reload the configuration file."
             );
             return Ok(false);
         }
@@ -511,12 +511,13 @@ impl RunningTopology {
             self.setup_inputs(&name, new_pieces).await;
         }
 
-        // Broadcast changes. When tokio 1.x lands, we can wrap this is an `.is_closed()`
-        // check to avoid premature cloning.
-        self.watch
-            .0
-            .broadcast(self.outputs.clone())
-            .expect("Couldn't broadcast config changes.");
+        // Broadcast changes to subscribers.
+        if !self.watch.0.is_closed() {
+            self.watch
+                .0
+                .send(self.outputs.clone())
+                .expect("Couldn't broadcast config changes.");
+        }
     }
 
     /// Starts new and changed pieces of topology.
@@ -758,7 +759,7 @@ impl RunningTopology {
         }
     }
 
-    /// Borrows the Config.
+    /// Borrows the Config
     pub fn config(&self) -> &Config {
         &self.config
     }

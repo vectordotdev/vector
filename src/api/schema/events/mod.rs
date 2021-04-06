@@ -9,10 +9,11 @@ use output::OutputEventsPayload;
 use crate::{api::tap::TapController, topology::WatchRx};
 
 use async_graphql::{validators::IntRange, Context, Subscription};
-use futures::StreamExt;
+use futures::Stream;
 use itertools::Itertools;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
-use tokio::{select, stream::Stream, sync::mpsc, time};
+use tokio::{select, sync::mpsc, time};
+use tokio_stream::wrappers::ReceiverStream;
 
 #[derive(Debug, Default)]
 pub struct EventsSubscription;
@@ -50,7 +51,7 @@ fn create_events_stream(
     // The resulting vector of `Event` sent to the client. Only one result set will be streamed
     // back to the client at a time. This value is set higher than `1` to prevent blocking the event
     // pipeline on slower client connections, but low enough to apply a modest cap on mem usage.
-    let (mut event_tx, event_rx) = mpsc::channel::<Vec<OutputEventsPayload>>(10);
+    let (event_tx, event_rx) = mpsc::channel::<Vec<OutputEventsPayload>>(10);
 
     tokio::spawn(async move {
         // Create a tap controller. When this drops out of scope, clean up will be performed on the
@@ -83,7 +84,7 @@ fn create_events_stream(
                 // Process `TapPayload`s. A tap payload could contain log/metric events or a
                 // notification. Notifications are emitted immediately; events buffer until
                 // the next `interval`.
-                Some(payload) = tap_rx.next() => {
+                Some(payload) = tap_rx.recv() => {
                     let payload = payload.into();
 
                     // Emit notifications immediately; these don't count as a 'batch'.
@@ -141,5 +142,5 @@ fn create_events_stream(
         }
     });
 
-    event_rx
+    ReceiverStream::new(event_rx)
 }

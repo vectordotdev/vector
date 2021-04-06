@@ -6,17 +6,14 @@ use crate::{
     trace, unit_test, validate,
 };
 use cfg_if::cfg_if;
-use std::{cmp::max, collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 
-use futures::StreamExt;
-use std::collections::HashMap;
 use tokio::{
     runtime::{self, Runtime},
     sync::mpsc,
 };
 
 use futures::StreamExt;
-use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "sources-host_metrics")]
