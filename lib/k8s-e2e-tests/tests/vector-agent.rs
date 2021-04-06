@@ -657,7 +657,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         let line = tokio::select! {
             result = stop_rx.next() => {
                 result.unwrap();
-                log_reader.kill()?;
+                log_reader.kill().await?;
                 continue;
             }
             line = log_reader.read_line() => line,
@@ -671,7 +671,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
             println!("Giving up");
-            log_reader.kill()?;
+            log_reader.kill().await?;
             break;
         }
 
@@ -837,7 +837,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
         let line = tokio::select! {
             result = stop_rx.next() => {
                 result.unwrap();
-                log_reader.kill()?;
+                log_reader.kill().await?;
                 continue;
             }
             line = log_reader.read_line() => line,
@@ -851,7 +851,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
             println!("Giving up");
-            log_reader.kill()?;
+            log_reader.kill().await?;
             break;
         }
 
@@ -978,7 +978,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         let line = tokio::select! {
             result = stop_rx.next() => {
                 result.unwrap();
-                log_reader.kill()?;
+                log_reader.kill().await?;
                 continue;
             }
             line = log_reader.read_line() => line,
@@ -992,7 +992,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
             println!("Giving up");
-            log_reader.kill()?;
+            log_reader.kill().await?;
             break;
         }
 
@@ -1128,7 +1128,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
         let line = tokio::select! {
             result = stop_rx.next() => {
                 result.unwrap();
-                log_reader.kill()?;
+                log_reader.kill().await?;
                 continue;
             }
             line = log_reader.read_line() => line,
@@ -1142,7 +1142,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
             println!("Giving up");
-            log_reader.kill()?;
+            log_reader.kill().await?;
             break;
         }
 

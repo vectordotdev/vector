@@ -11,11 +11,11 @@ use vector::{
     test_util::{random_lines, runtime},
 };
 
-fn benchmark_batching(c: &mut Criterion) {
+fn benchmark_batch(c: &mut Criterion) {
     let event_len: usize = 100;
     let num_events: usize = 100_000;
 
-    let mut group = c.benchmark_group("partitioned_batching");
+    let mut group = c.benchmark_group("batch");
     group.throughput(Throughput::Bytes((event_len * num_events) as u64));
     group.sampling_mode(SamplingMode::Flat);
 
@@ -32,8 +32,40 @@ fn benchmark_batching(c: &mut Criterion) {
         .collect();
 
     for (compression, batch_size) in cases.iter() {
+        group.bench_function(format!("partitioned/{}_{}", compression, batch_size), |b| {
+            b.iter_batched(
+                || {
+                    let rt = runtime();
+                    let (acker, _) = Acker::new_for_testing();
+                    let batch = BatchSettings::default()
+                        .bytes(*batch_size as u64)
+                        .events(num_events)
+                        .size;
+                    let batch_sink = PartitionBatchSink::new(
+                        tower::service_fn(|_| future::ok::<_, Infallible>(())),
+                        PartitionedBuffer::new(batch, *compression),
+                        Duration::from_secs(1),
+                        acker,
+                    )
+                    .sink_map_err(|error| panic!("{}", error));
+
+                    (
+                        rt,
+                        stream::iter(input.clone().into_iter().map(|b| InnerBuffer {
+                            inner: b,
+                            key: Bytes::from("key"),
+                        }))
+                        .map(Ok),
+                        batch_sink,
+                    )
+                },
+                |(rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
+                criterion::BatchSize::LargeInput,
+            )
+        });
+
         group.bench_function(
-            format!("partitioned_batching_{}_{}", compression, batch_size),
+            format!("unpartitioned/{}_{}", compression, batch_size),
             |b| {
                 b.iter_batched(
                     || {
@@ -43,53 +75,21 @@ fn benchmark_batching(c: &mut Criterion) {
                             .bytes(*batch_size as u64)
                             .events(num_events)
                             .size;
-                        let batch_sink = PartitionBatchSink::new(
+                        let batch_sink = BatchSink::new(
                             tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                            PartitionedBuffer::new(batch, *compression),
+                            Buffer::new(batch, *compression),
                             Duration::from_secs(1),
                             acker,
                         )
                         .sink_map_err(|error| panic!("{}", error));
 
-                        (
-                            rt,
-                            stream::iter(input.clone().into_iter().map(|b| InnerBuffer {
-                                inner: b,
-                                key: Bytes::from("key"),
-                            }))
-                            .map(Ok),
-                            batch_sink,
-                        )
+                        (rt, stream::iter(input.clone()).map(Ok), batch_sink)
                     },
                     |(rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
                     criterion::BatchSize::LargeInput,
                 )
             },
         );
-
-        group.bench_function(format!("batching_{}_{}", compression, batch_size), |b| {
-            b.iter_batched(
-                || {
-                    let rt = runtime();
-                    let (acker, _) = Acker::new_for_testing();
-                    let batch = BatchSettings::default()
-                        .bytes(*batch_size as u64)
-                        .events(num_events)
-                        .size;
-                    let batch_sink = BatchSink::new(
-                        tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                        Buffer::new(batch, *compression),
-                        Duration::from_secs(1),
-                        acker,
-                    )
-                    .sink_map_err(|error| panic!("{}", error));
-
-                    (rt, stream::iter(input.clone()).map(Ok), batch_sink)
-                },
-                |(rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
-                criterion::BatchSize::LargeInput,
-            )
-        });
     }
 }
 
@@ -98,7 +98,7 @@ criterion_group!(
     // noisy benchmarks; 10% encapsulates what we saw in
     // https://github.com/timberio/vector/issues/5394
     config = Criterion::default().noise_threshold(0.10);
-    targets = benchmark_batching
+    targets = benchmark_batch
 );
 
 pub struct PartitionedBuffer {

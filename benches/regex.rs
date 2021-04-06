@@ -29,7 +29,7 @@ fn benchmark_regex(c: &mut Criterion) {
         })
         .collect();
 
-    group.bench_function("regex", |b| {
+    group.bench_function("http", |b| {
         let rt = runtime();
 
         let mut parser = rt.block_on(async move {
