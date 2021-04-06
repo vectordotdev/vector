@@ -13,4 +13,4 @@ cue version
 rm "${JSON_OUT}" 2> /dev/null
 
 # Build the docs JSON object out of the CUE sources
-find "${DOCS_DIR}" -name "*.cue" | xargs cue export --all-errors "$@" --outfile "${JSON_OUT}"
+find "${DOCS_DIR}" -name "*.cue" -print0 | xargs -0 cue export --all-errors "$@" --outfile "${JSON_OUT}"
