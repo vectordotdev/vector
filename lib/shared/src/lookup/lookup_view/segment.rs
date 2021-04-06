@@ -1,6 +1,6 @@
+use crate::lookup::parser::ParserRule;
 use crate::lookup::*;
 use pest::iterators::Pair;
-use crate::lookup::parser::ParserRule;
 use std::{
     collections::VecDeque,
     fmt::{Display, Formatter},
@@ -37,7 +37,13 @@ impl<'a> Segment<'a> {
     }
 
     pub fn is_field(&self) -> bool {
-        matches!(self, Segment::Field { name: _, requires_quoting: _  })
+        matches!(
+            self,
+            Segment::Field {
+                name: _,
+                requires_quoting: _
+            }
+        )
     }
 
     pub const fn index(v: usize) -> Segment<'a> {

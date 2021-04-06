@@ -9,10 +9,10 @@ use std::{
     str::FromStr,
 };
 
+use crate::lookup::parser::ParserRule;
 use crate::{event::*, lookup::*};
 use indexmap::map::IndexMap;
 use pest::iterators::Pair;
-use crate::lookup::parser::ParserRule;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use toml::Value as TomlValue;

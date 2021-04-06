@@ -6,11 +6,11 @@ use crate::{
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
-use shared::{event:: Event, lookup::LookupBuf};
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use getset::{CopyGetters, Getters, Setters};
 use serde::{Deserialize, Serialize};
+use shared::{event::Event, lookup::LookupBuf};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Getters, CopyGetters, Setters)]
 pub struct TcpConfig {

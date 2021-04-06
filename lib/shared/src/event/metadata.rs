@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::EventDataEq;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct EventMetadata;

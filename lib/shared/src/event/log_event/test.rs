@@ -615,16 +615,12 @@ mod remap {
             ),
             (
                 map!["foo": "bar"],
-                vec![vrl::Segment::Field(vrl::Field::Regular(
-                    "foo".to_owned(),
-                ))],
+                vec![vrl::Segment::Field(vrl::Field::Regular("foo".to_owned()))],
                 Ok(Some("bar".into())),
             ),
             (
                 map!["foo": "bar"],
-                vec![vrl::Segment::Field(vrl::Field::Regular(
-                    "bar".to_owned(),
-                ))],
+                vec![vrl::Segment::Field(vrl::Field::Regular("bar".to_owned()))],
                 Ok(None),
             ),
             (
@@ -678,9 +674,7 @@ mod remap {
             ),
             (
                 map!["foo": "bar"],
-                vec![vrl::Segment::Field(vrl::Field::Regular(
-                    "foo".to_owned(),
-                ))],
+                vec![vrl::Segment::Field(vrl::Field::Regular("foo".to_owned()))],
                 "baz".into(),
                 map!["foo": "baz"],
                 Ok(()),
@@ -803,9 +797,7 @@ mod remap {
         let cases = vec![
             (
                 map!["foo": "bar"],
-                vec![vrl::Segment::Field(vrl::Field::Regular(
-                    "foo".to_owned(),
-                ))],
+                vec![vrl::Segment::Field(vrl::Field::Regular("foo".to_owned()))],
                 false,
                 Some(map![].into()),
             ),
@@ -875,14 +867,8 @@ mod remap {
             let path = vrl::Path::new_unchecked(segments);
             let removed = vrl::Target::get(&event, &path).unwrap();
 
-            assert_eq!(
-                vrl::Target::remove(&mut event, &path, compact),
-                Ok(removed)
-            );
-            assert_eq!(
-                vrl::Target::get(&event, &vrl::Path::root()),
-                Ok(expect)
-            )
+            assert_eq!(vrl::Target::remove(&mut event, &path, compact), Ok(removed));
+            assert_eq!(vrl::Target::get(&event, &vrl::Path::root()), Ok(expect))
         }
     }
 }

@@ -1,10 +1,10 @@
 #![allow(clippy::len_without_is_empty)] // It's invalid to have a lookupbuf that is empty.
 
+use crate::lookup::parser::{Parser as RemapParser, ParserRule};
 use crate::lookup::*;
 use core::fmt;
 use pest::iterators::Pair;
 use pest::Parser;
-use crate::lookup::parser::{Parser as RemapParser, ParserRule};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};

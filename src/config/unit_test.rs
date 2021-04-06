@@ -538,10 +538,9 @@ async fn build_unit_test(
             {
                 match cond_conf.build() {
                     Ok(c) => conditions.push(c),
-                    Err(e) => errors.push(format!(
-                        "failed to create test condition '{}': {}",
-                        index, e,
-                    ).into()),
+                    Err(e) => errors.push(
+                        format!("failed to create test condition '{}': {}", index, e,).into(),
+                    ),
                 }
             }
 

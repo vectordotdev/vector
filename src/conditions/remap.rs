@@ -122,7 +122,7 @@ mod test {
     fn check_remap() {
         let checks = vec![
             (
-                log_event!{},   // event
+                log_event! {},  // event
                 "true == true", // source
                 Ok(()),         // build result
                 Ok(()),         // check result
@@ -134,7 +134,7 @@ mod test {
                 Ok(()),
             ),
             (
-                log_event!{},
+                log_event! {},
                 "true == false",
                 Ok(()),
                 Err("source execution resolved to false"),

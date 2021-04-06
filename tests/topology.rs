@@ -10,8 +10,8 @@ use std::{
         Arc,
     },
 };
-use vector::{config::log_schema, log_event};
 use tokio::time::{sleep, Duration};
+use vector::{config::log_schema, log_event};
 use vector::{config::Config, event::Event, test_util::start_topology, topology};
 
 fn basic_config() -> Config {

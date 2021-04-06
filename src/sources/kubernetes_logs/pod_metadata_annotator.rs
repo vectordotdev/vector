@@ -545,7 +545,10 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert(LookupBuf::from_str("kubernetes.container_id").unwrap(), "container_id_foo");
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.container_id").unwrap(),
+                        "container_id_foo",
+                    );
                     log
                 },
             ),

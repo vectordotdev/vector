@@ -1,5 +1,5 @@
-use crate::event::LookupBuf;
 use super::{load_builder_from_paths, FormatHint};
+use crate::event::LookupBuf;
 use getset::{Getters, Setters};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};

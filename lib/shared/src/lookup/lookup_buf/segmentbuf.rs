@@ -36,7 +36,13 @@ impl SegmentBuf {
     }
 
     pub fn is_field(&self) -> bool {
-        matches!(self, SegmentBuf::Field { name: _, requires_quoting: _ })
+        matches!(
+            self,
+            SegmentBuf::Field {
+                name: _,
+                requires_quoting: _
+            }
+        )
     }
 
     pub const fn index(v: usize) -> SegmentBuf {

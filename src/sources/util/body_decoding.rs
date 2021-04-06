@@ -1,10 +1,10 @@
 use crate::{config::log_schema, event::Event, sources::util::http::ErrorMessage};
-use shared::log_event;
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use codec::BytesDelimitedCodec;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use shared::log_event;
 use tokio_util::codec::Decoder;
 use warp::http::StatusCode;
 
@@ -45,10 +45,12 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>
 pub fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
     match enc {
         Encoding::Text => body_to_lines(body)
-            .map(|r| Ok(log_event! {
-                log_schema().message_key().clone() => r?,
-                log_schema().timestamp_key().clone() => chrono::Utc::now(),
-            }))
+            .map(|r| {
+                Ok(log_event! {
+                    log_schema().message_key().clone() => r?,
+                    log_schema().timestamp_key().clone() => chrono::Utc::now(),
+                })
+            })
             .collect::<Result<_, _>>(),
         Encoding::Ndjson => body_to_lines(body)
             .map(|j| {

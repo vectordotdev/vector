@@ -23,13 +23,13 @@ use rusoto_s3::{
     HeadBucketRequest, PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, S3,
 };
 use serde::{Deserialize, Serialize};
+use shared::lookup::LookupBuf;
 use snafu::Snafu;
 use std::{
     collections::BTreeMap,
     convert::{TryFrom, TryInto},
     task::{Context, Poll},
 };
-use shared::lookup::LookupBuf;
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
 use uuid::Uuid;

@@ -1,14 +1,13 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use chrono::TimeZone;
-use std::collections::BTreeMap ;
+use std::collections::BTreeMap;
 
 pub mod discriminant;
-pub mod merge;
 pub mod merge_state;
 pub mod util;
 
-pub use shared::{event::*, lookup::*};
 pub use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+pub use shared::{event::*, lookup::*};
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));

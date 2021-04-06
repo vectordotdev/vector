@@ -163,8 +163,8 @@ mod test {
         log_event,
     };
     use chrono::{offset::TimeZone, Utc};
-    use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use pretty_assertions::assert_eq;
+    use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 
     #[test]
     fn generate_config() {
