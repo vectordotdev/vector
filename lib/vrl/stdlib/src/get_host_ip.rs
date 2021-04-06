@@ -1,7 +1,5 @@
 use vrl::prelude::*;
 
-use pnet::datalink;
-
 #[derive(Clone, Copy, Debug)]
 pub struct GetHostIp;
 
@@ -30,7 +28,7 @@ impl Expression for GetHostIpFn {
     fn resolve(&self, _: &mut Context) -> Resolved {
         // This attempts to just find the first non-loopback
         // interface that is up and grab its first IP
-        let default_ip = datalink::interfaces()
+        let default_ip = pnet_datalink::interfaces()
             .iter()
             .find(|e| e.is_up() && !e.is_loopback() && !e.ips.is_empty())
             .and_then(|interface| interface.ips.get(0))
