@@ -7,6 +7,11 @@
     {{ $title := .Params.short | default .Title }}
     <div class="sidebar-section">
       <a class="sidebar-section-title{{ if $isHere }} is-active{{ end }}" href="{{ .RelPermalink }}">
+        {{ with .Params.icon }}
+        <span class="icon">
+          <i class="{{ . }}"></i>
+        </span>
+        {{ end }}
         {{ $title }}
       </a>
     </div>
@@ -26,6 +31,11 @@
 {{ $title := .ctx.Params.short | default .ctx.Title }}
 <div class="sidebar-section">
   <a class="sidebar-section-title{{ if $isHere }} is-active{{ end }}" href="{{ .ctx.RelPermalink }}">
+    {{ with .ctx.Params.icon }}
+    <span class="icon">
+      <i class="{{ . }}"></i>
+    </span>
+    {{ end }}
     {{ $title }}
   </a>
 
@@ -50,7 +60,7 @@
         <a href="{{ .RelPermalink }}"{{ if $isHere }} class="is-active"{{ end }}>
           {{ $title }}
         </a>
-  
+
         <a class="icon is-small has-text-primary" @click="open = !open">
           <i :class="{ 'rotate-90': open }" class="fas fa-sm fa-chevron-right"></i>
         </a>

@@ -6,13 +6,15 @@
       <span class="icon has-text-primary mr-2">
         <i class="fas fa-sm fa-align-left"></i>
       </span>
-  
+
       <span class="has-text-weight-light">
         Contents
       </span>
     </p>
-  
-    <div id="toc"></div>
+
+    <div id="toc">
+      {{ .TableOfContents }}
+    </div>
   </aside>
 </section>
 {{ end }}
