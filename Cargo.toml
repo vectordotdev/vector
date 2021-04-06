@@ -151,8 +151,8 @@ gouth = { version = "0.1", optional = true }
 smpl_jwt = { version = "0.6.1", optional = true }
 
 # API
-async-graphql = { version = "=2.5.9", optional = true }
-async-graphql-warp = { version = "=2.5.9", optional = true }
+async-graphql = { version = "=2.6.4", optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "=2.6.4", optional = true }
 itertools = { version = "0.10.0", optional = true }
 
 # API client
