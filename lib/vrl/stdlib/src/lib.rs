@@ -315,6 +315,8 @@ pub use parse_key_value::ParseKeyValue;
 pub use parse_linux_authorization::ParseLinuxAuthorization;
 #[cfg(feature = "parse_logfmt")]
 pub use parse_logfmt::ParseLogFmt;
+#[cfg(feature = "parse_nginx_log")]
+pub use parse_nginx_log::ParseNginxLog;
 #[cfg(feature = "parse_query_string")]
 pub use parse_query_string::ParseQueryString;
 #[cfg(feature = "parse_regex")]
