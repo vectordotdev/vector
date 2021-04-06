@@ -54,7 +54,7 @@ components: sources: exec: {
 				}
 			}
 		}
-		current_dir: {
+		working_directory: {
 			common:      false
 			required:    false
 			description: "The directory in which to run the command."
@@ -76,7 +76,7 @@ components: sources: exec: {
 			required:    false
 			type: bool: default: true
 		}
-		maximum_buffer_size: {
+		maximum_buffer_size_bytes: {
 			common:      false
 			description: "The maximum buffer size allowed before a log event will be generated."
 			required:    false
@@ -125,7 +125,7 @@ components: sources: exec: {
 						required:    false
 						warnings: []
 						type: uint: {
-							default: 60
+							default: 5
 							unit:    "seconds"
 						}
 					}
