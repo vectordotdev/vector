@@ -1,5 +1,5 @@
 use crate::config;
-use tokio::stream::StreamExt;
+use tokio_stream::StreamExt;
 use url::Url;
 use vector_api_client::{connect_subscription_client, gql::TapSubscriptionExt, Client};
 

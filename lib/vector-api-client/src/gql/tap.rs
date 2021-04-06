@@ -1,3 +1,5 @@
+#![allow(clippy::upper_case_acronyms)]
+
 use crate::BoxedSubscription;
 use graphql_client::GraphQLQuery;
 
