@@ -3,7 +3,7 @@ pub mod lua;
 mod test;
 
 use crate::{event::*, lookup::*};
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::{Deserialize, Serialize, Serializer};
@@ -1304,11 +1304,26 @@ impl Value {
                     .flatten();
 
                 if only_leaves && !self.is_empty() {
-                   Box::new(children)
+                    Box::new(children)
                 } else {
                     Box::new(this.chain(children))
                 }
             }
+        }
+    }
+
+    /// Merges `incoming` value into self.
+    ///
+    /// Will concatenate `Bytes` and overwrite the rest value kinds.
+    pub fn merge(&mut self, incoming: Value) {
+        match (self, incoming) {
+            (Value::Bytes(self_bytes), Value::Bytes(ref incoming)) => {
+                let mut bytes = BytesMut::with_capacity(self_bytes.len() + incoming.len());
+                bytes.extend_from_slice(&self_bytes[..]);
+                bytes.extend_from_slice(&incoming[..]);
+                *self_bytes = bytes.freeze();
+            }
+            (current, incoming) => *current = incoming,
         }
     }
 }
@@ -1624,7 +1639,6 @@ impl From<vrl::Value> for Value {
         }
     }
 }
-
 
 impl From<Value> for vrl::Value {
     fn from(v: Value) -> Self {

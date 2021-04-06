@@ -4,6 +4,8 @@ use crate::event::{Event, LookupBuf, Value};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
+#[allow(clippy::upper_case_acronyms)]
+// some of the generated names, like NEWLINE, come from Pest itself https://github.com/pest-parser/pest/issues/49k0
 pub mod parser;
 pub mod query;
 

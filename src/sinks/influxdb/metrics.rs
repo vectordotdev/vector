@@ -8,7 +8,7 @@ use crate::{
     sinks::{
         influxdb::{
             encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
-            InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
+            InfluxDb1Settings, InfluxDb2Settings, ProtocolVersion,
         },
         util::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
@@ -33,22 +33,22 @@ use std::{
 use tower::Service;
 
 #[derive(Clone)]
-struct InfluxDBSvc {
-    config: InfluxDBConfig,
+struct InfluxDbSvc {
+    config: InfluxDbConfig,
     protocol_version: ProtocolVersion,
     inner: HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
-pub struct InfluxDBConfig {
+pub struct InfluxDbConfig {
     #[serde(alias = "namespace")]
     pub default_namespace: Option<String>,
     pub endpoint: String,
     #[serde(flatten)]
-    pub influxdb1_settings: Option<InfluxDB1Settings>,
+    pub influxdb1_settings: Option<InfluxDb1Settings>,
     #[serde(flatten)]
-    pub influxdb2_settings: Option<InfluxDB2Settings>,
+    pub influxdb2_settings: Option<InfluxDb2Settings>,
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
@@ -72,19 +72,19 @@ lazy_static! {
 
 // https://v2.docs.influxdata.com/v2.0/write-data/#influxdb-api
 #[derive(Debug, Clone, PartialEq, Serialize)]
-struct InfluxDBRequest {
+struct InfluxDbRequest {
     series: Vec<String>,
 }
 
 inventory::submit! {
-    SinkDescription::new::<InfluxDBConfig>("influxdb_metrics")
+    SinkDescription::new::<InfluxDbConfig>("influxdb_metrics")
 }
 
-impl_generate_config_from_default!(InfluxDBConfig);
+impl_generate_config_from_default!(InfluxDbConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_metrics")]
-impl SinkConfig for InfluxDBConfig {
+impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls_settings)?;
@@ -95,7 +95,7 @@ impl SinkConfig for InfluxDBConfig {
             client.clone(),
         )?;
         validate_quantiles(&self.quantiles)?;
-        let sink = InfluxDBSvc::new(self.clone(), cx, client)?;
+        let sink = InfluxDbSvc::new(self.clone(), cx, client)?;
         Ok((sink, healthcheck))
     }
 
@@ -108,9 +108,9 @@ impl SinkConfig for InfluxDBConfig {
     }
 }
 
-impl InfluxDBSvc {
+impl InfluxDbSvc {
     pub fn new(
-        config: InfluxDBConfig,
+        config: InfluxDbConfig,
         cx: SinkContext,
         client: HttpClient,
     ) -> crate::Result<VectorSink> {
@@ -133,7 +133,7 @@ impl InfluxDBSvc {
 
         let http_service = HttpBatchService::new(client, create_build_request(uri, token));
 
-        let influxdb_http_service = InfluxDBSvc {
+        let influxdb_http_service = InfluxDbSvc {
             config,
             protocol_version,
             inner: http_service,
@@ -155,7 +155,7 @@ impl InfluxDBSvc {
     }
 }
 
-impl Service<Vec<Metric>> for InfluxDBSvc {
+impl Service<Vec<Metric>> for InfluxDbSvc {
     type Response = http::Response<Bytes>;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -360,7 +360,7 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<InfluxDBConfig>();
+        crate::test_util::test_generate_config::<InfluxDbConfig>();
     }
 
     #[test]
@@ -833,9 +833,9 @@ mod integration_tests {
         event::metric::{Metric, MetricKind, MetricValue},
         http::HttpClient,
         sinks::influxdb::{
-            metrics::{default_summary_quantiles, InfluxDBConfig, InfluxDBSvc},
+            metrics::{default_summary_quantiles, InfluxDbConfig, InfluxDbSvc},
             test_util::{cleanup_v1, onboarding_v1, onboarding_v2, query_v1, BUCKET, ORG, TOKEN},
-            InfluxDB1Settings, InfluxDB2Settings,
+            InfluxDb1Settings, InfluxDb2Settings,
         },
         tls::{self, TlsOptions},
         Event,
@@ -850,9 +850,9 @@ mod integration_tests {
 
         let cx = SinkContext::new_test();
 
-        let config = InfluxDBConfig {
+        let config = InfluxDbConfig {
             endpoint: "https://localhost:8087".to_string(),
-            influxdb1_settings: Some(InfluxDB1Settings {
+            influxdb1_settings: Some(InfluxDb1Settings {
                 consistency: None,
                 database: database.clone(),
                 retention_policy_name: Some("autogen".to_string()),
@@ -918,10 +918,10 @@ mod integration_tests {
 
         let cx = SinkContext::new_test();
 
-        let config = InfluxDBConfig {
+        let config = InfluxDbConfig {
             endpoint: "http://localhost:9999".to_string(),
             influxdb1_settings: None,
-            influxdb2_settings: Some(InfluxDB2Settings {
+            influxdb2_settings: Some(InfluxDb2Settings {
                 org: ORG.to_string(),
                 bucket: BUCKET.to_string(),
                 token: TOKEN.to_string(),
@@ -957,7 +957,7 @@ mod integration_tests {
         }
 
         let client = HttpClient::new(None).unwrap();
-        let sink = InfluxDBSvc::new(config, cx, client).unwrap();
+        let sink = InfluxDbSvc::new(config, cx, client).unwrap();
         sink.run(stream::iter(events)).await.unwrap();
 
         let mut body = std::collections::HashMap::new();

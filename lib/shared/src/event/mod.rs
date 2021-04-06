@@ -1,18 +1,22 @@
 mod error;
 pub mod log_event;
 pub mod lua;
+pub mod metadata;
 pub mod metric;
 pub mod value;
 pub mod visitors;
 
 pub use error::EventError;
 pub use log_event::LogEvent;
+pub use metadata::EventMetadata;
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use std::{
     collections::{BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
 };
 pub use value::Value;
+
+use crate::EventDataEq;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Event {
@@ -64,6 +68,23 @@ impl Event {
         match self {
             Event::Metric(metric) => metric,
             _ => panic!("Failed type coercion, {:?} is not a metric", self),
+        }
+    }
+
+    pub fn metadata(&self) -> &EventMetadata {
+        match self {
+            Self::Log(log) => log.metadata(),
+            Self::Metric(metric) => metric.metadata(),
+        }
+    }
+}
+
+impl EventDataEq for Event {
+    fn event_data_eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Log(a), Self::Log(b)) => a.event_data_eq(b),
+            (Self::Metric(a), Self::Metric(b)) => a.event_data_eq(b),
+            _ => false,
         }
     }
 }
@@ -143,11 +164,7 @@ impl vrl::Target for Event {
         }
     }
 
-    fn remove(
-        &mut self,
-        path: &vrl::Path,
-        compact: bool,
-    ) -> Result<Option<vrl::Value>, String> {
+    fn remove(&mut self, path: &vrl::Path, compact: bool) -> Result<Option<vrl::Value>, String> {
         match self {
             Event::Log(log) => vrl::Target::remove(log, path, compact),
             Event::Metric(metric) => vrl::Target::remove(metric, path, compact),

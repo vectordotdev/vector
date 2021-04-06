@@ -111,7 +111,6 @@ impl SourceConfig for SocketConfig {
                     config.address(),
                     config.max_length(),
                     host_key,
-                    #[cfg(unix)]
                     config.receive_buffer_bytes(),
                     shutdown,
                     out,
@@ -191,7 +190,8 @@ mod test {
         },
         thread,
     };
-
+    #[cfg(unix)]
+    use tokio::io::AsyncWriteExt;
     use tokio::{
         task::JoinHandle,
         time::{Duration, Instant},
@@ -235,7 +235,7 @@ mod test {
             .await
             .unwrap();
 
-        let event = rx.recv().await.unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().host_key()], "127.0.0.1".into());
     }
 
@@ -260,7 +260,7 @@ mod test {
             .await
             .unwrap();
 
-        let event = rx.recv().await.unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "socket".into()
@@ -424,7 +424,7 @@ mod test {
             .await
             .unwrap();
 
-        let event = rx.recv().await.unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().message_key()], "test".into());
 
         // Now signal to the Source to shut down.
@@ -558,7 +558,7 @@ mod test {
         let source_handle = tokio::spawn(server);
 
         // Wait for UDP to start listening
-        tokio::time::delay_for(tokio::time::Duration::from_millis(100)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         (address, source_handle)
     }
@@ -822,7 +822,7 @@ mod test {
     ////////////// UNIX DATAGRAM TESTS //////////////
     #[cfg(unix)]
     async fn send_lines_unix_datagram(path: PathBuf, lines: &[&str]) {
-        let mut socket = UnixDatagram::unbound().unwrap();
+        let socket = UnixDatagram::unbound().unwrap();
         socket.connect(path).unwrap();
 
         for line in lines {
@@ -866,8 +866,8 @@ mod test {
         let lines = lines.collect::<Vec<_>>();
         sink.send_all(&mut stream::iter(lines)).await.unwrap();
 
-        let socket = sink.into_inner();
-        socket.shutdown(std::net::Shutdown::Both).unwrap();
+        let mut socket = sink.into_inner();
+        socket.shutdown().await.unwrap();
     }
 
     #[cfg(unix)]

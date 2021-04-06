@@ -3,7 +3,7 @@ use crate::{
         log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
     },
     event::{LookupBuf, Value},
-    internal_events::{ANSIStripperFailed, ANSIStripperFieldInvalid, ANSIStripperFieldMissing},
+    internal_events::{AnsiStripperFailed, AnsiStripperFieldInvalid, AnsiStripperFieldMissing},
     transforms::{FunctionTransform, Transform},
     Event, Result,
 };
@@ -60,17 +60,17 @@ impl FunctionTransform for AnsiStripper {
         let log = event.as_mut_log();
 
         match log.get_mut(&self.field) {
-            None => emit!(ANSIStripperFieldMissing { field: &self.field }),
+            None => emit!(AnsiStripperFieldMissing { field: &self.field }),
             Some(Value::Bytes(ref mut bytes)) => {
                 match strip_ansi_escapes::strip(&bytes) {
                     Ok(b) => *bytes = b.into(),
-                    Err(error) => emit!(ANSIStripperFailed {
+                    Err(error) => emit!(AnsiStripperFailed {
                         field: &self.field,
                         error
                     }),
                 };
             }
-            _ => emit!(ANSIStripperFieldInvalid { field: &self.field }),
+            _ => emit!(AnsiStripperFieldInvalid { field: &self.field }),
         }
 
         output.push(event);

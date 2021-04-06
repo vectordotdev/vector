@@ -172,7 +172,7 @@ mod tests {
         sinks::util::{encoding::EncodingConfiguration, test::build_test_server, Concurrency},
         test_util::next_addr,
     };
-    use bytes::buf::BufExt;
+    use bytes::Buf;
     use futures::{stream, StreamExt};
     use hyper::Method;
     use serde_json::Value;

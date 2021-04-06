@@ -20,6 +20,7 @@ package metadata
 		diff?:   string
 		return?: _
 		output?: #Event
+		raises?: _
 
 		notes?: [string, ...string]
 		warnings?: [string, ...string]

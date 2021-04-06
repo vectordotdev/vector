@@ -26,5 +26,8 @@ pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+pub mod event_data_eq;
 #[cfg(test)]
 pub mod test;
+pub use event_data_eq::EventDataEq;
+pub use event::metadata::EventMetadata;

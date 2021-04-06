@@ -8,6 +8,7 @@ use crate::{
 use futures::{stream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[derivative(Default)]
@@ -60,7 +61,7 @@ async fn run(
     let mut out =
         out.sink_map_err(|error| error!(message = "Error sending internal metrics.", %error));
 
-    let mut interval = time::interval(interval).take_until(shutdown);
+    let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     while interval.next().await.is_some() {
         let metrics = capture_metrics(controller);
         out.send_all(&mut stream::iter(metrics).map(Ok)).await?;

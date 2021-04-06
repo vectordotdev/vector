@@ -25,6 +25,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
 use std::{future::ready, time::Duration};
 use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
 
 lazy_static! {
@@ -156,7 +157,7 @@ impl Ingestor {
     }
 
     pub(super) async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
-        time::interval(self.poll_interval)
+        IntervalStream::new(time::interval(self.poll_interval))
             .take_until(shutdown)
             .for_each(|_| self.run_once(&out))
             .await;

@@ -373,9 +373,9 @@ fn benchmark_configs(
                     config.push_str(&transform_config);
                     config.push_str(&sink_config);
 
-                    let config = config::load_from_str(&config, Some(config::Format::TOML))
+                    let config = config::load_from_str(&config, Some(config::Format::Toml))
                         .expect(&format!("invalid TOML configuration: {}", &config));
-                    let mut rt = runtime();
+                    let rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
                         let (topology, _crash) = start_topology(config, false).await;
@@ -385,7 +385,7 @@ fn benchmark_configs(
                     let lines = lines.clone();
                     (rt, lines, topology, output_lines)
                 },
-                |(mut rt, lines, topology, output_lines)| {
+                |(rt, lines, topology, output_lines)| {
                     rt.block_on(async move {
                         send_lines(in_addr, lines).await.unwrap();
 

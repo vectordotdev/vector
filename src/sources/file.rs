@@ -442,9 +442,8 @@ mod tests {
         future::Future,
         io::{Seek, Write},
     };
-
     use tempfile::tempdir;
-    use tokio::time::{delay_for, timeout, Duration};
+    use tokio::time::{sleep, timeout, Duration};
 
     #[test]
     fn generate_config() {
@@ -465,8 +464,8 @@ mod tests {
 
     async fn wait_with_timeout<F, R>(future: F) -> R
     where
-        F: Future<Output = R> + Send + 'static,
-        R: Send + 'static,
+        F: Future<Output = R> + Send,
+        R: Send,
     {
         timeout(Duration::from_secs(5), future)
             .await
@@ -476,7 +475,7 @@ mod tests {
     }
 
     async fn sleep_500_millis() {
-        delay_for(Duration::from_millis(500)).await;
+        sleep(Duration::from_millis(500)).await;
     }
 
     #[test]
@@ -835,7 +834,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test();
+            let (tx, mut rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -857,7 +856,7 @@ mod tests {
             drop(trigger_shutdown);
             shutdown_done.await;
 
-            let received = wait_with_timeout(rx.into_future()).await.0.unwrap();
+            let received = wait_with_timeout(rx.next()).await.unwrap();
             assert_eq!(
                 received.as_log()[Lookup::from("file")].to_string_lossy(),
                 path.to_str().unwrap()
@@ -868,7 +867,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test();
+            let (tx, mut rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -891,7 +890,7 @@ mod tests {
             drop(trigger_shutdown);
             shutdown_done.await;
 
-            let received = wait_with_timeout(rx.into_future()).await.0.unwrap();
+            let received = wait_with_timeout(rx.next()).await.unwrap();
             assert_eq!(
                 received.as_log()[Lookup::from("source")].to_string_lossy(),
                 path.to_str().unwrap()
@@ -902,7 +901,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test();
+            let (tx, mut rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -925,7 +924,7 @@ mod tests {
             drop(trigger_shutdown);
             shutdown_done.await;
 
-            let received = wait_with_timeout(rx.into_future()).await.0.unwrap();
+            let received = wait_with_timeout(rx.next()).await.unwrap();
             assert_eq!(
                 received.as_log().keys(true).collect::<HashSet<_>>(),
                 vec![
@@ -1730,7 +1729,7 @@ mod tests {
 
         for _ in 0..10 {
             // Wait for remove grace period to end.
-            delay_for(Duration::from_secs(remove_after_secs + 1)).await;
+            sleep(Duration::from_secs(remove_after_secs + 1)).await;
 
             if File::open(&path).is_err() {
                 break;

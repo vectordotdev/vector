@@ -1,12 +1,12 @@
 use crate::{
     event::Event,
-    internal_events::{HTTPBadRequest, HTTPDecompressError, HTTPEventsReceived},
+    internal_events::{HttpBadRequest, HttpDecompressError, HttpEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
 use async_trait::async_trait;
-use bytes::{buf::BufExt, Bytes};
+use bytes::{Buf, Bytes};
 use flate2::read::{DeflateDecoder, GzDecoder};
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use headers::{Authorization, HeaderMapExt};
@@ -163,7 +163,7 @@ pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMe
 }
 
 fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
-    emit!(HTTPDecompressError {
+    emit!(HttpDecompressError {
         encoding,
         error: &error
     });
@@ -244,7 +244,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         async move {
                             match events {
                                 Ok((events,body_size)) => {
-                                    emit!(HTTPEventsReceived {
+                                    emit!(HttpEventsReceived {
                                         events_count: events.len(),
                                         byte_size: body_size,
                                     });
@@ -260,7 +260,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                         .await
                                 }
                                 Err(error) => {
-                                    emit!(HTTPBadRequest {
+                                    emit!(HttpBadRequest {
                                         error_code: error.code,
                                         error_message: error.message.as_str(),
                                     });
@@ -290,14 +290,12 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             info!(message = "Building HTTP server.", address = %address);
 
             let listener = tls.bind(&address).await.unwrap();
-            let _ = warp::serve(routes)
+            warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
-                    shutdown.clone().map(|_| ()),
+                    shutdown.map(|_| ()),
                 )
                 .await;
-            // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
-            drop(shutdown);
             Ok(())
         }))
     }

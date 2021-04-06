@@ -102,7 +102,7 @@ fn bench_field_filter(c: &mut Criterion) {
 
     let benchmarks: Vec<(&str, Transform)> = vec![
         ("native", {
-            let mut rt = runtime();
+            let rt = runtime();
             rt.block_on(async move {
                 transforms::field_filter::FieldFilterConfig {
                     field: LookupBuf::from("the_field"),

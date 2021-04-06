@@ -72,7 +72,7 @@ mod test {
                     .load(assertion)
                     .eval()
                     .unwrap_or_else(|_| panic!("Failed to verify assertion {:?}", assertion));
-                assert!(result, assertion);
+                assert!(result, "{}", assertion);
             }
         });
     }

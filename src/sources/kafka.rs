@@ -42,10 +42,14 @@ pub struct KafkaSourceConfig {
     fetch_wait_max_ms: u64,
     #[serde(default = "default_commit_interval_ms")]
     commit_interval_ms: u64,
-    key_field: Option<LookupBuf>,
-    topic_key: Option<LookupBuf>,
-    partition_key: Option<LookupBuf>,
-    offset_key: Option<LookupBuf>,
+    #[serde(default = "default_key_field")]
+    key_field: LookupBuf,
+    #[serde(default = "default_topic_key")]
+    topic_key: LookupBuf,
+    #[serde(default = "default_partition_key")]
+    partition_key: LookupBuf,
+    #[serde(default = "default_offset_key")]
+    offset_key: LookupBuf,
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
@@ -69,6 +73,22 @@ fn default_commit_interval_ms() -> u64 {
 
 fn default_auto_offset_reset() -> String {
     "largest".into() // default in librdkafka
+}
+
+fn default_key_field() -> LookupBuf {
+    LookupBuf::from("message_key")
+}
+
+fn default_topic_key() -> LookupBuf {
+    LookupBuf::from("topic")
+}
+
+fn default_partition_key() -> LookupBuf {
+    LookupBuf::from("partition")
+}
+
+fn default_offset_key() -> LookupBuf {
+    LookupBuf::from("offset")
 }
 
 inventory::submit! {
@@ -111,9 +131,11 @@ fn kafka_source(
     let consumer = Arc::new(create_consumer(config)?);
 
     Ok(Box::pin(async move {
+        let shutdown = shutdown;
+
         Arc::clone(&consumer)
-            .start()
-            .take_until(shutdown.clone())
+            .stream()
+            .take_until(shutdown)
             .then(move |message| {
                 let key_field = key_field.clone();
                 let topic_key = topic_key.clone();
@@ -158,29 +180,17 @@ fn kafka_source(
                                 Bytes::from("kafka"),
                             );
 
-                            if let Some(key_field) = key_field {
-                                match msg.key() {
-                                    None => (),
-                                    Some(key) => {
-                                        log.insert(
-                                            key_field,
-                                            Value::from(String::from_utf8_lossy(key).to_string()),
-                                        );
-                                    }
-                                }
-                            }
+                            let msg_key = msg
+                                .key()
+                                .map(|key| Value::from(String::from_utf8_lossy(key).to_string()))
+                                .unwrap_or(Value::Null);
+                            log.insert(key_field, msg_key);
 
-                            if let Some(topic_key) = &topic_key {
-                                log.insert(topic_key.clone(), Value::from(msg.topic().to_string()));
-                            }
+                            log.insert(topic_key, Value::from(msg.topic().to_string()));
 
-                            if let Some(partition_key) = &partition_key {
-                                log.insert(partition_key.clone(), Value::from(msg.partition()));
-                            }
+                            log.insert(partition_key, Value::from(msg.partition()));
 
-                            if let Some(offset_key) = &offset_key {
-                                log.insert(offset_key.clone(), Value::from(msg.offset()));
-                            }
+                            log.insert(offset_key, Value::from(msg.offset()));
 
                             consumer.store_offset(&msg).map_err(|error| {
                                 emit!(KafkaOffsetUpdateFailed { error });
@@ -263,24 +273,24 @@ mod test {
             auto_offset_reset: "earliest".to_string(),
             session_timeout_ms: 10000,
             commit_interval_ms: 5000,
-            key_field: Some(LookupBuf::from("message_key")),
-            topic_key: Some(LookupBuf::from("topic")),
-            partition_key: Some(LookupBuf::from("partition")),
-            offset_key: Some(LookupBuf::from("offset")),
+            key_field: LookupBuf::from("message_key"),
+            topic_key: LookupBuf::from("topic"),
+            partition_key: LookupBuf::from("partition"),
+            offset_key: LookupBuf::from("offset"),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             ..Default::default()
         }
     }
 
-    #[test]
-    fn kafka_source_create_ok() {
+    #[tokio::test]
+    async fn kafka_source_create_ok() {
         let config = make_config();
         assert!(kafka_source(&config, ShutdownSignal::noop(), Pipeline::new_test().0).is_ok());
     }
 
-    #[test]
-    fn kafka_source_create_incorrect_auto_offset_reset() {
+    #[tokio::test]
+    async fn kafka_source_create_incorrect_auto_offset_reset() {
         let config = KafkaSourceConfig {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
             ..make_config()
@@ -340,10 +350,10 @@ mod integration_test {
             auto_offset_reset: "beginning".into(),
             session_timeout_ms: 6000,
             commit_interval_ms: 5000,
-            key_field: Some(LookupBuf::from("message_key")),
-            topic_key: Some(LookupBuf::from("topic")),
-            partition_key: Some(LookupBuf::from("partition")),
-            offset_key: Some(LookupBuf::from("offset")),
+            key_field: LookupBuf::from("message_key"),
+            topic_key: LookupBuf::from("topic"),
+            partition_key: LookupBuf::from("partition"),
+            offset_key: LookupBuf::from("offset"),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             ..Default::default()

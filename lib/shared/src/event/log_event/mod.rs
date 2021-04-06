@@ -4,9 +4,11 @@ pub mod lua;
 #[cfg(test)]
 mod test;
 
-use crate::{event::*, lookup::*};
+use crate::{event::*, lookup::*, EventDataEq};
 use derivative::Derivative;
-use serde::{Deserialize, Serialize};
+use getset::Getters;
+use serde::{Deserialize, Serialize, Serializer};
+use std::fmt::Display;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
@@ -14,7 +16,6 @@ use std::{
     iter::FromIterator,
 };
 use tracing::{debug, info, instrument, trace, trace_span};
-use std::fmt::Display;
 
 /// A map of [`crate::event::Value`].
 ///
@@ -72,13 +73,15 @@ use std::fmt::Display;
 /// assert!(event.contains("foo"));
 /// assert!(event.contains(Lookup::from_str("foo").unwrap()));
 /// ```
-#[derive(PartialEq, Debug, Clone, Derivative, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Getters, Clone, Derivative, Deserialize)]
 #[derivative(Default)]
 pub struct LogEvent {
     // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
     #[serde(flatten)]
     #[derivative(Default(value = "Value::from(BTreeMap::default())"))]
     fields: Value,
+    #[getset(get = "pub")]
+    metadata: EventMetadata,
 }
 
 impl LogEvent {
@@ -225,7 +228,7 @@ impl LogEvent {
         value: impl Into<Value> + Debug,
     ) {
         let key = key.into();
-        // TODO can we get away with this clone?
+        // TODO can we get away without this clone?
         if !self.contains(key.clone()) {
             self.insert(key, value);
         }
@@ -453,6 +456,41 @@ impl LogEvent {
     pub fn inner_mut(&mut self) -> &mut Value {
         &mut self.fields
     }
+
+    /// Merge all fields specified at `fields` from `incoming` to `current`.
+    pub fn merge(&mut self, mut incoming: LogEvent, fields: &[LookupBuf]) {
+        for field in fields {
+            let incoming_val = match incoming.remove(field, true) {
+                None => continue,
+                Some(val) => val,
+            };
+            match self.get_mut(field) {
+                None => {
+                    self.insert(field.clone(), incoming_val);
+                }
+                Some(current_val) => current_val.merge(incoming_val),
+            }
+        }
+        self.metadata.merge(incoming.metadata());
+    }
+}
+
+impl EventDataEq for LogEvent {
+    fn event_data_eq(&self, other: &Self) -> bool {
+        self.fields == other.fields && self.metadata.event_data_eq(&other.metadata)
+    }
+}
+
+impl Serialize for LogEvent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match &self.fields {
+            Value::Map(fields) => serializer.collect_map(fields.iter()),
+            _ => serializer.serialize_none(),
+        }
+    }
 }
 
 impl vrl::Target for LogEvent {
@@ -510,13 +548,14 @@ impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
         LogEvent {
             fields: Value::from(map),
+            metadata: EventMetadata,
         }
     }
 }
 
 impl Into<BTreeMap<String, Value>> for LogEvent {
     fn into(self) -> BTreeMap<String, Value> {
-        let Self { fields } = self;
+        let Self { fields, .. } = self;
         fields.try_into().expect("Tried to turn a log event which was not a map into a map. This is an invariant, please report it.")
     }
 }
@@ -525,6 +564,7 @@ impl From<HashMap<String, Value>> for LogEvent {
     fn from(map: HashMap<String, Value>) -> Self {
         LogEvent {
             fields: map.into_iter().collect(),
+            metadata: EventMetadata,
         }
     }
 }
@@ -559,7 +599,10 @@ impl TryFrom<Value> for LogEvent {
 
     fn try_from(fields: Value) -> Result<Self, Self::Error> {
         match fields {
-            Value::Map(_) => Ok(Self { fields }),
+            Value::Map(_) => Ok(Self {
+                fields,
+                metadata: EventMetadata,
+            }),
             _ => Err(crate::Error::from(
                 "Attempted to convert non-Map value into a LogEvent.",
             )),
@@ -571,7 +614,7 @@ impl TryInto<serde_json::Value> for LogEvent {
     type Error = crate::Error;
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
-        let Self { fields } = self;
+        let Self { fields, .. } = self;
         Ok(serde_json::to_value(fields)?)
     }
 }

@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 impl Config {
     /// Prepares a config by reading a kubeconfig file from defined path
     pub fn kubeconfig(path: &Path) -> Result<Self, Error> {
-        kubeconfig_reader(&std::fs::read_to_string(path).context(IO)?)
+        kubeconfig_reader(&std::fs::read_to_string(path).context(Io)?)
     }
 }
 
@@ -83,7 +83,7 @@ fn kubeconfig_reader(config: &str) -> Result<Config, Error> {
 pub enum Error {
     /// The kube_config file does not exist or could not be opened for reading.
     #[snafu(display("unable to load kubernetes configuration (kube_config)"))]
-    IO {
+    Io {
         /// The underlying error.
         source: std::io::Error,
     },

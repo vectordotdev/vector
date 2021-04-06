@@ -2,6 +2,7 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)] // some features only use some variants
 pub(crate) enum SocketMode {
     Tcp,
     Udp,

@@ -1,14 +1,14 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use chrono::TimeZone;
-use std::collections::BTreeMap;
+use std::collections::BTreeMap ;
 
 pub mod discriminant;
 pub mod merge;
 pub mod merge_state;
 pub mod util;
 
-pub use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 pub use shared::{event::*, lookup::*};
+pub use shared::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
@@ -194,24 +194,24 @@ impl From<Event> for proto::EventWrapper {
 
                 proto::EventWrapper { event: Some(event) }
             }
-            Event::Metric(Metric { series, data }) => {
-                let name = series.name.name;
-                let namespace = series.name.namespace.unwrap_or_default();
+            Event::Metric(metric) => {
+                let name = metric.series.name.name;
+                let namespace = metric.series.name.namespace.unwrap_or_default();
 
-                let timestamp = data.timestamp.map(|ts| prost_types::Timestamp {
+                let timestamp = metric.data.timestamp.map(|ts| prost_types::Timestamp {
                     seconds: ts.timestamp(),
                     nanos: ts.timestamp_subsec_nanos() as i32,
                 });
 
-                let tags = series.tags.unwrap_or_default();
+                let tags = metric.series.tags.unwrap_or_default();
 
-                let kind = match data.kind {
+                let kind = match metric.data.kind {
                     MetricKind::Incremental => proto::metric::Kind::Incremental,
                     MetricKind::Absolute => proto::metric::Kind::Absolute,
                 }
                 .into();
 
-                let metric = match data.value {
+                let metric = match metric.data.value {
                     MetricValue::Counter { value } => {
                         MetricProto::Counter(proto::Counter { value })
                     }

@@ -255,7 +255,7 @@ mod integration_tests {
 
         tokio::spawn(source);
 
-        tokio::time::delay_for(Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_secs(2)).await;
 
         let events = test_util::collect_ready(rx).await;
         assert!(!events.is_empty());

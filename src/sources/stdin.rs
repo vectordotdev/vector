@@ -7,10 +7,9 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use futures::{executor, FutureExt, SinkExt, StreamExt, TryStreamExt};
+use futures::{channel::mpsc, executor, FutureExt, SinkExt, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use std::{io, thread};
-use tokio::sync::mpsc::channel;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -79,7 +78,7 @@ where
         .unwrap_or_else(|| log_schema().host_key().clone());
     let hostname = crate::get_hostname().ok();
 
-    let (mut sender, receiver) = channel(1024);
+    let (mut sender, receiver) = mpsc::channel(1024);
 
     // Start the background thread
     thread::spawn(move || {
@@ -143,7 +142,6 @@ mod tests {
         Pipeline,
     };
     use std::io::Cursor;
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {
@@ -168,7 +166,7 @@ mod tests {
     async fn stdin_decodes_line() {
         trace_init();
 
-        let (tx, mut rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test();
         let config = StdinConfig::default();
         let buf = Cursor::new("hello world\nhello world again");
 
@@ -177,23 +175,21 @@ mod tests {
             .await
             .unwrap();
 
-        let event = rx.try_recv();
+        let mut stream = rx;
 
-        assert!(event.is_ok());
+        let event = stream.next().await;
         assert_eq!(
-            Ok("hello world".into()),
+            Some("hello world".into()),
             event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
         );
 
-        let event = rx.try_recv();
-        assert!(event.is_ok());
+        let event = stream.next().await;
         assert_eq!(
-            Ok("hello world again".into()),
+            Some("hello world again".into()),
             event.map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
         );
 
-        let event = rx.try_recv();
-        assert!(event.is_err());
-        assert_eq!(Err(mpsc::error::TryRecvError::Closed), event);
+        let event = stream.next().await;
+        assert!(event.is_none());
     }
 }

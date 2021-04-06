@@ -1,7 +1,7 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     internal_events::TemplateRenderingFailed,
-    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
+    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -61,7 +61,7 @@ pub struct S3SinkConfig {
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
-    pub auth: AWSAuthentication,
+    pub auth: AwsAuthentication,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -97,7 +97,7 @@ enum S3CannedAcl {
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 enum S3ServerSideEncryption {
     #[serde(rename = "AES256")]
-    AES256,
+    Aes256,
     #[serde(rename = "aws:kms")]
     AwsKms,
 }
@@ -110,10 +110,8 @@ enum S3StorageClass {
     Standard,
     ReducedRedundancy,
     IntelligentTiering,
-    #[serde(rename = "STANDARD_IA")]
-    StandardIA,
-    #[serde(rename = "ONEZONE_IA")]
-    OnezoneIA,
+    StandardIa,
+    OnezoneIa,
     Glacier,
     DeepArchive,
 }
@@ -152,7 +150,7 @@ impl GenerateConfig for S3SinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             assume_role: None,
-            auth: AWSAuthentication::default(),
+            auth: AwsAuthentication::default(),
         })
         .unwrap()
     }
@@ -242,6 +240,7 @@ impl S3SinkConfig {
     pub async fn healthcheck(self, client: S3Client) -> crate::Result<()> {
         let req = client.head_bucket(HeadBucketRequest {
             bucket: self.bucket.clone(),
+            expected_bucket_owner: None,
         });
 
         match req.await {
@@ -560,10 +559,10 @@ mod tests {
             ("DEEP_ARCHIVE", S3StorageClass::DeepArchive),
             ("GLACIER", S3StorageClass::Glacier),
             ("INTELLIGENT_TIERING", S3StorageClass::IntelligentTiering),
-            ("ONEZONE_IA", S3StorageClass::OnezoneIA),
+            ("ONEZONE_IA", S3StorageClass::OnezoneIa),
             ("REDUCED_REDUNDANCY", S3StorageClass::ReducedRedundancy),
             ("STANDARD", S3StorageClass::Standard),
-            ("STANDARD_IA", S3StorageClass::StandardIA),
+            ("STANDARD_IA", S3StorageClass::StandardIa),
         ] {
             assert_eq!(name, to_string(storage_class));
             let result: S3StorageClass = serde_json::from_str(&format!("{:?}", name))
@@ -583,7 +582,7 @@ mod integration_tests {
         assert_downcast_matches, log_event,
         test_util::{random_lines_with_stream, random_string},
     };
-    use bytes::{buf::BufExt, BytesMut};
+    use bytes::{Buf, BytesMut};
     use flate2::read::GzDecoder;
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;

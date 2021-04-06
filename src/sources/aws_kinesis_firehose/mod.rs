@@ -36,14 +36,12 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         let listener = tls.bind(&self.address).await?;
 
         Ok(Box::pin(async move {
-            let _ = warp::serve(svc)
+            warp::serve(svc)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
-                    shutdown.clone().map(|_| ()),
+                    shutdown.map(|_| ()),
                 )
                 .await;
-            // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
-            drop(shutdown);
             Ok(())
         }))
     }
@@ -86,12 +84,12 @@ mod tests {
     };
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::{read::GzEncoder, Compression};
+    use futures::channel::mpsc;
     use pretty_assertions::assert_eq;
     use std::{
         io::{Cursor, Read},
         net::SocketAddr,
     };
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {

@@ -2,8 +2,10 @@ pub mod lua;
 #[cfg(test)]
 mod test;
 
+use crate::{EventDataEq, EventMetadata};
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
+use getset::Getters;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
@@ -14,12 +16,15 @@ use std::{
 };
 use vrl::path::Segment;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Getters, PartialEq, Serialize)]
 pub struct Metric {
     #[serde(flatten)]
     pub series: MetricSeries,
     #[serde(flatten)]
     pub data: MetricData,
+    #[getset(get = "pub")]
+    #[serde(skip)]
+    metadata: EventMetadata,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -243,6 +248,7 @@ impl Metric {
                 kind,
                 value,
             },
+            metadata: EventMetadata,
         }
     }
 
@@ -261,11 +267,17 @@ impl Metric {
         self
     }
 
+    pub fn with_value(mut self, value: MetricValue) -> Self {
+        self.data.value = value;
+        self
+    }
+
     /// Rewrite this into a Metric with the data marked as absolute.
     pub fn into_absolute(self) -> Self {
         Self {
             series: self.series,
             data: self.data.into_absolute(),
+            metadata: EventMetadata,
         }
     }
 
@@ -274,6 +286,7 @@ impl Metric {
         Self {
             series: self.series,
             data: self.data.into_incremental(),
+            metadata: EventMetadata,
         }
     }
 
@@ -365,7 +378,16 @@ impl Metric {
         Self {
             series: self.series.clone(),
             data: self.data.zero(),
+            metadata: EventMetadata,
         }
+    }
+}
+
+impl EventDataEq for Metric {
+    fn event_data_eq(&self, other: &Self) -> bool {
+        self.series == other.series
+            && self.data == other.data
+            && self.metadata.event_data_eq(&other.metadata)
     }
 }
 
