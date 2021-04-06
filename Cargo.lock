@@ -81,9 +81,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.38"
+version = "1.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afddf7f520a80dbf76e6f50a35bca42a2331ef227a28b3b6dc5c2e2338d114b1"
+checksum = "28b2cd92db5cbd74e8e5028f7e27dd7aa3090e89e4f2a197cc7c8dfb69c7063b"
 
 [[package]]
 name = "approx"
@@ -262,7 +262,7 @@ dependencies = [
  "static_assertions",
  "tempfile",
  "thiserror",
- "tracing 0.1.23",
+ "tracing 0.1.25",
  "url",
  "uuid 0.8.2",
 ]
@@ -1036,7 +1036,7 @@ dependencies = [
  "bytes 1.0.1",
  "serde_json",
  "tokio-util",
- "tracing 0.1.23",
+ "tracing 0.1.25",
 ]
 
 [[package]]
@@ -2102,7 +2102,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
- "tracing 0.1.23",
+ "tracing 0.1.25",
  "winapi 0.3.9",
 ]
 
@@ -2586,7 +2586,7 @@ dependencies = [
  "slab",
  "tokio",
  "tokio-util",
- "tracing 0.1.23",
+ "tracing 0.1.25",
 ]
 
 [[package]]
@@ -2944,7 +2944,7 @@ version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df004cfca50ef23c36850aaaa59ad52cc70d0e90243c3c7737a4dd32dc7a3c4f"
 dependencies = [
- "quick-error",
+ "quick-error 1.2.3",
 ]
 
 [[package]]
@@ -2967,7 +2967,7 @@ dependencies = [
  "socket2 0.3.19",
  "tokio",
  "tower-service",
- "tracing 0.1.23",
+ "tracing 0.1.25",
  "want",
 ]
 
@@ -3174,7 +3174,7 @@ dependencies = [
  "once_cell",
  "slab",
  "sluice",
- "tracing 0.1.23",
+ "tracing 0.1.25",
  "tracing-futures 0.2.5",
  "url",
  "waker-fn",
@@ -3626,7 +3626,7 @@ dependencies = [
  "rand 0.7.3",
  "raw-cpuid 6.1.0",
  "thiserror",
- "tracing 0.1.23",
+ "tracing 0.1.25",
  "userfaultfd",
 ]
 
@@ -3888,7 +3888,7 @@ dependencies = [
  "itoa",
  "metrics",
  "metrics-util",
- "tracing 0.1.23",
+ "tracing 0.1.25",
  "tracing-core 0.1.17",
  "tracing-subscriber",
 ]
@@ -5016,19 +5016,19 @@ dependencies = [
 
 [[package]]
 name = "proptest"
-version = "0.10.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12e6c80c1139113c28ee4670dc50cc42915228b51f56a9e407f0ec60f966646f"
+checksum = "1e0d9cc07f18492d879586c92b485def06bc850da3118075cd45d50e9c95b0e5"
 dependencies = [
  "bit-set",
  "bitflags",
  "byteorder",
  "lazy_static",
  "num-traits",
- "quick-error",
- "rand 0.7.3",
- "rand_chacha 0.2.2",
- "rand_xorshift 0.2.0",
+ "quick-error 2.0.0",
+ "rand 0.8.3",
+ "rand_chacha 0.3.0",
+ "rand_xorshift 0.3.0",
  "regex-syntax",
  "rusty-fork",
  "tempfile",
@@ -5153,6 +5153,12 @@ name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
+
+[[package]]
+name = "quick-error"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ac73b1112776fc109b2e61909bc46c7e1bf0d7f690ffb1676553acce16d5cda"
 
 [[package]]
 name = "quickcheck"
@@ -5404,11 +5410,11 @@ dependencies = [
 
 [[package]]
 name = "rand_xorshift"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77d416b86801d23dde1aa643023b775c3a462efc0ed96443add11546cdf1dca8"
+checksum = "d25bf25ec5ae4a3f1b92f929810509a2f53d7dca2f50b794ff57e3face536c8f"
 dependencies = [
- "rand_core 0.5.1",
+ "rand_core 0.6.2",
 ]
 
 [[package]]
@@ -5640,7 +5646,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52e44394d2086d010551b14b53b1f24e31647570cd1deb0379e2c21b329aba00"
 dependencies = [
  "hostname",
- "quick-error",
+ "quick-error 1.2.3",
 ]
 
 [[package]]
@@ -5951,7 +5957,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb3dcc6e454c328bb824492db107ab7c0ae8fcffe4ad210136ef014458c1bc4f"
 dependencies = [
  "fnv",
- "quick-error",
+ "quick-error 1.2.3",
  "tempfile",
  "wait-timeout",
 ]
@@ -6369,9 +6375,9 @@ dependencies = [
  "snafu",
  "test-env-log",
  "toml",
- "tracing 0.1.23",
  "tracing-subscriber",
  "vrl",
+ "tracing 0.1.25",
 ]
 
 [[package]]
@@ -7177,9 +7183,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-stream"
-version = "0.1.3"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1981ad97df782ab506a1f43bf82c967326960d278acf3bf8279809648c3ff3ea"
+checksum = "e177a5d8c3bf36de9ebe6d58537d8879e964332f93fb3339e43f618c81361af0"
 dependencies = [
  "futures-core",
  "pin-project-lite",
@@ -7275,7 +7281,7 @@ dependencies = [
  "tokio-util",
  "tower-layer",
  "tower-service",
- "tracing 0.1.23",
+ "tracing 0.1.25",
 ]
 
 [[package]]
@@ -7325,14 +7331,14 @@ dependencies = [
 
 [[package]]
 name = "tracing"
-version = "0.1.23"
+version = "0.1.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7d40a22fd029e33300d8d89a5cc8ffce18bb7c587662f54629e94c9de5487f3"
+checksum = "01ebdc2bb4498ab1ab5f5b73c5803825e60199229ccba0698170e3be0e7f959f"
 dependencies = [
  "cfg-if 1.0.0",
  "log",
  "pin-project-lite",
- "tracing-attributes 0.1.12",
+ "tracing-attributes 0.1.15",
  "tracing-core 0.1.17",
 ]
 
@@ -7348,9 +7354,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.12"
+version = "0.1.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43f080ea7e4107844ef4766459426fa2d5c1ada2e47edba05dc7fa99d9629f47"
+checksum = "c42e6fa53307c8a17e4ccd4dc81cf5ec38db9209f59b222210375b54ee40d1e2"
 dependencies = [
  "proc-macro2 1.0.24",
  "quote 1.0.9",
@@ -7384,7 +7390,7 @@ dependencies = [
  "futures 0.3.13",
  "futures-task",
  "pin-project 1.0.6",
- "tracing 0.1.23",
+ "tracing 0.1.25",
 ]
 
 [[package]]
@@ -7404,7 +7410,7 @@ dependencies = [
  "criterion",
  "dashmap 4.0.2",
  "mock_instant",
- "tracing 0.1.23",
+ "tracing 0.1.25",
  "tracing-core 0.1.17",
  "tracing-subscriber",
 ]
@@ -7446,7 +7452,7 @@ dependencies = [
  "sharded-slab",
  "smallvec",
  "thread_local",
- "tracing 0.1.23",
+ "tracing 0.1.25",
  "tracing-core 0.1.17",
  "tracing-log",
  "tracing-serde",
@@ -7974,7 +7980,7 @@ dependencies = [
  "tower",
  "tower-layer",
  "tower-test",
- "tracing 0.1.23",
+ "tracing 0.1.25",
  "tracing-core 0.1.17",
  "tracing-futures 0.2.5",
  "tracing-limit",
@@ -8024,7 +8030,7 @@ dependencies = [
  "anyhow",
  "serde",
  "serde_json",
- "tracing 0.1.23",
+ "tracing 0.1.25",
 ]
 
 [[package]]
@@ -8093,7 +8099,7 @@ dependencies = [
  "regex",
  "serde",
  "thiserror",
- "tracing 0.1.23",
+ "tracing 0.1.25",
  "vrl-diagnostic",
  "vrl-parser",
 ]
@@ -8145,7 +8151,7 @@ dependencies = [
  "shared",
  "strip-ansi-escapes",
  "syslog_loose",
- "tracing 0.1.23",
+ "tracing 0.1.25",
  "url",
  "uuid 0.8.2",
  "vrl",
@@ -8263,7 +8269,7 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util",
  "tower-service",
- "tracing 0.1.23",
+ "tracing 0.1.25",
  "tracing-futures 0.2.5",
 ]
 
@@ -8486,7 +8492,7 @@ version = "0.18.0"
 source = "git+https://github.com/bytecodealliance/lucet.git?rev=b1863dacc8c92c11e5434fc8815d9b9a26cfe3db#b1863dacc8c92c11e5434fc8815d9b9a26cfe3db"
 dependencies = [
  "thiserror",
- "tracing 0.1.23",
+ "tracing 0.1.25",
  "wiggle-macro",
  "witx",
 ]
