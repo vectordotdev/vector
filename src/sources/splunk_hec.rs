@@ -1,11 +1,10 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, Resource, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{
         SplunkHecEventReceived, SplunkHecRequestBodyInvalid, SplunkHecRequestError,
         SplunkHecRequestReceived,
     },
-    shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
@@ -77,17 +76,11 @@ fn default_socket_address() -> SocketAddr {
 #[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec")]
 impl SourceConfig for SplunkConfig {
-    async fn build(
-        &self,
-        _: &str,
-        _: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = SplunkSource::new(self);
 
-        let event_service = source.event_service(out.clone());
-        let raw_service = source.raw_service(out.clone());
+        let event_service = source.event_service(cx.out.clone());
+        let raw_service = source.raw_service(cx.out);
         let health_service = source.health_service();
         let options = SplunkSource::options();
 
@@ -115,6 +108,7 @@ impl SourceConfig for SplunkConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
 
+        let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             warp::serve(services)
                 .serve_incoming_with_graceful_shutdown(
@@ -743,9 +737,8 @@ fn event_error(text: &str, code: u16, event: usize) -> Response {
 mod tests {
     use super::{parse_timestamp, SplunkConfig};
     use crate::{
-        config::{log_schema, GlobalOptions, SinkConfig, SinkContext, SourceConfig},
+        config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::Event,
-        shutdown::ShutdownSignal,
         sinks::{
             splunk_hec::{Encoding, HecSinkConfig},
             util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
@@ -779,12 +772,7 @@ mod tests {
                 token,
                 tls: None,
             }
-            .build(
-                "default",
-                &GlobalOptions::default(),
-                ShutdownSignal::noop(),
-                sender,
-            )
+            .build(SourceContext::new_test(sender))
             .await
             .unwrap()
             .await

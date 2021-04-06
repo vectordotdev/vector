@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     http::HttpClient,
     internal_events::{
@@ -60,13 +60,7 @@ impl GenerateConfig for ApacheMetricsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "apache_metrics")]
 impl SourceConfig for ApacheMetricsConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let urls = self
             .endpoints
             .iter()
@@ -80,8 +74,8 @@ impl SourceConfig for ApacheMetricsConfig {
             urls,
             self.scrape_interval_secs,
             namespace,
-            shutdown,
-            out,
+            cx.shutdown,
+            cx.out,
         ))
     }
 
@@ -269,7 +263,7 @@ fn apache_metrics(
 mod test {
     use super::*;
     use crate::{
-        config::{GlobalOptions, SourceConfig},
+        config::SourceConfig,
         test_util::{collect_ready, next_addr, wait_for_tcp},
         Error,
     };
@@ -349,12 +343,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             scrape_interval_secs: 1,
             namespace: "custom".to_string(),
         }
-        .build(
-            "default",
-            &GlobalOptions::default(),
-            ShutdownSignal::noop(),
-            tx,
-        )
+        .build(SourceContext::new_test(tx))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -415,12 +404,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             scrape_interval_secs: 1,
             namespace: "apache".to_string(),
         }
-        .build(
-            "default",
-            &GlobalOptions::default(),
-            ShutdownSignal::noop(),
-            tx,
-        )
+        .build(SourceContext::new_test(tx))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -454,12 +438,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             scrape_interval_secs: 1,
             namespace: "custom".to_string(),
         }
-        .build(
-            "default",
-            &GlobalOptions::default(),
-            ShutdownSignal::noop(),
-            tx,
-        )
+        .build(SourceContext::new_test(tx))
         .await
         .unwrap();
         tokio::spawn(source);

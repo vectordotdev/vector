@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{JournaldEventReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
@@ -91,18 +91,14 @@ type Record = HashMap<String, String>;
 #[async_trait::async_trait]
 #[typetag::serde(name = "journald")]
 impl SourceConfig for JournaldConfig {
-    async fn build(
-        &self,
-        name: &str,
-        globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.remap_priority {
             warn!("Option `remap_priority` has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead.");
         }
 
-        let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
+        let data_dir = cx
+            .globals
+            .resolve_and_make_data_subdir(self.data_dir.as_ref(), &cx.name)?;
 
         let include_units = match (!self.units.is_empty(), !self.include_units.is_empty()) {
             (true, true) => return Err(BuildError::BothUnitsAndIncludeUnits.into()),
@@ -145,9 +141,9 @@ impl SourceConfig for JournaldConfig {
                 checkpoint_path,
                 batch_size,
                 remap_priority: self.remap_priority,
-                out,
+                out: cx.out,
             }
-            .run_shutdown(shutdown, start)
+            .run_shutdown(cx.shutdown, start)
             .instrument(info_span!("journald-server")),
         ))
     }

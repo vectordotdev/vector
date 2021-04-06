@@ -1163,14 +1163,13 @@ mod source_finished_tests {
 ))]
 mod transient_state_tests {
     use crate::{
-        config::{Config, DataType, GlobalOptions, SourceConfig},
-        shutdown::ShutdownSignal,
+        config::{Config, DataType, SourceConfig, SourceContext},
         sinks::blackhole::BlackholeConfig,
         sources::stdin::StdinConfig,
         sources::Source,
         test_util::{start_topology, trace_init},
         transforms::json_parser::JsonParserConfig,
-        Error, Pipeline,
+        Error,
     };
     use futures::{future, FutureExt};
     use serde::{Deserialize, Serialize};
@@ -1199,18 +1198,13 @@ mod transient_state_tests {
     #[async_trait::async_trait]
     #[typetag::serde(name = "mock")]
     impl SourceConfig for MockSourceConfig {
-        async fn build(
-            &self,
-            _name: &str,
-            _globals: &GlobalOptions,
-            shutdown: ShutdownSignal,
-            out: Pipeline,
-        ) -> Result<Source, Error> {
+        async fn build(&self, cx: SourceContext) -> Result<Source, Error> {
             let tripwire = self.tripwire.lock().await;
 
+            let out = cx.out;
             Ok(Box::pin(
                 future::select(
-                    shutdown.map(|_| ()).boxed(),
+                    cx.shutdown.map(|_| ()).boxed(),
                     tripwire
                         .clone()
                         .unwrap()
