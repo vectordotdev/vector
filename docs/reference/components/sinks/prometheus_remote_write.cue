@@ -78,7 +78,8 @@ components: sinks: prometheus_remote_write: {
 				High cardinality metric names and labels are discouraged by
 				Prometheus as they can provide performance and reliability
 				problems. You should consider alternative strategies to reduce
-				the cardinality. Vector offers a [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit]
+				the cardinality. Vector offers a [`tag_cardinality_limit`
+				transform](\(urls.vrl_functions)#tag_cardinality_limit)
 				as a way to protect against this.
 				""",
 		]
@@ -116,7 +117,7 @@ components: sinks: prometheus_remote_write: {
 		}
 		buckets: {
 			common:      false
-			description: "Default buckets to use for aggregating [distribution][docs.data-model.metric#distribution] metrics into histograms."
+			description: "Default buckets to use for aggregating [distribution](\(urls.vector_data_model)#distribution) metrics into histograms."
 			required:    false
 			warnings: []
 			type: array: {
@@ -126,7 +127,7 @@ components: sinks: prometheus_remote_write: {
 		}
 		quantiles: {
 			common:      false
-			description: "Quantiles to use for aggregating [distribution][docs.data-model.metric#distribution] metrics into a summary."
+			description: "Quantiles to use for aggregating [distribution](\(urls.vector_data_model)#distribution) metrics into a summary."
 			required:    false
 			warnings: []
 			type: array: {
