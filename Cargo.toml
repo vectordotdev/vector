@@ -95,7 +95,7 @@ vector-api-client = { path = "lib/vector-api-client", optional = true }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures
-async-trait = "0.1.42"
+async-trait = "0.1.48"
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
 futures01 = { package = "futures", version = "0.1.25" }
 tokio = { version = "1.4.0", features = ["full"] }
