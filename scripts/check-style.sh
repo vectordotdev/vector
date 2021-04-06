@@ -32,6 +32,7 @@ for FILE in $(git ls-files); do
     *gif) continue;;
     *ico) continue;;
     *sig) continue;;
+    *html) continue;;
     tests/data*) continue;;
     distribution/kubernetes/*/*.yaml) continue;;
     tests/helm-snapshots/*/snapshot.yaml) continue;;
