@@ -29,6 +29,7 @@ use tokio_postgres::{
     types::FromSql,
     Client, Config, Error as PgError, NoTls, Row,
 };
+use tokio_stream::wrappers::IntervalStream;
 
 macro_rules! tags {
     ($tags:expr) => { $tags.clone() };
@@ -156,7 +157,7 @@ impl SourceConfig for PostgresqlMetricsConfig {
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         Ok(Box::pin(async move {
-            let mut interval = time::interval(duration).take_until(shutdown);
+            let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter_mut().map(|source| source.collect())).await;

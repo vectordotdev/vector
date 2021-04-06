@@ -1,11 +1,11 @@
 use criterion::criterion_main;
 
 mod batch;
-mod buffering;
+mod buffer;
 mod event;
 mod files;
 mod http;
-mod isolated_buffering;
+mod isolated_buffer;
 mod lookup;
 mod lua;
 mod metrics_snapshot;
@@ -15,11 +15,11 @@ mod topology;
 
 criterion_main!(
     batch::benches,
-    buffering::benches,
+    buffer::benches,
     event::benches,
     files::benches,
     http::benches,
-    isolated_buffering::benches,
+    isolated_buffer::benches,
     lookup::benches,
     lua::benches,
     metrics_snapshot::benches,

@@ -6,10 +6,8 @@ use crate::{
 use async_stream::stream;
 use lazy_static::lazy_static;
 use std::{collections::BTreeMap, sync::Arc};
-use tokio::{
-    stream::{Stream, StreamExt},
-    time::Duration,
-};
+use tokio::time::Duration;
+use tokio_stream::{Stream, StreamExt};
 
 lazy_static! {
     static ref GLOBAL_CONTROLLER: Arc<&'static Controller> =

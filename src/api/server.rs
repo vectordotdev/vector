@@ -64,14 +64,11 @@ fn make_routes(playground: bool, watch_tx: topology::WatchRx) -> BoxedFilter<(im
 
     // GraphQL query and subscription handler.
     let graphql_handler = warp::path("graphql").and(
-        graphql_subscription_with_data(
-            schema.clone(),
-            Some(move |_| {
-                let mut data = Data::default();
-                data.insert(watch_tx);
-                Ok(data)
-            }),
-        )
+        graphql_subscription_with_data(schema.clone(), move |_| async {
+            let mut data = Data::default();
+            data.insert(watch_tx);
+            Ok(data)
+        })
         .or(async_graphql_warp::graphql(schema).and_then(
             |(schema, request): (Schema<_, _, _>, Request)| async move {
                 Ok::<_, Infallible>(GQLResponse::from(schema.execute(request).await))

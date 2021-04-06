@@ -9,7 +9,7 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use bytes::{buf::BufExt, Bytes};
+use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
@@ -116,14 +116,13 @@ impl SourceConfig for SplunkConfig {
         let listener = tls.bind(&self.address).await?;
 
         Ok(Box::pin(async move {
-            let _ = warp::serve(services)
+            warp::serve(services)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
-                    shutdown.clone().map(|_| ()),
+                    shutdown.map(|_| ()),
                 )
                 .await;
-            // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
-            drop(shutdown);
+
             Ok(())
         }))
     }
@@ -632,12 +631,6 @@ pub(crate) enum ApiError {
     BadRequest,
 }
 
-impl From<ApiError> for Rejection {
-    fn from(error: ApiError) -> Self {
-        warp::reject::custom(error)
-    }
-}
-
 impl warp::reject::Reject for ApiError {}
 
 /// Cached bodies for common responses
@@ -762,9 +755,8 @@ mod tests {
         Pipeline,
     };
     use chrono::{TimeZone, Utc};
-    use futures::{stream, StreamExt};
+    use futures::{channel::mpsc, stream, StreamExt};
     use std::{future::ready, net::SocketAddr};
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {

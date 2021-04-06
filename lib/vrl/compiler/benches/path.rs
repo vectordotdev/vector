@@ -26,7 +26,7 @@ impl fmt::Display for Parameters {
 }
 
 fn benchmark_to_alternative_strings(c: &mut Criterion) {
-    let mut group = c.benchmark_group("vrl::path::to_alternative_strings");
+    let mut group = c.benchmark_group("vrl_compiler/path::to_alternative_strings");
     for param in &PARAMETERS {
         group.throughput(Throughput::Bytes(param.basis.len() as u64));
 

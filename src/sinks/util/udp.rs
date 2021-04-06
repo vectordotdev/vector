@@ -1,5 +1,4 @@
 use super::SinkBuildError;
-#[cfg(unix)]
 use crate::udp;
 use crate::{
     buffers::Acker,
@@ -26,7 +25,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tokio::{net::UdpSocket, sync::oneshot, time::delay_for};
+use tokio::{net::UdpSocket, sync::oneshot, time::sleep};
 
 #[derive(Debug, Snafu)]
 pub enum UdpError {
@@ -124,9 +123,10 @@ impl UdpConnector {
 
         let socket = UdpSocket::bind(bind_address).await.context(BindError)?;
 
-        #[cfg(unix)]
         if let Some(send_buffer_bytes) = self.send_buffer_bytes {
-            udp::set_send_buffer_size(&socket, send_buffer_bytes);
+            if let Err(error) = udp::set_send_buffer_size(&socket, send_buffer_bytes) {
+                warn!(message = "Failed configuring send buffer size on UDP socket.", %error);
+            }
         }
 
         socket.connect(addr).await.context(ConnectError)?;
@@ -144,7 +144,7 @@ impl UdpConnector {
                 }
                 Err(error) => {
                     emit!(UdpSocketConnectionFailed { error });
-                    delay_for(backoff.next().unwrap()).await;
+                    sleep(backoff.next().unwrap()).await;
                 }
             }
         }

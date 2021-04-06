@@ -56,7 +56,7 @@ fn test_buffering() {
         config.build().unwrap()
     };
 
-    let mut rt = runtime();
+    let rt = runtime();
     let (topology, input_events) = rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
         let (input_events, input_events_stream) =
@@ -105,7 +105,7 @@ fn test_buffering() {
         config.build().unwrap()
     };
 
-    let mut rt = runtime();
+    let rt = runtime();
     rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
 

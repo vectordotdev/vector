@@ -326,7 +326,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Wait for some extra time to ensure pod completes.
-    tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     let vector = framework
         .vector(
@@ -657,7 +657,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         let line = tokio::select! {
             result = stop_rx.next() => {
                 result.unwrap();
-                log_reader.kill()?;
+                log_reader.kill().await?;
                 continue;
             }
             line = log_reader.read_line() => line,
@@ -671,7 +671,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
             println!("Giving up");
-            log_reader.kill()?;
+            log_reader.kill().await?;
             break;
         }
 
@@ -718,7 +718,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(120);
             println!("Starting stop timer, due in {} seconds", duration.as_secs());
-            tokio::time::delay_for(duration).await;
+            tokio::time::sleep(duration).await;
             println!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
@@ -837,7 +837,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
         let line = tokio::select! {
             result = stop_rx.next() => {
                 result.unwrap();
-                log_reader.kill()?;
+                log_reader.kill().await?;
                 continue;
             }
             line = log_reader.read_line() => line,
@@ -851,7 +851,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
             println!("Giving up");
-            log_reader.kill()?;
+            log_reader.kill().await?;
             break;
         }
 
@@ -898,7 +898,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(120);
             println!("Starting stop timer, due in {} seconds", duration.as_secs());
-            tokio::time::delay_for(duration).await;
+            tokio::time::sleep(duration).await;
             println!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
@@ -978,7 +978,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         let line = tokio::select! {
             result = stop_rx.next() => {
                 result.unwrap();
-                log_reader.kill()?;
+                log_reader.kill().await?;
                 continue;
             }
             line = log_reader.read_line() => line,
@@ -992,7 +992,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
             println!("Giving up");
-            log_reader.kill()?;
+            log_reader.kill().await?;
             break;
         }
 
@@ -1043,7 +1043,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(30);
             println!("Starting stop timer, due in {} seconds", duration.as_secs());
-            tokio::time::delay_for(duration).await;
+            tokio::time::sleep(duration).await;
             println!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
@@ -1128,7 +1128,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
         let line = tokio::select! {
             result = stop_rx.next() => {
                 result.unwrap();
-                log_reader.kill()?;
+                log_reader.kill().await?;
                 continue;
             }
             line = log_reader.read_line() => line,
@@ -1142,7 +1142,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
             println!("Giving up");
-            log_reader.kill()?;
+            log_reader.kill().await?;
             break;
         }
 
@@ -1192,7 +1192,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(30);
             println!("Starting stop timer, due in {} seconds", duration.as_secs());
-            tokio::time::delay_for(duration).await;
+            tokio::time::sleep(duration).await;
             println!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
@@ -1439,7 +1439,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     // We give Vector some reasonable time to perform this initial bootstrap,
     // and capture the `processed_events` value afterwards.
     println!("Waiting for Vector bootstrap");
-    tokio::time::delay_for(std::time::Duration::from_secs(30)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
     println!("Done waiting for Vector bootstrap");
 
     // Capture events processed before deploying the test pod.
@@ -1499,7 +1499,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     // Due to how `internal_metrics` are implemented, we have to wait for it's
     // scraping period to pass before we can observe the updates.
     println!("Waiting for `internal_metrics` to update");
-    tokio::time::delay_for(std::time::Duration::from_secs(6)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(6)).await;
     println!("Done waiting for `internal_metrics` to update");
 
     // Capture events processed after the test pod has finished.
@@ -1562,7 +1562,7 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     // collecting them takes some time to boot (15s roughly).
     // We wait twice as much, so the bootstrap is guaranteed.
     println!("Waiting for Vector bootstrap");
-    tokio::time::delay_for(std::time::Duration::from_secs(30)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
     println!("Done waiting for Vector bootstrap");
 
     // Ensure the host metrics are exposed in the Prometheus endpoint.

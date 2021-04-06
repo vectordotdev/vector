@@ -10,8 +10,7 @@ use std::{
         Arc,
     },
 };
-
-use tokio::time::{delay_for, Duration};
+use tokio::time::{sleep, Duration};
 use vector::{config::Config, event::Event, test_util::start_topology, topology};
 
 fn basic_config() -> Config {
@@ -64,7 +63,7 @@ async fn topology_shutdown_while_active() {
     // Wait until at least 100 events have been seen by the source so we know the pump is running
     // and pushing events through the pipeline.
     while source_event_total.load(Ordering::SeqCst) < 100 {
-        delay_for(Duration::from_millis(10)).await;
+        sleep(Duration::from_millis(10)).await;
     }
 
     // Now shut down the RunningTopology while Events are still being processed.
@@ -116,7 +115,7 @@ async fn topology_source_and_sink() {
 async fn topology_multiple_sources() {
     let (mut in1, source1) = source();
     let (mut in2, source2) = source();
-    let (out1, sink1) = sink(10);
+    let (mut out1, sink1) = sink(10);
 
     let mut config = Config::builder();
     config.add_source("in1", source1);
@@ -130,11 +129,11 @@ async fn topology_multiple_sources() {
 
     in1.send(event1.clone()).await.unwrap();
 
-    let (out_event1, out1) = out1.into_future().await;
+    let out_event1 = out1.next().await;
 
     in2.send(event2.clone()).await.unwrap();
 
-    let (out_event2, _out1) = out1.into_future().await;
+    let out_event2 = out1.next().await;
 
     topology.stop().await;
 
@@ -452,7 +451,7 @@ async fn topology_swap_transform_is_atomic() {
     config.add_sink("out1", &["t1"], sink1);
 
     let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
-    delay_for(Duration::from_millis(10)).await;
+    sleep(Duration::from_millis(10)).await;
 
     let transform1v2 = transform(" replaced", 0.0);
 
@@ -465,7 +464,7 @@ async fn topology_swap_transform_is_atomic() {
         .reload_config_and_respawn(config.build().unwrap())
         .await
         .unwrap());
-    delay_for(Duration::from_millis(10)).await;
+    sleep(Duration::from_millis(10)).await;
 
     run_control.store(false, Ordering::Release);
     h_in.await.unwrap();
