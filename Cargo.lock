@@ -8030,7 +8030,7 @@ dependencies = [
 
 [[package]]
 name = "vector-api-client"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -8038,6 +8038,7 @@ dependencies = [
  "chrono",
  "futures 0.3.13",
  "graphql_client",
+ "indoc",
  "reqwest",
  "serde",
  "serde_json",

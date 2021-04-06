@@ -19,6 +19,8 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 #[cfg(feature = "sources-host_metrics")]
 use crate::sources::host_metrics;
 #[cfg(feature = "api-client")]
+use crate::tap;
+#[cfg(feature = "api-client")]
 use crate::top;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
@@ -116,6 +118,8 @@ impl Application {
                         SubCommand::Generate(g) => generate::cmd(&g),
                         #[cfg(feature = "api-client")]
                         SubCommand::Top(t) => top::cmd(&t).await,
+                        #[cfg(feature = "api-client")]
+                        SubCommand::Tap(t) => tap::cmd(&t).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
                         #[cfg(feature = "vrl-cli")]
