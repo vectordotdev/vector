@@ -5,14 +5,14 @@ use vector::test_util::{
 };
 use vector::{buffers::BufferConfig, config, sinks, sources};
 
-fn benchmark_buffers(c: &mut Criterion) {
+fn benchmark_buffer(c: &mut Criterion) {
     let num_lines: usize = 10_000;
     let line_size: usize = 100;
 
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let mut group = c.benchmark_group("buffers");
+    let mut group = c.benchmark_group("buffer");
     group.throughput(Throughput::Bytes((num_lines * line_size) as u64));
     group.sampling_mode(SamplingMode::Flat);
 
@@ -160,5 +160,5 @@ criterion_group!(
     // encapsulates CI noise we saw in
     // https://github.com/timberio/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
-    targets = benchmark_buffers
+    targets = benchmark_buffer
 );

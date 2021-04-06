@@ -20,7 +20,7 @@ impl fmt::Display for Parameters {
 }
 
 fn benchmark_kind_display(c: &mut Criterion) {
-    let mut group = c.benchmark_group("vrl_compiler::value::kind::display");
+    let mut group = c.benchmark_group("vrl_compiler/value::kind::display");
     for param in &PARAMETERS {
         group.bench_with_input(BenchmarkId::from_parameter(param), &param, |b, &param| {
             b.iter(|| format!("{}", param.basis))
