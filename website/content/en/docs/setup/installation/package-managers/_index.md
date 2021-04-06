@@ -7,7 +7,7 @@ weight: 1
 
 Vector supports a wide variety of package managers across several operating systems and platforms.
 
-## Available package managers 
+## Available package managers
 
 {{< pages >}}
 
