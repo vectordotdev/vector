@@ -1,4 +1,4 @@
 {{ $file := printf "static/img/%s" .src }}
-<div>
+<div class="svg">
   {{ $file | readFile | safeHTML }}
 </div>

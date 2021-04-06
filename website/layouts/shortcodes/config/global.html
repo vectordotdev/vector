@@ -14,7 +14,7 @@
           {{ range $k, $v := $v.type }}{{ $k }}{{ end }}
         </div>
 
-        <div class="config-button{{ if $req }} is-magenta{{ end }}">
+        <div class="config-button{{ if $req }} is-bold{{ end }}">
           {{ if $req }}
           required
           {{ else }}

@@ -1,0 +1,79 @@
+{{ $schema := site.Data.docs.data_model.schema.metric }}
+
+<div class="configs">
+  {{ range $k, $v := $schema.type.object.options }}
+  {{ $req := $v.required }}
+  <div class="config">
+    <h3 class="config-title" id="{{ $k }}">
+      <span class="name">
+        {{ $k }}
+      </span>
+
+      <div class="config-buttons">
+        <div class="config-button">
+          {{ range $k, $v := $v.type }}{{ $k }}{{ end }}
+        </div>
+
+        {{ if $v.common }}
+        <div class="config-button">
+          common
+        </div>
+        {{ end }}
+
+        <div class="config-button{{ if $req }} is-bold{{ end }}">
+          {{ if $req }}
+          required
+          {{ else }}
+          optional
+          {{ end }}
+        </div>
+      </div>
+    </h3>
+
+    <p class="config-description">
+      {{ $v.description | markdownify }}
+    </p>
+
+    {{ range $k, $v := $v.type }}
+    {{ with $v.options }}
+    <table class="config-options">
+      <thead>
+        <tr>
+          <th>
+            Name
+          </th>
+          <th>
+            Description
+          </th>
+          <th>
+            Type
+          </th>
+          <th>
+            Required?
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ range $k, $v := . }}
+        <tr>
+          <td>
+            <code>{{ $k }}</code>
+          </td>
+          <td>
+            {{ $v.description | markdownify }}
+          </td>
+          <td>
+            {{ range $k, $v := $v.type }}{{ $k }}{{ end }}
+          </td>
+          <td>
+            {{ $v.required }}
+          </td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+    {{ end }}
+    {{ end }}
+  </div>
+  {{ end }}
+</div>

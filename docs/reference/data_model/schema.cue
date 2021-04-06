@@ -169,7 +169,7 @@ data_model: schema: {
 				histogram: {
 					common: true
 					description: """
-						Also called a "timer". A histogram samples
+						Also called a **timer**. A histogram samples
 						observations (usually things like request
 						durations or response sizes) and counts them
 						in configurable buckets. It also provides a
