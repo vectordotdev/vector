@@ -351,7 +351,7 @@ mod tests {
         let mut outputs = HashMap::new();
         outputs.insert(name.to_string(), control_tx);
 
-        let (_watch_tx, watch_rx) = watch::channel(outputs);
+        let (watch_tx, watch_rx) = watch::channel(HashMap::new());
         let (sink_tx, mut sink_rx) = tokio_mpsc::channel(10);
 
         let _controller = TapController::new(
@@ -359,6 +359,9 @@ mod tests {
             sink_tx,
             &[pattern_matched.to_string(), pattern_not_matched.to_string()],
         );
+
+        // Add the outputs to trigger a change event.
+        watch_tx.send(outputs).unwrap();
 
         // First two events should contain a notification that one pattern matched, and
         // one that didn't.
