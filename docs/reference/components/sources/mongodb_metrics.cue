@@ -94,7 +94,7 @@ components: sources: mongodb_metrics: {
 	how_it_works: {
 		mod_status: {
 			title: "MongoDB `serverStatus` command"
-			body: """
+			body:  """
 				The [serverStatus](\(urls.mongodb_command_server_status)) command
 				returns a document that provides an overview of the database’s
 				state. The output fields vary depending on the version of
