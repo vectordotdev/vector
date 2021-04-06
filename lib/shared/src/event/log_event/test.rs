@@ -273,7 +273,7 @@ mod corner_cases {
 
     // Prune on deeply nested values is tested in `value.rs`, but we must test root values here.
     #[test_env_log::test]
-    fn pruning() -> crate::Result<()> {
+    fn pruning() {
         let mut event = crate::log_event! {
             LookupBuf::from("foo.bar.baz") => 1,
         }
@@ -294,8 +294,6 @@ mod corner_cases {
             Some(Value::from(1))
         );
         assert!(!event.contains(Lookup::from("foo")));
-
-        Ok(())
     }
 
     // While authors should prefer to set an array via `event.insert(lookup_to_array, array)`,
@@ -779,7 +777,7 @@ mod remap {
             let path = vrl::Path::new_unchecked(segments);
 
             assert_eq!(
-                vrl::Target::insert(&mut event, &path, value.clone().into()),
+                vrl::Target::insert(&mut event, &path, value.clone()),
                 result,
                 "Result of {:?}::insert({:?},{:?}) was not {:?}.",
                 event,
@@ -788,7 +786,7 @@ mod remap {
                 result
             );
             assert_eq!(event, expect);
-            assert_eq!(vrl::Target::get(&event, &path), Ok(Some(value.into())));
+            assert_eq!(vrl::Target::get(&event, &path), Ok(Some(value)));
         }
     }
 

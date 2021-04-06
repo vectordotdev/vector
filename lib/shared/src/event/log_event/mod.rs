@@ -553,9 +553,9 @@ impl From<BTreeMap<String, Value>> for LogEvent {
     }
 }
 
-impl Into<BTreeMap<String, Value>> for LogEvent {
-    fn into(self) -> BTreeMap<String, Value> {
-        let Self { fields, .. } = self;
+impl From<LogEvent> for BTreeMap<String, Value> {
+    fn from(event: LogEvent) -> Self {
+        let LogEvent { fields, .. } = event;
         fields.try_into().expect("Tried to turn a log event which was not a map into a map. This is an invariant, please report it.")
     }
 }
@@ -569,9 +569,9 @@ impl From<HashMap<String, Value>> for LogEvent {
     }
 }
 
-impl Into<HashMap<String, Value>> for LogEvent {
-    fn into(self) -> HashMap<String, Value> {
-        let map: BTreeMap<_, _> = self.into();
+impl From<LogEvent> for HashMap<String, Value> {
+    fn from(event: LogEvent) -> Self {
+        let map: BTreeMap<_, _> = event.into();
         map.into_iter().collect()
     }
 }
