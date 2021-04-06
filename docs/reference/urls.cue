@@ -173,6 +173,8 @@ urls: {
 	gcp_stackdriver:                                          "https://cloud.google.com/products/operations"
 	gcp_stackdriver_logging:                                  "https://cloud.google.com/logging/docs/reference/v2/rest/"
 	gcp_stackdriver_logging_rest:                             "https://cloud.google.com/logging/"
+	gcp_stackdriver_metrics:                                  "https://cloud.google.com/monitoring/api/ref_v3/rest/"
+	gcp_stackdriver_metrics_rest:                             "https://monitoring.googleapis.com/"
 	gcp_stackdriver_severity:                                 "https://cloud.google.com/logging/docs/reference/v2/rest/v2/LogEntry#logseverity"
 	gcp_xml_interface:                                        "https://cloud.google.com/storage/docs/xml-api/overview"
 	gcs_predefined_acl:                                       "https://cloud.google.com/storage/docs/access-control/lists#predefined-acl"
