@@ -165,7 +165,7 @@ vrl = { path = "lib/vrl/core" }
 vrl-stdlib = { path = "lib/vrl/stdlib" }
 
 # External libs
-anyhow = "1.0.37"
+anyhow = "1.0.40"
 async-compression = { version = "0.3.7", features = ["tokio", "gzip", "zstd"] }
 avro-rs = { version = "0.13.0", optional = true }
 base64 = { version = "0.13.0", optional = true }
