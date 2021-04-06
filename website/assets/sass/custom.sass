@@ -1,12 +1,18 @@
 $sticky-top-margin: 2rem
 $sticky-top: $navbar-height + $sticky-top-margin
 
+/// AlpineJS helpers
+// Hides an element if x-cloak is set
+[x-cloak]
+  display: none !important
+
+// Make a row horizontally spaced
 =x-spaced
   display: flex
   flex-direction: row
   justify-content: space-between
 
-// Ensure a sticky footer at the bottom
+// Ensure a sticky footer at the bottom of each page
 .page
   display: flex
   flex-direction: column
@@ -15,6 +21,12 @@ $sticky-top: $navbar-height + $sticky-top-margin
   .main
     flex: 1
 
+.is-sticky
+  position: sticky
+  position: -webkit-sticky
+  top: $sticky-top
+
+// Some small tweaks to the footer aesthetic
 .footer
   a, .icon
     color: $primary
@@ -22,19 +34,14 @@ $sticky-top: $navbar-height + $sticky-top-margin
     &:hover
       color: $vector-magenta
 
-  .social-buttons
-    a + a
-      margin-left: 0.5rem
-
-.has-left-margin
-  margin-left: 1rem
-
+// hr elements used on the main page for flair
 hr.narrow
   width: 3em
   height: 2.5px
   background-color: $primary
   margin: 0 0 2rem 0
 
+// SVGs on the main page in the "A complete, end-to-end platform" section
 .svg-container
   margin: 0 auto
 
@@ -43,6 +50,8 @@ hr.narrow
     width: 90%
     height: auto
 
+  // This SVG has different dimensions from the others and needs to be treated
+  // a bit differently
   &.distributed
     width: 60%
     height: auto
@@ -50,24 +59,14 @@ hr.narrow
     +mobile
       width: 70%
 
-.menu-label.is-active
-  font-weight: 700
-  color: $vector-magenta
-
+// Used for the external link icon in superscript
 sup.ml-tiny
   margin-left: 0.1rem
 
+// Basic hover effect for cards
 .card.is-hoverable
   &:hover
     background-color: $white-bis
-
-.is-sticky
-  position: sticky
-  position: -webkit-sticky
-  top: $sticky-top
-
-.dashboard
-  margin-top: $sticky-top-margin
 
 .is-horizontally-spaced
   display: flex
@@ -191,9 +190,6 @@ sup.ml-tiny
       transition: all 0.25s ease-in-out
       padding-left: 0.75rem
       font-size: 1.25rem
-
-[x-cloak]
-  display: none !important
 
 .rotate-90
   transform: rotate(90deg)

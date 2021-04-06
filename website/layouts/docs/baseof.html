@@ -11,18 +11,18 @@
     {{ partial "navbar.html" . }}
 
     <main class="main">
-      <div class="dashboard">
+      <div class="dashboard mt-5">
         <div class="container">
           <div class="columns">
             <div class="column is-one-fifth is-hidden-mobile">
               {{ partial "docs/sidebar.html" (dict "ctx" .) }}
             </div>
-      
+
             <div class="column">
               {{ partial "docs/hero.html" (dict "title" .Title "description" .Params.description) }}
               {{ partial "docs/content.html" . }}
             </div>
-      
+
             <div class="column is-one-fifth is-hidden-mobile">
               {{ block "toc". }}
               {{ partial "docs/toc.html" . }}
@@ -34,6 +34,7 @@
     </main>
 
     {{ block "below" . }}
+    {{ partial "docs/pagination.html" . }}
     {{ partial "footer.html" . }}
     {{ end }}
 
