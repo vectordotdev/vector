@@ -5,6 +5,6 @@
 {{- if $url.Path -}}
 {{- $fragment := "" -}}
 {{- with $url.Fragment }}{{ $fragment = printf "#%s" . }}{{ end -}}
-{{- if .Page.GetPage $url.Path }}{{ $link = printf "%s%s" (.Page.GetPage $url.Path).RelPermalink $fragment }}{{ end }}{{ end -}}
+{{- if .Page.GetPage $url.Path }}{{- $link = printf "%s%s" (.Page.GetPage $url.Path).RelPermalink $fragment -}}{{- end -}}{{- end -}}
 {{- end -}}
-<a href="{{ $link | safeURL }}"{{ with .Title }} title="{{ . }}"{{ end }}{{ if $isRemote }} target="_blank"{{ end }}>{{- .Text | safeHTML -}}{{ if $isRemote }}<sup class="ml-tiny"><i class="fas fa-xs fa-external-link-alt"></i></sup>{{ end }}</a>
+<a href="{{ $link | safeURL }}"{{ with .Title }} title="{{ . }}"{{ end }}{{ if $isRemote }} target="_blank"{{- end -}}>{{- .Text | safeHTML -}}{{- if $isRemote -}}<sup class="ml-tiny"><i class="fas fa-xs fa-external-link-alt"></i></sup>{{- end -}}</a>

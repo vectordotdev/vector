@@ -1,12 +1,20 @@
 ---
 title: The Vector documentation
-description: Probably more than you actually want to know about Vector
+description: Your gateway to the world of Vector
 short: Docs home
 icon: fas fa-home
 ---
 
-The Vector docs.
+Welcome to the documentation for **Vector**! Vector is a lightweight and ultra-fast tool for building observability pipelines.
 
-## Heading 2
+If you'd like to familiarize yourself with Vector's core concepts, we recommend reading up on Vector's core concepts:
 
-Here is a heading.
+{{< jump "/docs/about/concepts" >}}
+
+If you feel comfortable with the concepts, we recommend our quickstart guide, which takes you through a practical example:
+
+{{< jump "/docs/setup/quickstart" >}}
+
+## Sections
+
+{{< sections >}}
