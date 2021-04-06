@@ -1,17 +1,3 @@
-$sticky-top-margin: 2rem
-$sticky-top: $navbar-height + $sticky-top-margin
-
-/// AlpineJS helpers
-// Hides an element if x-cloak is set
-[x-cloak]
-  display: none !important
-
-// Make a row horizontally spaced
-=x-spaced
-  display: flex
-  flex-direction: row
-  justify-content: space-between
-
 // Ensure a sticky footer at the bottom of each page
 .page
   display: flex
@@ -20,11 +6,6 @@ $sticky-top: $navbar-height + $sticky-top-margin
 
   .main
     flex: 1
-
-.is-sticky
-  position: sticky
-  position: -webkit-sticky
-  top: $sticky-top
 
 // Some small tweaks to the footer aesthetic
 .footer

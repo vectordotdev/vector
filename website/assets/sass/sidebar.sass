@@ -3,20 +3,13 @@
 $section-title-color: $dark
 $active-link-color: $primary
 $link-hover-color: $secondary
-$indent: 0.75rem
+$link-line-height: 130%
+$indent: 0.8rem
 $margin-sm: 0.3rem
 $margin-md: 0.5rem
 $margin-lg: 1rem
 $margin-xl: 1.5rem
-$subsection-padding: 0.25rem
-
-=x
-  border: 1px solid red
-
-=spread-out
-  display: flex
-  flex-direction: row
-  justify-content: space-between
+$subsection-left-border: 2px solid $grey-lighter
 
 =indent
   padding-left: $indent
@@ -33,10 +26,14 @@ $subsection-padding: 0.25rem
 =topped-xl
   margin-top: $margin-xl
 
-=bold
+=title
   font-weight: 600
   text-transform: uppercase
   letter-spacing: 0.02rem
+
+=active
+  font-weight: $weight-bold
+  color: $active-link-color
 
 .sidebar
   margin: 0
@@ -45,11 +42,10 @@ $subsection-padding: 0.25rem
   a
     color: $grey
     display: block
-    line-height: 1.3rem
+    line-height: $link-line-height
 
     &.is-active
-      font-weight: $weight-bold
-      color: $active-link-color
+      +active
 
     &:hover
       color: $link-hover-color
@@ -62,12 +58,11 @@ $subsection-padding: 0.25rem
       margin-bottom: $margin-xl
 
     .sidebar-section-title
-      +bold
+      +title
       color: $section-title-color
 
       &.is-active
-        font-weight: $weight-bold
-        color: $active-link-color
+        +active
 
       &:hover
         color: $secondary
@@ -87,12 +82,11 @@ $subsection-padding: 0.25rem
 
       .sidebar-subsection-accordion
         .sidebar-subsection-title
-          +spread-out
+          +x-spaced
 
         .sidebar-subsection-group
           +topped-md
-          //padding-top: $subsection-padding
-          border-left: 2px solid $grey-lighter
+          border-left: $subsection-left-border
 
           .sidebar-subsection-group-link
             +indent
@@ -112,7 +106,7 @@ $subsection-padding: 0.25rem
                 +topped-sm
 
             .sidebar-subsection-subgroup-title
-              +spread-out
+              +x-spaced
 
             & + .sidebar-subsection-group-link
               +topped-sm

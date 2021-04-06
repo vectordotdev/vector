@@ -1,7 +1,8 @@
 {{ $sections := where site.Sections "Section" "docs" }}
 {{ $page := .ctx }}
 <section class="section is-sticky">
-  <aside class="sidebar pb-6" x-cloak>
+  <!-- x-cloak hides the sidebar until it's loaded, which provides a smoother UX -->
+  <aside class="sidebar" x-cloak>
     {{ range $sections }}
     {{ $isHere := eq $page.RelPermalink .RelPermalink }}
     {{ $title := .Params.short | default .Title }}
