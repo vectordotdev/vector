@@ -26,6 +26,12 @@ Here's an example representation of a log event (as JSON):
 
 ## How it works
 
-TODO
+### Schemas
+
+{{< snippet "how-it-works/schemas" >}}
+
+### Types
+
+{{% snippet "how-it-works/types" %}}
 
 [components]: /components
