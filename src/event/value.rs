@@ -2,13 +2,13 @@ use crate::{event::timestamp_to_string, Result};
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::iter::FromIterator;
 use toml::value::Value as TomlValue;
 
-#[derive(PartialEq, Debug, Clone, is_enum_variant)]
+#[derive(PartialEq, Debug, Clone, Deserialize, is_enum_variant)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
