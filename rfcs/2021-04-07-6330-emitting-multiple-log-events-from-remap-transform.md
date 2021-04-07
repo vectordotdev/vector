@@ -5,9 +5,11 @@ This RFC describes an apporach for emitting multiple log events from a remap tra
 ## Scope
 
 In:
+
 - Emitting multiple log events from a remap transform
 
 Out:
+
 - Emitting multiple metrics from a remap transform
 
 ## Motivation
@@ -24,7 +26,7 @@ This is roughly the same as https://github.com/timberio/vector/issues/6330#issue
 
 A new `emit_log` function will be added to the VRL stdlib:
 
-```
+```text
 emit_log(value: Object)
 ```
 
@@ -34,7 +36,7 @@ Additionally, an `emit_root` (we can work on the naming) config option will be a
 
 In the future we can also add functions for emitting metrics like:
 
-```
+```text
 emit_counter(namespace: String, name: String, timestamp: Timestamp, value: Float, kind: "absolute"|"relative")
 ```
 
@@ -44,7 +46,7 @@ I considered having just an `emit_metric()` but it would require users to pass i
 
 The `remap` tranform would gain an extra configuration option:
 
-```
+```text
 emit_root = true/false # default false
 ```
 
@@ -88,9 +90,9 @@ Have a separate, special purpose, transform for converting a single log event in
 
 This would work, but I think the downsides are:
 
-* Introduces a new transform rather than just leveraging an existing one, remap. There is some precedence for this with the `route` and `reduce` transforms though.
-* It is less flexible than letting users emit arbitrary events
-* There isn't a clear path to emitting, say, multiple metrics from an input log event
+- Introduces a new transform rather than just leveraging an existing one, remap. There is some precedence for this with the `route` and `reduce` transforms though.
+- It is less flexible than letting users emit arbitrary events
+- There isn't a clear path to emitting, say, multiple metrics from an input log event
 
 ## Plan Of Attack
 
