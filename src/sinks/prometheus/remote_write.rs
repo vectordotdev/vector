@@ -511,7 +511,10 @@ mod integration_tests {
             for (tag, value) in metric.tags().unwrap() {
                 assert_eq!(output[&tag[..]], Value::String(value.to_string()));
             }
-            let timestamp = format_timestamp(metric.data.timestamp.unwrap());
+            let timestamp = format_timestamp(
+                metric.data.timestamp.unwrap(),
+                chrono::SecondsFormat::Millis,
+            );
             assert_eq!(output["time"], Value::String(timestamp));
         }
 

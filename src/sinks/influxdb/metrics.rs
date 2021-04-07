@@ -843,7 +843,7 @@ mod integration_tests {
         tls::{self, TlsOptions},
         Event,
     };
-    use chrono::Utc;
+    use chrono::{SecondsFormat, Utc};
     use futures::stream;
     use pretty_assertions::assert_eq;
 
@@ -925,7 +925,7 @@ mod integration_tests {
                 MetricValue::Counter { value } => value,
                 _ => unreachable!(),
             };
-            let timestamp = format_timestamp(metric.data.timestamp.unwrap());
+            let timestamp = format_timestamp(metric.data.timestamp.unwrap(), SecondsFormat::Nanos);
             let res =
                 query_v1_json(url, &format!("select * from {}..\"{}\"", database, name)).await;
 

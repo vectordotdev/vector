@@ -462,8 +462,8 @@ pub mod test_util {
         );
     }
 
-    pub(crate) fn format_timestamp(timestamp: DateTime<Utc>) -> String {
-        strip_timestamp(timestamp.to_rfc3339_opts(SecondsFormat::Nanos, true))
+    pub(crate) fn format_timestamp(timestamp: DateTime<Utc>, format: SecondsFormat) -> String {
+        strip_timestamp(timestamp.to_rfc3339_opts(format, true))
     }
 
     // InfluxDB strips off trailing zeros in timestamps in metrics
