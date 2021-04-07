@@ -124,7 +124,7 @@ impl Function for EncodeLogfmt {
             },
             Example {
                 title: "encode object with fields ordering",
-                source: r#"encode_logfmt!({"msg": "This is a message", "lod_id": 12345, "lvl": "info"}, ["lvl", "msg"])"#,
+                source: r#"encode_logfmt!({"msg": "This is a message", "lvl": "info", "log_id": 12345}, ["lvl", "msg"])"#,
                 result: Ok(r#"s'lvl=info msg="This is a message" log_id=12345'"#),
             },
         ]

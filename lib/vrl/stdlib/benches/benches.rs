@@ -197,24 +197,25 @@ bench_function! {
 bench_function! {
     encode_logfmt => vrl_stdlib::EncodeLogfmt;
 
-    map {
-        args: func_args![value: value!(
-                  vec![
-                      value!(vec![value!("lvl"), value!("info")]),
-                      value!(vec![value!("msg"), value!("This is a log message")]),
-                  ]
-              )],
-        want: Ok(r#"lvl=info msg="This is a log message""#),
+    string_with_characters_to_escape {
+        args: func_args![value:
+            btreemap! {
+                "lvl" => "info",
+                "msg" => r#"payload: {"code": 200}\n"#
+            }],
+        want: Ok(r#"lvl=info msg="payload: {\"code\": 200}\\n""#),
     }
 
-    array {
-        args: func_args![value: value!(
-                  vec![
-                      value!(vec![value!("lvl"), value!("info")]),
-                      value!(vec![value!("log_id"), value!(12345)]),
-                  ]
-              )],
-        want: Ok("lvl=info log_id=12345"),
+    fields_ordering {
+        args: func_args![value:
+            btreemap! {
+                "lvl" => "info",
+                "msg" => "This is a log message",
+                "log_id" => 12345,
+            },
+            fields_ordering: value!(["lvl", "msg"])
+        ],
+        want: Ok(r#"lvl=info msg="This is a log message" log_id=12345"#),
     }
 }
 
