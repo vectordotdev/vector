@@ -21,7 +21,7 @@ default-features = false
 features = []
 
 [dependencies.bytes]
-version = "0.5"
+version = "1.0.0"
 default-features = false
 features = []
 
@@ -66,9 +66,9 @@ default-features = false
 features = []
 
 [dependencies.tokio]
-version = "0.2"
+version = "1.3.0"
 default-features = false
-features = ["rt-core", "blocking", "time"]
+features = ["full"]
 
 [dev-dependencies]
 criterion = "0.3"

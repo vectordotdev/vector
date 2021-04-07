@@ -2,8 +2,8 @@ use crate::{
     config::{self, GlobalOptions, SourceConfig, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
-        MongoDBMetricsBsonParseError, MongoDBMetricsCollectCompleted, MongoDBMetricsEventsReceived,
-        MongoDBMetricsRequestError,
+        MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted, MongoDbMetricsEventsReceived,
+        MongoDbMetricsRequestError,
     },
     shutdown::ShutdownSignal,
     Event, Pipeline,
@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{collections::BTreeMap, time::Instant};
 use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
 
 mod types;
 use types::{CommandBuildInfo, CommandIsMaster, CommandServerStatus, NodeType};
@@ -72,7 +73,7 @@ enum CollectError {
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
-struct MongoDBMetricsConfig {
+struct MongoDbMetricsConfig {
     endpoints: Vec<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
@@ -81,7 +82,7 @@ struct MongoDBMetricsConfig {
 }
 
 #[derive(Debug)]
-struct MongoDBMetrics {
+struct MongoDbMetrics {
     client: Client,
     endpoint: String,
     namespace: Option<String>,
@@ -97,14 +98,14 @@ pub fn default_namespace() -> String {
 }
 
 inventory::submit! {
-    SourceDescription::new::<MongoDBMetricsConfig>("mongodb_metrics")
+    SourceDescription::new::<MongoDbMetricsConfig>("mongodb_metrics")
 }
 
-impl_generate_config_from_default!(MongoDBMetricsConfig);
+impl_generate_config_from_default!(MongoDbMetricsConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "mongodb_metrics")]
-impl SourceConfig for MongoDBMetricsConfig {
+impl SourceConfig for MongoDbMetricsConfig {
     async fn build(
         &self,
         _name: &str,
@@ -117,7 +118,7 @@ impl SourceConfig for MongoDBMetricsConfig {
         let sources = try_join_all(
             self.endpoints
                 .iter()
-                .map(|endpoint| MongoDBMetrics::new(endpoint, namespace.clone())),
+                .map(|endpoint| MongoDbMetrics::new(endpoint, namespace.clone())),
         )
         .await?;
 
@@ -126,11 +127,11 @@ impl SourceConfig for MongoDBMetricsConfig {
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         Ok(Box::pin(async move {
-            let mut interval = time::interval(duration).take_until(shutdown);
+            let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|mongodb| mongodb.collect())).await;
-                emit!(MongoDBMetricsCollectCompleted {
+                emit!(MongoDbMetricsCollectCompleted {
                     start,
                     end: Instant::now()
                 });
@@ -156,10 +157,10 @@ impl SourceConfig for MongoDBMetricsConfig {
     }
 }
 
-impl MongoDBMetrics {
+impl MongoDbMetrics {
     /// Works only with Standalone connection-string. Collect metrics only from specified instance.
     /// https://docs.mongodb.com/manual/reference/connection-string/#standard-connection-string-format
-    async fn new(endpoint: &str, namespace: Option<String>) -> Result<MongoDBMetrics, BuildError> {
+    async fn new(endpoint: &str, namespace: Option<String>) -> Result<MongoDbMetrics, BuildError> {
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
 
         let mut client_options = ClientOptions::parse(endpoint)
@@ -241,11 +242,11 @@ impl MongoDBMetrics {
             Ok(metrics) => (1.0, metrics),
             Err(error) => {
                 match error {
-                    CollectError::Mongo(error) => emit!(MongoDBMetricsRequestError {
+                    CollectError::Mongo(error) => emit!(MongoDbMetricsRequestError {
                         error,
                         endpoint: &self.endpoint,
                     }),
-                    CollectError::Bson(error) => emit!(MongoDBMetricsBsonParseError {
+                    CollectError::Bson(error) => emit!(MongoDbMetricsBsonParseError {
                         error,
                         endpoint: &self.endpoint,
                     }),
@@ -257,7 +258,7 @@ impl MongoDBMetrics {
 
         metrics.push(self.create_metric("up", gauge!(up_value), tags!(self.tags)));
 
-        emit!(MongoDBMetricsEventsReceived {
+        emit!(MongoDbMetricsEventsReceived {
             count: metrics.len(),
             uri: &self.endpoint,
         });
@@ -1024,7 +1025,7 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<MongoDBMetricsConfig>();
+        crate::test_util::test_generate_config::<MongoDbMetricsConfig>();
     }
 
     #[tokio::test]
@@ -1050,7 +1051,7 @@ mod integration_tests {
         let (sender, mut recv) = Pipeline::new_test();
 
         tokio::spawn(async move {
-            MongoDBMetricsConfig {
+            MongoDbMetricsConfig {
                 endpoints: vec![endpoint.to_owned()],
                 scrape_interval_secs: 15,
                 namespace: namespace.to_owned(),

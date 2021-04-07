@@ -1,12 +1,12 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
-use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
+use shared::EventDataEq;
 use std::collections::{BTreeMap, HashMap};
 
 pub mod discriminant;
-pub mod merge;
 pub mod merge_state;
+pub mod metadata;
 pub mod metric;
 pub mod util;
 
@@ -16,6 +16,7 @@ mod value;
 
 pub use log_event::LogEvent;
 pub use lookup::Lookup;
+pub use metadata::EventMetadata;
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use std::convert::{TryFrom, TryInto};
 pub(crate) use util::log::PathComponent;
@@ -78,6 +79,23 @@ impl Event {
         match self {
             Event::Metric(metric) => metric,
             _ => panic!("Failed type coercion, {:?} is not a metric", self),
+        }
+    }
+
+    pub fn metadata(&self) -> &EventMetadata {
+        match self {
+            Self::Log(log) => log.metadata(),
+            Self::Metric(metric) => metric.metadata(),
+        }
+    }
+}
+
+impl EventDataEq for Event {
+    fn event_data_eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Log(a), Self::Log(b)) => a.event_data_eq(b),
+            (Self::Metric(a), Self::Metric(b)) => a.event_data_eq(b),
+            _ => false,
         }
     }
 }
@@ -303,24 +321,24 @@ impl From<Event> for proto::EventWrapper {
 
                 proto::EventWrapper { event: Some(event) }
             }
-            Event::Metric(Metric { series, data }) => {
-                let name = series.name.name;
-                let namespace = series.name.namespace.unwrap_or_default();
+            Event::Metric(metric) => {
+                let name = metric.series.name.name;
+                let namespace = metric.series.name.namespace.unwrap_or_default();
 
-                let timestamp = data.timestamp.map(|ts| prost_types::Timestamp {
+                let timestamp = metric.data.timestamp.map(|ts| prost_types::Timestamp {
                     seconds: ts.timestamp(),
                     nanos: ts.timestamp_subsec_nanos() as i32,
                 });
 
-                let tags = series.tags.unwrap_or_default();
+                let tags = metric.series.tags.unwrap_or_default();
 
-                let kind = match data.kind {
+                let kind = match metric.data.kind {
                     MetricKind::Incremental => proto::metric::Kind::Incremental,
                     MetricKind::Absolute => proto::metric::Kind::Absolute,
                 }
                 .into();
 
-                let metric = match data.value {
+                let metric = match metric.data.value {
                     MetricValue::Counter { value } => {
                         MetricProto::Counter(proto::Counter { value })
                     }
@@ -438,28 +456,19 @@ impl From<proto::SummaryQuantile> for metric::Quantile {
 
 impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
-        let mut event = Event::Log(LogEvent::from(BTreeMap::new()));
-
-        event
-            .as_mut_log()
-            .insert(log_schema().message_key(), message);
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key(), Utc::now());
-
-        event
+        Event::Log(LogEvent::from(message))
     }
 }
 
 impl From<&str> for Event {
     fn from(line: &str) -> Self {
-        line.to_owned().into()
+        LogEvent::from(line).into()
     }
 }
 
 impl From<String> for Event {
     fn from(line: String) -> Self {
-        Bytes::from(line).into()
+        LogEvent::from(line).into()
     }
 }
 
@@ -478,6 +487,7 @@ impl From<Metric> for Event {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::config::log_schema;
     use regex::Regex;
     use std::collections::HashSet;
 

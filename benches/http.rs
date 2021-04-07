@@ -58,7 +58,7 @@ fn benchmark_http(c: &mut Criterion) {
                             },
                         );
 
-                        let mut rt = runtime();
+                        let rt = runtime();
                         let topology = rt.block_on(async move {
                             let (topology, _crash) =
                                 start_topology(config.build().unwrap(), false).await;
@@ -67,7 +67,7 @@ fn benchmark_http(c: &mut Criterion) {
                         });
                         (rt, topology)
                     },
-                    |(mut rt, topology)| {
+                    |(rt, topology)| {
                         rt.block_on(async move {
                             let lines = random_lines(line_size).take(num_lines);
                             send_lines(in_addr, lines).await.unwrap();
@@ -94,7 +94,7 @@ fn serve(addr: SocketAddr) -> Runtime {
 
         Server::bind(&addr)
             .serve(make_service)
-            .map_err(|e| panic!(e))
+            .map_err(|e| panic!("{}", e))
             .await
     });
     rt

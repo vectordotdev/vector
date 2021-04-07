@@ -88,7 +88,7 @@ pub async fn wait_for_vector_started(
                 .saturating_duration_since(std::time::Instant::now())
                 .as_secs_f64(),
         );
-        tokio::time::delay_for(next_attempt_delay).await;
+        tokio::time::sleep(next_attempt_delay).await;
     }
     Ok(())
 }

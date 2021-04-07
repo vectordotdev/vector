@@ -36,7 +36,7 @@ fn lookup_to_string(c: &mut Criterion) {
             _ => panic!("This test should never read Err'ing test fixtures."),
         });
 
-    let mut group_from_elem = c.benchmark_group("from_string");
+    let mut group_from_elem = c.benchmark_group("lookup/from_string");
     for (_path, fixture) in fixtures.iter() {
         group_from_elem.throughput(Throughput::Bytes(fixture.clone().into_bytes().len() as u64));
         group_from_elem.bench_with_input(
@@ -54,9 +54,7 @@ fn lookup_to_string(c: &mut Criterion) {
     }
     group_from_elem.finish();
 
-    let mut group_to_string = c.benchmark_group("to_string");
-    // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
+    let mut group_to_string = c.benchmark_group("lookup/to_string");
     for (_path, fixture) in fixtures.iter() {
         group_to_string.throughput(Throughput::Bytes(fixture.clone().into_bytes().len() as u64));
         group_to_string.bench_with_input(
@@ -74,7 +72,7 @@ fn lookup_to_string(c: &mut Criterion) {
     }
     group_to_string.finish();
 
-    let mut group_serialize = c.benchmark_group("serialize");
+    let mut group_serialize = c.benchmark_group("lookup/serialize");
     for (_path, fixture) in fixtures.iter() {
         group_serialize.throughput(Throughput::Bytes(fixture.clone().into_bytes().len() as u64));
         group_serialize.bench_with_input(
@@ -92,9 +90,7 @@ fn lookup_to_string(c: &mut Criterion) {
     }
     group_serialize.finish();
 
-    let mut group_deserialize = c.benchmark_group("deserialize");
-    // encapsulates CI noise we saw in
-    // https://github.com/timberio/vector/issues/5394
+    let mut group_deserialize = c.benchmark_group("lookup/deserialize");
     for (_path, fixture) in fixtures.iter() {
         group_deserialize.throughput(Throughput::Bytes(fixture.clone().into_bytes().len() as u64));
         group_deserialize.bench_with_input(

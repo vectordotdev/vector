@@ -2,7 +2,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::AwsKinesisStreamsEventSent,
-    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
+    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
@@ -52,7 +52,7 @@ pub struct KinesisSinkConfig {
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
-    pub auth: AWSAuthentication,
+    pub auth: AwsAuthentication,
 }
 
 lazy_static! {
@@ -398,7 +398,7 @@ mod integration_tests {
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn kinesis_put_records() {
@@ -438,7 +438,7 @@ mod integration_tests {
 
         let _ = sink.send_all(&mut events).await.unwrap();
 
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let timestamp = timestamp as f64 / 1000.0;
         let records = fetch_records(stream, timestamp, region).await.unwrap();
@@ -509,7 +509,7 @@ mod integration_tests {
         //
         // I initially tried using `wait_for` with `DescribeStream` but localstack would
         // successfully return the stream before it was able to accept PutRecords requests
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
     }
 
     fn gen_stream() -> String {

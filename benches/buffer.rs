@@ -5,14 +5,14 @@ use vector::test_util::{
 };
 use vector::{buffers::BufferConfig, config, sinks, sources};
 
-fn benchmark_buffers(c: &mut Criterion) {
+fn benchmark_buffer(c: &mut Criterion) {
     let num_lines: usize = 10_000;
     let line_size: usize = 100;
 
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let mut group = c.benchmark_group("buffers");
+    let mut group = c.benchmark_group("buffer");
     group.throughput(Throughput::Bytes((num_lines * line_size) as u64));
     group.sampling_mode(SamplingMode::Flat);
 
@@ -34,7 +34,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     when_full: Default::default(),
                 };
 
-                let mut rt = runtime();
+                let rt = runtime();
                 let (output_lines, topology) = rt.block_on(async move {
                     let output_lines = CountReceiver::receive_lines(out_addr);
                     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
@@ -44,7 +44,7 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                 (rt, topology, output_lines)
             },
-            |(mut rt, topology, output_lines)| {
+            |(rt, topology, output_lines)| {
                 rt.block_on(async move {
                     let lines = random_lines(line_size).take(num_lines);
                     send_lines(in_addr, lines).await.unwrap();
@@ -82,7 +82,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     when_full: Default::default(),
                 };
                 config.global.data_dir = Some(data_dir.path().to_path_buf());
-                let mut rt = runtime();
+                let rt = runtime();
                 let (output_lines, topology) = rt.block_on(async move {
                     let output_lines = CountReceiver::receive_lines(out_addr);
                     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
@@ -91,7 +91,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                 });
                 (rt, topology, output_lines)
             },
-            |(mut rt, topology, output_lines)| {
+            |(rt, topology, output_lines)| {
                 rt.block_on(async move {
                     let lines = random_lines(line_size).take(num_lines);
                     send_lines(in_addr, lines).await.unwrap();
@@ -130,7 +130,7 @@ fn benchmark_buffers(c: &mut Criterion) {
     //when_full: Default::default(),
     //};
     //config.global.data_dir = Some(data_dir.path().to_path_buf());
-    //let mut rt = runtime();
+    //let rt = runtime();
     //let (output_lines, topology) = rt.block_on(async move {
     //let output_lines = CountReceiver::receive_lines(out_addr);
     //let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
@@ -139,7 +139,7 @@ fn benchmark_buffers(c: &mut Criterion) {
     //});
     //(rt, topology, output_lines)
     //},
-    //|(mut rt, topology, output_lines)| {
+    //|(rt, topology, output_lines)| {
     //rt.block_on(async move {
     //let lines = random_lines(line_size).take(num_lines);
     //send_lines(in_addr, lines).await.unwrap();
@@ -160,5 +160,5 @@ criterion_group!(
     // encapsulates CI noise we saw in
     // https://github.com/timberio/vector/issues/5394
     config = Criterion::default().noise_threshold(0.05);
-    targets = benchmark_buffers
+    targets = benchmark_buffer
 );

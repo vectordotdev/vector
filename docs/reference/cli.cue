@@ -114,6 +114,7 @@ cli: {
 				auto:   "Detect ANSI terminal formatting and enable if supported."
 				never:  "Disable ANSI terminal formatting."
 			}
+			env_var: "VECTOR_COLOR"
 		}
 		"config": {
 			_short: "c"
@@ -171,6 +172,7 @@ cli: {
 				json: "Output Vector's logs as JSON."
 				text: "Output Vector's logs as text."
 			}
+			env_var: "VECTOR_LOG_FORMAT"
 		}
 	}
 

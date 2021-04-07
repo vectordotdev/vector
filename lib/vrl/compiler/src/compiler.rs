@@ -13,6 +13,7 @@ pub struct Compiler<'a> {
     state: &'a mut State,
     errors: Errors,
     fallible: bool,
+    abortable: bool,
 }
 
 impl<'a> Compiler<'a> {
@@ -22,6 +23,7 @@ impl<'a> Compiler<'a> {
             state,
             errors: vec![],
             fallible: false,
+            abortable: false,
         }
     }
 
@@ -39,6 +41,7 @@ impl<'a> Compiler<'a> {
         Ok(Program {
             expressions,
             fallible: self.fallible,
+            abortable: self.abortable,
         })
     }
 
@@ -93,6 +96,7 @@ impl<'a> Compiler<'a> {
             FunctionCall(node) => self.compile_function_call(node).into(),
             Variable(node) => self.compile_variable(node).into(),
             Unary(node) => self.compile_unary(node).into(),
+            Abort(node) => self.compile_abort(node).into(),
         }
     }
 
@@ -379,6 +383,11 @@ impl<'a> Compiler<'a> {
             self.errors.push(Box::new(err));
             Not::noop()
         })
+    }
+
+    fn compile_abort(&mut self, _: Node<()>) -> Abort {
+        self.abortable = true;
+        Abort
     }
 
     fn handle_parser_error(&mut self, error: parser::Error) {

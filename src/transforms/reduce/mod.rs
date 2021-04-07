@@ -260,7 +260,7 @@ impl TaskTransform for Reduce {
               loop {
                 let mut output = Vec::new();
                 let done = tokio::select! {
-                    _ = flush_stream.next() => {
+                    _ = flush_stream.tick() => {
                       me.flush_into(&mut output);
                       false
                     }

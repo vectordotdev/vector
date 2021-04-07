@@ -10,7 +10,7 @@ use crate::{
     tls::TlsConfig,
     Pipeline,
 };
-use bytes::{buf::BufExt, Bytes};
+use bytes::{Buf, Bytes};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -162,7 +162,7 @@ fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, Erro
         );
 
         if cfg!(test) {
-            panic!(error_msg);
+            panic!("{}", error_msg);
         }
         return Err(header_error_message("Logplex-Msg-Count", &error_msg));
     }
@@ -250,9 +250,9 @@ mod tests {
         Pipeline,
     };
     use chrono::{DateTime, Utc};
+    use futures::channel::mpsc;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {

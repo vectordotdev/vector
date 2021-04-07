@@ -1,11 +1,13 @@
-use super::{repl, Error};
+#[cfg(feature = "repl")]
+use super::repl;
+use super::Error;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{self, Read};
 use std::iter::IntoIterator;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use vrl::{diagnostic::Formatter, state, Runtime, Target, Value};
+use vrl::{diagnostic::Formatter, state, Program, Runtime, Target, Value};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "VRL", about = "Vector Remap Language CLI")]
@@ -52,10 +54,13 @@ fn run(opts: &Opts) -> Result<(), Error> {
         repl(repl_objects)
     } else {
         let objects = read_into_objects(opts.input_file.as_ref())?;
-        let program = read_program(opts.program.as_deref(), opts.program_file.as_ref())?;
+        let source = read_program(opts.program.as_deref(), opts.program_file.as_ref())?;
+        let program = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
+            Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
+        })?;
 
         for mut object in objects {
-            let result = execute(&mut object, program.clone()).map(|v| {
+            let result = execute(&mut object, &program).map(|v| {
                 if opts.print_object {
                     object.to_string()
                 } else {
@@ -82,15 +87,12 @@ fn repl(objects: Vec<Value>) -> Result<(), Error> {
     }
 }
 
-fn execute(object: &mut impl Target, source: String) -> Result<Value, Error> {
+fn execute(object: &mut impl Target, program: &Program) -> Result<Value, Error> {
     let state = state::Runtime::default();
     let mut runtime = Runtime::new(state);
-    let program = vrl::compile(&source, &stdlib::all()).map_err(|diagnostics| {
-        Error::Parse(Formatter::new(&source, diagnostics).colored().to_string())
-    })?;
 
     runtime
-        .resolve(object, &program)
+        .resolve(object, program)
         .map_err(|err| Error::Runtime(err.to_string()))
 }
 

@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use futures::{future::BoxFuture, FutureExt};
 use std::{collections::VecDeque, time::Duration};
-use tokio::time::{delay_until, Instant};
+use tokio::time::{sleep_until, timeout_at, Instant};
 
 /// A [`super::Write`] implementation that wraps another [`super::Write`] and
 /// delays the delete calls.
@@ -15,7 +15,7 @@ where
 {
     inner: T,
     queue: VecDeque<(<T as super::Write>::Item, Instant)>,
-    delay_for: Duration,
+    sleep: Duration,
 }
 
 impl<T> Writer<T>
@@ -24,12 +24,12 @@ where
     <T as super::Write>::Item: Send + Sync,
 {
     /// Take a [`super::Write`] and return it wrapped with [`Writer`].
-    pub fn new(inner: T, delay_for: Duration) -> Self {
+    pub fn new(inner: T, sleep: Duration) -> Self {
         let queue = VecDeque::new();
         Self {
             inner,
             queue,
-            delay_for,
+            sleep,
         }
     }
 }
@@ -41,7 +41,7 @@ where
 {
     /// Schedules the delayed deletion of the item at the future.
     pub fn schedule_delete(&mut self, item: <T as super::Write>::Item) {
-        let deadline = Instant::now() + self.delay_for;
+        let deadline = Instant::now() + self.sleep;
         self.queue.push_back((item, deadline));
     }
 
@@ -92,7 +92,7 @@ where
     }
 
     async fn delete(&mut self, item: Self::Item) {
-        let deadline = Instant::now() + self.delay_for;
+        let deadline = Instant::now() + self.sleep;
         self.queue.push_back((item, deadline));
     }
 
@@ -109,16 +109,17 @@ where
     <T as super::Write>::Item: Send + Sync,
 {
     fn maintenance_request(&mut self) -> Option<BoxFuture<'_, ()>> {
-        let delayed_delete_deadline = self.next_deadline().map(delay_until);
+        let delayed_delete_deadline = self.next_deadline();
         let downstream = self.inner.maintenance_request();
 
         match (downstream, delayed_delete_deadline) {
             (Some(downstream), Some(delayed_delete_deadline)) => {
-                let fut = futures::future::select(downstream, delayed_delete_deadline)
-                    .map(|either| either.factor_first().0);
+                let fut = timeout_at(delayed_delete_deadline, downstream).map(|_| ());
                 Some(Box::pin(fut))
             }
-            (None, Some(delayed_delete_deadline)) => Some(Box::pin(delayed_delete_deadline)),
+            (None, Some(delayed_delete_deadline)) => {
+                Some(Box::pin(sleep_until(delayed_delete_deadline)))
+            }
             (Some(downstream), None) => Some(downstream),
             (None, None) => None,
         }
