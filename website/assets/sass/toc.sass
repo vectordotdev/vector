@@ -2,7 +2,8 @@
 // Our implementation uses the Tocbot JavaScript to build the HTML for the TOC but doesn't use Tocbot's CSS
 // Instead, we use the Sass/CSS here in this file
 
-$toc-indent: 1rem
+$toc-indent-lg: 1rem
+$toc-indent-sm: 0.75rem
 
 #docs-toc
   border-left: 2px solid $grey-lighter
@@ -10,13 +11,14 @@ $toc-indent: 1rem
 
   .toc-list // h2
     margin: 0
-    padding-left: $toc-indent
+    padding-left: $toc-indent-lg
 
     .toc-list // h3
       font-size: 0.9rem
       padding-top: 0.25rem
       padding-bottom: 0.25rem
       color: $grey
+      padding-left: $toc-indent-sm
 
   & > .toc-list
     overflow: hidden

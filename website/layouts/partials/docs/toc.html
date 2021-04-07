@@ -1,5 +1,6 @@
 {{/* A hack to check for the presence of a TOC */}}
 {{ if gt (len .TableOfContents) 32 }}
+{{ $scrollableToc := .Params.scrollable_toc }}
 <section class="section is-sticky">
   <aside>
     <p class="title is-size-4 is-size-5-mobile">
@@ -12,7 +13,7 @@
       </span>
     </p>
 
-    <div id="docs-toc"></div>
+    <div id="docs-toc" class="mb-6"></div>
   </aside>
 </section>
 {{ end }}
