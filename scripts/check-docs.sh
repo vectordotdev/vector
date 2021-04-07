@@ -30,7 +30,7 @@ read-all-docs() {
     echo "Validating cue files formatting..."
 
     STATE_BEFORE="$(read-all-docs)"
-    scripts/cue.sh fmt
+    ${ROOT}/cue.sh fmt
     STATE_AFTER="$(read-all-docs)"
 
     if [[ "$STATE_BEFORE" != "$STATE_AFTER" ]]; then
