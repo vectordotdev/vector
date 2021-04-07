@@ -1,4 +1,4 @@
 ---
 title: Concurrency model
-weight: 3
+weight: 2
 ---
