@@ -1,35 +1,33 @@
+use std::result::Result;
 use vrl::prelude::*;
 
 mod logfmt {
     use std::collections::{BTreeMap, HashSet};
-    use std::fmt::{self, Write};
-    use std::result::Result;
+    use std::fmt::Write;
 
     use vrl::prelude::*;
 
-    fn encode_string(output: &mut String, str: &str) -> fmt::Result {
+    fn encode_string(output: &mut String, str: &str) {
         let needs_quotting = str.find(' ').is_some();
         if needs_quotting {
-            output.write_char('"')?;
+            output.write_char('"').unwrap();
         }
 
         for c in str.chars() {
             let needs_escaping = matches!(c, '\\' | '"');
             if needs_escaping {
-                output.write_char('\\')?;
+                output.write_char('\\').expect("");
             }
 
-            output.write_char(c)?;
+            output.write_char(c).unwrap();
         }
 
         if needs_quotting {
-            output.write_char('"')?;
+            output.write_char('"').unwrap();
         }
-
-        Ok(())
     }
 
-    fn encode_value(output: &mut String, value: &Value) -> fmt::Result {
+    fn encode_value(output: &mut String, value: &Value) {
         match value {
             Value::Bytes(b) => {
                 let val = String::from_utf8_lossy(b);
@@ -42,22 +40,22 @@ mod logfmt {
         }
     }
 
-    fn encode_field(output: &mut String, key: &str, value: &Value) -> fmt::Result {
-        encode_string(output, key)?;
-        output.write_char('=')?;
+    fn encode_field(output: &mut String, key: &str, value: &Value) {
+        encode_string(output, key);
+        output.write_char('=').unwrap();
         encode_value(output, value)
     }
 
-    pub fn encode(input: &BTreeMap<String, Value>, fields: &[String]) -> Result<String, String> {
+    pub fn encode(input: &BTreeMap<String, Value>, fields: &[String]) -> String {
         let mut output = String::new();
         let mut seen_fields = HashSet::new();
 
         for (idx, field) in fields.iter().enumerate() {
             if let Some(val) = input.get(field) {
                 if idx > 0 {
-                    output.write_char(' ').map_err(|_| "write error")?;
+                    output.write_char(' ').unwrap();
                 }
-                encode_field(&mut output, field, val).map_err(|_| "write error")?;
+                encode_field(&mut output, field, val);
                 seen_fields.insert(field);
             }
         }
@@ -68,12 +66,12 @@ mod logfmt {
             }
 
             if idx > 0 || !seen_fields.is_empty() {
-                output.write_char(' ').map_err(|_| "write error")?;
+                output.write_char(' ').unwrap();
             }
-            encode_field(&mut output, key, value).map_err(|_| "write error")?;
+            encode_field(&mut output, key, value);
         }
 
-        Ok(output)
+        output
     }
 }
 
@@ -129,39 +127,31 @@ struct EncodeLogfmtFn {
     fields: Option<Box<dyn Expression>>,
 }
 
-fn resolve_fields(fields: &Value) -> Vec<String> {
-    match fields {
-        Value::Array(arr) => arr
-            .iter()
-            .filter_map(|v| match v {
-                Value::Bytes(bytes) => Some(String::from_utf8_lossy(&bytes)),
-                _ => None,
-            })
-            .map(Into::into)
-            .collect(),
-        _ => vec![],
-    }
+fn resolve_fields(fields: Value) -> Result<Vec<String>, ExpressionError> {
+    let arr = fields.try_array()?;
+    arr.iter()
+        .enumerate()
+        .map(|(idx, v)| {
+            v.try_bytes_utf8_lossy()
+                .map(|v| v.to_string())
+                .map_err(|e| format!("invalid field value type at index {}: {}", idx, e).into())
+        })
+        .collect()
 }
 
 impl Expression for EncodeLogfmtFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let fields = match &self.fields {
-            None => vec![],
-            Some(expr) => match expr.resolve(ctx) {
-                Ok(val) => resolve_fields(&val),
-                Err(_) => vec![],
-            },
-        };
+            None => Ok(vec![]),
+            Some(expr) => {
+                let fields = expr.resolve(ctx)?;
+                resolve_fields(fields)
+            }
+        }?;
 
-        let logfmt = match value {
-            Value::Object(map) => logfmt::encode(&map, &fields[..]),
-            _ => Err("unsupported value-type".into()),
-        };
-
-        logfmt
-            .map_err(|err| format!("failed to encode logfmt: {}", err).into())
-            .map(Into::into)
+        let object = value.try_object()?;
+        Ok(logfmt::encode(&object, &fields[..]).into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -228,6 +218,23 @@ mod tests {
                 fields_ordering: value!(["lvl", "msg"])
             ],
             want: Ok(r#"lvl=info msg="This is a log message" log_id=12345"#),
+            tdef: TypeDef::new().bytes().fallible(),
+        }
+
+        fields_ordering_invalid_field_type {
+            args: func_args![value:
+                btreemap! {
+                    "lvl" => "info",
+                    "msg" => "This is a log message",
+                    "log_id" => 12345,
+                },
+                fields_ordering: value!(["lvl", 2])
+            ],
+            want: Err(format!(r"invalid field value type at index 1: {}",
+                    value::Error::Expected {
+                        got: Kind::Integer,
+                        expected: Kind::Bytes
+                    })),
             tdef: TypeDef::new().bytes().fallible(),
         }
     ];
