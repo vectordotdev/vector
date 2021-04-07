@@ -444,7 +444,7 @@ mod integration_tests {
     use crate::{
         config::{SinkConfig, SinkContext},
         event::metric::MetricValue,
-        sinks::influxdb::test_util::{cleanup_v1, onboarding_v1, query_v1},
+        sinks::influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
         tls::{self, TlsOptions},
         Event,
     };
@@ -511,13 +511,9 @@ mod integration_tests {
             for (tag, value) in metric.tags().unwrap() {
                 assert_eq!(output[&tag[..]], Value::String(value.to_string()));
             }
-            let timestamp = strip_timestamp(
-                metric
-                    .data
-                    .timestamp
-                    .unwrap()
-                    .format("%Y-%m-%dT%H:%M:%S%.3fZ")
-                    .to_string(),
+            let timestamp = format_timestamp(
+                metric.data.timestamp.unwrap(),
+                chrono::SecondsFormat::Millis,
             );
             assert_eq!(output["time"], Value::String(timestamp));
         }
@@ -529,16 +525,6 @@ mod integration_tests {
         let result = query_v1(url, query).await;
         let text = result.text().await.unwrap();
         serde_json::from_str(&text).expect("error when parsing InfluxDB response JSON")
-    }
-
-    // InfluxDB strips off trailing zeros in
-    fn strip_timestamp(timestamp: String) -> String {
-        let strip_one = || format!("{}Z", &timestamp[..timestamp.len() - 2]);
-        match timestamp {
-            _ if timestamp.ends_with("0Z") => strip_timestamp(strip_one()),
-            _ if timestamp.ends_with(".Z") => strip_one(),
-            _ => timestamp,
-        }
     }
 
     fn decode_metrics(data: &Value) -> Vec<HashMap<String, Value>> {

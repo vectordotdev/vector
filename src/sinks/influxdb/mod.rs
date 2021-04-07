@@ -310,7 +310,7 @@ pub(in crate::sinks) fn encode_uri(
 pub mod test_util {
     use super::*;
     use crate::tls;
-    use chrono::{offset::TimeZone, Utc};
+    use chrono::{offset::TimeZone, DateTime, SecondsFormat, Utc};
     use std::fs::File;
     use std::io::Read;
 
@@ -460,6 +460,20 @@ pub mod test_util {
             "UnexpectedStatus: {}",
             status
         );
+    }
+
+    pub(crate) fn format_timestamp(timestamp: DateTime<Utc>, format: SecondsFormat) -> String {
+        strip_timestamp(timestamp.to_rfc3339_opts(format, true))
+    }
+
+    // InfluxDB strips off trailing zeros in timestamps in metrics
+    fn strip_timestamp(timestamp: String) -> String {
+        let strip_one = || format!("{}Z", &timestamp[..timestamp.len() - 2]);
+        match timestamp {
+            _ if timestamp.ends_with("0Z") => strip_timestamp(strip_one()),
+            _ if timestamp.ends_with(".Z") => strip_one(),
+            _ => timestamp,
+        }
     }
 }
 

@@ -834,13 +834,16 @@ mod integration_tests {
         http::HttpClient,
         sinks::influxdb::{
             metrics::{default_summary_quantiles, InfluxDbConfig, InfluxDbSvc},
-            test_util::{cleanup_v1, onboarding_v1, onboarding_v2, query_v1, BUCKET, ORG, TOKEN},
+            test_util::{
+                cleanup_v1, format_timestamp, onboarding_v1, onboarding_v2, query_v1, BUCKET, ORG,
+                TOKEN,
+            },
             InfluxDb1Settings, InfluxDb2Settings,
         },
         tls::{self, TlsOptions},
         Event,
     };
-    use chrono::Utc;
+    use chrono::{SecondsFormat, Utc};
     use futures::stream;
     use pretty_assertions::assert_eq;
 
@@ -922,11 +925,7 @@ mod integration_tests {
                 MetricValue::Counter { value } => value,
                 _ => unreachable!(),
             };
-            let timestamp = metric
-                .data
-                .timestamp
-                .unwrap()
-                .to_rfc3339_opts(chrono::SecondsFormat::Nanos, true);
+            let timestamp = format_timestamp(metric.data.timestamp.unwrap(), SecondsFormat::Nanos);
             let res =
                 query_v1_json(url, &format!("select * from {}..\"{}\"", database, name)).await;
 
