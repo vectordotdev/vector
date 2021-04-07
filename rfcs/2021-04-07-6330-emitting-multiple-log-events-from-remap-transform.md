@@ -90,6 +90,8 @@ This would modify remap to allow setting `.` to an array of objects to have each
 
 This turned out to require a bigger change than I expected in that `.` is linked to mutating the underlying event (metric or log). It's definitely doable, but would require a substantial refactoring and so caused me to take a step back and consider the alternatives, prompting this RFC.
 
+I also don't see an easy way to extend this to deal with emitting multiple metrics without requiring users to create objects with a known format (like `{ "name": "foo", "namespace": "bar", "type = "counter", "value": 1 ...}`) whereas it seems more straightforward to extend the proposed approach with functions like `emit_counter`
+
 ### An `explode` transformation
 
 https://github.com/timberio/vector/pull/6545
