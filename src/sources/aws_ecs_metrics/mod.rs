@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
     internal_events::{
         AwsEcsMetricsErrorResponse, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
         AwsEcsMetricsReceived, AwsEcsMetricsRequestCompleted,
@@ -92,21 +92,15 @@ impl GenerateConfig for AwsEcsMetricsSourceConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ecs_metrics")]
 impl SourceConfig for AwsEcsMetricsSourceConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
         Ok(Box::pin(aws_ecs_metrics(
             self.stats_endpoint(),
             self.scrape_interval_secs,
             namespace,
-            out,
-            shutdown,
+            cx.out,
+            cx.shutdown,
         )))
     }
 
@@ -520,12 +514,7 @@ mod test {
             scrape_interval_secs: 1,
             namespace: default_namespace(),
         }
-        .build(
-            "default",
-            &GlobalOptions::default(),
-            ShutdownSignal::noop(),
-            tx,
-        )
+        .build(SourceContext::new_test(tx))
         .await
         .unwrap();
         tokio::spawn(source);
@@ -577,12 +566,7 @@ mod integration_tests {
             scrape_interval_secs: 1,
             namespace: default_namespace(),
         }
-        .build(
-            "default",
-            &GlobalOptions::default(),
-            ShutdownSignal::noop(),
-            tx,
-        )
+        .build(SourceContext::new_test(tx))
         .await
         .unwrap();
         tokio::spawn(source);

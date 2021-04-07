@@ -11,14 +11,11 @@ use std::{
 use tokio::time::{sleep, Duration};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use vector::{
-    config::{self, GlobalOptions, SinkConfig, SinkContext, SourceConfig},
-    shutdown::ShutdownSignal,
+    config::{self, SinkConfig, SinkContext, SourceConfig, SourceContext},
+    sinks::{self, Healthcheck, VectorSink},
+    sources,
     test_util::{next_addr, random_lines, send_lines, start_topology, wait_for_tcp, CountReceiver},
-    Event, Pipeline,
-    {
-        sinks::{self, Healthcheck, VectorSink},
-        sources,
-    },
+    Event,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -197,13 +194,7 @@ struct ErrorSourceConfig;
 #[async_trait]
 #[typetag::serde(name = "tcp")]
 impl SourceConfig for ErrorSourceConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
-        _out: Pipeline,
-    ) -> Result<sources::Source, vector::Error> {
+    async fn build(&self, _cx: SourceContext) -> Result<sources::Source, vector::Error> {
         Ok(Box::pin(future::err(())))
     }
 
@@ -264,13 +255,7 @@ struct PanicSourceConfig;
 #[async_trait]
 #[typetag::serde(name = "tcp")]
 impl SourceConfig for PanicSourceConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
-        _out: Pipeline,
-    ) -> Result<sources::Source, vector::Error> {
+    async fn build(&self, _cx: SourceContext) -> Result<sources::Source, vector::Error> {
         Ok(Box::pin(async { panic!() }))
     }
 

@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, Resource, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{StdinEventReceived, StdinReadFailed},
     shutdown::ShutdownSignal,
@@ -40,14 +40,13 @@ impl_generate_config_from_default!(StdinConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        stdin_source(io::BufReader::new(io::stdin()), self.clone(), shutdown, out)
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        stdin_source(
+            io::BufReader::new(io::stdin()),
+            self.clone(),
+            cx.shutdown,
+            cx.out,
+        )
     }
 
     fn output_type(&self) -> DataType {
