@@ -8,22 +8,18 @@
 {{ partial "hero.html" . }}
 <section class="section">
   <div class="container">
-    {{ range $versions }}
-    {{ $pages := where $highlights ".Params.release" "eq" . }}
-    <p class="title">
-      {{ . }}
-    </p>
-
-    <ul>
-      {{ range sort $pages ".Date" }}
-      <li>
-        <a href="{{ .RelPermalink }}">
-          {{ .Title | markdownify }}
-        </a>
-      </li>
+    <div class="timeline">
+      {{ range $versions }}
+      {{ $pages := where $highlights ".Params.release" . }}
+      <div class="timeline-item">
+        <div class="timeline-marker is-primary"></div>
+        <div class="timeline-content">
+          <p class="heading has-text-weight-bold">Version {{ . }}</p>
+          <p>{{ len $pages }} highlights</p>
+        </div>
+      </div>
       {{ end }}
-    </ul>
-    {{ end }}
+    </div>
   </div>
 </section>
 {{ end }}
