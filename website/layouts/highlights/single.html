@@ -1,0 +1,7 @@
+{{ define "title" }}
+{{ .Title }} | {{ site.Title }}
+{{ end }}
+
+{{ define "main" }}
+{{ partial "hero.html" (dict "title" .Title) }}
+{{ end }}

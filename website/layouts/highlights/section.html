@@ -1,0 +1,29 @@
+{{ define "title" }}
+{{ .Title }} | {{ site.Title }}
+{{ end }}
+
+{{ define "main" }}
+{{ $highlights := .RegularPages }}
+{{ $versions := site.Params.vector_versions }} {{/* We need this because Hugo can't sort based on semver */}}
+{{ partial "hero.html" . }}
+<section class="section">
+  <div class="container">
+    {{ range $versions }}
+    {{ $pages := where $highlights ".Params.release" "eq" . }}
+    <p class="title">
+      {{ . }}
+    </p>
+
+    <ul>
+      {{ range sort $pages ".Date" }}
+      <li>
+        <a href="{{ .RelPermalink }}">
+          {{ .Title | markdownify }}
+        </a>
+      </li>
+      {{ end }}
+    </ul>
+    {{ end }}
+  </div>
+</section>
+{{ end }}
