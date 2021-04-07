@@ -1,3 +1,4 @@
 tap "cuelang/tap"
 
 brew "cue"
+brew "htmltest"

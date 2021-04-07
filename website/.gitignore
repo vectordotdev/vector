@@ -7,3 +7,6 @@ node_modules/
 
 # CUE-generated assets
 data/docs.json
+
+# htmltest generated
+tmp/
