@@ -113,7 +113,7 @@ pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
         .iter()
         .map(|kv| Metric::from_metric_kv(kv.key().key(), kv.value()).into())
         .collect::<Vec<Event>>();
-    let handle = Handle::Counter(Counter::with_count(events.len() as u64));
+    let handle = Handle::Counter(Counter::with_count(events.len() as u64 + 1));
     events.push(Metric::from_metric_kv(CARDINALITY_KEY.key(), &handle).into());
 
     events.into_iter()
