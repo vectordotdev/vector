@@ -29,11 +29,9 @@ package metadata
 	#Type: "any" | "array" | "boolean" | "float" | "integer" | "object" | "null" | "path" | "string" | "regex" | "timestamp"
 
 	concepts:    _
-	description: string
 	errors:      _
 	examples: [#Example, ...#Example]
 	expressions:  _
-	features:     _
 	functions:    _
 	how_it_works: #HowItWorks
 	literals:     _
@@ -42,16 +40,6 @@ package metadata
 }
 
 remap: #Remap & {
-	description: #"""
-		**Vector Remap Language** (VRL) is an expression-oriented language designed for transforming observability data
-		(logs and metrics) in a [safe](\#(urls.vrl_safety)) and [performant](\#(urls.vrl_performance)) manner. It
-		features a simple [syntax](\#(urls.vrl_expressions)) and a rich set of built-in
-		[functions](\#(urls.vrl_functions)) tailored specifically to observability use cases.
-
-		You can use VRL in Vector via the [`remap` transform](\#(urls.vector_remap_transform)), and for a more in-depth
-		picture, see the [announcement blog post](\#(urls.vrl_announcement)).
-		"""#
-
 	examples: [
 		{
 			title: "Parse Syslog logs"
