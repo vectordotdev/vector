@@ -8,21 +8,13 @@ mod logfmt {
     use vrl::prelude::*;
 
     fn encode_string(output: &mut String, str: &str) -> fmt::Result {
-        let needs_quotting = match str.find(' ') {
-            Some(_) => true,
-            None => false,
-        };
-
+        let needs_quotting = str.find(' ').is_some();
         if needs_quotting {
             output.write_char('"')?;
         }
 
         for c in str.chars() {
-            let needs_escaping = match c {
-                '\\' | '"' => true,
-                _ => false,
-            };
-
+            let needs_escaping = matches!(c, '\\' | '"');
             if needs_escaping {
                 output.write_char('\\')?;
             }
@@ -75,7 +67,7 @@ mod logfmt {
                 continue;
             }
 
-            if idx > 0 || seen_fields.len() > 0 {
+            if idx > 0 || !seen_fields.is_empty() {
                 output.write_char(' ').map_err(|_| "write error")?;
             }
             encode_field(&mut output, key, value).map_err(|_| "write error")?;
