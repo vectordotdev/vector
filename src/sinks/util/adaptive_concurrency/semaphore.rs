@@ -2,7 +2,10 @@
 // clippy's warning that an AtomicUsize would work better is incorrect.
 #![allow(clippy::mutex_atomic)]
 
-use futures::{future::BoxFuture, ready};
+use futures::{
+    future::{BoxFuture, FutureExt},
+    ready,
+};
 use std::future::Future;
 use std::mem::{drop, replace};
 use std::pin::Pin;
@@ -31,7 +34,11 @@ impl ShrinkableSemaphore {
     ) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static {
         MaybeForgetFuture {
             master: Arc::clone(&self),
-            future: Box::pin(Arc::clone(&self.semaphore).acquire_owned()),
+            future: Box::pin(
+                Arc::clone(&self.semaphore)
+                    .acquire_owned()
+                    .map(|r| r.expect("Semaphore has been closed")),
+            ),
         }
     }
 
@@ -84,7 +91,9 @@ impl Future for MaybeForgetFuture {
             let permit = ready!(self.future.as_mut().poll(cx));
             permit.forget();
             *to_forget -= 1;
-            let future = Arc::clone(&self.master.semaphore).acquire_owned();
+            let future = Arc::clone(&self.master.semaphore)
+                .acquire_owned()
+                .map(|r| r.expect("Semaphore is closed"));
             drop(replace(&mut self.future, Box::pin(future)));
         }
         drop(to_forget);

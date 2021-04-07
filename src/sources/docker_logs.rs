@@ -1,6 +1,6 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
     internal_events::{
@@ -152,17 +152,11 @@ impl_generate_config_from_default!(DockerLogsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "docker_logs")]
 impl SourceConfig for DockerLogsConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = DockerLogsSource::new(
             self.clone().with_empty_partial_event_marker_field_as_none(),
-            out,
-            shutdown.clone(),
+            cx.out,
+            cx.shutdown.clone(),
         )?;
 
         // Capture currently running containers, and do main future(run)
@@ -178,6 +172,7 @@ impl SourceConfig for DockerLogsConfig {
             }
         };
 
+        let shutdown = cx.shutdown;
         // Once this ShutdownSignal resolves it will drop DockerLogsSource and by extension it's ShutdownSignal.
         Ok(Box::pin(async move {
             Ok(tokio::select! {
@@ -207,14 +202,8 @@ struct DockerCompatConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "docker")]
 impl SourceConfig for DockerCompatConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        self.config.build(_name, _globals, shutdown, out).await
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        self.config.build(cx).await
     }
 
     fn output_type(&self) -> DataType {
@@ -434,7 +423,7 @@ impl DockerLogsSource {
     async fn run(mut self) {
         loop {
             tokio::select! {
-                value = self.main_recv.next() => {
+                value = self.main_recv.recv() => {
                     match value {
                         Some(message) => {
                             match message {
@@ -547,7 +536,7 @@ impl EventStreamBuilder {
         let this = self.clone();
         tokio::spawn(async move {
             if let Some(duration) = backoff {
-                tokio::time::delay_for(duration).await;
+                tokio::time::sleep(duration).await;
             }
             match this
                 .core
@@ -605,13 +594,15 @@ impl EventStreamBuilder {
         // Create event streamer
         let mut partial_event_merge_state = None;
 
+        let core = Arc::clone(&self.core);
+
         let events_stream = stream
             .map(|value| {
                 match value {
                     Ok(message) => Ok(info.new_event(
                         message,
-                        self.core.config.partial_event_marker_field.clone(),
-                        self.core.config.auto_partial_merge,
+                        core.config.partial_event_marker_field.clone(),
+                        core.config.auto_partial_merge,
                         &mut partial_event_merge_state,
                     )),
                     Err(error) => {
@@ -630,7 +621,6 @@ impl EventStreamBuilder {
                                 container_id: Some(info.id.as_str())
                             }),
                         };
-
                         Err(())
                     }
                 }
@@ -640,7 +630,7 @@ impl EventStreamBuilder {
             .take_until(self.shutdown.clone());
 
         let events_stream: Box<dyn Stream<Item = Event> + Unpin + Send> =
-            if let Some(ref line_agg_config) = self.core.line_agg_config {
+            if let Some(ref line_agg_config) = core.line_agg_config {
                 Box::new(line_agg_adapter(
                     events_stream,
                     line_agg::Logic::new(line_agg_config.clone()),
@@ -1026,8 +1016,18 @@ fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<D
     let host = host.or_else(|| env::var("DOCKER_HOST").ok());
 
     match host {
-        None => Docker::connect_with_local_defaults().map_err(Into::into),
-
+        None => {
+            // TODO: Use `connect_with_local_defaults` on all platforms.
+            //
+            // Using `connect_with_local_defaults` defers to `connect_with_named_pipe_defaults` on Windows. However,
+            // named pipes are currently disabled in Tokio. Tracking issue:
+            // https://github.com/fussybeaver/bollard/pull/138
+            if cfg!(windows) {
+                Docker::connect_with_http_defaults().map_err(Into::into)
+            } else {
+                Docker::connect_with_local_defaults().map_err(Into::into)
+            }
+        }
         Some(host) => {
             let scheme = host
                 .parse::<Uri>()
@@ -1056,8 +1056,17 @@ fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Result<D
                     .map_err(Into::into)
                 }
                 Some("unix") | Some("npipe") | None => {
-                    Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
-                        .map_err(Into::into)
+                    // TODO: Use `connect_with_local` on all platforms.
+                    //
+                    // Named pipes are currently disabled in Tokio. Tracking issue:
+                    // https://github.com/fussybeaver/bollard/pull/138
+                    if cfg!(windows) {
+                        warn!("Named pipes are currently not available on Windows, trying to connecting to Docker with default HTTP settings instead.");
+                        Docker::connect_with_http_defaults().map_err(Into::into)
+                    } else {
+                        Docker::connect_with_local(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
+                            .map_err(Into::into)
+                    }
                 }
                 Some(scheme) => Err(format!("Unknown scheme: {}", scheme).into()),
             }
@@ -1129,8 +1138,7 @@ mod integration_tests {
         },
         image::{CreateImageOptions, ListImagesOptions},
     };
-    use futures::stream::TryStreamExt;
-    use tokio::sync::mpsc;
+    use futures::{channel::mpsc, stream::TryStreamExt, FutureExt};
 
     /// None if docker is not present on the system
     fn source_with<'a, L: Into<Option<&'a str>>>(
@@ -1148,12 +1156,7 @@ mod integration_tests {
         let (sender, recv) = Pipeline::new_test();
         tokio::spawn(async move {
             config
-                .build(
-                    "default",
-                    &GlobalOptions::default(),
-                    ShutdownSignal::noop(),
-                    sender,
-                )
+                .build(SourceContext::new_test(sender))
                 .await
                 .unwrap()
                 .await
@@ -1351,12 +1354,8 @@ mod integration_tests {
         id
     }
 
-    async fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> Result<bool, ()> {
-        match rx.try_recv() {
-            Ok(_) => Ok(false),
-            Err(mpsc::error::TryRecvError::Empty) => Ok(true),
-            Err(mpsc::error::TryRecvError::Closed) => Err(()),
-        }
+    fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> bool {
+        rx.next().now_or_never().is_none()
     }
 
     #[tokio::test]
@@ -1459,7 +1458,7 @@ mod integration_tests {
         let id0 = container_log_n(1, &excluded0, None, "will not be read", &docker).await;
         let id1 = container_log_n(1, &included0, None, will_be_read, &docker).await;
         let id2 = container_log_n(1, &included1, None, will_be_read, &docker).await;
-        tokio::time::delay_for(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
         let events = collect_ready(out).await;
         container_remove(&id0, &docker).await;
         container_remove(&id1, &docker).await;
@@ -1575,7 +1574,7 @@ mod integration_tests {
         let id = container_log_n(1, name, None, message, &docker).await;
         container_remove(&id, &docker).await;
 
-        assert!(is_empty(exclude_out).await.unwrap());
+        assert!(is_empty(exclude_out));
     }
 
     #[tokio::test]
@@ -1604,7 +1603,7 @@ mod integration_tests {
         let _ = container_kill(&id, &docker).await;
         container_remove(&id, &docker).await;
 
-        assert!(is_empty(exclude_out).await.unwrap());
+        assert!(is_empty(exclude_out));
     }
 
     #[tokio::test]

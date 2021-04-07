@@ -10,7 +10,9 @@ use crate::{
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt, StreamExt};
 use std::{future::ready, path::PathBuf};
+use tokio::io::AsyncWriteExt;
 use tokio::net::{UnixListener, UnixStream};
+use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::field;
 use tracing_futures::Instrument;
@@ -34,12 +36,12 @@ where
     let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
 
     Box::pin(async move {
-        let mut listener =
-            UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
+        let listener = UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
         info!(message = "Listening.", path = ?listen_path, r#type = "unix");
 
         let connection_open = OpenGauge::new();
-        let mut stream = listener.incoming().take_until(shutdown.clone());
+        let stream = UnixListenerStream::new(listener).take_until(shutdown.clone());
+        tokio::pin!(stream);
         while let Some(socket) = stream.next().await {
             let socket = match socket {
                 Err(error) => {
@@ -90,8 +92,10 @@ where
                     let _ = out.send_all(&mut stream).await;
                     info!("Finished sending.");
 
-                    let socket: &UnixStream = stream.get_ref().get_ref().get_ref();
-                    let _ = socket.shutdown(std::net::Shutdown::Both);
+                    let socket: &mut UnixStream = stream.get_mut().get_mut().get_mut();
+                    if let Err(error) = socket.shutdown().await {
+                        error!(message = "Failed shutting down socket.", %error);
+                    }
                 }
                 .instrument(span),
             );

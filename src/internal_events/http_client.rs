@@ -8,7 +8,7 @@ use metrics::{counter, histogram};
 use std::time::Duration;
 
 #[derive(Debug)]
-pub struct AboutToSendHTTPRequest<'a, T> {
+pub struct AboutToSendHttpRequest<'a, T> {
     pub request: &'a Request<T>,
 }
 
@@ -27,7 +27,7 @@ fn remove_sensitive(headers: &HeaderMap<HeaderValue>) -> HeaderMap<HeaderValue> 
     headers
 }
 
-impl<'a, T: HttpBody> InternalEvent for AboutToSendHTTPRequest<'a, T> {
+impl<'a, T: HttpBody> InternalEvent for AboutToSendHttpRequest<'a, T> {
     fn emit_logs(&self) {
         debug!(
             message = "Sending HTTP request.",
@@ -45,12 +45,12 @@ impl<'a, T: HttpBody> InternalEvent for AboutToSendHTTPRequest<'a, T> {
 }
 
 #[derive(Debug)]
-pub struct GotHTTPResponse<'a, T> {
+pub struct GotHttpResponse<'a, T> {
     pub response: &'a Response<T>,
     pub roundtrip: Duration,
 }
 
-impl<'a, T: HttpBody> InternalEvent for GotHTTPResponse<'a, T> {
+impl<'a, T: HttpBody> InternalEvent for GotHttpResponse<'a, T> {
     fn emit_logs(&self) {
         debug!(
             message = "HTTP response.",
@@ -69,12 +69,12 @@ impl<'a, T: HttpBody> InternalEvent for GotHTTPResponse<'a, T> {
 }
 
 #[derive(Debug)]
-pub struct GotHTTPError<'a> {
+pub struct GotHttpError<'a> {
     pub error: &'a Error,
     pub roundtrip: Duration,
 }
 
-impl<'a> InternalEvent for GotHTTPError<'a> {
+impl<'a> InternalEvent for GotHttpError<'a> {
     fn emit_logs(&self) {
         debug!(
             message = "HTTP error.",

@@ -221,6 +221,7 @@ mod test {
             for assertion in assertions {
                 assert!(
                     ctx.load(assertion).eval::<bool>().expect(assertion),
+                    "{}",
                     assertion
                 );
             }

@@ -4,7 +4,7 @@
 //! and the [`Debounce::debounced`] will be resolved only once.
 
 use std::{future::pending, time::Duration};
-use tokio::time::{delay_until, Instant};
+use tokio::time::{sleep_until, Instant};
 
 /// Provides an arbitrary signal debouncing.
 pub struct Debounce {
@@ -40,7 +40,7 @@ impl Debounce {
             None => pending().await,
         };
 
-        delay_until(sequence_start).await;
+        sleep_until(sequence_start).await;
         self.sequence_start = None;
     }
 

@@ -69,9 +69,15 @@ components: transforms: "remap": {
 			description: """
 				Drop the event if the VRL program returns an error at runtime.
 				"""
-			type: bool: {
-				default: false
-			}
+			type: bool: default: false
+		}
+		drop_on_abort: {
+			common:   false
+			required: false
+			description: """
+				Drop the event if the VRL program is manually aborted through the `abort` statement.
+				"""
+			type: bool: default: true
 		}
 	}
 

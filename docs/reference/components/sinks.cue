@@ -410,7 +410,7 @@ components: sinks: [Name=string]: {
 						buffers_batches: {
 							title: "Buffers & batches"
 							body: #"""
-									![Buffers and Batches](/optimized_svg/buffers-and-batches-serial_538_160.svg)
+									<SVG src="/optimized_svg/buffers-and-batches-serial_538_160.svg" />
 
 									This component buffers & batches data as shown in the diagram above. You'll notice that Vector treats these concepts
 									differently, instead of treating them as global concepts, Vector treats them

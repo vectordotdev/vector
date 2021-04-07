@@ -65,8 +65,15 @@ components: transforms: route: {
 	}
 
 	input: {
-		logs:    true
-		metrics: null
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
 	}
 
 	examples: [
@@ -85,6 +92,31 @@ components: transforms: route: {
 			}
 			output: log: {
 				level: "info"
+			}
+		},
+		{
+			title: "Split by metric namespace"
+			configuration: {
+				route: {
+					app:  #".namespace == "app""#
+					host: #".namespace == "host""#
+				}
+			}
+			input: metric: {
+				counter: {
+					value: 10000.0
+				}
+				kind:      "absolute"
+				name:      "memory_available_bytes"
+				namespace: "host"
+			}
+			output: metric: {
+				counter: {
+					value: 10000.0
+				}
+				kind:      "absolute"
+				name:      "memory_available_bytes"
+				namespace: "host"
 			}
 		},
 	]

@@ -240,9 +240,8 @@ mod test {
     use super::*;
     use crate::{event::Metric, test_util::*};
     use bytes::Bytes;
-    use futures::TryStreamExt;
+    use futures::{channel::mpsc, TryStreamExt};
     use tokio::net::UdpSocket;
-    use tokio::sync::mpsc;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 
     #[cfg(feature = "sources-statsd")]
@@ -428,7 +427,7 @@ mod test {
                 .with_namespace(Some("vector")),
             ),
         ];
-        let (mut tx, rx) = mpsc::channel(1);
+        let (mut tx, rx) = mpsc::channel(0);
 
         let socket = UdpSocket::bind(addr).await.unwrap();
         tokio::spawn(async move {

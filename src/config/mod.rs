@@ -192,13 +192,7 @@ macro_rules! impl_generate_config_from_default {
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
-    async fn build(
-        &self,
-        name: &str,
-        globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<sources::Source>;
+    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source>;
 
     fn output_type(&self) -> DataType;
 
@@ -207,6 +201,43 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     /// Resources that the source is using.
     fn resources(&self) -> Vec<Resource> {
         Vec::new()
+    }
+}
+
+pub struct SourceContext {
+    pub name: String,
+    pub globals: GlobalOptions,
+    pub shutdown: ShutdownSignal,
+    pub out: Pipeline,
+}
+
+impl SourceContext {
+    #[cfg(test)]
+    pub fn new_shutdown(
+        name: &str,
+        out: Pipeline,
+    ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
+        let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
+        let (shutdown_signal, _) = shutdown.register_source(name);
+        (
+            Self {
+                name: name.into(),
+                globals: GlobalOptions::default(),
+                shutdown: shutdown_signal,
+                out,
+            },
+            shutdown,
+        )
+    }
+
+    #[cfg(test)]
+    pub fn new_test(out: Pipeline) -> Self {
+        Self {
+            name: "default".into(),
+            globals: GlobalOptions::default(),
+            shutdown: ShutdownSignal::noop(),
+            out,
+        }
     }
 }
 
@@ -548,7 +579,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::TOML),
+            Some(Format::Toml),
         )
         .unwrap();
 
@@ -571,7 +602,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::TOML),
+            Some(Format::Toml),
         )
         .unwrap();
 
@@ -604,7 +635,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::TOML),
+            Some(Format::Toml),
         )
         .unwrap();
 
@@ -626,7 +657,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::TOML),
+            Some(Format::Toml),
         )
         .unwrap();
 
@@ -652,7 +683,7 @@ mod test {
                               type = "check_fields"
                               "message.equals" = "Sorry, I'm busy this week Cecil"
                     "#},
-                    Some(Format::TOML),
+                    Some(Format::Toml),
                 )
                 .unwrap()
             ),
@@ -679,7 +710,7 @@ mod test {
                   inputs = ["in"]
                   encoding = "json"
             "#},
-            Some(Format::TOML),
+            Some(Format::Toml),
         )
         .unwrap();
 
@@ -700,7 +731,7 @@ mod test {
                           inputs = ["in"]
                           encoding = "json"
                     "#},
-                    Some(Format::TOML),
+                    Some(Format::Toml),
                 )
                 .unwrap()
             ),
@@ -844,7 +875,7 @@ mod resource_tests {
                   inputs = ["in0","in1"]
                   encoding = "json"
             "#},
-            Some(Format::TOML),
+            Some(Format::Toml),
         )
         .is_err());
     }

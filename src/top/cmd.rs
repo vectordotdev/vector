@@ -3,9 +3,8 @@ use super::{
     metrics, state,
 };
 use crate::config;
-use indoc::indoc;
 use url::Url;
-use vector_api_client::{connect_subscription_client, gql::HealthQueryExt, Client};
+use vector_api_client::{connect_subscription_client, Client};
 
 /// CLI command func for displaying Vector components, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets
@@ -25,28 +24,11 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
             .expect("Couldn't parse default API URL. Please report this.")
     });
 
-    // Create a new API client for connecting to the local/remote Vector instance
-    let client = Client::new(url.clone());
-
-    // Check that the GraphQL server is reachable
-    match client.health_query().await {
-        Ok(_) => (),
-        _ => {
-            eprintln!(
-                indoc! {"
-                    Vector API server isn't reachable ({}).
-
-                    Have you enabled the API?
-
-                    To enable the API, add the following to your `vector.toml` config file:
-
-                    [api]
-                      enabled = true"},
-                url
-            );
-            return exitcode::UNAVAILABLE;
-        }
-    }
+    // Create a new API client for connecting to the local/remote Vector instance.
+    let client = match Client::new_with_healthcheck(url.clone()).await {
+        Some(client) => client,
+        None => return exitcode::UNAVAILABLE,
+    };
 
     // Create a metrics state updater
     let (tx, rx) = tokio::sync::mpsc::channel(20);

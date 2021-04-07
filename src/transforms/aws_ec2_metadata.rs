@@ -17,7 +17,7 @@ use std::{
     future::ready,
     pin::Pin,
 };
-use tokio::time::{delay_for, Duration, Instant};
+use tokio::time::{sleep, Duration, Instant};
 use tracing_futures::Instrument;
 
 type WriteHandle = evmap::WriteHandle<String, Bytes, (), RandomState>;
@@ -254,7 +254,7 @@ impl MetadataClient {
                 }
             }
 
-            delay_for(self.refresh_interval).await;
+            sleep(self.refresh_interval).await;
         }
     }
 
@@ -283,7 +283,7 @@ impl MetadataClient {
             .map_err(crate::Error::from)
             .and_then(|res| match res.status() {
                 StatusCode::OK => Ok(res),
-                status_code => Err(UnexpectedHTTPStatusError {
+                status_code => Err(UnexpectedHttpStatusError {
                     status: status_code,
                 }
                 .into()),
@@ -433,7 +433,7 @@ impl MetadataClient {
             .map_err(crate::Error::from)
             .and_then(|res| match res.status() {
                 StatusCode::OK => Ok(res),
-                status_code => Err(UnexpectedHTTPStatusError {
+                status_code => Err(UnexpectedHttpStatusError {
                     status: status_code,
                 }
                 .into()),
@@ -482,17 +482,17 @@ impl Keys {
 }
 
 #[derive(Debug)]
-struct UnexpectedHTTPStatusError {
+struct UnexpectedHttpStatusError {
     status: http::StatusCode,
 }
 
-impl fmt::Display for UnexpectedHTTPStatusError {
+impl fmt::Display for UnexpectedHttpStatusError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "got unexpected status code: {}", self.status)
     }
 }
 
-impl error::Error for UnexpectedHTTPStatusError {}
+impl error::Error for UnexpectedHttpStatusError {}
 
 #[derive(Debug, snafu::Snafu)]
 enum Ec2MetadataError {
@@ -536,16 +536,16 @@ mod integration_tests {
             .into_task();
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut rx = transform.transform(Box::pin(rx));
+        let mut stream = transform.transform(Box::pin(rx));
 
         // We need to sleep to let the background task fetch the data.
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let log = LogEvent::default();
         let mut expected = log.clone();
         tx.send(log.into()).await.unwrap();
 
-        let event = rx.next().await.unwrap();
+        let event = stream.next().await.unwrap();
 
         expected.insert("availability-zone", "ww-region-1a");
         expected.insert("public-ipv4", "192.1.1.1");
@@ -577,16 +577,16 @@ mod integration_tests {
             .into_task();
 
         let (mut tx, rx) = futures::channel::mpsc::channel(100);
-        let mut rx = transform.transform(Box::pin(rx));
+        let mut stream = transform.transform(Box::pin(rx));
 
         // We need to sleep to let the background task fetch the data.
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let log = LogEvent::default();
         let mut expected = log.clone();
         tx.send(log.into()).await.unwrap();
 
-        let event = rx.next().await.unwrap();
+        let event = stream.next().await.unwrap();
 
         expected.insert("public-ipv4", "192.1.1.1");
         expected.insert("region", "us-east-1");
@@ -608,16 +608,16 @@ mod integration_tests {
                 .into_task();
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut rx = transform.transform(Box::pin(rx));
+            let mut stream = transform.transform(Box::pin(rx));
 
             // We need to sleep to let the background task fetch the data.
-            delay_for(Duration::from_secs(1)).await;
+            sleep(Duration::from_secs(1)).await;
 
             let log = LogEvent::default();
             let mut expected = log.clone();
             tx.send(log.into()).await.unwrap();
 
-            let event = rx.next().await.unwrap();
+            let event = stream.next().await.unwrap();
 
             expected.insert("ec2.metadata.availability-zone", "ww-region-1a");
             expected.insert("ec2.metadata.public-ipv4", "192.1.1.1");
@@ -638,16 +638,16 @@ mod integration_tests {
                 .into_task();
 
             let (mut tx, rx) = futures::channel::mpsc::channel(100);
-            let mut rx = transform.transform(Box::pin(rx));
+            let mut stream = transform.transform(Box::pin(rx));
 
             // We need to sleep to let the background task fetch the data.
-            delay_for(Duration::from_secs(1)).await;
+            sleep(Duration::from_secs(1)).await;
 
             let log = LogEvent::default();
             let mut expected = log.clone();
             tx.send(log.into()).await.unwrap();
 
-            let event = rx.next().await.unwrap();
+            let event = stream.next().await.unwrap();
 
             expected.insert("availability-zone", "ww-region-1a");
             expected.insert("public-ipv4", "192.1.1.1");

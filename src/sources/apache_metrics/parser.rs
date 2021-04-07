@@ -29,11 +29,11 @@ enum StatusFieldStatistic<'a> {
     TotalAccesses(u64),
     TotalKBytes(u64),
     TotalDuration(u64),
-    CPUUser(f64),
-    CPUSystem(f64),
-    CPUChildrenUser(f64),
-    CPUChildrenSystem(f64),
-    CPULoad(f64),
+    CpuUser(f64),
+    CpuSystem(f64),
+    CpuChildrenUser(f64),
+    CpuChildrenSystem(f64),
+    CpuLoad(f64),
     IdleWorkers(u64),
     BusyWorkers(u64),
     ConnsTotal(u64),
@@ -61,17 +61,17 @@ impl<'a> StatusFieldStatistic<'a> {
             "Total Duration" => {
                 Some(parse_numeric_value(key, value).map(StatusFieldStatistic::TotalDuration))
             }
-            "CPUUser" => Some(parse_numeric_value(key, value).map(StatusFieldStatistic::CPUUser)),
+            "CPUUser" => Some(parse_numeric_value(key, value).map(StatusFieldStatistic::CpuUser)),
             "CPUSystem" => {
-                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::CPUSystem))
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::CpuSystem))
             }
             "CPUChildrenUser" => {
-                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::CPUChildrenUser))
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::CpuChildrenUser))
             }
             "CPUChildrenSystem" => {
-                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::CPUChildrenSystem))
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::CpuChildrenSystem))
             }
-            "CPULoad" => Some(parse_numeric_value(key, value).map(StatusFieldStatistic::CPULoad)),
+            "CPULoad" => Some(parse_numeric_value(key, value).map(StatusFieldStatistic::CpuLoad)),
             "IdleWorkers" => {
                 Some(parse_numeric_value(key, value).map(StatusFieldStatistic::IdleWorkers))
             }
@@ -200,7 +200,7 @@ fn line_to_metrics<'a>(
                 .with_tags(tags.cloned())
                 .with_timestamp(Some(now)),
             )),
-            StatusFieldStatistic::CPUUser(value) => Box::new(iter::once(
+            StatusFieldStatistic::CpuUser(value) => Box::new(iter::once(
                 Metric::new(
                     "cpu_seconds_total",
                     MetricKind::Absolute,
@@ -215,7 +215,7 @@ fn line_to_metrics<'a>(
                 .with_timestamp(Some(now)),
             ))
                 as Box<dyn Iterator<Item = Metric>>,
-            StatusFieldStatistic::CPUSystem(value) => Box::new(iter::once(
+            StatusFieldStatistic::CpuSystem(value) => Box::new(iter::once(
                 Metric::new(
                     "cpu_seconds_total",
                     MetricKind::Absolute,
@@ -230,7 +230,7 @@ fn line_to_metrics<'a>(
                 .with_timestamp(Some(now)),
             ))
                 as Box<dyn Iterator<Item = Metric>>,
-            StatusFieldStatistic::CPUChildrenUser(value) => Box::new(iter::once(
+            StatusFieldStatistic::CpuChildrenUser(value) => Box::new(iter::once(
                 Metric::new(
                     "cpu_seconds_total",
                     MetricKind::Absolute,
@@ -245,7 +245,7 @@ fn line_to_metrics<'a>(
                 .with_timestamp(Some(now)),
             ))
                 as Box<dyn Iterator<Item = Metric>>,
-            StatusFieldStatistic::CPUChildrenSystem(value) => Box::new(iter::once(
+            StatusFieldStatistic::CpuChildrenSystem(value) => Box::new(iter::once(
                 Metric::new(
                     "cpu_seconds_total",
                     MetricKind::Absolute,
@@ -260,7 +260,7 @@ fn line_to_metrics<'a>(
                 .with_timestamp(Some(now)),
             ))
                 as Box<dyn Iterator<Item = Metric>>,
-            StatusFieldStatistic::CPULoad(value) => Box::new(iter::once(
+            StatusFieldStatistic::CpuLoad(value) => Box::new(iter::once(
                 Metric::new(
                     "cpu_load",
                     MetricKind::Absolute,

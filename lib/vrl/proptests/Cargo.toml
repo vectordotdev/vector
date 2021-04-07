@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 chrono = "0.4"
-proptest = "0.10"
+proptest = "1.0"
 ordered-float = "2"
 parser = { package = "vrl-parser", path = "../parser/" }
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic/" }

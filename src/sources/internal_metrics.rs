@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, SourceConfig, SourceContext, SourceDescription},
     metrics::Controller,
     metrics::{capture_metrics, get_controller},
     shutdown::ShutdownSignal,
@@ -8,6 +8,7 @@ use crate::{
 use futures::{stream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[derivative(Default)]
@@ -26,20 +27,19 @@ impl_generate_config_from_default!(InternalMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.scrape_interval_secs == 0 {
             warn!(
                 "Interval set to 0 secs, this could result in high CPU utilization. It is suggested to use interval >= 1 secs.",
             );
         }
         let interval = time::Duration::from_secs(self.scrape_interval_secs);
-        Ok(Box::pin(run(get_controller()?, interval, out, shutdown)))
+        Ok(Box::pin(run(
+            get_controller()?,
+            interval,
+            cx.out,
+            cx.shutdown,
+        )))
     }
 
     fn output_type(&self) -> DataType {
@@ -60,7 +60,7 @@ async fn run(
     let mut out =
         out.sink_map_err(|error| error!(message = "Error sending internal metrics.", %error));
 
-    let mut interval = time::interval(interval).take_until(shutdown);
+    let mut interval = IntervalStream::new(time::interval(interval)).take_until(shutdown);
     while interval.next().await.is_some() {
         let metrics = capture_metrics(controller);
         out.send_all(&mut stream::iter(metrics).map(Ok)).await?;

@@ -7,6 +7,7 @@ use futures::{
 };
 use futures01::{stream, Sink, Stream};
 use tempfile::tempdir;
+use tokio_stream::wrappers::ReceiverStream;
 use vector::{
     buffers::{
         disk::{leveldb_buffer, DiskBuffer},
@@ -49,13 +50,13 @@ fn benchmark_buffers(c: &mut Criterion) {
                 let rt = runtime();
 
                 let (writer, reader) = futures01::sync::mpsc::channel(100);
-                let writer = writer.sink_map_err(|e| panic!(e));
+                let writer = writer.sink_map_err(|e| panic!("{}", e));
 
                 let read_loop = reader.for_each(move |_| Ok(()));
 
                 (rt, writer, read_loop)
             },
-            |(mut rt, writer, read_loop)| {
+            |(rt, writer, read_loop)| {
                 let send = writer.send_all(random_events(line_size).take(num_lines as u64));
 
                 let read_handle = rt.spawn(read_loop.compat());
@@ -81,7 +82,7 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                 (rt, writer, read_handle)
             },
-            |(mut rt, mut writer, read_handle)| {
+            |(rt, mut writer, read_handle)| {
                 let write_handle = rt.spawn(async move {
                     let mut stream = random_events(line_size).take(num_lines as u64).compat();
                     while let Some(e) = stream.next().await {
@@ -101,13 +102,14 @@ fn benchmark_buffers(c: &mut Criterion) {
             || {
                 let rt = runtime();
 
-                let (writer, mut reader) = tokio::sync::mpsc::channel(100);
+                let (writer, reader) = tokio::sync::mpsc::channel(100);
+                let mut stream = ReceiverStream::new(reader);
 
-                let read_handle = rt.spawn(async move { while reader.next().await.is_some() {} });
+                let read_handle = rt.spawn(async move { while stream.next().await.is_some() {} });
 
                 (rt, writer, read_handle)
             },
-            |(mut rt, mut writer, read_handle)| {
+            |(rt, writer, read_handle)| {
                 let write_handle = rt.spawn(async move {
                     let mut stream = random_events(line_size).take(num_lines as u64).compat();
                     while let Some(e) = stream.next().await {
@@ -136,7 +138,7 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                 (rt, writer)
             },
-            |(mut rt, writer)| {
+            |(rt, writer)| {
                 let send = writer.send_all(random_events(line_size).take(num_lines as u64));
                 let write_handle = rt.spawn(send.compat());
                 let _ = rt.block_on(write_handle).unwrap().unwrap();
@@ -150,7 +152,7 @@ fn benchmark_buffers(c: &mut Criterion) {
             || {
                 let data_dir = tempdir().unwrap();
 
-                let mut rt = runtime();
+                let rt = runtime();
 
                 let plenty_of_room = num_lines * line_size * 2;
                 let (writer, reader, acker) =
@@ -170,7 +172,7 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                 (rt, read_loop)
             },
-            |(mut rt, read_loop)| {
+            |(rt, read_loop)| {
                 let read_handle = rt.spawn(read_loop);
                 rt.block_on(read_handle).unwrap().unwrap();
             },
@@ -198,7 +200,7 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                 (rt, writer, read_loop)
             },
-            |(mut rt, writer, read_loop)| {
+            |(rt, writer, read_loop)| {
                 let send = writer.send_all(random_events(line_size).take(num_lines as u64));
 
                 let read_handle = rt.spawn(read_loop);
