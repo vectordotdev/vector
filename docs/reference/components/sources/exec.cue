@@ -44,6 +44,17 @@ components: sources: exec: {
 	}
 
 	configuration: {
+		mode: {
+			description: "The type of exec mechanism."
+			required:    true
+			type: string: {
+				enum: {
+					scheduled: "Scheduled exec mechanism."
+					streaming: "Streaming exec mechanism."
+				}
+				syntax: "literal"
+			}
+		}
 		command: {
 			required:    true
 			description: "The command to be run, plus any arguments required."
@@ -68,11 +79,11 @@ components: sources: exec: {
 			common:      false
 			description: "Include the output of stderr when generating events."
 			required:    false
-			type: bool: default: false
+			type: bool: default: true
 		}
 		event_per_line: {
 			common:      false
-			description: "Determine if events should be generated per line."
+			description: "Determine if events should be generated per line or buffered and output as a single event when script execution finishes."
 			required:    false
 			type: bool: default: true
 		}
@@ -94,9 +105,10 @@ components: sources: exec: {
 				examples: []
 				options: {
 					exec_interval_secs: {
-						common:      true
-						description: "The interval in seconds between scheduled command runs. The command will be killed if it takes longer than exec_interval_secs to run."
-						required:    false
+						common:        true
+						description:   "The interval in seconds between scheduled command runs. The command will be killed if it takes longer than exec_interval_secs to run."
+						relevant_when: "mode = `scheduled`"
+						required:      false
 						type: uint: {
 							default: 60
 							unit:    "seconds"
@@ -114,15 +126,17 @@ components: sources: exec: {
 				examples: []
 				options: {
 					respawn_on_exit: {
-						common:      true
-						description: "Determine if a streaming command should be restarted if it exits."
-						required:    false
+						common:        true
+						description:   "Determine if a streaming command should be restarted if it exits."
+						relevant_when: "mode = `streaming`"
+						required:      false
 						type: bool: default: true
 					}
 					respawn_interval_secs: {
-						common:      false
-						description: "The interval in seconds between restarting streaming commands if needed."
-						required:    false
+						common:        false
+						description:   "The interval in seconds between restarting streaming commands if needed."
+						relevant_when: "mode = `streaming`"
+						required:      false
 						warnings: []
 						type: uint: {
 							default: 5

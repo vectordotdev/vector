@@ -26,8 +26,9 @@ use tokio_stream::wrappers::IntervalStream;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(default, deny_unknown_fields)]
 pub struct ExecConfig {
-    #[serde(flatten)]
     pub mode: Mode,
+    pub scheduled: Option<ScheduledConfig>,
+    pub streaming: Option<StreamingConfig>,
     pub command: Vec<String>,
     pub working_directory: Option<PathBuf>,
     #[serde(default = "default_include_stderr")]
@@ -38,19 +39,29 @@ pub struct ExecConfig {
     pub maximum_buffer_size_bytes: u64,
 }
 
+// TODO: Would be nice to combine the scheduled and streaming config with the mode enum once
+//       this serde ticket has been addressed (https://github.com/serde-rs/serde/issues/2013)
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Mode {
-    Scheduled {
-        #[serde(default = "default_exec_interval_secs")]
-        exec_interval_secs: u64,
-    },
-    Streaming {
-        #[serde(default = "default_respawn_on_exit")]
-        respawn_on_exit: bool,
-        #[serde(default = "default_respawn_interval_secs")]
-        respawn_interval_secs: u64,
-    },
+    Scheduled,
+    Streaming,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub struct ScheduledConfig {
+    #[serde(default = "default_exec_interval_secs")]
+    exec_interval_secs: u64,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub struct StreamingConfig {
+    #[serde(default = "default_respawn_on_exit")]
+    respawn_on_exit: bool,
+    #[serde(default = "default_respawn_interval_secs")]
+    respawn_interval_secs: u64,
 }
 
 #[derive(Debug, PartialEq, Snafu)]
@@ -64,9 +75,11 @@ pub enum ExecConfigError {
 impl Default for ExecConfig {
     fn default() -> Self {
         ExecConfig {
-            mode: Mode::Scheduled {
+            mode: Mode::Scheduled,
+            scheduled: Some(ScheduledConfig {
                 exec_interval_secs: default_exec_interval_secs(),
-            },
+            }),
+            streaming: None,
             command: vec!["echo".to_owned(), "Hello World!".to_owned()],
             working_directory: None,
             include_stderr: default_include_stderr(),
@@ -108,7 +121,7 @@ fn get_hostname() -> Option<String> {
 const EXEC: &str = "exec";
 const STDOUT: &str = "stdout";
 const STDERR: &str = "stderr";
-const DATA_STREAM_KEY: &str = "data_stream";
+const STREAM_KEY: &str = "stream";
 const PID_KEY: &str = "pid";
 const EXIT_STATUS_KEY: &str = "exit_status";
 const COMMAND_KEY: &str = "command";
@@ -134,6 +147,27 @@ impl ExecConfig {
     pub(self) fn command_line(&self) -> String {
         self.command.join(" ")
     }
+
+    pub(self) fn exec_interval_secs_or_default(&self) -> u64 {
+        match &self.scheduled {
+            None => default_exec_interval_secs(),
+            Some(config) => config.exec_interval_secs,
+        }
+    }
+
+    pub(self) fn respawn_on_exit_or_default(&self) -> bool {
+        match &self.streaming {
+            None => default_respawn_on_exit(),
+            Some(config) => config.respawn_on_exit,
+        }
+    }
+
+    pub(self) fn respawn_interval_secs_or_default(&self) -> u64 {
+        match &self.streaming {
+            None => default_respawn_interval_secs(),
+            Some(config) => config.respawn_interval_secs,
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -149,20 +183,22 @@ impl SourceConfig for ExecConfig {
         self.validate()?;
         let hostname = get_hostname();
         match self.mode.clone() {
-            Mode::Scheduled { exec_interval_secs } => {
+            Mode::Scheduled => {
+                let exec_interval_secs = self.exec_interval_secs_or_default();
                 run_scheduled(self.clone(), hostname, exec_interval_secs, shutdown, out)
             }
-            Mode::Streaming {
-                respawn_on_exit,
-                respawn_interval_secs,
-            } => run_streaming(
-                self.clone(),
-                hostname,
-                respawn_on_exit,
-                respawn_interval_secs,
-                shutdown,
-                out,
-            ),
+            Mode::Streaming => {
+                let respawn_on_exit = self.respawn_on_exit_or_default();
+                let respawn_interval_secs = self.respawn_interval_secs_or_default();
+                run_streaming(
+                    self.clone(),
+                    hostname,
+                    respawn_on_exit,
+                    respawn_interval_secs,
+                    shutdown,
+                    out,
+                )
+            }
         }
     }
 
@@ -257,11 +293,14 @@ pub fn run_streaming(
                     }
                 }
 
+                let mut poll_shutdown = shutdown.clone();
+                if futures::poll!(&mut poll_shutdown).is_pending() {
+                    warn!("Streaming process ended before shutdown.");
+                }
+
                 tokio::select! {
-                    _ = shutdown.clone() => break, // will break early if a shutdown is started
-                    _ = sleep(duration) => {
-                        warn!("Streaming process ended before shutdown.");
-                    },
+                    _ = &mut poll_shutdown => break, // will break early if a shutdown is started
+                    _ = sleep(duration) => debug!("Restarting streaming process."),
                 }
             }
         } else {
@@ -361,17 +400,17 @@ async fn run_command(
 
     match child.try_wait() {
         Ok(Some(exit_status)) => {
-            handle_exit_status(&config, hostname, pid, Some(exit_status), elapsed, out).await;
+            handle_exit_status(&config, Some(exit_status), elapsed).await;
             Ok(Some(exit_status))
         }
         Ok(None) => {
-            handle_exit_status(&config, hostname, pid, None, elapsed, out).await;
+            handle_exit_status(&config, None, elapsed).await;
             Ok(None)
         }
         Err(error) => {
             error!(message = "Unable to obtain exit status.", %error);
 
-            handle_exit_status(&config, hostname, pid, None, elapsed, out).await;
+            handle_exit_status(&config, None, elapsed).await;
             Ok(None)
         }
     }
@@ -379,11 +418,8 @@ async fn run_command(
 
 async fn handle_exit_status(
     config: &ExecConfig,
-    hostname: Option<String>,
-    pid: Option<u32>,
     exit_status: Option<ExitStatus>,
     exec_duration: Duration,
-    mut out: Pipeline,
 ) {
     let exit_status = match exit_status {
         Some(exit_status) => exit_status.code(),
@@ -395,23 +431,6 @@ async fn handle_exit_status(
         exit_status,
         exec_duration,
     });
-
-    let event = create_event(
-        config,
-        &hostname,
-        Bytes::new(),
-        &None,
-        pid,
-        exit_status,
-        &Some(exec_duration.as_millis()),
-    );
-
-    let _ = out
-        .send(event)
-        .await
-        .map_err(|_: crate::pipeline::ClosedError| {
-            error!(message = "Failed to forward events; downstream is closed.");
-        });
 }
 
 fn build_command(config: &ExecConfig) -> Command {
@@ -463,7 +482,7 @@ fn create_event(
 
     // Add data stream of stdin or stderr (if needed)
     if let Some(data_stream) = data_stream {
-        log_event.insert(DATA_STREAM_KEY, data_stream.clone());
+        log_event.insert(STREAM_KEY, data_stream.clone());
     }
 
     // Add pid (if needed)
@@ -530,13 +549,16 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
 
                 let read_bytes = Bytes::from(read_buffer.clone());
                 if sender.send((read_bytes, stream)).await.is_err() {
+                    // If the receive half of the channel is closed, either due to close being
+                    // called or the Receiver handle dropping, the function returns an error.
+                    debug!("Receive channel closed, unable to send.");
                     break;
                 }
 
                 // Clear the read buffer ready for the next read
                 read_buffer.clear();
 
-                // Reset the limit for the next read (minus any left over if we do utf8 checks)
+                // Reset the limit for the next read
                 limited_reader.set_limit(buf_size);
             }
         } else {
@@ -549,13 +571,16 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
 
                 let read_bytes = Bytes::from(read_buffer.clone());
                 if sender.send((read_bytes, stream)).await.is_err() {
+                    // If the receive half of the channel is closed, either due to close being
+                    // called or the Receiver handle dropping, the function returns an error.
+                    debug!("Receive channel closed, unable to send.");
                     break;
                 }
 
                 // Clear the read buffer ready for the next read
                 read_buffer.clear();
 
-                // Reset the limit for the next read (minus any left over if we do utf8 checks)
+                // Reset the limit for the next read
                 limited_reader.set_limit(buf_size);
             }
         }
@@ -563,7 +588,9 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
         // Handle any left over buffer
         if !read_buffer.is_empty() {
             let read_bytes = Bytes::from(read_buffer.clone());
-            let _ = sender.send((read_bytes, stream)).await.is_err();
+            if sender.send((read_bytes, stream)).await.is_err() {
+                debug!("Receive channel closed, unable to send.");
+            }
         }
 
         debug!("Finished capturing {} command output.", stream);
@@ -603,7 +630,7 @@ mod tests {
         let log = event.into_log();
 
         assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
-        assert_eq!(log[DATA_STREAM_KEY], STDOUT.into());
+        assert_eq!(log[STREAM_KEY], STDOUT.into());
         assert_eq!(log[PID_KEY], (8888_i64).into());
         assert_eq!(log[COMMAND_KEY], config.command.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
@@ -633,7 +660,7 @@ mod tests {
         let log = event.into_log();
 
         assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
-        assert_eq!(log[DATA_STREAM_KEY], STDOUT.into());
+        assert_eq!(log[STREAM_KEY], STDOUT.into());
         assert_eq!(log[PID_KEY], (8888_i64).into());
         assert_eq!(log[COMMAND_KEY], config.command.into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
@@ -644,10 +671,12 @@ mod tests {
     #[test]
     fn test_build_command() {
         let config = ExecConfig {
-            mode: Mode::Streaming {
+            mode: Mode::Streaming,
+            scheduled: None,
+            streaming: Some(StreamingConfig {
                 respawn_on_exit: default_respawn_on_exit(),
                 respawn_interval_secs: default_respawn_interval_secs(),
-            },
+            }),
             command: vec!["./runner".to_owned(), "arg1".to_owned(), "arg2".to_owned()],
             working_directory: Some(PathBuf::from("/tmp")),
             include_stderr: default_include_stderr(),
@@ -781,7 +810,7 @@ mod tests {
         if let Ok(Some(event)) = rx.try_next() {
             let log = event.as_log();
             assert_eq!(log[COMMAND_KEY], config.command.clone().into());
-            assert_eq!(log[DATA_STREAM_KEY], STDOUT.into());
+            assert_eq!(log[STREAM_KEY], STDOUT.into());
             assert_eq!(log[log_schema().source_type_key()], "exec".into());
             assert_eq!(log[log_schema().message_key()], "Hello World!".into());
             assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
@@ -792,22 +821,6 @@ mod tests {
         } else {
             panic!("Expected to receive a linux event");
         }
-
-        if let Ok(Some(event)) = rx.try_next() {
-            let log = event.as_log();
-            assert_eq!(log[COMMAND_KEY], config.command.clone().into());
-            assert_eq!(log[log_schema().source_type_key()], "exec".into());
-            assert_eq!(log[log_schema().message_key()], "".into());
-            assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
-            assert_eq!(log[EXIT_STATUS_KEY], (0_i64).into());
-            assert_ne!(log[PID_KEY], "".into());
-            assert_ne!(log[EXEC_DURATION_MILLIS_KEY], "".into());
-            assert_ne!(log[log_schema().timestamp_key()], "".into());
-
-            assert_eq!(9, log.all_fields().count());
-        } else {
-            panic!("Expected to receive an end of process linux event");
-        }
     }
 
     fn standard_scheduled_test_config() -> ExecConfig {
@@ -816,10 +829,12 @@ mod tests {
 
     fn standard_streaming_test_config() -> ExecConfig {
         ExecConfig {
-            mode: Mode::Streaming {
+            mode: Mode::Streaming,
+            scheduled: None,
+            streaming: Some(StreamingConfig {
                 respawn_on_exit: default_respawn_on_exit(),
                 respawn_interval_secs: default_respawn_interval_secs(),
-            },
+            }),
             command: vec!["yes".to_owned()],
             working_directory: None,
             include_stderr: default_include_stderr(),

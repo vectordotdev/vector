@@ -7,7 +7,7 @@ use std::{
 use tokio::io::{AsyncBufRead, AsyncRead, ReadBuf, Result as IoResult};
 
 pub trait VecAsyncBufReadExt: AsyncRead + AsyncBufRead {
-    /// Read data from this reader until the given future resolves.
+    /// Allow reading data from this reader until the given future resolves.
     fn allow_read_until<F>(self, until: F) -> AllowReadUntil<Self, F>
     where
         Self: Sized,
@@ -73,5 +73,34 @@ where
     fn consume(self: Pin<&mut Self>, amt: usize) {
         let this = self.project();
         this.reader.consume(amt)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shutdown::ShutdownSignal;
+    use futures::FutureExt;
+    use std::io::Cursor;
+    use tokio::io::{AsyncBufReadExt, BufReader};
+
+    #[tokio::test]
+    async fn test_read_line_without_shutdown() {
+        let buf = Cursor::new("First line\nSecond line\n");
+        let reader = BufReader::new(buf);
+        let shutdown = ShutdownSignal::noop();
+
+        let mut reader = reader.allow_read_until(shutdown.clone().map(|_| ()));
+
+        // Test one of the AsyncBufRead extension functions
+        let mut line_one = String::new();
+        let _ = reader.read_line(&mut line_one).await;
+
+        assert_eq!("First line\n", line_one);
+
+        let mut line_two = String::new();
+        let _ = reader.read_line(&mut line_two).await;
+
+        assert_eq!("Second line\n", line_two);
     }
 }
