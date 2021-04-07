@@ -13,15 +13,14 @@
 {{ $name := .name }}
 {{ $toc.Add $category (slice .name) }}
 {{ $func := index site.Data.docs.remap.functions .name }}
-
-<div class="function" id="{{ .name }}">
-  {{/* The h3 ensures that the function name is picked up by Tocbot and added to the TOC */}}
-  <h3 style="display: none;">
-    {{ .name }}
-  </h3>
-
+<div class="function">
   <header class="function-header">
     <span class="function-title">
+      {{/* The h3 ensures that the function name is picked up by Tocbot and added to the TOC */}}
+      <h3 id="{{ .name }}">
+        {{ .name }}
+      </h3>
+
       {{ with $func.arguments }}
       {{ $args := slice }}
       {{ range . }}
