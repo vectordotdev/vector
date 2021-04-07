@@ -14,7 +14,7 @@ impl AtomicF64 {
         }
     }
 
-    pub fn fetch_update<F>(
+    fn fetch_update<F>(
         &self,
         set_order: Ordering,
         fetch_order: Ordering,
@@ -30,11 +30,11 @@ impl AtomicF64 {
 
         match res {
             Ok(f) => Ok(f64::from_bits(f)),
-            Err(f) => Ok(f64::from_bits(f)),
+            Err(f) => Err(f64::from_bits(f)),
         }
     }
 
-    pub fn load(&self, order: Ordering) -> f64 {
+    fn load(&self, order: Ordering) -> f64 {
         f64::from_bits(self.inner.load(order))
     }
 }
@@ -131,7 +131,6 @@ impl Histogram {
 
     pub(crate) fn record(&mut self, value: f64) {
         let mut prev_bound = f64::NEG_INFINITY;
-        assert!(self.buckets.len() == 22);
         for (bound, bucket) in self.buckets.iter_mut() {
             if value > prev_bound && value <= *bound {
                 bucket.fetch_add(1, Ordering::Relaxed);
