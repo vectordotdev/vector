@@ -121,7 +121,7 @@ impl Histogram {
         f64::from_bits(self.sum.load(Ordering::Relaxed))
     }
 
-    pub fn buckets<'a>(&'a self) -> BucketIter<'a> {
+    pub fn buckets(&self) -> BucketIter<'_> {
         BucketIter {
             inner: self.buckets.iter(),
         }
