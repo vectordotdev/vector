@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="770px" height="325px" viewBox="0 0 770 325" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>runtime-model</title>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="runtime-model" transform="translate(1.000000, 0.000000)">
+            <g id="Group" fill-rule="nonzero">
+                <rect id="Rectangle" fill="#000000" x="0" y="0" width="768" height="48" rx="3"></rect>
+                <text id="Tokio-core-event-loop" fill="#FFFFFF" font-family="Helvetica" font-size="18" font-weight="normal">
+                    <tspan x="298.5" y="30">Tokio core event loop</tspan>
+                </text>
+            </g>
+            <g id="Group" transform="translate(0.000000, 72.000000)">
+                <rect id="Rectangle" fill-opacity="0.25" fill="#F44AF5" fill-rule="nonzero" x="0" y="0" width="768" height="48" rx="3"></rect>
+                <rect id="Rectangle" stroke="#F44AF5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="768" height="48" rx="3"></rect>
+                <text id="Main-task" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="18" font-weight="normal">
+                    <tspan x="345" y="30">Main task</tspan>
+                </text>
+            </g>
+            <g id="Group" transform="translate(0.000000, 144.000000)">
+                <rect id="Rectangle" fill-opacity="0.25" fill="#3084FF" fill-rule="nonzero" x="0" y="0" width="768" height="48" rx="3"></rect>
+                <rect id="Rectangle" stroke="#3084FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="768" height="48" rx="3"></rect>
+                <text id="futures::futures::FromAll" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="18" font-weight="normal">
+                    <tspan x="287.5" y="30">futures::futures::FromAll</tspan>
+                </text>
+            </g>
+            <g id="Group" transform="translate(378.000000, 54.000000)" stroke="#C3CFD9" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="6" y1="-2.84217094e-14" x2="6" y2="8" id="Path" stroke-width="4"></line>
+                <polygon id="Path" stroke-width="2" fill="#C3CFD9" fill-rule="nonzero" points="11.54095 4.9079 6 12 0.45905 4.9079"></polygon>
+            </g>
+            <g id="Group" transform="translate(378.000000, 126.000000)" stroke="#C3CFD9" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="6" y1="0" x2="6" y2="8" id="Path" stroke-width="4"></line>
+                <polygon id="Path" stroke-width="2" fill="#C3CFD9" fill-rule="nonzero" points="11.54095 4.9079 6 12 0.45905 4.9079"></polygon>
+            </g>
+            <g id="Group" transform="translate(0.000000, 252.000000)">
+                <rect id="Rectangle" fill-opacity="0.25" fill="#28D9F2" fill-rule="nonzero" x="0" y="0" width="192" height="72" rx="3"></rect>
+                <rect id="Rectangle" stroke="#28D9F2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="192" height="72" rx="3"></rect>
+                <text id="Future-#1" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                    <tspan x="63.5" y="31">Future #1</tspan>
+                </text>
+                <text id="(component)" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                    <tspan x="53.5" y="51">(component)</tspan>
+                </text>
+            </g>
+            <g id="Group" transform="translate(204.000000, 252.000000)">
+                <rect id="Rectangle" fill-opacity="0.25" fill="#28D9F2" fill-rule="nonzero" x="0" y="0" width="180" height="72" rx="3"></rect>
+                <rect id="Rectangle" stroke="#28D9F2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="180" height="72" rx="3"></rect>
+                <text id="Future-#2" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                    <tspan x="57.5" y="31">Future #2</tspan>
+                </text>
+                <text id="(component)" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                    <tspan x="47.5" y="51">(component)</tspan>
+                </text>
+            </g>
+            <g id="Group" transform="translate(396.000000, 252.000000)">
+                <rect id="Rectangle" fill-opacity="0.25" fill="#28D9F2" fill-rule="nonzero" x="0" y="0" width="180" height="72" rx="3"></rect>
+                <rect id="Rectangle" stroke="#28D9F2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="180" height="72" rx="3"></rect>
+                <text id="Future-#3" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                    <tspan x="57.5" y="31">Future #3</tspan>
+                </text>
+                <text id="(component)" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                    <tspan x="47.5" y="51">(component)</tspan>
+                </text>
+            </g>
+            <g id="Group" transform="translate(588.000000, 252.000000)">
+                <rect id="Rectangle" fill-opacity="0.25" fill="#28D9F2" fill-rule="nonzero" x="0" y="0" width="180" height="72" rx="3"></rect>
+                <rect id="Rectangle" stroke="#28D9F2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" x="0" y="0" width="180" height="72" rx="3"></rect>
+                <text id="Future-#n" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                    <tspan x="57.5" y="31">Future #n</tspan>
+                </text>
+                <text id="(component)" fill="#000000" fill-rule="nonzero" font-family="Helvetica" font-size="15" font-weight="normal">
+                    <tspan x="47.5" y="51">(component)</tspan>
+                </text>
+            </g>
+            <g id="Group" transform="translate(90.000000, 200.000000)" stroke="#C3CFD9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M294,0 L294,8 C294,12.41827 290.41827,16 286,16 L20,16 C12.26802,16 6,22.26802 6,30 L6,40" id="Path" stroke-width="4"></path>
+                <polygon id="Path" stroke-width="2" fill="#C3CFD9" fill-rule="nonzero" points="11.54095 36.9079 6 44 0.45905 36.9079"></polygon>
+            </g>
+            <g id="Group" transform="translate(288.000000, 200.000000)" stroke="#C3CFD9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M96,0 L96,8 C96,12.41827 92.41827,16 88,16 L20,16 C12.26802,16 6,22.26802 6,30 L6,40" id="Path" stroke-width="4"></path>
+                <polygon id="Path" stroke-width="2" fill="#C3CFD9" fill-rule="nonzero" points="11.54095 36.9079 6 44 0.45905 36.9079"></polygon>
+            </g>
+            <g id="Group" transform="translate(384.000000, 200.000000)" stroke="#C3CFD9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M0,0 L0,8 C0,12.41827 3.58173,16 8,16 L88,16 C95.73198,16 102,22.26802 102,30 L102,40" id="Path" stroke-width="4"></path>
+                <polygon id="Path" stroke-width="2" fill="#C3CFD9" fill-rule="nonzero" points="107.54095 36.9079 102 44 96.45905 36.9079"></polygon>
+            </g>
+            <g id="Group" transform="translate(384.000000, 200.000000)" stroke="#C3CFD9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M0,0 L0,8 C0,12.41827 3.58173,16 8,16 L280,16 C287.73198,16 294,22.26802 294,30 L294,40" id="Path" stroke-width="4"></path>
+                <polygon id="Path" stroke-width="2" fill="#C3CFD9" fill-rule="nonzero" points="299.54095 36.9079 294 44 288.45905 36.9079"></polygon>
+            </g>
+        </g>
+    </g>
+</svg>
