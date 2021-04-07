@@ -34,6 +34,14 @@ This function will cause the object passed as value to be emitted at that point 
 
 Additionally, an `emit_root` (we can work on the naming) config option will be added to the `remap` transform to configure whether `.` is emitted after the transform runs. It will default to `true` to preserve the current behavior but can be set to `false` by users to supress this behavior. Admittedly, I'm not wild about introducing this additional config option, but I'm not seeing another great alternative.
 
+This will be able to be combined with the iteration mechanism that will be introduced [#6031](https://github.com/timberio/vector/issues/6031) to emit an unknown number of events. Naively this might look something like:
+
+```text
+for stooge in .stooges
+   emit(stooge)
+end
+```
+
 In the future we can also add functions for emitting metrics like:
 
 ```text
