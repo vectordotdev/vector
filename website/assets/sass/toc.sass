@@ -1,0 +1,37 @@
+// Table of Contents provided by Tocbot (https://github.com/tscanlin/tocbot)
+// Our implementation uses the Tocbot JavaScript to build the HTML for the TOC but doesn't use Tocbot's CSS
+// Instead, we use the Sass/CSS here in this file
+
+$toc-indent: 1rem
+
+#docs-toc
+  border-left: 2px solid $grey-lighter
+  overflow-y: auto
+
+  .toc-list // h2
+    margin: 0
+    padding-left: $toc-indent
+
+    .toc-list // h3
+      font-size: 0.9rem
+      padding-top: 0.25rem
+      padding-bottom: 0.25rem
+      color: $grey
+
+  & > .toc-list
+    overflow: hidden
+    position: relative
+
+    li
+      list-style: none
+
+a.toc-link
+  color: currentColor
+  height: 100%
+
+.is-active-link
+  font-weight: $weight-bold
+
+// Get rid of the annoying border on Chrome when a link is selected
+*:focus
+  outline: none

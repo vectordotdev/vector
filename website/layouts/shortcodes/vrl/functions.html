@@ -15,6 +15,11 @@
 {{ $func := index site.Data.docs.remap.functions .name }}
 
 <div class="function" id="{{ .name }}">
+  {{/* The h3 ensures that the function name is picked up by Tocbot and added to the TOC */}}
+  <h3 style="display: none;">
+    {{ .name }}
+  </h3>
+
   <header class="function-header">
     <span class="function-title">
       {{ with $func.arguments }}
