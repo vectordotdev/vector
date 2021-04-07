@@ -34,6 +34,9 @@ pub enum Error {
     #[error("invalid string literal")]
     StringLiteral { start: usize },
 
+    #[error("unterminated literal")]
+    UnterminatedLiteral { start: usize },
+
     #[error("invalid literal")]
     Literal { start: usize },
 
@@ -62,6 +65,7 @@ impl DiagnosticError for Error {
             Literal { .. } => 208,
             EscapeChar { .. } => 209,
             UnexpectedParseError(..) => 210,
+            UnterminatedLiteral { .. } => 211,
         }
     }
 
@@ -181,6 +185,11 @@ impl DiagnosticError for Error {
             )],
 
             UnexpectedParseError(string) => vec![Label::primary(string, Span::default())],
+
+            UnterminatedLiteral { start } => vec![Label::primary(
+                "unterminated literal",
+                Span::new(*start, *start + 1),
+            )],
         }
     }
 }
@@ -470,9 +479,13 @@ impl<'input> Iterator for Lexer<'input> {
             //
             // We don't advance the internal iterator, because this token does not
             // represent a physical character, instead it is a boundary marker.
-            if self.query_start(start) {
-                // dbg!("LQuery"); // NOTE: uncomment this for debugging
-                return Some(Ok(self.token2(start, start + 1, LQuery)));
+            match self.query_start(start) {
+                Err(err) => return Some(Err(err)),
+                Ok(true) => {
+                    // dbg!("LQuery"); // NOTE: uncomment this for debugging
+                    return Some(Ok(self.token2(start, start + 1, LQuery)));
+                }
+                Ok(false) => (),
             }
 
             // Check if we need to emit a `RQuery` token.
@@ -601,16 +614,16 @@ impl<'input> Lexer<'input> {
         }
     }
 
-    fn query_start(&mut self, start: usize) -> bool {
+    fn query_start(&mut self, start: usize) -> Result<bool, Error> {
         // If we already opened a query for the current position, we don't want
         // to open another one.
         if self.rquery_indices.last() == Some(&start) {
-            return false;
+            return Ok(false);
         }
 
         // If the iterator is at the end, we don't want to open another one
         if self.peek().is_none() {
-            return false;
+            return Ok(false);
         }
 
         // Take a clone of the existing chars iterator, to allow us to look
@@ -623,7 +636,7 @@ impl<'input> Lexer<'input> {
         // character. We know there's at least one more char, given the above
         // assertion.
         if !is_query_start(chars.peek().unwrap().1) {
-            return false;
+            return Ok(false);
         }
 
         // Track if the current chain is a valid one.
@@ -772,28 +785,36 @@ impl<'input> Lexer<'input> {
                                 let r = Lexer::new(&self.input[pos + 1..]).string_literal(0);
                                 match literal_check(r, &mut chars) {
                                     Ok(ch) => ch,
-                                    Err(_) => continue,
+                                    Err(_) => {
+                                        return Err(Error::UnterminatedLiteral { start: pos + 1 });
+                                    }
                                 }
                             }
                             s if s.starts_with("s'") => {
                                 let r = Lexer::new(&self.input[pos + 1..]).raw_string_literal(0);
                                 match literal_check(r, &mut chars) {
                                     Ok(ch) => ch,
-                                    Err(_) => continue,
+                                    Err(_) => {
+                                        return Err(Error::UnterminatedLiteral { start: pos + 1 });
+                                    }
                                 }
                             }
                             s if s.starts_with("r'") => {
                                 let r = Lexer::new(&self.input[pos + 1..]).regex_literal(0);
                                 match literal_check(r, &mut chars) {
                                     Ok(ch) => ch,
-                                    Err(_) => continue,
+                                    Err(_) => {
+                                        return Err(Error::UnterminatedLiteral { start: pos + 1 });
+                                    }
                                 }
                             }
                             s if s.starts_with("t'") => {
                                 let r = Lexer::new(&self.input[pos + 1..]).timestamp_literal(0);
                                 match literal_check(r, &mut chars) {
                                     Ok(ch) => ch,
-                                    Err(_) => continue,
+                                    Err(_) => {
+                                        return Err(Error::UnterminatedLiteral { start: pos + 1 });
+                                    }
                                 }
                             }
                             _ => *ch,
@@ -859,16 +880,16 @@ impl<'input> Lexer<'input> {
 
         // Skip invalid query chains
         if !valid {
-            return false;
+            return Ok(false);
         }
 
         // If we already tracked the current chain, we want to ignore another one.
         if self.rquery_indices.contains(&end) {
-            return false;
+            return Ok(false);
         }
 
         self.rquery_indices.push(end);
-        true
+        Ok(true)
     }
 
     fn string_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
@@ -1165,6 +1186,15 @@ mod test {
         assert_eq!(count, length);
         assert!(count > 0);
         assert!(lexer.next().is_none());
+    }
+
+    #[test]
+    fn unterminated_literal_errors() {
+        let mut lexer = Lexer::new("a(m, r')");
+        assert_eq!(
+            Some(Err(Error::UnterminatedLiteral { start: 6 })),
+            lexer.next()
+        );
     }
 
     #[test]
