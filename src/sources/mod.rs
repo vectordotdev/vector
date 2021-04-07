@@ -51,6 +51,8 @@ pub mod statsd;
 pub mod stdin;
 #[cfg(feature = "sources-syslog")]
 pub mod syslog;
+#[cfg(feature = "sources-syslog_remap")]
+pub mod syslog_remap;
 #[cfg(feature = "sources-vector")]
 pub mod vector;
 
