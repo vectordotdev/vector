@@ -1,4 +1,5 @@
 use metrics::GaugeValue;
+use std::slice;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 #[derive(Debug)]
@@ -120,10 +121,24 @@ impl Histogram {
         f64::from_bits(self.sum.load(Ordering::Relaxed))
     }
 
-    pub fn buckets(&self, buf: &mut Vec<(f64, u32)>) {
-        for (k, v) in self.buckets.iter() {
-            buf.push((*k, v.load(Ordering::Relaxed)));
+    pub fn buckets<'a>(&'a self) -> BucketIter<'a> {
+        BucketIter {
+            inner: self.buckets.iter(),
         }
+    }
+}
+
+pub struct BucketIter<'a> {
+    inner: slice::Iter<'a, (f64, AtomicU32)>,
+}
+
+impl<'a> Iterator for BucketIter<'a> {
+    type Item = (f64, u32);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner
+            .next()
+            .map(|(k, v)| (*k, v.load(Ordering::Relaxed)))
     }
 }
 

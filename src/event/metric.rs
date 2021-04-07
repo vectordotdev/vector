@@ -299,10 +299,8 @@ impl Metric {
                 value: gauge.gauge(),
             },
             Handle::Histogram(histogram) => {
-                let mut buckets: Vec<(f64, u32)> = Vec::with_capacity(32);
-                histogram.buckets(&mut buckets);
-                let buckets: Vec<Bucket> = buckets
-                    .into_iter()
+                let buckets: Vec<Bucket> = histogram
+                    .buckets()
                     .map(|(upper_limit, count)| Bucket { upper_limit, count })
                     .collect();
 
