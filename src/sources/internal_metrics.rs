@@ -114,20 +114,40 @@ mod tests {
             MetricValue::Counter { value: 7.0 },
             output["bar"].data.value
         );
-        assert_eq!(
-            MetricValue::Distribution {
-                samples: crate::samples![5.0 => 1, 6.0 => 1],
-                statistic: StatisticKind::Histogram
-            },
-            output["baz"].data.value
-        );
-        assert_eq!(
-            MetricValue::Distribution {
-                samples: crate::samples![7.0 => 1, 8.0 => 1],
-                statistic: StatisticKind::Histogram
-            },
-            output["quux"].data.value
-        );
+
+        match &output["baz"].data.value {
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => {
+                // This index is _only_ stable so long as the offsets in
+                // [`metrics::handle::Histogram::new`] are hard-coded. If this
+                // check fails you might look there and see if we've allowed
+                // users to set their own bucket widths.
+                assert_eq!(buckets[11].count, 2);
+                assert_eq!(*count, 2);
+                assert_eq!(*sum, 11.0);
+            }
+            _ => panic!("wrong type"),
+        }
+
+        match &output["quux"].data.value {
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => {
+                // This index is _only_ stable so long as the offsets in
+                // [`metrics::handle::Histogram::new`] are hard-coded. If this
+                // check fails you might look there and see if we've allowed
+                // users to set their own bucket widths.
+                assert_eq!(buckets[12].count, 2);
+                assert_eq!(*count, 2);
+                assert_eq!(*sum, 15.0);
+            }
+            _ => panic!("wrong type"),
+        }
 
         let mut labels = BTreeMap::new();
         labels.insert(String::from("host"), String::from("foo"));
