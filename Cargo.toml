@@ -282,6 +282,7 @@ tokio-test = "0.4.1"
 tokio01-test = "0.1.1"
 tower-test = "0.4.0"
 walkdir = "2.3.2"
+quickcheck = "1"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin

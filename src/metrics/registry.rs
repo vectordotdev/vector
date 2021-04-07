@@ -40,10 +40,10 @@ where
     pub fn op<I, O, V>(&self, key: K, op: O, init: I) -> V
     where
         I: FnOnce() -> H,
-        O: FnOnce(&H) -> V,
+        O: FnOnce(&mut H) -> V,
     {
-        let valref = self.map.entry(key).or_insert_with(init);
-        op(valref.value())
+        let mut valref = self.map.entry(key).or_insert_with(init);
+        op(valref.value_mut())
     }
 }
 

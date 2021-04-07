@@ -1,4 +1,5 @@
 use super::EventMetadata;
+use crate::metrics::Handle;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use getset::Getters;
@@ -289,29 +290,26 @@ impl Metric {
 
     /// Convert the metrics_runtime::Measurement value plus the name and
     /// labels from a Key into our internal Metric format.
-    pub fn from_metric_kv(key: &metrics::Key, handle: &metrics_util::Handle) -> Self {
+    pub fn from_metric_kv(key: &metrics::Key, handle: &Handle) -> Self {
         let value = match handle {
-            metrics_util::Handle::Counter(_) => MetricValue::Counter {
-                value: handle.read_counter() as f64,
+            Handle::Counter(counter) => MetricValue::Counter {
+                value: counter.count() as f64,
             },
-            metrics_util::Handle::Gauge(_) => MetricValue::Gauge {
-                value: handle.read_gauge() as f64,
+            Handle::Gauge(gauge) => MetricValue::Gauge {
+                value: gauge.gauge(),
             },
-            metrics_util::Handle::Histogram(_) => {
-                let mut samples = Vec::with_capacity(128);
-                handle.read_histogram_with_clear(|values| {
-                    // Each sample in the source measurement has an effective
-                    // sample rate of 1.
-                    for value in values {
-                        samples.push(Sample {
-                            value: *value,
-                            rate: 1,
-                        });
-                    }
-                });
-                MetricValue::Distribution {
-                    samples,
-                    statistic: StatisticKind::Histogram,
+            Handle::Histogram(histogram) => {
+                let mut buckets: Vec<(f64, u32)> = Vec::with_capacity(32);
+                histogram.buckets(&mut buckets);
+                let buckets: Vec<Bucket> = buckets
+                    .into_iter()
+                    .map(|(upper_limit, count)| Bucket { upper_limit, count })
+                    .collect();
+
+                MetricValue::AggregatedHistogram {
+                    buckets,
+                    sum: histogram.sum() as f64,
+                    count: histogram.count(),
                 }
             }
         };
