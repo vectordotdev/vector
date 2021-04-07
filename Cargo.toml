@@ -112,9 +112,9 @@ tracing-subscriber = "0.2.17"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
-metrics = "=0.13.0-alpha.13"
-metrics-tracing-context = "=0.1.0-alpha.7"
-metrics-util = "=0.4.0-alpha.10"
+metrics = "=0.14.2"
+metrics-tracing-context = "0.3.0"
+metrics-util = "0.6.2"
 # Indirect dependency; benchmark regression detected; pinning until
 # https://github.com/timberio/vector/issues/6412 is resolved
 metrics-macros = "=0.1.0-alpha.9"
