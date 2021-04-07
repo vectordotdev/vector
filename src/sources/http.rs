@@ -1,15 +1,13 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::{Event, Value},
-    shutdown::ShutdownSignal,
     sources::util::{
         add_query_parameters, decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
     },
     tls::TlsConfig,
-    Pipeline,
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -99,13 +97,7 @@ impl HttpSource for SimpleHttpSource {
 #[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl SourceConfig for SimpleHttpConfig {
-    async fn build(
-        &self,
-        _: &str,
-        _: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = SimpleHttpSource {
             encoding: self.encoding,
             headers: self.headers.clone(),
@@ -118,8 +110,8 @@ impl SourceConfig for SimpleHttpConfig {
             self.strict_path,
             &self.tls,
             &self.auth,
-            out,
-            shutdown,
+            cx.out,
+            cx.shutdown,
         )
     }
 
@@ -168,9 +160,8 @@ fn add_headers(
 #[cfg(test)]
 mod tests {
     use super::{Encoding, SimpleHttpConfig};
-    use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{log_schema, GlobalOptions, SourceConfig},
+        config::{log_schema, SourceConfig, SourceContext},
         event::{Event, Value},
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
@@ -215,12 +206,7 @@ mod tests {
                 path_key,
                 path,
             }
-            .build(
-                "default",
-                &GlobalOptions::default(),
-                ShutdownSignal::noop(),
-                sender,
-            )
+            .build(SourceContext::new_test(sender))
             .await
             .unwrap()
             .await

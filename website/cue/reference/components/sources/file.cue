@@ -298,7 +298,7 @@ components: sources: file: {
 				currently will not attempt to make further reads from a file for
 				which it has already stored a checkpoint in a previous run. For
 				this reason, users should take care to allow Vector to fully
-				process anycompressed files before shutting the process down or moving the
+				process any compressed files before shutting the process down or moving the
 				files to another location on disk.
 				"""
 		}

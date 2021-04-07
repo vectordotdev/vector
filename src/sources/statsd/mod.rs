@@ -1,6 +1,6 @@
 use crate::udp;
 use crate::{
-    config::{self, GenerateConfig, GlobalOptions, Resource, SourceConfig, SourceDescription},
+    config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpSource},
@@ -92,15 +92,11 @@ impl GenerateConfig for StatsdConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "statsd")]
 impl SourceConfig for StatsdConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         match self {
-            StatsdConfig::Udp(config) => Ok(Box::pin(statsd_udp(config.clone(), shutdown, out))),
+            StatsdConfig::Udp(config) => {
+                Ok(Box::pin(statsd_udp(config.clone(), cx.shutdown, cx.out)))
+            }
             StatsdConfig::Tcp(config) => {
                 let tls = MaybeTlsSettings::from_config(&config.tls, true)?;
                 StatsdTcpSource.run(
@@ -109,12 +105,12 @@ impl SourceConfig for StatsdConfig {
                     config.shutdown_timeout_secs,
                     tls,
                     config.receive_buffer_bytes,
-                    shutdown,
-                    out,
+                    cx.shutdown,
+                    cx.out,
                 )
             }
             #[cfg(unix)]
-            StatsdConfig::Unix(config) => Ok(statsd_unix(config.clone(), shutdown, out)),
+            StatsdConfig::Unix(config) => Ok(statsd_unix(config.clone(), cx.shutdown, cx.out)),
         }
     }
 

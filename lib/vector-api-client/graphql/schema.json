@@ -817,6 +817,95 @@
           "possibleTypes": null
         },
         {
+          "description": "Encoding format for the event",
+          "enumValues": [
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "JSON"
+            },
+            {
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "YAML"
+            }
+          ],
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "ENUM",
+          "name": "EventEncodingType",
+          "possibleTypes": null
+        },
+        {
+          "description": "A notification regarding events observation",
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Name of the component associated with the notification",
+              "isDeprecated": false,
+              "name": "componentName",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Event notification type",
+              "isDeprecated": false,
+              "name": "notification",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "EventNotificationType",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "EventNotification",
+          "possibleTypes": null
+        },
+        {
+          "description": "Event notification type",
+          "enumValues": [
+            {
+              "deprecationReason": null,
+              "description": "A component was found that matched the provided pattern",
+              "isDeprecated": false,
+              "name": "MATCHED"
+            },
+            {
+              "deprecationReason": null,
+              "description": "There isn't currently a component that matches this pattern",
+              "isDeprecated": false,
+              "name": "NOT_MATCHED"
+            }
+          ],
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "ENUM",
+          "name": "EventNotificationType",
+          "possibleTypes": null
+        },
+        {
           "description": null,
           "enumValues": null,
           "fields": [
@@ -1628,6 +1717,88 @@
           "possibleTypes": null
         },
         {
+          "description": "Log event with fields for querying log data",
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Name of the component associated with the log event",
+              "isDeprecated": false,
+              "name": "componentName",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Log message",
+              "isDeprecated": false,
+              "name": "message",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Log timestamp",
+              "isDeprecated": false,
+              "name": "timestamp",
+              "type": {
+                "kind": "SCALAR",
+                "name": "DateTime",
+                "ofType": null
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": null,
+                  "description": null,
+                  "name": "encoding",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "ENUM",
+                      "name": "EventEncodingType",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": "Log event as an encoded string format",
+              "isDeprecated": false,
+              "name": "string",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "Log",
+          "possibleTypes": null
+        },
+        {
           "description": "Host memory metrics",
           "enumValues": null,
           "fields": [
@@ -1962,6 +2133,27 @@
           "kind": "OBJECT",
           "name": "NetworkMetrics",
           "possibleTypes": null
+        },
+        {
+          "description": "An event or a notification",
+          "enumValues": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "kind": "UNION",
+          "name": "OutputEventsPayload",
+          "possibleTypes": [
+            {
+              "kind": "OBJECT",
+              "name": "Log",
+              "ofType": null
+            },
+            {
+              "kind": "OBJECT",
+              "name": "EventNotification",
+              "ofType": null
+            }
+          ]
         },
         {
           "description": "Information about pagination in a connection",
@@ -3502,6 +3694,81 @@
           "description": null,
           "enumValues": null,
           "fields": [
+            {
+              "args": [
+                {
+                  "defaultValue": null,
+                  "description": null,
+                  "name": "componentNames",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "String",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "defaultValue": "500",
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                },
+                {
+                  "defaultValue": "100",
+                  "description": null,
+                  "name": "limit",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": "A stream of events emitted from matched component(s)",
+              "isDeprecated": false,
+              "name": "outputEvents",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "UNION",
+                      "name": "OutputEventsPayload",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
             {
               "args": [],
               "deprecationReason": null,

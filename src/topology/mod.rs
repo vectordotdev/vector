@@ -7,7 +7,7 @@
 //! each type of component.
 
 pub mod builder;
-mod fanout;
+pub mod fanout;
 mod task;
 
 use crate::{
@@ -29,7 +29,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tokio::{
-    sync::mpsc,
+    sync::{mpsc, watch},
     time::{interval, sleep_until, Duration, Instant},
 };
 use tracing_futures::Instrument;
@@ -42,6 +42,14 @@ type BuiltBuffer = (
     buffers::Acker,
 );
 
+type Outputs = HashMap<String, fanout::ControlChannel>;
+
+// Watcher types for topology changes. These are currently specific to receiving
+// `Outputs`. This could be expanded in the future to send an enum of types if, for example,
+// this included a new 'Inputs' type.
+type WatchTx = watch::Sender<Outputs>;
+pub type WatchRx = watch::Receiver<Outputs>;
+
 #[allow(dead_code)]
 pub struct RunningTopology {
     inputs: HashMap<String, buffers::BufferInputCloner>,
@@ -52,6 +60,7 @@ pub struct RunningTopology {
     detach_triggers: HashMap<String, DisabledTrigger>,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
+    watch: (WatchTx, WatchRx),
 }
 
 pub async fn start_validated(
@@ -70,6 +79,7 @@ pub async fn start_validated(
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
         abort_tx,
+        watch: watch::channel(HashMap::new()),
     };
 
     if !running_topology
@@ -210,7 +220,7 @@ impl RunningTopology {
         if self.config.global != new_config.global {
             error!(
                 message =
-                    "Global options can't be changed while reloading config file; reload aborted. Please restart vector to reload the configuration file."
+                "Global options can't be changed while reloading config file; reload aborted. Please restart vector to reload the configuration file."
             );
             return Ok(false);
         }
@@ -500,6 +510,14 @@ impl RunningTopology {
         for name in &diff.sinks.to_add {
             self.setup_inputs(&name, new_pieces).await;
         }
+
+        // Broadcast changes to subscribers.
+        if !self.watch.0.is_closed() {
+            self.watch
+                .0
+                .send(self.outputs.clone())
+                .expect("Couldn't broadcast config changes.");
+        }
     }
 
     /// Starts new and changed pieces of topology.
@@ -744,6 +762,13 @@ impl RunningTopology {
     /// Borrows the Config
     pub fn config(&self) -> &Config {
         &self.config
+    }
+
+    /// Subscribe to topology changes. This will receive an `Outputs` currently, but may be
+    /// expanded in the future to accommodate `Inputs`. This is used by the 'tap' API to observe
+    /// config changes, and re-wire tap sinks.
+    pub fn watch(&self) -> watch::Receiver<Outputs> {
+        self.watch.1.clone()
     }
 }
 
@@ -1163,14 +1188,13 @@ mod source_finished_tests {
 ))]
 mod transient_state_tests {
     use crate::{
-        config::{Config, DataType, GlobalOptions, SourceConfig},
-        shutdown::ShutdownSignal,
+        config::{Config, DataType, SourceConfig, SourceContext},
         sinks::blackhole::BlackholeConfig,
         sources::stdin::StdinConfig,
         sources::Source,
         test_util::{start_topology, trace_init},
         transforms::json_parser::JsonParserConfig,
-        Error, Pipeline,
+        Error,
     };
     use futures::{future, FutureExt};
     use serde::{Deserialize, Serialize};
@@ -1199,18 +1223,13 @@ mod transient_state_tests {
     #[async_trait::async_trait]
     #[typetag::serde(name = "mock")]
     impl SourceConfig for MockSourceConfig {
-        async fn build(
-            &self,
-            _name: &str,
-            _globals: &GlobalOptions,
-            shutdown: ShutdownSignal,
-            out: Pipeline,
-        ) -> Result<Source, Error> {
+        async fn build(&self, cx: SourceContext) -> Result<Source, Error> {
             let tripwire = self.tripwire.lock().await;
 
+            let out = cx.out;
             Ok(Box::pin(
                 future::select(
-                    shutdown.map(|_| ()).boxed(),
+                    cx.shutdown.map(|_| ()).boxed(),
                     tripwire
                         .clone()
                         .unwrap()

@@ -834,24 +834,44 @@ mod integration_tests {
         http::HttpClient,
         sinks::influxdb::{
             metrics::{default_summary_quantiles, InfluxDbConfig, InfluxDbSvc},
-            test_util::{cleanup_v1, onboarding_v1, onboarding_v2, query_v1, BUCKET, ORG, TOKEN},
+            test_util::{
+                cleanup_v1, format_timestamp, onboarding_v1, onboarding_v2, query_v1, BUCKET, ORG,
+                TOKEN,
+            },
             InfluxDb1Settings, InfluxDb2Settings,
         },
         tls::{self, TlsOptions},
         Event,
     };
-    use chrono::Utc;
+    use chrono::{SecondsFormat, Utc};
     use futures::stream;
+    use pretty_assertions::assert_eq;
 
     #[tokio::test]
-    async fn insert_metrics_over_https() {
+    async fn inserts_metrics_v1_over_https() {
+        insert_metrics_v1(
+            "https://localhost:8087",
+            Some(TlsOptions {
+                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+                ..Default::default()
+            }),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn inserts_metrics_v1_over_http() {
+        insert_metrics_v1("http://localhost:8086", None).await
+    }
+
+    async fn insert_metrics_v1(url: &str, tls: Option<TlsOptions>) {
         crate::test_util::trace_init();
-        let database = onboarding_v1("https://localhost:8087").await;
+        let database = onboarding_v1(url).await;
 
         let cx = SinkContext::new_test();
 
         let config = InfluxDbConfig {
-            endpoint: "https://localhost:8087".to_string(),
+            endpoint: url.to_string(),
             influxdb1_settings: Some(InfluxDb1Settings {
                 consistency: None,
                 database: database.clone(),
@@ -862,10 +882,7 @@ mod integration_tests {
             influxdb2_settings: None,
             batch: Default::default(),
             request: Default::default(),
-            tls: Some(TlsOptions {
-                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
-                ..Default::default()
-            }),
+            tls,
             quantiles: default_summary_quantiles(),
             tags: None,
             default_namespace: None,
@@ -873,16 +890,9 @@ mod integration_tests {
 
         let events: Vec<_> = (0..10).map(create_event).collect();
         let (sink, _) = config.build(cx).await.expect("error when building config");
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run(stream::iter(events.clone())).await.unwrap();
 
-        let res = query_v1(
-            "https://localhost:8087",
-            &format!("show series on {}", database),
-        )
-        .await;
-        let string = res.text().await.unwrap();
-        let res: serde_json::Value =
-            serde_json::from_str(&string).expect("error when parsing InfluxDB response JSON");
+        let res = query_v1_json(url, &format!("show series on {}", database)).await;
 
         //
         // {"results":[{"statement_id":0,"series":[{"columns":["key"],"values":
@@ -905,10 +915,45 @@ mod integration_tests {
                 .as_array()
                 .unwrap()
                 .len(),
-            10
+            events.len()
         );
 
-        cleanup_v1("https://localhost:8087", &database).await;
+        for event in events {
+            let metric = event.into_metric();
+            let name = format!("{}.{}", metric.namespace().unwrap(), metric.name());
+            let value = match metric.data.value {
+                MetricValue::Counter { value } => value,
+                _ => unreachable!(),
+            };
+            let timestamp = format_timestamp(metric.data.timestamp.unwrap(), SecondsFormat::Nanos);
+            let res =
+                query_v1_json(url, &format!("select * from {}..\"{}\"", database, name)).await;
+
+            assert_eq!(
+                res,
+                serde_json::json! {
+                    {"results": [{
+                        "statement_id": 0,
+                        "series": [{
+                            "name": name,
+                            "columns": ["time", "metric_type", "production", "region", "value"],
+                            "values": [[timestamp, "counter", "true", "us-west-1", value as isize]]
+                        }]
+                    }]}
+                }
+            );
+        }
+
+        cleanup_v1(url, &database).await;
+    }
+
+    async fn query_v1_json(url: &str, query: &str) -> serde_json::Value {
+        let string = query_v1(url, query)
+            .await
+            .text()
+            .await
+            .expect("Fetching text from InfluxDB query failed");
+        serde_json::from_str(&string).expect("Error when parsing InfluxDB response JSON")
     }
 
     #[tokio::test]
@@ -1036,7 +1081,8 @@ mod integration_tests {
                 ]
                 .into_iter()
                 .collect(),
-            )),
+            ))
+            .with_timestamp(Some(Utc::now())),
         )
     }
 }
