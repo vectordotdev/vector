@@ -3,6 +3,43 @@ use std::slice;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 #[derive(Debug)]
+struct AtomicF64 {
+    inner: AtomicU64,
+}
+
+impl AtomicF64 {
+    fn new(init: f64) -> Self {
+        Self {
+            inner: AtomicU64::new(init.to_bits()),
+        }
+    }
+
+    pub fn fetch_update<F>(
+        &self,
+        set_order: Ordering,
+        fetch_order: Ordering,
+        mut f: F,
+    ) -> Result<f64, f64>
+    where
+        F: FnMut(f64) -> Option<f64>,
+    {
+        let res = self.inner.fetch_update(set_order, fetch_order, |x| {
+            let opt: Option<f64> = f(f64::from_bits(x));
+            opt.map(|i| i.to_bits())
+        });
+
+        match res {
+            Ok(f) => Ok(f64::from_bits(f)),
+            Err(f) => Ok(f64::from_bits(f)),
+        }
+    }
+
+    pub fn load(&self, order: Ordering) -> f64 {
+        f64::from_bits(self.inner.load(order))
+    }
+}
+
+#[derive(Debug)]
 pub enum Handle {
     Gauge(Gauge),
     Counter(Counter),
@@ -46,9 +83,9 @@ impl Handle {
 
 #[derive(Debug)]
 pub struct Histogram {
-    pub buckets: Box<[(f64, AtomicU32); 22]>,
-    pub count: AtomicU32,
-    pub sum: AtomicU64,
+    buckets: Box<[(f64, AtomicU32); 22]>,
+    count: AtomicU32,
+    sum: AtomicF64,
 }
 
 impl Histogram {
@@ -88,7 +125,7 @@ impl Histogram {
         Self {
             buckets,
             count: AtomicU32::new(0),
-            sum: AtomicU64::new(0),
+            sum: AtomicF64::new(0.0),
         }
     }
 
@@ -107,10 +144,7 @@ impl Histogram {
         self.count.fetch_add(1, Ordering::Relaxed);
         let _ = self
             .sum
-            .fetch_update(Ordering::AcqRel, Ordering::Relaxed, |cur| {
-                let next_sum = f64::from_bits(cur) + value;
-                Some(next_sum.to_bits())
-            });
+            .fetch_update(Ordering::AcqRel, Ordering::Relaxed, |cur| Some(cur + value));
     }
 
     pub fn count(&self) -> u32 {
@@ -118,7 +152,7 @@ impl Histogram {
     }
 
     pub fn sum(&self) -> f64 {
-        f64::from_bits(self.sum.load(Ordering::Relaxed))
+        self.sum.load(Ordering::Relaxed)
     }
 
     pub fn buckets(&self) -> BucketIter<'_> {
@@ -171,13 +205,13 @@ impl Counter {
 
 #[derive(Debug)]
 pub struct Gauge {
-    inner: AtomicU64,
+    inner: AtomicF64,
 }
 
 impl Gauge {
     pub(crate) fn new() -> Self {
         Self {
-            inner: AtomicU64::new(0),
+            inner: AtomicF64::new(0.0),
         }
     }
 
@@ -189,13 +223,13 @@ impl Gauge {
         let _ = self
             .inner
             .fetch_update(Ordering::AcqRel, Ordering::Relaxed, |cur| {
-                let val = value.update_value(f64::from_bits(cur));
-                Some(val.to_bits())
+                let val = value.update_value(cur);
+                Some(val)
             });
     }
 
     pub fn gauge(&self) -> f64 {
-        f64::from_bits(self.inner.load(Ordering::Relaxed))
+        self.inner.load(Ordering::Relaxed)
     }
 }
 
