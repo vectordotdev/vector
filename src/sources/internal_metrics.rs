@@ -94,8 +94,8 @@ mod tests {
         counter!("bar", 4);
         histogram!("baz", 5.0);
         histogram!("baz", 6.0);
-        histogram!("quux", 7.0, "host" => "foo");
         histogram!("quux", 8.0, "host" => "foo");
+        histogram!("quux", 8.1, "host" => "foo");
 
         let controller = get_controller().expect("no controller");
 
@@ -142,9 +142,10 @@ mod tests {
                 // [`metrics::handle::Histogram::new`] are hard-coded. If this
                 // check fails you might look there and see if we've allowed
                 // users to set their own bucket widths.
-                assert_eq!(buckets[12].count, 2);
+                assert_eq!(buckets[11].count, 1);
+                assert_eq!(buckets[12].count, 1);
                 assert_eq!(*count, 2);
-                assert_eq!(*sum, 15.0);
+                assert_eq!(*sum, 16.1);
             }
             _ => panic!("wrong type"),
         }
