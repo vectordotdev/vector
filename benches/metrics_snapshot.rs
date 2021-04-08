@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
+use criterion::{criterion_group, BenchmarkId, Criterion};
 
 fn benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("metrics_snapshot");
