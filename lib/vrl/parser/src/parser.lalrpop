@@ -388,9 +388,9 @@ PathSegment: PathSegment = {
 pub ExtendedField: Field = {
     Field,
     <i:Integer> <s:AnyIdent?> => {
-        let field = match s{
-            Some(s) => format!("{}{}",i,s),
-            None => format!("{}",i),
+        let field = match s {
+            Some(s) => format!("{}{}", i, s),
+            None => i.to_string(),
         };
         Field::Quoted(field)
     },

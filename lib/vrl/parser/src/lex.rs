@@ -527,13 +527,7 @@ impl<'input> Iterator for Lexer<'input> {
                     't' if self.test_peek(|ch| ch == '\'') => Some(self.timestamp_literal(start)),
 
                     ch if is_ident_start(ch)
-                        || (is_digit(ch)
-                            && (0..start)
-                                .into_iter()
-                                .rev()
-                                .filter_map(|i| self.input.get(i..start))
-                                .next()
-                                == Some(".")) =>
+                        || (is_digit(ch) && self.before(start) == Some('.')) =>
                     {
                         Some(Ok(self.identifier_or_function_call(start)))
                     }
@@ -1068,6 +1062,15 @@ impl<'input> Lexer<'input> {
 
     fn next_index(&mut self) -> usize {
         self.peek().as_ref().map_or(self.input.len(), |l| l.0)
+    }
+
+    fn before(&self, from: usize) -> Option<char> {
+        (0..from)
+            .into_iter()
+            .rev()
+            .filter_map(|i| self.input.get(i..from))
+            .next()
+            .and_then(|s| s.chars().next())
     }
 
     fn escape_code(&mut self, start: usize) -> Result<char, Error> {
