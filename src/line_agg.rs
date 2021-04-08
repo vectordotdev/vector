@@ -14,7 +14,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::time::DelayQueue;
+use tokio_util::time::DelayQueue;
 
 /// The mode of operation of the line aggregator.
 #[derive(Debug, Hash, Clone, PartialEq, Deserialize, Serialize)]

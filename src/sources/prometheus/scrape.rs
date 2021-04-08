@@ -1,6 +1,6 @@
 use super::parser;
 use crate::{
-    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
     http::Auth,
     http::HttpClient,
     internal_events::{
@@ -20,6 +20,7 @@ use std::{
     future::ready,
     time::{Duration, Instant},
 };
+use tokio_stream::wrappers::IntervalStream;
 
 #[derive(Debug, Snafu)]
 enum ConfigError {
@@ -67,13 +68,7 @@ impl GenerateConfig for PrometheusScrapeConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus_scrape")]
 impl SourceConfig for PrometheusScrapeConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<sources::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let urls = self
             .endpoints
             .iter()
@@ -85,8 +80,8 @@ impl SourceConfig for PrometheusScrapeConfig {
             tls,
             self.auth.clone(),
             self.scrape_interval_secs,
-            shutdown,
-            out,
+            cx.shutdown,
+            cx.out,
         ))
     }
 
@@ -118,23 +113,16 @@ struct PrometheusCompatConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus")]
 impl SourceConfig for PrometheusCompatConfig {
-    async fn build(
-        &self,
-        name: &str,
-        globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<sources::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         // Workaround for serde bug
         // https://github.com/serde-rs/serde/issues/1504
-        PrometheusScrapeConfig {
+        let config = PrometheusScrapeConfig {
             endpoints: self.endpoints.clone(),
             scrape_interval_secs: self.scrape_interval_secs,
             tls: self.tls.clone(),
             auth: self.auth.clone(),
-        }
-        .build(name, globals, shutdown, out)
-        .await
+        };
+        config.build(cx).await
     }
 
     fn output_type(&self) -> config::DataType {
@@ -156,7 +144,7 @@ fn prometheus(
 ) -> sources::Source {
     let out = out.sink_map_err(|error| error!(message = "Error sending metric.", %error));
 
-    Box::pin(tokio::time::interval(Duration::from_secs(interval))
+    Box::pin(IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
         .take_until(shutdown)
         .map(move |_| stream::iter(urls.clone()))
         .flatten()
@@ -261,7 +249,7 @@ mod test {
         {Body, Client, Response, Server},
     };
     use pretty_assertions::assert_eq;
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[test]
     fn genreate_config() {
@@ -338,7 +326,7 @@ mod test {
         );
 
         let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let response = Client::new()
             .get(format!("http://{}/metrics", out_addr).parse().unwrap())
@@ -390,8 +378,9 @@ mod test {
 mod integration_tests {
     use super::*;
     use crate::{
+        config::SourceContext,
         event::{MetricKind, MetricValue},
-        shutdown, test_util, Pipeline,
+        test_util, Pipeline,
     };
     use tokio::time::Duration;
 
@@ -405,18 +394,10 @@ mod integration_tests {
         };
 
         let (tx, rx) = Pipeline::new_test();
-        let source = config
-            .build(
-                "prometheus_scrape",
-                &GlobalOptions::default(),
-                shutdown::ShutdownSignal::noop(),
-                tx,
-            )
-            .await
-            .unwrap();
+        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
 
         tokio::spawn(source);
-        tokio::time::delay_for(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
         let events = test_util::collect_ready(rx).await;
         assert!(!events.is_empty());

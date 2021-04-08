@@ -80,7 +80,11 @@ mod join;
 mod length;
 #[cfg(feature = "log")]
 mod log;
-#[cfg(any(feature = "parse_common_log", feature = "parse_apache_log"))]
+#[cfg(any(
+    feature = "parse_common_log",
+    feature = "parse_apache_log",
+    feature = "parse_nginx_log"
+))]
 mod log_util;
 #[cfg(feature = "match")]
 mod r#match;
@@ -104,6 +108,8 @@ mod parse_aws_cloudwatch_log_subscription_message;
 mod parse_aws_vpc_flow_log;
 #[cfg(feature = "parse_common_log")]
 mod parse_common_log;
+#[cfg(feature = "parse_csv")]
+mod parse_csv;
 #[cfg(feature = "parse_duration")]
 mod parse_duration;
 #[cfg(feature = "parse_glog")]
@@ -118,6 +124,8 @@ mod parse_key_value;
 mod parse_linux_authorization;
 #[cfg(feature = "parse_logfmt")]
 mod parse_logfmt;
+#[cfg(feature = "parse_nginx_log")]
+mod parse_nginx_log;
 #[cfg(feature = "parse_regex")]
 mod parse_regex;
 #[cfg(feature = "parse_regex_all")]
@@ -291,6 +299,8 @@ pub use parse_aws_cloudwatch_log_subscription_message::ParseAwsCloudWatchLogSubs
 pub use parse_aws_vpc_flow_log::ParseAwsVpcFlowLog;
 #[cfg(feature = "parse_common_log")]
 pub use parse_common_log::ParseCommonLog;
+#[cfg(feature = "parse_csv")]
+pub use parse_csv::ParseCsv;
 #[cfg(feature = "parse_duration")]
 pub use parse_duration::ParseDuration;
 #[cfg(feature = "parse_glog")]
@@ -305,6 +315,8 @@ pub use parse_key_value::ParseKeyValue;
 pub use parse_linux_authorization::ParseLinuxAuthorization;
 #[cfg(feature = "parse_logfmt")]
 pub use parse_logfmt::ParseLogFmt;
+#[cfg(feature = "parse_nginx_log")]
+pub use parse_nginx_log::ParseNginxLog;
 #[cfg(feature = "parse_query_string")]
 pub use parse_query_string::ParseQueryString;
 #[cfg(feature = "parse_regex")]
@@ -488,12 +500,16 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseApacheLog),
         #[cfg(feature = "parse_common_log")]
         Box::new(ParseCommonLog),
+        #[cfg(feature = "parse_csv")]
+        Box::new(ParseCsv),
         #[cfg(feature = "parse_key_value")]
         Box::new(ParseKeyValue),
         #[cfg(feature = "parse_linux_authorization")]
         Box::new(ParseLinuxAuthorization),
         #[cfg(feature = "parse_logfmt")]
         Box::new(ParseLogFmt),
+        #[cfg(feature = "parse_nginx_log")]
+        Box::new(ParseNginxLog),
         #[cfg(feature = "parse_query_string")]
         Box::new(ParseQueryString),
         #[cfg(feature = "parse_regex")]

@@ -239,6 +239,7 @@ impl S3SinkConfig {
     pub async fn healthcheck(self, client: S3Client) -> crate::Result<()> {
         let req = client.head_bucket(HeadBucketRequest {
             bucket: self.bucket.clone(),
+            expected_bucket_owner: None,
         });
 
         match req.await {
@@ -572,7 +573,7 @@ mod integration_tests {
         assert_downcast_matches,
         test_util::{random_lines_with_stream, random_string},
     };
-    use bytes::{buf::BufExt, BytesMut};
+    use bytes::{Buf, BytesMut};
     use flate2::read::GzDecoder;
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;

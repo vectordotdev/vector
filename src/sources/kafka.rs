@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::{Event, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
@@ -100,14 +100,8 @@ impl_generate_config_from_default!(KafkaSourceConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        kafka_source(self, shutdown, out)
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        kafka_source(self, cx.shutdown, cx.out)
     }
 
     fn output_type(&self) -> DataType {
@@ -131,9 +125,11 @@ fn kafka_source(
     let consumer = Arc::new(create_consumer(config)?);
 
     Ok(Box::pin(async move {
+        let shutdown = shutdown;
+
         Arc::clone(&consumer)
-            .start()
-            .take_until(shutdown.clone())
+            .stream()
+            .take_until(shutdown)
             .then(move |message| {
                 let key_field = key_field.clone();
                 let topic_key = topic_key.clone();
@@ -278,14 +274,14 @@ mod test {
         }
     }
 
-    #[test]
-    fn kafka_source_create_ok() {
+    #[tokio::test]
+    async fn kafka_source_create_ok() {
         let config = make_config();
         assert!(kafka_source(&config, ShutdownSignal::noop(), Pipeline::new_test().0).is_ok());
     }
 
-    #[test]
-    fn kafka_source_create_incorrect_auto_offset_reset() {
+    #[tokio::test]
+    async fn kafka_source_create_incorrect_auto_offset_reset() {
         let config = KafkaSourceConfig {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
             ..make_config()

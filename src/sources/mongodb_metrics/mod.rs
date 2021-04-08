@@ -1,12 +1,11 @@
 use crate::{
-    config::{self, GlobalOptions, SourceConfig, SourceDescription},
+    config::{self, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
         MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted, MongoDbMetricsEventsReceived,
         MongoDbMetricsRequestError,
     },
-    shutdown::ShutdownSignal,
-    Event, Pipeline,
+    Event,
 };
 use chrono::Utc;
 use futures::{
@@ -23,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{collections::BTreeMap, time::Instant};
 use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
 
 mod types;
 use types::{CommandBuildInfo, CommandIsMaster, CommandServerStatus, NodeType};
@@ -105,13 +105,7 @@ impl_generate_config_from_default!(MongoDbMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "mongodb_metrics")]
 impl SourceConfig for MongoDbMetricsConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
         let sources = try_join_all(
@@ -121,12 +115,14 @@ impl SourceConfig for MongoDbMetricsConfig {
         )
         .await?;
 
-        let mut out =
-            out.sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
+        let mut out = cx
+            .out
+            .sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
+        let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
-            let mut interval = time::interval(duration).take_until(shutdown);
+            let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|mongodb| mongodb.collect())).await;
@@ -1055,12 +1051,7 @@ mod integration_tests {
                 scrape_interval_secs: 15,
                 namespace: namespace.to_owned(),
             }
-            .build(
-                "default",
-                &GlobalOptions::default(),
-                ShutdownSignal::noop(),
-                sender,
-            )
+            .build(SourceContext::new_test(sender))
             .await
             .unwrap()
             .await

@@ -64,6 +64,8 @@ pub mod sinks;
 pub mod sources;
 pub(crate) mod stats;
 pub mod stream;
+#[cfg(feature = "api-client")]
+mod tap;
 pub mod tcp;
 pub mod template;
 pub mod test_util;
@@ -75,7 +77,6 @@ pub mod trace;
 pub mod transforms;
 pub mod trigger;
 pub mod types;
-#[cfg(any(feature = "sources-utils-udp", feature = "sinks-utils-udp"))]
 pub mod udp;
 pub mod unit_test;
 pub(crate) mod utilization;

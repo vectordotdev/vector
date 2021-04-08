@@ -14,7 +14,7 @@ dashmap = "4"
 
 [dev-dependencies]
 criterion = "0.3"
-tracing = "0.1.15"
+tracing = "0.1.25"
 mock_instant = { version = "0.2" }
 
 [[bench]]
