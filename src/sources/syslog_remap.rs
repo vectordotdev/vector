@@ -4,7 +4,6 @@ use crate::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
-    shutdown::ShutdownSignal,
     transforms::remap::{Remap, RemapConfig},
     Pipeline,
 };
