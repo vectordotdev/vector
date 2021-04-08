@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LookupBuf, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
@@ -26,7 +26,7 @@ enum BuildError {
     KafkaSubscribeError { source: rdkafka::error::KafkaError },
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct KafkaSourceConfig {
     bootstrap_servers: String,
@@ -53,6 +53,27 @@ pub struct KafkaSourceConfig {
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
+}
+
+impl Default for KafkaSourceConfig {
+    fn default() -> Self {
+        Self {
+            bootstrap_servers: Default::default(),
+            topics: Default::default(),
+            group_id: Default::default(),
+            auto_offset_reset: default_auto_offset_reset(),
+            session_timeout_ms: default_session_timeout_ms(),
+            socket_timeout_ms: default_socket_timeout_ms(),
+            fetch_wait_max_ms: default_fetch_wait_max_ms(),
+            commit_interval_ms: default_commit_interval_ms(),
+            key_field: default_key_field(),
+            topic_key: default_topic_key(),
+            partition_key: default_partition_key(),
+            offset_key: default_offset_key(),
+            librdkafka_options: Default::default(),
+            auth: Default::default(),
+        }
+    }
 }
 
 fn default_session_timeout_ms() -> u64 {
@@ -100,14 +121,8 @@ impl_generate_config_from_default!(KafkaSourceConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        kafka_source(self, shutdown, out)
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        kafka_source(self, cx.shutdown, cx.out)
     }
 
     fn output_type(&self) -> DataType {

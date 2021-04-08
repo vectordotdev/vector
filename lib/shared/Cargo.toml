@@ -7,6 +7,7 @@ publish = false
 license = "MPL-2.0"
 
 [dependencies]
+async-graphql = { version = "=2.6.4", optional = true, features = ["chrono"] }
 bytes = { version = "1.0.0", optional = true }
 chrono = { version = "0.4", optional = true }
 chrono-tz = "0.5.3"
@@ -60,6 +61,7 @@ tokenize = [
 ]
 
 event = [
+  "async-graphql",
   "pest",
   "pest_derive",
   "serde",

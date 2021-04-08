@@ -1,6 +1,6 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, LookupBuf, Value},
     internal_events::{
@@ -133,6 +133,15 @@ impl DockerLogsConfig {
                 .iter()
                 .any(|name| items.iter().any(|item| name.starts_with(item)))
     }
+
+    fn with_empty_partial_event_marker_field_as_none(mut self) -> Self {
+        if let Some(val) = &self.partial_event_marker_field {
+            if val.is_empty() {
+                self.partial_event_marker_field = None;
+            }
+        }
+        self
+    }
 }
 
 inventory::submit! {
@@ -144,14 +153,12 @@ impl_generate_config_from_default!(DockerLogsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "docker_logs")]
 impl SourceConfig for DockerLogsConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        let source = DockerLogsSource::new(self.clone(), out, shutdown.clone())?;
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let source = DockerLogsSource::new(
+            self.clone().with_empty_partial_event_marker_field_as_none(),
+            cx.out,
+            cx.shutdown.clone(),
+        )?;
 
         // Capture currently running containers, and do main future(run)
         let fut = async move {
@@ -166,6 +173,7 @@ impl SourceConfig for DockerLogsConfig {
             }
         };
 
+        let shutdown = cx.shutdown;
         // Once this ShutdownSignal resolves it will drop DockerLogsSource and by extension it's ShutdownSignal.
         Ok(Box::pin(async move {
             Ok(tokio::select! {
@@ -195,14 +203,8 @@ struct DockerCompatConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "docker")]
 impl SourceConfig for DockerCompatConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        self.config.build(_name, _globals, shutdown, out).await
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        self.config.build(cx).await
     }
 
     fn output_type(&self) -> DataType {
@@ -1162,12 +1164,7 @@ mod integration_tests {
         let (sender, recv) = Pipeline::new_test();
         tokio::spawn(async move {
             config
-                .build(
-                    "default",
-                    &GlobalOptions::default(),
-                    ShutdownSignal::noop(),
-                    sender,
-                )
+                .build(SourceContext::new_test(sender))
                 .await
                 .unwrap()
                 .await

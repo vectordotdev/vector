@@ -3,6 +3,7 @@ pub mod log_event;
 pub mod lua;
 pub mod metadata;
 pub mod metric;
+mod scalar;
 pub mod value;
 pub mod visitors;
 

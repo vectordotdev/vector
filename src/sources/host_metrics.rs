@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, SourceConfig, SourceContext, SourceDescription},
     event::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
@@ -118,17 +118,11 @@ impl_generate_config_from_default!(HostMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "host_metrics")]
 impl SourceConfig for HostMetricsConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let mut config = self.clone();
         config.namespace.0 = config.namespace.0.filter(|namespace| !namespace.is_empty());
 
-        Ok(Box::pin(config.run(out, shutdown)))
+        Ok(Box::pin(config.run(cx.out, cx.shutdown)))
     }
 
     fn output_type(&self) -> DataType {

@@ -213,6 +213,11 @@ impl LookupBuf {
     }
 
     #[instrument(level = "trace")]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[instrument(level = "trace")]
     pub fn from_toml_table(value: TomlValue) -> crate::Result<IndexMap<LookupBuf, Value>> {
         let mut discoveries = IndexMap::new();
         match value {

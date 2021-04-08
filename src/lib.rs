@@ -63,6 +63,8 @@ pub mod sinks;
 pub mod sources;
 pub(crate) mod stats;
 pub mod stream;
+#[cfg(feature = "api-client")]
+mod tap;
 pub mod tcp;
 pub mod template;
 pub mod test_util;

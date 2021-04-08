@@ -122,13 +122,16 @@ impl FunctionTransform for Remap {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::log_schema;
-    use crate::event::{
-        metric::{MetricKind, MetricValue},
-        Metric, Value,
+    use crate::{
+        config::log_schema,
+        event::{
+            metric::{MetricKind, MetricValue},
+            Metric, Value,
+        },
+        log_event,
     };
     use indoc::formatdoc;
-    use shared::{event::*, log_event, lookup::*};
+    use shared::{event::*, lookup::*};
     use std::collections::BTreeMap;
 
     #[test]

@@ -13,7 +13,7 @@ use url::Url;
 use uuid::Uuid;
 use weak_table::WeakValueHashMap;
 
-/// Subscription GraphQL response, returned from an active stream
+/// Subscription GraphQL response, returned from an active stream.
 pub type StreamResponse<T> = Pin<
     Box<
         dyn Stream<Item = Option<graphql_client::Response<<T as GraphQLQuery>::ResponseData>>>
@@ -25,7 +25,7 @@ pub type StreamResponse<T> = Pin<
 /// Payload contains the raw data received back from a GraphQL subscription. At the point
 /// of receiving data, the only known fields are { id, type }; what's contained inside the
 /// `payload` field is unknown until we attempt to deserialize it against a generated
-/// GraphQLQuery::ResponseData later
+/// GraphQLQuery::ResponseData later.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Payload {
     id: Uuid,
@@ -35,7 +35,16 @@ pub struct Payload {
 }
 
 impl Payload {
-    /// Returns a "start" payload necessary for starting a new subscription
+    /// Returns an "init" payload to confirm the connection to the server.
+    pub fn init(id: Uuid) -> Self {
+        Self {
+            id,
+            payload_type: "connection_init".to_owned(),
+            payload: json!({}),
+        }
+    }
+
+    /// Returns a "start" payload necessary for starting a new subscription.
     pub fn start<T: GraphQLQuery + Send + Sync>(
         id: Uuid,
         payload: &graphql_client::QueryBody<T::Variables>,
@@ -47,7 +56,7 @@ impl Payload {
         }
     }
 
-    /// Returns a "stop" payload for terminating the subscription in the GraphQL server
+    /// Returns a "stop" payload for terminating the subscription in the GraphQL server.
     fn stop(id: Uuid) -> Self {
         Self {
             id,
@@ -57,7 +66,7 @@ impl Payload {
     }
 
     /// Attempts to return a definitive ResponseData on the `payload` field, matched against
-    /// a generated GraphQLQuery
+    /// a generated `GraphQLQuery`.
     fn response<T: GraphQLQuery + Send + Sync>(
         &self,
     ) -> Option<graphql_client::Response<T::ResponseData>> {
@@ -67,19 +76,19 @@ impl Payload {
 }
 
 /// Receiver<T> has a single method, `stream`, that returns a `StreamResponse<T>` of
-/// `Payload`s received from the server
+/// `Payload`s received from the server.
 pub trait Receiver<T: GraphQLQuery + Send + Sync> {
     /// Returns a stream of `Payload` responses, received from the GraphQL server
     fn stream(&self) -> StreamResponse<T>;
 }
 
-/// BoxedSubscription<T> returns a thread-safe, boxed `Receiver<T>`
+/// BoxedSubscription<T> returns a thread-safe, boxed `Receiver<T>`.
 pub type BoxedSubscription<T> = Box<Arc<dyn Receiver<T> + Send + Sync>>;
 
 /// A Subscription is associated with a single GraphQL subscription query. Its methods
 /// allow transmitting `Payload`s upstream to the API server, via its `Receiver<T: GraphQLQuery`
 /// implementation, returning a stream of `Payload`, and preventing additional `Payload`
-/// messages from the server
+/// messages from the server.
 #[derive(Debug)]
 pub struct Subscription {
     id: Uuid,
@@ -88,10 +97,15 @@ pub struct Subscription {
 }
 
 impl Subscription {
-    /// Returns a new Subscription, that is associated with a particular GraphQL query
+    /// Returns a new Subscription, that is associated with a particular GraphQL query.
     pub fn new(id: Uuid, client_tx: tokio::sync::mpsc::UnboundedSender<Payload>) -> Self {
         let (tx, _) = broadcast::channel(100);
         Self { id, tx, client_tx }
+    }
+
+    // Initalize the connection by sending a "GQL_CONNECTION_INIT" message.
+    fn init(&self) -> Result<(), tokio::sync::mpsc::error::SendError<Payload>> {
+        self.client_tx.send(Payload::init(self.id))
     }
 
     /// Send a payload down the channel. This is synchronous because broadcast::Sender::send
@@ -100,7 +114,7 @@ impl Subscription {
         self.tx.send(payload)
     }
 
-    /// Start a subscription. Fires a request to the upstream GraphQL
+    /// Start a subscription. Fires a request to the upstream GraphQL.
     fn start<T: GraphQLQuery + Send + Sync>(
         &self,
         request_body: &graphql_client::QueryBody<T::Variables>,
@@ -110,25 +124,21 @@ impl Subscription {
     }
 
     /// Stop a subscription. This has no return value since it'll be typically used by
-    /// the Drop implementation
+    /// the `Drop` implementation.
     fn stop(&self) -> Result<(), tokio::sync::mpsc::error::SendError<Payload>> {
         self.client_tx.send(Payload::stop(self.id))
     }
 }
 
 impl Drop for Subscription {
-    /// Send a close message upstream once the subscription drops out of scope
+    /// Send a close message upstream once the subscription drops out of scope.
     fn drop(&mut self) {
         let _ = self.stop();
     }
 }
 
-impl<T> Receiver<T> for Subscription
-where
-    T: GraphQLQuery + Send + Sync,
-    <T as GraphQLQuery>::ResponseData: Unpin + Send + Sync + 'static,
-{
-    /// Returns a stream of `Payload` responses, received from the GraphQL server
+impl<T: GraphQLQuery + Send + Sync> Receiver<T> for Subscription {
+    /// Returns a stream of `Payload` responses, received from the GraphQL server.
     fn stream(&self) -> StreamResponse<T> {
         Box::pin(
             BroadcastStream::new(self.tx.subscribe())
@@ -138,7 +148,7 @@ where
     }
 }
 
-/// A single `SubscriptionClient` enables subscription multiplexing
+/// A single `SubscriptionClient` enables subscription multiplexing.
 #[derive(Debug)]
 pub struct SubscriptionClient {
     tx: mpsc::UnboundedSender<Payload>,
@@ -148,7 +158,7 @@ pub struct SubscriptionClient {
 
 impl SubscriptionClient {
     /// Create a new subscription client. `tx` is a channel for sending `Payload`s to the
-    /// GraphQL server; `rx` is a channel for `Payload` back
+    /// GraphQL server; `rx` is a channel for `Payload` back.
     fn new(tx: mpsc::UnboundedSender<Payload>, mut rx: mpsc::UnboundedReceiver<Payload>) -> Self {
         // Oneshot channel for cancelling the listener if SubscriptionClient is dropped
         let (_shutdown_tx, mut shutdown_rx) = oneshot::channel::<()>();
@@ -157,7 +167,7 @@ impl SubscriptionClient {
         let subscriptions_clone = Arc::clone(&subscriptions);
 
         // Spawn a handler for shutdown, and relaying received `Payload`s back to the relevant
-        // subscription
+        // subscription.
         tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -185,8 +195,8 @@ impl SubscriptionClient {
         }
     }
 
-    /// Start a new subscription request
-    pub fn start<T>(
+    /// Start a new subscription request.
+    pub fn start<T: GraphQLQuery + Send + Sync>(
         &self,
         request_body: &graphql_client::QueryBody<T::Variables>,
     ) -> BoxedSubscription<T>
@@ -200,20 +210,21 @@ impl SubscriptionClient {
         let id = Uuid::new_v4();
 
         // Create a new subscription wrapper, mapped to the new ID and with a clone of the
-        // tx channel to send payloads back upstream
+        // tx channel to send payloads back upstream.
         let subscription = Arc::new(Subscription::new(id, self.tx.clone()));
 
         // Store the subscription in the WeakValueHashMap. This is converted internally into
-        // a weak reference, to prevent dropped subscriptions lingering in memory
+        // a weak reference, to prevent dropped subscriptions lingering in memory.
         self.subscriptions
             .lock()
             .unwrap()
             .insert(id, Arc::clone(&subscription));
 
-        // Start the subscription by sending a { type: "start" } payload upstream
+        // Initialize the connection with the relevant control messages.
+        let _ = subscription.init();
         let _ = subscription.start::<T>(request_body);
 
-        // The caller gets back a Box<dyn Receiver<T>>, to consume subscription payloads
+        // The caller gets back a Box<dyn Receiver<T>>, to consume subscription payloads.
         Box::new(Arc::clone(&subscription) as Arc<dyn Receiver<T> + Send + Sync>)
     }
 }
@@ -241,7 +252,7 @@ pub async fn connect_subscription_client(
         }
     });
 
-    // Forward received messages to the receiver channel
+    // Forward received messages to the receiver channel.
     tokio::spawn(async move {
         loop {
             if let Some(Ok(Message::Text(m))) = ws_rx.next().await {

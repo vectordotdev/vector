@@ -5,20 +5,20 @@
 
 #![deny(missing_docs)]
 
-use crate::event::Event;
+use crate::event::{Event, LookupBuf};
 use crate::internal_events::{
     FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
     KubernetesLogsEventReceived,
 };
 use crate::kubernetes as k8s;
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
-    event::LookupBuf,
+    config::{
+        DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceContext, SourceDescription,
+    },
     log_event,
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, TaskTransform},
-    Pipeline,
 };
 use bytes::Bytes;
 use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, ReadFrom};
@@ -129,15 +129,9 @@ const COMPONENT_NAME: &str = "kubernetes_logs";
 #[async_trait::async_trait]
 #[typetag::serde(name = "kubernetes_logs")]
 impl SourceConfig for Config {
-    async fn build(
-        &self,
-        name: &str,
-        globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<sources::Source> {
-        let source = Source::new(self, globals, name)?;
-        Ok(Box::pin(source.run(out, shutdown).map(|result| {
+    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        let source = Source::new(self, &cx.globals, &cx.name)?;
+        Ok(Box::pin(source.run(cx.out, cx.shutdown).map(|result| {
             result.map_err(|error| {
                 error!(message = "Source future failed.", %error);
             })
