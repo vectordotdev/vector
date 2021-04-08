@@ -11,21 +11,22 @@ $sx-10: $vector-purple
 $sx-11: $white-bis
 $sx-12: $warning
 
-.highlight
-  .chroma
-    padding: 1rem
+$bg-color: $grey-darker
+$default-text-color: $white-bis
+$padding: 0.8rem
 
 // Code blocks with no language specified
-.content pre
-  background-color: $dark
-  color: $white-bis
+.content pre, .chroma
+  background-color: $bg-color
+  color: $default-text-color
+  padding: $padding
 
 .chroma
-  // Base text color
-  color: $white-bis
-
   // Background
   background-color: $dark
+
+  // Base text color
+  color: $default-text-color
 
   // Other
   .x
