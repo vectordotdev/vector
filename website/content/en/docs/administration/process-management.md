@@ -7,6 +7,8 @@ This document covers how to manage the Vector process using various interfaces. 
 
 ## Administrate
 
+OK
+
 ### Linux
 
 #### Start
