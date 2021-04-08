@@ -1,0 +1,21 @@
+{{ if not .Params.default }}
+{{ errorf "no default tab specified in tabs shortcode %s" .File }}
+{{ end }}
+
+{{ $default := .Params.default | urlize }}
+<div x-data="{ selected: '{{ $default }}' }">
+  <div class="tabs is-centered is-fullwidths">
+  <ul>
+{{ .Inner }}
+</ul>
+  </div>
+
+  {{ range $k, $v := $.Page.Scratch.Get "tabs" }}
+  <div x-show="selected === '{{ $k }}'">
+{{ $v | $.Page.RenderString }}
+  </div>
+  {{ end }}
+</div>
+
+{{/* Reset Scratch for the "tabs" key */}}
+{{ $.Page.Scratch.Set "tabs" dict }}

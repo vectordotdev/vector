@@ -1,0 +1,8 @@
+{{ $title := .Params.title }}
+{{ $slug := .Params.title | urlize }}
+{{ $.Page.Scratch.SetInMap "tabs" $slug .Inner }}
+<li :class="{ 'is-active': selected === '{{ $slug }}' }">
+  <a @click="selected = '{{ $slug }}'">
+{{ $title }}
+  </a>
+</li>
