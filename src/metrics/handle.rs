@@ -28,10 +28,7 @@ impl AtomicF64 {
             opt.map(|i| i.to_bits())
         });
 
-        match res {
-            Ok(f) => Ok(f64::from_bits(f)),
-            Err(f) => Err(f64::from_bits(f)),
-        }
+        res.map(f64::from_bits).map_err(f64::from_bits)
     }
 
     fn load(&self, order: Ordering) -> f64 {
