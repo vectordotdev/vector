@@ -24,7 +24,7 @@ static CARDINALITY_KEY_DATA_NAME: [SharedString; 1] =
     [SharedString::const_str(&CARDINALITY_KEY_NAME)];
 static CARDINALITY_KEY_DATA: KeyData = KeyData::from_static_name(&CARDINALITY_KEY_DATA_NAME);
 static CARDINALITY_KEY: CompositeKey =
-    CompositeKey::new(MetricKind::COUNTER, Key::Borrowed(&CARDINALITY_KEY_DATA));
+    CompositeKey::new(MetricKind::Counter, Key::Borrowed(&CARDINALITY_KEY_DATA));
 
 /// Controller allows capturing metric snapshots.
 pub struct Controller {

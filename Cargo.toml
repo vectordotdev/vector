@@ -112,9 +112,9 @@ tracing-subscriber = "0.2.17"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
-metrics = "=0.13.0-alpha.13"
-metrics-tracing-context = "=0.1.0-alpha.7"
-metrics-util = "=0.4.0-alpha.10"
+metrics = "=0.14.2"
+metrics-tracing-context = "0.3.0"
+metrics-util = "0.6.2"
 # Indirect dependency; benchmark regression detected; pinning until
 # https://github.com/timberio/vector/issues/6412 is resolved
 metrics-macros = "=0.1.0-alpha.9"
@@ -147,7 +147,7 @@ prost-types = "0.7.0"
 
 # GCP
 goauth = { version = "0.9.0", optional = true }
-gouth = { version = "0.1", optional = true }
+gouth = { version = "0.2", optional = true }
 smpl_jwt = { version = "0.6.1", optional = true }
 
 # API
@@ -273,7 +273,7 @@ assert_cmd = "1.0.2"
 base64 = "0.13"
 criterion = { version = "0.3", features = ["html_reports"] }
 httpmock = "0.5.7"
-libc = "0.2.92"
+libc = "0.2.93"
 libz-sys = "1.1.2"
 matches = "0.1.8"
 pretty_assertions = "0.7.1"
