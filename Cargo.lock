@@ -465,23 +465,6 @@ checksum = "065374052e7df7ee4047b1160cca5e1467a12351a40b3da123c870ba0b8eda2a"
 
 [[package]]
 name = "attohttpc"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93610ce1c035e8a273fe56a19852e42798f3c019ca2726e52d2971197f116525"
-dependencies = [
- "flate2",
- "http",
- "log",
- "rustls 0.17.0",
- "serde",
- "serde_urlencoded 0.6.1",
- "url",
- "webpki",
- "webpki-roots 0.19.0",
-]
-
-[[package]]
-name = "attohttpc"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe174d1b67f7b2bafed829c09db039301eb5841f66e43be2cf60b326e7f8e2cc"
@@ -490,6 +473,24 @@ dependencies = [
  "http",
  "log",
  "url",
+]
+
+[[package]]
+name = "attohttpc"
+version = "0.16.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdb8867f378f33f78a811a8eb9bf108ad99430d7aad43315dd9319c827ef6247"
+dependencies = [
+ "flate2",
+ "http",
+ "log",
+ "rustls 0.18.1",
+ "serde",
+ "serde_urlencoded 0.6.1",
+ "url",
+ "webpki",
+ "webpki-roots 0.19.0",
+ "wildmatch",
 ]
 
 [[package]]
@@ -2482,11 +2483,11 @@ dependencies = [
 
 [[package]]
 name = "gouth"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56d4fbd421d0deed2aab108d39c07a136edb5c3dcc183c6343198356b9bc3378"
+checksum = "1f60d0f7f508e9354fb3d9f734655e47ac525177e60dbdcb120ed482f58f385c"
 dependencies = [
- "attohttpc 0.14.0",
+ "attohttpc 0.16.3",
  "gcemeta",
  "jsonwebtoken",
  "serde",
@@ -5967,11 +5968,11 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.17.0"
+version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0d4a31f5d68413404705d6982529b0e11a9aacd4839d1d6222ee3b8cb4015e1"
+checksum = "5d1126dcf58e93cee7d098dbda643b5f92ed724f1f6a63007c1116eed6700c81"
 dependencies = [
- "base64 0.11.0",
+ "base64 0.12.3",
  "log",
  "ring",
  "sct",
@@ -8553,6 +8554,12 @@ dependencies = [
  "wiggle-generate",
  "witx",
 ]
+
+[[package]]
+name = "wildmatch"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f44b95f62d34113cf558c93511ac93027e03e9c29a60dd0fd70e6e025c7270a"
 
 [[package]]
 name = "winapi"
