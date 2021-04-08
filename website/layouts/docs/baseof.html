@@ -21,6 +21,7 @@
             <div class="column">
               {{ partial "docs/hero.html" (dict "title" .Title "description" .Params.description) }}
               {{ partial "docs/content.html" . }}
+              {{ partial "docs/edit.html" . }}
             </div>
 
             <div class="column is-one-fifth is-hidden-mobile">
