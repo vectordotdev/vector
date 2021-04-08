@@ -13,6 +13,8 @@ pros and cons of each. Use these as _guidelines_ to build your own.
 
 ## Distributed
 
+{{< svg "topology-distributed.svg" >}}
+
 <SVG src="/optimized_svg/topologies-distributed_453_298.svg" />
 
 The simplest topology. This topology offers direct communication with your
