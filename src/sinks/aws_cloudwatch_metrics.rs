@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{
-        metric::{Metric, MetricValue},
+        metric::{Metric, MetricValue, Sample},
         Event,
     },
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
@@ -177,11 +177,14 @@ impl CloudWatchMetricsSvc {
                     MetricValue::Distribution {
                         samples,
                         statistic: _,
-                    } => (
-                        None,
-                        Some(samples.iter().map(|s| s.value).collect()),
-                        Some(samples.iter().map(|s| f64::from(s.rate)).collect()),
-                    ),
+                    } => {
+                        let samples = normalize_distribution(samples);
+                        (
+                            None,
+                            Some(samples.iter().map(|s| s.value).collect()),
+                            Some(samples.iter().map(|s| f64::from(s.rate)).collect()),
+                        )
+                    }
                     MetricValue::Set { values } => (Some(values.len() as f64), None, None),
                     MetricValue::Gauge { value } => (Some(value), None, None),
                     _ => unreachable!(),
@@ -198,6 +201,55 @@ impl CloudWatchMetricsSvc {
             })
             .collect()
     }
+}
+
+fn median_value(samples: &[Sample]) -> f64 {
+    let count = samples.len();
+    let midpt = count / 2;
+    if count % 2 == 1 {
+        samples[midpt].value
+    } else {
+        (samples[midpt - 1].value + samples[midpt].value) / 2.0
+    }
+}
+
+/// Normalize a distribution to reduce over-sized sample sets. AWS
+/// CloudWatch metrics only accepts distributions with 150 or less
+/// samples, so check the length and downsample the distribution if it's
+/// over 150.  See
+/// https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html
+fn normalize_distribution(samples: Vec<Sample>) -> Vec<Sample> {
+    if samples.len() > 150 {
+        downsample_distribution(samples, 150)
+    } else {
+        samples
+    }
+}
+
+/// Reduce a distribution to a maximum number of elements by chunking
+/// together sets of values and summing their rates.
+fn downsample_distribution(mut samples: Vec<Sample>, maxsize: usize) -> Vec<Sample> {
+    use std::cmp::Ordering;
+    // Sort the samples so that they are grouped together with their closest values.
+    samples.sort_unstable_by(|a, b| {
+        if a.value < b.value {
+            Ordering::Less
+        } else if a.value > b.value {
+            Ordering::Greater
+        } else {
+            Ordering::Equal
+        }
+    });
+    // Figure out the required chunk size, rounding up to ensure the
+    // result is at most `maxsize` long.
+    let chunk_size = (samples.len() + maxsize - 1) / maxsize;
+    samples
+        .chunks(chunk_size)
+        .map(|chunk| Sample {
+            value: median_value(chunk),
+            rate: chunk.iter().map(|s| s.rate).sum(),
+        })
+        .collect()
 }
 
 struct AwsCloudwatchMetricNormalize;
