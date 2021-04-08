@@ -1,3 +1,3 @@
 {{ $snippet := .Get 0 }}
 {{ $file := printf "snippets/%s.md" $snippet }}
-{{ readFile $file | $.Page.RenderString }}
+{{ readFile $file | $.Page.RenderString | safeHTML }}
