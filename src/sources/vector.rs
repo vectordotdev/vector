@@ -298,6 +298,6 @@ mod test {
         shutdown_down.await;
 
         let output = collect_ready(rx).await;
-        assert_event_data_eq!(&[Event::from(event)][..], output);
+        assert_event_data_eq!([Event::from(event)][..], output.as_slice());
     }
 }
