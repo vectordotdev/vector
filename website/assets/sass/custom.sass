@@ -57,6 +57,10 @@ hr.narrow
 
 // Small fixes for text content CSS
 .content
+  .icon.is-anchor
+    &:hover
+      color: $secondary
+
   a.no-break
     display: inline-block
 
@@ -101,10 +105,6 @@ sup.ml-tiny
 
   &:hover
     background-color: $white-bis
-
-.content
-  .card + .card
-    margin-top: 0.5rem
 
 .metrics
   .metric-tags
