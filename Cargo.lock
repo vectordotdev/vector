@@ -2945,9 +2945,9 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "0.14.4"
+version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8e946c2b1349055e0b72ae281b238baf1a3ea7307c7e9f9d64673bdd9c26ac7"
+checksum = "8bf09f61b52cfcf4c00de50df88ae423d6c02354e385a86341133b5338630ad1"
 dependencies = [
  "bytes 1.0.1",
  "futures-channel",
@@ -2960,7 +2960,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project 1.0.6",
- "socket2 0.3.19",
+ "socket2 0.4.0",
  "tokio",
  "tower-service",
  "tracing 0.1.25",
