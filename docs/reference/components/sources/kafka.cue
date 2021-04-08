@@ -121,6 +121,17 @@ components: sources: kafka: {
 				syntax: "literal"
 			}
 		}
+		headers_key: {
+			common:      false
+			description: "The log field name to use for the Kafka headers."
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["headers"]
+				syntax: "literal"
+			}
+		}
 		librdkafka_options: components._kafka.configuration.librdkafka_options
 		sasl: {
 			common:      false
