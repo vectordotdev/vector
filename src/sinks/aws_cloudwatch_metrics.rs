@@ -167,45 +167,33 @@ impl CloudWatchMetricsSvc {
     fn encode_events(&mut self, events: Vec<Metric>) -> Vec<MetricDatum> {
         events
             .into_iter()
-            .filter_map(|event| {
+            .map(|event| {
                 let metric_name = event.name().to_string();
                 let timestamp = event.data.timestamp.map(timestamp_to_string);
                 let dimensions = event.series.tags.clone().map(tags_to_dimensions);
                 // AwsCloudwatchMetricNormalize converts these to the right MetricKind
-                match event.data.value {
-                    MetricValue::Counter { value } => Some(MetricDatum {
-                        metric_name,
-                        value: Some(value),
-                        timestamp,
-                        dimensions,
-                        ..Default::default()
-                    }),
+                let (value, values, counts) = match event.data.value {
+                    MetricValue::Counter { value } => (Some(value), None, None),
                     MetricValue::Distribution {
                         samples,
                         statistic: _,
-                    } => Some(MetricDatum {
-                        metric_name,
-                        values: Some(samples.iter().map(|s| s.value).collect()),
-                        counts: Some(samples.iter().map(|s| f64::from(s.rate)).collect()),
-                        timestamp,
-                        dimensions,
-                        ..Default::default()
-                    }),
-                    MetricValue::Set { values } => Some(MetricDatum {
-                        metric_name,
-                        value: Some(values.len() as f64),
-                        timestamp,
-                        dimensions,
-                        ..Default::default()
-                    }),
-                    MetricValue::Gauge { value } => Some(MetricDatum {
-                        metric_name,
-                        value: Some(value),
-                        timestamp,
-                        dimensions,
-                        ..Default::default()
-                    }),
-                    _ => None,
+                    } => (
+                        None,
+                        Some(samples.iter().map(|s| s.value).collect()),
+                        Some(samples.iter().map(|s| f64::from(s.rate)).collect()),
+                    ),
+                    MetricValue::Set { values } => (Some(values.len() as f64), None, None),
+                    MetricValue::Gauge { value } => (Some(value), None, None),
+                    _ => unreachable!(),
+                };
+                MetricDatum {
+                    metric_name,
+                    value,
+                    values,
+                    counts,
+                    timestamp,
+                    dimensions,
+                    ..Default::default()
                 }
             })
             .collect()
@@ -218,7 +206,11 @@ impl MetricNormalize for AwsCloudwatchMetricNormalize {
     fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric> {
         match &metric.data.value {
             MetricValue::Gauge { .. } => state.make_absolute(metric),
-            _ => state.make_incremental(metric),
+            MetricValue::Counter { .. }
+            | MetricValue::Set { .. }
+            | MetricValue::Distribution { .. } => state.make_incremental(metric),
+            // Drop all other types, Cloudwatch can't handle them
+            _ => None,
         }
     }
 }
