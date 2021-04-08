@@ -12,13 +12,14 @@ set -euo pipefail
 
 ROOT=$(git rev-parse --show-toplevel)
 
+CUE="${ROOT}/scripts/cue.sh"
+CUE_SOURCES="${ROOT}/website/cue"
+
 read-all-docs() {
-  ${ROOT}/scripts/cue.sh list | sort | xargs cat -A
+  ${CUE} list | sort | xargs cat -A
 }
 
 (
-  cd "${ROOT}/website/cue"
-
   if ! cue version >/dev/null; then
     echo 'Error: cue is not installed'
     exit 1
@@ -30,7 +31,7 @@ read-all-docs() {
     echo "Validating cue files formatting..."
 
     STATE_BEFORE="$(read-all-docs)"
-    ${ROOT}/cue.sh fmt
+    "${CUE}" fmt
     STATE_AFTER="$(read-all-docs)"
 
     if [[ "$STATE_BEFORE" != "$STATE_AFTER" ]]; then
@@ -42,7 +43,7 @@ read-all-docs() {
 
   echo "Validating cue files correctness..."
 
-  if ERRORS="$(${ROOT}/scripts/cue.sh vet 2>&1)"; then
+  if ERRORS="$("${CUE}" vet 2>&1)"; then
     echo "Success! The contents of the \"docs/\" directory are valid"
   else
     printf "Failed!\n\n%s\n" "$ERRORS"
