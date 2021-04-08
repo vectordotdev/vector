@@ -19,10 +19,9 @@
   {{ template "dropdown" (dict "tag" "MacOSTool" "options" $macosTools "show" "Platform === 'macOS'") }}
   {{ template "dropdown" (dict "tag" "DockerDistro" "options" $dockerDistros "show" "Platform === 'Linux' && LinuxTool === 'Docker CLI'") }}
 
-  <div class="mt-4">
-    <p x-text="LinuxDistro">
-      Showing...
-    </p>
+  <div class="mt-5">
+    <div x-show="MacOSTool === 'Homebrew'">
+    </div>
   </div>
 </div>
 
