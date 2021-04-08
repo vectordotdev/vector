@@ -27,7 +27,7 @@ impl LogEvent {
         }
     }
 
-    pub fn deconstruct(self) -> (BTreeMap<String, Value>, EventMetadata) {
+    pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
         (self.fields, self.metadata)
     }
 

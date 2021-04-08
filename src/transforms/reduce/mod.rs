@@ -77,7 +77,7 @@ struct ReduceState {
 
 impl ReduceState {
     fn new(e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) -> Self {
-        let (fields, metadata) = e.deconstruct();
+        let (fields, metadata) = e.into_parts();
         Self {
             stale_since: Instant::now(),
             fields: fields
@@ -101,7 +101,7 @@ impl ReduceState {
     }
 
     fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) {
-        let (fields, metadata) = e.deconstruct();
+        let (fields, metadata) = e.into_parts();
         self.metadata.merge(&metadata);
 
         for (k, v) in fields.into_iter() {
