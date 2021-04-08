@@ -34,9 +34,6 @@ pub enum Error {
     #[error("invalid string literal")]
     StringLiteral { start: usize },
 
-    #[error("unterminated literal")]
-    UnterminatedLiteral { start: usize },
-
     #[error("invalid literal")]
     Literal { start: usize },
 
@@ -65,7 +62,6 @@ impl DiagnosticError for Error {
             Literal { .. } => 208,
             EscapeChar { .. } => 209,
             UnexpectedParseError(..) => 210,
-            UnterminatedLiteral { .. } => 211,
         }
     }
 
@@ -185,11 +181,6 @@ impl DiagnosticError for Error {
             )],
 
             UnexpectedParseError(string) => vec![Label::primary(string, Span::default())],
-
-            UnterminatedLiteral { start } => vec![Label::primary(
-                "unterminated literal",
-                Span::new(*start, *start + 1),
-            )],
         }
     }
 }
@@ -764,56 +755,69 @@ impl<'input> Lexer<'input> {
                     while let Some((pos, ch)) = chars.peek() {
                         let pos = *pos;
 
-                        let literal_check = |result: SpannedResult<'input, usize>, chars: &mut Peekable<CharIndices<'input>>| match result {
-                            Err(_) => Err(()),
-                            Ok((_, _, new)) => {
-                                #[allow(clippy::while_let_on_iterator)]
-                                while let Some((i, _)) = chars.next() {
-                                    if i == new + pos {
-                                        break;
-                                    }
+                        let literal_check = |result: Spanned<'input, usize>, chars: &mut Peekable<CharIndices<'input>>| {
+                            let (_, _, new) = result;
+
+                            #[allow(clippy::while_let_on_iterator)]
+                            while let Some((i, _)) = chars.next() {
+                                if i == new + pos {
+                                    break;
                                 }
-                                match chars.peek().map(|(_, ch)| ch) {
-                                    Some(ch) => Ok(*ch),
-                                    None => Err(()),
-                                }
+                            }
+                            match chars.peek().map(|(_, ch)| ch) {
+                                Some(ch) => Ok(*ch),
+                                None => Err(()),
                             }
                         };
 
                         let ch = match &self.input[pos..] {
                             s if s.starts_with('"') => {
-                                let r = Lexer::new(&self.input[pos + 1..]).string_literal(0);
+                                let r = Lexer::new(&self.input[pos + 1..]).string_literal(0)?;
                                 match literal_check(r, &mut chars) {
                                     Ok(ch) => ch,
                                     Err(_) => {
-                                        return Err(Error::UnterminatedLiteral { start: pos + 1 });
+                                        // The call to lexer about should have raised an appropriate error by now,
+                                        // so these errors should only occur if there is a bug somewhere previously.
+                                        return Err(Error::UnexpectedParseError(
+                                            "Expected characters at end of string literal."
+                                                .to_string(),
+                                        ));
                                     }
                                 }
                             }
                             s if s.starts_with("s'") => {
-                                let r = Lexer::new(&self.input[pos + 1..]).raw_string_literal(0);
+                                let r = Lexer::new(&self.input[pos + 1..]).raw_string_literal(0)?;
                                 match literal_check(r, &mut chars) {
                                     Ok(ch) => ch,
                                     Err(_) => {
-                                        return Err(Error::UnterminatedLiteral { start: pos + 1 });
+                                        return Err(Error::UnexpectedParseError(
+                                            "Expected characters at end of raw string literal."
+                                                .to_string(),
+                                        ));
                                     }
                                 }
                             }
                             s if s.starts_with("r'") => {
-                                let r = Lexer::new(&self.input[pos + 1..]).regex_literal(0);
+                                let r = Lexer::new(&self.input[pos + 1..]).regex_literal(0)?;
                                 match literal_check(r, &mut chars) {
                                     Ok(ch) => ch,
                                     Err(_) => {
-                                        return Err(Error::UnterminatedLiteral { start: pos + 1 });
+                                        return Err(Error::UnexpectedParseError(
+                                            "Expected characters at end of regex literal."
+                                                .to_string(),
+                                        ));
                                     }
                                 }
                             }
                             s if s.starts_with("t'") => {
-                                let r = Lexer::new(&self.input[pos + 1..]).timestamp_literal(0);
+                                let r = Lexer::new(&self.input[pos + 1..]).timestamp_literal(0)?;
                                 match literal_check(r, &mut chars) {
                                     Ok(ch) => ch,
                                     Err(_) => {
-                                        return Err(Error::UnterminatedLiteral { start: pos + 1 });
+                                        return Err(Error::UnexpectedParseError(
+                                            "Expected characters at end of timestamp literal."
+                                                .to_string(),
+                                        ));
                                     }
                                 }
                             }
@@ -1191,8 +1195,20 @@ mod test {
     #[test]
     fn unterminated_literal_errors() {
         let mut lexer = Lexer::new("a(m, r')");
+        assert_eq!(Some(Err(Error::Literal { start: 0 })), lexer.next());
+    }
+
+    #[test]
+    fn invalid_grok_pattern() {
+        // Grok pattern has an invalid escape char -> `\]`
+        let mut lexer = Lexer::new(
+            r#"parse_grok!("1.2.3.4 - - [23/Mar/2021:06:46:35 +0000]", "%{IPORHOST:remote_ip} %{USER:ident} %{USER:user_name} \[%{HTTPDATE:timestamp}\]""#,
+        );
         assert_eq!(
-            Some(Err(Error::UnterminatedLiteral { start: 6 })),
+            Some(Err(Error::EscapeChar {
+                start: 55,
+                ch: Some('[')
+            })),
             lexer.next()
         );
     }
