@@ -378,10 +378,21 @@ Path: Path = PathSegment+ => Path(<>);
 PathSegment: PathSegment = {
     "."? <Field> => PathSegment::Field(<>),
     "[" <Integer> "]" => PathSegment::Index(<>),
-    "."? "(" <v:(<Field> "|")+> <e:Field> ")" => {
+    "."? "(" <v:(<ExtendedField> "|")+> <e:ExtendedField> ")" => {
         let mut v = v;
         v.push(e);
         PathSegment::Coalesce(v)
+    },
+};
+
+pub ExtendedField: Field = {
+    Field,
+    <i:Integer> <s:AnyIdent?> => {
+        let field = match s{
+            Some(s) => format!("{}{}",i,s),
+            None => format!("{}",i),
+        };
+        Field::Quoted(field)
     },
 };
 

@@ -526,7 +526,7 @@ impl<'input> Iterator for Lexer<'input> {
                     's' if self.test_peek(|ch| ch == '\'') => Some(self.raw_string_literal(start)),
                     't' if self.test_peek(|ch| ch == '\'') => Some(self.timestamp_literal(start)),
 
-                    ch if is_ident_start(ch) => Some(Ok(self.identifier_or_function_call(start))),
+                    ch if is_ident_start(ch) || (is_digit(ch) && (0..start).into_iter().rev().filter_map(|i|self.input.get(i..start)).next()==Some(".")) => Some(Ok(self.identifier_or_function_call(start))),
                     ch if is_digit(ch) || (ch == '-' && self.test_peek(is_digit)) => {
                         Some(self.numeric_literal(start))
                     }
@@ -1720,6 +1720,26 @@ mod test {
                 (r#"                                     ~     "#, Dot),
                 (r#"                                      ~~~~~"#, Identifier("child")),
                 (r#"                                          ~"#, RQuery),
+            ],
+        );
+    }
+
+    #[test]
+    fn queries_digit_path() {
+        test(
+            data(r#".0 foo.2bar.42"#),
+            vec![
+                (r#"~             "#, LQuery),
+                (r#"~             "#, Dot),
+                (r#" ~            "#, Identifier("0")),
+                (r#" ~            "#, RQuery),
+                (r#"   ~          "#, LQuery),
+                (r#"   ~~~        "#, Identifier("foo")),
+                (r#"      ~       "#, Dot),
+                (r#"       ~~~~   "#, Identifier("2bar")),
+                (r#"           ~  "#, Dot),
+                (r#"            ~~"#, Identifier("42")),
+                (r#"             ~"#, RQuery),
             ],
         );
     }
