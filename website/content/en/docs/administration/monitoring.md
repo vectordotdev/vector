@@ -1,5 +1,5 @@
 ---
 title: Monitoring and observing
 short: Monitoring
-weight: 1
+weight: 2
 ---
