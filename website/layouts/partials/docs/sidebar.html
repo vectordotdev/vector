@@ -30,16 +30,6 @@
     {{ $title }}
   </a>
 
-  {{ with .ctx.RegularPages }}
-  {{ range . }}
-  {{ $isHere := eq $page.RelPermalink .RelPermalink }}
-  {{ $title := .Params.short | default .Title }}
-  <a class="sidebar-section-link{{ if $isHere }} is-active{{ end }}" href="{{ .RelPermalink }}">
-    {{ $title }}
-  </a>
-  {{ end }}
-  {{ end }}
-
   {{ with .ctx.Sections }}
   <div class="sidebar-subsection">
     {{ range . }}
@@ -77,6 +67,16 @@
     </div>
     {{ end }}
   </div>
+  {{ end }}
+
+  {{ with .ctx.RegularPages }}
+  {{ range . }}
+  {{ $isHere := eq $page.RelPermalink .RelPermalink }}
+  {{ $title := .Params.short | default .Title }}
+  <a class="sidebar-section-link{{ if $isHere }} is-active{{ end }}" href="{{ .RelPermalink }}">
+    {{ $title }}
+  </a>
+  {{ end }}
   {{ end }}
 </div>
 {{ end }}
