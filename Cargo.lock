@@ -3871,22 +3871,8 @@ version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58e285601dcfb9f3a8f37a7093b9956a0df730b50848c8ac0117406aff06c851"
 dependencies = [
- "metrics-macros 0.2.0",
+ "metrics-macros",
  "proc-macro-hack",
-]
-
-[[package]]
-name = "metrics-macros"
-version = "0.1.0-alpha.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0197e48db63aa8c28f9fbae021585b8f1b299a0b21640cf98853211ac39eb294"
-dependencies = [
- "lazy_static",
- "proc-macro-hack",
- "proc-macro2 1.0.26",
- "quote 1.0.9",
- "regex",
- "syn 1.0.68",
 ]
 
 [[package]]
@@ -7932,7 +7918,6 @@ dependencies = [
  "matches",
  "maxminddb",
  "metrics",
- "metrics-macros 0.1.0-alpha.9",
  "metrics-tracing-context",
  "metrics-util",
  "mongodb",
@@ -7957,6 +7942,7 @@ dependencies = [
  "prost-build",
  "prost-types",
  "pulsar",
+ "quickcheck",
  "rand 0.8.3",
  "rand_distr",
  "rdkafka",

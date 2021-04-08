@@ -1,4 +1,5 @@
 use super::EventMetadata;
+use crate::metrics::Handle;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use getset::Getters;
@@ -289,28 +290,24 @@ impl Metric {
 
     /// Convert the metrics_runtime::Measurement value plus the name and
     /// labels from a Key into our internal Metric format.
-    pub fn from_metric_kv(key: &metrics::Key, handle: &metrics_util::Handle) -> Self {
+    pub fn from_metric_kv(key: &metrics::Key, handle: &Handle) -> Self {
         let value = match handle {
-            metrics_util::Handle::Counter(_) => MetricValue::Counter {
-                value: handle.read_counter() as f64,
+            Handle::Counter(counter) => MetricValue::Counter {
+                value: counter.count() as f64,
             },
-            metrics_util::Handle::Gauge(_) => MetricValue::Gauge {
-                value: handle.read_gauge() as f64,
+            Handle::Gauge(gauge) => MetricValue::Gauge {
+                value: gauge.gauge(),
             },
-            metrics_util::Handle::Histogram(_) => {
-                let values = handle.read_histogram();
-                // Each sample in the source measurement has an
-                // effective sample rate of 1.
-                let samples = values
-                    .into_iter()
-                    .map(|i| Sample {
-                        value: i as f64,
-                        rate: 1,
-                    })
+            Handle::Histogram(histogram) => {
+                let buckets: Vec<Bucket> = histogram
+                    .buckets()
+                    .map(|(upper_limit, count)| Bucket { upper_limit, count })
                     .collect();
-                MetricValue::Distribution {
-                    samples,
-                    statistic: StatisticKind::Histogram,
+
+                MetricValue::AggregatedHistogram {
+                    buckets,
+                    sum: histogram.sum() as f64,
+                    count: histogram.count(),
                 }
             }
         };
