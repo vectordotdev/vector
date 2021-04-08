@@ -6,12 +6,8 @@
 {{ end }}
 {{ end }}
 
-{{ $toc := $.Page.Scratch }}
-{{ $toc.Add "categories" (slice $category) }}
-
 {{ range $funcs }}
 {{ $name := .name }}
-{{ $toc.Add $category (slice .name) }}
 {{ $func := index site.Data.docs.remap.functions .name }}
 <div class="function">
   <header class="function-header">
