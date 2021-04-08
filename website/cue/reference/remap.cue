@@ -28,7 +28,7 @@ package metadata
 
 	#Type: "any" | "array" | "boolean" | "float" | "integer" | "object" | "null" | "path" | "string" | "regex" | "timestamp"
 
-	errors:      _
+	errors: _
 	examples: [#Example, ...#Example]
 	expressions:  _
 	functions:    _
