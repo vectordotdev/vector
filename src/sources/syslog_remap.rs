@@ -1,7 +1,7 @@
 use crate::sources::socket::SocketConfig;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     shutdown::ShutdownSignal,
@@ -34,13 +34,7 @@ impl GenerateConfig for SyslogRemapConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "syslog_remap")]
 impl SourceConfig for SyslogRemapConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let conf = RemapConfig {
             source: r#"
 structured = parse_syslog!(.message)
@@ -52,6 +46,8 @@ structured = parse_syslog!(.message)
         };
         let tf = Remap::new(conf).unwrap();
         let (to_transform, rx) = Pipeline::new_with_buffer(100, vec![Box::new(tf)]);
+        let out = cx.out;
+        cx.out = to_transform;
         tokio::spawn(async move {
             rx.map(|mut event| {
                 event
@@ -62,9 +58,7 @@ structured = parse_syslog!(.message)
             .forward(out)
             .await
         });
-        self.original_config
-            .build(_name, _globals, shutdown, to_transform)
-            .await
+        self.original_config.build(cx).await
     }
 
     fn output_type(&self) -> DataType {
@@ -84,8 +78,6 @@ structured = parse_syslog!(.message)
 mod test {
     use super::SyslogRemapConfig;
     use crate::sources::socket::Mode;
-    //use crate::{config::log_schema, event::Event};
-    //use chrono::prelude::*;
 
     #[test]
     fn generate_config() {
