@@ -614,7 +614,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
                 }
             }
         }
-        
+
         debug!("Finished capturing {} command output.", stream);
     }));
 }
