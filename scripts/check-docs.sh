@@ -11,9 +11,7 @@ set -euo pipefail
 #     2. In CI, ensuring that the .cue files are properly formatted.
 
 ROOT=$(git rev-parse --show-toplevel)
-
 CUE="${ROOT}/scripts/cue.sh"
-CUE_SOURCES="${ROOT}/website/cue"
 
 read-all-docs() {
   ${CUE} list | sort | xargs cat -A
