@@ -82,6 +82,11 @@ hr.narrow
     font-size: 1rem
     font-weight: $weight-semibold
 
+.breadcrumb
+  li.is-active
+    a
+      font-weight: $weight-bold
+
 .has-text-small
   font-size: 0.8rem
 
@@ -199,10 +204,11 @@ sup.ml-tiny
     color: $black
 
 .jump
-  background-color: $white-bis
+  box-shadow: $card-shadow
   padding: 0.5rem 0.75rem
   border-radius: 5px
-  +x-spaced
+  a
+    +x-spaced
 
   & + .jump, & + p
     margin-top: 0.75rem

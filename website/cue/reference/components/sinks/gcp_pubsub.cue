@@ -82,7 +82,7 @@ components: sinks: gcp_pubsub: {
 	configuration: {
 		api_key: {
 			common:      false
-			description: "A [Google Cloud API key][urls.gcp_authentication_api_key] used to authenticate access the pubsub project and topic. Either this or `credentials_path` must be set."
+			description: "A [Google Cloud API key](\(urls.gcp_authentication_api_key)) used to authenticate access the pubsub project and topic. Either this or `credentials_path` must be set."
 			required:    false
 			warnings: []
 			type: string: {
