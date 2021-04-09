@@ -1,4 +1,4 @@
-use crate::async_buf_read::VecAsyncBufReadExt;
+use crate::async_read::VecAsyncReadExt;
 use crate::config::{DataType, GlobalOptions};
 use crate::event::LogEvent;
 use crate::internal_events::{ExecCommandExecuted, ExecTimeout};
@@ -9,19 +9,21 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures::{FutureExt, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use std::io;
 use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
 use std::process::ExitStatus;
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
+use tokio::io::{AsyncRead, BufReader};
 use tokio::process::Command;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio::time::{self, sleep, Duration, Instant};
 use tokio_stream::wrappers::IntervalStream;
+use tokio_util::codec::{Decoder, FramedRead, LinesCodec};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(default, deny_unknown_fields)]
@@ -36,7 +38,7 @@ pub struct ExecConfig {
     #[serde(default = "default_events_per_line")]
     pub event_per_line: bool,
     #[serde(default = "default_maximum_buffer_size")]
-    pub maximum_buffer_size_bytes: u64,
+    pub maximum_buffer_size_bytes: usize,
 }
 
 // TODO: Would be nice to combine the scheduled and streaming config with the mode enum once
@@ -89,7 +91,56 @@ impl Default for ExecConfig {
     }
 }
 
-fn default_maximum_buffer_size() -> u64 {
+// TODO: Maybe split into a shared codec module
+#[derive(Debug)]
+pub struct SizedBytesCodec {
+    max_length: usize,
+}
+
+impl SizedBytesCodec {
+    pub fn new_with_max_length(max_length: usize) -> Self {
+        SizedBytesCodec { max_length }
+    }
+}
+
+// TODO: If needed it might be useful to return a list of BytesMut for
+//       a single call but returning a single seems to work fine.
+impl Decoder for SizedBytesCodec {
+    type Item = BytesMut;
+    type Error = io::Error;
+
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<BytesMut>, io::Error> {
+        if !buf.is_empty() {
+            let incoming_length = buf.len();
+            if incoming_length >= self.max_length {
+                // Buffer full
+                Ok(Some(buf.split_to(self.max_length)))
+            } else {
+                // Buffer not full yet
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<BytesMut>, io::Error> {
+        Ok(match self.decode(buf)? {
+            Some(frame) => Some(frame),
+            None => {
+                if !buf.is_empty() {
+                    // Send what ever is left over
+                    Some(buf.split_to(buf.len()))
+                } else {
+                    // Nothing left ot send
+                    None
+                }
+            }
+        })
+    }
+}
+
+fn default_maximum_buffer_size() -> usize {
     // 1MB
     1000000
 }
@@ -333,18 +384,8 @@ async fn run_command(
 
     let mut child = command.spawn()?;
 
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| Error::new(ErrorKind::Other, "Unable to take stdout of spawned process"))?;
-
-    // Create stdout async reader
-    let stdout_reader = BufReader::new(stdout);
-
     // Set up communication channels
     let (sender, mut receiver) = channel(1024);
-
-    let pid = child.id();
 
     // Optionally include stderr
     if config.include_stderr {
@@ -353,11 +394,11 @@ async fn run_command(
         })?;
 
         // Create stderr async reader
+        let stderr = stderr.allow_read_until(shutdown.clone().map(|_| ()));
         let stderr_reader = BufReader::new(stderr);
 
         spawn_reader_thread(
             stderr_reader,
-            shutdown.clone(),
             config.event_per_line,
             config.maximum_buffer_size_bytes,
             STDERR,
@@ -365,9 +406,19 @@ async fn run_command(
         );
     }
 
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| Error::new(ErrorKind::Other, "Unable to take stdout of spawned process"))?;
+
+    // Create stdout async reader
+    let stdout = stdout.allow_read_until(shutdown.clone().map(|_| ()));
+    let stdout_reader = BufReader::new(stdout);
+
+    let pid = child.id();
+
     spawn_reader_thread(
         stdout_reader,
-        shutdown.clone(),
         config.event_per_line,
         config.maximum_buffer_size_bytes,
         STDOUT,
@@ -513,9 +564,8 @@ fn create_event(
 
 fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     reader: BufReader<R>,
-    shutdown: ShutdownSignal,
     event_per_line: bool,
-    buf_size: u64,
+    buf_size: usize,
     stream: &'static str,
     sender: Sender<(Bytes, &'static str)>,
 ) {
@@ -523,76 +573,48 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     Box::pin(tokio::spawn(async move {
         debug!("Start capturing {} command output.", stream);
 
-        let mut read_buffer: Vec<u8> = Vec::new();
-
-        let reader = reader.allow_read_until(shutdown.clone().map(|_| ()));
-
-        let mut limited_reader = reader.take(buf_size);
-
         if event_per_line {
-            // Keep reading lines (lines longer than the max buffer will be split)
-            while let Ok(bytes_read) = limited_reader.read_until(b'\n', &mut read_buffer).await {
-                if bytes_read == 0 {
-                    // If we get a continuous stream of \n the bytes_read will be at least 1
-                    debug!("End of input reached, stop reading.");
-                    break;
-                }
-
-                // Strip of the end of line bytes
-                if read_buffer.ends_with(&[b'\n']) {
-                    let _ = read_buffer.pop();
-
-                    if read_buffer.ends_with(&[b'\r']) {
-                        let _ = read_buffer.pop();
+            let codec = LinesCodec::new_with_max_length(buf_size);
+            let mut bytes_stream = FramedRead::new(reader, codec);
+            while let Some(result) = bytes_stream.next().await {
+                match result {
+                    Ok(read_line) => {
+                        let read_bytes = Bytes::from(read_line);
+                        if sender.send((read_bytes, stream)).await.is_err() {
+                            // If the receive half of the channel is closed, either due to close being
+                            // called or the Receiver handle dropping, the function returns an error.
+                            debug!("Receive channel closed, unable to send.");
+                            break;
+                        }
+                    }
+                    Err(error) => {
+                        // Added this match to log the error and continue reading the stream
+                        error!(message = "Error decoding lines.", %error);
                     }
                 }
-
-                let read_bytes = Bytes::from(read_buffer.clone());
-                if sender.send((read_bytes, stream)).await.is_err() {
-                    // If the receive half of the channel is closed, either due to close being
-                    // called or the Receiver handle dropping, the function returns an error.
-                    debug!("Receive channel closed, unable to send.");
-                    break;
-                }
-
-                // Clear the read buffer ready for the next read
-                read_buffer.clear();
-
-                // Reset the limit for the next read
-                limited_reader.set_limit(buf_size);
             }
         } else {
-            // Keep reading max buffer chunks
-            while let Ok(bytes_read) = limited_reader.read_to_end(&mut read_buffer).await {
-                if bytes_read == 0 {
-                    debug!("End of input reached, stop reading.");
-                    break;
+            let codec = SizedBytesCodec::new_with_max_length(buf_size);
+            let mut bytes_stream = FramedRead::new(reader, codec);
+            while let Some(result) = bytes_stream.next().await {
+                match result {
+                    Ok(read_line) => {
+                        let read_bytes = Bytes::from(read_line);
+                        if sender.send((read_bytes, stream)).await.is_err() {
+                            // If the receive half of the channel is closed, either due to close being
+                            // called or the Receiver handle dropping, the function returns an error.
+                            debug!("Receive channel closed, unable to send.");
+                            break;
+                        }
+                    }
+                    Err(error) => {
+                        // Added this match to log the error and continue reading the stream
+                        error!(message = "Error decoding bytes.", %error);
+                    }
                 }
-
-                let read_bytes = Bytes::from(read_buffer.clone());
-                if sender.send((read_bytes, stream)).await.is_err() {
-                    // If the receive half of the channel is closed, either due to close being
-                    // called or the Receiver handle dropping, the function returns an error.
-                    debug!("Receive channel closed, unable to send.");
-                    break;
-                }
-
-                // Clear the read buffer ready for the next read
-                read_buffer.clear();
-
-                // Reset the limit for the next read
-                limited_reader.set_limit(buf_size);
             }
         }
-
-        // Handle any left over buffer
-        if !read_buffer.is_empty() {
-            let read_bytes = Bytes::from(read_buffer.clone());
-            if sender.send((read_bytes, stream)).await.is_err() {
-                debug!("Receive channel closed, unable to send.");
-            }
-        }
-
+        
         debug!("Finished capturing {} command output.", stream);
     }));
 }
@@ -704,10 +726,9 @@ mod tests {
 
         let buf = Cursor::new("hello world\nhello rocket 🚀");
         let reader = BufReader::new(buf);
-        let shutdown = ShutdownSignal::noop();
         let (sender, mut receiver) = channel(1024);
 
-        spawn_reader_thread(reader, shutdown, true, 88888, STDOUT, sender);
+        spawn_reader_thread(reader, true, 88888, STDOUT, sender);
 
         let mut counter = 0;
         if let Some((line, stream)) = receiver.recv().await {
@@ -729,39 +750,28 @@ mod tests {
     async fn test_spawn_reader_thread_per_line_tiny_buffer() {
         trace_init();
 
-        let buf = Cursor::new("hello world\n🚀 123");
+        let buf = Cursor::new("hello\nhello world\nok\n");
         let reader = BufReader::new(buf);
-        let shutdown = ShutdownSignal::noop();
         let (sender, mut receiver) = channel(1024);
 
-        spawn_reader_thread(reader, shutdown, true, 6, STDOUT, sender);
+        spawn_reader_thread(reader, true, 6, STDOUT, sender);
 
         let mut counter = 0;
+
         if let Some((line, stream)) = receiver.recv().await {
-            assert_eq!(Bytes::from("hello "), line);
+            assert_eq!(Bytes::from("hello"), line);
             assert_eq!(STDOUT, stream);
             counter += 1;
         }
 
         if let Some((line, stream)) = receiver.recv().await {
-            assert_eq!(Bytes::from("world"), line);
+            assert_eq!(Bytes::from("ok"), line);
             assert_eq!(STDOUT, stream);
             counter += 1;
         }
 
-        if let Some((line, stream)) = receiver.recv().await {
-            assert_eq!(Bytes::from("🚀 1"), line);
-            assert_eq!(STDOUT, stream);
-            counter += 1;
-        }
-
-        if let Some((line, stream)) = receiver.recv().await {
-            assert_eq!(Bytes::from("23"), line);
-            assert_eq!(STDOUT, stream);
-            counter += 1;
-        }
-
-        assert_eq!(counter, 4);
+        // We should get two lines as the middle one is discarded for being too long
+        assert_eq!(counter, 2);
     }
 
     #[tokio::test]
@@ -770,10 +780,9 @@ mod tests {
 
         let buf = Cursor::new("hello world\nhello rocket 🚀");
         let reader = BufReader::new(buf);
-        let shutdown = ShutdownSignal::noop();
         let (sender, mut receiver) = channel(1024);
 
-        spawn_reader_thread(reader, shutdown, false, 88888, STDOUT, sender);
+        spawn_reader_thread(reader, false, 88888, STDOUT, sender);
 
         let mut counter = 0;
         if let Some((line, stream)) = receiver.recv().await {
@@ -783,6 +792,38 @@ mod tests {
         }
 
         assert_eq!(counter, 1);
+    }
+
+    #[tokio::test]
+    async fn test_spawn_reader_thread_per_blob_tiny_buffer() {
+        trace_init();
+
+        let buf = Cursor::new("stream 🐟 888");
+        let reader = BufReader::new(buf);
+        let (sender, mut receiver) = channel(1024);
+
+        spawn_reader_thread(reader, false, 6, STDOUT, sender);
+
+        let mut counter = 0;
+        if let Some((line, stream)) = receiver.recv().await {
+            assert_eq!(Bytes::from("stream"), line);
+            assert_eq!(STDOUT, stream);
+            counter += 1;
+        }
+
+        if let Some((line, stream)) = receiver.recv().await {
+            assert_eq!(Bytes::from(" 🐟 "), line);
+            assert_eq!(STDOUT, stream);
+            counter += 1;
+        }
+
+        if let Some((line, stream)) = receiver.recv().await {
+            assert_eq!(Bytes::from("888"), line);
+            assert_eq!(STDOUT, stream);
+            counter += 1;
+        }
+
+        assert_eq!(counter, 3);
     }
 
     #[tokio::test]

@@ -39,7 +39,6 @@ pub mod internal_events;
 #[cfg(feature = "api")]
 pub mod api;
 pub mod app;
-pub mod async_buf_read;
 pub mod async_read;
 pub mod buffers;
 pub mod encoding_transcode;

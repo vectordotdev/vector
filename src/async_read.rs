@@ -59,3 +59,81 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::shutdown::ShutdownSignal;
+    use crate::test_util::temp_file;
+    use futures::FutureExt;
+    use tokio::fs::{remove_file, File};
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
+
+    #[tokio::test]
+    async fn test_read_line_without_shutdown() {
+        let shutdown = ShutdownSignal::noop();
+        let temp_path = temp_file();
+        let write_file = File::create(temp_path.clone()).await.unwrap();
+        let read_file = File::open(temp_path.clone()).await.unwrap();
+
+        // Wrapper AsyncRead
+        let read_file = read_file.allow_read_until(shutdown.clone().map(|_| ()));
+
+        let mut reader = BufReader::new(read_file);
+        let mut writer = BufWriter::new(write_file);
+
+        writer.write_all("First line\n".as_bytes()).await.unwrap();
+        writer.flush().await.unwrap();
+
+        // Test one of the AsyncBufRead extension functions
+        let mut line_one = String::new();
+        let _ = reader.read_line(&mut line_one).await;
+
+        assert_eq!("First line\n", line_one);
+
+        writer.write_all("Second line\n".as_bytes()).await.unwrap();
+        writer.flush().await.unwrap();
+
+        let mut line_two = String::new();
+        let _ = reader.read_line(&mut line_two).await;
+
+        assert_eq!("Second line\n", line_two);
+
+        remove_file(temp_path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_read_line_with_shutdown() {
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+        let temp_path = temp_file();
+        let write_file = File::create(temp_path.clone()).await.unwrap();
+        let read_file = File::open(temp_path.clone()).await.unwrap();
+
+        // Wrapper AsyncRead
+        let read_file = read_file.allow_read_until(shutdown.clone().map(|_| ()));
+
+        let mut reader = BufReader::new(read_file);
+        let mut writer = BufWriter::new(write_file);
+
+        writer.write_all("First line\n".as_bytes()).await.unwrap();
+        writer.flush().await.unwrap();
+
+        // Test one of the AsyncBufRead extension functions
+        let mut line_one = String::new();
+        let _ = reader.read_line(&mut line_one).await;
+
+        assert_eq!("First line\n", line_one);
+
+        drop(trigger_shutdown);
+
+        writer.write_all("Second line\n".as_bytes()).await.unwrap();
+        writer.flush().await.unwrap();
+
+        let mut line_two = String::new();
+        let _ = reader.read_line(&mut line_two).await;
+
+        assert_eq!("", line_two);
+
+        remove_file(temp_path).await.unwrap();
+    }
+}
