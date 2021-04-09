@@ -614,14 +614,14 @@ mod integration_tests {
             sleep(Duration::from_secs(1)).await;
 
             let log = LogEvent::default();
-            let mut expected = log.clone();
             tx.send(log.into()).await.unwrap();
 
             let event = stream.next().await.unwrap();
 
-            expected.insert("ec2.metadata.availability-zone", "ww-region-1a");
-            expected.insert("ec2.metadata.public-ipv4", "192.1.1.1");
-            assert_eq!(event.into_log(), expected);
+            assert_eq!(
+                event.as_log().get("ec2.metadata.availability-zone"),
+                Some(&"ww-region-1a".into())
+            );
         }
 
         {
@@ -644,14 +644,14 @@ mod integration_tests {
             sleep(Duration::from_secs(1)).await;
 
             let log = LogEvent::default();
-            let mut expected = log.clone();
             tx.send(log.into()).await.unwrap();
 
             let event = stream.next().await.unwrap();
 
-            expected.insert("availability-zone", "ww-region-1a");
-            expected.insert("public-ipv4", "192.1.1.1");
-            assert_eq!(event.into_log(), expected);
+            assert_eq!(
+                event.as_log().get("availability-zone"),
+                Some(&"ww-region-1a".into())
+            );
         }
     }
 }
