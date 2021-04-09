@@ -1,0 +1,22 @@
+{{ define "breadcrumb" }}
+{{ if .p1.Parent }}
+{{ template "breadcrumb" (dict "p1" .p1.Parent "p2" .p2) }}
+{{ else if not .p1.IsHome }}
+{{ template "breadcrumb" (dict "p1" .p1.Site.Home "p2" .p2) }}
+{{ end }}
+{{ $isHere := eq .p1 .p2 }}
+{{ $title := .p1.Params.short | default .p1.Title }}
+<li {{ if $isHere }} class="is-active"{{ end }}>
+  <a href="{{ .p1.RelPermalink }}">
+    {{ $title }}
+  </a>
+</li>
+{{ end }}
+
+<section class="section">
+  <nav class="breadcrumb is-center has-arrow-separator" aria-label="breadcrumbs">
+    <ul>
+      {{ template "breadcrumb" (dict "p1" . "p2" .) }}
+    </ul>
+  </nav>
+</section>

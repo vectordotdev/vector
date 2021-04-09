@@ -4,10 +4,8 @@ short: Topologies
 weight: 2
 ---
 
-In the previous section we covered the various [deployment
-strategies][docs.strategies] used to collect and forward data. You combine these
-strategies to form topologies. This section showcases common topologies and the
-pros and cons of each. Use these as _guidelines_ to build your own.
+In the previous section we covered the various [deployment strategies][roles] used to collect and forward data. You combine these
+strategies to form topologies. This section showcases common topologies and the pros and cons of each. Use these as _guidelines_ to build your own.
 
 ## Distributed
 
@@ -102,3 +100,5 @@ service such as Kafka.
   managing production-grade streams.
 - **More expensive.** In addition the management cost, the added stream cluster
   will require more resources which will increase operational cost.
+
+[roles]: /docs/setup/deployment/roles

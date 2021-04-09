@@ -7,18 +7,19 @@
 
     {{ partial "css.html" . }}
   </head>
-  <body class="page has-navbar-fixed-top" id="page" x-data="{ drawer: false }">
+  <body class="page has-navbar-fixed-top" x-data="{ drawer: false }">
     {{ partial "navbar.html" . }}
 
     <main class="main">
       <div class="dashboard">
         <div class="container">
           <div class="columns is-variable is-5">
-            <div class="column is-one-fifth is-hidden-mobile">
+            <div class="column is-one-fifth is-hidden-touch">
               {{ partial "docs/sidebar.html" (dict "ctx" .) }}
             </div>
 
             <div class="column">
+              {{ partial "docs/breadcrumb.html" . }}
               {{ partial "docs/hero.html" (dict "title" .Title "description" .Params.description) }}
               {{ partial "docs/content.html" . }}
             </div>
