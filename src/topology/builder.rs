@@ -61,12 +61,7 @@ pub async fn build_pieces(
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
-        let context = SourceContext {
-            name: name.into(),
-            globals: config.global.clone(),
-            shutdown: shutdown_signal,
-            out: pipeline,
-        };
+        let context = SourceContext::new(name, config.global.clone(), shutdown_signal, pipeline);
         let server = match source.build(context).await {
             Err(error) => {
                 errors.push(format!("Source \"{}\": {}", name, error));

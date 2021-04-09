@@ -372,7 +372,7 @@ mod test {
         let source_name = "tcp_shutdown_simple";
         let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
-        let (cx, mut shutdown) = SourceContext::new_shutdown(source_name, tx);
+        let (cx, mut shutdown) = SourceContext::new_with_shutdown(source_name, tx);
 
         // Start TCP Source
         let server = SocketConfig::from(TcpConfig::from_address(addr.into()))
@@ -409,7 +409,7 @@ mod test {
         let source_name = "tcp_shutdown_infinite_stream";
 
         let addr = next_addr();
-        let (cx, mut shutdown) = SourceContext::new_shutdown(source_name, tx);
+        let (cx, mut shutdown) = SourceContext::new_with_shutdown(source_name, tx);
 
         // Start TCP Source
         let server = SocketConfig::from({
@@ -509,12 +509,12 @@ mod test {
         let address = next_addr();
 
         let server = SocketConfig::from(UdpConfig::from_address(address))
-            .build(SourceContext {
-                name: source_name.into(),
-                globals: GlobalOptions::default(),
-                shutdown: shutdown_signal,
-                out: sender,
-            })
+            .build(SourceContext::new(
+                source_name,
+                GlobalOptions::default(),
+                shutdown_signal,
+                sender,
+            ))
             .await
             .unwrap();
         let source_handle = tokio::spawn(server);
