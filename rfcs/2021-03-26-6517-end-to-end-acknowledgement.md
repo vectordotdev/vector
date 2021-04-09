@@ -117,22 +117,35 @@ would only be discarding the status.
 ### Sinks using a disk buffer
 
 In order to deal with longer delivery delays and backpressure, sinks may
-be configured to store events temporarily in a disk buffer. Since the
-events are not actually delivered when they are buffered, the final
-delivery status will have to be confirmed after the event is loaded back
-from the buffer. The source, to be used to determine where
-to provide the finalization status indicator, must be converted into a form
-that may be serialized (ie string or integer index). However, the
-configuration may be reloaded while the event is buffered in such a way
-that the source name provided in the configuration may change, or a
-different component may be substituted for the same identifier. As such,
-the configured component name is not sufficient to uniquely identify the
-source. Further, Vector may be stopped while the event is buffered and
-then restarted with an identical configuration. At this point, the old
-source will be distinct from the current source, despite having the same
-configured name. As such, the persisted identifier for the source must
-stay the same across configuration reloads, but must be different for
-each run of Vector.
+be configured to store events temporarily in a disk buffer. This may
+cause acknowledgements to follow one of two paths, depending on the
+configuration:
+
+1. Since the events will no longer be lost in the event of a crash, they
+   may be finalized as soon as they are persisted to the buffer. In this
+   case, buffer will handle the finalization, and the finalization data
+   will be stripped before the event is serialized. However, the buffer
+   will need to be modified to handle acknowledgement, and only purge
+   events from the buffer once they are delivered. As such, new
+   finalization tracking will be added to the events on reload so the
+   buffer can track their status.
+
+2. Since the events are not actually delivered when they are buffered,
+   the final delivery status will have to be confirmed after the event
+   is loaded back from the buffer. The source, to be used to determine
+   where to provide the finalization status indicator, must be converted
+   into a form that may be serialized (ie string or integer
+   index). However, the configuration may be reloaded while the event is
+   buffered in such a way that the source name provided in the
+   configuration may change, or a different component may be substituted
+   for the same identifier. As such, the configured component name is
+   not sufficient to uniquely identify the source. Further, Vector may
+   be stopped while the event is buffered and then restarted with an
+   identical configuration. At this point, the old source will be
+   distinct from the current source, despite having the same configured
+   name. As such, the persisted identifier for the source must stay the
+   same across configuration reloads, but must be different for each run
+   of Vector.
 
 ## Internal Proposal
 
@@ -287,13 +300,28 @@ for acknowledgements. It is a boolean defaulting to `false`. If no sink
 indicates it is authoritative, all sinks must finalize the event before
 an acknowledgement may be sent, as described above.
 
+Finally, a new `acknowledgements` option will be added to the buffer
+configuration to control if events will be acknowledged when they are
+persisted to the buffer. It is a boolean defaulting to `false`.
+
 ```toml
 # Global enable option
+# Defaults to `true`
 acknowledgements = true
 
 [sources.my_source_id]
-  # Per-source enable option
+  # Enable or disable waiting for acknowledgements for this sink.
+  # Defaults to the global value of `acknowledgements`
   acknowledgements = true
+
+[sinks.my_sink_id]
+  # Treat this sinks' acknowledgements as authoritative for the event.
+  # Defaults to `false`
+  authoritative = true
+
+  # Enable or disable acknowledging events when they are buffered.
+  # Defaults to `false`
+  buffer.acknowledgements = true
 ```
 
 A new class named `acknowledgements` will be added to the source
@@ -342,24 +370,6 @@ The above structure provides for several considerations:
     through a channel, increasing the run-time overhead.
 
 ## Outstanding Questions
-
-1. Is this feature intended to be opt-in to maximize performance in the
-   default configuration, or opt-out to maximize reliability?
-
-2. In most configurations, each event is likely to have a single source.
-   Would it be better to store that single source inline (ie with either
-   a `smallvec` of size 1, or an enum with variants of none, one, or an
-   array of sources)? The would make each event larger but would
-   eliminate the secondary allocation and indirection for all events
-   with a single source. Some benchmarking may be instructive here, but
-   it is difficult to measure the effects of data layout changes and
-   other secondary effects.
-
-3. Does the batch status indicator need to be multi-valued instead of a
-   single indicator? This may be handled by decomposing the shared
-   status indicator into a shared array and an index into that
-   array. However, I am not aware that any source requires
-   distinguishing which part of a batch failed to deliver.
 
 ## Plan Of Attack
 
