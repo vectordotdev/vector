@@ -110,13 +110,6 @@ remap: #Remap & {
 				. = merge(., structured)
 				"""#
 			output: log: {
-				"0":       "2021/01/20 06:39:15 +0000 [error] 17755#17755: *3569904 open() \"/usr/share/nginx/html/test.php\" failed (2: No such file or directory), client: xxx.xxx.xxx.xxx, server: localhost, request: \"GET /test.php HTTP/1.1\", host: \"yyy.yyy.yyy.yyy\""
-				"1":       "2021/01/20 06:39:15 +0000"
-				"2":       "error"
-				"3":       "17755"
-				"4":       "17755"
-				"5":       "3569904"
-				"6":       "open() \"/usr/share/nginx/html/test.php\" failed (2: No such file or directory), client: xxx.xxx.xxx.xxx, server: localhost, request: \"GET /test.php HTTP/1.1\", host: \"yyy.yyy.yyy.yyy\""
 				timestamp: "2021-01-20T06:39:15Z"
 				severity:  "error"
 				pid:       17755
