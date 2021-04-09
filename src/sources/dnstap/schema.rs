@@ -1,17 +1,20 @@
-#[readonly::make]
-#[derive(Default, Debug, Clone)]
+use getset::{Getters, MutGetters, Setters};
+
+#[derive(Getters, MutGetters, Default, Debug, Clone)]
+#[get = "pub"]
 pub struct DnstapEventSchema {
-    pub dnstap_root_data_schema: DnstapRootDataSchema,
-    pub dnstap_message_schema: DnstapMessageSchema,
-    pub dns_query_message_schema: DnsQueryMessageSchema,
-    pub dns_query_header_schema: DnsQueryHeaderSchema,
-    pub dns_update_message_schema: DnsUpdateMessageSchema,
-    pub dns_update_header_schema: DnsUpdateHeaderSchema,
-    pub dns_message_opt_pseudo_section_schema: DnsMessageOptPseudoSectionSchema,
-    pub dns_message_option_schema: DnsMessageOptionSchema,
-    pub dns_record_schema: DnsRecordSchema,
-    pub dns_query_question_schema: DnsQueryQuestionSchema,
-    pub dns_update_zone_info_schema: DnsUpdateZoneInfoSchema,
+    #[getset(get = "pub", get_mut = "pub")]
+    dnstap_root_data_schema: DnstapRootDataSchema,
+    dnstap_message_schema: DnstapMessageSchema,
+    dns_query_message_schema: DnsQueryMessageSchema,
+    dns_query_header_schema: DnsQueryHeaderSchema,
+    dns_update_message_schema: DnsUpdateMessageSchema,
+    dns_update_header_schema: DnsUpdateHeaderSchema,
+    dns_message_opt_pseudo_section_schema: DnsMessageOptPseudoSectionSchema,
+    dns_message_option_schema: DnsMessageOptionSchema,
+    dns_record_schema: DnsRecordSchema,
+    dns_query_question_schema: DnsQueryQuestionSchema,
+    dns_update_zone_info_schema: DnsUpdateZoneInfoSchema,
 }
 
 impl DnstapEventSchema {
@@ -32,18 +35,20 @@ impl DnstapEventSchema {
     }
 }
 
-#[readonly::make]
-#[derive(Debug, Clone)]
+#[derive(Getters, Setters, Debug, Clone)]
+#[get = "pub"]
 pub struct DnstapRootDataSchema {
-    pub server_identity: &'static str,
-    pub server_version: &'static str,
-    pub extra: &'static str,
-    pub data_type: &'static str,
-    pub data_type_id: &'static str,
-    pub timestamp: &'static str,
-    pub time_precision: &'static str,
-    pub error: &'static str,
-    pub raw_data: &'static str,
+    server_identity: &'static str,
+    server_version: &'static str,
+    extra: &'static str,
+    data_type: &'static str,
+    data_type_id: &'static str,
+    #[getset(get = "pub", set = "pub")]
+    timestamp: &'static str,
+    time: &'static str,
+    time_precision: &'static str,
+    error: &'static str,
+    raw_data: &'static str,
 }
 
 impl Default for DnstapRootDataSchema {
@@ -54,7 +59,8 @@ impl Default for DnstapRootDataSchema {
             extra: "extraInfo",
             data_type: "dataType",
             data_type_id: "dataTypeId",
-            timestamp: "time",
+            timestamp: "timestamp",
+            time: "time",
             time_precision: "timePrecision",
             error: "error",
             raw_data: "rawData",
@@ -62,20 +68,20 @@ impl Default for DnstapRootDataSchema {
     }
 }
 
-#[readonly::make]
-#[derive(Debug, Clone)]
+#[derive(Getters, Debug, Clone)]
+#[get = "pub"]
 pub struct DnstapMessageSchema {
-    pub socket_family: &'static str,
-    pub socket_protocol: &'static str,
-    pub query_address: &'static str,
-    pub query_port: &'static str,
-    pub response_address: &'static str,
-    pub response_port: &'static str,
-    pub query_zone: &'static str,
-    pub dnstap_message_type: &'static str,
-    pub dnstap_message_type_id: &'static str,
-    pub request_message: &'static str,
-    pub response_message: &'static str,
+    socket_family: &'static str,
+    socket_protocol: &'static str,
+    query_address: &'static str,
+    query_port: &'static str,
+    response_address: &'static str,
+    response_port: &'static str,
+    query_zone: &'static str,
+    dnstap_message_type: &'static str,
+    dnstap_message_type_id: &'static str,
+    request_message: &'static str,
+    response_message: &'static str,
 }
 
 impl Default for DnstapMessageSchema {
@@ -96,15 +102,15 @@ impl Default for DnstapMessageSchema {
     }
 }
 
-#[readonly::make]
-#[derive(Debug, Clone)]
-struct DnsMessageCommonSchema {
-    pub response_code: &'static str,
-    pub response: &'static str,
-    pub timestamp: &'static str,
-    pub time_precision: &'static str,
-    pub raw_data: &'static str,
-    pub header: &'static str,
+#[derive(Getters, Debug, Clone)]
+#[get = "pub"]
+pub struct DnsMessageCommonSchema {
+    response_code: &'static str,
+    response: &'static str,
+    time: &'static str,
+    time_precision: &'static str,
+    raw_data: &'static str,
+    header: &'static str,
 }
 
 impl Default for DnsMessageCommonSchema {
@@ -112,7 +118,7 @@ impl Default for DnsMessageCommonSchema {
         Self {
             response_code: "fullRcode",
             response: "rcodeName",
-            timestamp: "time",
+            time: "time",
             time_precision: "timePrecision",
             raw_data: "rawData",
             header: "header",
@@ -120,20 +126,20 @@ impl Default for DnsMessageCommonSchema {
     }
 }
 
-#[readonly::make]
-#[derive(Debug, Clone)]
+#[derive(Getters, Debug, Clone)]
+#[get = "pub"]
 pub struct DnsQueryMessageSchema {
-    pub response_code: &'static str,
-    pub response: &'static str,
-    pub timestamp: &'static str,
-    pub time_precision: &'static str,
-    pub raw_data: &'static str,
-    pub header: &'static str,
-    pub question_section: &'static str,
-    pub answer_section: &'static str,
-    pub authority_section: &'static str,
-    pub additional_section: &'static str,
-    pub opt_pseudo_section: &'static str,
+    response_code: &'static str,
+    response: &'static str,
+    time: &'static str,
+    time_precision: &'static str,
+    raw_data: &'static str,
+    header: &'static str,
+    question_section: &'static str,
+    answer_section: &'static str,
+    authority_section: &'static str,
+    additional_section: &'static str,
+    opt_pseudo_section: &'static str,
 }
 
 impl Default for DnsQueryMessageSchema {
@@ -142,7 +148,7 @@ impl Default for DnsQueryMessageSchema {
         Self {
             response_code: common_schema.response_code,
             response: common_schema.response,
-            timestamp: common_schema.timestamp,
+            time: common_schema.time,
             time_precision: common_schema.time_precision,
             raw_data: common_schema.raw_data,
             header: common_schema.header,
@@ -155,19 +161,19 @@ impl Default for DnsQueryMessageSchema {
     }
 }
 
-#[readonly::make]
-#[derive(Debug, Clone)]
+#[derive(Getters, Debug, Clone)]
+#[get = "pub"]
 pub struct DnsUpdateMessageSchema {
-    pub response_code: &'static str,
-    pub response: &'static str,
-    pub timestamp: &'static str,
-    pub time_precision: &'static str,
-    pub raw_data: &'static str,
-    pub header: &'static str,
-    pub zone_section: &'static str,
-    pub prerequisite_section: &'static str,
-    pub update_section: &'static str,
-    pub additional_section: &'static str,
+    response_code: &'static str,
+    response: &'static str,
+    time: &'static str,
+    time_precision: &'static str,
+    raw_data: &'static str,
+    header: &'static str,
+    zone_section: &'static str,
+    prerequisite_section: &'static str,
+    update_section: &'static str,
+    additional_section: &'static str,
 }
 
 impl Default for DnsUpdateMessageSchema {
@@ -176,7 +182,7 @@ impl Default for DnsUpdateMessageSchema {
         Self {
             response_code: common_schema.response_code,
             response: common_schema.response,
-            timestamp: common_schema.timestamp,
+            time: common_schema.time,
             time_precision: common_schema.time_precision,
             raw_data: common_schema.raw_data,
             header: common_schema.header,
@@ -188,13 +194,13 @@ impl Default for DnsUpdateMessageSchema {
     }
 }
 
-#[readonly::make]
-#[derive(Debug, Clone)]
-struct DnsMessageHeaderCommonSchema {
-    pub id: &'static str,
-    pub opcode: &'static str,
-    pub rcode: &'static str,
-    pub qr: &'static str,
+#[derive(Getters, Debug, Clone)]
+#[get = "pub"]
+pub struct DnsMessageHeaderCommonSchema {
+    id: &'static str,
+    opcode: &'static str,
+    rcode: &'static str,
+    qr: &'static str,
 }
 
 impl Default for DnsMessageHeaderCommonSchema {
@@ -208,23 +214,23 @@ impl Default for DnsMessageHeaderCommonSchema {
     }
 }
 
-#[readonly::make]
-#[derive(Debug, Clone)]
+#[derive(Getters, Debug, Clone)]
+#[get = "pub"]
 pub struct DnsQueryHeaderSchema {
-    pub id: &'static str,
-    pub opcode: &'static str,
-    pub rcode: &'static str,
-    pub qr: &'static str,
-    pub aa: &'static str,
-    pub tc: &'static str,
-    pub rd: &'static str,
-    pub ra: &'static str,
-    pub ad: &'static str,
-    pub cd: &'static str,
-    pub question_count: &'static str,
-    pub answer_count: &'static str,
-    pub authority_count: &'static str,
-    pub additional_count: &'static str,
+    id: &'static str,
+    opcode: &'static str,
+    rcode: &'static str,
+    qr: &'static str,
+    aa: &'static str,
+    tc: &'static str,
+    rd: &'static str,
+    ra: &'static str,
+    ad: &'static str,
+    cd: &'static str,
+    question_count: &'static str,
+    answer_count: &'static str,
+    authority_count: &'static str,
+    additional_count: &'static str,
 }
 
 impl Default for DnsQueryHeaderSchema {
@@ -249,17 +255,17 @@ impl Default for DnsQueryHeaderSchema {
     }
 }
 
-#[readonly::make]
-#[derive(Debug, Clone)]
+#[derive(Getters, Debug, Clone)]
+#[get = "pub"]
 pub struct DnsUpdateHeaderSchema {
-    pub id: &'static str,
-    pub opcode: &'static str,
-    pub rcode: &'static str,
-    pub qr: &'static str,
-    pub zone_count: &'static str,
-    pub prerequisite_count: &'static str,
-    pub udpate_count: &'static str,
-    pub additional_count: &'static str,
+    id: &'static str,
+    opcode: &'static str,
+    rcode: &'static str,
+    qr: &'static str,
+    zone_count: &'static str,
+    prerequisite_count: &'static str,
+    update_count: &'static str,
+    additional_count: &'static str,
 }
 
 impl Default for DnsUpdateHeaderSchema {
@@ -272,20 +278,20 @@ impl Default for DnsUpdateHeaderSchema {
             qr: header_common_schema.qr,
             zone_count: "zoCount",
             prerequisite_count: "prCount",
-            udpate_count: "upCount",
+            update_count: "upCount",
             additional_count: "adCount",
         }
     }
 }
 
-#[readonly::make]
-#[derive(Debug, Clone)]
+#[derive(Getters, Debug, Clone)]
+#[get = "pub"]
 pub struct DnsMessageOptPseudoSectionSchema {
-    pub extended_rcode: &'static str,
-    pub version: &'static str,
-    pub do_flag: &'static str,
-    pub udp_max_payload_size: &'static str,
-    pub options: &'static str,
+    extended_rcode: &'static str,
+    version: &'static str,
+    do_flag: &'static str,
+    udp_max_payload_size: &'static str,
+    options: &'static str,
 }
 
 impl Default for DnsMessageOptPseudoSectionSchema {
@@ -300,12 +306,12 @@ impl Default for DnsMessageOptPseudoSectionSchema {
     }
 }
 
-#[readonly::make]
-#[derive(Debug, Clone)]
+#[derive(Getters, Debug, Clone)]
+#[get = "pub"]
 pub struct DnsMessageOptionSchema {
-    pub opt_code: &'static str,
-    pub opt_name: &'static str,
-    pub opt_data: &'static str,
+    opt_code: &'static str,
+    opt_name: &'static str,
+    opt_data: &'static str,
 }
 
 impl Default for DnsMessageOptionSchema {
@@ -318,16 +324,16 @@ impl Default for DnsMessageOptionSchema {
     }
 }
 
-#[readonly::make]
-#[derive(Debug, Clone)]
+#[derive(Getters, Debug, Clone)]
+#[get = "pub"]
 pub struct DnsRecordSchema {
-    pub name: &'static str,
-    pub record_type: &'static str,
-    pub record_type_id: &'static str,
-    pub ttl: &'static str,
-    pub class: &'static str,
-    pub rdata: &'static str,
-    pub rdata_bytes: &'static str,
+    name: &'static str,
+    record_type: &'static str,
+    record_type_id: &'static str,
+    ttl: &'static str,
+    class: &'static str,
+    rdata: &'static str,
+    rdata_bytes: &'static str,
 }
 
 impl Default for DnsRecordSchema {
@@ -344,13 +350,13 @@ impl Default for DnsRecordSchema {
     }
 }
 
-#[readonly::make]
-#[derive(Debug, Clone)]
+#[derive(Getters, Debug, Clone)]
+#[get = "pub"]
 pub struct DnsQueryQuestionSchema {
-    pub name: &'static str,
-    pub question_type: &'static str,
-    pub question_type_id: &'static str,
-    pub class: &'static str,
+    name: &'static str,
+    question_type: &'static str,
+    question_type_id: &'static str,
+    class: &'static str,
 }
 
 impl Default for DnsQueryQuestionSchema {
@@ -364,13 +370,13 @@ impl Default for DnsQueryQuestionSchema {
     }
 }
 
-#[readonly::make]
-#[derive(Debug, Clone)]
+#[derive(Getters, Debug, Clone)]
+#[get = "pub"]
 pub struct DnsUpdateZoneInfoSchema {
-    pub zone_name: &'static str,
-    pub zone_class: &'static str,
-    pub zone_type: &'static str,
-    pub zone_type_id: &'static str,
+    zone_name: &'static str,
+    zone_class: &'static str,
+    zone_type: &'static str,
+    zone_type_id: &'static str,
 }
 
 impl Default for DnsUpdateZoneInfoSchema {

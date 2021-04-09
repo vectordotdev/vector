@@ -12,17 +12,15 @@ use futures::{
     sink::{Sink, SinkExt},
     stream::{self, StreamExt, TryStreamExt},
 };
-use std::convert::TryInto;
-use std::fs;
-use std::marker::{Send, Sync};
 #[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
-#[cfg(unix)]
-use std::os::unix::io::AsRawFd;
+use std::os::unix::{fs::PermissionsExt, io::AsRawFd};
 use std::{
+    convert::TryInto,
+    fs,
+    marker::{Send, Sync},
     path::PathBuf,
     sync::{
-        atomic::{AtomicI32, Ordering},
+        atomic::{AtomicU32, Ordering},
         Arc, Mutex,
     },
     thread,
@@ -345,14 +343,15 @@ impl FrameStreamReader {
 pub trait FrameHandler {
     fn content_type(&self) -> String;
     fn max_frame_length(&self) -> usize;
-    fn host_key(&self) -> String;
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event>;
     fn socket_path(&self) -> PathBuf;
     fn multithreaded(&self) -> bool;
-    fn max_frame_handling_tasks(&self) -> i32;
+    fn max_frame_handling_tasks(&self) -> u32;
     fn socket_file_mode(&self) -> Option<u32>;
     fn socket_receive_buffer_size(&self) -> Option<usize>;
     fn socket_send_buffer_size(&self) -> Option<usize>;
+    fn host_key(&self) -> String;
+    fn timestamp_key(&self) -> String;
 }
 
 /**
@@ -364,7 +363,7 @@ pub fn build_framestream_unix_source(
     frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
     shutdown: ShutdownSignal,
     out: Pipeline,
-) -> Source {
+) -> crate::Result<Source> {
     let path = frame_handler.socket_path();
 
     let out = out.sink_map_err(|e| error!("Error sending event: {:?}.", e));
@@ -374,66 +373,72 @@ pub fn build_framestream_unix_source(
         Ok(_) => {
             //exists, so try to delete it
             info!(message = "Deleting file.", ?path);
-            fs::remove_file(&path).expect("Failed to delete existing socket.");
+            fs::remove_file(&path)?;
         }
         Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {} //doesn't exist, do nothing
-        Err(e) => error!("Failed to bind to listener socket; error = {:?}.", e),
+        Err(e) => {
+            error!("Unable to get socket information; error = {:?}.", e);
+            return Err(Box::new(e));
+        }
+    };
+
+    let listener = UnixListener::bind(&path)?;
+
+    // system's 'net.core.rmem_max' might have to be changed if socket receive buffer is not updated properly
+    if let Some(socket_receive_buffer_size) = frame_handler.socket_receive_buffer_size() {
+        let _ = nix::sys::socket::setsockopt(
+            listener.as_raw_fd(),
+            nix::sys::socket::sockopt::RcvBuf,
+            &(socket_receive_buffer_size),
+        );
+        let rcv_buf_size =
+            nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::RcvBuf);
+        info!(
+            "Unix socket receive buffer size modified to {}.",
+            rcv_buf_size.unwrap()
+        );
+    }
+
+    // system's 'net.core.wmem_max' might have to be changed if socket send buffer is not updated properly
+    if let Some(socket_send_buffer_size) = frame_handler.socket_send_buffer_size() {
+        let _ = nix::sys::socket::setsockopt(
+            listener.as_raw_fd(),
+            nix::sys::socket::sockopt::SndBuf,
+            &(socket_send_buffer_size),
+        );
+        let snd_buf_size =
+            nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::SndBuf);
+        info!(
+            "Unix socket buffer send size modified to {}.",
+            snd_buf_size.unwrap()
+        );
+    }
+
+    // the permissions to unix socket are restricted from 0o700 to 0o777, which are 448 and 511 in decimal
+    if let Some(socket_permission) = frame_handler.socket_file_mode() {
+        if !(448..=511).contains(&socket_permission) {
+            return Err(format!(
+                "Invalid Socket permission {:#o}. Must between 0o700 and 0o777.",
+                socket_permission
+            )
+            .into());
+        }
+        match fs::set_permissions(&path, fs::Permissions::from_mode(socket_permission)) {
+            Ok(_) => {
+                info!("Socket permissions updated to {:#o}.", socket_permission);
+            }
+            Err(e) => {
+                error!(
+                    "Failed to update listener socket permissions; error = {:?}.",
+                    e
+                );
+                return Err(Box::new(e));
+            }
+        };
     };
 
     let fut = async move {
-        let listener = UnixListener::bind(&path).expect("Failed to bind to listener socket");
-
-        // system's 'net.core.rmem_max' might have to be changed if socket receive buffer is not updated properly
-        if let Some(socket_receive_buffer_size) = frame_handler.socket_receive_buffer_size() {
-            let _ = nix::sys::socket::setsockopt(
-                listener.as_raw_fd(),
-                nix::sys::socket::sockopt::RcvBuf,
-                &(socket_receive_buffer_size),
-            );
-            let rcv_buf_size = nix::sys::socket::getsockopt(
-                listener.as_raw_fd(),
-                nix::sys::socket::sockopt::RcvBuf,
-            );
-            info!(
-                "Unix socket receive buffer size modified to {}.",
-                rcv_buf_size.unwrap()
-            );
-        }
-
-        // system's 'net.core.wmem_max' might have to be changed if socket send buffer is not updated properly
-        if let Some(socket_send_buffer_size) = frame_handler.socket_send_buffer_size() {
-            let _ = nix::sys::socket::setsockopt(
-                listener.as_raw_fd(),
-                nix::sys::socket::sockopt::SndBuf,
-                &(socket_send_buffer_size),
-            );
-            let snd_buf_size = nix::sys::socket::getsockopt(
-                listener.as_raw_fd(),
-                nix::sys::socket::sockopt::SndBuf,
-            );
-            info!(
-                "Unix socket buffer send size modified to {}.",
-                snd_buf_size.unwrap()
-            );
-        }
-
-        // the permissions to unix socket are restricted from 0o700 to 0o777, which are 448 and 511 in decimal
-        if let Some(socket_permission) = frame_handler.socket_file_mode() {
-            if !(448..=511).contains(&socket_permission) {
-                panic!("Invalid Socket permission.");
-            }
-            match fs::set_permissions(&path, fs::Permissions::from_mode(socket_permission)) {
-                Ok(_) => {
-                    info!("Socket permissions updated to {:o}.", socket_permission);
-                }
-                Err(e) => error!(
-                    "Failed to update listener socket permissions; error = {:?}.",
-                    e
-                ),
-            };
-        };
-
-        let active_parsing_task_nums = Arc::new(AtomicI32::new(0));
+        let active_parsing_task_nums = Arc::new(AtomicU32::new(0));
 
         info!(message = "Listening...", ?path, r#type = "unix");
 
@@ -501,10 +506,6 @@ pub fn build_framestream_unix_source(
                 let handler = async move {
                     let _ = event_sink.send_all(&mut events).await;
                     info!("Finished sending.");
-
-                    //TODO: shutdown
-                    // let splitstream = events.get_ref().get_ref();
-                    // let _ = socket.shutdown(std::net::Shutdown::Both);
                 };
                 tokio::spawn(handler.instrument(span));
             } else {
@@ -538,7 +539,7 @@ pub fn build_framestream_unix_source(
         Ok(())
     };
 
-    Box::pin(fut)
+    Ok(Box::pin(fut))
 }
 
 fn spawn_event_handling_tasks<S>(
@@ -546,8 +547,8 @@ fn spawn_event_handling_tasks<S>(
     event_handler: impl FrameHandler + Send + Sync + 'static,
     mut event_sink: S,
     received_from: Option<Bytes>,
-    active_task_nums: Arc<AtomicI32>,
-    max_frame_handling_tasks: i32,
+    active_task_nums: Arc<AtomicU32>,
+    max_frame_handling_tasks: u32,
 ) -> JoinHandle<()>
 where
     S: Sink<Event> + Send + Unpin + 'static,
@@ -567,7 +568,7 @@ where
     })
 }
 
-fn wait_for_task_quota(active_task_nums: &Arc<AtomicI32>, max_tasks: i32) {
+fn wait_for_task_quota(active_task_nums: &Arc<AtomicU32>, max_tasks: u32) {
     while max_tasks > 0 && max_tasks < active_task_nums.load(Ordering::Acquire) {
         thread::sleep(Duration::from_millis(3));
     }
@@ -595,7 +596,7 @@ mod test {
     use std::{
         path::PathBuf,
         sync::{
-            atomic::{AtomicI32, Ordering},
+            atomic::{AtomicU32, Ordering},
             Arc,
         },
         thread,
@@ -612,14 +613,15 @@ mod test {
     struct MockFrameHandler<F: Send + Sync + Clone + FnOnce() + 'static> {
         content_type: String,
         max_frame_length: usize,
-        host_key: String,
         socket_path: PathBuf,
         multithreaded: bool,
-        max_frame_handling_tasks: i32,
+        max_frame_handling_tasks: u32,
         socket_file_mode: Option<u32>,
         socket_receive_buffer_size: Option<usize>,
         socket_send_buffer_size: Option<usize>,
         extra_task_handling_routine: F,
+        host_key: String,
+        timestamp_key: String,
     }
 
     impl<F: Send + Sync + Clone + FnOnce() + 'static> MockFrameHandler<F> {
@@ -627,7 +629,6 @@ mod test {
             Self {
                 content_type,
                 max_frame_length: bytesize::kib(100u64) as usize,
-                host_key: "test_framestream".to_string(),
                 socket_path: tempfile::tempdir().unwrap().into_path().join("unix_test"),
                 multithreaded,
                 max_frame_handling_tasks: 0,
@@ -635,6 +636,8 @@ mod test {
                 socket_receive_buffer_size: None,
                 socket_send_buffer_size: None,
                 extra_task_handling_routine: extra_routine,
+                host_key: "test_framestream".to_string(),
+                timestamp_key: "my_timestamp".to_string(),
             }
         }
     }
@@ -645,9 +648,6 @@ mod test {
         }
         fn max_frame_length(&self) -> usize {
             self.max_frame_length
-        }
-        fn host_key(&self) -> String {
-            self.host_key.clone()
         }
 
         fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event> {
@@ -670,7 +670,7 @@ mod test {
         fn multithreaded(&self) -> bool {
             self.multithreaded
         }
-        fn max_frame_handling_tasks(&self) -> i32 {
+        fn max_frame_handling_tasks(&self) -> u32 {
             self.max_frame_handling_tasks
         }
 
@@ -684,6 +684,14 @@ mod test {
 
         fn socket_send_buffer_size(&self) -> Option<usize> {
             self.socket_send_buffer_size
+        }
+
+        fn host_key(&self) -> String {
+            self.host_key.clone()
+        }
+
+        fn timestamp_key(&self) -> String {
+            self.timestamp_key.clone()
         }
     }
 
@@ -699,10 +707,9 @@ mod test {
         let socket_path = frame_handler.socket_path();
         let mut shutdown = SourceShutdownCoordinator::default();
         let (shutdown_signal, _) = shutdown.register_source(source_name);
-        let server = build_framestream_unix_source(frame_handler, shutdown_signal, pipeline);
+        let server = build_framestream_unix_source(frame_handler, shutdown_signal, pipeline)
+            .expect("Failed to build framestream unix source.");
 
-        // let mut rt = runtime::Runtime::new().unwrap();
-        // rt.spawn(server);
         let join_handle = tokio::spawn(server);
 
         // Wait for server to accept traffic
@@ -812,7 +819,7 @@ mod test {
         //4 - send data
         send_data_frames(
             &mut sock_sink,
-            vec![Ok(Bytes::from(&"hello"[..])), Ok(Bytes::from(&"world"[..]))],
+            vec![Ok(Bytes::from("hello")), Ok(Bytes::from("world"))],
         )
         .await;
         let events = collect_n(rx, 2).await;
@@ -862,7 +869,7 @@ mod test {
         //4 - send data
         send_data_frames(
             &mut sock_sink,
-            vec![Ok(Bytes::from(&"hello"[..])), Ok(Bytes::from(&"world"[..]))],
+            vec![Ok(Bytes::from("hello")), Ok(Bytes::from("world"))],
         )
         .await;
         let events = collect_n(rx, 2).await;
@@ -960,7 +967,7 @@ mod test {
         //1 - send data frame (too soon!)
         send_data_frames(
             &mut sock_sink,
-            vec![Ok(Bytes::from(&"bad"[..])), Ok(Bytes::from(&"data"[..]))],
+            vec![Ok(Bytes::from("bad")), Ok(Bytes::from("data"))],
         )
         .await;
 
@@ -983,7 +990,7 @@ mod test {
         //5 - send data (will go through)
         send_data_frames(
             &mut sock_sink,
-            vec![Ok(Bytes::from(&"hello"[..])), Ok(Bytes::from(&"world"[..]))],
+            vec![Ok(Bytes::from("hello")), Ok(Bytes::from("world"))],
         )
         .await;
         let events = collect_n(rx, 2).await;
@@ -1023,7 +1030,7 @@ mod test {
         //4 - send data
         send_data_frames(
             &mut sock_sink,
-            vec![Ok(Bytes::from(&"hello"[..])), Ok(Bytes::from(&"world"[..]))],
+            vec![Ok(Bytes::from("hello")), Ok(Bytes::from("world"))],
         )
         .await;
         let events = collect_n(rx, 2).await;
@@ -1053,9 +1060,9 @@ mod test {
         let out = tx.sink_map_err(|e| error!("Error sending event: {:?}.", e));
 
         let max_frame_handling_tasks = 20;
-        let active_task_nums = Arc::new(AtomicI32::new(0));
+        let active_task_nums = Arc::new(AtomicU32::new(0));
         let active_task_nums_copy = Arc::clone(&active_task_nums);
-        let max_task_nums_reached = Arc::new(AtomicI32::new(0));
+        let max_task_nums_reached = Arc::new(AtomicU32::new(0));
         let max_task_nums_reached_copy = Arc::clone(&max_task_nums_reached);
 
         let mut join_handles = vec![];

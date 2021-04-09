@@ -7,7 +7,7 @@ components: sources: dnstap: {
 		commonly_used: false
 		delivery:      "best_effort"
 		deployment_roles: ["daemon"]
-		development:   "stable"
+		development:   "beta"
 		egress_method: "stream"
 		stateful:      false
 	}
@@ -16,7 +16,7 @@ components: sources: dnstap: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				service: services.bind_dnstap
+				service: services.dnstap_data
 				interface: socket: {
 					api: {
 						title: "dnstap"
@@ -37,8 +37,8 @@ components: sources: dnstap: {
 		targets: {
 			"aarch64-unknown-linux-gnu":      true
 			"aarch64-unknown-linux-musl":     true
-			"armv7-unknown-linux-gnueabihf":  false
-			"armv7-unknown-linux-musleabihf": false
+			"armv7-unknown-linux-gnueabihf":  true
+			"armv7-unknown-linux-musleabihf": true
 			"x86_64-apple-darwin":            true
 			"x86_64-pc-windows-msv":          false
 			"x86_64-unknown-linux-gnu":       true
@@ -53,7 +53,7 @@ components: sources: dnstap: {
 	configuration: {
 		max_frame_length: {
 			common:      false
-			description: "Max dnstap frame length that the dns source can handle."
+			description: "Max dnstap frame length that the dnstap source can handle."
 			required:    false
 			type: uint: {
 				default: 102400
@@ -62,9 +62,9 @@ components: sources: dnstap: {
 		}
 		socket_path: {
 			description: """
-				Absolute path of server socket file to which BIND is configured
-				to send dnstap data. The socket file will be created by dnstap
-				source component automatically upon startup.
+				Absolute path of server socket file to which the DNS server is
+				configured to send dnstap data. The socket file will be created
+				by dnstap source component automatically upon startup.
 				"""
 			required: true
 			type: string: {
@@ -77,6 +77,9 @@ components: sources: dnstap: {
 			description: """
 				Unix file mode bits to be applied to server socket file
 				as its designated file permissions.
+				Note that the file mode value can be specified in any numeric format
+				supported by TOML, but it'd be more intuitive to use an octal number.
+				Also note that the value specified must be between `0o700` and `0o777`.
 				"""
 			required: false
 			type: uint: {
@@ -119,7 +122,7 @@ components: sources: dnstap: {
 					below the limit.
 					""",
 				"""
-					Upraising the limit may increase memory consumption. Be cautious!
+					Raising the limit may increase memory consumption. Be cautious!
 					""",
 			]
 		}
@@ -196,7 +199,7 @@ components: sources: dnstap: {
 				}
 			}
 			messageType: {
-				relevant_when: "dataTypeId = 1"
+				relevant_when: "dataType = Message"
 				common:        true
 				description:   "Dnstap message type."
 				required:      false
@@ -282,7 +285,7 @@ components: sources: dnstap: {
 				}
 			}
 			messageTypeId: {
-				relevant_when: "dataTypeId = 1"
+				relevant_when: "dataType = Message"
 				description:   "Numeric ID of dnstap message type."
 				required:      true
 				type: uint: {
@@ -291,7 +294,7 @@ components: sources: dnstap: {
 				}
 			}
 			time: {
-				relevant_when: "dataTypeId = 1"
+				relevant_when: "dataType = Message"
 				description: """
 					The time at which the DNS message was sent or received.
 					This is the number of time units (determined by 'timePrecision')
@@ -306,7 +309,7 @@ components: sources: dnstap: {
 				}
 			}
 			timePrecision: {
-				relevant_when: "dataTypeId = 1"
+				relevant_when: "dataType = Message"
 				description:   "The time precision used by field 'time'."
 				required:      true
 				type: string: {
@@ -316,6 +319,17 @@ components: sources: dnstap: {
 						us: "microsecond"
 						ns: "nanosecond"
 					}
+					syntax: "literal"
+				}
+			}
+			timestamp: {
+				description: """
+					The same time as of field \"time\", but represented as an ISO 8601
+					date and time string (in UTC time zone).
+					"""
+				required: true
+				type: string: {
+					examples: ["2021-04-09T15:08:32.767098Z"]
 					syntax: "literal"
 				}
 			}
@@ -350,7 +364,7 @@ components: sources: dnstap: {
 				}
 			}
 			socketFamily: {
-				relevant_when: "dataTypeId = 1"
+				relevant_when: "dataType = Message"
 				description: """
 					The network protocol family of a socket. This specifies how
 					to interpret 'sourceAddress'/'responseAddress' fields.
@@ -358,14 +372,14 @@ components: sources: dnstap: {
 				required: true
 				type: string: {
 					enum: {
-						INET:  "IPv4 (RFC 791)."
-						INET6: "IPv6 (RFC 2460)."
+						INET:  "IPv4 ([RFC 791](\(urls.rfc_791)))."
+						INET6: "IPv6 ([RFC 2460](\(urls.rfc_2460)))."
 					}
 					syntax: "literal"
 				}
 			}
 			socketProtocol: {
-				relevant_when: "dataTypeId = 1"
+				relevant_when: "dataType = Message"
 				description: """
 					The transport protocol of a socket. This specifies how to
 					interpret 'sourcePort'/'responsePort' fields.
@@ -373,14 +387,14 @@ components: sources: dnstap: {
 				required: true
 				type: string: {
 					enum: {
-						UDP: "User Datagram Protocol (RFC 768)."
-						TCP: "Transmission Control Protocol (RFC 793)."
+						UDP: "User Datagram Protocol ([RFC 768](\(urls.rfc_768)))."
+						TCP: "Transmission Control Protocol ([RFC 793](\(urls.rfc_793)))."
 					}
 					syntax: "literal"
 				}
 			}
 			sourceAddress: {
-				relevant_when: "dataTypeId = 1"
+				relevant_when: "dataType = Message"
 				description:   "The network address of the message initiator."
 				required:      true
 				type: string: {
@@ -389,7 +403,7 @@ components: sources: dnstap: {
 				}
 			}
 			sourcePort: {
-				relevant_when: "dataTypeId = 1"
+				relevant_when: "dataType = Message"
 				common:        true
 				description:   "The transport port of the message initiator."
 				required:      false
@@ -400,7 +414,7 @@ components: sources: dnstap: {
 				}
 			}
 			responseAddress: {
-				relevant_when: "dataTypeId = 1"
+				relevant_when: "dataType = Message"
 				description:   "The network address of the message responder."
 				required:      true
 				type: string: {
@@ -409,7 +423,7 @@ components: sources: dnstap: {
 				}
 			}
 			responsePort: {
-				relevant_when: "dataTypeId = 1"
+				relevant_when: "dataType = Message"
 				common:        true
 				description:   "The transport port of the message responder."
 				required:      false
@@ -443,7 +457,7 @@ components: sources: dnstap: {
 				}
 			}
 			requestData: {
-				relevant_when: "dataTypeId = 1"
+				relevant_when: "dataType = Message"
 				common:        true
 				description:   "Request message data for DNS query/update."
 				required:      false
@@ -535,13 +549,14 @@ components: sources: dnstap: {
 							}
 						}
 						header: {
-							common: true
+							common:      true
 							description: """
 								Header section of DNS query/update request message.
-								See DNS related RFCs for detailed information about
+								See DNS related RFCs (i.e. [RFC 1035](\(urls.rfc_1035)),
+								[RFC 2136](\(urls.rfc_2136))) for detailed information about
 								its content.
 								"""
-							required: false
+							required:    false
 							type: object: {
 								examples: [
 									{
@@ -565,12 +580,13 @@ components: sources: dnstap: {
 							}
 						}
 						question: {
-							common: true
+							common:      true
 							description: """
-								Question section of DNS query request message. See DNS
-								related RFCs for detailed information about its content.
+								Question section of DNS query request message. See
+								[RFC 1035](\(urls.rfc_1035)) for detailed information
+								about its content.
 								"""
-							required: false
+							required:    false
 							type: object: {
 								examples: [
 									{
@@ -584,12 +600,13 @@ components: sources: dnstap: {
 							}
 						}
 						additional: {
-							common: true
+							common:      true
 							description: """
-								Additional section of DNS query request message. See DNS
-								related RFCs for detailed information about its content.
+								Additional section of DNS query request message. See
+								[RFC 1035](\(urls.rfc_1035)) for detailed information
+								about its content.
 								"""
-							required: false
+							required:    false
 							type: object: {
 								examples: [
 									{
@@ -605,13 +622,13 @@ components: sources: dnstap: {
 							}
 						}
 						opt: {
-							common: true
+							common:      true
 							description: """
 								A pseudo section containing EDNS options of DNS query request
-								message. See DNS related RFCs for detailed information about
-								its content.
+								message. See [RFC 6891](\(urls.rfc_6891)) for detailed
+								information about its content.
 								"""
-							required: false
+							required:    false
 							type: object: {
 								examples: [
 									{
@@ -632,12 +649,13 @@ components: sources: dnstap: {
 							}
 						}
 						zone: {
-							common: true
+							common:      true
 							description: """
-								Zone section of DNS update request message. See DNS related
-								RFCs for detailed information about its content.
+								Zone section of DNS update request message. See
+								[RFC 2136](\(urls.rfc_2136)) for detailed information
+								about its content.
 								"""
-							required: false
+							required:    false
 							type: object: {
 								examples: [
 									{
@@ -651,12 +669,13 @@ components: sources: dnstap: {
 							}
 						}
 						prerequisite: {
-							common: true
+							common:      true
 							description: """
-								Prerequisite section of DNS update request message. See DNS
-								related RFCs for detailed information about its content.
+								Prerequisite section of DNS update request message. See
+								[RFC 2136](\(urls.rfc_2136)) for detailed information
+								about its content.
 								"""
-							required: false
+							required:    false
 							type: object: {
 								examples: [
 									{
@@ -671,12 +690,13 @@ components: sources: dnstap: {
 							}
 						}
 						update: {
-							common: true
+							common:      true
 							description: """
-								Update section of DNS update request message. See DNS related
-								RFCs for detailed information about its content.
+								Update section of DNS update request message. See
+								[RFC 2136](\(urls.rfc_2136)) for detailed information
+								about its content.
 								"""
-							required: false
+							required:    false
 							type: object: {
 								examples: [
 									{
@@ -695,7 +715,7 @@ components: sources: dnstap: {
 				}
 			}
 			responseData: {
-				relevant_when: "dataTypeId = 1"
+				relevant_when: "dataType = Message"
 				common:        true
 				description:   "Response message data for DNS query/update."
 				required:      false
@@ -783,13 +803,14 @@ components: sources: dnstap: {
 							}
 						}
 						header: {
-							common: true
+							common:      true
 							description: """
 								Header section of DNS query/update response message.
-								See DNS related RFCs for detailed information about
+								See DNS related RFCs (i.e. [RFC 1035](\(urls.rfc_1035)),
+								[RFC 2136](\(urls.rfc_2136))) for detailed information about
 								its content.
 								"""
-							required: false
+							required:    false
 							type: object: {
 								examples: [
 									{
@@ -813,12 +834,13 @@ components: sources: dnstap: {
 							}
 						}
 						question: {
-							common: true
+							common:      true
 							description: """
-								Question section of DNS query response message. See DNS
-								related RFCs for detailed information about its content.
+								Question section of DNS query response message. See
+								[RFC 1035](\(urls.rfc_1035)) for detailed information
+								about its content.
 								"""
-							required: false
+							required:    false
 							type: object: {
 								examples: [
 									{
@@ -832,12 +854,13 @@ components: sources: dnstap: {
 							}
 						}
 						answers: {
-							common: true
+							common:      true
 							description: """
-								Answers section of DNS query response message. See DNS
-								related RFCs for detailed information about its content.
+								Answers section of DNS query response message. See
+								[RFC 1035](\(urls.rfc_1035)) for detailed information
+								about its content.
 								"""
-							required: false
+							required:    false
 							type: object: {
 								examples: [
 									{
@@ -853,12 +876,13 @@ components: sources: dnstap: {
 							}
 						}
 						authority: {
-							common: true
+							common:      true
 							description: """
-								Authority section of DNS query response message. See DNS
-								related RFCs for detailed information about its content.
+								Authority section of DNS query response message. See
+								[RFC 1035](\(urls.rfc_1035)) for detailed information
+								about its content.
 								"""
-							required: false
+							required:    false
 							type: object: {
 								examples: [
 									{
@@ -874,12 +898,13 @@ components: sources: dnstap: {
 							}
 						}
 						additional: {
-							common: true
+							common:      true
 							description: """
-								Additional section of DNS query response message. See DNS
-								related RFCs for detailed information about its content.
+								Additional section of DNS query response message. See
+								[RFC 1035](\(urls.rfc_1035)) for detailed information
+								about its content.
 								"""
-							required: false
+							required:    false
 							type: object: {
 								examples: [
 									{
@@ -895,13 +920,13 @@ components: sources: dnstap: {
 							}
 						}
 						opt: {
-							common: true
+							common:      true
 							description: """
 								A pseudo section containing EDNS options of DNS query response
-								message. See DNS related RFCs for detailed information about
-								its content.
+								message. See [RFC 6891](\(urls.rfc_6891)) for detailed
+								information about its content.
 								"""
-							required: false
+							required:    false
 							type: object: {
 								examples: [
 									{
@@ -922,12 +947,13 @@ components: sources: dnstap: {
 							}
 						}
 						zone: {
-							common: true
+							common:      true
 							description: """
-								Zone section of DNS update response message. See DNS related
-								RFCs for detailed information about its content.
+								Zone section of DNS update response message. See
+								[RFC 2136](\(urls.rfc_2136)) for detailed information
+								about its content.
 								"""
-							required: false
+							required:    false
 							type: object: {
 								examples: [
 									{
@@ -1213,10 +1239,10 @@ components: sources: dnstap: {
 
 	how_it_works: {
 		server_uds: {
-			title: "Server UDS (Unix Domain Socket)"
+			title: "Server Unix Domain Socket (UDS)"
 			body: #"""
 				The dnstap source component receives dnstap data through a Unix
-				domain socket (a.k.a. UDS). Path of the UDS must be specified
+				Domain Socket (a.k.a. UDS). Path of the UDS must be specified
 				explicitly in dnstap source configuration.
 
 				Upon startup, the dnstap source component will create a new server
@@ -1242,9 +1268,9 @@ components: sources: dnstap: {
 					body: #"""
 						The dnstap source component can create server UDS only on local
 						machine, but it's also possible to work with remote BIND server
-						too. To do it, you'd have to forward the server UDS from vector's
+						too. To do it, you'd have to forward the server UDS from Vector's
 						hosting machine to the remote BIND server (e.g. through "ssh")
-						once vector starts.
+						once Vector starts.
 						Make sure the Unix domain sockets on both local and remote machines
 						having appropriate permissions set.
 						"""#
@@ -1257,8 +1283,8 @@ components: sources: dnstap: {
 			body: #"""
 				By default, the dnstap source component reads and processes dnstap
 				data sequentially as a pipeline: retrieving a dnstap data frame,
-				parsing it thoroughly and composing a new vector event out of it,
-				and finally sending the event composed onto the next vector component
+				parsing it thoroughly and composing a new Vector event out of it,
+				and finally sending the event composed onto the next Vector component
 				for further processing, then starting to retrieve next dnstap data frame.
 				The pipeline should work fine with casual DNS query flows, but may
 				become inefficient on a multi-cpu-core machine under extreme load,
@@ -1267,7 +1293,7 @@ components: sources: dnstap: {
 
 				To make the process more efficient on multi-cpu-core machine, we need to
 				spread the load to all available CPU cores as much as possible, especially
-				the part of parsing dnstap data frame and composing vector event out of it.
+				the part of parsing dnstap data frame and composing Vector event out of it.
 				And that's exactly what the "multi-threaded mode" is for.
 
 				When "multi-threaded mode" is enabled, retrieving of dnstap data frames

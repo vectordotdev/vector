@@ -15,7 +15,6 @@ mod unix_stream;
 
 #[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
 pub(crate) use self::body_decoding::{decode_body, Encoding};
-pub use self::framestream::build_framestream_unix_source;
 #[cfg(any(feature = "sources-http", feature = "sources-heroku_logs"))]
 pub(crate) use self::http::add_query_parameters;
 #[cfg(feature = "sources-prometheus")]

@@ -25,7 +25,7 @@ pub struct DnstapConfig {
     pub socket_path: PathBuf,
     pub raw_data_only: Option<bool>,
     pub multithreaded: Option<bool>,
-    pub max_frame_handling_tasks: Option<i32>,
+    pub max_frame_handling_tasks: Option<u32>,
     pub socket_file_mode: Option<u32>,
     pub socket_receive_buffer_size: Option<usize>,
     pub socket_send_buffer_size: Option<usize>,
@@ -82,33 +82,18 @@ impl SourceConfig for DnstapConfig {
 
         let frame_handler = DnstapFrameHandler::new(
             self.max_frame_length,
-            host_key,
             self.socket_path.clone(),
             self.content_type(),
-            if let Some(v) = self.raw_data_only {
-                v
-            } else {
-                false
-            },
-            if let Some(v) = self.multithreaded {
-                v
-            } else {
-                false
-            },
-            if let Some(v) = self.max_frame_handling_tasks {
-                v
-            } else {
-                1000
-            },
+            self.raw_data_only.unwrap_or(false),
+            self.multithreaded.unwrap_or(false),
+            self.max_frame_handling_tasks.unwrap_or(1000),
             self.socket_file_mode,
             self.socket_receive_buffer_size,
             self.socket_send_buffer_size,
+            host_key,
+            log_schema().timestamp_key(),
         );
-        Ok(build_framestream_unix_source(
-            frame_handler,
-            cx.shutdown,
-            cx.out,
-        ))
+        build_framestream_unix_source(frame_handler, cx.shutdown, cx.out)
     }
 
     fn output_type(&self) -> DataType {
@@ -123,43 +108,51 @@ impl SourceConfig for DnstapConfig {
 #[derive(Clone)]
 pub struct DnstapFrameHandler {
     max_frame_length: usize,
-    host_key: String,
     socket_path: PathBuf,
     content_type: String,
     schema: DnstapEventSchema,
     raw_data_only: bool,
     multithreaded: bool,
-    max_frame_handling_tasks: i32,
+    max_frame_handling_tasks: u32,
     socket_file_mode: Option<u32>,
     socket_receive_buffer_size: Option<usize>,
     socket_send_buffer_size: Option<usize>,
+    host_key: String,
+    timestamp_key: String,
 }
 
 impl DnstapFrameHandler {
     pub fn new(
         max_frame_length: usize,
-        host_key: String,
         socket_path: PathBuf,
         content_type: String,
         raw_data_only: bool,
         multithreaded: bool,
-        max_frame_handling_tasks: i32,
+        max_frame_handling_tasks: u32,
         socket_file_mode: Option<u32>,
         socket_receive_buffer_size: Option<usize>,
         socket_send_buffer_size: Option<usize>,
+        host_key: String,
+        timestamp_key: &'static str,
     ) -> Self {
+        let mut schema = DnstapEventSchema::new();
+        schema
+            .dnstap_root_data_schema_mut()
+            .set_timestamp(timestamp_key);
+
         Self {
             max_frame_length,
-            host_key,
             socket_path,
             content_type,
-            schema: DnstapEventSchema::new(),
+            schema,
             raw_data_only,
             multithreaded,
             max_frame_handling_tasks,
             socket_file_mode,
             socket_receive_buffer_size,
             socket_send_buffer_size,
+            host_key,
+            timestamp_key: timestamp_key.to_string(),
         }
     }
 }
@@ -171,10 +164,6 @@ impl FrameHandler for DnstapFrameHandler {
 
     fn max_frame_length(&self) -> usize {
         self.max_frame_length
-    }
-
-    fn host_key(&self) -> String {
-        self.host_key.clone()
     }
 
     /**
@@ -192,7 +181,7 @@ impl FrameHandler for DnstapFrameHandler {
 
         if self.raw_data_only {
             log_event.insert(
-                &self.schema.dnstap_root_data_schema.raw_data,
+                &self.schema.dnstap_root_data_schema().raw_data(),
                 base64::encode(&frame),
             );
             Some(event)
@@ -214,7 +203,7 @@ impl FrameHandler for DnstapFrameHandler {
         self.multithreaded
     }
 
-    fn max_frame_handling_tasks(&self) -> i32 {
+    fn max_frame_handling_tasks(&self) -> u32 {
         self.max_frame_handling_tasks
     }
 
@@ -228,5 +217,13 @@ impl FrameHandler for DnstapFrameHandler {
 
     fn socket_send_buffer_size(&self) -> Option<usize> {
         self.socket_send_buffer_size
+    }
+
+    fn host_key(&self) -> String {
+        self.host_key.clone()
+    }
+
+    fn timestamp_key(&self) -> String {
+        self.timestamp_key.clone()
     }
 }

@@ -1,6 +1,6 @@
 use super::dns_message::{
-    DnsQueryMessage, DnsRecord, DnsUpdateMessage, EdnsOptionEntry, OptPseudoSection, QueryHeader,
-    QueryQuestion, UpdateHeader, ZoneInfo,
+    self, DnsQueryMessage, DnsRecord, DnsUpdateMessage, EdnsOptionEntry, OptPseudoSection,
+    QueryHeader, QueryQuestion, UpdateHeader, ZoneInfo,
 };
 use data_encoding::{BASE32HEX_NOPAD, HEXUPPER};
 use snafu::{ResultExt, Snafu};
@@ -9,7 +9,6 @@ use trust_dns_proto::{
     error::ProtoError,
     op::{message::Message as TrustDnsMessage, Edns, Query},
     rr::{
-        // rdata::caa::{Property, Value, KeyValue},
         dnssec::{rdata::DNSSECRData, Algorithm, SupportedAlgorithms},
         rdata::{
             a, aaaa,
@@ -19,8 +18,7 @@ use trust_dns_proto::{
         },
         record_data::RData,
         resource::Record,
-        Name,
-        RecordType,
+        Name, RecordType,
     },
     serialize::binary::{BinDecodable, BinDecoder},
 };
@@ -29,8 +27,8 @@ use trust_dns_proto::{
 pub enum DnsMessageParserError {
     #[snafu(display("Encountered error : {}", cause))]
     SimpleError { cause: String },
-    #[snafu(display("Encountered error from TrustDns: {}", failure_source.to_string()))]
-    TrustDnsError { failure_source: ProtoError },
+    #[snafu(display("Encountered error from TrustDns: {}", source.to_string()))]
+    TrustDnsError { source: ProtoError },
     #[snafu(display("UTF8Error: {}", source))]
     Utf8ParsingError { source: Utf8Error },
 }
@@ -53,50 +51,41 @@ impl DnsMessageParser {
     }
 
     pub fn parse_as_query_message(&mut self) -> Result<DnsQueryMessage, DnsMessageParserError> {
-        match TrustDnsMessage::from_vec(&self.raw_message) {
-            Ok(msg) => {
-                let header = parse_dns_query_message_header(&msg);
-                let edns_section = parse_edns(&msg);
-                let rcode_high = if let Some(edns) = edns_section.clone() {
-                    edns.extended_rcode
-                } else {
-                    0
-                };
-                let response_code =
-                    (u16::from(rcode_high) << 4) | ((u16::from(header.rcode)) & 0x000F);
+        let msg = TrustDnsMessage::from_vec(&self.raw_message).context(TrustDnsError)?;
+        let header = parse_dns_query_message_header(&msg);
+        let edns_section = parse_edns(&msg);
+        let rcode_high = if let Some(edns) = edns_section.clone() {
+            edns.extended_rcode
+        } else {
+            0
+        };
+        let response_code = (u16::from(rcode_high) << 4) | ((u16::from(header.rcode)) & 0x000F);
 
-                Ok(DnsQueryMessage::new(
-                    response_code,
-                    parse_response_code(response_code),
-                    header,
-                    self.parse_dns_query_message_question_section(&msg),
-                    self.parse_dns_message_section(msg.answers())?,
-                    self.parse_dns_message_section(&msg.name_servers())?,
-                    self.parse_dns_message_section(&msg.additionals())?,
-                    edns_section,
-                ))
-            }
-            Err(e) => Err(DnsMessageParserError::TrustDnsError { failure_source: e }),
-        }
+        Ok(DnsQueryMessage {
+            response_code,
+            response: parse_response_code(response_code),
+            header,
+            question_section: self.parse_dns_query_message_question_section(&msg),
+            answer_section: self.parse_dns_message_section(msg.answers())?,
+            authority_section: self.parse_dns_message_section(msg.name_servers())?,
+            additional_section: self.parse_dns_message_section(msg.additionals())?,
+            opt_pserdo_section: edns_section,
+        })
     }
 
     pub fn parse_as_update_message(&mut self) -> Result<DnsUpdateMessage, DnsMessageParserError> {
-        match TrustDnsMessage::from_vec(&self.raw_message) {
-            Ok(msg) => {
-                let header = parse_dns_update_message_header(&msg);
-                let response_code = (u16::from(header.rcode)) & 0x000F;
-                Ok(DnsUpdateMessage::new(
-                    response_code,
-                    parse_response_code(response_code),
-                    header,
-                    self.parse_dns_update_message_zone_section(&msg)?,
-                    self.parse_dns_message_section(msg.answers())?,
-                    self.parse_dns_message_section(&msg.name_servers())?,
-                    self.parse_dns_message_section(&msg.additionals())?,
-                ))
-            }
-            Err(e) => Err(DnsMessageParserError::TrustDnsError { failure_source: e }),
-        }
+        let msg = TrustDnsMessage::from_vec(&self.raw_message).context(TrustDnsError)?;
+        let header = parse_dns_update_message_header(&msg);
+        let response_code = (u16::from(header.rcode)) & 0x000F;
+        Ok(DnsUpdateMessage {
+            response_code,
+            response: parse_response_code(response_code),
+            header,
+            zone_to_update: self.parse_dns_update_message_zone_section(&msg)?,
+            prerequisite_section: self.parse_dns_message_section(msg.answers())?,
+            update_section: self.parse_dns_message_section(msg.name_servers())?,
+            additional_section: self.parse_dns_message_section(msg.additionals())?,
+        })
     }
 
     fn parse_dns_query_message_question_section(
@@ -111,12 +100,12 @@ impl DnsMessageParser {
     }
 
     fn parse_dns_query_question(&self, question: &Query) -> QueryQuestion {
-        QueryQuestion::new(
-            question.name().to_string(),
-            question.query_class().to_string(),
-            format_record_type(question.query_type()),
-            u16::from(question.query_type()),
-        )
+        QueryQuestion {
+            name: question.name().to_string(),
+            class: question.query_class().to_string(),
+            record_type: format_record_type(question.query_type()),
+            record_type_id: u16::from(question.query_type()),
+        }
     }
 
     fn parse_dns_update_message_zone_section(
@@ -158,15 +147,15 @@ impl DnsMessageParser {
             _ => format_rdata(record.rdata())?,
         };
 
-        Ok(DnsRecord::new(
-            record.name().to_string(),
-            record.dns_class().to_string(),
-            format_record_type(record.record_type()),
-            u16::from(record.record_type()),
-            record.ttl(),
-            record_data.0,
-            record_data.1,
-        ))
+        Ok(DnsRecord {
+            name: record.name().to_string(),
+            class: record.dns_class().to_string(),
+            record_type: format_record_type(record.record_type()),
+            record_type_id: u16::from(record.record_type()),
+            ttl: record.ttl(),
+            rdata: record_data.0,
+            rdata_bytes: record_data.1,
+        })
     }
 
     fn get_rdata_decoder_with_raw_message(&mut self, raw_rdata: &[u8]) -> BinDecoder {
@@ -347,7 +336,7 @@ impl DnsMessageParser {
         rdata: &NULL,
     ) -> Result<(Option<String>, Option<Vec<u8>>), DnsMessageParserError> {
         match code {
-            7 => match rdata.anything() {
+            dns_message::RTYPE_MB => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
                     let madname = parse_domain_name(&mut decoder)?;
@@ -358,7 +347,7 @@ impl DnsMessageParser {
                 }),
             },
 
-            8 => match rdata.anything() {
+            dns_message::RTYPE_MG => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
                     let mgname = parse_domain_name(&mut decoder)?;
@@ -369,7 +358,7 @@ impl DnsMessageParser {
                 }),
             },
 
-            9 => match rdata.anything() {
+            dns_message::RTYPE_MR => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
                     let newname = parse_domain_name(&mut decoder)?;
@@ -380,14 +369,14 @@ impl DnsMessageParser {
                 }),
             },
 
-            11 => match rdata.anything() {
+            dns_message::RTYPE_WKS => match rdata.anything() {
                 Some(raw_rdata) => self.parse_wks_rdata(raw_rdata),
                 None => Err(DnsMessageParserError::SimpleError {
                     cause: String::from("Empty WKS rdata"),
                 }),
             },
 
-            13 => match rdata.anything() {
+            dns_message::RTYPE_HINFO => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = BinDecoder::new(raw_rdata);
                     let cpu = parse_character_string(&mut decoder)?;
@@ -406,7 +395,7 @@ impl DnsMessageParser {
                 }),
             },
 
-            14 => match rdata.anything() {
+            dns_message::RTYPE_MINFO => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
                     let rmailbx = parse_domain_name(&mut decoder)?;
@@ -421,7 +410,7 @@ impl DnsMessageParser {
                 }),
             },
 
-            17 => match rdata.anything() {
+            dns_message::RTYPE_RP => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
                     let mbox = parse_domain_name(&mut decoder)?;
@@ -436,7 +425,7 @@ impl DnsMessageParser {
                 }),
             },
 
-            18 => match rdata.anything() {
+            dns_message::RTYPE_AFSDB => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
                     let subtype = parse_u16(&mut decoder)?;
@@ -448,7 +437,7 @@ impl DnsMessageParser {
                 }),
             },
 
-            19 => match rdata.anything() {
+            dns_message::RTYPE_X25 => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = BinDecoder::new(raw_rdata);
                     let psdn_address = parse_character_string(&mut decoder)?;
@@ -465,7 +454,7 @@ impl DnsMessageParser {
                 }),
             },
 
-            20 => match rdata.anything() {
+            dns_message::RTYPE_ISDN => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = BinDecoder::new(raw_rdata);
                     let address = parse_character_string(&mut decoder)?;
@@ -494,7 +483,7 @@ impl DnsMessageParser {
                 }),
             },
 
-            21 => match rdata.anything() {
+            dns_message::RTYPE_RT => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
                     let preference = parse_u16(&mut decoder)?;
@@ -509,7 +498,7 @@ impl DnsMessageParser {
                 }),
             },
 
-            22 => match rdata.anything() {
+            dns_message::RTYPE_NSAP => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = BinDecoder::new(raw_rdata);
                     let rdata_len = raw_rdata.len() as u16;
@@ -522,7 +511,7 @@ impl DnsMessageParser {
                 }),
             },
 
-            26 => match rdata.anything() {
+            dns_message::RTYPE_PX => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
                     let preference = parse_u16(&mut decoder)?;
@@ -543,14 +532,14 @@ impl DnsMessageParser {
                 }),
             },
 
-            29 => match rdata.anything() {
+            dns_message::RTYPE_LOC => match rdata.anything() {
                 Some(raw_rdata) => self.parse_loc_rdata(raw_rdata),
                 None => Err(DnsMessageParserError::SimpleError {
                     cause: String::from("Empty LOC rdata"),
                 }),
             },
 
-            36 => match rdata.anything() {
+            dns_message::RTYPE_KX => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = self.get_rdata_decoder_with_raw_message(raw_rdata);
                     let preference = parse_u16(&mut decoder)?;
@@ -565,7 +554,7 @@ impl DnsMessageParser {
                 }),
             },
 
-            37 => match rdata.anything() {
+            dns_message::RTYPE_CERT => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = BinDecoder::new(raw_rdata);
                     let cert_type = parse_u16(&mut decoder)?;
@@ -589,14 +578,14 @@ impl DnsMessageParser {
                 }),
             },
 
-            38 => match rdata.anything() {
+            dns_message::RTYPE_A6 => match rdata.anything() {
                 Some(raw_rdata) => self.parse_a6_rdata(raw_rdata),
                 None => Err(DnsMessageParserError::SimpleError {
                     cause: String::from("Empty A6 rdata"),
                 }),
             },
 
-            40 => match rdata.anything() {
+            dns_message::RTYPE_SINK => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = BinDecoder::new(raw_rdata);
                     let meaning = parse_u8(&mut decoder)?;
@@ -615,14 +604,14 @@ impl DnsMessageParser {
                 }),
             },
 
-            42 => match rdata.anything() {
+            dns_message::RTYPE_APL => match rdata.anything() {
                 Some(raw_rdata) => self.parse_apl_rdata(raw_rdata),
                 None => Err(DnsMessageParserError::SimpleError {
                     cause: String::from("Empty APL rdata"),
                 }),
             },
 
-            49 => match rdata.anything() {
+            dns_message::RTYPE_DHCID => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = BinDecoder::new(raw_rdata);
                     let raw_data_len = raw_rdata.len() as u16;
@@ -635,7 +624,7 @@ impl DnsMessageParser {
                 }),
             },
 
-            99 => match rdata.anything() {
+            dns_message::RTYPE_SPF => match rdata.anything() {
                 Some(raw_rdata) => {
                     let mut decoder = BinDecoder::new(raw_rdata);
                     let mut text = String::new();
@@ -761,7 +750,7 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
                 u8::from(tlsa.cert_usage()),
                 u8::from(tlsa.selector()),
                 u8::from(tlsa.matching()),
-                HEXUPPER.encode(&tlsa.cert_data())
+                HEXUPPER.encode(tlsa.cert_data())
             );
             Ok((Some(tlsa_rdata), None))
         }
@@ -770,13 +759,13 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
                 "{} {} {}",
                 Into::<u8>::into(sshfp.algorithm()),
                 Into::<u8>::into(sshfp.fingerprint_type()),
-                HEXUPPER.encode(&sshfp.fingerprint())
+                HEXUPPER.encode(sshfp.fingerprint())
             );
             Ok((Some(sshfp_rdata), None))
         }
         RData::NAPTR(naptr) => {
             let naptr_rdata = format!(
-                r#"{} {} "{}" "{}" "{}" {}"#, // why the " escaping desnt work?
+                r#"{} {} "{}" "{}" "{}" {}"#,
                 naptr.order(),
                 naptr.preference(),
                 escape_string_for_text_representation(
@@ -799,6 +788,8 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
             Ok((Some(naptr_rdata), None))
         }
         RData::DNSSEC(dnssec) => match dnssec {
+            // See https://tools.ietf.org/html/rfc4034 for details
+            // on dnssec related rdata formats
             DNSSECRData::DS(ds) => {
                 let ds_rdata = format!(
                     "{} {} {} {}",
@@ -814,11 +805,11 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
                     "{} 3 {} {}",
                     {
                         if dnskey.revoke() {
-                            String::from("0")
+                            0b0000_0000_0000_0000
                         } else if dnskey.zone_key() && dnskey.secure_entry_point() {
-                            String::from("257")
+                            0b0000_0001_0000_0001
                         } else {
-                            String::from("256")
+                            0b0000_0001_0000_0000
                         }
                     },
                     u8::from(dnskey.algorithm()),
@@ -935,46 +926,46 @@ fn parse_response_code(rcode: u16) -> Option<&'static str> {
 }
 
 fn parse_dns_query_message_header(dns_message: &TrustDnsMessage) -> QueryHeader {
-    QueryHeader::new(
-        dns_message.header().id(),
-        dns_message.header().op_code().into(),
-        dns_message.header().response_code(),
-        dns_message.header().message_type() as u8,
-        dns_message.header().authoritative(),
-        dns_message.header().truncated(),
-        dns_message.header().recursion_desired(),
-        dns_message.header().recursion_available(),
-        dns_message.header().authentic_data(),
-        dns_message.header().checking_disabled(),
-        dns_message.header().query_count(),
-        dns_message.header().answer_count(),
-        dns_message.header().name_server_count(),
-        dns_message.header().additional_count(),
-    )
+    QueryHeader {
+        id: dns_message.header().id(),
+        opcode: dns_message.header().op_code().into(),
+        rcode: dns_message.header().response_code(),
+        qr: dns_message.header().message_type() as u8,
+        aa: dns_message.header().authoritative(),
+        tc: dns_message.header().truncated(),
+        rd: dns_message.header().recursion_desired(),
+        ra: dns_message.header().recursion_available(),
+        ad: dns_message.header().authentic_data(),
+        cd: dns_message.header().checking_disabled(),
+        question_count: dns_message.header().query_count(),
+        answer_count: dns_message.header().answer_count(),
+        authority_count: dns_message.header().name_server_count(),
+        additional_count: dns_message.header().additional_count(),
+    }
 }
 
 fn parse_dns_update_message_header(dns_message: &TrustDnsMessage) -> UpdateHeader {
-    UpdateHeader::new(
-        dns_message.header().id(),
-        dns_message.header().op_code().into(),
-        dns_message.header().response_code(),
-        dns_message.header().message_type() as u8,
-        dns_message.header().query_count(),
-        dns_message.header().answer_count(),
-        dns_message.header().name_server_count(),
-        dns_message.header().additional_count(),
-    )
+    UpdateHeader {
+        id: dns_message.header().id(),
+        opcode: dns_message.header().op_code().into(),
+        rcode: dns_message.header().response_code(),
+        qr: dns_message.header().message_type() as u8,
+        zone_count: dns_message.header().query_count(),
+        prerequisite_count: dns_message.header().answer_count(),
+        update_count: dns_message.header().name_server_count(),
+        additional_count: dns_message.header().additional_count(),
+    }
 }
 
 fn parse_edns(dns_message: &TrustDnsMessage) -> Option<OptPseudoSection> {
     match dns_message.edns() {
-        Some(edns) => Some(OptPseudoSection::new(
-            edns.rcode_high(),
-            edns.version(),
-            edns.dnssec_ok(),
-            edns.max_payload(),
-            parse_edns_options(edns),
-        )),
+        Some(edns) => Some(OptPseudoSection {
+            extended_rcode: edns.rcode_high(),
+            version: edns.version(),
+            dnssec_ok: edns.dnssec_ok(),
+            udp_max_payload_size: edns.max_payload(),
+            options: parse_edns_options(edns),
+        }),
 
         None => None,
     }
@@ -998,19 +989,19 @@ fn parse_edns_opt_dnssec_algorithms(
     algorithms: SupportedAlgorithms,
 ) -> EdnsOptionEntry {
     let algorithm_names: Vec<String> = algorithms.iter().map(|alg| alg.to_string()).collect();
-    EdnsOptionEntry::new(
-        Into::<u16>::into(opt_code),
-        format!("{:?}", opt_code),
-        algorithm_names.join(" "),
-    )
+    EdnsOptionEntry {
+        opt_code: Into::<u16>::into(opt_code),
+        opt_name: format!("{:?}", opt_code),
+        opt_data: algorithm_names.join(" "),
+    }
 }
 
 fn parse_edns_opt(opt_code: EdnsCode, opt_data: &[u8]) -> EdnsOptionEntry {
-    EdnsOptionEntry::new(
-        Into::<u16>::into(opt_code),
-        format!("{:?}", opt_code),
-        base64::encode(&opt_data),
-    )
+    EdnsOptionEntry {
+        opt_code: Into::<u16>::into(opt_code),
+        opt_name: format!("{:?}", opt_code),
+        opt_data: base64::encode(&opt_data),
+    }
 }
 
 fn parse_loc_rdata_size(data: u8) -> Result<f64, DnsMessageParserError> {
@@ -1051,107 +1042,61 @@ fn parse_loc_rdata_coordinates(coordinates: u32, dir: &str) -> String {
 }
 
 fn parse_character_string(decoder: &mut BinDecoder) -> Result<String, DnsMessageParserError> {
-    match decoder.read_u8() {
-        Ok(raw_len) => {
-            let len = raw_len.unverified() as usize;
-            match decoder.read_slice(len) {
-                Ok(raw_text) => match raw_text.verify_unwrap(|r| r.len() == len) {
-                    Ok(verified_text) => Ok(String::from_utf8_lossy(verified_text).to_string()),
-                    Err(raw_data) => Err(DnsMessageParserError::SimpleError {
-                        cause: format!(
-                            "Unexpected data length: expected {}, got {}. Raw data {}",
-                            len,
-                            raw_data.len(),
-                            format_bytes_as_hex_string(&raw_data.to_vec())
-                        ),
-                    }),
-                },
-                Err(error) => Err(DnsMessageParserError::TrustDnsError {
-                    failure_source: error,
-                }),
-            }
-        }
-        Err(error) => Err(DnsMessageParserError::TrustDnsError {
-            failure_source: error,
+    let raw_len = decoder.read_u8().context(TrustDnsError)?;
+    let len = raw_len.unverified() as usize;
+    let raw_text = decoder.read_slice(len).context(TrustDnsError)?;
+    match raw_text.verify_unwrap(|r| r.len() == len) {
+        Ok(verified_text) => Ok(String::from_utf8_lossy(verified_text).to_string()),
+        Err(raw_data) => Err(DnsMessageParserError::SimpleError {
+            cause: format!(
+                "Unexpected data length: expected {}, got {}. Raw data {}",
+                len,
+                raw_data.len(),
+                format_bytes_as_hex_string(&raw_data.to_vec())
+            ),
         }),
     }
 }
 
 fn parse_u8(decoder: &mut BinDecoder) -> Result<u8, DnsMessageParserError> {
-    match decoder.read_u8() {
-        Ok(data) => Ok(data.unverified()),
-        Err(error) => Err(DnsMessageParserError::TrustDnsError {
-            failure_source: error,
-        }),
-    }
+    Ok(decoder.read_u8().context(TrustDnsError)?.unverified())
 }
 
 fn parse_u16(decoder: &mut BinDecoder) -> Result<u16, DnsMessageParserError> {
-    match decoder.read_u16() {
-        Ok(data) => Ok(data.unverified()),
-        Err(error) => Err(DnsMessageParserError::TrustDnsError {
-            failure_source: error,
-        }),
-    }
+    Ok(decoder.read_u16().context(TrustDnsError)?.unverified())
 }
 
 fn parse_u32(decoder: &mut BinDecoder) -> Result<u32, DnsMessageParserError> {
-    match decoder.read_u32() {
-        Ok(data) => Ok(data.unverified()),
-        Err(error) => Err(DnsMessageParserError::TrustDnsError {
-            failure_source: error,
-        }),
-    }
+    Ok(decoder.read_u32().context(TrustDnsError)?.unverified())
 }
 
 fn parse_vec(decoder: &mut BinDecoder, buffer_len: u8) -> Result<Vec<u8>, DnsMessageParserError> {
-    let len = buffer_len as usize;
-    match decoder.read_vec(len) {
-        Ok(data) => Ok(data.unverified()),
-        Err(error) => Err(DnsMessageParserError::TrustDnsError {
-            failure_source: error,
-        }),
-    }
+    Ok(decoder
+        .read_vec(buffer_len as usize)
+        .context(TrustDnsError)?
+        .unverified())
 }
 
 fn parse_vec_with_u16_len(
     decoder: &mut BinDecoder,
     buffer_len: u16,
 ) -> Result<Vec<u8>, DnsMessageParserError> {
-    let len = buffer_len as usize;
-    match decoder.read_vec(len) {
-        Ok(data) => Ok(data.unverified()),
-        Err(error) => Err(DnsMessageParserError::TrustDnsError {
-            failure_source: error,
-        }),
-    }
+    Ok(decoder
+        .read_vec(buffer_len as usize)
+        .context(TrustDnsError)?
+        .unverified())
 }
 
 fn parse_ipv6_address(decoder: &mut BinDecoder) -> Result<String, DnsMessageParserError> {
-    match aaaa::read(decoder) {
-        Ok(ipv6_address) => Ok(ipv6_address.to_string()),
-        Err(error) => Err(DnsMessageParserError::TrustDnsError {
-            failure_source: error,
-        }),
-    }
+    Ok(aaaa::read(decoder).context(TrustDnsError)?.to_string())
 }
 
 fn parse_ipv4_address(decoder: &mut BinDecoder) -> Result<String, DnsMessageParserError> {
-    match a::read(decoder) {
-        Ok(ipv4_address) => Ok(ipv4_address.to_string()),
-        Err(error) => Err(DnsMessageParserError::TrustDnsError {
-            failure_source: error,
-        }),
-    }
+    Ok(a::read(decoder).context(TrustDnsError)?.to_string())
 }
 
 fn parse_domain_name(decoder: &mut BinDecoder) -> Result<Name, DnsMessageParserError> {
-    match Name::read(decoder) {
-        Ok(data) => Ok(data),
-        Err(error) => Err(DnsMessageParserError::TrustDnsError {
-            failure_source: error,
-        }),
-    }
+    Name::read(decoder).context(TrustDnsError)
 }
 
 fn escape_string_for_text_representation(original_string: String) -> String {
@@ -1304,7 +1249,7 @@ mod tests {
                 assert_eq!(message.header.qr, 0);
                 assert_eq!(message.question_section.len(), 1);
                 assert_eq!(
-                    &message.question_section.first().unwrap().name,
+                    message.question_section.first().unwrap().name,
                     "h5.example.com."
                 );
                 assert_eq!(
@@ -1330,7 +1275,7 @@ mod tests {
         if let Err(err) = DnsMessageParser::new(vec![1, 2, 3]).parse_as_query_message() {
             assert!(err.to_string().contains("unexpected end of input"));
             match err {
-                DnsMessageParserError::TrustDnsError { failure_source: e } => {
+                DnsMessageParserError::TrustDnsError { source: e } => {
                     assert!(e.to_string().contains("unexpected end of input"))
                 }
                 DnsMessageParserError::SimpleError { cause: e } => {
@@ -1366,7 +1311,7 @@ mod tests {
             if let Err(err) = DnsMessageParser::new(raw_query_message).parse_as_query_message() {
                 assert!(err.to_string().contains("Unsupported rdata"));
                 match err {
-                    DnsMessageParserError::TrustDnsError { failure_source: e } => {
+                    DnsMessageParserError::TrustDnsError { source: e } => {
                         error!("Expected TrustDnsError, got {}.", &e)
                     }
                     DnsMessageParserError::SimpleError { cause: e } => {
@@ -1398,7 +1343,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_as_udpate_message_failure() {
+    fn test_parse_as_update_message_failure() {
         let raw_dns_message = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcq0ICAQQARgBIgSs\
         FDetKgTAN1MeMMn/Ajg1QL6m6fcFTQLEKhVS+QMSSIIAAAEAAAAFAAUJZmFjZWJvb2sxA2NvbQAAAQABwAwAAgABAAKjA\
         AAPA25zMQhyZW50b25kY8AWwAwAAgABAAKjAAAGA25zMsAvIENLMFBPSk1HODc0TEpSRUY3RUZOODQzMFFWSVQ4QlNNwB\
@@ -1426,7 +1371,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_as_udpate_message() {
+    fn test_parse_as_update_message() {
         let raw_dns_message = "xjUoAAABAAAAAQAAB2V4YW1wbGUDY29tAAAGAAECaDXADAD/AP8AAAAAAAA=";
         if let Ok(raw_update_message) = base64::decode(raw_dns_message) {
             let parse_result = DnsMessageParser::new(raw_update_message).parse_as_update_message();
@@ -1434,9 +1379,9 @@ mod tests {
             if let Ok(message) = parse_result {
                 assert_eq!(message.header.qr, 0);
                 assert_eq!(message.update_section.len(), 1);
-                assert_eq!(&message.update_section.first().unwrap().class, "ANY");
+                assert_eq!(message.update_section.first().unwrap().class, "ANY");
                 assert_eq!(&message.zone_to_update.zone_type.clone().unwrap(), "SOA");
-                assert_eq!(&message.zone_to_update.name, "example.com.");
+                assert_eq!(message.zone_to_update.name, "example.com.");
             } else {
                 error!("Message is not parsed.");
             }
