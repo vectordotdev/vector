@@ -67,6 +67,8 @@ pub mod splunk_hec;
 pub mod statsd;
 #[cfg(feature = "sinks-vector")]
 pub mod vector;
+#[cfg(feature = "sinks-vector_grpc")]
+pub mod vector_grpc;
 
 pub enum VectorSink {
     Sink(Box<dyn Sink<Event, Error = ()> + Send + Unpin>),
