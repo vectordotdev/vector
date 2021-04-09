@@ -116,7 +116,7 @@ mod test {
     use super::VectorConfig;
     use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext},
+        config::{SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::{
             metric::{MetricKind, MetricValue},
             Metric,
@@ -231,12 +231,7 @@ mod test {
         let (trigger_shutdown, shutdown, shutdown_down) = ShutdownSignal::new_wired();
 
         let server = config
-            .build(SourceContext {
-                name: "default".into(),
-                globals: GlobalOptions::default(),
-                shutdown,
-                out: tx,
-            })
+            .build(SourceContext::new_default(shutdown, tx))
             .await
             .unwrap();
         tokio::spawn(server);
@@ -267,12 +262,7 @@ mod test {
         let (trigger_shutdown, shutdown, shutdown_down) = ShutdownSignal::new_wired();
 
         let server = config
-            .build(SourceContext {
-                name: "default".into(),
-                globals: GlobalOptions::default(),
-                shutdown,
-                out: tx,
-            })
+            .build(SourceContext::new_default(shutdown, tx))
             .await
             .unwrap();
         tokio::spawn(server);

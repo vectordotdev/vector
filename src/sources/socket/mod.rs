@@ -509,12 +509,13 @@ mod test {
         let address = next_addr();
 
         let server = SocketConfig::from(UdpConfig::from_address(address))
-            .build(SourceContext {
-                name: source_name.into(),
-                globals: GlobalOptions::default(),
-                shutdown: shutdown_signal,
-                out: sender,
-            })
+            .build(SourceContext::new(
+                source_name,
+                None,
+                GlobalOptions::default(),
+                shutdown_signal,
+                sender,
+            ))
             .await
             .unwrap();
         let source_handle = tokio::spawn(server);

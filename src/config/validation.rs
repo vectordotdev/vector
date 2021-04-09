@@ -77,7 +77,7 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let source_resources = config
         .sources
         .iter()
-        .map(|(name, config)| (name, config.resources()));
+        .map(|(name, entry)| (name, entry.config.resources()));
     let sink_resources = config
         .sinks
         .iter()
@@ -255,8 +255,8 @@ impl From<&ConfigBuilder> for Graph {
         let mut graph = Graph::default();
 
         // TODO: validate that node names are unique across sources/transforms/sinks?
-        for (name, config) in config.sources.iter() {
-            graph.add_source(name, config.output_type());
+        for (name, entry) in config.sources.iter() {
+            graph.add_source(name, entry.config.output_type());
         }
 
         for (name, config) in config.transforms.iter() {

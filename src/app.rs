@@ -161,7 +161,7 @@ impl Application {
                 config.healthchecks.set_require_healthy(require_healthy);
 
                 let diff = config::ConfigDiff::initial(&config);
-                let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
+                let pieces = topology::build_or_log_errors(&mut config, &diff, HashMap::new())
                     .await
                     .ok_or(exitcode::CONFIG)?;
 

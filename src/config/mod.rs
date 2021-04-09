@@ -43,13 +43,21 @@ pub use log_schema::{init_log_schema, log_schema, LogSchema};
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SourceConfigEntry {
+    #[serde(flatten)]
+    pub config: Box<dyn SourceConfig>,
+    #[serde(skip)]
+    pub identifier: Option<String>,
+}
+
 #[derive(Debug, Default)]
 pub struct Config {
     pub global: GlobalOptions,
     #[cfg(feature = "api")]
     pub api: api::Options,
     pub healthchecks: HealthcheckOptions,
-    pub sources: IndexMap<String, Box<dyn SourceConfig>>,
+    pub sources: IndexMap<String, SourceConfigEntry>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
     tests: Vec<TestDefinition>,
@@ -206,38 +214,63 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 
 pub struct SourceContext {
     pub name: String,
+    pub identifier: String,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
 }
 
 impl SourceContext {
+    pub(crate) fn new(
+        name: &str,
+        identifier: Option<String>,
+        globals: GlobalOptions,
+        shutdown: ShutdownSignal,
+        out: Pipeline,
+    ) -> Self {
+        let identifier = identifier.unwrap_or_else(|| {
+            let mut identifier = [b' '; 32];
+            uuid::Uuid::new_v4()
+                .to_simple()
+                .encode_lower(&mut identifier)
+                .into()
+        });
+        Self {
+            name: name.into(),
+            identifier,
+            globals,
+            shutdown,
+            out,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_default(shutdown: ShutdownSignal, out: Pipeline) -> Self {
+        Self::new("default", None, GlobalOptions::default(), shutdown, out)
+    }
+
     #[cfg(test)]
     pub fn new_shutdown(
         name: &str,
         out: Pipeline,
     ) -> (Self, crate::shutdown::SourceShutdownCoordinator) {
-        let mut shutdown = crate::shutdown::SourceShutdownCoordinator::default();
-        let (shutdown_signal, _) = shutdown.register_source(name);
+        let mut coordinator = crate::shutdown::SourceShutdownCoordinator::default();
+        let (shutdown, _) = coordinator.register_source(name);
         (
-            Self {
-                name: name.into(),
-                globals: GlobalOptions::default(),
-                shutdown: shutdown_signal,
-                out,
-            },
-            shutdown,
+            Self::new(name, None, GlobalOptions::default(), shutdown, out),
+            coordinator,
         )
     }
 
     #[cfg(test)]
     pub fn new_test(out: Pipeline) -> Self {
-        Self {
-            name: "default".into(),
-            globals: GlobalOptions::default(),
-            shutdown: ShutdownSignal::noop(),
+        Self::new(
+            "default",
+            None,
+            GlobalOptions::default(),
+            ShutdownSignal::noop(),
             out,
-        }
+        )
     }
 }
 

@@ -34,7 +34,7 @@ pub struct Pieces {
 
 /// Builds only the new pieces, and doesn't check their topology.
 pub async fn build_pieces(
-    config: &super::Config,
+    config: &mut super::Config,
     diff: &ConfigDiff,
     mut buffers: HashMap<String, BuiltBuffer>,
 ) -> Result<Pieces, Vec<String>> {
@@ -51,23 +51,27 @@ pub async fn build_pieces(
     // Build sources
     for (name, source) in config
         .sources
-        .iter()
+        .iter_mut()
         .filter(|(name, _)| diff.sources.contains_new(&name))
     {
         let (tx, rx) = futures::channel::mpsc::channel(1000);
         let pipeline = Pipeline::from_sender(tx, vec![]);
 
-        let typetag = source.source_type();
+        let typetag = source.config.source_type();
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
-        let context = SourceContext {
-            name: name.into(),
-            globals: config.global.clone(),
-            shutdown: shutdown_signal,
-            out: pipeline,
-        };
-        let server = match source.build(context).await {
+        let context = SourceContext::new(
+            name,
+            source.identifier.clone(),
+            config.global.clone(),
+            shutdown_signal,
+            pipeline,
+        );
+        if source.identifier.is_none() {
+            source.identifier = Some(context.identifier.clone());
+        }
+        let server = match source.config.build(context).await {
             Err(error) => {
                 errors.push(format!("Source \"{}\": {}", name, error));
                 continue;

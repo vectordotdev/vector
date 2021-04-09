@@ -482,7 +482,7 @@ async fn topology_required_healthcheck_fails_start() {
     let mut config = basic_config_with_sink_failing_healthcheck();
     config.healthchecks.require_healthy = true;
     let diff = vector::config::ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
+    let pieces = topology::build_or_log_errors(&mut config, &diff, HashMap::new())
         .await
         .unwrap();
 
@@ -493,9 +493,9 @@ async fn topology_required_healthcheck_fails_start() {
 
 #[tokio::test]
 async fn topology_optional_healthcheck_does_not_fail_start() {
-    let config = basic_config_with_sink_failing_healthcheck();
+    let mut config = basic_config_with_sink_failing_healthcheck();
     let diff = vector::config::ConfigDiff::initial(&config);
-    let pieces = topology::build_or_log_errors(&config, &diff, HashMap::new())
+    let pieces = topology::build_or_log_errors(&mut config, &diff, HashMap::new())
         .await
         .unwrap();
     assert!(topology::start_validated(config, diff, pieces)

@@ -95,7 +95,7 @@ pub async fn start_validated(
 }
 
 pub async fn build_or_log_errors(
-    config: &Config,
+    config: &mut Config,
     diff: &ConfigDiff,
     buffers: HashMap<String, BuiltBuffer>,
 ) -> Option<Pieces> {
@@ -216,13 +216,20 @@ impl RunningTopology {
 
     /// On Error, topology is in invalid state.
     /// May change componenets even if reload fails.
-    pub async fn reload_config_and_respawn(&mut self, new_config: Config) -> Result<bool, ()> {
+    pub async fn reload_config_and_respawn(&mut self, mut new_config: Config) -> Result<bool, ()> {
         if self.config.global != new_config.global {
             error!(
                 message =
                 "Global options can't be changed while reloading config file; reload aborted. Please restart vector to reload the configuration file."
             );
             return Ok(false);
+        }
+
+        // Synchronize source identifiers into the new config
+        for (name, source) in self.config.sources.iter() {
+            if let Some(new_source) = new_config.sources.get_mut(name) {
+                new_source.identifier = source.identifier.clone();
+            }
         }
 
         let diff = ConfigDiff::new(&self.config, &new_config);
@@ -239,7 +246,8 @@ impl RunningTopology {
         }
 
         // Now let's actually build the new pieces.
-        if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff, buffers.clone()).await
+        if let Some(mut new_pieces) =
+            build_or_log_errors(&mut new_config, &diff, buffers.clone()).await
         {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, new_config.healthchecks)
@@ -256,7 +264,7 @@ impl RunningTopology {
         // We need to rebuild the removed.
         info!("Rebuilding old configuration.");
         let diff = diff.flip();
-        if let Some(mut new_pieces) = build_or_log_errors(&self.config, &diff, buffers).await {
+        if let Some(mut new_pieces) = build_or_log_errors(&mut self.config, &diff, buffers).await {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
@@ -388,7 +396,7 @@ impl RunningTopology {
         let add_source = diff
             .sources
             .changed_and_added()
-            .map(|name| (name, new_config.sources[name].resources()));
+            .map(|name| (name, new_config.sources[name].config.resources()));
         let add_sink = diff
             .sinks
             .changed_and_added()
