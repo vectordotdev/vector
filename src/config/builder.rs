@@ -28,7 +28,6 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
     #[cfg(feature = "providers")]
-    #[serde(default)]
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
 }
 
@@ -114,6 +113,12 @@ impl ConfigBuilder {
         if let Err(error) = self.api.merge(with.api) {
             errors.push(error);
         }
+
+        cfg_if::cfg_if!(
+            if #[cfg(feature = "providers")] {
+                self.provider = with.provider;
+            }
+        );
 
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
             self.global.data_dir = with.global.data_dir;

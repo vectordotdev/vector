@@ -2,23 +2,17 @@ use super::{builder::ConfigBuilder, DataType, Resource};
 use std::collections::HashMap;
 
 pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
-    let mut errors = vec![];
-
-    Ok(())
+    if !config.sources.is_empty() || !config.transforms.is_empty() || !config.sinks.is_empty() {
+        Err(vec![
+            "No sources/transforms/sinks are allowed if provider config is present.".to_owned(),
+        ])
+    } else {
+        Ok(())
+    }
 }
 
 pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = vec![];
-
-    // If a provider is present, there can be no components.
-    if config.provider.is_some()
-        && (!config.sources.is_empty() || !config.transforms.is_empty() || !config.sinks.is_empty())
-    {
-        errors.push(
-            "No sources/transforms/sinks are allowed if a provider config is given.".to_owned(),
-        );
-        return Err(errors);
-    }
 
     if config.sources.is_empty() {
         errors.push("No sources defined in the config.".to_owned());

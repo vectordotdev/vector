@@ -3896,10 +3896,10 @@ checksum = "11ac60cd4d3a869fd39d57baf0ed7f79fb677580d8d6655c4330d4f1126bc27b"
 dependencies = [
  "lazy_static",
  "proc-macro-hack",
- "proc-macro2 1.0.24",
+ "proc-macro2 1.0.26",
  "quote 1.0.9",
  "regex",
- "syn 1.0.62",
+ "syn 1.0.68",
 ]
 
 [[package]]
@@ -6304,10 +6304,11 @@ dependencies = [
 
 [[package]]
 name = "serde_with"
-version = "1.6.4"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b44be9227e214a0420707c9ca74c2d4991d9955bae9415a8f93f05cebf561be5"
+checksum = "e557c650adfb38b32a5aec07082053253c703bc3cec654b27a5dbcf61995bb9b"
 dependencies = [
+ "rustversion",
  "serde",
  "serde_with_macros",
 ]

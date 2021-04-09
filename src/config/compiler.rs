@@ -1,7 +1,35 @@
 use super::{builder::ConfigBuilder, validation, Config, TransformOuter};
 use indexmap::IndexMap;
 
-pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
+pub fn compile(builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
+    if builder.provider.is_some() {
+        compile_provider(builder)
+    } else {
+        compile_components(builder)
+    }
+}
+
+fn compile_provider(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
+    validation::check_provider(&mut builder)?;
+
+    Ok((
+        Config {
+            global: builder.global,
+            #[cfg(feature = "api")]
+            api: builder.api,
+            healthchecks: builder.healthchecks,
+            sources: IndexMap::new(),
+            sinks: IndexMap::new(),
+            transforms: IndexMap::new(),
+            provider: builder.provider,
+            tests: builder.tests,
+            expansions: IndexMap::new(),
+        },
+        Vec::new(),
+    ))
+}
+
+fn compile_components(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
 
     expand_wildcards(&mut builder);
