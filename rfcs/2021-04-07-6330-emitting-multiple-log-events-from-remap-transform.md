@@ -1,8 +1,6 @@
-# RFC 6330 - 2021-04-07 - Emitting multiple log events from remap transform
+# RFC 6330 - 2021-04-07 - Converting one log event into multiple log events
 
-This RFC describes an approach for emitting multiple log events from a remap transform.
-
-[Credit to @JeanMertz](https://github.com/timberio/vector/pull/7038#discussion_r609476064) for this revised approach.
+This RFC describes an approach for emitting multiple log events from an `explode` transform.
 
 ## Scope
 
@@ -18,13 +16,13 @@ Out:
 
 ## Motivation
 
-Currently the remap transform can only modify an event as it is passing through. Users have asked [1][] [2][] to be able to transform an incoming event into multiple events. This is useful, for example, when parsing an incoming JSON payload that contains an array for which you'd like to publish an event for each element.
+Users have asked [1][] [2][] to be able to transform an incoming event into multiple events. This is useful, for example, when parsing an incoming JSON payload that contains an array for which you'd like to publish an event for each element.
 
 Currently, users are restricted to using the Lua or WASM transform for this, [introducing a substantial bottleneck](https://user-images.githubusercontent.com/316880/105531520-d3643200-5cbf-11eb-8b35-fe1c99e5c254.png).
 
 ## Internal Proposal
 
-The proposal is to add an `explode` transform that makes use of remap to emit a set of events from one input event by requiring the remap script to resolve to an array. For each element of the array, a separate event will be published.
+The proposal is to add an `explode` transform that makes use of the Vector Remap Language (VRL) to emit a set of events from one input event by requiring the VRL program to resolve to an array. For each element of the array, a separate event will be published.
 
 Example input:
 
@@ -75,7 +73,7 @@ This is similar to the support that the current [`explode` transform PR](https:/
 
 ## Doc-level Proposal
 
-To convert an incoming event into multiple events, the `explode` transform can be used. This transform takes a VRL script where it expects the last expression to return an array.
+To convert an incoming event into multiple events, the `explode` transform can be used. This transform takes a VRL program where it expects the last expression to return an array.
 
 For example, given an input of:
 
@@ -98,9 +96,11 @@ The following events will be output:
 {"message": "bar"}
 ```
 
+If any elements in the returned array are not an object, they will be turned into a string and set as the `message` key on event.
+
 ## Rationale
 
-This enhances vector with a native transform capable of an event into multiple events. Without this, users will continue to have to use Lua or WASM to acheive this, which introduces a performance bottleneck compared to remap
+This enhances Vector with a native transform capable of transforming an event into multiple events. Without this, users will continue to have to use Lua or WASM to acheive this, which introduces a performance bottleneck compared to this proposal.
 
 ## Prior Art
 
@@ -113,7 +113,7 @@ These are similar to the proposed approach.
 
 - Adds an additional transform to be aware of.
 - Less flexible than `emit_log` alternative which could emit arbitrary events from `remap` transform.
-- This idea of the last line of the remap script being the "return value" could be a bit confusing to users in how it differs from `remap` which uses whatever `.` is at the end of the script.
+- This idea of the last line of the remap script being the "return value" could be a bit confusing to users in how it differs from `remap` which uses whatever `.` is at the end of the script. However, this is similar to VRL's use in unit tests and conditions for the `filter` and `route` transforms.
 - Ongoing maintenance burden should be minimal.
 
 ## Alternatives
@@ -169,10 +169,6 @@ This would modify remap to allow setting `.` to an array of objects to have each
 This turned out to require a bigger change than I expected in that `.` is linked to mutating the underlying event (metric or log). It's definitely doable, but would require a substantial refactoring and so caused me to take a step back and consider the alternatives, prompting this RFC.
 
 Using a separate `explode` transform keeps the responsibilities of the transform more clear and avoids having to refactor the `remap` transform to decouple `.` from the underlying Vector `Event` object; though we may still want to do this in the future anyway.
-
-## Open Questions
-
-1. How should we handle the case where the user returns an array where one or more elements is not an object? My instinct for now is just to log and drop them.
 
 ## Plan Of Attack
 
