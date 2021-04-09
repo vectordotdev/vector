@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
@@ -143,15 +143,9 @@ impl_generate_config_from_default!(GeneratorConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "generator")]
 impl SourceConfig for GeneratorConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.format.validate()?;
-        Ok(self.clone().generator(shutdown, out))
+        Ok(self.clone().generator(cx.shutdown, cx.out))
     }
 
     fn output_type(&self) -> DataType {

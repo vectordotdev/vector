@@ -312,7 +312,8 @@ impl From<Event> for proto::EventWrapper {
     fn from(event: Event) -> Self {
         match event {
             Event::Log(log_event) => {
-                let fields = log_event
+                let (fields, _metadata) = log_event.into_parts();
+                let fields = fields
                     .into_iter()
                     .map(|(k, v)| (k, encode_value(v)))
                     .collect::<BTreeMap<_, _>>();

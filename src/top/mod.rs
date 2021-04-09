@@ -14,7 +14,7 @@ pub use cmd::cmd;
 pub struct Opts {
     /// Interval to sample metrics at, in milliseconds
     #[structopt(default_value = "500", short = "i", long)]
-    interval: u64,
+    interval: u32,
 
     /// Vector GraphQL API server endpoint
     #[structopt(short, long)]

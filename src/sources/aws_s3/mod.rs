@@ -1,10 +1,8 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, SourceConfig, SourceContext, SourceDescription},
     line_agg,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
-    shutdown::ShutdownSignal,
-    Pipeline,
 };
 use rusoto_core::Region;
 use rusoto_s3::S3Client;
@@ -63,13 +61,7 @@ impl_generate_config_from_default!(AwsS3Config);
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_s3")]
 impl SourceConfig for AwsS3Config {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let multiline_config: Option<line_agg::Config> = self
             .multiline
             .as_ref()
@@ -80,7 +72,7 @@ impl SourceConfig for AwsS3Config {
             Strategy::Sqs => Ok(Box::pin(
                 self.create_sqs_ingestor(multiline_config)
                     .await?
-                    .run(out, shutdown),
+                    .run(cx.out, cx.shutdown),
             )),
         }
     }
@@ -261,10 +253,9 @@ mod test {
 mod integration_tests {
     use super::{sqs, AwsS3Config, Compression, Strategy};
     use crate::{
-        config::{GlobalOptions, SourceConfig},
+        config::{SourceConfig, SourceContext},
         line_agg,
         rusoto::RegionOrEndpoint,
-        shutdown::ShutdownSignal,
         sources::util::MultilineConfig,
         test_util::{collect_n, random_lines},
         Pipeline,
@@ -369,12 +360,7 @@ mod integration_tests {
         let (tx, rx) = Pipeline::new_test();
         tokio::spawn(async move {
             config
-                .build(
-                    "default",
-                    &GlobalOptions::default(),
-                    ShutdownSignal::noop(),
-                    tx,
-                )
+                .build(SourceContext::new_test(tx))
                 .await
                 .unwrap()
                 .await

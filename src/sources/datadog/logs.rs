@@ -1,16 +1,14 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
-    shutdown::ShutdownSignal,
     sources::{
         self,
         util::{decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsConfig,
-    Pipeline,
 };
 use bytes::Bytes;
 use lazy_static::lazy_static;
@@ -50,13 +48,7 @@ impl GenerateConfig for DatadogLogsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_logs")]
 impl SourceConfig for DatadogLogsConfig {
-    async fn build(
-        &self,
-        _: &str,
-        _: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<sources::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = DatadogLogsSource {};
         // We accept /v1/input & /v1/input/<API_KEY>
         source.run(
@@ -65,8 +57,8 @@ impl SourceConfig for DatadogLogsConfig {
             false,
             &self.tls,
             &self.auth,
-            out,
-            shutdown,
+            cx.out,
+            cx.shutdown,
         )
     }
 
@@ -134,9 +126,8 @@ fn extract_api_key<'a>(headers: &'a HeaderMap, path: &'a str) -> Option<String> 
 mod tests {
     use super::DatadogLogsConfig;
 
-    use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{log_schema, GlobalOptions, SourceConfig},
+        config::{log_schema, SourceConfig, SourceContext},
         event::Event,
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
@@ -160,12 +151,7 @@ mod tests {
                 tls: None,
                 auth: None,
             }
-            .build(
-                "default",
-                &GlobalOptions::default(),
-                ShutdownSignal::noop(),
-                sender,
-            )
+            .build(SourceContext::new_test(sender))
             .await
             .unwrap()
             .await

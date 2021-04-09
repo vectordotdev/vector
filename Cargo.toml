@@ -27,12 +27,12 @@ debug = true
 [package.metadata.deb]
 name = "vector"
 maintainer-scripts = "distribution/debian/scripts/"
-conf-files = ["/etc/vector/vector.toml"]
+conf-files = ["/etc/vector/vector.toml", "/etc/default/vector"]
 assets = [
   ["target/release/vector", "/usr/bin/", "755"],
   ["config/vector.toml", "/etc/vector/vector.toml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
-  ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"],
+  ["distribution/systemd/vector.service", "/lib/systemd/system/vector.service", "644"],
   ["distribution/systemd/vector.default", "/etc/default/vector", "600"]
 ]
 license-file = ["target/debian-license.txt"]
@@ -95,16 +95,16 @@ vector-api-client = { path = "lib/vector-api-client", optional = true }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures
-async-trait = "0.1.42"
+async-trait = "0.1.48"
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
 futures01 = { package = "futures", version = "0.1.25" }
-tokio = { version = "1.3.0", features = ["full"] }
+tokio = { version = "1.4.0", features = ["full"] }
 tokio-openssl = "0.6.1"
-tokio-stream = { version = "0.1.3", features = ["net", "sync"] }
-tokio-util = { version = "0.6.2", features = ["codec", "time"] }
+tokio-stream = { version = "0.1.5", features = ["net", "sync"] }
+tokio-util = { version = "0.6.5", features = ["codec", "time"] }
 
 # Tracing
-tracing = "0.1.15"
+tracing = "0.1.25"
 tracing-core = "0.1.17"
 tracing-futures = { version = "0.2", features = ["futures-01", "futures-03"]}
 tracing-log = "0.1.0"
@@ -112,12 +112,9 @@ tracing-subscriber = "0.2.17"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
-metrics = "=0.13.0-alpha.13"
-metrics-tracing-context = "=0.1.0-alpha.7"
-metrics-util = "=0.4.0-alpha.10"
-# Indirect dependency; benchmark regression detected; pinning until
-# https://github.com/timberio/vector/issues/6412 is resolved
-metrics-macros = "=0.1.0-alpha.9"
+metrics = "0.14"
+metrics-tracing-context = "0.3"
+metrics-util = "0.6"
 
 # Aws
 rusoto_cloudwatch = { version = "0.46.0", optional = true }
@@ -137,8 +134,8 @@ tower = { version = "0.4.0", features = ["buffer", "limit", "retry", "timeout", 
 tower-layer = "0.3.1"
 
 # Serde
-serde = { version = "1.0.117", features = ["derive"] }
-serde_json = { version = "1.0.33", features = ["raw_value"] }
+serde = { version = "1.0.125", features = ["derive"] }
+serde_json = { version = "1.0.64", features = ["raw_value"] }
 serde_yaml = { version ="0.8.13" }
 
 # Prost
@@ -147,11 +144,12 @@ prost-types = "0.7.0"
 
 # GCP
 goauth = { version = "0.9.0", optional = true }
+gouth = { version = "0.2", optional = true }
 smpl_jwt = { version = "0.6.1", optional = true }
 
 # API
-async-graphql = { version = "2.5.9", optional = true }
-async-graphql-warp = { version = "2.5.9", optional = true }
+async-graphql = { version = "=2.6.4", optional = true, features = ["chrono"] }
+async-graphql-warp = { version = "=2.6.4", optional = true }
 itertools = { version = "0.10.0", optional = true }
 
 # API client
@@ -165,7 +163,7 @@ vrl = { path = "lib/vrl/core" }
 vrl-stdlib = { path = "lib/vrl/stdlib" }
 
 # External libs
-anyhow = "1.0.37"
+anyhow = "1.0.40"
 async-compression = { version = "0.3.7", features = ["tokio", "gzip", "zstd"] }
 avro-rs = { version = "0.13.0", optional = true }
 base64 = { version = "0.13.0", optional = true }
@@ -206,12 +204,12 @@ logfmt = { version = "0.0.2", optional = true }
 lru = { version = "0.6.3", optional = true }
 maxminddb = { version = "0.17.0", optional = true }
 mongodb = { version = "2.0.0-alpha", optional = true }
-async-nats = { version = "0.9.4", optional = true }
+async-nats = { version = "0.9.9", optional = true }
 nom = { version = "6.0.1", optional = true }
 notify = "4.0.14"
 num_cpus = "1.10.0"
 once_cell = "1.3"
-openssl = "0.10.32"
+openssl = "0.10.33"
 openssl-probe = "0.1.2"
 percent-encoding = "2.1.0"
 pest = "2.1.3"
@@ -235,13 +233,14 @@ strip-ansi-escapes = "0.1.0"
 structopt = "0.3.21"
 syslog = { version = "5", optional = true }
 syslog_loose = { version = "0.10.0", optional = true }
-tokio-postgres = { version = "0.7.0", features = ["runtime", "with-chrono-0_4"], optional = true }
+tokio-postgres = { version = "0.7.1", features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = "0.5.8"
 typetag = "0.1.6"
 twox-hash = "1.6"
 url = "2.2.1"
 uuid = { version = "0.8", features = ["serde", "v4"], optional = true }
 warp = { version = "0.3.0", default-features = false, optional = true }
+cfg-if = "1.0.0"
 
 # For WASM
 async-stream = "0.3.0"
@@ -271,18 +270,19 @@ assert_cmd = "1.0.2"
 base64 = "0.13"
 criterion = { version = "0.3", features = ["html_reports"] }
 httpmock = "0.5.7"
-libc = "0.2.92"
+libc = "0.2.93"
 libz-sys = "1.1.2"
 matches = "0.1.8"
 pretty_assertions = "0.7.1"
-reqwest = { version = "0.11.0", features = ["json"] }
+reqwest = { version = "0.11.2", features = ["json"] }
 rusty-fork = "0.3.0"
 tempfile = "3.0.6"
-tokio = { version = "1.3.0", features = ["test-util"] }
-tokio-test = "0.4.0"
+tokio = { version = "1.4.0", features = ["test-util"] }
+tokio-test = "0.4.1"
 tokio01-test = "0.1.1"
 tower-test = "0.4.0"
 walkdir = "2.3.2"
+quickcheck = "1"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -552,7 +552,7 @@ sinks-console = []
 sinks-datadog = ["bytesize"]
 sinks-elasticsearch = ["bytesize", "rusoto"]
 sinks-file = []
-sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt", "uuid"]
+sinks-gcp = ["base64", "bytesize", "goauth", "gouth", "smpl_jwt", "uuid"]
 sinks-honeycomb = ["bytesize"]
 sinks-http = ["bytesize"]
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]

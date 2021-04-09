@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     buffers,
-    config::{DataType, SinkContext},
+    config::{DataType, SinkContext, SourceContext},
     event::Event,
     internal_events::{EventIn, EventOut, EventProcessed, EventZeroIn},
     shutdown::SourceShutdownCoordinator,
@@ -61,10 +61,13 @@ pub async fn build_pieces(
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
-        let server = match source
-            .build(&name, &config.global, shutdown_signal, pipeline)
-            .await
-        {
+        let context = SourceContext {
+            name: name.into(),
+            globals: config.global.clone(),
+            shutdown: shutdown_signal,
+            out: pipeline,
+        };
+        let server = match source.build(context).await {
             Err(error) => {
                 errors.push(format!("Source \"{}\": {}", name, error));
                 continue;

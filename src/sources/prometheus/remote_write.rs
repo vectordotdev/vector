@@ -1,14 +1,13 @@
 use super::parser;
 use crate::{
-    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
     internal_events::{PrometheusRemoteWriteParseError, PrometheusRemoteWriteReceived},
-    shutdown::ShutdownSignal,
     sources::{
         self,
         util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsConfig,
-    Event, Pipeline,
+    Event,
 };
 use bytes::Bytes;
 use prometheus_parser::proto;
@@ -46,15 +45,17 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus_remote_write")]
 impl SourceConfig for PrometheusRemoteWriteConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<sources::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = RemoteWriteSource;
-        source.run(self.address, "", true, &self.tls, &self.auth, out, shutdown)
+        source.run(
+            self.address,
+            "",
+            true,
+            &self.tls,
+            &self.auth,
+            cx.out,
+            cx.shutdown,
+        )
     }
 
     fn output_type(&self) -> crate::config::DataType {
@@ -124,7 +125,6 @@ mod test {
     };
     use chrono::{SubsecRound as _, Utc};
     use futures::stream;
-    use pretty_assertions::assert_eq;
 
     #[test]
     fn genreate_config() {
@@ -151,15 +151,7 @@ mod test {
             auth: None,
             tls: tls.clone(),
         };
-        let source = source
-            .build(
-                "source",
-                &GlobalOptions::default(),
-                ShutdownSignal::noop(),
-                tx,
-            )
-            .await
-            .unwrap();
+        let source = source.build(SourceContext::new_test(tx)).await.unwrap();
         tokio::spawn(source);
 
         let sink = RemoteWriteConfig {
@@ -180,7 +172,7 @@ mod test {
         // put them back into order before comparing.
         output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
 
-        assert_eq!(events, output);
+        shared::assert_event_data_eq!(events, output);
     }
 
     fn make_events() -> Vec<Event> {
@@ -229,7 +221,7 @@ mod test {
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
     use super::*;
-    use crate::{shutdown, test_util, Pipeline};
+    use crate::{test_util, Pipeline};
     use tokio::time::Duration;
 
     const PROMETHEUS_RECEIVE_ADDRESS: &str = "127.0.0.1:9093";
@@ -243,15 +235,7 @@ mod integration_tests {
         };
 
         let (tx, rx) = Pipeline::new_test();
-        let source = config
-            .build(
-                "prometheus_remote_write",
-                &GlobalOptions::default(),
-                shutdown::ShutdownSignal::noop(),
-                tx,
-            )
-            .await
-            .unwrap();
+        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
 
         tokio::spawn(source);
 

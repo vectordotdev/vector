@@ -196,7 +196,7 @@ impl<S: Subscriber + 'static> Subscriber for BroadcastSubscriber<S> {
 impl From<&tracing::Event<'_>> for Event {
     fn from(event: &tracing::Event<'_>) -> Self {
         let now = chrono::Utc::now();
-        let mut maker = MakeLogEvent::default();
+        let mut maker = MakeLogEvent(LogEvent::default());
         event.record(&mut maker);
 
         let mut log = maker.0;
@@ -226,7 +226,7 @@ impl From<&tracing::Event<'_>> for Event {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct MakeLogEvent(LogEvent);
 
 impl Visit for MakeLogEvent {

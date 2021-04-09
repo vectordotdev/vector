@@ -318,6 +318,7 @@ mod tests {
 
     async fn do_transform(event: &str, patterns: &str, config: &str) -> Option<LogEvent> {
         let event = Event::from(event);
+        let metadata = event.metadata().clone();
         let mut parser = toml::from_str::<RegexParserConfig>(&format!(
             r#"
                 patterns = {}
@@ -331,7 +332,11 @@ mod tests {
         .unwrap();
         let parser = parser.as_function();
 
-        parser.transform_one(event).map(|event| event.into_log())
+        let result = parser.transform_one(event).map(|event| event.into_log());
+        if let Some(event) = &result {
+            assert_eq!(event.metadata(), &metadata);
+        }
+        result
     }
 
     #[tokio::test]

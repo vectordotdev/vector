@@ -230,7 +230,11 @@ mod tests {
                 Sample::new(0, key_field.clone(), Some(condition_contains("important")));
             let iterations = 0..1000;
             let total_passed = iterations
-                .filter_map(|_| sampler.transform_one(event.clone()))
+                .filter_map(|_| {
+                    sampler
+                        .transform_one(event.clone())
+                        .map(|result| assert_eq!(result, event))
+                })
                 .count();
             assert_eq!(total_passed, 1000);
         }
@@ -247,7 +251,11 @@ mod tests {
             );
             let iterations = 0..1000;
             let total_passed = iterations
-                .filter_map(|_| sampler.transform_one(event.clone()))
+                .filter_map(|_| {
+                    sampler
+                        .transform_one(event.clone())
+                        .map(|result| assert_eq!(result, event))
+                })
                 .count();
             assert_eq!(total_passed, 1000);
         }

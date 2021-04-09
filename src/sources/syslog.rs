@@ -4,7 +4,7 @@ use crate::sources::util::build_unix_stream_source;
 use crate::udp;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::{Event, Value},
@@ -96,13 +96,7 @@ impl GenerateConfig for SyslogConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "syslog")]
 impl SourceConfig for SyslogConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let host_key = self
             .host_key
             .clone()
@@ -127,8 +121,8 @@ impl SourceConfig for SyslogConfig {
                     shutdown_secs,
                     tls,
                     receive_buffer_bytes,
-                    shutdown,
-                    out,
+                    cx.shutdown,
+                    cx.out,
                 )
             }
             Mode::Udp {
@@ -139,16 +133,16 @@ impl SourceConfig for SyslogConfig {
                 self.max_length,
                 host_key,
                 receive_buffer_bytes,
-                shutdown,
-                out,
+                cx.shutdown,
+                cx.out,
             )),
             #[cfg(unix)]
             Mode::Unix { path } => Ok(build_unix_stream_source(
                 path,
                 SyslogDecoder::new(self.max_length),
                 host_key,
-                shutdown,
-                out,
+                cx.shutdown,
+                cx.out,
                 |host_key, default_host, line| Some(event_from_str(host_key, default_host, line)),
             )),
         }
@@ -558,6 +552,7 @@ mod test {
     use crate::{config::log_schema, event::Event};
     use bytes::BufMut;
     use chrono::prelude::*;
+    use shared::assert_event_data_eq;
 
     #[test]
     fn generate_config() {
@@ -722,7 +717,7 @@ mod test {
             expected.insert("procid", 8449);
         }
 
-        assert_eq!(event_from_str(&"host".to_string(), None, &raw), expected);
+        assert_event_data_eq!(event_from_str(&"host".to_string(), None, &raw), expected);
     }
 
     #[test]
@@ -751,7 +746,7 @@ mod test {
         }
 
         let event = event_from_str(&"host".to_string(), None, &raw);
-        assert_eq!(event, expected);
+        assert_event_data_eq!(event, expected);
 
         let raw = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
@@ -759,7 +754,7 @@ mod test {
         );
 
         let event = event_from_str(&"host".to_string(), None, &raw);
-        assert_eq!(event, expected);
+        assert_event_data_eq!(event, expected);
     }
 
     #[test]
@@ -813,7 +808,7 @@ mod test {
             "#;
         let cleaned = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
-        assert_eq!(
+        assert_event_data_eq!(
             event_from_str(&"host".to_string(), None, raw),
             event_from_str(&"host".to_string(), None, cleaned)
         );
@@ -843,7 +838,7 @@ mod test {
             expected.insert("procid", 8539);
         }
 
-        assert_eq!(event, expected);
+        assert_event_data_eq!(event, expected);
     }
 
     #[test]
@@ -876,7 +871,7 @@ mod test {
             expected.insert("origin.x-info", "http://www.rsyslog.com");
         }
 
-        assert_eq!(event, expected);
+        assert_event_data_eq!(event, expected);
     }
 
     #[test]
@@ -908,7 +903,7 @@ mod test {
             expected.insert("origin.x-info", "http://www.rsyslog.com");
         }
 
-        assert_eq!(event_from_str(&"host".to_string(), None, &raw), expected);
+        assert_event_data_eq!(event_from_str(&"host".to_string(), None, &raw), expected);
     }
 
     #[test]

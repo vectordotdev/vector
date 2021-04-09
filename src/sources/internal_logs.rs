@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, SourceConfig, SourceContext, SourceDescription},
     shutdown::ShutdownSignal,
     trace, Pipeline,
 };
@@ -20,14 +20,8 @@ impl_generate_config_from_default!(InternalLogsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "internal_logs")]
 impl SourceConfig for InternalLogsConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        Ok(Box::pin(run(out, shutdown)))
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        Ok(Box::pin(run(cx.out, cx.shutdown)))
     }
 
     fn output_type(&self) -> DataType {
@@ -69,7 +63,7 @@ async fn run(out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::GlobalOptions, test_util::collect_ready, trace, Event};
+    use crate::{test_util::collect_ready, trace, Event};
     use futures::channel::mpsc;
     use tokio::time::{sleep, Duration};
 
@@ -109,12 +103,7 @@ mod tests {
         let (tx, rx) = Pipeline::new_test();
 
         let source = InternalLogsConfig {}
-            .build(
-                "default",
-                &GlobalOptions::default(),
-                ShutdownSignal::noop(),
-                tx,
-            )
+            .build(SourceContext::new_test(tx))
             .await
             .unwrap();
         tokio::spawn(source);

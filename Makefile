@@ -441,7 +441,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh nginx stop
 	@scripts/setup_integration_env.sh nginx start
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nginx-integration-tests --lib ::nginx:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nginx-integration-tests --lib ::nginx_metrics:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nginx stop
 endif

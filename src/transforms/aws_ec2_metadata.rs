@@ -511,7 +511,7 @@ enum Ec2MetadataError {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::{config::GlobalOptions, event::Event, test_util::trace_init};
+    use crate::{config::GlobalOptions, event::LogEvent, test_util::trace_init};
     use futures::{SinkExt, StreamExt};
 
     const HOST: &str = "http://localhost:8111";
@@ -541,27 +541,26 @@ mod integration_tests {
         // We need to sleep to let the background task fetch the data.
         sleep(Duration::from_secs(1)).await;
 
-        let event = Event::new_empty_log();
-        tx.send(event).await.unwrap();
+        let log = LogEvent::default();
+        let mut expected = log.clone();
+        tx.send(log.into()).await.unwrap();
 
         let event = stream.next().await.unwrap();
-        let log = event.as_log();
 
-        assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
-        assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
-        assert_eq!(
-            log.get("public-hostname"),
-            Some(&"mock-public-hostname".into())
-        );
-        assert_eq!(log.get(&"local-ipv4"), Some(&"192.1.1.2".into()));
-        assert_eq!(log.get("local-hostname"), Some(&"mock-hostname".into()));
-        assert_eq!(log.get("instance-id"), Some(&"i-096fba6d03d36d262".into()));
-        assert_eq!(log.get("ami-id"), Some(&"ami-05f27d4d6770a43d2".into()));
-        assert_eq!(log.get("instance-type"), Some(&"t2.micro".into()));
-        assert_eq!(log.get("region"), Some(&"us-east-1".into()));
-        assert_eq!(log.get("vpc-id"), Some(&"mock-vpc-id".into()));
-        assert_eq!(log.get("subnet-id"), Some(&"mock-subnet-id".into()));
-        assert_eq!(log.get("role-name[0]"), Some(&"mock-user".into()));
+        expected.insert("availability-zone", "ww-region-1a");
+        expected.insert("public-ipv4", "192.1.1.1");
+        expected.insert("public-hostname", "mock-public-hostname");
+        expected.insert("local-ipv4", "192.1.1.2");
+        expected.insert("local-hostname", "mock-hostname");
+        expected.insert("instance-id", "i-096fba6d03d36d262");
+        expected.insert("ami-id", "ami-05f27d4d6770a43d2");
+        expected.insert("instance-type", "t2.micro");
+        expected.insert("region", "us-east-1");
+        expected.insert("vpc-id", "mock-vpc-id");
+        expected.insert("subnet-id", "mock-subnet-id");
+        expected.insert("role-name[0]", "mock-user");
+
+        assert_eq!(event.into_log(), expected);
     }
 
     #[tokio::test]
@@ -583,21 +582,15 @@ mod integration_tests {
         // We need to sleep to let the background task fetch the data.
         sleep(Duration::from_secs(1)).await;
 
-        let event = Event::new_empty_log();
-        tx.send(event).await.unwrap();
+        let log = LogEvent::default();
+        let mut expected = log.clone();
+        tx.send(log.into()).await.unwrap();
 
         let event = stream.next().await.unwrap();
-        let log = event.as_log();
 
-        assert_eq!(log.get("availability-zone"), None);
-        assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
-        assert_eq!(log.get("public-hostname"), None);
-        assert_eq!(log.get("local-ipv4"), None);
-        assert_eq!(log.get("local-hostname"), None);
-        assert_eq!(log.get("instance-id"), None,);
-        assert_eq!(log.get("instance-type"), None,);
-        assert_eq!(log.get("ami-id"), None);
-        assert_eq!(log.get("region"), Some(&"us-east-1".into()));
+        expected.insert("public-ipv4", "192.1.1.1");
+        expected.insert("region", "us-east-1");
+        assert_eq!(event.into_log(), expected);
     }
 
     #[tokio::test]
@@ -620,19 +613,14 @@ mod integration_tests {
             // We need to sleep to let the background task fetch the data.
             sleep(Duration::from_secs(1)).await;
 
-            let event = Event::new_empty_log();
-            tx.send(event).await.unwrap();
+            let log = LogEvent::default();
+            tx.send(log.into()).await.unwrap();
 
             let event = stream.next().await.unwrap();
-            let log = event.as_log();
 
             assert_eq!(
-                log.get("ec2.metadata.availability-zone"),
+                event.as_log().get("ec2.metadata.availability-zone"),
                 Some(&"ww-region-1a".into())
-            );
-            assert_eq!(
-                log.get("ec2.metadata.public-ipv4"),
-                Some(&"192.1.1.1".into())
             );
         }
 
@@ -655,14 +643,15 @@ mod integration_tests {
             // We need to sleep to let the background task fetch the data.
             sleep(Duration::from_secs(1)).await;
 
-            let event = Event::new_empty_log();
-            tx.send(event).await.unwrap();
+            let log = LogEvent::default();
+            tx.send(log.into()).await.unwrap();
 
             let event = stream.next().await.unwrap();
-            let log = event.as_log();
 
-            assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
-            assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
+            assert_eq!(
+                event.as_log().get("availability-zone"),
+                Some(&"ww-region-1a".into())
+            );
         }
     }
 }

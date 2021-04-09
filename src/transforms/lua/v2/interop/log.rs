@@ -4,7 +4,9 @@ use rlua::prelude::*;
 
 impl<'a> ToLua<'a> for LogEvent {
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
-        ctx.create_table_from(self.into_iter().map(|(k, v)| (k, v)))
+        let (fields, _metadata) = self.into_parts();
+        // The metadata is handled when converting the enclosing `Event`.
+        ctx.create_table_from(fields.into_iter().map(|(k, v)| (k, v)))
             .map(LuaValue::Table)
     }
 }

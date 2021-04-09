@@ -28,12 +28,14 @@ use std::{
 use tracing::{error, info};
 use vector::{
     buffers::Acker,
-    config::{DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig},
+    config::{
+        DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext,
+        TransformConfig,
+    },
     event::{
         metric::{self, MetricValue},
         Value,
     },
-    shutdown::ShutdownSignal,
     sinks::{util::StreamSink, Healthcheck, VectorSink},
     sources::Source,
     test_util::{temp_dir, temp_file},
@@ -141,18 +143,13 @@ impl MockSourceConfig {
 #[async_trait]
 #[typetag::serde(name = "mock")]
 impl SourceConfig for MockSourceConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> Result<Source, vector::Error> {
+    async fn build(&self, cx: SourceContext) -> Result<Source, vector::Error> {
         let wrapped = self.receiver.clone();
         let event_counter = self.event_counter.clone();
         let mut recv = wrapped.lock().unwrap().take().unwrap();
-        let mut shutdown = Some(shutdown);
+        let mut shutdown = Some(cx.shutdown);
         let mut _token = None;
+        let out = cx.out;
         Ok(Box::pin(async move {
             stream::poll_fn(move |cx| {
                 if let Some(until) = shutdown.as_mut() {

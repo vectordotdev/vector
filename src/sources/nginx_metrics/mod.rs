@@ -1,14 +1,13 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     http::{Auth, HttpClient},
     internal_events::{
         NginxMetricsCollectCompleted, NginxMetricsEventsReceived, NginxMetricsRequestError,
         NginxMetricsStubStatusParseError,
     },
-    shutdown::ShutdownSignal,
     tls::{TlsOptions, TlsSettings},
-    Event, Pipeline,
+    Event,
 };
 use bytes::Bytes;
 use chrono::Utc;
@@ -81,13 +80,7 @@ impl_generate_config_from_default!(NginxMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "nginx_metrics")]
 impl SourceConfig for NginxMetricsConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let tls = TlsSettings::from_options(&self.tls)?;
         let http_client = HttpClient::new(tls)?;
 
@@ -102,10 +95,12 @@ impl SourceConfig for NginxMetricsConfig {
             )?);
         }
 
-        let mut out =
-            out.sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
+        let mut out = cx
+            .out
+            .sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
+        let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
             let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
             while interval.next().await.is_some() {
@@ -267,12 +262,7 @@ mod integration_tests {
                 tls: None,
                 auth,
             }
-            .build(
-                "default",
-                &GlobalOptions::default(),
-                ShutdownSignal::noop(),
-                sender,
-            )
+            .build(SourceContext::new_test(sender))
             .await
             .unwrap()
             .await
