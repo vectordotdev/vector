@@ -18,6 +18,7 @@ use serde::{de, Deserialize, Serialize};
 use serde_json::{de::IoRead, json, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use std::{
+    collections::HashMap,
     future,
     io::Read,
     net::{Ipv4Addr, SocketAddr},
@@ -150,10 +151,20 @@ impl SplunkSource {
     }
 
     fn event_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
+        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
+        let splunk_channel_query_param =
+            warp::query::<HashMap<String, String>>().map(|qs: HashMap<String, String>| {
+                match qs.get("channel") {
+                    Some(v) => Some(v.to_owned()),
+                    None => None,
+                }
+            });
+        let splunk_channel = splunk_channel_header.or(splunk_channel_query_param).unify();
+
         warp::post()
             .and(path!("event").or(path!("event" / "1.0")))
             .and(self.authorization())
-            .and(warp::header::optional::<String>("x-splunk-request-channel"))
+            .and(splunk_channel)
             .and(warp::header::optional::<String>("host"))
             .and(self.gzip())
             .and(warp::body::bytes())
@@ -172,20 +183,29 @@ impl SplunkSource {
     }
 
     fn raw_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
+        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
+        let splunk_channel_query_param =
+            warp::query::<HashMap<String, String>>().map(|qs: HashMap<String, String>| {
+                match qs.get("channel") {
+                    Some(v) => Some(v.to_owned()),
+                    None => None,
+                }
+            });
+        let splunk_channel = splunk_channel_header
+            .or(splunk_channel_query_param)
+            .unify()
+            .and_then(|channel: Option<String>| async {
+                if let Some(channel) = channel {
+                    Ok(channel)
+                } else {
+                    Err(Rejection::from(ApiError::MissingChannel))
+                }
+            });
+
         warp::post()
             .and(path!("raw" / "1.0").or(path!("raw")))
             .and(self.authorization())
-            .and(
-                warp::header::optional::<String>("x-splunk-request-channel").and_then(
-                    |channel: Option<String>| async {
-                        if let Some(channel) = channel {
-                            Ok(channel)
-                        } else {
-                            Err(Rejection::from(ApiError::MissingChannel))
-                        }
-                    },
-                ),
-            )
+            .and(splunk_channel)
             .and(warp::header::optional::<String>("host"))
             .and(self.gzip())
             .and(warp::body::bytes())
