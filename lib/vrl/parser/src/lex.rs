@@ -526,11 +526,7 @@ impl<'input> Iterator for Lexer<'input> {
                     's' if self.test_peek(|ch| ch == '\'') => Some(self.raw_string_literal(start)),
                     't' if self.test_peek(|ch| ch == '\'') => Some(self.timestamp_literal(start)),
 
-                    ch if is_ident_start(ch)
-                        || (is_digit(ch) && self.before(start) == Some('.')) =>
-                    {
-                        Some(Ok(self.identifier_or_function_call(start)))
-                    }
+                    ch if is_ident_start(ch) => Some(Ok(self.identifier_or_function_call(start))),
                     ch if is_digit(ch) || (ch == '-' && self.test_peek(is_digit)) => {
                         Some(self.numeric_literal(start))
                     }
@@ -912,7 +908,16 @@ impl<'input> Lexer<'input> {
     fn numeric_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
         let (end, int) = self.take_while(start, |ch| is_digit(ch) || ch == '_');
 
+        let negative = self.input.get(start..start + 1) == Some("-");
         match self.peek() {
+            Some((_, ch)) if is_ident_continue(ch) && !negative => {
+                self.bump();
+                let (end, ident) = self.take_while(start, is_ident_continue);
+                Ok((start, Token::ident(ident), end))
+            }
+            _ if !negative && self.is_before('.', start) => {
+                Ok((start, Token::ident(&self.input[start..end]), end))
+            }
             Some((_, '.')) => {
                 self.bump();
                 let (end, float) = self.take_while(start, |ch| is_digit(ch) || ch == '_');
@@ -1064,13 +1069,13 @@ impl<'input> Lexer<'input> {
         self.peek().as_ref().map_or(self.input.len(), |l| l.0)
     }
 
-    fn before(&self, from: usize) -> Option<char> {
-        (0..from)
-            .into_iter()
-            .rev()
-            .filter_map(|i| self.input.get(i..from))
-            .next()
-            .and_then(|s| s.chars().next())
+    fn is_before(&self, is: char, before: usize) -> bool {
+        let len = is.len_utf8();
+        if let Some(start) = before.checked_sub(len) {
+            self.input.get(start..before).and_then(|s| s.chars().next()) == Some(is)
+        } else {
+            false
+        }
     }
 
     fn escape_code(&mut self, start: usize) -> Result<char, Error> {
