@@ -21,8 +21,8 @@ impl Function for ToRegex {
         &[
             Example {
                 title: "regex",
-                source: "to_regex(s'foo')",
-                result: Ok(r"foo"),
+                source: "to_regex(s'^foobar$')",
+                result: Ok(r'^foobar$'),
             }
         ]
     }
@@ -42,12 +42,11 @@ impl Expression for ToRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         use Value::*;
 
-        let value = match self.value.resolve(ctx)? {
-            v @ Bytes(_) => Value::Regex::new(v).unwrap(),
-            v => return Err(format!(r#"unable to coerce {} into "regex""#, v.kind()).into()),
-        };
+        let value = self.value.resolve(ctx)?.try_bytes()?;
+        let regex = Regex::new(value).map_err(|err| format!("could not create regex: {}",err))?;
+        Value::Regex(regex);
 
-        Ok(value)
+        Ok(regex)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -56,7 +55,7 @@ impl Expression for ToRegexFn {
             .fallible_unless(
                 Kind::Bytes
             )
-            .bytes()
+            .regex()
     }
 }
 
