@@ -67,7 +67,7 @@ mod tests {
     test_function![
         to_regex => ToRegex;
 
-        integer {
+        plaintext {
             args: func_args![value: "foo"],
             want: Ok(Regex::new("foo").unwrap()),
             tdef: Regex::new("foo").unwrap(),
