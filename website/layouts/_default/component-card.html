@@ -4,17 +4,17 @@
 {{ $desc := .Params.description }}
 
 <a href="{{ .RelPermalink }}">
-  <div class="component-card is-hoverable">
-    <header class="component-card-header">
-      {{ .Title }} {{ .Params.kind }}
-    </header>
-
-    {{ with $desc }}
-    <div class="component-card-content">
-      <p>
-        {{ . | markdownify | plainify }}
+  <div class="card is-hoverable is-fullheight">
+    <div class="card-content">
+      <p class="title is-size-5 is-size-6-mobile">
+        {{ .Title }}
       </p>
+
+      {{ with $desc }}
+      <div class="mt-2 content is-small has-text-grey">
+        {{ . | markdownify | plainify }}
+      </div>
+      {{ end }}
     </div>
-    {{ end }}
   </div>
 </a>

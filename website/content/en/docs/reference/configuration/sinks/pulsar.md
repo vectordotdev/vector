@@ -1,6 +1,5 @@
 ---
 title: Apache Pulsar
-short: Pulsar
 kind: sink
 layout: component
 ---

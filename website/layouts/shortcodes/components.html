@@ -1,10 +1,12 @@
 {{ $kind := .Get 0 }}
 {{ $componentsOfType := where site.RegularPages ".Params.kind" $kind }}
 
-<div class="columns is-multiline">
-  {{ range $componentsOfType }}
-  <div class="column is-one-quarter">
-    {{ .Render "component-card" }}
+<div class="mt-3">
+  <div class="columns is-multiline is-variable is-2">
+    {{ range $componentsOfType }}
+    <div class="column is-one-quarter">
+      {{ .Render "component-card" }}
+    </div>
+    {{ end }}
   </div>
-  {{ end }}
 </div>

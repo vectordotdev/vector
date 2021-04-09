@@ -82,6 +82,9 @@ hr.narrow
     font-size: 1rem
     font-weight: $weight-semibold
 
+.has-text-small
+  font-size: 0.8rem
+
 // Some spacing helpers for inserting SVGs into documentation text
 .svg
   margin-bottom: 2rem
@@ -101,8 +104,17 @@ sup.ml-tiny
 
 // Basic hover effect for cards
 .card.is-hoverable
+  .title
+    color: $primary
+
   &:hover
     background-color: $white-bis
+
+    .title
+      color: $secondary
+
+.card.is-fullheight
+  height: 100%
 
 .is-horizontally-spaced
   display: flex
@@ -159,9 +171,9 @@ sup.ml-tiny
       border-top: 1px solid $grey-lighter
 
 .component-card
-  background-color: $black
-  padding: 1rem 1.25rem
+  padding: 0.75rem 1rem
   height: 100%
+  box-shadow: $card-shadow
 
   p
     color: $light
@@ -171,19 +183,20 @@ sup.ml-tiny
 
     .component-card-header
       color: $vector-light-blue
+      font-weight: $weight-semibold
 
     p
       color: $white-bis
 
   .component-card-header
     font-size: 1.25rem
-    line-height: 130%
+    line-height: 125%
 
     & + .component-card-content
       margin-top: 0.75rem
 
-  .component-card-content
-    color: $grey
+  .component-card-content p
+    color: $black
 
 .jump
   background-color: $white-bis
