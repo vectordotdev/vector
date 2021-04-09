@@ -4,7 +4,7 @@
 
 {{ $default := .Params.default | urlize }}
 <div x-data="{ selected: '{{ $default }}' }">
-  <div class="tabs is-centered is-fullwidths">
+  <div class="tabs is-left is-fullwidth">
   <ul>
 {{ .Inner }}
 </ul>
