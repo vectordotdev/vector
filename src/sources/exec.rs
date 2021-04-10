@@ -1,5 +1,5 @@
 use crate::async_read::VecAsyncReadExt;
-use crate::config::{DataType, GlobalOptions};
+use crate::config::{DataType, SourceContext};
 use crate::event::LogEvent;
 use crate::internal_events::{ExecCommandExecuted, ExecTimeout};
 use crate::{
@@ -224,19 +224,19 @@ impl ExecConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "exec")]
 impl SourceConfig for ExecConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.validate()?;
         let hostname = get_hostname();
         match self.mode.clone() {
             Mode::Scheduled => {
                 let exec_interval_secs = self.exec_interval_secs_or_default();
-                run_scheduled(self.clone(), hostname, exec_interval_secs, shutdown, out)
+                run_scheduled(
+                    self.clone(),
+                    hostname,
+                    exec_interval_secs,
+                    cx.shutdown,
+                    cx.out,
+                )
             }
             Mode::Streaming => {
                 let respawn_on_exit = self.respawn_on_exit_or_default();
@@ -246,8 +246,8 @@ impl SourceConfig for ExecConfig {
                     hostname,
                     respawn_on_exit,
                     respawn_interval_secs,
-                    shutdown,
-                    out,
+                    cx.shutdown,
+                    cx.out,
                 )
             }
         }
