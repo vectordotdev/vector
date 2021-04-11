@@ -855,16 +855,37 @@ mod tests {
         events
     }
 
-    async fn post(address: SocketAddr, api: &str, message: &str) -> u16 {
-        send_with(address, api, message, TOKEN).await
+    #[derive(Clone, Copy, Debug)]
+    enum Channel<'a> {
+        Header(&'a str),
+        QueryParam(&'a str),
     }
 
-    async fn send_with(address: SocketAddr, api: &str, message: &str, token: &str) -> u16 {
-        reqwest::Client::new()
+    async fn post(address: SocketAddr, api: &str, message: &str) -> u16 {
+        send_with(address, api, message, TOKEN, Channel::Header("channel")).await
+    }
+
+    async fn send_with(
+        address: SocketAddr,
+        api: &str,
+        message: &str,
+        token: &str,
+        channel: Channel,
+    ) -> u16 {
+        let wrap_with_channel =
+            |c: Channel, b: reqwest::RequestBuilder| -> reqwest::RequestBuilder {
+                match c {
+                    Channel::Header(v) => b.header("x-splunk-request-channel", v),
+                    Channel::QueryParam(v) => b.query(&["channel", v]),
+                }
+            };
+
+        let b = reqwest::Client::new()
             .post(&format!("http://{}/{}", address, api))
             .header("Authorization", format!("Splunk {}", token))
-            .header("x-splunk-request-channel", "guid")
-            .body(message.to_owned())
+            .header("x-splunk-request-channel", "guid");
+        b = wrap_with_channel(Channel, b);
+        b.body(message.to_owned())
             .send()
             .await
             .unwrap()
@@ -1022,6 +1043,52 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn channel_header() {
+        trace_init();
+
+        let message = "raw";
+        let (source, address) = source().await;
+
+        assert_eq!(
+            200,
+            send_with(
+                address,
+                "services/collector/raw",
+                message,
+                TOKEN,
+                Channel::Header("guid")
+            )
+            .await
+        );
+
+        let event = collect_n(source, 1).await.remove(0);
+        assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
+    }
+
+    #[tokio::test]
+    async fn channel_query_param() {
+        trace_init();
+
+        let message = "raw";
+        let (source, address) = source().await;
+
+        assert_eq!(
+            200,
+            send_with(
+                address,
+                "services/collector/raw",
+                message,
+                TOKEN,
+                Channel::QueryParam("guid")
+            )
+            .await
+        );
+
+        let event = collect_n(source, 1).await.remove(0);
+        assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
+    }
+
+    #[tokio::test]
     async fn no_data() {
         trace_init();
 
@@ -1038,7 +1105,14 @@ mod tests {
 
         assert_eq!(
             401,
-            send_with(address, "services/collector/event", "", "nope").await
+            send_with(
+                address,
+                "services/collector/event",
+                "",
+                "nope",
+                Channel::Header("channel")
+            )
+            .await
         );
     }
 
