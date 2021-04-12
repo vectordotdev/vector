@@ -11,7 +11,7 @@ remap: functions: to_regex: {
 			name:        "value"
 			description: "The value to convert to a regex."
 			required:    true
-			type:        "string"
+			type:        ["string"]
 		},
 	]
 	internal_failure_reasons: [
