@@ -864,7 +864,7 @@ mod tests {
         channel: Channel<'_>,
     ) -> u16 {
         let wrap_with_channel =
-            |c: Channel, b: reqwest::RequestBuilder| -> reqwest::RequestBuilder {
+            |b: reqwest::RequestBuilder, c: Channel| -> reqwest::RequestBuilder {
                 match c {
                     Channel::Header(v) => b.header("x-splunk-request-channel", v),
                     Channel::QueryParam(v) => b.query(&[("channel", v)]),
@@ -874,7 +874,7 @@ mod tests {
         let mut b = reqwest::Client::new()
             .post(&format!("http://{}/{}", address, api))
             .header("Authorization", format!("Splunk {}", token));
-        b = wrap_with_channel(channel, b);
+        b = wrap_with_channel(b, channel);
         b.body(message.to_owned())
             .send()
             .await
