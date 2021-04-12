@@ -9,9 +9,9 @@ remap: functions: to_regex: {
 
 	arguments: [
 		{
-			name: "value"
+			name:        "value"
 			description: "The value to convert to a regex."
-			required: true
+			required:    true
 			type: ["string"]
 		},
 	]
@@ -21,7 +21,7 @@ remap: functions: to_regex: {
 	return: {
 		types: ["regex"]
 		rules: [
-			#"If `value` is string, returns the regex constructed with this string."#,
+			#"If `value` is string that contains a valid regex, returns the regex constructed with this string."#,
 		]
 	}
 
