@@ -1,0 +1,13 @@
+# result:
+#
+# error[E202]: syntax error
+#   ┌─ :1:1
+#   │
+# 1 │ ╭
+# 2 │ │ . = parse_regex!(.message, r'(?P<syslog_pri><\d+>)(?P<syslog_seqnum>\d+)(?:\W+)(?P<syslog_host>\w+-\w+-\w+)(?:\W+)(?P<syslog_datetime>.*?)(?:\W+)(?P<message_type>\.*?)(?:\W+)(?P<syslog_message>.*))
+# 3 │ │
+#   │ ╰^ unexpected error: invalid literal
+#   │
+#   = see language documentation at https://vrl.dev
+
+. = parse_regex!(.message, r'(?P<syslog_pri><\d+>)(?P<syslog_seqnum>\d+)(?:\W+)(?P<syslog_host>\w+-\w+-\w+)(?:\W+)(?P<syslog_datetime>.*?)(?:\W+)(?P<message_type>\.*?)(?:\W+)(?P<syslog_message>.*))
