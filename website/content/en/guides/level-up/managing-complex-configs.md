@@ -2,7 +2,8 @@
 title: Building & Managing Complex Configs
 description: Strategies for building and managing complex Vector configs
 author_github: Jeffail
-tags: ["type: guide", "domain: config"]
+domain: config
+weight: 3
 ---
 
 * You understand the [basic Vector concepts][docs.about.concepts]

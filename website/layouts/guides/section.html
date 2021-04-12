@@ -4,8 +4,7 @@
 
 {{ define "main" }}
 {{ $desc := .Params.description }}
-
-<section class="section m-6">
+<section class="section mt-6">
   <div class="container">
     <div class="columns is-variable is-8">
       <div class="column is-one-third">
@@ -21,16 +20,27 @@
       <div class="column">
         <div class="container">
           {{ range .Sections }}
-          <p class="title mb-6">
+          {{ $desc := .Params.description }}
+          <p class="title is-size-3 is-size-4-mobile has-text-weight-light{{ if $desc }} is-spaced{{ end }}">
             {{ .Title }}
           </p>
 
+          {{ with $desc }}
+          <p class="subtitle has-text-grey">
+            {{ . }}
+          </p>
+          {{ end }}
+
           {{ with .RegularPages }}
-          <div class="columns">
+         <div class="mt-4">
+          <div class="columns is-multiline">
             {{ range . }}
-            {{ .Render "guide-card" }}
+            <div class="column is-half">
+              {{ .Render "guide-card" }}
+            </div>
             {{ end }}
           </div>
+         </div>
           {{ end }}
           {{ end }}
         </div>

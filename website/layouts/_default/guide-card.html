@@ -1,14 +1,12 @@
-<div class="column is-half">
-  <div class="card is-hoverable">
-    <div class="card-header">
-      <a class="card-header-title is-space-between" href="{{ .RelPermalink }}">
-        <span class="text">
-          {{ .Title }}
-        </span>
-      </a>
-    </div>
-    <div class="card-content">
-      {{ .Params.description | markdownify }}
-    </div>
+<div class="card is-hoverable">
+  <div class="card-header">
+    <a class="card-header-title is-space-between" href="{{ .RelPermalink }}">
+      <span class="text">
+        {{ with .Weight }}{{ . }}. {{ end }}{{ .Title }}
+      </span>
+    </a>
+  </div>
+  <div class="card-content">
+    {{ .Params.description | markdownify }}
   </div>
 </div>

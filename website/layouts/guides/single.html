@@ -10,7 +10,7 @@
     <div class="columns is-variable is-8">
       <div class="column is-one-third">
         <p class="title is-size-2 is-size-3-mobile has-text-weight-light{{ if $desc }} is-spaced{{ end }}">
-          {{ .Title }}
+          {{ with .Weight }}{{ . }}. {{ end }}{{ .Title }}
         </p>
 
         {{ with $desc }}

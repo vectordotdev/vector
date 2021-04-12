@@ -152,9 +152,6 @@ sup.ml-tiny
     border-radius: 5px
     color: $vector-light-blue
 
-  a
-    color: $vector-light-blue
-
   .requirement
     padding: 0.75rem 1rem
     display: flex
@@ -206,6 +203,14 @@ sup.ml-tiny
   padding: 0.5rem 0.75rem
   border-radius: 5px
 
+  a
+    display: flex
+    flex-direction: row
+    justify-content: space-between
+    color: red
+
+  &:hover
+    background-color: $light
 
   & + .jump, & + p
     margin-top: 0.75rem
@@ -221,23 +226,6 @@ sup.ml-tiny
 
   .icon
     color: $red
-
-  &:hover
-    transition: background-color 0.5s ease-in-out
-    background-color: $black
-
-    .link
-      color: $white
-
-      .icon
-        transition: all 0.5s ease-in-out
-        color: $purple
-
-    .right-icon
-      color: $purple
-      transition: all 0.25s ease-in-out
-      padding-left: 0.75rem
-      font-size: 1.25rem
 
 .rotate-90
   transform: rotate(90deg)
