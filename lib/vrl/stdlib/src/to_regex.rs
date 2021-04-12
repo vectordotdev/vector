@@ -12,7 +12,7 @@ impl Function for ToRegex {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kind: kind::bytes,
+            kind: kind::BYTES,
             required: true,
         }]
     }
@@ -22,7 +22,7 @@ impl Function for ToRegex {
             Example {
                 title: "regex",
                 source: "to_regex(s'^foobar$')",
-                result: Ok(r'^foobar$'),
+                result: Ok("r'^foobar$'"),
             }
         ]
     }
@@ -41,7 +41,7 @@ struct ToRegexFn {
 impl Expression for ToRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?.try_bytes()?;
-        let regex = regex::Regex::new(value).map_err(|err| format!("could not create regex: {}",err))?.map(Into:into)
+        let regex = regex::Regex::new(value).map_err(|err| format!("could not create regex: {}",err))?.map(Into::into);
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -62,9 +62,9 @@ mod tests {
         to_regex => ToRegex;
 
         plaintext {
-            args: func_args![value: "foo"],
-            want: Ok(Regex::new("foo").unwrap()),
-            tdef: Regex::new("foo").unwrap(),
+            args: func_args![value: "^foobar$"],
+            want: Ok(Regex::new("^foobar$").unwrap()),
+            tdef: TypeDef::new().regex(),
         }
     ];
 }
