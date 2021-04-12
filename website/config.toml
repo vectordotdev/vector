@@ -20,6 +20,7 @@ contentDir = "content/en"
 weight = 1
 
 [params]
+vector_version = "0.12.2"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
 tagline = "Take control of your observability stack"
 undertagline = "Collect, transform, and route all observability data with one simple tool"
