@@ -40,16 +40,16 @@ struct ToRegexFn {
 
 impl Expression for ToRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let value = self.value.resolve(ctx)?.try_bytes()?;
-        let regex = regex::Regex::new(value).map_err(|err| format!("could not create regex: {}",err))?.map(Into::into);
+        let value = self.value.resolve(ctx)?;
+        let string = value.try_bytes_utf8_lossy()?;
+        let regex = regex::Regex::new(string.as_ref()).map_err(|err| format!("could not create regex: {}",err)).map(Into::into)?;
+        Ok(regex)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(
-                Kind::Bytes
-            )
+            .fallible()
             .regex()
     }
 }
