@@ -23,7 +23,7 @@ releases: "0.12.0": {
 		{
 			title: "Improved Vector to Vector communication"
 			description: """
-				The `vector` source and sink currently leverage the TCP protocol to transmit data. While this has
+				The `vector` source and sink currently use the TCP protocol to transmit data. While this has
 				served users well, it presents operational challenges for large-scale deployments of Vector. Because
 				HTTP is widely used and easy to integrate into platforms like Kubernetes we will be moving these
 				components to the HTTP protocol.

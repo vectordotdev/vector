@@ -1,5 +1,5 @@
 $scroll-adjust-margin: 1rem
-$scroll-adjust: $navbar-height + $scroll-adjust-margin
+$scroll-adjust: $navbar-height + scroll-adjust-margin
 
 // Allow the element to be scrollable
 .is-scrollable
@@ -10,7 +10,7 @@ h1::before, h2::before, h3::before, h4::before, h5::before, h6::before
     display: block
     content: " "
     height: $scroll-adjust
-    margin-top: -#{$scroll-adjust}
+    margin-top: -scroll-adjust
     visibility: hidden
 
 // Ensure a sticky footer at the bottom of each page
@@ -59,8 +59,6 @@ hr.narrow
     width: 60%
     height: auto
 
-    +mobile
-      width: 70%
 
 // Small fixes for text content CSS
 .content
@@ -173,7 +171,7 @@ sup.ml-tiny
       flex: 19
 
     & + .requirement
-      border-top: 1px solid $grey-lighter
+      border-top: 1px solid grey-lighter
 
 .component-card
   padding: 0.75rem 1rem
@@ -207,8 +205,7 @@ sup.ml-tiny
   box-shadow: $card-shadow
   padding: 0.5rem 0.75rem
   border-radius: 5px
-  a
-    +x-spaced
+
 
   & + .jump, & + p
     margin-top: 0.75rem
@@ -245,3 +242,7 @@ sup.ml-tiny
 .rotate-90
   transform: rotate(90deg)
   transition-duration: 0.2s
+
+.color-panel
+  padding: 1rem 1.25rem
+  font-size: 1.25rem
