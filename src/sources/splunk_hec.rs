@@ -151,15 +151,24 @@ impl SplunkSource {
     }
 
     fn event_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
-        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
+        let splunk_channel_header = warp::header::<String>("x-splunk-request-channel");
         let splunk_channel_query_param =
             warp::query::<HashMap<String, String>>().map(|qs: HashMap<String, String>| {
                 match qs.get("channel") {
-                    Some(v) => Some(v.to_owned()),
-                    None => None,
+                    Some(v) => v.to_owned(),
+                    None => format!(""),
                 }
             });
-        let splunk_channel = splunk_channel_header.or(splunk_channel_query_param).unify();
+        let splunk_channel = splunk_channel_header
+            .or(splunk_channel_query_param)
+            .unify()
+            .map(|channel: String| {
+                if !channel.is_empty() {
+                    Some(channel)
+                } else {
+                    None
+                }
+            });
 
         warp::post()
             .and(path!("event").or(path!("event" / "1.0")))
@@ -183,19 +192,19 @@ impl SplunkSource {
     }
 
     fn raw_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
-        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
+        let splunk_channel_header = warp::header::<String>("x-splunk-request-channel");
         let splunk_channel_query_param =
             warp::query::<HashMap<String, String>>().map(|qs: HashMap<String, String>| {
                 match qs.get("channel") {
-                    Some(v) => Some(v.to_owned()),
-                    None => None,
+                    Some(v) => v.to_owned(),
+                    None => format!(""),
                 }
             });
         let splunk_channel = splunk_channel_header
             .or(splunk_channel_query_param)
             .unify()
-            .and_then(|channel: Option<String>| async {
-                if let Some(channel) = channel {
+            .and_then(|channel: String| async {
+                if !channel.is_empty() {
                     Ok(channel)
                 } else {
                     Err(Rejection::from(ApiError::MissingChannel))
@@ -876,7 +885,7 @@ mod tests {
             |c: Channel, b: reqwest::RequestBuilder| -> reqwest::RequestBuilder {
                 match c {
                     Channel::Header(v) => b.header("x-splunk-request-channel", v),
-                    Channel::QueryParam(v) => b.query(&["channel", v]),
+                    Channel::QueryParam(v) => b.query(&[("channel", v)]),
                 }
             };
 
