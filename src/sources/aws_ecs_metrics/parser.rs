@@ -488,7 +488,7 @@ mod test {
     use super::parse;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::{offset::TimeZone, DateTime, Utc};
-    use pretty_assertions::assert_eq;
+    use shared::assert_event_data_eq;
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -532,7 +532,7 @@ mod test {
             }
         }"##;
 
-        assert_eq!(
+        assert_event_data_eq!(
             parse(json.as_bytes(), Some(namespace())).unwrap(),
             vec![
                 Metric::new(
@@ -610,7 +610,7 @@ mod test {
             }
         }"##;
 
-        assert_eq!(
+        assert_event_data_eq!(
             parse(json.as_bytes(), Some(namespace())).unwrap(),
             vec![
                 Metric::new(
@@ -859,7 +859,7 @@ mod test {
 
         let metrics = parse(json.as_bytes(), Some(namespace())).unwrap();
 
-        assert_eq!(
+        assert_event_data_eq!(
             metrics
                 .iter()
                 .find(|m| m.name() == "memory_used_bytes")
@@ -884,7 +884,7 @@ mod test {
             .with_timestamp(Some(ts())),
         );
 
-        assert_eq!(
+        assert_event_data_eq!(
             metrics
                 .iter()
                 .find(|m| m.name() == "memory_max_used_bytes")
@@ -909,7 +909,7 @@ mod test {
             .with_timestamp(Some(ts())),
         );
 
-        assert_eq!(
+        assert_event_data_eq!(
             metrics
                 .iter()
                 .find(|m| m.name() == "memory_active_anonymous_bytes")
@@ -934,7 +934,7 @@ mod test {
             .with_timestamp(Some(ts())),
         );
 
-        assert_eq!(
+        assert_event_data_eq!(
             metrics
                 .iter()
                 .find(|m| m.name() == "memory_total_page_faults_total")
@@ -985,7 +985,7 @@ mod test {
 
         let metrics = parse(json.as_bytes(), Some(namespace())).unwrap();
 
-        assert_eq!(
+        assert_event_data_eq!(
             metrics
                 .iter()
                 .find(|m| m.name() == "network_receive_bytes_total")
@@ -1011,7 +1011,7 @@ mod test {
             .with_timestamp(Some(ts())),
         );
 
-        assert_eq!(
+        assert_event_data_eq!(
             metrics
                 .iter()
                 .find(|m| m.name() == "network_transmit_bytes_total")

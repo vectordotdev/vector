@@ -100,12 +100,8 @@ impl FunctionTransform for AddTags {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        event::metric::{Metric, MetricKind, MetricValue},
-        event::Event,
-    };
-    use indexmap::IndexMap;
-    use std::collections::BTreeMap;
+    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use shared::btreemap;
 
     #[test]
     fn generate_config() {
@@ -114,13 +110,17 @@ mod tests {
 
     #[test]
     fn add_tags() {
-        let event = Event::Metric(Metric::new(
+        let metric = Metric::new(
             "bar",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 10.0 },
-        ));
+        );
+        let expected = metric.clone().with_tags(Some(btreemap! {
+            "region" => "us-east-1",
+            "host" => "localhost",
+        }));
 
-        let map: IndexMap<String, String> = vec![
+        let map = vec![
             ("region".into(), "us-east-1".into()),
             ("host".into(), "localhost".into()),
         ]
@@ -128,36 +128,29 @@ mod tests {
         .collect();
 
         let mut transform = AddTags::new(map, true);
-        let metric = transform.transform_one(event).unwrap().into_metric();
-        let tags = metric.tags().unwrap();
+        let event = transform.transform_one(metric.into()).unwrap();
 
-        assert_eq!(tags.len(), 2);
-        assert_eq!(tags.get("region"), Some(&"us-east-1".to_owned()));
-        assert_eq!(tags.get("host"), Some(&"localhost".to_owned()));
+        assert_eq!(event, expected.into());
     }
 
     #[test]
     fn add_tags_override() {
-        let mut tags = BTreeMap::new();
-        tags.insert("region".to_string(), "us-east-1".to_string());
-        let event = Event::Metric(
-            Metric::new(
-                "bar",
-                MetricKind::Absolute,
-                MetricValue::Gauge { value: 10.0 },
-            )
-            .with_tags(Some(tags)),
-        );
+        let metric = Metric::new(
+            "bar",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 10.0 },
+        )
+        .with_tags(Some(btreemap! {"region" => "us-east-1"}));
+        let expected = metric.clone();
 
-        let map: IndexMap<String, String> = vec![("region".to_string(), "overridden".to_string())]
+        let map = vec![("region".to_string(), "overridden".to_string())]
             .into_iter()
             .collect();
 
         let mut transform = AddTags::new(map, false);
 
-        let metric = transform.transform_one(event).unwrap().into_metric();
-        let tags = metric.tags().unwrap();
+        let event = transform.transform_one(metric.into()).unwrap();
 
-        assert_eq!(tags.get("region"), Some(&"us-east-1".to_owned()));
+        assert_eq!(event, expected.into());
     }
 }

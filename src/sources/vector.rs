@@ -127,6 +127,7 @@ mod test {
         Event, Pipeline,
     };
     use futures::stream;
+    use shared::assert_event_data_eq;
     use std::net::SocketAddr;
     use tokio::{
         io::AsyncWriteExt,
@@ -179,7 +180,7 @@ mod test {
         sleep(Duration::from_millis(50)).await;
 
         let output = collect_ready(rx).await;
-        assert_eq!(events, output);
+        assert_event_data_eq!(events, output);
     }
 
     #[tokio::test]
@@ -297,6 +298,6 @@ mod test {
         shutdown_down.await;
 
         let output = collect_ready(rx).await;
-        assert_eq!(vec![Event::from(event)], output);
+        assert_event_data_eq!([Event::from(event)][..], output.as_slice());
     }
 }

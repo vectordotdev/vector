@@ -80,8 +80,35 @@ impl FunctionTransform for FieldFilter {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use crate::Event;
+
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::FieldFilterConfig>();
+    }
+
+    fn transform_it(msg: &str) -> Option<Event> {
+        let mut transform = FieldFilter {
+            field_name: "message".into(),
+            value: "something".into(),
+        };
+        let event = Event::from(msg);
+        let metadata = event.metadata().clone();
+        let result = transform.transform_one(event);
+        if let Some(event) = &result {
+            assert_eq!(event.metadata(), &metadata);
+        }
+        result
+    }
+
+    #[test]
+    fn passes_matching() {
+        assert!(transform_it("something").is_some());
+    }
+
+    #[test]
+    fn drops_not_matching() {
+        assert!(transform_it("nothing").is_none());
     }
 }
