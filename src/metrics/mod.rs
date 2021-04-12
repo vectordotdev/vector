@@ -1,9 +1,11 @@
+mod handle;
 mod label_filter;
 mod recorder;
 mod registry;
 #[cfg(test)]
 mod tests;
 
+pub use crate::metrics::handle::{Counter, Handle};
 use crate::metrics::label_filter::VectorLabelFilter;
 use crate::metrics::recorder::VectorRecorder;
 use crate::metrics::registry::VectorRegistry;
@@ -11,9 +13,8 @@ use crate::{event::Metric, Event};
 use metrics::{Key, KeyData, SharedString};
 use metrics_tracing_context::TracingContextLayer;
 use metrics_util::layers::Layer;
-use metrics_util::{CompositeKey, Handle, MetricKind};
+use metrics_util::{CompositeKey, MetricKind};
 use once_cell::sync::OnceCell;
-use std::sync::{atomic::AtomicU64, Arc};
 
 static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 // Cardinality counter parameters, expose the internal metrics registry
@@ -52,17 +53,7 @@ pub fn init() -> crate::Result<()> {
     ////
     //// Prepare the registry
     ////
-
     let registry = VectorRegistry::default();
-    // We keep track of the total number of metrics tracked by vector, its
-    // "cardinality". This counter is an atomic so we can update it
-    // cross-thread. It is owned by the recorder.
-    let cardinality_counter = Arc::new(AtomicU64::new(1));
-    registry.op(
-        CARDINALITY_KEY.clone(),
-        |_| {},
-        || Handle::Counter(Arc::clone(&cardinality_counter)),
-    );
 
     ////
     //// Prepare the controller
@@ -86,7 +77,7 @@ pub fn init() -> crate::Result<()> {
     // The recorder is the interface between metrics-rs and our registry. In our
     // case it doesn't _do_ much other than shepherd into the registry and
     // update the cardinality counter, see above, as needed.
-    let recorder = VectorRecorder::new(registry, cardinality_counter);
+    let recorder = VectorRecorder::new(registry);
     let recorder: Box<dyn metrics::Recorder> = if tracing_context_layer_enabled() {
         // Apply a layer to capture tracing span fields as labels.
         Box::new(TracingContextLayer::new(VectorLabelFilter).layer(recorder))
@@ -116,11 +107,14 @@ pub fn get_controller() -> crate::Result<&'static Controller> {
 /// Take a snapshot of all gathered metrics and expose them as metric
 /// [`Event`]s.
 pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
-    controller
+    let mut events = controller
         .registry
         .map
         .iter()
         .map(|kv| Metric::from_metric_kv(kv.key().key(), kv.value()).into())
-        .collect::<Vec<Event>>()
-        .into_iter()
+        .collect::<Vec<Event>>();
+    let handle = Handle::Counter(Counter::with_count(events.len() as u64 + 1));
+    events.push(Metric::from_metric_kv(CARDINALITY_KEY.key(), &handle).into());
+
+    events.into_iter()
 }

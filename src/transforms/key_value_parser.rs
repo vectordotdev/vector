@@ -202,6 +202,7 @@ mod tests {
         trim_value: Option<String>,
     ) -> LogEvent {
         let event = Event::from(text);
+        let metadata = event.metadata().clone();
 
         let mut parser = KeyValueConfig {
             separator,
@@ -221,7 +222,9 @@ mod tests {
 
         let parser = parser.as_function();
 
-        parser.transform_one(event).unwrap().into_log()
+        let result = parser.transform_one(event).unwrap().into_log();
+        assert_eq!(result.metadata(), &metadata);
+        result
     }
 
     #[tokio::test]
