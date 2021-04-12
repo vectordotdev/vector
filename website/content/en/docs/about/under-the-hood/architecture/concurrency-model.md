@@ -5,7 +5,7 @@ weight: 2
 
 {{< svg "img/concurrency-model.svg" >}}
 
-{{< warning >}}
+{{< warning title="Work in progress" >}}
 Vector's concurrency model is currently a work in progress. We're expecting to complete the work in **Q2 of 2021**.
 {{< /warning >}}
 

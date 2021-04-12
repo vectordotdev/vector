@@ -1,0 +1,20 @@
+<div class="notification is-{{ .type }} is-light">
+  <article class="media">
+    <div class="media-left">
+      <span class="icon">
+        <i class="fas fa-lg fa-{{ .icon }}"></i>
+      </span>
+    </div>
+    <div class="media-content">
+      <div class="content">
+        {{ if ne .title nil }}
+        <h5 class="has-text-weight-bold">
+          {{ .title | markdownify }}
+        </h5>
+        {{ end }}
+
+        {{ .content | markdownify }}
+      </div>
+    </div>
+  </article>
+</div>

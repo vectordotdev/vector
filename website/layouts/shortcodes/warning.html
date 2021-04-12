@@ -1,3 +1,1 @@
-<div class="notification is-warning is-light mt-3">
-  {{ .Inner | markdownify }}
-</div>
+{{ partial "admonition.html" (dict "type" "warning" "icon" "exclamation" "content" .Inner "title" (.Get "title")) }}
