@@ -20,7 +20,7 @@ rollme: {{ randAlphaNum 5 | quote }}
 */}}
 {{- define "libvector.configTemplateChecksumAnnotation" -}}
 {{- if not .Values.externalConfigMap }}
-checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+checksum/config: {{ tpl (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
 {{- end }}
 {{- end }}
 

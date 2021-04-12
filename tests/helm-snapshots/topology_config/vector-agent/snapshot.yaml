@@ -72,12 +72,16 @@ data:
       option1 = "value1"
       option2 = "value2"
       type = "type1"
+      option = "value"
+      arbitrary text
     
     [sources.source2]
       optionA = "valueA"
       type = "type2"
       [sources.source2.optionB]
         suboption = "valueB"
+    [sources.source2]
+      arbitrary text 2
     
     [sources.source3]
       type = "type3"
@@ -87,6 +91,8 @@ data:
       option1 = "value1"
       option2 = "value2"
       type = "type1"
+      option = "value"
+      arbitrary text
     
     [transforms.transform2]
       inputs = ["input2", "input1"]
@@ -94,6 +100,8 @@ data:
       type = "type2"
       [transforms.transform2.optionB]
         suboption = "valueB"
+    [transforms.transform2]
+      arbitrary text 2
     
     [transforms.transform3]
       inputs = []
@@ -104,6 +112,8 @@ data:
       option1 = "value1"
       option2 = "value2"
       type = "type1"
+      option = "value"
+      arbitrary text
     
     [sinks.sink2]
       inputs = ["input2", "input1"]
@@ -111,6 +121,8 @@ data:
       type = "type2"
       [sinks.sink2.optionB]
         suboption = "valueB"
+    [sinks.sink2]
+      arbitrary text 2
     
     [sinks.sink3]
       inputs = []
@@ -174,7 +186,7 @@ spec:
     metadata:
       annotations:
         
-        checksum/config: 79f6b7f5a91c11ef2f84028d3c06c95b36190bca6cd539451afab66908c9287b
+        checksum/config: 75958f6034a2d836d57468a572df3af05ea5d4eaf4b8b5cbd6371e6ec319a696
         
       labels:
         app.kubernetes.io/name: vector-agent
