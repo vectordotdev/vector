@@ -17,13 +17,11 @@ impl Function for ToRegex {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[
-            Example {
-                title: "regex",
-                source: "to_regex(s'^foobar$')",
-                result: Ok("r'^foobar$'"),
-            }
-        ]
+        &[Example {
+            title: "regex",
+            source: "to_regex(s'^foobar$')",
+            result: Ok("r'^foobar$'"),
+        }]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
@@ -41,15 +39,14 @@ impl Expression for ToRegexFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
         let string = value.try_bytes_utf8_lossy()?;
-        let regex = regex::Regex::new(string.as_ref()).map_err(|err| format!("could not create regex: {}",err)).map(Into::into)?;
+        let regex = regex::Regex::new(string.as_ref())
+            .map_err(|err| format!("could not create regex: {}", err))
+            .map(Into::into)?;
         Ok(regex)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value
-            .type_def(state)
-            .fallible()
-            .regex()
+        self.value.type_def(state).fallible().regex()
     }
 }
 
