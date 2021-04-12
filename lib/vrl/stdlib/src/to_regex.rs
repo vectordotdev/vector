@@ -62,7 +62,7 @@ mod tests {
 
         plaintext {
             args: func_args![value: "^foobar$"],
-            want: Ok(Regex::new("^foobar$").unwrap()),
+            want: Ok(regex::Regex::new("^foobar$")),
             tdef: TypeDef::new().regex(),
         }
     ];

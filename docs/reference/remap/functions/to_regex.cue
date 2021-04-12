@@ -4,14 +4,15 @@ remap: functions: to_regex: {
 	category: "Coerce"
 	description: """
 		Coerces the `value` into a regex.
+		Warning: Creating regex is expensive! Too much use of this function can decrease the throughput of vector. 
 		"""
 
 	arguments: [
 		{
-			name:        "value"
+			name: "value"
 			description: "The value to convert to a regex."
-			required:    true
-			type:        ["string"]
+			required: true
+			type: ["string"]
 		},
 	]
 	internal_failure_reasons: [
@@ -28,7 +29,7 @@ remap: functions: to_regex: {
 		{
 			title: "Coerce to a regex"
 			source: #"""
-				to_regex("^foo$")
+				to_regex("^foo$") ?? r''
 				"""#
 			return: "r'^foo$'"
 		},
