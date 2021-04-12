@@ -57,7 +57,7 @@ impl Function for ParseRegexAll {
                 "veg": "peas"}]"# }),
             },
             Example {
-                title: "Simple match",
+                title: "Numeric groups",
                 source: r#"parse_regex_all!("apples and carrots, peaches and peas", r'(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)', numeric_groups: true)"#,
                 result: Ok(indoc! { r#"[
                {"fruit": "apples",
