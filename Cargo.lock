@@ -3453,6 +3453,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879777f0cc6f3646a044de60e4ab98c75617e3f9580f7a2032e6ad7ea0cd3054"
 
 [[package]]
+name = "lookup"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "serde",
+ "snafu",
+ "tracing 0.1.25",
+]
+
+[[package]]
 name = "lru"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7707,6 +7717,7 @@ dependencies = [
  "libz-sys",
  "listenfd",
  "logfmt",
+ "lookup",
  "lru",
  "lucet-runtime",
  "lucet-wasi",
@@ -7864,6 +7875,7 @@ version = "0.1.0"
 dependencies = [
  "bytes 1.0.1",
  "indoc",
+ "lookup",
  "ordered-float",
  "thiserror",
  "vrl-compiler",
@@ -7900,6 +7912,7 @@ dependencies = [
  "criterion",
  "dyn-clone",
  "lalrpop-util",
+ "lookup",
  "ordered-float",
  "paste",
  "regex",
@@ -7924,6 +7937,7 @@ version = "0.1.0"
 dependencies = [
  "lalrpop",
  "lalrpop-util",
+ "lookup",
  "ordered-float",
  "paste",
  "test-case",

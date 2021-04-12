@@ -17,7 +17,7 @@ pub(crate) use state::Compiler as State;
 pub use context::Context;
 pub use expression::{Expression, ExpressionError, Resolved};
 pub use function::{Function, Parameter};
-pub use path::Path;
+//pub use path::Path;
 pub use program::Program;
 pub use target::Target;
 pub use type_def::TypeDef;
@@ -51,5 +51,5 @@ pub fn compile_with_state(
 /// re-export of commonly used parser types.
 pub(crate) mod parser {
     pub use ::parser::ast::{self, Ident, Node};
-    pub use ::parser::{Field, Path, PathSegment, Program};
+    pub use ::parser::Program;
 }

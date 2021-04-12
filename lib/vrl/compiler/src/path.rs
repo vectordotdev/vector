@@ -1,3 +1,4 @@
+/*
 use std::fmt;
 use std::iter::{FromIterator, IntoIterator};
 use std::str::FromStr;
@@ -563,3 +564,4 @@ mod tests {
         );
     }
 }
+*/

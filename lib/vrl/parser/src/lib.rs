@@ -8,7 +8,7 @@ lalrpop_mod!(
 pub mod ast;
 mod lex;
 
-pub use ast::{Field, Literal, Path, PathSegment, Program};
+pub use ast::{Literal, Program};
 pub use diagnostic::Span;
 pub use lex::{Error, Token};
 
@@ -26,6 +26,7 @@ pub fn parse(input: impl AsRef<str>) -> Result<Program, Error> {
         })
 }
 
+/*
 pub fn parse_path(input: impl AsRef<str>) -> Result<Path, Error> {
     let lexer = lex::Lexer::new(input.as_ref());
 
@@ -45,8 +46,9 @@ pub fn parse_path(input: impl AsRef<str>) -> Result<Path, Error> {
             )),
         })
 }
+*/
 
-pub fn parse_field(input: impl AsRef<str>) -> Result<Field, Error> {
+/*pub fn parse_field(input: impl AsRef<str>) -> Result<Field, Error> {
     let lexer = lex::Lexer::new(input.as_ref());
 
     parser::FieldParser::new()
@@ -59,6 +61,7 @@ pub fn parse_field(input: impl AsRef<str>) -> Result<Field, Error> {
             dropped_tokens: vec![],
         })
 }
+*/
 
 pub fn parse_literal(input: impl AsRef<str>) -> Result<Literal, Error> {
     let lexer = lex::Lexer::new(input.as_ref());

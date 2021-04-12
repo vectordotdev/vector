@@ -1,6 +1,5 @@
 use super::Value;
-use crate::path::Segment::*;
-use crate::Path;
+use lookup::{LookupBuf, SegmentBuf};
 use std::collections::BTreeMap;
 
 impl Value {
@@ -8,21 +7,21 @@ impl Value {
     ///
     /// For example, given the path `.foo.bar` and value `true`, the return
     /// value would be an object representing `{ "foo": { "bar": true } }`.
-    pub fn at_path(mut self, path: &Path) -> Self {
-        for segment in path.segments().iter().rev() {
+    pub fn at_path(mut self, path: &LookupBuf) -> Self {
+        for segment in path.as_segments().iter().rev() {
             match segment {
-                Field(field) => {
+                SegmentBuf::Field{name, .. } => {
                     let mut map = BTreeMap::default();
-                    map.insert(field.as_str().to_owned(), self);
+                    map.insert(name.as_str().to_owned(), self);
                     self = Value::Object(map);
                 }
-                Coalesce(fields) => {
-                    let field = fields.last().unwrap();
-                    let mut map = BTreeMap::default();
-                    map.insert(field.as_str().to_owned(), self);
-                    self = Value::Object(map);
-                }
-                Index(index) => {
+                SegmentBuf::Coalesce(fields) => todo!(), /*{
+                let field = fields.last().unwrap();
+                let mut map = BTreeMap::default();
+                map.insert(field.as_str().to_owned(), self);
+                self = Value::Object(map);
+                }*/
+                SegmentBuf::Index(index) => {
                     let mut array = vec![];
 
                     if *index > 0 {
@@ -38,6 +37,8 @@ impl Value {
         self
     }
 }
+
+/* TODO Restore!
 
 #[cfg(test)]
 mod tests {
@@ -95,3 +96,4 @@ mod tests {
         assert_eq!(value.at_path(&path), object);
     }
 }
+*/

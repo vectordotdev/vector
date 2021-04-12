@@ -5,6 +5,7 @@ use diagnostic::span;
 use std::collections::BTreeMap;
 use lalrpop_util::ErrorRecovery;
 use ordered_float::NotNan;
+use lookup::{LookupBuf, SegmentBuf};
 
 grammar<'err, 'input>(input: &'input str);
 
@@ -355,7 +356,7 @@ pub Query: Query = {
     LQuery <Sp<".">> RQuery => {
         let span = <>.span();
         let target = Node::new(span, QueryTarget::External);
-        let path = Node::new(span, Path(vec![]));
+        let path = Node::new(span, LookupBuf::root());
 
         Query { target, path }
     },
@@ -373,23 +374,25 @@ QueryTarget: QueryTarget = {
 // path
 // -----------------------------------------------------------------------------
 
-Path: Path = PathSegment+ => Path(<>);
+Path: LookupBuf = PathSegment+ => LookupBuf::from_segments(<>);
 
-PathSegment: PathSegment = {
-    "."? <Field> => PathSegment::Field(<>),
-    "[" <Integer> "]" => PathSegment::Index(<>),
-    "."? "(" <v:(<Field> "|")+> <e:Field> ")" => {
-        let mut v = v;
-        v.push(e);
-        PathSegment::Coalesce(v)
-    },
+PathSegment: SegmentBuf = {
+    "."? <Field> => <>,
+    "[" <Integer> "]" => SegmentBuf::index(<> as isize),
+    // TODO sort out coalescing
+    //    "."? "(" <v:(<Field> "|")+> <e:Field> ")" => {
+    //        let mut v = v;
+    //        v.push(e);
+    //        PathSegment::Coalesce(v)
+    //    },
+    //
 };
 
-pub Field: Field = {
-    AnyIdent => Field::Regular(<>),
-    PathField => Field::Regular(<>),
-    String => Field::Quoted(<>),
-};
+pub Field: SegmentBuf = {
+    AnyIdent => SegmentBuf::field(<>.to_string(), false),
+    PathField => SegmentBuf::field(<>.to_string(), false),
+    String => SegmentBuf::field(<>, true),
+}
 
 // -----------------------------------------------------------------------------
 // function call

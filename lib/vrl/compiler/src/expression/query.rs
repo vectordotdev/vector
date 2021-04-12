@@ -1,24 +1,25 @@
 use crate::expression::{Container, FunctionCall, Resolved, Variable};
 use crate::parser::ast::Ident;
-use crate::{Context, Expression, Path, State, TypeDef, Value};
+use crate::{Context, Expression, State, TypeDef, Value};
+use lookup::LookupBuf;
 use std::collections::BTreeMap;
 use std::fmt;
 
 #[derive(Clone, PartialEq)]
 pub struct Query {
     target: Target,
-    path: Path,
+    path: LookupBuf,
 }
 
 impl Query {
     // TODO:
     // - error when trying to index into object
     // - error when trying to path into array
-    pub fn new(target: Target, path: Path) -> Self {
+    pub fn new(target: Target, path: LookupBuf) -> Self {
         Query { target, path }
     }
 
-    pub fn path(&self) -> &Path {
+    pub fn path(&self) -> &LookupBuf {
         &self.path
     }
 
@@ -74,7 +75,7 @@ impl Expression for Query {
                 // `.` path must be an object
                 //
                 // TODO: make sure to enforce this
-                if self.path.is_root() {
+                if self.path.is_empty() {
                     return TypeDef::new()
                         .object::<String, TypeDef>(BTreeMap::default())
                         .infallible();

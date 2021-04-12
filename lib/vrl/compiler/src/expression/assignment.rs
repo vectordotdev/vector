@@ -3,8 +3,9 @@ use crate::parser::{
     ast::{self, Ident},
     Node,
 };
-use crate::{Context, Expression, Path, Span, State, TypeDef, Value};
+use crate::{Context, Expression, Span, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Note};
+use lookup::LookupBuf;
 use std::convert::TryFrom;
 use std::fmt;
 
@@ -184,8 +185,8 @@ impl fmt::Debug for Assignment {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Target {
     Noop,
-    Internal(Ident, Option<Path>),
-    External(Option<Path>),
+    Internal(Ident, Option<LookupBuf>),
+    External(Option<LookupBuf>),
 }
 
 impl Target {
@@ -195,7 +196,7 @@ impl Target {
         fn set_type_def(
             current_type_def: &TypeDef,
             new_type_def: TypeDef,
-            path: &Option<Path>,
+            path: &Option<LookupBuf>,
         ) -> TypeDef {
             // If the assignment is onto root or has no path (root variable assignment), use the
             // new type def, otherwise merge the type defs.
@@ -268,7 +269,7 @@ impl Target {
             External(path) => {
                 let _ = ctx
                     .target_mut()
-                    .insert(path.as_ref().unwrap_or(&Path::root()), value);
+                    .insert(path.as_ref().unwrap_or(&LookupBuf::root()), value);
             }
         }
     }

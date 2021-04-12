@@ -1,5 +1,6 @@
 use crate::lex::Error;
 use diagnostic::Span;
+use lookup::LookupBuf;
 use ordered_float::NotNan;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -806,8 +807,8 @@ impl fmt::Debug for Assignment {
 pub enum AssignmentTarget {
     Noop,
     Query(Query),
-    Internal(Ident, Option<Path>),
-    External(Option<Path>),
+    Internal(Ident, Option<LookupBuf>),
+    External(Option<LookupBuf>),
 }
 
 impl AssignmentTarget {
@@ -829,7 +830,7 @@ impl AssignmentTarget {
                 span,
                 Query {
                     target: Node::new(span, QueryTarget::External),
-                    path: Node::new(span, path.clone().unwrap_or_else(|| Path(Vec::new()))),
+                    path: Node::new(span, path.clone().unwrap_or_else(|| LookupBuf::root())),
                 },
             )),
         }
@@ -873,7 +874,7 @@ impl fmt::Debug for AssignmentTarget {
 #[derive(Clone, PartialEq)]
 pub struct Query {
     pub target: Node<QueryTarget>,
-    pub path: Node<Path>,
+    pub path: Node<LookupBuf>,
 }
 
 impl fmt::Display for Query {
@@ -926,6 +927,7 @@ impl fmt::Debug for QueryTarget {
 // path
 // -----------------------------------------------------------------------------
 
+/*
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Path(pub Vec<PathSegment>);
 
@@ -1007,6 +1009,8 @@ impl fmt::Debug for Field {
         write!(f, "Field({})", self)
     }
 }
+
+*/
 
 // -----------------------------------------------------------------------------
 // function call

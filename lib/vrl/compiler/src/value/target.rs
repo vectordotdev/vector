@@ -1,20 +1,18 @@
-use crate::{
-    path::{Field, Segment, Segment::*},
-    Path, Target, Value,
-};
+use crate::{Target, Value};
+use lookup::{LookupBuf, SegmentBuf};
 use std::collections::BTreeMap;
 
 impl Target for Value {
-    fn insert(&mut self, path: &Path, value: Value) -> Result<(), String> {
+    fn insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
         self.insert_by_path(path, value);
         Ok(())
     }
 
-    fn get(&self, path: &Path) -> Result<Option<Value>, String> {
+    fn get(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
         Ok(self.get_by_path(path).cloned())
     }
 
-    fn remove(&mut self, path: &Path, compact: bool) -> Result<Option<Value>, String> {
+    fn remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
         let value = self.get(path)?;
         self.remove_by_path(path, compact);
 
@@ -73,14 +71,14 @@ impl Value {
     ///    assert_eq!(value.get_by_path(&path), Some(&Value::Boolean(true)))
     ///    ```
     ///
-    pub fn get_by_path(&self, path: &Path) -> Option<&Value> {
-        self.get_by_segments(path.segments())
+    pub fn get_by_path(&self, path: &LookupBuf) -> Option<&Value> {
+        self.get_by_segments(path.as_segments().iter())
     }
 
     /// Similar to [`Value::get_by_path`], but returns a mutable reference to
     /// the value.
-    pub fn get_by_path_mut(&mut self, path: &Path) -> Option<&mut Value> {
-        self.get_by_segments_mut(path.segments())
+    pub fn get_by_path_mut(&mut self, path: &LookupBuf) -> Option<&mut Value> {
+        self.get_by_segments_mut(path.as_segments().iter())
     }
 
     /// Insert a value, given the provided path.
@@ -128,8 +126,8 @@ impl Value {
     /// )
     /// ```
     ///
-    pub fn insert_by_path(&mut self, path: &Path, new: Value) {
-        self.insert_by_segments(path.segments(), new)
+    pub fn insert_by_path(&mut self, path: &LookupBuf, new: Value) {
+        self.insert_by_segments(path.as_segments().iter(), new)
     }
 
     /// Remove a value, given the provided path.
@@ -143,28 +141,34 @@ impl Value {
     /// If the `compact` argument is set to `true`, then any `Array` or `Object`
     /// that had one of its elements removed and is now empty, is removed as
     /// well.
-    pub fn remove_by_path(&mut self, path: &Path, compact: bool) {
-        self.remove_by_segments(path.segments(), compact)
+    pub fn remove_by_path(&mut self, path: &LookupBuf, compact: bool) {
+        self.remove_by_segments(path.as_segments().iter(), compact)
     }
 
-    fn get_by_segments(&self, segments: &[Segment]) -> Option<&Value> {
-        let (segment, next) = match segments.split_first() {
-            Some(segments) => segments,
+    fn get_by_segments<'a, T>(&self, mut segments: T) -> Option<&Value>
+    where
+        T: Iterator<Item = &'a SegmentBuf>,
+    {
+        let segment = match segments.next() {
+            Some(segment) => segment,
             None => return Some(self),
         };
 
         self.get_by_segment(segment)
-            .and_then(|value| value.get_by_segments(next))
+            .and_then(|value| value.get_by_segments(segments))
     }
 
-    fn get_by_segment(&self, segment: &Segment) -> Option<&Value> {
+    fn get_by_segment(&self, segment: &SegmentBuf) -> Option<&Value> {
         match segment {
-            Field(field) => self.as_object().and_then(|map| map.get(field.as_str())),
-            Coalesce(fields) => self
-                .as_object()
-                .and_then(|map| fields.iter().find_map(|field| map.get(field.as_str()))),
-            Index(index) => self.as_array().and_then(|array| {
-                let len = array.len() as i64;
+            SegmentBuf::Field { name, .. } => {
+                self.as_object().and_then(|map| map.get(name.as_str()))
+            }
+            SegmentBuf::Coalesce(fields) => todo!(), /*self
+            .as_object()
+            .and_then(|map| fields.iter().find_map(|field| map.get(field.as_str()))),
+             */
+            SegmentBuf::Index(index) => self.as_array().and_then(|array| {
+                let len = array.len() as isize;
                 if *index >= len || index.abs() > len {
                     return None;
                 }
@@ -176,29 +180,32 @@ impl Value {
         }
     }
 
-    fn get_by_segments_mut(&mut self, segments: &[Segment]) -> Option<&mut Value> {
-        let (segment, next) = match segments.split_first() {
+    fn get_by_segments_mut<'a, T>(&mut self, mut segments: T) -> Option<&mut Value>
+    where
+        T: Iterator<Item = &'a SegmentBuf>,
+    {
+        let segment = match segments.next() {
             Some(segments) => segments,
             None => return Some(self),
         };
 
         self.get_by_segment_mut(segment)
-            .and_then(|value| value.get_by_segments_mut(next))
+            .and_then(|value| value.get_by_segments_mut(segments))
     }
 
-    fn get_by_segment_mut(&mut self, segment: &Segment) -> Option<&mut Value> {
+    fn get_by_segment_mut(&mut self, segment: &SegmentBuf) -> Option<&mut Value> {
         match segment {
-            Field(field) => self
+            SegmentBuf::Field { name, .. } => self
                 .as_object_mut()
-                .and_then(|map| map.get_mut(field.as_str())),
-            Coalesce(fields) => self.as_object_mut().and_then(|map| {
-                fields
-                    .iter()
-                    .find(|field| map.contains_key(field.as_str()))
-                    .and_then(move |field| map.get_mut(field.as_str()))
-            }),
-            Index(index) => self.as_array_mut().and_then(|array| {
-                let len = array.len() as i64;
+                .and_then(|map| map.get_mut(name.as_str())),
+            SegmentBuf::Coalesce(fields) => todo!(), /*self.as_object_mut().and_then(|map| {
+            fields
+            .iter()
+            .find(|field| map.contains_key(field.as_str()))
+            .and_then(move |field| map.get_mut(field.as_str()))
+            }),*/
+            SegmentBuf::Index(index) => self.as_array_mut().and_then(|array| {
+                let len = array.len() as isize;
                 if *index >= len || index.abs() > len {
                     return None;
                 }
@@ -210,8 +217,11 @@ impl Value {
         }
     }
 
-    fn remove_by_segments(&mut self, segments: &[Segment], compact: bool) {
-        let (segment, next) = match segments.split_first() {
+    fn remove_by_segments<'a, T>(&mut self, mut segments: T, compact: bool)
+    where
+        T: Iterator<Item = &'a SegmentBuf> + Clone,
+    {
+        let segment = match segments.next() {
             Some(segments) => segments,
             None => {
                 return match self {
@@ -222,12 +232,14 @@ impl Value {
             }
         };
 
-        if next.is_empty() {
+        let mut peekable = segments.clone().peekable();
+
+        if peekable.peek().is_none() {
             return self.remove_by_segment(segment);
         }
 
         if let Some(value) = self.get_by_segment_mut(segment) {
-            value.remove_by_segments(next, compact);
+            value.remove_by_segments(segments, compact);
 
             match value {
                 Value::Object(v) if compact & v.is_empty() => self.remove_by_segment(segment),
@@ -237,26 +249,25 @@ impl Value {
         }
     }
 
-    fn remove_by_segment(&mut self, segment: &Segment) {
+    fn remove_by_segment(&mut self, segment: &SegmentBuf) {
         match segment {
-            Field(field) => self
+            SegmentBuf::Field { name, .. } => self
                 .as_object_mut()
-                .and_then(|map| map.remove(field.as_str())),
+                .and_then(|map| map.remove(name.as_str())),
 
-            Coalesce(fields) => fields
-                .iter()
-                .find(|field| {
-                    self.as_object()
-                        .map(|map| map.contains_key(field.as_str()))
-                        .unwrap_or_default()
-                })
-                .and_then(|field| {
-                    self.as_object_mut()
-                        .and_then(|map| map.remove(field.as_str()))
-                }),
-
-            Index(index) => self.as_array_mut().and_then(|array| {
-                let len = array.len() as i64;
+            SegmentBuf::Coalesce(fields) => todo!(), /*fields
+            .iter()
+            .find(|field| {
+            self.as_object()
+            .map(|map| map.contains_key(field.as_str()))
+            .unwrap_or_default()
+            })
+            .and_then(|field| {
+            self.as_object_mut()
+            .and_then(|map| map.remove(field.as_str()))
+            }),*/
+            SegmentBuf::Index(index) => self.as_array_mut().and_then(|array| {
+                let len = array.len() as isize;
                 if *index >= len || index.abs() > len {
                     return None;
                 }
@@ -268,8 +279,12 @@ impl Value {
         };
     }
 
-    fn insert_by_segments(&mut self, segments: &[Segment], new: Value) {
-        let (segment, rest) = match segments.split_first() {
+    fn insert_by_segments<'a, T>(&mut self, mut segments: T, new: Value)
+    where
+        T: Iterator<Item = &'a SegmentBuf> + Clone,
+    {
+        let original = segments.clone();
+        let segment = match segments.next() {
             Some(segments) => segments,
             None => return *self = new,
         };
@@ -279,19 +294,22 @@ impl Value {
         // match the requested segment, we'll update the value to match and
         // continue on, until we're able to assign the final `new` value.
         match self.get_by_segment_mut(segment) {
-            Some(value) => value.insert_by_segments(rest, new),
-            None => self.update_by_segments(segments, new),
+            Some(value) => value.insert_by_segments(segments, new),
+            None => self.update_by_segments(original, new),
         };
     }
 
-    fn update_by_segments(&mut self, segments: &[Segment], new: Value) {
-        let (segment, rest) = match segments.split_first() {
+    fn update_by_segments<'a, T>(&mut self, mut segments: T, new: Value)
+    where
+        T: Iterator<Item = &'a SegmentBuf> + Clone,
+    {
+        let segment = match segments.next() {
             Some(segments) => segments,
             None => return,
         };
 
-        let mut handle_field = |field: &Field, new| {
-            let key = field.as_str().to_owned();
+        let mut handle_field = |field: &str, new, mut segments: T| {
+            let key = field.to_owned();
 
             // `handle_field` is used to update map values, if the current value
             // isn't a map, we need to make it one.
@@ -304,7 +322,7 @@ impl Value {
                 _ => unreachable!("see invariant above"),
             };
 
-            match rest.first() {
+            match segments.next() {
                 // If there are no other segments to traverse, we'll add the new
                 // value to the current map.
                 None => {
@@ -315,33 +333,34 @@ impl Value {
                 // or array depending on what the next segment is, and continue
                 // to add the next segment.
                 Some(next) => match next {
-                    Index(_) => map.insert(key, Value::Array(vec![])),
+                    SegmentBuf::Index(_) => map.insert(key, Value::Array(vec![])),
                     _ => map.insert(key, BTreeMap::default().into()),
                 },
             };
 
-            map.get_mut(field.as_str())
+            // TODO: This may be wrong as segments should probably have been peeked
+            // in the above segments.next() call.
+            map.get_mut(field)
                 .unwrap()
-                .insert_by_segments(rest, new);
+                .insert_by_segments(segments, new);
         };
 
         match segment {
-            Field(field) => handle_field(field, new),
+            SegmentBuf::Field { name, .. } => handle_field(name, new, segments),
 
-            Coalesce(fields) => {
-                // At this point, we know that the coalesced field query did not
-                // result in an actual value, so none of the fields match an
-                // existing field. We'll pick the last field in the list to
-                // insert the new value into.
-                let field = match fields.last() {
-                    Some(field) => field,
-                    None => return,
-                };
+            SegmentBuf::Coalesce(fields) => todo!(), /*{
+            // At this point, we know that the coalesced field query did not
+            // result in an actual value, so none of the fields match an
+            // existing field. We'll pick the last field in the list to
+            // insert the new value into.
+            let field = match fields.last() {
+            Some(field) => field,
+            None => return,
+            };
 
-                handle_field(field, new)
-            }
-
-            Index(index) => {
+            handle_field(field, new)
+            }*/
+            SegmentBuf::Index(index) => {
                 let array = match self {
                     Value::Array(array) => array,
                     _ => {
@@ -363,13 +382,14 @@ impl Value {
                         array.insert(0, Value::Null)
                     }
 
-                    match rest.first() {
+                    // TODO should this be a peek?
+                    match segments.next() {
                         None => {
                             array.insert(0, new);
                             return;
                         }
                         Some(next) => match next {
-                            Index(_) => array.insert(0, Value::Array(vec![])),
+                            SegmentBuf::Index(_) => array.insert(0, Value::Array(vec![])),
                             _ => array.insert(0, BTreeMap::default().into()),
                         },
                     };
@@ -377,7 +397,7 @@ impl Value {
                     array
                         .first_mut()
                         .expect("exists")
-                        .insert_by_segments(rest, new);
+                        .insert_by_segments(segments, new);
                 } else {
                     let index = index as usize;
 
@@ -386,13 +406,13 @@ impl Value {
                         array.resize(index, Value::Null);
                     }
 
-                    match rest.first() {
+                    match segments.next() {
                         None => {
                             array.push(new);
                             return;
                         }
                         Some(next) => match next {
-                            Index(_) => array.push(Value::Array(vec![])),
+                            SegmentBuf::Index(_) => array.push(Value::Array(vec![])),
                             _ => array.push(BTreeMap::default().into()),
                         },
                     }
@@ -400,12 +420,16 @@ impl Value {
                     array
                         .last_mut()
                         .expect("exists")
-                        .insert_by_segments(rest, new);
+                        .insert_by_segments(segments, new);
                 }
             }
         }
     }
 }
+
+/*
+
+TODO We want these back!
 
 #[cfg(test)]
 mod tests {
@@ -663,3 +687,5 @@ mod tests {
         }
     }
 }
+
+*/

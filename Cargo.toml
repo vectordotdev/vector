@@ -71,6 +71,7 @@ members = [
   "lib/tracing-limit",
   "lib/vector-api-client",
   "lib/vector-wasm",
+  "lib/lookup",
   "lib/vrl/cli",
   "lib/vrl/compiler",
   "lib/vrl/core",
@@ -161,6 +162,9 @@ tui = { version = "0.14.0", optional = true, default-features = false, features 
 # VRL Lang
 vrl = { path = "lib/vrl/core" }
 vrl-stdlib = { path = "lib/vrl/stdlib" }
+
+# Lookup
+lookup = { path = "lib/lookup" }
 
 # External libs
 anyhow = { version = "1.0.40", default-features = false }
