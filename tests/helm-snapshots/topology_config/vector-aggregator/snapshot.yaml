@@ -69,16 +69,12 @@ data:
       option1 = "value1"
       option2 = "value2"
       type = "type1"
-      option = "value"
-      arbitrary text
     
     [sources.source2]
       optionA = "valueA"
       type = "type2"
       [sources.source2.optionB]
         suboption = "valueB"
-    [sources.source2]
-      arbitrary text 2
     
     [sources.source3]
       type = "type3"
@@ -88,8 +84,6 @@ data:
       option1 = "value1"
       option2 = "value2"
       type = "type1"
-      option = "value"
-      arbitrary text
     
     [transforms.transform2]
       inputs = ["input2", "input1"]
@@ -97,8 +91,6 @@ data:
       type = "type2"
       [transforms.transform2.optionB]
         suboption = "valueB"
-    [transforms.transform2]
-      arbitrary text 2
     
     [transforms.transform3]
       inputs = []
@@ -109,8 +101,6 @@ data:
       option1 = "value1"
       option2 = "value2"
       type = "type1"
-      option = "value"
-      arbitrary text
     
     [sinks.sink2]
       inputs = ["input2", "input1"]
@@ -118,8 +108,6 @@ data:
       type = "type2"
       [sinks.sink2.optionB]
         suboption = "valueB"
-    [sinks.sink2]
-      arbitrary text 2
     
     [sinks.sink3]
       inputs = []
@@ -191,7 +179,7 @@ spec:
     metadata:
       annotations:
         
-        checksum/config: 2e32b2eca9854ebc0d3877ff9cb719ac16698a6e976a05151945729a41eb058d
+        checksum/config: 7e0405b9b931bef02fd2a4d2c508e0a3de7038879cd64a3a08332b20f9bba6e3
         
       labels:
         app.kubernetes.io/name: vector-aggregator

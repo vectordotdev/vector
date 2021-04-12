@@ -146,7 +146,7 @@ spec:
     metadata:
       annotations:
         
-        checksum/config: 75958f6034a2d836d57468a572df3af05ea5d4eaf4b8b5cbd6371e6ec319a696
+        checksum/config: f50cafe8069c3ed3be6a945818694ae493869907e7991b688a00cdf037dc7d2c
         
       labels:
         app.kubernetes.io/name: vector-agent
