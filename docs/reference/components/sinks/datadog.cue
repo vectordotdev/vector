@@ -48,11 +48,13 @@ components: sinks: _datadog: {
 			}
 		}
 		region: {
+			common:        false
 			description:   "The region to send data to."
 			required:      false
 			relevant_when: "endpoint is not set"
 			warnings: []
 			type: string: {
+				default: null
 				enum: {
 					us: "United States"
 					eu: "Europe"
