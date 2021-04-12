@@ -3,7 +3,7 @@ title: Architecture
 weight: 1
 ---
 
-{{< svg "architecture.svg" >}}
+{{< svg "img/architecture.svg" >}}
 
 This section covers the various models that combine to form Vector's architecture. These are ordered progressively, beginning with the [data model][data_model] and broadening all the way to Vector's [runtime model][runtime_model].
 

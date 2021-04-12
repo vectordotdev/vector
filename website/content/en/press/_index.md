@@ -18,12 +18,10 @@ Since its initial release in July of 2019 Vector has grown to over 100,000 downl
 
 Vector's capabilities continue to expand at a rapid pace, aspiring to integrate with any and all observability products in a way that's simple, predictable and stable. No compromises.
 
+<!-- Logos: TBD -->
+
 ## Vector blue
 
-{{< color hex="10E7FF" r=16 g=231 b=255 >}}
-
-<!--
-
--->
+{{< press/color hex="10E7FF" r=16 g=231 b=255 >}}
 
 [timber]: https://timber.io

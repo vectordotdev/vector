@@ -3,7 +3,7 @@ title: Metric events
 weight: 2
 ---
 
-{{< svg "data-model-metric.svg" >}}
+{{< svg "img/data-model-metric.svg" >}}
 
 A **metric event** in Vector represents a numerical operation performed on a time series. In Vector, unlike in other tools, metrics are first-class citizens. They are *not* represented as [logs]. This makes them interoperable with various metrics services without the need for any transformation.
 

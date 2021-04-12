@@ -4,7 +4,7 @@ description: Vector's runtime model and how it manages concurrency
 weight: 3
 ---
 
-{{< svg "runtime-model.svg" >}}
+{{< svg "img/runtime-model.svg" >}}
 
 Vector's runtime is a futures-based asynchronous runtime where nodes in Vector's [DAG topology model][pipeline] roughly map to asynchonous [tasks](#tasks) that communicate via channels, all [scheduled](#scheduled) by the [Tokio][tokio] runtime.
 

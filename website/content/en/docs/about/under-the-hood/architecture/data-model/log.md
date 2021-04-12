@@ -3,7 +3,7 @@ title: Log events
 weight: 1
 ---
 
-{{< svg "data-model-log.svg" >}}
+{{< svg "img/data-model-log.svg" >}}
 
 A **log event** in Vector is a structured representation of a point-in-time event. It contains an arbitrary set of fields that describe the event.
 

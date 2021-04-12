@@ -4,7 +4,7 @@ description: How Vector understands data
 weight: 1
 ---
 
-{{< svg "data-model-event.svg" >}}
+{{< svg "img/data-model-event.svg" >}}
 
 The individual units of data flowing through Vector are known as **events**. Events must fall into one of Vector's defined observability types.
 

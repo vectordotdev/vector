@@ -9,7 +9,7 @@ strategies to form topologies. This section showcases common topologies and the 
 
 ## Distributed
 
-{{< svg "topology-distributed.svg" >}}
+{{< svg "img/topology-distributed.svg" >}}
 
 The simplest topology. This topology offers direct communication with your
 downstream services from your client nodes.
@@ -40,7 +40,7 @@ downstream services from your client nodes.
 
 ## Centralized
 
-{{< svg "topology-centralized.svg" >}}
+{{< svg "img/topology-centralized.svg" >}}
 
 A good balance of simplicity, stability, and control. For most, this topology
 is a good compromise between the [distributed](#distributed) and
@@ -72,7 +72,7 @@ Kafka cluster.
 
 ## Stream-Based
 
-{{< svg "topology-stream-based.svg" >}}
+{{< svg "img/topology-stream-based.svg" >}}
 
 The most durable and elastic topology. This topology is typically adopted for
 very large streams with teams that are familiar with running a stream-based

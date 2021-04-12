@@ -8,7 +8,7 @@
         </p>
 
         <hr class="narrow" />
-    
+
         <p class="subtitle has-text-weight-light">
           Deploy Vector in a variety of <a href="/docs/setup/deployment/roles">roles</a> to suit your use case.
         </p>
@@ -28,17 +28,17 @@
               {{ end }}
             </ul>
           </div>
-    
+
           {{ range $tabs }}
           {{ $slug := . | urlize }}
-          {{ $svg := printf "pipelines-%s.svg" $slug }}
+          {{ $svg := printf "img/pipelines-%s.svg" $slug }}
           {{ $url := printf "/docs/setup/deployment/topologies/#%s" $slug }}
           {{ $dist := eq $slug "distributed" }}
           <div x-show="tab === '{{ $slug }}'">
             <div class="svg-container has-text-centered{{ if $dist }} distributed{{ end }}">
               {{ partial "svg.html" (dict "src" $svg) }}
             </div>
-    
+
             <p class="has-text-weight-light has-text-centered">
               Learn more about the <a class="has-text-weight-bold" href="{{ $url }}">{{ $slug }}</a> topology
             </p>
