@@ -1,4 +1,3 @@
-use regex::Regex;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
