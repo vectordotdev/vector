@@ -190,7 +190,7 @@ impl SplunkSource {
             .and_then(|header: Option<String>, query_param| async move {
                 header
                     .or(query_param)
-                    .ok_or(Rejection::from(ApiError::MissingChannel))
+                    .ok_or_else(|| Rejection::from(ApiError::MissingChannel))
             });
 
         warp::post()
