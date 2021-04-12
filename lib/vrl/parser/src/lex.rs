@@ -776,7 +776,7 @@ impl<'input> Lexer<'input> {
                                 match literal_check(r, &mut chars) {
                                     Ok(ch) => ch,
                                     Err(_) => {
-                                        // The call to lexer about should have raised an appropriate error by now,
+                                        // The call to lexer above should have raised an appropriate error by now,
                                         // so these errors should only occur if there is a bug somewhere previously.
                                         return Err(Error::UnexpectedParseError(
                                             "Expected characters at end of string literal."
