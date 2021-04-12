@@ -48,7 +48,7 @@ pub struct SourceConfigEntry {
     #[serde(flatten)]
     pub config: Box<dyn SourceConfig>,
     #[serde(skip)]
-    pub identifier: Option<String>,
+    pub identifier: Option<Box<str>>,
 }
 
 #[derive(Debug, Default)]
@@ -214,7 +214,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 
 pub struct SourceContext {
     pub name: String,
-    pub identifier: String,
+    pub identifier: Box<str>,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
@@ -223,7 +223,7 @@ pub struct SourceContext {
 impl SourceContext {
     pub(crate) fn new(
         name: &str,
-        identifier: Option<String>,
+        identifier: Option<Box<str>>,
         globals: GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,
@@ -233,7 +233,8 @@ impl SourceContext {
             uuid::Uuid::new_v4()
                 .to_simple()
                 .encode_lower(&mut identifier)
-                .into()
+                .to_string()
+                .into_boxed_str()
         });
         Self {
             name: name.into(),
