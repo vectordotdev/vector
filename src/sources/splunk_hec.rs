@@ -151,24 +151,13 @@ impl SplunkSource {
     }
 
     fn event_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
-        let splunk_channel_header = warp::header::<String>("x-splunk-request-channel");
-        let splunk_channel_query_param =
-            warp::query::<HashMap<String, String>>().map(|qs: HashMap<String, String>| {
-                match qs.get("channel") {
-                    Some(v) => v.to_owned(),
-                    None => format!(""),
-                }
-            });
+        let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
+            .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
+        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
+
         let splunk_channel = splunk_channel_header
-            .or(splunk_channel_query_param)
-            .unify()
-            .map(|channel: String| {
-                if !channel.is_empty() {
-                    Some(channel)
-                } else {
-                    None
-                }
-            });
+            .and(splunk_channel_query_param)
+            .map(|header: Option<String>, query_param| header.or(query_param));
 
         warp::post()
             .and(path!("event").or(path!("event" / "1.0")))
@@ -192,23 +181,16 @@ impl SplunkSource {
     }
 
     fn raw_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
-        let splunk_channel_header = warp::header::<String>("x-splunk-request-channel");
-        let splunk_channel_query_param =
-            warp::query::<HashMap<String, String>>().map(|qs: HashMap<String, String>| {
-                match qs.get("channel") {
-                    Some(v) => v.to_owned(),
-                    None => format!(""),
-                }
-            });
+        let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
+            .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
+        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
+
         let splunk_channel = splunk_channel_header
-            .or(splunk_channel_query_param)
-            .unify()
-            .and_then(|channel: String| async {
-                if !channel.is_empty() {
-                    Ok(channel)
-                } else {
-                    Err(Rejection::from(ApiError::MissingChannel))
-                }
+            .and(splunk_channel_query_param)
+            .and_then(|header: Option<String>, query_param| async move {
+                header
+                    .or(query_param)
+                    .ok_or(Rejection::from(ApiError::MissingChannel))
             });
 
         warp::post()
@@ -1042,7 +1024,7 @@ mod tests {
 
         let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-        assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
+        assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
