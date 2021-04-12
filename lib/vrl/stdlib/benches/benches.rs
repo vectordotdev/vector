@@ -993,8 +993,6 @@ bench_function! {
         ],
         want: Ok(value!({
             "number": "first",
-            "0": "first group",
-            "1": "first"
         }))
     }
 }
