@@ -962,7 +962,8 @@ bench_function! {
         args: func_args! [
             value: "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574",
             pattern: Regex::new(r#"^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$"#)
-                .unwrap()
+                .unwrap(),
+            numeric_groups: true
         ],
         want: Ok(value!({
             "bytes_in": "5667",
@@ -992,8 +993,6 @@ bench_function! {
         ],
         want: Ok(value!({
             "number": "first",
-            "0": "first group",
-            "1": "first"
         }))
     }
 }
@@ -1004,7 +1003,8 @@ bench_function! {
     matches {
         args: func_args![
             value: "apples and carrots, peaches and peas",
-            pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap()
+            pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap(),
+            numeric_groups: true
         ],
         want: Ok(value!([
                 {

@@ -32,6 +32,16 @@ remap: functions: parse_regex: {
 			required:    true
 			type: ["regex"]
 		},
+		{
+			name: "numeric_groups"
+			description: """
+				If true, the index of each group in the regular expression is also captured. The 0th index
+				will contain the whole match.
+				"""
+			required: false
+			default:  false
+			type: ["regex"]
+		},
 	]
 	internal_failure_reasons: [
 		"`value` fails to parse using the provided `pattern`",
@@ -52,14 +62,12 @@ remap: functions: parse_regex: {
 				"""
 			return: {
 				number: "first"
-				"0":    "first group"
-				"1":    "first"
 			}
 		},
 		{
 			title: "Parse using Regex (without capture groups)"
 			source: """
-				parse_regex!("first group and second group.", r'(\\w+) group')
+				parse_regex!("first group and second group.", r'(\\w+) group', numeric_groups: true)
 				"""
 			return: {
 				"0": "first group"
