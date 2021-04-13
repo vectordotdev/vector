@@ -5,7 +5,7 @@ remap: functions: to_regex: {
 	description: """
 		Coerces the `value` into a regex.
 		"""
-	notices: ["Compiling a regular expression is an expensive operation and can limit Vector throughput."]
+	notices: ["Compiling a regular expression is an expensive operation and can limit Vector throughput. Don't use this function unless you are absolutely sure there is no other way!"]
 
 	arguments: [
 		{
@@ -21,7 +21,7 @@ remap: functions: to_regex: {
 	return: {
 		types: ["regex"]
 		rules: [
-			#"If `value` is string that contains a valid regex, returns the regex constructed with this string."#,
+			#"If `value` is a string that contains a valid regex, returns the regex constructed with this string."#,
 		]
 	}
 
