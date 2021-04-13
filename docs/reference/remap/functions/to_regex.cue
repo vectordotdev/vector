@@ -31,7 +31,7 @@ remap: functions: to_regex: {
 			source: #"""
 				to_regex("^foo$") ?? r''
 				"""#
-			return: "r'^foo$'"
+			return: "^foo$"
 		},
 	]
 }
