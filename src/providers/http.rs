@@ -16,7 +16,14 @@ use url::Url;
 #[serde(deny_unknown_fields, default)]
 pub struct HttpConfig {
     url: Option<Url>,
+    #[serde(flatten)]
     tls_options: Option<TlsOptions>,
+    pub timeout_secs: Option<u64>,               // 60
+    pub rate_limit_duration_secs: Option<u64>,   // 1
+    pub rate_limit_num: Option<u64>,             // 5
+    pub retry_attempts: Option<usize>,           // max_value()
+    pub retry_max_duration_secs: Option<u64>,    // 3600
+    pub retry_initial_backoff_secs: Option<u64>, // 1
 }
 
 impl Default for HttpConfig {
@@ -24,6 +31,12 @@ impl Default for HttpConfig {
         Self {
             url: None,
             tls_options: None,
+            timeout_secs: Some(60),
+            rate_limit_duration_secs: Some(1),
+            rate_limit_num: Some(5),
+            retry_attempts: Some(usize::MAX),
+            retry_max_duration_secs: Some(3600),
+            retry_initial_backoff_secs: Some(1),
         }
     }
 }
