@@ -8,11 +8,11 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-mod parser;
-use parser::DnstapParser;
+pub mod parser;
+pub use parser::DnstapParser;
 
-mod schema;
-use schema::DnstapEventSchema;
+pub mod schema;
+pub use schema::DnstapEventSchema;
 
 mod dns_message;
 mod dns_message_parser;
