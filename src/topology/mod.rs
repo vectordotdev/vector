@@ -779,7 +779,6 @@ impl RunningTopology {
         self.watch.1.clone()
     }
 
-    #[cfg(test)]
     pub fn source_identifier(&self, name: &str) -> Option<Box<str>> {
         self.config
             .sources
