@@ -97,7 +97,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: "criterion"
-          path: "./target/criterion.zip"
+          path: "./target/criterion"
       - name: Upload criterion data to S3
         run: scripts/upload-benchmarks-s3.sh
         if: github.ref == 'refs/heads/master'
