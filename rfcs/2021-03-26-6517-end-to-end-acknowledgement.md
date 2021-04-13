@@ -210,12 +210,13 @@ struct EventMetadata {
 struct EventFinalizer {
     status: EventStatus,
     sources: Box<[Arc<BatchNotifier>]>,
+    identifier: Uuid,
 }
 
 struct BatchNotifier {
     status: Mutex<BatchStatus>,
     notifier: tokio::sync::oneshot::Sender<BatchStatus>,
-    identifier: Box<str>,
+    identifier: Uuid,
 }
 
 enum BatchStatus {

@@ -1,8 +1,16 @@
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-pub struct EventMetadata;
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct EventMetadata {
+    //finalizer: Option<Arc<EventFinalizer>>,
+}
+
+impl Default for EventMetadata {
+    fn default() -> Self {
+        Self {} //finalizer: None }
+    }
+}
 
 impl EventMetadata {
     pub fn merge(&mut self, _other: &Self) {
