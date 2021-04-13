@@ -11,7 +11,7 @@ The glossary contains common terms and their definitions.
 
 ## Benchmark
 
-"Benchmark" refers to a test designed to measure performance and resource usage. You can learn more about Vector's benchmarks in the [Benchmarks][benchmarks] section.
+"Benchmark" refers to a test designed to measure performance and resource usage. You can learn more about Vector's benchmarks in Vector's [main README][performance] section.
 
 ## Binary
 
@@ -126,12 +126,12 @@ a metric.
 
 "Vector" is the name of this project.
 
-[benchmarks]: /#performance
 [configuration]: /docs/reference/configuration
 [data_model]: /docs/about/under-the-hood/architecture/data-model
 [guides]: /guides
 [log]: /docs/about/under-the-hood/architecture/data-model/log
 [metric]: /docs/about/under-the-hood/architecture/data-model/metric
+[performance]: https://github.com/timberio/vector#performance
 [roles]: /docs/setup/deployment/roles
 [rust]: https://www.rust-lang.org
 [sinks]: /docs/reference/configuration/sinks

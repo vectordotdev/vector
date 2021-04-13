@@ -5,7 +5,7 @@ import 'tocbot/dist/tocbot';
 tocbot.init({
   tocSelector: '#docs-toc',
   contentSelector: '#docs-content',
-  headingSelector: 'h1, h2, h3',
+  headingSelector: 'h1, h2, h3, h4',
   ignoreSelector: 'no-toc',
   scrollSmoothDuration: 400
 });
