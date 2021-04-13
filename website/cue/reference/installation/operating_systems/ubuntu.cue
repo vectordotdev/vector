@@ -7,8 +7,6 @@ installation: operating_systems: ubuntu: {
 		"""
 
 	interfaces: [
-		installation._interfaces.apt,
-		installation._interfaces.dpkg,
 		installation._interfaces."vector-installer" & {
 			role_implementations: agent: role_implementations._journald_agent
 		},
