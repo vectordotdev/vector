@@ -194,7 +194,10 @@ mod tests {
         .unwrap();
         let parser = parser.as_function();
 
-        parser.transform_one(event).unwrap().into_log()
+        let metadata = event.metadata().clone();
+        let result = parser.transform_one(event).unwrap().into_log();
+        assert_eq!(result.metadata(), &metadata);
+        result
     }
 
     #[tokio::test]

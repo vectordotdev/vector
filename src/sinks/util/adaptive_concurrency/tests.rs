@@ -411,7 +411,7 @@ async fn run_test(params: TestParams) -> TestResults {
             .unwrap()
             .data
             .value,
-        MetricValue::Distribution { .. }
+        MetricValue::AggregatedHistogram { .. }
     ));
     assert!(matches!(
         metrics
@@ -419,7 +419,7 @@ async fn run_test(params: TestParams) -> TestResults {
             .unwrap()
             .data
             .value,
-        MetricValue::Distribution { .. }
+        MetricValue::AggregatedHistogram { .. }
     ));
     if params.concurrency == Concurrency::Adaptive {
         assert!(matches!(
@@ -428,7 +428,7 @@ async fn run_test(params: TestParams) -> TestResults {
                 .unwrap()
                 .data
                 .value,
-            MetricValue::Distribution { .. }
+            MetricValue::AggregatedHistogram { .. }
         ));
     }
     assert!(matches!(
@@ -437,7 +437,7 @@ async fn run_test(params: TestParams) -> TestResults {
             .unwrap()
             .data
             .value,
-        MetricValue::Distribution { .. }
+        MetricValue::AggregatedHistogram { .. }
     ));
 
     TestResults { stats, cstats }

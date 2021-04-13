@@ -161,15 +161,15 @@ impl TaskTransform for Merge {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::event::{self, Event};
+    use crate::event::{self, Event, LogEvent};
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<MergeConfig>();
     }
 
-    fn make_partial(mut event: Event) -> Event {
-        event.as_mut_log().insert(event::PARTIAL, true);
+    fn make_partial(mut event: LogEvent) -> LogEvent {
+        event.insert(event::PARTIAL, true);
         event
     }
 
@@ -191,26 +191,19 @@ mod test {
     fn merge_merges_partial_events() {
         let mut merge = Merge::from(MergeConfig::default());
 
-        let partial_event_1 = make_partial(Event::from("hel"));
-        let partial_event_2 = make_partial(Event::from("lo "));
+        let partial_event_1 = make_partial(LogEvent::from("hel"));
+        let partial_event_2 = make_partial(LogEvent::from("lo "));
         let non_partial_event = Event::from("world");
 
-        assert!(merge.transform_one(partial_event_1).is_none());
-        assert!(merge.transform_one(partial_event_2).is_none());
-        let merged_event = merge.transform_one(non_partial_event).unwrap();
-
-        assert_eq!(
-            merged_event
-                .as_log()
-                .get("message")
-                .unwrap()
-                .as_bytes()
-                .as_ref(),
-            b"hello world"
-        );
-
+        let mut expected = partial_event_1.clone();
+        expected.insert("message", "hello world");
         // Merged event shouldn't contain partial event marker.
-        assert!(!merged_event.as_log().contains(&*event::PARTIAL));
+        expected.remove(event::PARTIAL);
+
+        assert!(merge.transform_one(partial_event_1.into()).is_none());
+        assert!(merge.transform_one(partial_event_2.into()).is_none());
+        let merged_event = merge.transform_one(non_partial_event).unwrap();
+        assert_eq!(merged_event.into_log(), expected);
     }
 
     #[test]
@@ -223,10 +216,8 @@ mod test {
         });
 
         let make_event = |message, stream| {
-            let mut event = Event::from(message);
-            event
-                .as_mut_log()
-                .insert(stream_discriminant_field.clone(), stream);
+            let mut event = LogEvent::from(message);
+            event.insert(stream_discriminant_field.clone(), stream);
             event
         };
 
@@ -234,40 +225,28 @@ mod test {
         let s1_partial_event_2 = make_partial(make_event("lo ", "s1"));
         let s1_non_partial_event = make_event("world", "s1");
 
+        let mut expected_1 = s1_partial_event_1.clone();
+        expected_1.insert("message", "hello world");
+        expected_1.remove(event::PARTIAL);
+
         let s2_partial_event_1 = make_partial(make_event("lo", "s2"));
         let s2_partial_event_2 = make_partial(make_event("rem ip", "s2"));
         let s2_non_partial_event = make_event("sum", "s2");
 
+        let mut expected_2 = s2_partial_event_1.clone();
+        expected_2.insert("message", "lorem ipsum");
+        expected_2.remove(event::PARTIAL);
+
         // Simulate events arriving in non-trivial order.
-        assert!(merge.transform_one(s1_partial_event_1).is_none());
-        assert!(merge.transform_one(s2_partial_event_1).is_none());
-        assert!(merge.transform_one(s1_partial_event_2).is_none());
-        let s1_merged_event = merge.transform_one(s1_non_partial_event).unwrap();
-        assert!(merge.transform_one(s2_partial_event_2).is_none());
-        let s2_merged_event = merge.transform_one(s2_non_partial_event).unwrap();
+        assert!(merge.transform_one(s1_partial_event_1.into()).is_none());
+        assert!(merge.transform_one(s2_partial_event_1.into()).is_none());
+        assert!(merge.transform_one(s1_partial_event_2.into()).is_none());
+        let s1_merged_event = merge.transform_one(s1_non_partial_event.into()).unwrap();
+        assert!(merge.transform_one(s2_partial_event_2.into()).is_none());
+        let s2_merged_event = merge.transform_one(s2_non_partial_event.into()).unwrap();
 
-        assert_eq!(
-            s1_merged_event
-                .as_log()
-                .get("message")
-                .unwrap()
-                .as_bytes()
-                .as_ref(),
-            b"hello world"
-        );
+        assert_eq!(s1_merged_event.into_log(), expected_1);
 
-        assert_eq!(
-            s2_merged_event
-                .as_log()
-                .get("message")
-                .unwrap()
-                .as_bytes()
-                .as_ref(),
-            b"lorem ipsum"
-        );
-
-        // Merged events shouldn't contain partial event marker.
-        assert!(!s1_merged_event.as_log().contains(&*event::PARTIAL));
-        assert!(!s2_merged_event.as_log().contains(&*event::PARTIAL));
+        assert_eq!(s2_merged_event.into_log(), expected_2);
     }
 }
