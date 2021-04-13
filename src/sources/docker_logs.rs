@@ -52,6 +52,7 @@ const MIN_HOSTNAME_LENGTH: usize = 6;
 lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
     static ref STDOUT: Bytes = "stdout".into();
+    static ref CONSOLE: Bytes = "console".into();
 }
 
 #[derive(Debug, Snafu)]
@@ -790,6 +791,7 @@ impl ContainerLogInfo {
         let (stream, mut bytes_message) = match log_output {
             LogOutput::StdErr { message } => (STDERR.clone(), message),
             LogOutput::StdOut { message } => (STDOUT.clone(), message),
+            LogOutput::Console { message } => (CONSOLE.clone(), message),
             _ => return None,
         };
 
