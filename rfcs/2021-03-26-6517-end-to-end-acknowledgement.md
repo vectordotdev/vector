@@ -218,11 +218,6 @@ struct BatchNotifier {
     identifier: Box<str>,
 }
 
-struct EventFinalization {
-    id: EventId,
-    status: EventStatus,
-}
-
 enum BatchStatus {
     Delivered,
     Failed,
