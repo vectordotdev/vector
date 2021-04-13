@@ -4,8 +4,8 @@ remap: functions: to_regex: {
 	category: "Coerce"
 	description: """
 		Coerces the `value` into a regex.
-		Warning: Creating regex is expensive! Too much use of this function can decrease the throughput of vector.
 		"""
+	notices: ["Compiling a regular expression is an expensive operation and can limit Vector throughput."]
 
 	arguments: [
 		{

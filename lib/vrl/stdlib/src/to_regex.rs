@@ -57,10 +57,16 @@ mod tests {
     test_function![
         to_regex => ToRegex;
 
-        plaintext {
+        regex {
             args: func_args![value: "^foobar$"],
-            want: Ok(regex::Regex::new("^foobar$")),
-            tdef: TypeDef::new().regex(),
+            want: Ok(regex::Regex::new("^foobar$").expect("regex is valid")),
+            tdef: TypeDef::new().fallible().regex(),
+        }
+
+        invalid_regex {
+            args: func_args![value: "(+)"],
+            want: Err("could not create regex: regex parse error:\n    (+)\n     ^\nerror: repetition operator missing expression"),
+            tdef: TypeDef::new().fallible().regex(),
         }
     ];
 }
