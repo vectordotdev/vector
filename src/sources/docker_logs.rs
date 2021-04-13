@@ -851,6 +851,13 @@ impl ContainerLogInfo {
             .unwrap_or(false)
         {
             bytes_message.truncate(bytes_message.len() - 1);
+            if bytes_message
+                .last()
+                .map(|&b| b as char == '\r')
+                .unwrap_or(false)
+            {
+                bytes_message.truncate(bytes_message.len() - 1);
+            }
             false
         } else {
             true
@@ -1168,8 +1175,8 @@ mod integration_tests {
     }
 
     /// Users should ensure to remove container before exiting.
-    async fn log_container(name: &str, label: Option<&str>, log: &str, docker: &Docker) -> String {
-        cmd_container(name, label, vec!["echo", log], docker).await
+    async fn log_container(name: &str, label: Option<&str>, log: &str, docker: &Docker, tty: bool) -> String {
+        cmd_container(name, label, vec!["echo", log], docker, tty).await
     }
 
     /// Users should ensure to remove container before exiting.
@@ -1189,6 +1196,7 @@ mod integration_tests {
                 format!("echo before; i=0; while [ $i -le 50 ]; do sleep 0.1; echo {}; i=$((i+1)); done", log).as_str(),
             ],
             docker,
+            false
         ).await
     }
 
@@ -1198,8 +1206,9 @@ mod integration_tests {
         label: Option<&str>,
         cmd: Vec<&str>,
         docker: &Docker,
+        tty: bool
     ) -> String {
-        if let Some(id) = cmd_container_for_real(name, label, cmd, docker).await {
+        if let Some(id) = cmd_container_for_real(name, label, cmd, docker, tty).await {
             id
         } else {
             // Maybe a before created container is present
@@ -1217,6 +1226,7 @@ mod integration_tests {
         label: Option<&str>,
         cmd: Vec<&str>,
         docker: &Docker,
+        tty: bool
     ) -> Option<String> {
         pull_busybox(docker).await;
 
@@ -1227,6 +1237,7 @@ mod integration_tests {
             image: Some("busybox"),
             cmd: Some(cmd),
             labels: label.map(|label| vec![(label, "")].into_iter().collect()),
+            tty: Some(tty),
             ..Default::default()
         };
 
@@ -1319,7 +1330,17 @@ mod integration_tests {
         log: &str,
         docker: &Docker,
     ) -> String {
-        let id = log_container(name, label, log, docker).await;
+        container_with_optional_tty_log_n(n, name, label, log, docker, false).await
+    }
+    async fn container_with_optional_tty_log_n(
+        n: usize,
+        name: &str,
+        label: Option<&str>,
+        log: &str,
+        docker: &Docker,
+        tty: bool
+    ) -> String {
+        let id = log_container(name, label, log, docker, tty).await;
         for _ in 0..n {
             if let Err(error) = container_run(&id, docker).await {
                 container_remove(&id, docker).await;
@@ -1358,6 +1379,27 @@ mod integration_tests {
 
     fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> bool {
         rx.next().now_or_never().is_none()
+    }
+
+    #[tokio::test]
+    async fn container_with_tty() {
+        trace_init();
+
+        let message = "log container_with_tty";
+        let name = "container_with_tty";
+
+        let out = source_with(&[name], None);
+
+        let docker = docker(None, None).unwrap();
+
+        let id = container_with_optional_tty_log_n(1, name, None, message, &docker, true).await;
+        let events = collect_n(out, 1).await;
+        container_remove(&id, &docker).await;
+
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key()],
+            message.into()
+        );
     }
 
     #[tokio::test]
@@ -1667,7 +1709,7 @@ mod integration_tests {
             .collect::<Box<_>>()
             .join(" && ");
 
-        let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker).await;
+        let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker, false).await;
         if let Err(error) = container_run(&id, &docker).await {
             container_remove(&id, &docker).await;
             panic!("Container failed to start with error: {:?}", error);
