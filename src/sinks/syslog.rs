@@ -218,7 +218,7 @@ fn build_syslog_message(
 
 fn build_structured_data(log: LogEvent) -> Vec<StructuredElement<String>> {
     let mut d = vec![];
-    for (k, v) in log.into_iter() {
+    for (k, v) in log.as_map().iter() {
         let mut e = StructuredElement {
             id: k.clone(),
             params: vec![],
