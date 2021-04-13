@@ -101,6 +101,8 @@ async fn topology_source_and_sink() {
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
+    assert!(topology.source_identifier("in1").is_some());
+
     let event = Event::from("this");
     in1.send(event.clone()).await.unwrap();
 
@@ -123,6 +125,12 @@ async fn topology_multiple_sources() {
     config.add_sink("out1", &["in1", "in2"], sink1);
 
     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+    let ident1 = topology.source_identifier("in1");
+    assert!(ident1.is_some());
+    let ident2 = topology.source_identifier("in2");
+    assert!(ident2.is_some());
+    assert_ne!(ident1, ident2);
 
     let event1 = Event::from("this");
     let event2 = Event::from("that");
@@ -309,6 +317,9 @@ async fn topology_swap_source() {
 
     let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
+    let ident1 = topology.source_identifier("in1");
+    assert!(ident1.is_some());
+
     let (mut in2, source2) = source();
     let (out1v2, sink1v2) = sink(10);
 
@@ -320,6 +331,10 @@ async fn topology_swap_source() {
         .reload_config_and_respawn(config.build().unwrap())
         .await
         .unwrap());
+
+    let ident2 = topology.source_identifier("in2");
+    assert!(ident2.is_some());
+    assert_ne!(ident1, ident2);
 
     let event1 = Event::from("this");
     let event2 = Event::from("that");
@@ -334,6 +349,39 @@ async fn topology_swap_source() {
 
     assert_eq!(Vec::<Event>::new(), res1v1);
     assert_eq!(vec![event2], res1v2);
+}
+
+#[tokio::test]
+async fn topology_source_retains_identifier() {
+    let (_in1, source1) = source();
+    let (_out1, sink1v1) = sink(10);
+
+    let mut config = Config::builder();
+    config.add_source("in1", source1);
+    config.add_sink("out1", &["in1"], sink1v1);
+
+    let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
+
+    let ident1 = topology.source_identifier("in1");
+    assert!(ident1.is_some());
+
+    let (_in2, source2) = source();
+    let (_out1, sink1v2) = sink(10);
+
+    let mut config = Config::builder();
+    config.add_source("in1", source2);
+    config.add_sink("out1", &["in1"], sink1v2);
+
+    assert!(topology
+        .reload_config_and_respawn(config.build().unwrap())
+        .await
+        .unwrap());
+
+    let ident2 = topology.source_identifier("in1");
+    assert!(ident2.is_some());
+    assert_eq!(ident1, ident2);
+
+    topology.stop().await;
 }
 
 #[tokio::test]

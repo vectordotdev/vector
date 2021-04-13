@@ -778,6 +778,14 @@ impl RunningTopology {
     pub fn watch(&self) -> watch::Receiver<Outputs> {
         self.watch.1.clone()
     }
+
+    #[cfg(test)]
+    pub fn source_identifier(&self, name: &str) -> Option<Box<str>> {
+        self.config
+            .sources
+            .get(name)
+            .and_then(|source| source.identifier.clone())
+    }
 }
 
 async fn handle_errors(
