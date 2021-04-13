@@ -429,8 +429,7 @@ mod tests {
 
         let bytes = build_message(event, false).unwrap();
 
-        let msg =
-            Bytes::from("<4> 2021-04-12T21:00:01+00:00 foo bar[vector]: A message\n");
+        let msg = Bytes::from("<4> 2021-04-12T21:00:01+00:00 foo bar[vector]: A message\n");
 
         assert_eq!(bytes, msg);
     }
