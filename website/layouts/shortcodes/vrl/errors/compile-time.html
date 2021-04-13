@@ -1,13 +1,18 @@
 {{ $errors := site.Data.docs.remap.errors }}
 {{ range $code, $error := $errors }}
+{{ $id := printf "%s %s" $code $error.title | urlize }}
+<h3 style="display: none;" id="{{ $id }}">
+  {{ $code }} {{ $error.title }}
+</h3>
+
 <div class="error" id="{{ $code }}" x-data="{ open: location.hash === '#{{ $code }}' }">
-  <header class="error-header">
-    <span>
-      <span class="error-code">
+  <header class="error-title">
+    <span class="is-size-5 is-size-6-mobile">
+      <span class="code">
         {{ $code }}
       </span>
-  
-      <span class="error-title">
+
+      <span class="name">
         {{ $error.title }}
       </span>
     </span>
@@ -21,7 +26,7 @@
     <div class="error-description">
       {{ $error.description | markdownify }}
     </div>
-  
+
     {{ with $error.examples }}
     <div class="error-examples" x-data="{ open: location.hash == '#{{ $code }}' }">
       <header class="error-examples-title">
@@ -36,7 +41,7 @@
 
       <div x-show="open">
         <span class="has-text-secondary">
-          TODO!
+          TODO
         </span>
       </div>
     </div>

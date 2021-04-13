@@ -1,24 +1,17 @@
 .error
   box-shadow: $card-shadow
 
-  .error-header
+  .error-title
     +x-spaced
-    font-size: $header-font-size
-    background-color: $header-bg-color
-    padding: $padding
+    padding: $padding !important
 
-    .error-code
-      color: $header-code-color
-      margin-right: $header-code-right-margin
-      font-weight: $weight-bold
-      font-family: $family-monospace
-
-    .error-title
-      color: $header-title-color
-      font-weight: $weight-bold
-
+    .code
+      color: $primary
+    .name
+      font-weight: $weight-normal
+      font-weight: $weight-light
     .icon
-      color: $icon-color
+      color: $secondary
 
   .error-info
     padding: $padding
