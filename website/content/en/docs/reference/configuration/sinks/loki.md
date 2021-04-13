@@ -10,4 +10,4 @@ layout: component
 
 ## Telemetry
 
-{{< component/config >}}
+{{< component/telemetry >}}

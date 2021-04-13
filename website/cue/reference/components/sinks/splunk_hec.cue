@@ -99,7 +99,10 @@ components: sinks: splunk_hec: {
 		}
 		host_key: {
 			common:      true
-			description: "The name of the log field to be used as the hostname sent to Splunk HEC. This overrides the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
+			description: """
+				The name of the log field to be used as the hostname sent to Splunk HEC. This overrides the
+				[global `host_key` option](\(urls.vector_configuration)/global-options#host_key).
+				"""
 			required:    false
 			warnings: []
 			type: string: {
@@ -121,7 +124,7 @@ components: sinks: splunk_hec: {
 		}
 		indexed_fields: {
 			common:      true
-			description: "Fields to be [added to Splunk index][urls.splunk_hec_indexed_fields]."
+			description: "Fields to be [added to Splunk index](\(urls.splunk_hec_indexed_fields))."
 			required:    false
 			warnings: []
 			type: array: {

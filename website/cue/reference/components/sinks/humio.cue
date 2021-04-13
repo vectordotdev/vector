@@ -99,7 +99,12 @@ components: sinks: _humio: {
 		}
 		event_type: {
 			common:      false
-			description: "The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.\n\nIf unset, Humio will default it to none.\n"
+			description: """
+				The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the
+				data.
+
+				If unset, Humio will default it to none.
+				"""
 			required:    false
 			warnings: []
 			type: string: {
@@ -110,7 +115,10 @@ components: sinks: _humio: {
 		}
 		host_key: {
 			common:      true
-			description: "The name of the log field to be used as the hostname sent to Humio. This overrides the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
+			description: """
+				The name of the log field to be used as the hostname sent to Humio. This overrides the
+				[global `host_key` option](\(urls.vector_configuration)/global-options#host_key).
+				"""
 			required:    false
 			warnings: []
 			type: string: {
@@ -121,7 +129,10 @@ components: sinks: _humio: {
 		}
 		source: {
 			common:      false
-			description: "The source of events sent to this sink. Typically the filename the logs originated from. Maps to @source in Humio.\n"
+			description: """
+				The source of events sent to this sink. Typically the filename the logs originated from. Maps to
+				`@source` in Humio.
+				"""
 			required:    false
 			warnings: []
 			type: string: {

@@ -59,11 +59,10 @@ components: sinks: prometheus_exporter: {
 		requirements: []
 		warnings: [
 			"""
-				High cardinality metric names and labels are discouraged by
-				Prometheus as they can provide performance and reliability
-				problems. You should consider alternative strategies to reduce
-				the cardinality. Vector offers a [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit]
-				as a way to protect against this.
+				High cardinality metric names and labels are discouraged by Prometheus as they can provide performance
+				and reliability problems. You should consider alternative strategies to reduce the cardinality. Vector
+				offers a [`tag_cardinality_limit` transform](\(urls.vector_transforms)/tag_cardinality_limit) as a way
+				to protect against this.
 				""",
 		]
 		notices: []
@@ -81,7 +80,10 @@ components: sinks: prometheus_exporter: {
 		}
 		buckets: {
 			common:      false
-			description: "Default buckets to use for aggregating [distribution][docs.data-model.metric#distribution] metrics into histograms."
+			description: """
+				Default buckets to use for aggregating [distribution](\(urls.vector_data_model)/metric#distribution)
+				metrics into histograms.
+				"""
 			required:    false
 			warnings: []
 			type: array: {
@@ -91,7 +93,7 @@ components: sinks: prometheus_exporter: {
 		}
 		flush_period_secs: {
 			common:      false
-			description: "Time interval between [set][docs.data-model.metric#set] values are reset."
+			description: "Time interval between [set](\(urls.vector_data_model)/metric#set) values are reset."
 			required:    false
 			warnings: []
 			type: uint: {
@@ -117,7 +119,10 @@ components: sinks: prometheus_exporter: {
 		}
 		quantiles: {
 			common:      false
-			description: "Quantiles to use for aggregating [distribution][docs.data-model.metric#distribution] metrics into a summary."
+			description: """
+				Quantiles to use for aggregating [distribution](\(urls.vector_data_model)/metric#distribution) metrics
+				into a summary.
+				"""
 			required:    false
 			warnings: []
 			type: array: {

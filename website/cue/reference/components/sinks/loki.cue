@@ -93,7 +93,12 @@ components: sinks: loki: {
 			username_example: "${LOKI_USERNAME}"
 		}}
 		labels: {
-			description: "A set of labels that will be attached to each batch of events. These values are also templateable to allow events to provide dynamic label values.Note: If the set of label values has high cardinality this can cause drastic performance issues with Loki. To ensure this does not happen one should try to reduce the amount of unique label values."
+			description: """
+				A set of labels that will be attached to each batch of events. These values are also templateable to
+				allow events to provide dynamic label values. Note: if the set of label values has high cardinality,
+				this can cause drastic performance issues with Loki. To ensure this doesn't happen, you should try to
+				reduce the number of unique label values.
+				"""
 			required:    true
 			warnings: []
 			type: object: {
@@ -121,11 +126,9 @@ components: sinks: loki: {
 		out_of_order_action: {
 			common: false
 			description: """
-				Some sources may generate events with timestamps that are
-				not strictly in chronological order. The Loki service cannot
-				accept a stream of such events. Vector will sort events before
-				sending it to Loki. However, some late events might arrive after
-				a batch has been sent. This option specifies what Vector should do
+				Some sources may generate events with timestamps that aren't in strictly chronological order. The Loki
+				service can't accept a stream of such events. Vector sorts events before sending them to Loki, however
+				some late events might arrive after a batch has been sent. This option specifies what Vector should do
 				with those events.
 				"""
 			required: false
@@ -155,7 +158,12 @@ components: sinks: loki: {
 		}
 		tenant_id: {
 			common:      false
-			description: "The tenant id that will be sent with every request, by default this is not required since a proxy should set this header. When running Loki locally a tenant id is not required either.\n\nYou can read more about tenant id's [here][urls.loki_multi_tenancy]"
+			description: """
+				The tenant id that's sent with every request, by default this is not required since a proxy should set
+				this header. When running Loki locally a tenant id is not required either.
+
+				You can read more about tenant id's [here](\(urls.loki_multi_tenancy)).
+				"""
 			required:    false
 			warnings: []
 			type: string: {

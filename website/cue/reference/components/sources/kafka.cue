@@ -36,7 +36,11 @@ components: sources: kafka: {
 	configuration: {
 		auto_offset_reset: {
 			common:      false
-			description: "If offsets for consumer group do not exist, set them using this strategy. [librdkafka documentation][urls.librdkafka_config] for `auto.offset.reset` option for explanation."
+			description: """
+				If offsets for consumer group do not exist, set them using this strategy. See the
+				[librdkafka documentation](\(urls.librdkafka_config)) for the `auto.offset.reset` option for further
+				clarification.
+				"""
 			required:    false
 			warnings: []
 			type: string: {
@@ -48,7 +52,7 @@ components: sources: kafka: {
 		bootstrap_servers: components._kafka.configuration.bootstrap_servers
 		commit_interval_ms: {
 			common:      false
-			description: "The frequency that the consumer offsets are committed (written) to offset storage.\n"
+			description: "The frequency that the consumer offsets are committed (written) to offset storage."
 			required:    false
 			warnings: []
 			type: uint: {
@@ -59,7 +63,7 @@ components: sources: kafka: {
 		}
 		fetch_wait_max_ms: {
 			common:      false
-			description: "Maximum time the broker may wait to fill the response.\n"
+			description: "Maximum time the broker may wait to fill the response."
 			required:    false
 			warnings: []
 			type: uint: {
@@ -69,7 +73,7 @@ components: sources: kafka: {
 			}
 		}
 		group_id: {
-			description: "The consumer group name to be used to consume events from Kafka.\n"
+			description: "The consumer group name to be used to consume events from Kafka."
 			required:    true
 			warnings: []
 			type: string: {
@@ -143,7 +147,7 @@ components: sources: kafka: {
 				options: {
 					enabled: {
 						common:      true
-						description: "Enable SASL/SCRAM authentication to the remote. (Not supported on Windows at this time.)"
+						description: "Enable SASL/SCRAM authentication to the remote (not supported on Windows at this time)."
 						required:    false
 						warnings: []
 						type: bool: default: null
@@ -186,7 +190,7 @@ components: sources: kafka: {
 		}
 		session_timeout_ms: {
 			common:      false
-			description: "The Kafka session timeout in milliseconds.\n"
+			description: "The Kafka session timeout in milliseconds."
 			required:    false
 			warnings: []
 			type: uint: {
@@ -197,7 +201,7 @@ components: sources: kafka: {
 		}
 		socket_timeout_ms: components._kafka.configuration.socket_timeout_ms
 		topics: {
-			description: "The Kafka topics names to read events from. Regex is supported if the topic begins with `^`.\n"
+			description: "The Kafka topics names to read events from. Regex is supported if the topic begins with `^`."
 			required:    true
 			warnings: []
 			type: array: items: type: string: {

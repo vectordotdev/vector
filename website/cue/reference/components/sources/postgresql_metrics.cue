@@ -2,7 +2,11 @@ package metadata
 
 components: sources: postgresql_metrics: {
 	title:       "PostgreSQL Metrics"
-	description: "[PostgreSQL][urls.postgresql] PostgreSQL is a powerful, open source object-relational database system with over 30 years of active development that has earned it a strong reputation for reliability, feature robustness, and performance."
+	description: """
+		[PostgreSQL](\(urls.postgresql)) is a powerful, open source object-relational database system with over 30 years
+		of active development that has earned it a strong reputation for reliability, feature robustness, and
+		performance.
+		"""
 
 	classes: {
 		commonly_used: false
@@ -88,11 +92,10 @@ components: sources: postgresql_metrics: {
 		}
 		include_databases: {
 			description: """
-				A list of databases to match (by using [POSIX Regular Expressions][urls.postgresql_matching]) against
-				the `datname` column for which you want to collect metrics from.
-				If not set, metrics will be collected from all databases.
-				Specifying `""` will include metrics where `datname` is `NULL`.
-				This can be used in conjunction with [`exclude_databases`](#exclude_databases).
+				A list of databases to match (by using [POSIX Regular Expressions](\(urls.postgresql_matching))) against
+				the `datname` column for which you want to collect metrics from. If not set, metrics are collected from
+				all databases. Specifying `""` will include metrics where `datname` is `NULL`. This can be used in
+				conjunction with [`exclude_databases`](#exclude_databases).
 				"""
 			common:   false
 			required: false
@@ -106,7 +109,7 @@ components: sources: postgresql_metrics: {
 		}
 		exclude_databases: {
 			description: """
-				A list of databases to match (by using [POSIX Regular Expressions][urls.postgresql_matching]) against
+				A list of databases to match (by using [POSIX Regular Expressions](\(urls.postgresql_matching))) against
 				the `datname` column for which you don't want to collect metrics from.
 				Specifying `""` will include metrics where `datname` is `NULL`.
 				This can be used in conjunction with [`include_databases`](#include_databases).

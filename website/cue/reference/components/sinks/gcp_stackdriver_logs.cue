@@ -104,7 +104,13 @@ components: sinks: gcp_stackdriver_logs: {
 		}
 		folder_id: {
 			common:      false
-			description: "The folder ID to which to publish logs.\nSee the [Google Cloud Platform folder documentation][urls.gcp_folders] for more details.\n\nExactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set."
+			description: """
+				The folder ID to which to publish logs.
+
+				See the [Google Cloud Platform folder documentation](\(urls.gcp_folders)) for more details.
+
+				Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
+				"""
 			required:    false
 			warnings: []
 			type: string: {
@@ -134,7 +140,12 @@ components: sinks: gcp_stackdriver_logs: {
 			}
 		}
 		project_id: {
-			description: "The project ID to which to publish logs. See the [Google Cloud Platform project management documentation][urls.gcp_projects] for more details.\n\nExactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set."
+			description: """
+				The project ID to which to publish logs. See the
+				[Google Cloud Platform project management documentation](\(urls.gcp_projects)) for more details.
+
+				Exactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set.
+				"""
 			required:    true
 			warnings: []
 			type: string: {
@@ -157,7 +168,13 @@ components: sinks: gcp_stackdriver_logs: {
 				]
 				options: {
 					type: {
-						description: "The monitored resource type. For example, the type of a Compute Engine VM instance is gce_instance.\n\nSee the [Google Cloud Platform monitored resource documentation][urls.gcp_resources] for more details."
+						description: """
+							The monitored resource type. For example, the type of a Compute Engine VM instance is
+							`gce_instance`.
+
+							See the [Google Cloud Platform monitored resource documentation](\(urls.gcp_resources)) for
+							more details.
+							"""
 						required:    true
 						warnings: []
 						type: string: {
@@ -181,7 +198,18 @@ components: sinks: gcp_stackdriver_logs: {
 		}
 		severity_key: {
 			common:      false
-			description: "The field of the log event from which to take the outgoing log's `severity` field. The named field is removed from the log event if present, and must be either an integer between 0 and 800 or a string containing one of the [severity level names][urls.gcp_stackdriver_severity] (case is ignored) or a common prefix such as `err`. This could be added by an [`add_fields` transform][docs.transforms.add_fields] or extracted from a field from the source.\n\nIf no severity key is specified, the severity of outgoing records will be set to 0 (`DEFAULT`).\n\nSee the [GCP Stackdriver Logging LogSeverity description][urls.gcp_stackdriver_severity] for more details on the value of the `severity` field."
+			description: """
+				The field of the log event from which to take the outgoing log's `severity` field. The named field is
+				removed from the log event if present, and must be either an integer between 0 and 800 or a string
+				containing one of the [severity level names](\(urls.gcp_stackdriver_severity)) (case is ignored) or a
+				common prefix such as `err`. This could be added by an [`add_fields` transform](\(urls.vector_transforms)/add_fields)
+				or extracted from a field from the source.
+
+				If no severity key is specified, the severity of outgoing records will be set to 0 (`DEFAULT`).
+
+				See the [GCP Stackdriver Logging LogSeverity description](\(urls.gcp_stackdriver_severity)) for more
+				details on the value of the `severity` field.
+				"""
 			required:    false
 			warnings: []
 			type: string: {
@@ -203,7 +231,7 @@ components: sinks: gcp_stackdriver_logs: {
 			body: #"""
 				If a `severity_key` is configured, outgoing log records will have their
 				`severity` header field set from the named field in the Vector
-				event. However, the [required values][urls.gcp_stackdriver_severity] for
+				event. However, the [required values](\(urls.gcp_stackdriver_severity)) for
 				this field may be inconvenient to produce, typically requiring a custom
 				mapping using an additional transform. To assist with this, this sink
 				remaps certain commonly used words to the required numbers as in the
