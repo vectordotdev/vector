@@ -59,7 +59,7 @@ mod tests {
 
         regex {
             args: func_args![value: "^test[A-Za-z_]+$"],
-            want: Ok(regex::Regex::new("^test[A-Za-z_].+$").expect("regex is valid")),
+            want: Ok(regex::Regex::new("^test[A-Za-z_]+$").expect("regex is valid")),
             tdef: TypeDef::new().fallible().regex(),
         }
 
