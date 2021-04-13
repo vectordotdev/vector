@@ -269,7 +269,7 @@ fn remove_unix_socket_stream() {
         r#"
         type = "socket"
         path = "{}"
-        mode = "unix"        
+        mode = "unix"
         "#,
         path.to_string_lossy()
     )));
@@ -289,7 +289,7 @@ fn remove_unix_socket_datagram() {
         r#"
         type = "socket"
         path = "{}"
-        mode = "unix_datagram"        
+        mode = "unix_datagram"
         "#,
         path.to_string_lossy()
     )));
