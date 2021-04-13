@@ -368,3 +368,70 @@ pub enum SyslogFacilityDef {
     LOG_LOCAL6 = 22,
     LOG_LOCAL7 = 23,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Event;
+    use chrono::Utc;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SyslogSinkConfig>();
+    }
+
+    fn build_message(event: Event, rfc5434: bool) -> Option<Bytes> {
+        build_syslog_message(
+            event,
+            false,
+            rfc5434,
+            true,
+            "appname",
+            "facility",
+            "hostname",
+            "msgid",
+            "procid",
+            "severity",
+            SyslogFacility::LOG_USER,
+            SyslogSeverity::SEV_INFO,
+        )
+    }
+
+    #[test]
+    fn basic_syslog5424_message() {
+        let mut event = Event::from("A message");
+
+        let timestamp = Utc.ymd(2021, 04, 12).and_hms(21, 0, 1);
+
+        event.as_mut_log().insert("timestamp", timestamp);
+        event.as_mut_log().insert("hostname", "foohost");
+        event.as_mut_log().insert("appname", "myapp");
+
+        let bytes = build_message(event, true).unwrap();
+
+        let msg =
+            Bytes::from("<14>1 2021-04-12T21:00:01+00:00 foohost myapp vector - - A message\n");
+
+        assert_eq!(bytes, msg);
+    }
+
+    #[test]
+    fn basic_syslog3164_message() {
+        let mut event = Event::from("A message");
+
+        let timestamp = Utc.ymd(2021, 04, 12).and_hms(21, 0, 1);
+
+        event.as_mut_log().insert("timestamp", timestamp);
+        event.as_mut_log().insert("hostname", "foo");
+        event.as_mut_log().insert("appname", "bar");
+        event.as_mut_log().insert("severity", "warning");
+        event.as_mut_log().insert("facility", "kern");
+
+        let bytes = build_message(event, false).unwrap();
+
+        let msg =
+            Bytes::from("<4> 2021-04-12T21:00:01+00:00 foo bar[vector]: A message\n");
+
+        assert_eq!(bytes, msg);
+    }
+}
