@@ -204,7 +204,7 @@ logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.6.3", default-features = false, optional = true }
 maxminddb = { version = "0.17.0", default-features = false, optional = true }
 mongodb = { version = "2.0.0-alpha.1", default-features = false, features = ["tokio-runtime"], optional = true }
-async-nats = { version = "0.9.9", default-features = false, optional = true }
+async-nats = { version = "0.9.12", default-features = false, optional = true }
 nom = { version = "6.0.1", default-features = false, optional = true }
 notify = { version = "4.0.14", default-features = false }
 num_cpus = { version = "1.10.0", default-features = false }
