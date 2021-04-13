@@ -4,4 +4,10 @@ icon: fas fa-asterisk
 weight: 3
 ---
 
-Here it is!
+## Pages
+
+{{< pages >}}
+
+## Subsections
+
+{{< sections >}}
