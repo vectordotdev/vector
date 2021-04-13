@@ -142,30 +142,29 @@ sup.ml-tiny
     padding-left: 1rem
 
 .requirements
-  background-color: $black
-  color: $grey-lighter
+  border: 1.5px solid $grey
+  border-radius: $border-radius
+  color: $black
   font-size: 1rem
 
   .highlight, code
-    //width: 10rem
     overflow-x: scroll
     border-radius: 5px
     color: $vector-light-blue
 
   .requirement
-    padding: 0.75rem 1rem
-    display: flex
-    flex-direction: row
+    +x-spaced
+    padding: 0.5rem 0.75rem
     align-items: center
 
     code
-      background-color: $grey-darker
+      background-color: $black
 
     .icon
       flex: 1
 
     .text
-      flex: 19
+      flex: 24
 
     & + .requirement
       border-top: 1px solid grey-lighter
