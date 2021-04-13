@@ -1175,7 +1175,13 @@ mod integration_tests {
     }
 
     /// Users should ensure to remove container before exiting.
-    async fn log_container(name: &str, label: Option<&str>, log: &str, docker: &Docker, tty: bool) -> String {
+    async fn log_container(
+        name: &str,
+        label: Option<&str>,
+        log: &str,
+        docker: &Docker,
+        tty: bool,
+    ) -> String {
         cmd_container(name, label, vec!["echo", log], docker, tty).await
     }
 
@@ -1206,7 +1212,7 @@ mod integration_tests {
         label: Option<&str>,
         cmd: Vec<&str>,
         docker: &Docker,
-        tty: bool
+        tty: bool,
     ) -> String {
         if let Some(id) = cmd_container_for_real(name, label, cmd, docker, tty).await {
             id
@@ -1226,7 +1232,7 @@ mod integration_tests {
         label: Option<&str>,
         cmd: Vec<&str>,
         docker: &Docker,
-        tty: bool
+        tty: bool,
     ) -> Option<String> {
         pull_busybox(docker).await;
 
@@ -1338,7 +1344,7 @@ mod integration_tests {
         label: Option<&str>,
         log: &str,
         docker: &Docker,
-        tty: bool
+        tty: bool,
     ) -> String {
         let id = log_container(name, label, log, docker, tty).await;
         for _ in 0..n {
