@@ -52,10 +52,6 @@ ignore = [
     # https://github.com/timberio/vector/issues/6224
     "RUSTSEC-2020-0095",
 
-    # Soundness issues in `raw-cpuid`
-    # https://github.com/timberio/vector/issues/6223
-    "RUSTSEC-2021-0013",
-
     # arr! macro erases lifetimes
     # https://github.com/timberio/vector/issues/6584
     "RUSTSEC-2020-0146",
