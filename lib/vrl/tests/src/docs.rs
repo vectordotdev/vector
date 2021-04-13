@@ -12,6 +12,7 @@ use crate::Test;
 const SKIP_FUNCTION_EXAMPLES: &[&str] = &[
     "uuid_v4",
     "strip_ansi_escape_codes",
+    "get_host_ip",
     "get_hostname",
     "now",
     "get_env_var",
