@@ -309,13 +309,19 @@ mod integration_tests {
 
         let client = ClickhouseClient::new(host);
         client
-            .create_table(&table, "host String, timestamp String, message String")
+            .create_table(
+                &table,
+                "host String, timestamp String, message String, items Array(String)",
+            )
             .await;
 
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
+        input_event
+            .as_mut_log()
+            .insert("items", vec!["item1", "item2"]);
 
         sink.run(stream::once(ready(input_event.clone())))
             .await
@@ -324,7 +330,7 @@ mod integration_tests {
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
 
-        let expected = serde_json::to_value(input_event.into_log().all_fields()).unwrap();
+        let expected = serde_json::to_value(input_event.into_log()).unwrap();
         assert_eq!(expected, output.data[0]);
     }
 
@@ -389,7 +395,7 @@ mod integration_tests {
             ),
         );
 
-        let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
+        let expected = serde_json::to_value(exp_event).unwrap();
         assert_eq!(expected, output.data[0]);
     }
 
@@ -449,7 +455,7 @@ timestamp_format = "unix""#,
             ),
         );
 
-        let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
+        let expected = serde_json::to_value(exp_event).unwrap();
         assert_eq!(expected, output.data[0]);
     }
 
