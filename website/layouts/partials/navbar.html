@@ -19,7 +19,7 @@
         {{ range $menu }}
         {{ $active := hasPrefix $here .URL }}
 
-        <a class="navbar-item has-text-weight-medium{{ if $active }} is-active{{ end }}" href="{{ .URL }}">
+        <a class="navbar-item{{ if $active }} is-active{{ end }}" href="{{ .URL }}">
           {{ .Name }}
         </a>
         {{ end }}
