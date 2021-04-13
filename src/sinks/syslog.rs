@@ -18,6 +18,58 @@ use syslog_loose::{Message, ProcId, Protocol, StructuredElement, SyslogFacility,
 pub struct SyslogSinkConfig {
     #[serde(flatten)]
     mode: Mode,
+    #[serde(default = "crate::serde::default_true")]
+    rfc5424: bool,
+    #[serde(default = "crate::serde::default_false")]
+    include_extra_fields: bool,
+    #[serde(default = "appname_key")]
+    appname_key: String,
+    #[serde(default = "facility_key")]
+    facility_key: String,
+    #[serde(default = "host_key")]
+    host_key: String,
+    #[serde(default = "msgid_key")]
+    msgid_key: String,
+    #[serde(default = "procid_key")]
+    procid_key: String,
+    #[serde(default = "severity_key")]
+    severity_key: String,
+    #[serde(with = "SyslogFacilityDef", default = "facility")]
+    default_facility: SyslogFacility,
+    #[serde(with = "SyslogSeverityDef", default = "severity")]
+    default_severity: SyslogSeverity,
+}
+
+fn appname_key() -> String {
+    "appname".to_string()
+}
+
+fn facility_key() -> String {
+    "facility".to_string()
+}
+
+fn host_key() -> String {
+    crate::config::log_schema().host_key().to_string()
+}
+
+fn msgid_key() -> String {
+    "msgid".to_string()
+}
+
+fn procid_key() -> String {
+    "procid".to_string()
+}
+
+fn severity_key() -> String {
+    "severity".to_string()
+}
+
+fn facility() -> SyslogFacility {
+    SyslogFacility::LOG_SYSLOG
+}
+
+fn severity() -> SyslogSeverity {
+    SyslogSeverity::SEV_DEBUG
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -44,16 +96,6 @@ impl GenerateConfig for SyslogSinkConfig {
     }
 }
 
-impl SyslogSinkConfig {
-    pub fn new(mode: Mode) -> Self {
-        SyslogSinkConfig { mode }
-    }
-
-    pub fn make_basic_tcp_config(address: String) -> Self {
-        Self::new(Mode::Tcp(TcpSinkConfig::from_address(address)))
-    }
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "syslog")]
 impl SinkConfig for SyslogSinkConfig {
@@ -61,13 +103,39 @@ impl SinkConfig for SyslogSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let syslog_encode = move |event| build_syslog_message(event);
+        let rfc5424 = self.rfc5424.clone();
+        let include_extra_fields = self.include_extra_fields.clone();
+        let appname_key = self.appname_key.to_owned();
+        let facility_key = self.facility_key.to_owned();
+        let host_key = self.host_key.to_owned();
+        let msgid_key = self.procid_key.to_owned();
+        let procid_key = self.msgid_key.to_owned();
+        let severity_key = self.severity_key.to_owned();
+        let default_facility = self.default_facility.clone();
+        let default_severity = self.default_severity.clone();
+
+        let syslog_encode = move |event, include_len| {
+            build_syslog_message(
+                event,
+                include_len,
+                rfc5424,
+                include_extra_fields,
+                appname_key.as_str(),
+                facility_key.as_str(),
+                host_key.as_str(),
+                msgid_key.as_str(),
+                procid_key.as_str(),
+                severity_key.as_str(),
+                default_facility,
+                default_severity,
+            )
+        };
 
         match &self.mode {
-            Mode::Tcp(config) => config.build(cx, syslog_encode),
-            Mode::Udp(config) => config.build(cx, syslog_encode),
+            Mode::Tcp(config) => config.build(cx, move |e| syslog_encode(e, true)),
+            Mode::Udp(config) => config.build(cx, move |e| syslog_encode(e, false)),
             #[cfg(unix)]
-            Mode::Unix(config) => config.build(cx, syslog_encode),
+            Mode::Unix(config) => config.build(cx, move |e| syslog_encode(e, true)),
         }
     }
 
@@ -80,62 +148,91 @@ impl SinkConfig for SyslogSinkConfig {
     }
 }
 
-/*
-
-{
-  "appname": "root",
-  "facility": "user",
-  "host": "74794bfb6795",
-  "hostname": "74794bfb6795",
-  "message": "i am foobar",
-  "meta": {
-    "sequenceId": "1"
-  },
-  "procid": 8449,
-  "service": "vector",
-  "severity": "notice",
-  "source_ip": "10.121.132.66",
-  "source_type": "syslog",
-  "timestamp": "2019-02-13T19:48:34Z",
-  "version": 1
-}*/
-
-fn build_syslog_message(event: Event) -> Option<Bytes> {
+fn build_syslog_message(
+    event: Event,
+    include_len: bool,
+    rfc5424: bool,
+    include_extra_fields: bool,
+    appname_key: &str,
+    facility_key: &str,
+    host_key: &str,
+    msgid_key: &str,
+    procid_key: &str,
+    severity_key: &str,
+    default_facility: SyslogFacility,
+    default_severity: SyslogSeverity,
+) -> Option<Bytes> {
     let mut log = event.into_log();
+
     let ts = log.remove(log_schema().timestamp_key()).and_then(|v| {
         v.as_timestamp()
             .map(|v| FixedOffset::west(0).timestamp_nanos(v.timestamp_nanos()))
     });
 
-    let procid = log.remove("procid").map(|procid| match procid {
-        Value::Integer(pid) => ProcId::PID(pid as i32),
-        Value::Bytes(_) => ProcId::Name(procid.to_string_lossy()),
-        _ => ProcId::Name("vector".to_string()),
-    });
+    let procid = log
+        .remove(procid_key)
+        .map(|procid| match procid {
+            Value::Integer(pid) => ProcId::PID(pid as i32),
+            Value::Bytes(_) => ProcId::Name(procid.to_string_lossy()),
+            _ => ProcId::Name("vector".to_string()),
+        })
+        .or(Some(ProcId::Name("vector".to_string())));
 
     let msg = Message {
-        protocol: Protocol::RFC5424(1),
-        facility: log.remove("facility").and_then(get_facility),
-        severity: log.remove("severity").and_then(get_severity),
+        protocol: if rfc5424 {
+            Protocol::RFC5424(1)
+        } else {
+            Protocol::RFC3164
+        },
         timestamp: ts,
-        // Note: the syslog source uses host and hostname key
-        hostname: log
-            .remove(log_schema().host_key())
-            .map(|v| v.to_string_lossy()),
-        appname: log.remove("appname").map(|v| v.to_string_lossy()),
         procid: procid,
-        msgid: log.remove("appname").map(|v| v.to_string_lossy()),
+        facility: log
+            .remove(facility_key)
+            .and_then(get_facility)
+            .or(Some(default_facility)),
+        severity: log
+            .remove(severity_key)
+            .and_then(get_severity)
+            .or(Some(default_severity)),
+        appname: log.remove(appname_key).map(|v| v.to_string_lossy()),
+        msgid: log.remove(msgid_key).map(|v| v.to_string_lossy()),
+        hostname: log.remove(host_key).map(|v| v.to_string_lossy()),
         msg: log
             .remove(log_schema().message_key())
             .map(|v| v.to_string_lossy())
             .unwrap_or("-".to_owned()),
-        structured_data: build_structured_data(log),
+        structured_data: if include_extra_fields {
+            build_structured_data(log)
+        } else {
+            vec![]
+        },
     };
-    Some(Bytes::from(format!("{}", msg)))
+
+    if include_len {
+        let msg = format!("{}", msg);
+        Some(Bytes::from(format!("{} {}\n", msg.len(), msg)))
+    } else {
+        Some(Bytes::from(format!("{}\n", msg)))
+    }
 }
 
 fn build_structured_data(log: LogEvent) -> Vec<StructuredElement<String>> {
-    vec![]
+    let mut d = vec![];
+    for (k, v) in log.into_iter() {
+        let mut e = StructuredElement {
+            id: k.clone(),
+            params: vec![],
+        };
+        if let Value::Map(m) = v {
+            for (k, v) in m.iter() {
+                e.params.push((k.clone(), v.to_string_lossy()));
+            }
+        } else {
+            e.params.push(("value".to_string(), v.to_string_lossy()));
+        }
+        d.push(e);
+    }
+    d
 }
 
 fn get_facility(value: Value) -> Option<SyslogFacility> {
@@ -224,4 +321,50 @@ fn get_severity(value: Value) -> Option<SyslogSeverity> {
         },
         _ => None,
     }
+}
+
+/// Syslog Severities from RFC 5424.
+#[derive(Serialize, Deserialize)]
+#[serde(remote = "SyslogSeverity")]
+#[allow(non_camel_case_types)]
+pub enum SyslogSeverityDef {
+    SEV_EMERG = 0,
+    SEV_ALERT = 1,
+    SEV_CRIT = 2,
+    SEV_ERR = 3,
+    SEV_WARNING = 4,
+    SEV_NOTICE = 5,
+    SEV_INFO = 6,
+    SEV_DEBUG = 7,
+}
+
+/// Names are from Linux.
+#[derive(Serialize, Deserialize)]
+#[serde(remote = "SyslogFacility")]
+#[allow(non_camel_case_types)]
+pub enum SyslogFacilityDef {
+    LOG_KERN = 0,
+    LOG_USER = 1,
+    LOG_MAIL = 2,
+    LOG_DAEMON = 3,
+    LOG_AUTH = 4,
+    LOG_SYSLOG = 5,
+    LOG_LPR = 6,
+    LOG_NEWS = 7,
+    LOG_UUCP = 8,
+    LOG_CRON = 9,
+    LOG_AUTHPRIV = 10,
+    LOG_FTP = 11,
+    LOG_NTP = 12,
+    LOG_AUDIT = 13,
+    LOG_ALERT = 14,
+    LOG_CLOCKD = 15,
+    LOG_LOCAL0 = 16,
+    LOG_LOCAL1 = 17,
+    LOG_LOCAL2 = 18,
+    LOG_LOCAL3 = 19,
+    LOG_LOCAL4 = 20,
+    LOG_LOCAL5 = 21,
+    LOG_LOCAL6 = 22,
+    LOG_LOCAL7 = 23,
 }
