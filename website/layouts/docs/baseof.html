@@ -37,19 +37,7 @@
       {{ block "below" . }}
       {{ end }}
 
-      <nav class="navbar is-fixed-bottom is-padded has-shadow is-hidden-desktop">
-        <div class="container">
-          <div class="navbar-brand">
-            <div class="navbar-item">
-              <a class="button is-black" @click="drawer = !drawer">
-                <span class="icon">
-                  <i class="fas fa-ellipsis-v"></i>
-                </span>
-              </a>
-            </div>
-          </div>
-        </div>
-      </nav>
+      {{ partial "docs/mobile-nav.html" . }}
     </section>
 
     {{ partial "docs/drawer.html" (dict "ctx" .) }}
