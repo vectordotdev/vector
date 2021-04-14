@@ -61,6 +61,7 @@ components: sinks: datadog_logs: {
 	configuration: {
 		api_key:  sinks._datadog.configuration.api_key
 		endpoint: sinks._datadog.configuration.endpoint
+		region:   sinks._datadog.configuration.region
 	}
 
 	input: {

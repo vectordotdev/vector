@@ -229,7 +229,7 @@ cli: {
 			description: """
 				Run Vector config unit tests, then exit. This command is experimental and
 				therefore subject to change. For guidance on how to write unit tests check
-				out: https://vector.dev/docs/setup/guides/unit-testing/
+				out: \(urls.vector_unit_testing)
 				"""
 
 			options: {

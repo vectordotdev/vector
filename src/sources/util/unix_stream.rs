@@ -2,16 +2,19 @@ use crate::{
     async_read::VecAsyncReadExt,
     emit,
     event::Event,
-    internal_events::{ConnectionOpen, OpenGauge, UnixSocketError},
+    internal_events::{ConnectionOpen, OpenGauge, UnixSocketError, UnixSocketFileDeleteFailed},
     shutdown::ShutdownSignal,
     sources::Source,
     Pipeline,
 };
 use bytes::Bytes;
 use futures::{FutureExt, SinkExt, StreamExt};
-use std::{future::ready, path::PathBuf};
-use tokio::io::AsyncWriteExt;
-use tokio::net::{UnixListener, UnixStream};
+use std::{fs::remove_file, future::ready, path::PathBuf, time::Duration};
+use tokio::{
+    io::AsyncWriteExt,
+    net::{UnixListener, UnixStream},
+    time::sleep,
+};
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::field;
@@ -99,6 +102,22 @@ where
                 }
                 .instrument(span),
             );
+        }
+
+        // Cleanup
+        drop(stream);
+
+        // Wait for open connections to finish
+        while connection_open.any_open() {
+            sleep(Duration::from_millis(10)).await;
+        }
+
+        // Delete socket file
+        if let Err(error) = remove_file(&listen_path) {
+            emit!(UnixSocketFileDeleteFailed {
+                path: &listen_path,
+                error
+            });
         }
 
         Ok(())
