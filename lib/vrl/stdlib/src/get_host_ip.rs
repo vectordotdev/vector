@@ -100,20 +100,20 @@ impl Expression for GetHostIpFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::{IpAddr, Ipv4Addr};
+    use std::net::IpAddr;
 
-    test_type_def![default {
-        expr: |_| {
-            GetHostIpFn {
-                interface: None,
-                family: None,
-            }
-        },
-        want: TypeDef::new().fallible().bytes(),
-    }];
+    test_function![
+        get_host_ip => GetHostIp;
+
+        loopback {
+            args: func_args![interface: "lo", family: "IPv4"],
+            want: Ok("127.0.0.1"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
+    ];
 
     #[test]
-    fn first() {
+    fn get_host_ip_first() {
         let mut state = vrl::state::Runtime::default();
         let mut object: Value = map![].into();
         let mut ctx = Context::new(&mut object, &mut state);
@@ -130,32 +130,6 @@ mod tests {
             Value::Bytes(val) => {
                 let val = String::from_utf8_lossy(&val);
                 val.parse::<IpAddr>().expect("valid ip address");
-            }
-            _ => unreachable!(),
-        }
-    }
-
-    #[test]
-    fn loopback() {
-        let mut state = vrl::state::Runtime::default();
-        let mut object: Value = map![].into();
-        let mut ctx = Context::new(&mut object, &mut state);
-        let value = GetHostIpFn {
-            interface: Some(expr!("lo").into()),
-            family: Some("IPv4".into()),
-        }
-        .resolve(&mut ctx)
-        .unwrap();
-
-        assert!(matches!(&value, Value::Bytes(_)));
-
-        match value {
-            Value::Bytes(val) => {
-                let val = String::from_utf8_lossy(&val);
-                assert_eq!(
-                    val.parse::<IpAddr>().expect("valid ip address"),
-                    IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
-                );
             }
             _ => unreachable!(),
         }
