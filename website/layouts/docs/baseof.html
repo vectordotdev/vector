@@ -18,7 +18,7 @@
                 {{ partial "docs/sidebar.html" (dict "ctx" .) }}
               </div>
 
-              <div class="column">
+              <div class="column is-three-fifths">
                 {{ partial "docs/breadcrumb.html" . }}
                 {{ partial "docs/hero.html" (dict "title" .Title "description" .Params.description) }}
                 {{ partial "docs/content.html" . }}
