@@ -792,7 +792,7 @@ impl ContainerLogInfo {
             LogOutput::StdErr { message } => (STDERR.clone(), message),
             LogOutput::StdOut { message } => (STDOUT.clone(), message),
             LogOutput::Console { message } => (CONSOLE.clone(), message),
-            _ => return None,
+            LogOutput::StdIn { message: _ } => return None,
         };
 
         let byte_size = bytes_message.len();
