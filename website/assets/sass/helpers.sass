@@ -21,7 +21,8 @@ $larger-top-margin: 8rem
   top: $navbar-height + $dashboard-top-margin
 
   &.with-larger-margin
-    top: $larger-top-margin
+    +desktop
+      top: $larger-top-margin
 
 .dashboard
   margin-top: $dashboard-top-margin

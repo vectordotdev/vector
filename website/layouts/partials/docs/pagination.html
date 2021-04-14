@@ -15,7 +15,7 @@
         </span>
       </a>
       {{ end }}
-    
+
       {{ with .PrevInSection }}
       {{ $title := .Params.short | default .Title }}
       <a class="pagination-next has-background-dark" href="{{ .RelPermalink }}">

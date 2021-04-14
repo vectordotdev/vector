@@ -3,7 +3,7 @@
 {{ end }}
 
 {{ define "main" }}
-{{ $desc := .Params.description }}
+{{ $desc := .Description }}
 {{ $numSections := len .Sections }}
 <section class="section mt-6">
   <div class="container">
@@ -22,7 +22,7 @@
         <div class="container">
           {{ range $idx, $section := .Sections }}
           {{ $isLast := eq $idx (sub $numSections 1) }}
-          {{ $desc := .Params.description }}
+          {{ $desc := .Description }}
           <div{{ if not $isLast }} class="mb-5"{{ end }}>
             <p class="title is-size-3 is-size-4-mobile has-text-weight-light{{ if $desc }} is-spaced{{ end }}">
               {{ .Title }}

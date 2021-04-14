@@ -3,21 +3,64 @@
 {{ end }}
 
 {{ define "main" }}
-<section class="section mt-6">
+{{ $desc := .Description }}
+{{ $release := .Params.release }}
+<section class="section">
   <div class="container">
     <div class="columns is-variable is-8">
       <div class="column is-one-quarter">
-        <p class="title is-size-3 is-size-4-mobile has-text-weight-light">
-          {{ .Title | markdownify }}
-        </p>
+        <section class="is-sticky with-larger-margin">
+          <p class="mb-3">
+            <span class="icon has-text-purple">
+              <i class="fas fa-arrow-left"></i>
+            </span>
+
+            <a href="{{ .CurrentSection.RelPermalink }}">
+              {{ .CurrentSection.Params.short }}
+            </a>
+          </p>
+
+          <p class="title is-size-2 is-size-3-mobile has-text-weight-light{{ if $desc }} is-spaced{{ end }}">
+            {{ .Title | markdownify }}
+          </p>
+
+          {{ with $desc }}
+          <p class="subtitle has-text-grey">
+            {{ . | markdownify }}
+          </p>
+          {{ end }}
+        </section>
       </div>
 
-      <div class="column is-three-quarters">
+      <div class="column is-three-quarters my-6">
         <div class="content with-limited-chars">
           {{ .Content }}
+
+          <div class="card mt-6">
+            <div class="card-content">
+              <div class="columns">
+                <div class="column is-1">
+                  <span class="icon is-medium has-text-primary">
+                    <i class="fas fa-md fa-info-circle"></i>
+                  </span>
+                </div>
+
+                <div class="column is-11">
+                  <p>
+                    This change was made available in version <strong>{{ $release }}</strong>. You can get this change by <a href="https://vector.dev/releases/latest/download/">downloading the latest stable release</a>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </section>
+{{ end }}
+
+{{ define "below" }}
+{{ partial "docs/pagination.html" . }}
+{{ partial "footer.html" . }}
 {{ end }}
