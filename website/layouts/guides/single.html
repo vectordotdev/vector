@@ -48,7 +48,7 @@
           {{ end }}
 
           {{ if or .NextInSection .PrevInSection }}
-          <p class="is-size-5 is-size-6-mobile has-text-grey-dark mt-3 mb-2">
+          <p class="is-size-5 is-size-6-mobile has-text-grey-dark mt-5 mb-2">
             Navigation
           </p>
 
@@ -58,7 +58,7 @@
               <i class="fas fa-arrow-left"></i>
             </span>
             <a href="{{ .RelPermalink }}" class="has-text-black">
-              {{ .Title }}
+              {{ .Weight }}. {{ .Title }}
             </a>
           </p>
           {{ end }}
@@ -69,7 +69,7 @@
               <i class="fas fa-arrow-right"></i>
             </span>
             <a href="{{ .RelPermalink }}" class="has-text-black">
-              {{ .Title }}
+              {{ .Weight }}. {{ .Title }}
             </a>
           </p>
           {{ end }}
@@ -79,7 +79,7 @@
 
       <div class="column is-two-thirds">
         <section class="section">
-          <div class="content pb-6" id="docs-content">
+          <div class="content with-limited-chars pb-6" id="docs-content">
             {{ .Content }}
           </div>
         </section>
