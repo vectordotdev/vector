@@ -1,0 +1,7 @@
+# https://github.com/timberio/vector/issues/6792#issuecomment-817986771
+# result: {"timestamp": "2020-01-01", "field1": "2020-01-01T04:00:00Z", "timestamp": "2020-01-01 00:00:00", "field2": 1577851200}
+
+.timestamp = "2020-01-01 00:00:00"
+.field1 = parse_timestamp!(.timestamp, format: "%Y-%m-%d %H:%M:%S")
+.field2 = to_int(.field1)
+.

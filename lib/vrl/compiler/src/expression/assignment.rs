@@ -197,18 +197,12 @@ impl Target {
             new_type_def: TypeDef,
             path: &Option<Path>,
         ) -> TypeDef {
-            // If the assignment is into a specific index, we want to keep the
-            // existing type def, and only update the type def at the provided
-            // index.
-            let is_index_assignment = path
-                .as_ref()
-                .and_then(|p| p.segments().last().map(|s| s.is_index()))
-                .unwrap_or_default();
-
-            if is_index_assignment {
-                current_type_def.clone().merge_overwrite(new_type_def)
-            } else {
+            // If the assignment is onto root or has no path (root variable assignment), use the
+            // new type def, otherwise merge the type defs.
+            if path.as_ref().map(|path| path.is_root()).unwrap_or(true) {
                 new_type_def
+            } else {
+                current_type_def.clone().merge_overwrite(new_type_def)
             }
         }
 
