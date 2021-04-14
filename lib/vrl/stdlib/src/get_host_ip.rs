@@ -27,8 +27,8 @@ impl Function for GetHostIp {
         let families = vec![value!("IPv4"), value!("IPv6")];
         let interface = arguments.optional("interface");
         let family = arguments
-            .optional_enum("variant", &families)?
-            .map(|v| v.try_bytes().expect("variant not bytes"));
+            .optional_enum("family", &families)?
+            .map(|v| v.try_bytes().expect("family not bytes"));
         Ok(Box::new(GetHostIpFn { interface, family }))
     }
 
@@ -71,7 +71,7 @@ impl Expression for GetHostIpFn {
 
         // This attempts to just find the first non-loopback
         // interface that is up and grab its first IP
-        let default_ip = pnet_datalink::interfaces()
+        pnet_datalink::interfaces()
             .iter()
             // If user specified a interface, find that one, otherwise find the first non-loopback
             // interface that is up
@@ -87,14 +87,50 @@ impl Expression for GetHostIpFn {
                 None => interface.ips.get(0),
                 _ => unreachable!("enum invariant"),
             })
-            .map(|ip| ip.ip().to_string());
-
-        default_ip
+            .map(|ip| ip.ip().to_string())
             .map(Into::into)
             .ok_or_else(|| "unable to find IP address".into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().fallible().bytes().add_null()
+        TypeDef::new().fallible().bytes()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    test_type_def![default {
+        expr: |_| {
+            GetHostIpFn {
+                interface: None,
+                family: None,
+            }
+        },
+        want: TypeDef::new().fallible().bytes(),
+    }];
+
+    #[test]
+    fn get_host_ip() {
+        let mut state = vrl::state::Runtime::default();
+        let mut object: Value = map![].into();
+        let mut ctx = Context::new(&mut object, &mut state);
+        let value = GetHostIpFn {
+            interface: None,
+            family: None,
+        }
+        .resolve(&mut ctx)
+        .unwrap();
+
+        assert!(matches!(&value, Value::Bytes(_)));
+
+        match value {
+            Value::Bytes(val) => {
+                let val = String::from_utf8_lossy(&val);
+                val.parse::<std::net::IpAddr>().expect("valid ip address");
+            }
+            _ => unreachable!(),
+        }
     }
 }
