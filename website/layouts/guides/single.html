@@ -46,6 +46,34 @@
 
           <div id="docs-toc" class="is-hidden-mobile"></div>
           {{ end }}
+
+          {{ if or .NextInSection .PrevInSection }}
+          <p class="is-size-5 is-size-6-mobile has-text-grey-dark mt-3 mb-2">
+            Navigation
+          </p>
+
+          {{ with .NextInSection }}
+          <p>
+            <span class="icon has-text-purple">
+              <i class="fas fa-arrow-left"></i>
+            </span>
+            <a href="{{ .RelPermalink }}" class="has-text-black">
+              {{ .Title }}
+            </a>
+          </p>
+          {{ end }}
+
+          {{ with .PrevInSection }}
+          <p>
+            <span class="icon has-text-purple">
+              <i class="fas fa-arrow-right"></i>
+            </span>
+            <a href="{{ .RelPermalink }}" class="has-text-black">
+              {{ .Title }}
+            </a>
+          </p>
+          {{ end }}
+          {{ end }}
         </section>
       </div>
 
