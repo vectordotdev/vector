@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-04-14"
-$schema: ".schema.json"
+date: "2020-04-14"
 title: "Improved Multiline Support In The File Source"
 description: "Merge multiple lines together based on rules"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1852]
 release: "0.8.0"
 hide_on_release_notes: false
-tags: ["type: enhancement", "domain: sources", "source: file"]
+tags:
+  type: "enhancement"
+  domains: ["sources"]
+  sources: ["file"]
 ---
 
 One of the biggest frustrations we've heard from users in this space is the
@@ -44,8 +46,7 @@ You can merge them with the following config:
     timeout_ms = 1000
 ```
 
-And if this doesn't do it, you can always fallback
-to our [`lua` transform][docs.transforms.lua].
+And if this doesn't do it, you can always fall back to the [`lua` transform][docs.transforms.lua].
 
 [docs.sources.docker_logs#auto_partial_merge]: /docs/reference/sources/docker/#auto_partial_merge
 [docs.sources.file#multiline]: /docs/reference/sources/file/#multiline

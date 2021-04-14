@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2020-07-17"
-$schema: ".schema.json"
+date: "2020-07-17"
 title: "New Reduce transform"
 description: "Canonical Log Lines in Vector"
-author_github: "https://github.com/hoverbear"
+author_github: "hoverbear"
 hide_on_release_notes: false
 pr_numbers: [2870]
 release: "0.10.0"
-tags: ["type: new feature", "domain: transforms"]
+tags:
+  type: "new feature"
+  domains: ["transforms"]
 ---
 
 Fan of [Stripe's Canonical Log Lines][urls.stripe_blog_canonical_log_lines]? We are too. You can now find a new [Reduce][docs.transforms.reduce]! This allows you to turn a stream of many small events into a stream of less small events!

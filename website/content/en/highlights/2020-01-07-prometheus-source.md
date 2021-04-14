@@ -1,20 +1,22 @@
 ---
-last_modified_on: "2020-03-31"
-$schema: ".schema.json"
+date: "2020-03-31"
 title: "New Prometheus Source"
 description: "Scrape prometheus metrics with Vector"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1264]
 release: "0.7.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: sources", "source: prometheus"]
+tags:
+  type: "new feature"
+  domains: ["sources"]
+  sources: ["prometheus"]
 ---
 
 We love [Prometheus][urls.prometheus], but we also love [options](https://www.mms.com/en-us/shop/single-color)
 and so we've added a [`prometheus` source][docs.sources.prometheus] to let you
 send Prometheus format metrics anywhere you like.
 
-<!--truncate-->
+<!--more-->
 
 This was an important feat for Vector because it required us to mature our
 metrics data model and tested our interoperability between metrics sources.

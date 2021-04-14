@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2020-07-13"
-$schema: ".schema.json"
+date: "2020-07-13"
 title: "Automatically merge partial Docker events"
 description: "Docker splits long messages by default, and now Vector merges them back for you"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1457]
 release: "0.8.0"
 hide_on_release_notes: false
 tags:
-  ["type: enhancement", "domain: sources", "source: docker", "platform: docker"]
+  type: "enhancement"
+  domains: ["sources"]
+  sources: ["docker"]
+  platforms: ["docker"]
 ---
 
 Anyone that was worked with Docker logs knows how frustrating this problem

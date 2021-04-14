@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2020-12-23"
-$schema: ".schema.json"
+date: "2020-12-23"
 title: "Introducing `vector top`"
 description: "A CLI dashboard interface for monitoring Vector instances."
-author_github: "https://github.com/lucperkins"
+author_github: "lucperkins"
 featured: true
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: cli", "domain: observability"]
+tags:
+  type: "new feature"
+  domains: ["cli"]
+  domains: ["observability"]
 ---
 
 [`vector top`][top] is a command for the Vector [CLI] that displays both metrics emitted by your Vector instance as well

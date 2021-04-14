@@ -1,13 +1,13 @@
 ---
-last_modified_on: "2020-07-13"
-$schema: ".schema.json"
+date: "2020-07-13"
 title: "Use external tagging for metrics serialization"
 description: "We've improved the way we serialize metrics data"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 hide_on_release_notes: true
 pr_numbers: [2231]
 release: "0.9.0"
-tags: ["type: breaking change"]
+tags:
+  type: "breaking change"
 ---
 
 We've improved the serialized structure of our metrics events. This change
@@ -50,6 +50,5 @@ It now serialized like:
 ```
 
 ## Upgrade Guide
-
 Upgrading should involve handling changes in any systems that are consuming
 metrics data from the `console` sink.

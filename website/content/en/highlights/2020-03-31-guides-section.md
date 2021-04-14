@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2020-03-31"
-$schema: ".schema.json"
+date: "2020-03-31"
 title: "A New Guides Section"
 description: "High quality guides and education for Vector"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [2132]
 release: "0.9.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: website"]
+tags:
+  type: "new feature"
+  domains: ["website"]
 ---
 
 Vector is only as good as it's documentation and education. And while we
@@ -16,10 +17,9 @@ aspect missing, so we launched a new [new guides section][pages.guides]. This
 section is meant to house high-quality guides that will be maintained and
 updated continuously. To kick this new section off we've added the following guides:
 
-<Jump to="/guides/getting-started/" iconLeft="book">Getting Started Series</Jump>
-<Jump to="/guides/advanced/custom-aggregations-with-lua/" leftIcon="book-open">Custom Aggregations With Lua</Jump>
-<Jump to="/guides/advanced/parsing-csv-logs-with-lua/" leftIcon="book-open">Parsing CSV Logs With Lua</Jump>
-<Jump to="/guides/advanced/parsing-csv-logs-with-lua/" leftIcon="book-open">Unit Testing Your Configs</Jump>
+{{< jump "/guides/getting-started" >}}
+{{< jump "/guides/advanced/custom-aggregations-with-lua" >}}
+{{< jump "/guides/advanced/parsing-csv-logs-with-lua" >}}
 
 [pages.docs]: /docs/
 [pages.guides]: /guides/

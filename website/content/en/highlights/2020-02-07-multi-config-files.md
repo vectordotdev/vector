@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2020-04-13"
-$schema: ".schema.json"
+date: "2020-04-13"
 title: "Support For Multiple Config Files"
 description: "A better way to manage complex Vector configurations"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1725]
 release: "0.8.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: config"]
+tags:
+  type: "new feature"
+  domains: ["config"]
 ---
 
 Vector is now able to execute a topology spread across multiple config files,

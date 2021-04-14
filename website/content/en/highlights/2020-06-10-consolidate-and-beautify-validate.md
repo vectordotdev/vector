@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2020-07-13"
-$schema: ".schema.json"
+date: "2020-07-13"
 title: "Beautification of the validate command"
 description: "A little polish on a useful feature."
-author_github: "https://github.com/hoverbear"
+author_github: "hoverbear"
 hide_on_release_notes: false
 pr_numbers: [2622]
 release: "0.10.0"
-tags: ["type: enhancement", "domain: ux"]
+tags:
+  type: "enhancement"
+  domains: ["ux"]
 ---
 
 We gave `vector validate` some touching up to make it look better, and feel nicer to use. This was heavily inspired by the fantastic `linkerd validate` command.

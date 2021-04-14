@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2021-02-16"
-$schema: ".schema.json"
 title: "Remap support for the `filter` transform"
 description: "Use VRL to specify conditions for filtering events in a stream"
-author_github: "https://github.com/lucperkins"
+date: "2021-02-16"
+author_github: "lucperkins"
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false
-tags: ["type: enhancement", "transform: filter"]
+tags:
+  type: "enhancement"
+  transforms: ["filter"]
 ---
 
 The [`filter`][filter] transform for Vector enables you to winnow down a stream

@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-04-13"
-$schema: ".schema.json"
+date: "2020-04-13"
 title: "The Vector Source & Sink Support TLS"
 description: "Securely forward data between Vector instances"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [2025]
 release: "0.9.0"
 hide_on_release_notes: true
-tags: ["type: new feature", "domain: sources", "source: vector"]
+tags:
+  type: "new feature"
+  domains: ["sources"]
+  sources: ["vector"]
 ---
 
 A highly requested feature of Vector is to support the TLS protocol for the

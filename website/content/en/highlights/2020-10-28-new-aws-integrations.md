@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-10-27"
-$schema: ".schema.json"
+date: "2020-10-27"
 title: "New AWS integrations"
 description: "Export observability data out of AWS."
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [4101, 4779]
 release: "0.11.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: sources", "platform: aws"]
+tags:
+  type: "new feature"
+  domains: ["sources"]
+  platforms: ["aws"]
 ---
 
 Getting observability data out of AWS can sometimes feel like you're in a

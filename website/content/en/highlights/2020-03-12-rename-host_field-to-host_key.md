@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-07-13"
-$schema: ".schema.json"
+date: "2020-07-13"
 title: "The `splunk_hec` source's `host_field` option has been renamed to `host_key`"
 description: "This change ensures that the `host_key` option is consistent across all sources"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [2037]
 release: "0.9.0"
 hide_on_release_notes: true
-tags: ["type: breaking change", "domain: sinks", "sink: splunk_hec"]
+tags:
+  type: "breaking change"
+  domains: ["sinks"]
+  sinks: ["splunk_hec"]
 ---
 
 We've renamed the [`splunk_hec` source's] `host_field` option to `host_key`.
@@ -21,5 +23,3 @@ This ensures that the `host_key` option is consistent across all sources.
 -  host_field = "host"
 +  host_key = "host"
 ```
-
-

@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-07-13"
-$schema: ".schema.json"
+date: "2020-07-13"
 title: "The `gcp_stackdriver_logging` sink has been renamed to `gcp_stackdriver_logs`"
 description: "This brings the sink naming inline with consistent naming pattern"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [2121]
 release: "0.9.0"
 hide_on_release_notes: false
-tags: ["type: breaking change", "domain: sinks", "sink: splunk_hec"]
+tags:
+  type: "breaking change"
+  domains: ["sinks"]
+  sinks: ["splunk_hec"]
 ---
 
 We've renamed the `gcp_stackdriver_logging` sink to `gcp_stackdriver_logs` to

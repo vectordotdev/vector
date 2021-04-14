@@ -1,12 +1,13 @@
 ---
-last_modified_on: "2020-04-13"
+date: "2020-04-13"
 title: "We've Added a Privacy Policy"
 description: "Our commitment to privacy"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1977, 1976]
 release: "0.8.1"
 hide_on_release_notes: true
-tags: ["type: announcement"]
+tags:
+  type: "announcement"
 ---
 
 In addition to our [security policy][urls.vector_security_policy], we've added

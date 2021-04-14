@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-04-13"
-$schema: ".schema.json"
+date: "2020-04-13"
 title: "NixOS Support"
 description: "Bringing Vector to NixOS"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1946]
 release: "0.9.0"
 hide_on_release_notes: true
-tags: ["type: new feature", "domain: platforms", "platform: nixos"]
+tags:
+  type: "new feature"
+  domains: ["platforms"]
+  platforms: ["nixos"]
 ---
 
 Vector is [lovingly maintained by the NixOS ecosystem][urls.vector_nix_package],

@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2021-01-31"
-$schema: ".schema.json"
+date: "2021-01-31"
 title: "Improved `file` source checkpointing"
 description: "The `file` source checkpointing strategy has been improved to solve surprising edge cases."
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 featured: false
 pr_numbers: [6178]
 release: "0.12.0"
 hide_on_release_notes: false
-tags: ["type: enhancement", "domain: sources", "source: file"]
+tags:
+  type: "enhancement"
+  domains: ["sources"]
+  sources: ["file"]
 ---
 
 The Vector [`file` source][file_source] included an option called `start_at_beginning` that would determine where

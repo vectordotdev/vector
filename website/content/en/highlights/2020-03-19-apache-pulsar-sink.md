@@ -1,12 +1,15 @@
 ---
-last_modified_on: "2020-07-13"
+date: "2020-07-13"
 title: "New Apache Pulsar Sink"
 description: "Sink logs to the Apache Pulsar service"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1665]
 release: "0.9.0"
 hide_on_release_notes: true
-tags: ["type: new feature", "domain: sinks", "sink: pulsar"]
+tags:
+  type: "new feature"
+  domains: ["sinks"]
+  sinks: ["pulsar"]
 ---
 
 We have a new [`pulsar` sink][docs.sinks.pulsar]! This was a community

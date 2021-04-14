@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-07-13"
-$schema: ".schema.json"
+date: "2020-07-13"
 title: "Now supporting the bearer auth strategy"
 description: "Vector can now bear authentication tokens for relevant components."
-author_github: "https://github.com/hoverbear"
+author_github: "hoverbear"
 hide_on_release_notes: false
 pr_numbers: [2607]
 release: "0.10.0"
-tags: ["type: enhancement", "domain: sinks", "sink: http"]
+tags:
+  type: "enhancement"
+  domains: ["sinks"]
+  sinks: ["http"]
 ---
 
 The light reading material of [IETF RFC 6750][urls.ietf_rfc_6750] taught us all about how bearer auth works, right?

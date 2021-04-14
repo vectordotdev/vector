@@ -1,13 +1,13 @@
 ---
-last_modified_on: "2020-07-23"
-$schema: ".schema.json"
+date: "2020-07-23"
 title: "Custom DNS resolution removal"
 description: "Vector once again follows the guidance of the host on DNS lookups."
-author_github: "https://github.com/hoverbear"
+author_github: "hoverbear"
 hide_on_release_notes: false
 pr_numbers: [2812]
 release: "0.10.0"
-tags: ["type: breaking change"]
+tags:
+  type: "breaking change"
 ---
 
 In Vector 0.10.0, we no longer support custom DNS servers. This feature was adding considerable code complexity and is better handled outside of Vector through tools like [`systemd-resolved`][urls.systemd_resolved].

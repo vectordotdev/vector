@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2020-07-14"
-$schema: ".schema.json"
+date: "2020-07-14"
 title: "Journald Unit Filtering Exclusions"
 description: "The journald source can now exclude units."
-author_github: "https://github.com/hoverbear"
+author_github: "hoverbear"
 hide_on_release_notes: false
 pr_numbers: [2540]
 release: "0.10.0"
-tags: ["type: new feature", "source: journald"]
+tags:
+  type: "new feature"
+  sources: ["journald"]
 ---
 
 Often when you tap into the Journald source you're only really interested in a subset of the units, previously, Vector supported this. However, sometimes you just want to exclude one or two.

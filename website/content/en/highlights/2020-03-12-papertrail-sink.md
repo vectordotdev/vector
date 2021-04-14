@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-04-13"
-$schema: ".schema.json"
+date: "2020-04-13"
 title: "New Papertrail Sink"
 description: "Sink logs to the Papertrail logging service"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1835]
 release: "0.9.0"
 hide_on_release_notes: true
-tags: ["type: new feature", "domain: sinks", "sink: papertrail"]
+tags:
+  type: "new feature"
+  domains: ["sinks"]
+  sinks: ["papertrail"]
 ---
 
 Tried, true, and simple. Our new [`papertrail` sink][docs.sinks.papertrail]

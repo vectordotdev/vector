@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2020-12-23"
-$schema: ".schema.json"
+date: "2020-12-23"
 title: "The `internal_logs` source"
 description: "A new source for observing Vector itself"
-author_github: "https://github.com/lucperkins"
+author_github: "lucperkins"
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "source: internal_logs"]
+tags:
+  type: "new feature"
+  sources: ["internal_logs"]
 ---
 
 Vector has a new [`internal_logs`][internal_logs] source that you can use to

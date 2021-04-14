@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2020-10-27"
-$schema: ".schema.json"
+date: "2020-10-27"
 title: "First-class Kubernetes integration"
 description: "Vector officially supports Kubernetes with a first-class integration."
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 featured: true
 pr_numbers: [1314]
 release: "0.11.0"
 hide_on_release_notes: false
-tags: ["type: featured", "domain: platforms", "platform: kubernetes"]
+tags:
+  type: "featured"
+  domains: ["platforms"]
+  platforms: ["kubernetes"]
 ---
 
 After eight months of development, [100 pull requests][kubernetes_pull_requests],

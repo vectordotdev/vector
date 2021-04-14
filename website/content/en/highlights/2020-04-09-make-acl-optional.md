@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-07-13"
-$schema: ".schema.json"
+date: "2020-07-13"
 title: "ACL is now optional for the Google Cloud Storage sink"
 description: "ACL is not always required when creating objects in GCP Cloud Storage"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 hide_on_release_notes: false
 pr_numbers: [2283]
 release: "0.9.0"
-tags: ["type: breaking change", "domain: sinks", "sink: gcp_cloud_storage"]
+tags:
+  type: "breaking change"
+  domain: ["sinks"]
+  sinks: ["gcp_cloud_storage"]
 ---
 
 GCP Cloud Storage buckets with [uniform bucket-level access](https://cloud.google.com/storage/docs/uniform-bucket-level-access)
@@ -27,5 +29,3 @@ the `acl` option:
 ```
 
 That's it!
-
-

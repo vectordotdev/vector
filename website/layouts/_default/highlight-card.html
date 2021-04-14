@@ -1,7 +1,9 @@
 <div class="card">
   <div class="card-content">
-    <a href="{{ .RelPermalink }}" class="has-text-weight-semibold">
-      {{ .Title | markdownify }}
-    </a>
+    <p class="has-text-weight-bold">
+      <a href="{{ .RelPermalink }}">
+        {{ .Title | markdownify }}
+      </a>
+    </p>
   </div>
 </div>

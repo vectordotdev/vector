@@ -1,12 +1,15 @@
 ---
-last_modified_on: "2020-07-13"
+date: "2020-07-13"
 title: "New Honeycomb Sink"
 description: "Sink logs to the Honeycomb logging service"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1665]
 release: "0.9.0"
 hide_on_release_notes: true
-tags: ["type: new feature", "domain: sinks", "sink: honeycomb"]
+tags:
+  type: "new feature"
+  domains: ["sinks"]
+  sinks: ["honeycomb"]
 ---
 
 For you [Honeycomb][urls.honeycomb] fans we have a new

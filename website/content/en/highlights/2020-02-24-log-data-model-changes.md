@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-04-13"
-$schema: ".schema.json"
+date: "2020-04-13"
 title: "Log Data Model Changes & Disk Buffers"
 description: "We're bringing our log data model closer to JSON"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1836, 1898]
 release: "0.8.0"
 hide_on_release_notes: true
-tags: ["type: breaking change", "domain: buffers", "event type: log"]
+tags:
+  type: "breaking change"
+  domains: ["buffers"]
+  "event type": "log"
 ---
 
 We are currently working to improve and optimize our [`log` data

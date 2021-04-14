@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-04-16"
-$schema: ".schema.json"
-title: "À La Carte Custom Vector Builds"
+date: "2020-04-16"
+title: "À la carte Custom Vector Builds"
 description: "Build Vector with select components"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1924]
 release: "0.9.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: sources", "source: vector"]
+tags:
+  type: "new feature"
+  domains: ["sources"]
+  sources: ["vector"]
 ---
 
 We've implemented a feature flag system that lets you build custom versions

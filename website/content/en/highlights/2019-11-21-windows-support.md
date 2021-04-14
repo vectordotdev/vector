@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-03-31"
-$schema: ".schema.json"
+date: "2020-03-31"
 title: "Windows Support Is Here!"
 description: "Bringing the performance and reliability of Vector to Windows"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1205]
 release: "0.6.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: platforms", "platform: windows"]
+tags:
+  type: "new feature"
+  domains: ["platforms"]
+  platforms: ["windows"]
 ---
 
 We're excited to announce that Vector can now be installed on Windows!
@@ -46,7 +48,7 @@ Or manually through the GUI installer:
 
 ## An important step for Vector
 
-A core tenant of Vector is that users should own and control their data; this
+A core tenet of Vector is that users should own and control their data; this
 starts with data collection. So often we see organizations deploying many
 (sometimes 10 or more) data collectors just because upstream and downstream
 support is lacking. This is especially true when Windows environments are

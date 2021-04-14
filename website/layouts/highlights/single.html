@@ -5,15 +5,15 @@
 {{ define "main" }}
 <section class="section mt-6">
   <div class="container">
-    <div class="columns is-variable is-6">
+    <div class="columns is-variable is-8">
       <div class="column is-one-quarter">
         <p class="title is-size-3 is-size-4-mobile has-text-weight-light">
           {{ .Title | markdownify }}
         </p>
       </div>
 
-      <div class="column">
-        <div class="content">
+      <div class="column is-three-quarters">
+        <div class="content with-limited-chars">
           {{ .Content }}
         </div>
       </div>

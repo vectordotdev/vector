@@ -1,19 +1,14 @@
 ---
-last_modified_on: "2020-07-13"
-$schema: ".schema.json"
+date: "2020-07-13"
 title: "Sink options have been refactored"
 description: "We've simplified and organized our sink options"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1006, 1493, 1494, 1495]
 release: "0.7.0"
 hide_on_release_notes: false
 tags:
-  [
-    "type: breaking change",
-    "domain: buffers",
-    "domain: config",
-    "domain: sinks",
-  ]
+  type: "breaking change"
+  domains: ["buffers", "config", "sinks"]
 ---
 
 In our preparation for 1.0 we took time to organize and cleanup our

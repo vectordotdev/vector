@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2020-07-13"
-$schema: ".schema.json"
+date: "2020-07-13"
 title: "Support for loading multiple CAs"
 description: "Complicated PEM? No PEM-blem with Vector!"
-author_github: "https://github.com/hoverbear"
+author_github: "hoverbear"
 hide_on_release_notes: false
 pr_numbers: [2616]
 release: "0.10.0"
-tags: ["type: enhancement", "source: socket"]
+tags:
+  type: "enhancement"
+  sources: ["socket"]
 ---
 
 Working with `openssl` isn't very fun, and we don't want to inflict that on you. Vector can deal non-trivial certificate chains now. This means if you have a `.pem` file with 2 chains of 4 certs, well, Vector should be able to work it out.

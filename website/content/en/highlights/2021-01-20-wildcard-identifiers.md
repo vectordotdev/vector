@@ -1,14 +1,15 @@
 ---
-last_modified_on: "2021-01-20"
-$schema: ".schema.json"
+date: "2021-01-20"
 title: "Wildcards are now supported in component IDs"
 description: "Wildcards allow for dynamic Vector topologies"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 featured: false
 pr_numbers: [6170]
 release: "0.12.0"
 hide_on_release_notes: false
-tags: ["type: enhancement", "domain: topology"]
+tags:
+  type: "enhancement"
+  domains: ["topology"]
 ---
 
 [PR 6170][pr_6170] introduced wildcards when referencing component IDs in the `inputs` option. This allows you to build

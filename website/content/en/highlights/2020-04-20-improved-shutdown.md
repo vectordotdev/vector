@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2020-04-20"
-$schema: ".schema.json"
+date: "2020-04-20"
 title: "Improved Shutdown"
 description: "A faster and more reliable shutdown process"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1994]
 release: "0.9.0"
 hide_on_release_notes: false
-tags: ["type: enhancement", "domain: topology"]
+tags:
+  type: "enhancement"
+  domains: ["topology"]
 ---
 
 A graceful shutdown process is often a problematic achievement in software.

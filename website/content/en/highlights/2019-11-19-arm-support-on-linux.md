@@ -1,19 +1,15 @@
 ---
-last_modified_on: "2020-03-31"
-$schema: ".schema.json"
+date: "2020-03-31"
 title: "ARMv7 & ARM64 Support on Linux"
 description: "These architectures are widely used in embeded devices & servers"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1054, 1292]
 release: "0.6.0"
 hide_on_release_notes: false
 tags:
-  [
-    "type: new feature",
-    "domain: platforms",
-    "platform: arm64",
-    "platform: armv7",
-  ]
+  type: "new feature"
+  domains: ["platforms"]
+  platforms: ["arm64", "arm7"]
 ---
 
 Vector now supports [ARM architectures][urls.arm] on the Linux platform! These
@@ -27,7 +23,7 @@ instructions for your preferred method:
 - [From archives][docs.manual.from-archives]
 - [Or, download the files directly][pages.releases]
 
-<!--truncate-->
+<!--more-->
 
 ## Fully-static without dependencies
 

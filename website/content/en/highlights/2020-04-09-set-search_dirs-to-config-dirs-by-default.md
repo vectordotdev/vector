@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-07-13"
-$schema: ".schema.json"
+date: "2020-07-13"
 title: "Set the Lua transform `search_dirs` option to Vector's config dir by default"
 description: "This allows you to place Lua scripts in the same dir as your Vector config"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 hide_on_release_notes: true
 pr_numbers: [2274]
 release: "0.9.0"
-tags: ["type: breaking change", "domain: transforms", "transform: lua"]
+tags:
+  type: "breaking change"
+  domains: ["transforms"]
+  transforms: ["lua"]
 ---
 
 As part of our recent Lua improvements we've defaulted the `search_dirs` option
@@ -27,5 +29,3 @@ in the same directory as your Vector configuration file:
 ```
 
 That's it!
-
-

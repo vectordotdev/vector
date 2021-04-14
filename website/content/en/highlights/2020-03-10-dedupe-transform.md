@@ -1,9 +1,8 @@
 ---
-last_modified_on: "2020-04-16"
-$schema: ".schema.json"
+date: "2020-04-16"
 title: "New Dedupe Transform"
 description: "Shed duplicate logs"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1848]
 release: "0.9.0"
 hide_on_release_notes: false
@@ -30,10 +29,8 @@ Simply add the transform to your pipeline:
   fields.match = ["timestamp", "host", "message"] # optional, default
 ```
 
-<CodeExplanation>
-
-- The `fields.match` option lets you control which fields are compared to determine if events are equal.
-
-</CodeExplanation>
+{{< success >}}
+The `fields.match` option lets you control which fields are compared to determine if events are equal.
+{{< /success >}}
 
 [docs.transforms.dedupe]: /docs/reference/transforms/dedupe/

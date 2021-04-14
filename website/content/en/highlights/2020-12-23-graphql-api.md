@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2020-12-23"
-$schema: ".schema.json"
+date: "2020-12-23"
 title: "The GraphQL API for Vector"
 description: "View Vector metrics and explore Vector topologies using GraphQL"
-author_github: "https://github.com/lucperkins"
+author_github: "lucperkins"
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: api"]
+tags:
+  type: "new feature"
+  domains: ["api"]
 ---
 
 Vector now has a [GraphQL] API that you can use for a variety of purposes:

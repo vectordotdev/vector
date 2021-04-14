@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-04-13"
-$schema: ".schema.json"
+date: "2020-04-13"
 title: "Improved Syslog Parsing"
 description: "Best effort parsing support for Syslog"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1757]
 release: "0.8.0"
 hide_on_release_notes: true
-tags: ["type: new feature", "domain: sources", "source: syslog"]
+tags:
+  type: "new feature"
+  domains: ["sources"]
+  sources: ["syslog"]
 ---
 
 Anyone that dealt with Syslog knows that the format specification is a "goal".

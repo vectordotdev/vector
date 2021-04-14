@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2021-02-16"
-$schema: ".schema.json"
+date: "2021-02-16"
 title: "Remap support for the `reduce` transform (multi-line logs)"
 description: "Use VRL to specify conditions for reducing multi-log lines into a single log event"
-author_github: "https://github.com/lucperkins"
+author_github: "lucperkins"
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false
-tags: ["type: enhancement", "transform: reduce"]
+tags:
+  type: "enhancement"
+  transforms: ["reduce"]
 ---
 
 The [`reduce`][reduce] transform for Vector enables you to reduce multiple log

@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2020-04-19"
-$schema: ".schema.json"
+date: "2020-04-19"
 title: "Introducing Vector's Global Log Schema"
 description: "Set defaults for Vector's common log key names"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1769, 1795]
 release: "0.8.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: config"]
+tags:
+  type: "new feature"
+  domains: ["config"]
 ---
 
 Vector does not require a rigid schema for it's [`log`

@@ -1,20 +1,15 @@
 ---
-last_modified_on: "2020-04-13"
-$schema: ".schema.json"
+date: "2020-04-13"
 title: "More Condition Predicates"
 description: "More options when filtering and routing events"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1997, 2183, 2198]
 release: "0.9.0"
 hide_on_release_notes: true
 tags:
-  [
-    "type: enhancement",
-    "domain: config",
-    "domain: transforms",
-    "transform: filter",
-    "transform: swimlanes",
-  ]
+  type: "enhancement"
+  domains: ["config", "transforms"]
+  transforms: ["filter", "swimlanes"]
 ---
 
 Vector has a concept "conditions" that are used to qualify events. For example,

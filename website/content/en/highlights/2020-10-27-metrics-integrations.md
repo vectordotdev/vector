@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2020-10-27"
-$schema: ".schema.json"
+date: "2020-10-27"
 title: "New metrics integrations"
 description: "Collect metrics from your host, Apache, Nginx, and Mongodb."
-author_github: "https://github.com/jamtur01"
+author_github: "jamtur01"
 pr_numbers: [3704, 4157, 4500, 4698, 5209]
 release: "0.11.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: metrics", "domain: sources"]
+tags:
+  type: "new feature"
+  domains: ["metrics", "sources"]
 ---
 
 Vector 0.11 includes new metrics sources:

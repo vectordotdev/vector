@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2020-07-13"
-$schema: ".schema.json"
+date: "2020-07-13"
 title: "Vector gracefully exits when specific sources finish"
 description: "One step closer to Vector replacing awk and sed!"
-author_github: "https://github.com/hoverbear"
+author_github: "hoverbear"
 hide_on_release_notes: false
 pr_numbers: [2533]
 release: "0.10.0"
-tags: ["type: enhancement", "source: stdin"]
+tags:
+  type: "enhancement"
+  sources: ["stdin"]
 ---
 
 We heard from some folks they were using Vector as a data processor in command line scripts!

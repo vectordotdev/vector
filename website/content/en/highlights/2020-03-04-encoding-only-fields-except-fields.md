@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2020-07-13"
-$schema: ".schema.json"
+date: "2020-07-13"
 title: "New Encoding Options"
 description: "Vector now lets you whitelist, blacklist, and format fields when events are encoded"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1915]
 release: "0.9.0"
 hide_on_release_notes: false
-tags: ["type: enhancement", "domain: sinks"]
+tags:
+  type: "enhancement"
+  domains: ["sinks"]
 ---
 
 Vector has deprecated the root-level `encoding` option in favor of new

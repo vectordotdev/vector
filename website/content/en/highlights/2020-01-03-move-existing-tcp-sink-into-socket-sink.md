@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-07-13"
-$schema: ".schema.json"
+date: "2020-07-13"
 title: "Rename existing `tcp` sink to `socket` sink"
 description: "This renames the existing `tcp` sink to `socket`"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1404]
 release: "0.7.0"
 hide_on_release_notes: false
-tags: ["type: breaking change", "domain: sinks", "sink: tcp"]
+tags:
+  type: "breaking change"
+  domains: ["sinks"]
+  sinks: ["tcp"]
 ---
 
 The `tcp` sink has been renamed to `socket`. This is part of an overall effort
@@ -23,5 +25,3 @@ foundation for upcoming sinks.
    address = "92.12.333.224:5000"
 +  mode = "tcp"
 ```
-
-

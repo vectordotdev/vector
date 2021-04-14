@@ -1,16 +1,16 @@
 ---
-last_modified_on: "2020-04-14"
-$schema: ".schema.json"
+date: "2020-04-14"
 title: "The Vector Source Now Accepts Metrics"
 description: "It's not possible to forward metrics between Vector instances"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [2245]
 release: "0.9.0"
 hide_on_release_notes: true
-tags: ["type: new feature", "domain: sources", "source: vector"]
+tags:
+  type: "new feature"
+  domains: ["sources"]
+  sources: ["vector"]
 ---
-
-import SVG from 'react-inlinesvg';
 
 Until recently the [`vector` source][docs.sources.vector] only accepted
 [`log` events][docs.data-model.log]. Supporting metrics was blocked by pending

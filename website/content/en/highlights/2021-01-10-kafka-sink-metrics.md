@@ -1,14 +1,16 @@
 ---
-last_modified_on: "2021-01-10"
-$schema: ".schema.json"
+date: "2021-01-10"
 title: "The `kafka` sink now supports metrics"
 description: "Send metric events to Kafka"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 featured: false
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false
-tags: ["type: enhancement", "domain: metrics", "sink: kafka"]
+tags:
+  type: "enhancement"
+  domains: ["metrics"]
+  sinks: ["kafka"]
 ---
 
 The [`kafka` sink][kafka_sink] now supports metrics, making it possible to send

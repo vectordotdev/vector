@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-09-18"
-$schema: ".schema.json"
+date: "2020-09-18"
 title: "Adaptive Request Concurrency (ARC)"
 description: "Increasing reliability and performance across your entire observability infrastructure."
-author_github: "https://github.com/lucperkins"
+author_github: "lucperkins"
 pr_numbers: [3094]
 release: "0.11.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: networking", "domain: reliability", "domain: performance"]
+tags:
+  type: "new feature"
+  domains: ["networking"]
+  domains: ["performance", "reliability"]
 ---
 
 Vector 0.11 includes a new Adaptive Request Concurrency (ARC) feature that

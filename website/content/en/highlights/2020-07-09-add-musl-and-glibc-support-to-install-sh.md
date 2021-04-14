@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2020-07-17"
-$schema: ".schema.json"
+date: "2020-07-17"
 title: "Leveraging glibc when possible"
 description: "If your Linux uses glibc, Vector will too."
-author_github: "https://github.com/hoverbear"
+author_github: "hoverbear"
 hide_on_release_notes: false
 pr_numbers: [2969, 2518]
 release: "0.10.0"
-tags: ["type: performance", "domain: operations"]
+tags:
+  type: "performance"
+  domains: ["operations"]
 ---
 
 As a result of some recent profiling and benchmarking, we determined that builds of Vector targeting `x86_64-unknown-linux-gnu` outperformed builds targeting `x86_64-unknown-linux-musl` under most usage scenarios on supported operating systems.

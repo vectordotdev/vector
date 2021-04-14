@@ -1,20 +1,14 @@
 ---
-last_modified_on: "2020-07-14"
-$schema: ".schema.json"
+date: "2020-07-14"
 title: "New compression options for some sinks"
 description: "Stuff more data down a smaller hose in less time for cheaper."
-author_github: "https://github.com/hoverbear"
+author_github: "hoverbear"
 hide_on_release_notes: false
 pr_numbers: [2953, 2637, 2679, 2682]
 release: "0.10.0"
 tags:
-  [
-    "type: new feature",
-    "sink: aws_s3",
-    "sink: humio_logs",
-    "sink: aws_kinesis_firehose",
-    "sink: aws_kinesis_streams",
-  ]
+  type: "new feature"
+  sinks: ["aws_kinesis_firehose", "aws_kinesis_streams", "aws_s3", "humio_logs"]
 ---
 
 Several sinks, including most AWS sinks as well as [Humio][urls.humio] and [New Relic][urls.new_relic] have had compression options added.

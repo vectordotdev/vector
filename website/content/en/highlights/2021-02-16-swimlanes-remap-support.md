@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2021-02-16"
-$schema: ".schema.json"
+date: "2021-02-16"
 title: "Remap support for the `swimlanes` transform (routing)"
 description: "Use VRL to specify conditions for routing events into multiple channels"
-author_github: "https://github.com/lucperkins"
+author_github: "lucperkins"
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false
-tags: ["type: enhancement", "transform: swimlanes"]
+tags:
+  type: "enhancement"
+  transforms: ["swimlanes"]
 ---
 
 The [`swimlanes`][swimlanes] transform for Vector enables you to route events into
@@ -25,7 +26,7 @@ Previously, the `swimlanes` transform required you to specify conditions using
 The example configuration below shows the same `swimlanes` transform using the
 old system (`check_fields`) and the new system (`remap`):
 
-```dff
+```diff
  [transforms.split_events]
  type = "swimlanes"
  inputs = ["http-server-logs"]

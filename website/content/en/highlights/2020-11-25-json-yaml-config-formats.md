@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2020-11-25"
-$schema: ".schema.json"
+date: "2020-11-25"
 title: "JSON & YAML config formats are now supported"
 description: "We've added support for JSON and YAML config formats."
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [4856, 5144]
 release: "0.11.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: config"]
+tags:
+  type: "new feature"
+  domains: ["config"]
 ---
 
 To ensure Vector fits into existing workflows, like Kubernetes, we've added

@@ -1,12 +1,15 @@
 ---
-last_modified_on: "2020-07-13"
+date: "2020-07-13"
 title: "Require `encoding` option for console and file sinks"
 description: "The `encoding` option is now required for these sinks"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1033]
 release: "0.6.0"
 hide_on_release_notes: false
-tags: ["type: breaking change", "domain: sinks", "sink: console", "sink: file"]
+tags:
+  type: "breaking change"
+  domains: ["sinks"]
+  sinks: ["console", "file"]
 ---
 
 The dynamic `encoding` concept in Vector was confusing users, so we've made

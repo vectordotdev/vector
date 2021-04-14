@@ -1,19 +1,21 @@
 ---
-last_modified_on: "2020-03-31"
-$schema: ".schema.json"
+date: "2020-03-31"
 title: "New AWS EC2 Medata Transform"
 description: "Enrich your events with EC2 metadata"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1325]
 release: "0.6.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: transforms", "transform: aws_ec2_metadata"]
+tags:
+  type: "new feature"
+  domains: ["transforms"]
+  transforms: ["aws_ec2_metadata"]
 ---
 
 Are your events the laughing-stock of the data warehouse? Then enrich them with
 our brand spanking new [`aws_ec2_metadata` transform][docs.transforms.aws_ec2_metadata].
 
-<!--truncate-->
+<!--more-->
 
 Configuration isn't complicated, just add and hook up the transform. If you
 don't want all enrichments added then white-list them with the `fields` option:

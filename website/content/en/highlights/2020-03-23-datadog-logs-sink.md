@@ -1,13 +1,15 @@
 ---
-last_modified_on: "2020-04-13"
-$schema: ".schema.json"
+date: "2020-04-13"
 title: "New Datadog Logs Sink"
 description: "Sink logs to the Datadog logging service"
-author_github: "https://github.com/binarylogic"
+author_github: "binarylogic"
 pr_numbers: [1832]
 release: "0.9.0"
 hide_on_release_notes: true
-tags: ["type: new feature", "domain: sinks", "sink: datadog_logs"]
+tags:
+  type: "new feature"
+  domains: ["sinks"]
+  sinks: ["datadog_logs"]
 ---
 
 In addition to our [`datadog_metrics` sink][docs.sinks.datadog_metrics], we've
