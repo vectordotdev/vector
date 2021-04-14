@@ -17,7 +17,7 @@ production-build:
 	hugo \
 	--minify
 
-ci-production-build: setup build-cue production-build check-links
+ci-production-build: setup build-cue production-build
 
 # Preview site
 preview-build:
