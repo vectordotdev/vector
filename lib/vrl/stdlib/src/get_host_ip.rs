@@ -102,6 +102,7 @@ mod tests {
     use super::*;
     use std::net::IpAddr;
 
+    #[cfg(unix)]
     test_function![
         get_host_ip => GetHostIp;
 
