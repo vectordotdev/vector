@@ -1,4 +1,5 @@
 $dashboard-top-margin: 1.25rem // Margin between sticky navbar and docs dashboard
+$larger-top-margin: 8rem
 
 // Debug element sizes
 =x
@@ -18,6 +19,9 @@ $dashboard-top-margin: 1.25rem // Margin between sticky navbar and docs dashboar
   position: sticky
   position: -webkit-sticky
   top: $navbar-height + $dashboard-top-margin
+
+  &.with-larger-margin
+    top: $larger-top-margin
 
 .dashboard
   margin-top: $dashboard-top-margin

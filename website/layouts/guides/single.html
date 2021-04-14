@@ -9,20 +9,49 @@
   <div class="container">
     <div class="columns is-variable is-8">
       <div class="column is-one-third">
-        <p class="title is-size-2 is-size-3-mobile has-text-weight-light{{ if $desc }} is-spaced{{ end }}">
-          {{ with .Weight }}{{ . }}. {{ end }}{{ .Title }}
-        </p>
+        <section class="is-sticky with-larger-margin">
+          <p class="has-text-primary mb-2">
+            {{ .CurrentSection.Title }}
+          </p>
 
-        {{ with $desc }}
-        <p class="subtitle has-text-grey">
-          {{ . }}
-        </p>
-        {{ end }}
+          <p class="title is-size-2 is-size-3-mobile has-text-weight-light{{ if $desc }} is-spaced{{ end }}">
+            {{ with .Weight }}{{ . }}. {{ end }}{{ .Title }}
+          </p>
+
+          {{ with $desc }}
+          <p class="subtitle has-text-grey">
+            {{ . }}
+          </p>
+          {{ end }}
+
+          <div class="mb-3">
+            <p class="is-size-4 is-size-5-mobile">
+              Stats
+            </p>
+
+            <p>
+              <span class="icon">
+                <i class="fas fa-book-open has-text-grey-light"></i>
+              </span>
+              <span>
+                {{ .ReadingTime }}-minute read
+              </span>
+            </p>
+          </div>
+
+          {{ if gt (len .TableOfContents) 32 }}
+          <p class="is-size-4 is-size-5-mobile has-text-grey-dark mb-3">
+            Contents
+          </p>
+
+          <div id="docs-toc" class="is-hidden-mobile"></div>
+          {{ end }}
+        </section>
       </div>
 
-      <div class="column">
+      <div class="column is-two-thirds">
         <section class="section">
-          <div class="content">
+          <div class="content pb-6" id="docs-content">
             {{ .Content }}
           </div>
         </section>
