@@ -143,8 +143,7 @@ configuration:
    be stopped while the event is buffered and then restarted with an
    identical configuration. At this point, the old source will be
    distinct from the current source, despite having the same configured
-   name. As such, the persisted identifier for the source must stay the
-   same across configuration reloads, but must be different for each run
+   name. As such, the source identifier must be different for each run
    of Vector.
 
 ## Internal Proposal
