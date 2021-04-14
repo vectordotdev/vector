@@ -18,6 +18,7 @@ use std::fs::DirBuilder;
 use std::hash::Hash;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use uuid::Uuid;
 
 pub mod api;
 mod builder;
@@ -206,7 +207,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 
 pub struct SourceContext {
     pub name: String,
-    pub identifier: Box<str>,
+    pub identifier: Uuid,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
@@ -219,15 +220,9 @@ impl SourceContext {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> Self {
-        let mut identifier = [b' '; 32];
-        let identifier = uuid::Uuid::new_v4()
-            .to_simple()
-            .encode_lower(&mut identifier)
-            .to_string()
-            .into_boxed_str();
         Self {
             name: name.into(),
-            identifier,
+            identifier: Uuid::new_v4(),
             globals,
             shutdown,
             out,
