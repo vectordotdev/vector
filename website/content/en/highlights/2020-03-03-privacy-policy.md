@@ -1,7 +1,6 @@
 ---
 last_modified_on: "2020-04-13"
-$schema: ".schema.json"
-title: "We've Added A Privacy Policy"
+title: "We've Added a Privacy Policy"
 description: "Our commitment to privacy"
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1977, 1976]

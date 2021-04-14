@@ -6,7 +6,7 @@
 {{ $highlights := .RegularPages }}
 {{ $versions := site.Params.vector_versions }} {{/* We need this because Hugo can't sort based on semver */}}
 {{ partial "hero.html" . }}
-<section class="section">
+<section class="section mt-4 mb-6">
   <div class="container">
     <div class="timeline">
       {{ range $versions }}
@@ -16,6 +16,14 @@
         <div class="timeline-content">
           <p class="heading has-text-weight-bold">Version {{ . }}</p>
           <p>{{ len $pages }} highlights</p>
+
+          <div class="columns is-multiline is-variable is-1 mt-4">
+            {{ range $pages }}
+            <div class="column is-one-third">
+              {{ .Render "highlight-card" }}
+            </div>
+            {{ end }}
+          </div>
         </div>
       </div>
       {{ end }}
