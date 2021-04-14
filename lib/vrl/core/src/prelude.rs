@@ -5,7 +5,7 @@ pub use compiler::{expression, state, value::kind};
 
 // commonly used top-level crate types
 pub use compiler::{
-    value::Kind, Context, Expression, ExpressionError, Function, Path, Resolved, Target, TypeDef,
+    value::Kind, Context, Expression, ExpressionError, Function, Resolved, Target, TypeDef,
     Value,
 };
 

@@ -129,7 +129,6 @@ impl Display for LookupBuf {
 }
 
 impl LookupBuf {
-
     /// Creates an lookup to the root
     pub fn root() -> Self {
         Self {
@@ -175,8 +174,7 @@ impl LookupBuf {
         values: IndexMap<String, TomlValue>,
     ) -> crate::Result<IndexMap<LookupBuf, Value>> {
         let mut discoveries = IndexMap::new();
-        for (key, value) in values {
-            Self::from_toml_table_recursive_step(
+        for (key, value) in values
                 LookupBuf::try_from(key)?,
                 value,
                 &mut discoveries,
@@ -193,6 +191,11 @@ impl LookupBuf {
 
     #[instrument(level = "trace")]
     pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[instrument(level = "trace")]
+    pub fn is_root(&self) -> bool {
         self.len() == 0
     }
 
@@ -306,6 +309,15 @@ impl LookupBuf {
     #[instrument(level = "trace")]
     pub fn starts_with(&self, needle: &LookupBuf) -> bool {
         needle.iter().zip(&self.segments).all(|(n, s)| n == s)
+    }
+
+    #[instrument(level = "trace")]
+    // TODO This is abysmal
+    pub fn as_slice(&self) -> Vec<SegmentBuf> {
+        let mut cloned = self.segments.clone();
+        cloned.make_contiguous();
+        let (slice, _) = cloned.as_slices();
+        Vec::from(slice)
     }
 }
 

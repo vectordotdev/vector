@@ -5,17 +5,18 @@ use shared::EventDataEq;
 use std::collections::{BTreeMap, HashMap};
 
 pub mod discriminant;
+pub mod error;
 pub mod merge_state;
 pub mod metadata;
 pub mod metric;
 pub mod util;
 
+mod legacy_lookup;
 mod log_event;
-mod lookup;
 mod value;
 
+pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
-pub use lookup::Lookup;
 pub use metadata::EventMetadata;
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use std::convert::{TryFrom, TryInto};
