@@ -64,7 +64,7 @@ $content-heading-weight: $weight-light
 $hero-body-padding: $section-padding
 $card-content-padding: 1rem
 $card-header-padding: 0.75rem 1rem
-$navbar-item-hover-color: $secondary !important
+$navbar-item-hover-color: $primary !important
 $navbar-item-hover-background-color: $black !important
 $navbar-item-active-background-color: $black !important
 $navbar-item-active-color: $vector-light-blue !important
@@ -152,10 +152,14 @@ $colors: mergeColorMaps(("secondary": ($secondary, $white), "twitter-blue": ($tw
 // Vendored Sass
 @import "bulma-timeline/src/sass/index"
 
-// Non-vendored, site-specific Sass
+/// Non-vendored, site-specific Sass
+
+// This needs to be imported first
 @import "helpers"
+
 @import "configs"
 @import "custom"
+@import "drawer"
 @import "sidebar"
 @import "syntax"
 @import "toc"

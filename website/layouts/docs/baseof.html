@@ -7,35 +7,52 @@
 
     {{ partial "css.html" . }}
   </head>
-  <body class="page has-navbar-fixed-top" x-data="{ drawer: false }">
-    {{ partial "navbar.html" . }}
+  <body class="page has-navbar-fixed-top" id="page" x-data="{ drawer: false }">
+    <section class="canvas" :class="{ 'is-opaque': drawer }">
+      <main class="main">
+        {{ partial "navbar.html" . }}
+        <div class="dashboard">
+          <div class="container">
+            <div class="columns is-variable is-5">
+              <div class="column is-one-fifth is-hidden-touch">
+                {{ partial "docs/sidebar.html" (dict "ctx" .) }}
+              </div>
 
-    <main class="main">
-      <div class="dashboard">
-        <div class="container">
-          <div class="columns is-variable is-5">
-            <div class="column is-one-fifth is-hidden-touch">
-              {{ partial "docs/sidebar.html" (dict "ctx" .) }}
-            </div>
+              <div class="column">
+                {{ partial "docs/breadcrumb.html" . }}
+                {{ partial "docs/hero.html" (dict "title" .Title "description" .Params.description) }}
+                {{ partial "docs/content.html" . }}
+              </div>
 
-            <div class="column">
-              {{ partial "docs/breadcrumb.html" . }}
-              {{ partial "docs/hero.html" (dict "title" .Title "description" .Params.description) }}
-              {{ partial "docs/content.html" . }}
-            </div>
-
-            <div class="column is-one-fifth is-hidden-mobile">
-              {{ block "toc". }}
-              {{ partial "docs/toc.html" . }}
-              {{ end }}
+              <div class="column is-one-fifth is-hidden-mobile">
+                {{ block "toc" . }}
+                {{ partial "docs/toc.html" . }}
+                {{ end }}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </main>
+      </main>
 
-    {{ block "below" . }}
-    {{ end }}
+      {{ block "below" . }}
+      {{ end }}
+
+      <nav class="navbar is-fixed-bottom is-padded has-shadow is-hidden-desktop">
+        <div class="container">
+          <div class="navbar-brand">
+            <div class="navbar-item">
+              <a class="button is-black" @click="drawer = !drawer">
+                <span class="icon">
+                  <i class="fas fa-ellipsis-v"></i>
+                </span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </section>
+
+    {{ partial "docs/drawer.html" (dict "ctx" .) }}
 
     {{ partial "javascript.html" . }}
   </body>
