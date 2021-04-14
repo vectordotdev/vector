@@ -4,6 +4,7 @@
 
 {{ define "main" }}
 {{ $desc := .Params.description }}
+{{ $numSections := len .Sections }}
 <section class="section mt-6">
   <div class="container">
     <div class="columns is-variable is-8">
@@ -17,30 +18,33 @@
         </p>
       </div>
 
-      <div class="column">
+      <div class="column is-two-thirds">
         <div class="container">
-          {{ range .Sections }}
+          {{ range $idx, $section := .Sections }}
+          {{ $isLast := eq $idx (sub $numSections 1) }}
           {{ $desc := .Params.description }}
-          <p class="title is-size-3 is-size-4-mobile has-text-weight-light{{ if $desc }} is-spaced{{ end }}">
-            {{ .Title }}
-          </p>
+          <div{{ if not $isLast }} class="mb-5"{{ end }}>
+            <p class="title is-size-3 is-size-4-mobile has-text-weight-light{{ if $desc }} is-spaced{{ end }}">
+              {{ .Title }}
+            </p>
 
-          {{ with $desc }}
-          <p class="subtitle has-text-grey">
-            {{ . }}
-          </p>
-          {{ end }}
-
-          {{ with .RegularPages }}
-         <div class="mt-4">
-          <div class="columns is-multiline">
-            {{ range . }}
-            <div class="column is-half">
-              {{ .Render "guide-card" }}
-            </div>
+            {{ with $desc }}
+            <p class="subtitle has-text-grey">
+              {{ . }}
+            </p>
             {{ end }}
+
+            {{ with .RegularPages }}
+           <div class="mt-4">
+            <div class="columns is-multiline">
+              {{ range . }}
+              <div class="column is-half">
+                {{ .Render "guide-card" }}
+              </div>
+              {{ end }}
+            </div>
+           </div>
           </div>
-         </div>
           {{ end }}
           {{ end }}
         </div>
