@@ -100,6 +100,7 @@ impl Expression for GetHostIpFn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::{IpAddr, Ipv4Addr};
 
     test_type_def![default {
         expr: |_| {
@@ -112,7 +113,7 @@ mod tests {
     }];
 
     #[test]
-    fn get_host_ip() {
+    fn first() {
         let mut state = vrl::state::Runtime::default();
         let mut object: Value = map![].into();
         let mut ctx = Context::new(&mut object, &mut state);
@@ -128,7 +129,33 @@ mod tests {
         match value {
             Value::Bytes(val) => {
                 let val = String::from_utf8_lossy(&val);
-                val.parse::<std::net::IpAddr>().expect("valid ip address");
+                val.parse::<IpAddr>().expect("valid ip address");
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn loopback() {
+        let mut state = vrl::state::Runtime::default();
+        let mut object: Value = map![].into();
+        let mut ctx = Context::new(&mut object, &mut state);
+        let value = GetHostIpFn {
+            interface: Some(expr!("lo").into()),
+            family: Some("IPv4".into()),
+        }
+        .resolve(&mut ctx)
+        .unwrap();
+
+        assert!(matches!(&value, Value::Bytes(_)));
+
+        match value {
+            Value::Bytes(val) => {
+                let val = String::from_utf8_lossy(&val);
+                assert_eq!(
+                    val.parse::<IpAddr>().expect("valid ip address"),
+                    IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
+                );
             }
             _ => unreachable!(),
         }
