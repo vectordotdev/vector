@@ -6,19 +6,11 @@
     <div class="container">
       <div class="columns is-variable is-8">
         <div class="column is-one-quarter">
-          <p class="title is-size-3 is-size-4-mobile has-text-light has-text-weight-bold">
+          <p class="title is-size-3 is-size-4-mobile has-text-light has-text-weight-bold mb-4">
             {{ site.Title }}
           </p>
 
-          <div class="social-buttons">
-            {{ range $buttons }}
-            <a href="{{ .URL }}" target="_blank">
-              <span class="icon is-medium">
-                <i class="{{ .Params.icon }} fa-lg"></i>
-              </span>
-            </a>
-            {{ end }}
-          </div>
+          {{ partial "social-buttons.html" . }}
         </div>
 
         {{ range $menu }}

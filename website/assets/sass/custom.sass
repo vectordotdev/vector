@@ -7,11 +7,11 @@ $scroll-adjust: $navbar-height + scroll-adjust-margin
 
 // Fix the issue where headers are obscured by the fixed navbar
 h1::before, h2::before, h3::before, h4::before, h5::before, h6::before
-    display: block
-    content: " "
-    height: $scroll-adjust
-    margin-top: -scroll-adjust
-    visibility: hidden
+  display: block
+  content: " "
+  height: $scroll-adjust
+  margin-top: $scroll-adjust
+  visibility: hidden
 
 // Ensure a sticky footer at the bottom of each page
 .page, .canvas
@@ -31,11 +31,8 @@ h1::before, h2::before, h3::before, h4::before, h5::before, h6::before
 
 // Some small tweaks to the footer aesthetic
 .footer
-  a, .icon
-    color: $primary
-
-    &:hover
-      color: $vector-magenta
+  a:hover
+    color: $vector-magenta
 
 // hr elements used on the main page for flair
 hr.narrow
