@@ -574,7 +574,7 @@ mod integration_tests {
         test_util::{random_lines_with_stream, random_string},
     };
     use bytes::{Buf, BytesMut};
-    use flate2::read::GzDecoder;
+    use flate2::read::MultiGzDecoder;
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;
     use std::io::{BufRead, BufReader};
@@ -803,7 +803,7 @@ mod integration_tests {
 
     async fn get_gzipped_lines(obj: rusoto_s3::GetObjectOutput) -> Vec<String> {
         let body = get_object_output_body(obj).await;
-        let buf_read = BufReader::new(GzDecoder::new(body));
+        let buf_read = BufReader::new(MultiGzDecoder::new(body));
         buf_read.lines().map(|l| l.unwrap()).collect()
     }
 
