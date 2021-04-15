@@ -21,7 +21,7 @@ Vector's `remap` transform is recommended for parsing, shaping, and transforming
 
 ## VRL examples
 
-{{< vrl/examples >}}
+{{< vrl/real-world-examples >}}
 
 ## How it works
 
