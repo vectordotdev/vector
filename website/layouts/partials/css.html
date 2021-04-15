@@ -8,6 +8,3 @@
 {{ $css          := resources.Get $sass | resources.ExecuteAsTemplate $sass . | toCSS $cssOpts | fingerprint}}
 
 <link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
-
-{{ $favicon := "favicon.ico" | absURL }}
-<link rel="shortcut icon" href="{{ $favicon }}">

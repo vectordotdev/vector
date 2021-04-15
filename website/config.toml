@@ -27,8 +27,11 @@ undertagline = "Collect, transform, and route all observability data with one si
 subtagline = "Vector is deployed over 1,000,000 times per month by Fortune 500 companies and startups"
 font_awesome_version = "5.15.3"
 alpine_js_version = "2.8.2"
-current_version = "0.12.1"
+site_logo = "img/vector-open-graph.png"
+favicon = "favicon.ico"
 
+# Versions
+current_version = "0.12.1"
 vector_versions = ["0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.1", "0.8.0", "0.7.0", "0.6.0"]
 
 # Aesthetics

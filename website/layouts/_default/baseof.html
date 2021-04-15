@@ -2,6 +2,8 @@
 <!DOCTYPE html>
 <html>
   <head>
+    {{ partial "meta.html" . }}
+
     <title>
       {{ block "title" . }}
       {{ site.Title }} | {{ site.Params.description }}
