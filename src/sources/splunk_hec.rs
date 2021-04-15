@@ -18,6 +18,7 @@ use serde::{de, Deserialize, Serialize};
 use serde_json::{de::IoRead, json, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use std::{
+    collections::HashMap,
     future,
     io::Read,
     net::{Ipv4Addr, SocketAddr},
@@ -150,10 +151,18 @@ impl SplunkSource {
     }
 
     fn event_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
+        let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
+            .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
+        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
+
+        let splunk_channel = splunk_channel_header
+            .and(splunk_channel_query_param)
+            .map(|header: Option<String>, query_param| header.or(query_param));
+
         warp::post()
             .and(path!("event").or(path!("event" / "1.0")))
             .and(self.authorization())
-            .and(warp::header::optional::<String>("x-splunk-request-channel"))
+            .and(splunk_channel)
             .and(warp::header::optional::<String>("host"))
             .and(self.gzip())
             .and(warp::body::bytes())
@@ -172,20 +181,22 @@ impl SplunkSource {
     }
 
     fn raw_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
+        let splunk_channel_query_param = warp::query::<HashMap<String, String>>()
+            .map(|qs: HashMap<String, String>| qs.get("channel").map(|v| v.to_owned()));
+        let splunk_channel_header = warp::header::optional::<String>("x-splunk-request-channel");
+
+        let splunk_channel = splunk_channel_header
+            .and(splunk_channel_query_param)
+            .and_then(|header: Option<String>, query_param| async move {
+                header
+                    .or(query_param)
+                    .ok_or_else(|| Rejection::from(ApiError::MissingChannel))
+            });
+
         warp::post()
             .and(path!("raw" / "1.0").or(path!("raw")))
             .and(self.authorization())
-            .and(
-                warp::header::optional::<String>("x-splunk-request-channel").and_then(
-                    |channel: Option<String>| async {
-                        if let Some(channel) = channel {
-                            Ok(channel)
-                        } else {
-                            Err(Rejection::from(ApiError::MissingChannel))
-                        }
-                    },
-                ),
-            )
+            .and(splunk_channel)
             .and(warp::header::optional::<String>("host"))
             .and(self.gzip())
             .and(warp::body::bytes())
@@ -835,16 +846,36 @@ mod tests {
         events
     }
 
-    async fn post(address: SocketAddr, api: &str, message: &str) -> u16 {
-        send_with(address, api, message, TOKEN).await
+    #[derive(Clone, Copy, Debug)]
+    enum Channel<'a> {
+        Header(&'a str),
+        QueryParam(&'a str),
     }
 
-    async fn send_with(address: SocketAddr, api: &str, message: &str, token: &str) -> u16 {
-        reqwest::Client::new()
+    async fn post(address: SocketAddr, api: &str, message: &str) -> u16 {
+        send_with(address, api, message, TOKEN, Channel::Header("channel")).await
+    }
+
+    async fn send_with(
+        address: SocketAddr,
+        api: &str,
+        message: &str,
+        token: &str,
+        channel: Channel<'_>,
+    ) -> u16 {
+        let wrap_with_channel =
+            |b: reqwest::RequestBuilder, c: Channel| -> reqwest::RequestBuilder {
+                match c {
+                    Channel::Header(v) => b.header("x-splunk-request-channel", v),
+                    Channel::QueryParam(v) => b.query(&[("channel", v)]),
+                }
+            };
+
+        let mut b = reqwest::Client::new()
             .post(&format!("http://{}/{}", address, api))
-            .header("Authorization", format!("Splunk {}", token))
-            .header("x-splunk-request-channel", "guid")
-            .body(message.to_owned())
+            .header("Authorization", format!("Splunk {}", token));
+        b = wrap_with_channel(b, channel);
+        b.body(message.to_owned())
             .send()
             .await
             .unwrap()
@@ -993,12 +1024,58 @@ mod tests {
 
         let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-        assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
+        assert_eq!(event.as_log()[&super::CHANNEL], "channel".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
         );
+    }
+
+    #[tokio::test]
+    async fn channel_header() {
+        trace_init();
+
+        let message = "raw";
+        let (source, address) = source().await;
+
+        assert_eq!(
+            200,
+            send_with(
+                address,
+                "services/collector/raw",
+                message,
+                TOKEN,
+                Channel::Header("guid")
+            )
+            .await
+        );
+
+        let event = collect_n(source, 1).await.remove(0);
+        assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
+    }
+
+    #[tokio::test]
+    async fn channel_query_param() {
+        trace_init();
+
+        let message = "raw";
+        let (source, address) = source().await;
+
+        assert_eq!(
+            200,
+            send_with(
+                address,
+                "services/collector/raw",
+                message,
+                TOKEN,
+                Channel::QueryParam("guid")
+            )
+            .await
+        );
+
+        let event = collect_n(source, 1).await.remove(0);
+        assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
     }
 
     #[tokio::test]
@@ -1018,7 +1095,14 @@ mod tests {
 
         assert_eq!(
             401,
-            send_with(address, "services/collector/event", "", "nope").await
+            send_with(
+                address,
+                "services/collector/event",
+                "",
+                "nope",
+                Channel::Header("channel")
+            )
+            .await
         );
     }
 
