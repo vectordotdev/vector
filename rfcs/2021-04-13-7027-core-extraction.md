@@ -298,18 +298,18 @@ that deferred.
 
 To extract the core of vector I propose that we do the following:
 
-- Create a new, blank `core` package that top-level vector depends on.
-- Migrate one of the areas from 'What is "core" to vector?' into this package,
+* Create a new, blank `core` package that top*level vector depends on.
+* Migrate one of the areas from 'What is "core" to vector?' into this package,
   along with any existing test code.
-- Add any new test code that seems worthwhile for the migrated material.
-- Repeat.
-- Once a critical mass of core exists, create a core-private source for
+* Add any new test code that seems worthwhile for the migrated material.
+* Repeat.
+* Once a critical mass of core exists, create a core-private source for
   generating `Event` load into a topology and a core-private sink that signals
   for program termination after a set number of `Event`s have been
-  received. Bundle this into a `vector-core` for throughput trials of core only,
+  received. Bundle this into a `vector*core` for throughput trials of core only,
   validating the package structure for cheap experimentation and for avoiding
   core as "vector but with pieces missing".
-- Migrate any remaining core concepts.
+* Migrate any remaining core concepts.
 
 By the end of this process we will have a "core" package that represents all the
 pieces needed to build the backbone of a vector, used in the top-level vector
