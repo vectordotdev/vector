@@ -1,4 +1,6 @@
-use crate::expression::{Expr, Expression, FunctionArgument, Literal, Query};
+use crate::expression::{
+    container::Variant, Container, Expr, Expression, FunctionArgument, Literal, Query,
+};
 use crate::parser::Node;
 use crate::value::Kind;
 use crate::{Span, Value};
@@ -188,6 +190,25 @@ impl ArgumentList {
 
     pub fn required_regex(&mut self, keyword: &'static str) -> Result<regex::Regex, Error> {
         Ok(required(self.optional_regex(keyword)?))
+    }
+
+    pub fn optional_array(&mut self, keyword: &'static str) -> Result<Option<Vec<Expr>>, Error> {
+        self.optional_expr(keyword)
+            .map(|expr| match expr {
+                Expr::Container(Container {
+                    variant: Variant::Array(array),
+                }) => Ok((*array).clone()),
+                expr => Err(Error::UnexpectedExpression {
+                    keyword,
+                    expected: "array",
+                    expr,
+                }),
+            })
+            .transpose()
+    }
+
+    pub fn required_array(&mut self, keyword: &'static str) -> Result<Vec<Expr>, Error> {
+        Ok(required(self.optional_array(keyword)?))
     }
 
     pub(crate) fn keywords(&self) -> Vec<&'static str> {

@@ -29,6 +29,7 @@ pub use array::Array;
 pub use assignment::Assignment;
 pub use block::Block;
 pub use container::Container;
+pub use container::Variant;
 pub use function_argument::FunctionArgument;
 pub use function_call::FunctionCall;
 pub use group::Group;

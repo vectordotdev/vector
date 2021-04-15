@@ -1,6 +1,13 @@
-/*
-use vrl::prelude::*;
+use lazy_static::lazy_static;
+use std::borrow::Cow;
+use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
+use vrl::prelude::*;
+
+lazy_static! {
+    // Matches Visa, Mastercard, American Express, Diner's Club, Discover Card, and JCB
+    static ref CREDIT_CARD_REGEX: regex::Regex = regex::Regex::new(r"(?:4[0-9]{12}(?:[0-9]{3})?|[25][1-7][0-9]{14}|6(?:011|5[0-9][0-9])[0-9]{12}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|(?:2131|1800|35\d{3})\d{11})").unwrap();
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Redact;
@@ -14,165 +21,198 @@ impl Function for Redact {
         &[
             Parameter {
                 keyword: "value",
-                kind: kind::ANY,
+                kind: kind::BYTES | kind::OBJECT | kind::ARRAY,
                 required: true,
             },
             Parameter {
                 keyword: "filters",
-                kind: kind::ANY,
-                required: false,
-            },
-            Parameter {
-                keyword: "redactor",
-                kind: kind::ANY,
-                required: false,
-            },
-            Parameter {
-                keyword: "patterns",
-                kind: kind::ANY,
-                required: false,
+                kind: kind::ARRAY,
+                required: true,
             },
         ]
+    }
+
+    fn examples(&self) -> &'static [Example] {
+        // TODO
+        &[]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
 
         let filters = arguments
-            .optional_enum_list("filters", &Filter::all_str())?
-            .unwrap_or_default()
+            .required_array("filters")?
             .into_iter()
-            .map(|s| Filter::from_str(&s).expect("validated enum"))
-            .collect::<Vec<_>>();
+            .map(|value| value.try_into().map_err(Into::into))
+            .collect::<Result<Vec<Filter>>>()
+            .map_err(|err| {
+                dbg!(err);
+                vrl::function::Error::UnexpectedExpression {
+                    keyword: "TODO",
+                    expected: "TODO",
+                    expr: expression::Expr::Literal(expression::Literal::String("TODO".into())),
+                }
+            })?;
 
-        let redactor = arguments
-            .optional_enum("redactor", &Redactor::all_str())?
-            .map(|s| Redactor::from_str(&s).expect("validated enum"))
-            .unwrap_or_default();
-
-        let patterns = arguments.optional_array("patterns")?.map(Into::into);
+        let redactor = Redactor::Full;
 
         Ok(Box::new(RedactFn {
             value,
             filters,
             redactor,
-            patterns,
         }))
     }
 }
 
-// -----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct RedactFn {
     value: Box<dyn Expression>,
     filters: Vec<Filter>,
     redactor: Redactor,
-    patterns: Option<Vec<Expr>>,
+}
+
+fn redact(value: Value, filters: &Vec<Filter>, redactor: &Redactor) -> Value {
+    match value {
+        Value::Bytes(bytes) => {
+            let input = String::from_utf8_lossy(&bytes);
+            let output = filters
+                .iter()
+                .fold(input, |input, filter| filter.redact(input, redactor));
+            Value::Bytes(output.into_owned().into())
+        }
+        Value::Array(values) => {
+            let values = values
+                .into_iter()
+                .map(|value| redact(value, filters, redactor))
+                .collect();
+            Value::Array(values)
+        }
+        Value::Object(map) => {
+            let map = map
+                .into_iter()
+                .map(|(key, value)| (key, redact(value, filters, redactor)))
+                .collect();
+            Value::Object(map)
+        }
+        _ => value,
+    }
 }
 
 impl Expression for RedactFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let value = self.value.resolve(ctx)?;
-        let mut input = value.try_bytes_utf8_lossy()?.into_owned();
 
-        for filter in &self.filters {
-            match filter {
-                Filter::Pattern => self
-                    .patterns
-                    .as_deref()
-                    .unwrap_or_default()
-                    .iter()
-                    .try_for_each::<_, Result<()>>(|expr| match expr.resolve(ctx)? {
-                        Value::Bytes(bytes) => {
-                            let pattern = String::from_utf8_lossy(&bytes);
-
-                            input = input.replace(pattern.as_ref(), self.redactor.pattern());
-                            Ok(())
-                        }
-                        Value::Regex(regex) => {
-                            input = regex
-                                .replace_all(&input, self.redactor.pattern())
-                                .into_owned();
-                            Ok(())
-                        }
-                        v => Err(value::Error::Expected(
-                            value::Kind::Bytes | value::Kind::Regex,
-                            v.kind(),
-                        )
-                        .into()),
-                    })?,
-            }
-        }
-
-        Ok(input.into())
+        Ok(redact(value, &self.filters, &self.redactor))
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let mut typedef = self
-            .value
-            .type_def(state)
-            .fallible_unless(Kind::Bytes)
-            .with_constraint(Kind::Bytes);
-
-        match &self.patterns {
-            Some(patterns) => {
-                for p in patterns {
-                    typedef = typedef.merge(
-                        p.type_def(state)
-                            .fallible_unless(Kind::Regex)
-                            .with_constraint(Kind::Bytes),
-                    )
-                }
-            }
-            None => (),
-        }
-
-        typedef
+        self.value.type_def(state).infallible()
     }
 }
 
-// -----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
 
 /// The redaction filter to apply to the given value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 enum Filter {
-    Pattern,
+    Pattern(Vec<Pattern>),
+    CreditCard,
+}
+
+#[derive(Debug, Clone)]
+enum Pattern {
+    Regex(regex::Regex),
+    String(String),
+}
+
+impl TryFrom<expression::Expr> for Filter {
+    type Error = &'static str;
+
+    fn try_from(value: expression::Expr) -> std::result::Result<Self, Self::Error> {
+        match value {
+            expression::Expr::Container(expression::Container {
+                variant: expression::Variant::Object(object),
+            }) => {
+                let r#type = match object
+                    .get("type")
+                    .ok_or("filters specified as objects must have type paramater")?
+                {
+                    expression::Expr::Literal(expression::Literal::String(bytes)) => {
+                        Ok(bytes.clone())
+                    }
+                    _ => Err("type key in filters must be a literal string"),
+                }?;
+
+                match r#type.as_ref() {
+                    b"credit_card" => Ok(Filter::CreditCard),
+                    b"pattern" => {
+                        let patterns = match object
+                            .get("patterns")
+                            .ok_or("pattern filter must have `patterns` specified")?
+                        {
+                            expression::Expr::Container(expression::Container {
+                                variant: expression::Variant::Array(array),
+                            }) => Ok(array
+                                .iter()
+                                .map(|expr| match expr {
+                                    expression::Expr::Literal(expression::Literal::Regex(
+                                        regex,
+                                    )) => Ok(Pattern::Regex((**regex).clone())),
+                                    expression::Expr::Literal(expression::Literal::String(
+                                        bytes,
+                                    )) => Ok(Pattern::String(
+                                        String::from_utf8_lossy(&bytes).into_owned(),
+                                    )),
+                                    _ => Err("`patterns` must be regular expressions"),
+                                })
+                                .collect::<std::result::Result<Vec<_>, _>>()?),
+                            _ => Err("`patterns` must be array of regular expression literals"),
+                        }?;
+                        Ok(Filter::Pattern(patterns))
+                    }
+                    _ => Err("unknown filter name"),
+                }
+            }
+            expression::Expr::Literal(literal) => match literal {
+                expression::Literal::String(bytes) => match bytes.as_ref() {
+                    b"pattern" => Err("pattern cannot be used without arguments"),
+                    b"credit_card" => Ok(Filter::CreditCard),
+                    _ => Err("unknown filter name"),
+                },
+                expression::Literal::Regex(regex) => {
+                    Ok(Filter::Pattern(vec![Pattern::Regex((*regex).clone())]))
+                }
+                _ => Err("unknown literal for filter, must be a regex, filter name, or object"),
+            },
+            _ => Err("unknown literal for filter, must be a regex, filter name, or object"),
+        }
+    }
 }
 
 impl Filter {
-    fn all_str() -> Vec<&'static str> {
-        use Filter::*;
-
-        vec![Pattern]
-            .into_iter()
-            .map(|p| p.as_str())
-            .collect::<Vec<_>>()
-    }
-
-    const fn as_str(self) -> &'static str {
-        use Filter::*;
-
-        match self {
-            Pattern => "pattern",
+    fn redact<'t>(&self, input: Cow<'t, str>, redactor: &Redactor) -> Cow<'t, str> {
+        match &self {
+            Filter::Pattern(patterns) => patterns.iter().fold(input, |input, pattern| {
+                // TODO see if we can avoid cloning here
+                match pattern {
+                    Pattern::Regex(regex) => regex
+                        .replace_all(&input, redactor.pattern())
+                        .into_owned()
+                        .into(),
+                    Pattern::String(pattern) => {
+                        input.to_owned().replace(pattern, redactor.pattern()).into()
+                    }
+                }
+            }),
+            Filter::CreditCard => CREDIT_CARD_REGEX
+                .replace_all(&input, redactor.pattern())
+                .into_owned()
+                .into(),
         }
     }
 }
-
-impl FromStr for Filter {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        use Filter::*;
-
-        match s {
-            "pattern" => Ok(Pattern),
-            _ => Err("unknown filter"),
-        }
-    }
-}
-
-// -----------------------------------------------------------------------------
 
 /// The recipe for redacting the matched filters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -181,28 +221,11 @@ enum Redactor {
 }
 
 impl Redactor {
-    fn all_str() -> Vec<&'static str> {
-        use Redactor::*;
-
-        vec![Full]
-            .into_iter()
-            .map(|p| p.as_str())
-            .collect::<Vec<_>>()
-    }
-
-    fn as_str(self) -> &'static str {
-        use Redactor::*;
-
-        match self {
-            Full => "full",
-        }
-    }
-
     fn pattern(&self) -> &str {
         use Redactor::*;
 
         match self {
-            Full => "****",
+            Full => "[REDACTED]",
         }
     }
 }
@@ -231,60 +254,40 @@ mod test {
     use super::*;
     use regex::Regex;
 
-    test_type_def![
-        string_infallible {
-            expr: |_| RedactFn {
-                value: lit!("foo").boxed(),
-                filters: vec![Filter::Pattern],
-                patterns: None,
-                redactor: Redactor::Full,
-            },
-            def: TypeDef {
-                kind: value::Kind::Bytes,
-                ..Default::default()
-            },
+    // TODO test error cases
+    test_function![
+        redact => Redact;
+
+        regex {
+             args: func_args![
+                 value: "hello 123456 world",
+                 filters: vec![Regex::new(r"\d+").unwrap()],
+             ],
+             want: Ok("hello [REDACTED] world"),
+             tdef: TypeDef::new().infallible().bytes(),
         }
 
-        non_string_fallible {
-            expr: |_| RedactFn {
-                value: lit!(27).boxed(),
-                filters: vec![Filter::Pattern],
-                patterns: None,
-                redactor: Redactor::Full,
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: value::Kind::Bytes,
-                ..Default::default()
-            },
+        patterns {
+             args: func_args![
+                 value: "hello 123456 world",
+                 filters: vec![
+                     value!({
+                         "type": "pattern",
+                         "patterns": ["123456"]
+                     })
+                 ],
+             ],
+             want: Ok("hello [REDACTED] world"),
+             tdef: TypeDef::new().infallible().bytes(),
         }
 
-        valid_pattern_infallible {
-            expr: |_| RedactFn {
-                value: lit!("1111222233334444").boxed(),
-                filters: vec![Filter::Pattern],
-                patterns: Some(vec![Literal::from(Regex::new(r"/[0-9]{16}/").unwrap()).into()]),
-                redactor: Redactor::Full,
-            },
-            def: TypeDef {
-                kind: value::Kind::Bytes,
-                ..Default::default()
-            },
-        }
-
-        invalid_pattern_fallible {
-            expr: |_| RedactFn {
-                value: lit!("1111222233334444").boxed(),
-                filters: vec![Filter::Pattern],
-                patterns: Some(vec![lit!("i am a teapot").into()]),
-                redactor: Redactor::Full,
-            },
-            def: TypeDef {
-                fallible: true,
-                kind: value::Kind::Bytes,
-                ..Default::default()
-            },
+        credit_card {
+             args: func_args![
+                 value: "hello 4916155524184782 world",
+                 filters: vec!["credit_card"],
+             ],
+             want: Ok("hello [REDACTED] world"),
+             tdef: TypeDef::new().infallible().bytes(),
         }
     ];
 }
-*/
