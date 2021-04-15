@@ -111,9 +111,6 @@ sup.ml-tiny
 
 // Basic hover effect for cards
 .card.is-hoverable
-  .title
-    color: $primary
-
   &:hover
     background-color: $white-bis
 
@@ -122,6 +119,10 @@ sup.ml-tiny
 
 .card.is-fullheight
   height: 100%
+
+.card.has-medium-padding
+  padding: 1.25rem
+
 
 .is-horizontally-spaced
   display: flex
@@ -276,3 +277,10 @@ $admonition-title-font-size: 1.1rem
 
   .icon
     color: $primary
+
+.button.no-hover
+  &:hover
+    background-color: currentColor
+
+.media
+  border-top: none !important

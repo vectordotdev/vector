@@ -3,7 +3,42 @@
 {{ end }}
 
 {{ define "main" }}
-<h1>
-  Blog
-</h1>
+{{ $rss := .OutputFormats.Get "rss" }}
+{{ $posts := .RegularPages }}
+<section class="hero is-medium is-dark is-bold">
+  <div class="hero-body">
+    <div class="container">
+      <p class="title is-size-1 is-size-2-mobile has-text-weight-semibold is-spaced">
+        {{ .Title }}
+      </p>
+
+      <p class="subtitle has-text-grey-lighter">
+        {{ .Description }}
+      </p>
+
+      <div class="buttons are-small">
+        <a class="button is-orange" href="{{ $rss.RelPermalink }}">
+          <span class="icon">
+            <i class="fas fa-rss"></i>
+          </span>
+          <span>
+            RSS
+          </span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section mt-4">
+  <div class="container">
+    <div class="columns is-multiline is-variable is-4">
+      {{ range $posts }}
+      <div class="column is-one-third">
+        {{ .Render "blog-post-card" }}
+      </div>
+      {{ end }}
+    </div>
+  </div>
+</section>
 {{ end }}

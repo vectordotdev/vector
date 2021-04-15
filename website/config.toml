@@ -73,6 +73,11 @@ name = "Releases"
 url = "/releases"
 weight = 4
 
+[[menu.navbar]]
+name = "Blog"
+url = "/blog"
+weight = 5
+
 # Footer menu
 [[menu.footer]]
 name = "About"

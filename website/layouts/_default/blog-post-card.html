@@ -1,0 +1,73 @@
+{{ $title := .Params.short | default .Title }}
+{{ $authors := .CurrentSection.Params.authors }}
+{{ $author := index (where $authors "handle" "==" .Params.author) 0 }}
+{{ $date := .Date | dateFormat "January 2, 2006" }}
+{{ $type := .Params.tags.type | default "announcement" }}
+{{ $domains := .Params.tags.domains }}
+{{ $authorImg := printf "https://github.com/%s.png" $author.handle }}
+
+<div class="card is-hoverable has-medium-padding" x-data="{ type: '{{ $type }}' }">
+  <div class="card-content">
+    <div class="media">
+      <div class="media-content">
+        <p class="title is-size-4 is-size-5-mobile has-text-weight-semibold is-spaced">
+          <a href="{{ .RelPermalink }}">
+            {{ $title }}
+          </a>
+        </p>
+
+        <p class="has-text-weight-light">
+          <span>
+            {{ $date }}
+          </span>
+
+          /
+
+          <span>
+            {{ .ReadingTime }} min read
+          </span>
+        </p>
+      </div>
+    </div>
+
+    <div class="media">
+      <div class="media-left">
+        <figure class="image is-48x48">
+          <img class="is-rounded" src="{{ $authorImg }}" alt="GitHub avatar for author {{ $author.name }}">
+        </figure>
+      </div>
+      <div class="media-content">
+        {{ $author.name }}
+      </div>
+    </div>
+
+    {{ with .Description }}
+    <div class="content has-text-grey">
+      {{ . }}
+    </div>
+    {{ end }}
+
+    <div class="buttons are-small">
+      <div class="button is-rounded is-secondary is-outlined no-hover">
+        <span>
+          type:&nbsp;
+        </span>
+        <span class="has-text-weight-bold">
+          {{ $type }}
+        </span>
+      </div>
+      {{ with $domains }}
+      {{ range . }}
+      <div class="button is-rounded is-purple is-outlined no-hover">
+        <span>
+          domain:&nbsp;
+        </span>
+        <span class="has-text-weight-bold">
+          {{ . }}
+        </span>
+      </div>
+      {{ end }}
+      {{ end }}
+    </div>
+  </div>
+</div>

@@ -29,6 +29,7 @@ $vector-purple: #98f
 $vector-green: #50FA7B
 $twitter-blue: #1DA1F2
 $discord-purple: #7289DA
+$rss-orange: #f26522
 
 // Bulma's initial variables need to be imported first, as they're used to construct other variables
 @import "bulma/sass/utilities/initial-variables"
@@ -79,7 +80,7 @@ $menu-item-active-color: $vector-magenta
 $card-shadow: 0 0.25em 1em -0.125em rgba($scheme-invert, 0.1), 0 0px 0 1px rgba($scheme-invert, 0.02)
 
 // Add colors to Bulma's color map
-$colors: mergeColorMaps(("secondary": ($secondary, $white), "twitter-blue": ($twitter-blue, $white), "discord-purple": ($discord-purple, $white), "purple": ($vector-purple, $white)), $colors)
+$colors: mergeColorMaps(("orange": ($orange, $white), "secondary": ($secondary, $white), "twitter-blue": ($twitter-blue, $white), "discord-purple": ($discord-purple, $white), "purple": ($vector-purple, $white)), $colors)
 
 /// Selective import of Bulma libraries. Unused libraries are commented out.
 
@@ -100,7 +101,7 @@ $colors: mergeColorMaps(("secondary": ($secondary, $white), "twitter-blue": ($tw
 @import "bulma/sass/elements/container"
 @import "bulma/sass/elements/content"
 @import "bulma/sass/elements/icon"
-//@import "bulma/sass/elements/image"
+@import "bulma/sass/elements/image"
 //@import "bulma/sass/elements/notification"
 //@import "bulma/sass/elements/other"
 //@import "bulma/sass/elements/progress"
