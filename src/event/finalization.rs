@@ -60,7 +60,7 @@ impl Serialize for EventFinalizers {
         for event in self.0.iter() {
             // Only register finalizers on serialization, to avoid the
             // expense of registration if the event is never serialized.
-            EventFinalizer::register(Arc::clone(&event));
+            EventFinalizer::register(&event);
             seq.serialize_element(&event.identifier)?;
         }
         seq.end()
@@ -113,11 +113,13 @@ pub struct EventFinalizer {
 
 impl EventFinalizer {
     /// Register a finalizer for later retrieval after serialization
-    pub fn register(finalizer: Arc<Self>) {
+    pub fn register(finalizer: &Arc<Self>) {
         // This explicitly does not overwrite existing entries, as that
         // will simply just increment and decrement the reference counts
         // because the identifier key is meant to be globally unique.
-        EVENTS.entry(finalizer.identifier()).or_insert(finalizer);
+        EVENTS
+            .entry(finalizer.identifier())
+            .or_insert(Arc::clone(finalizer));
     }
 
     /// Look up a registered finalizer. TODO Some solution will be
@@ -203,7 +205,7 @@ impl Serialize for BatchNotifiers {
         for source in self.0.iter() {
             // Only register notifiers on serialization, to avoid the
             // expense of registration if the event is never serialized.
-            BatchNotifier::register(Arc::clone(&source));
+            BatchNotifier::register(&source);
             seq.serialize_element(&source.identifier)?;
         }
         seq.end()
@@ -253,11 +255,13 @@ pub struct BatchNotifier {
 }
 
 impl BatchNotifier {
-    fn register(notifier: Arc<Self>) {
+    fn register(notifier: &Arc<Self>) {
         // This explicitly does not overwrite existing entries, as that
         // will simply just increment and decrement the reference counts
         // because the identifier key is meant to be globally unique.
-        BATCHES.entry(notifier.identifier()).or_insert(notifier);
+        BATCHES
+            .entry(notifier.identifier())
+            .or_insert(Arc::clone(notifier));
     }
 
     fn lookup(identifier: Uuid) -> Option<Arc<Self>> {
