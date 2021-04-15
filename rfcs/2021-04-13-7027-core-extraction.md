@@ -1,7 +1,7 @@
 # RFC 7027 - 2021-04-13 - Core Extraction
 
 This RFC describes the technical details of vector's "core", why we believe it
-should be extracted as a distinct crate from "non-core" components and the
+should be extracted as a distinct notion from "non-core" components and the
 process we'll take to do said extraction.
 
 * [Summary](#summary)
@@ -41,14 +41,14 @@ goals. It is our belief that by extracting a vector "core" we can:
 ## Motivation
 
 We want to push the vector project into new, more competitive spaces. This will
-mean intregrating with more sources of data, allowing our users to do new things
+mean integrating with more sources of data, allowing our users to do new things
 with their in-flight data and also consistently, release after release, use less
 resources to do it. As noted in the summary build times are long and growing,
 imposing a burden on development. It is _hard_ to benchmark and improve your
-code if the feedback cycle is 30 minutes at least. Our flat structure
-contributes raises the barrier to entry for contributions; users on discord have
-referred to our compile times as "punishing". If a user contributes a new sink,
-say, then they are responsible for:
+code if the feedback cycle is 30 minutes. Our flat structure raises the barrier
+to entry for contributions; users on discord have referred to our compile times
+as "punishing". If a user contributes a new sink, say, then they are responsible
+for:
 
 * writing the sink and its correctness tests,
 * writing benchmarks,
@@ -74,7 +74,7 @@ that integration tests remain to be written in the top-level of the project but
 the overall experience is improved. Changes in VRL are isolated to VRL, though
 experience with `Lookup`/`LookupBuf` -- see
 [5374](https://github.com/timberio/vector/pull/5374) -- does suggest that
-aggressive intregation of a cross-cutting concern will make things challenging.
+aggressive integration of a cross-cutting concern will make things challenging.
 
 We hope to capture the benefits to development we've seen in the VRL sub-package
 and make them more broadly available in the vector project.
@@ -131,15 +131,15 @@ features seem to do almost but not exactly quite the same things.
 
 Taken in the abstract the core of vector is a data ingest, transformation and
 egress framework, expressed as an acyclic graph with nodes being separated by a
-queue -- both in-memory and on-disk -- with associated mechanisms durability
-across restarts, acks, backpressure between nodes in the graph and
+queue -- both in-memory and on-disk -- with associated mechanisms providing
+durability across restarts, acks, back-pressure between nodes in the graph and
 self-instrumentation. Nodes are of type "source", "sink" and "transform". A
-"source" node crates new `Event` instances -- this is vector's internal data
+"source" node creates new `Event` instances -- this is vector's internal data
 type -- and a "sink" destroys them, possibly by egressing them but also possibly
 by just deallocating. A "transform" node modifies `Event` instances as they pass
 through, destroys them, merges them or creates additional `Event`
 instances. Configuration and reload management of, implementations of
-source/transform/sink for different domains, common mechanism for backoffy/retry
+source/transform/sink for different domains, common mechanism for backoff/retry
 in sinks and cross-cutting concerns like tracing integration are all non-core.
 
 Our project today has a small number of packages in `lib`, notably:
@@ -191,7 +191,7 @@ understanding of what is core versus not depends on whether the lack of a thing
 would make vector other than what it is in its absence or leave us blind to
 vector's runtime behavior. The loss of VRL makes vector significantly less
 useful to our users but the loss of `Transform` makes vector something else
-entirely. The core of vector should, as well, be a crate of useful pieces for
+entirely. The core of vector should, as well, be a package of useful pieces for
 _building_ a vector, not vector but with a bunch of pieces ripped out.
 
 ## Alternatives for Future Work
@@ -238,10 +238,10 @@ working on, improve iteration loop speed. We might make this the official
 default. This alternative would require us to modify our "release" build to flip
 on the specific features we intend to ship. However, while this alternative does
 potentially reduce iteration costs and experimentation costs depending on the
-area being worked it does nothing for reducing burden for casual contributors
-nor does it lead to more focused tests. A non-representative default may be
-surprising to casual contributors, leading to CI dings that would otherwise have
-happened locally.
+area being worked it does nothing for reducing the burden for casual
+contributors nor does it lead to more focused tests. A non-representative
+default may be surprising to casual contributors, leading to CI dings that would
+otherwise have happened locally.
 
 ### Top-Level is Core, Concepts Become Packages
 
@@ -252,13 +252,13 @@ sources. VRL would remain as-is and we'd need to debate in the future what is
 and isn't "core". Once done this alternative would reduce iteration costs on
 core and, if documented, give casual contributors guideposts about where to add
 code. Experimentation costs could also be reduced, with packages in need of
-modification because of changes to core being delt with only after the changes
+modification because of changes to core being dealt with only after the changes
 to core as shown to be worthwhile. This alternative does not make for a more
 focused testing environment. With "core" as the top-level package we can't
 follow the sub-package model of exposing internal interfaces for experimentation
 as easily: our `vector` binary lives at the top-level, what if we want to create
 a `core` binary at the top-level that takes no configuration and just sends data
-through itself for testing purposes. Is that confusing to our users? I, at
+through itself for testing purposes? Is that confusing to our users? I, at
 least, would find it so. Should configuration be a "core" issue or a package
 used exclusively by "core"? How granular should a package be? Must all sources
 go in a "sources" package or can `file-source` continue, or should it be a crate
@@ -279,7 +279,7 @@ contributions have historically been sources or sinks -- but, if they do, we'll
 have a less resource intensive package for them to work against. Core as just
 another package lends itself to an iterative approach: extraction of core pieces
 need not happen in one burst but bit by bit. This approach has the added benefit
-of defering questions of non-core project structure, how our feature flags are
+of deferring questions of non-core project structure, how our feature flags are
 set up etc. There will be some grey area of course -- I argue that configuration
 is not a core concern but am sympathetic to the counter -- but these can be
 resolved in the piecemeal process of moving things into "core".
@@ -290,7 +290,7 @@ I argue that "Core is Just Another Package" is the best path forward. This
 approach addresses each of our major goals for extracting core without imposing
 significant secondary questions about total project organization, of which there
 has been nervous concern in the team. We don't want to "cut the project
-boundarys wrong" and I share this concern. I think we will eventually want more
+boundaries wrong" and I share this concern. I think we will eventually want more
 rigorous structure in the non-core parts of the project but I would like to see
 that deferred.
 
