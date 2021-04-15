@@ -268,8 +268,28 @@ impl Application {
                 tokio::select! {
                     Some(control) = control_rx.recv() => {
                         match control {
-                            Control::Config(config) => {
-                                println!("Received a new config!");
+                            Control::Config(mut new_config) => {
+                                new_config.healthchecks.set_require_healthy(opts.require_healthy);
+                                    match topology
+                                        .reload_config_and_respawn(new_config)
+                                        .await
+                                    {
+                                        Ok(true) => {
+                                            #[cfg(feature = "api")]
+                                            // Pass the new config to the API server.
+                                            if let Some(ref api_server) = api_server {
+                                                api_server.update_config(topology.config());
+                                            }
+                                        },
+                                        Ok(false) => emit!(VectorReloadFailed),
+                                        // Trigger graceful shutdown for what remains of the topology
+                                        Err(()) => {
+                                            emit!(VectorReloadFailed);
+                                            emit!(VectorRecoveryFailed);
+                                            break Control::Shutdown;
+                                        }
+                                    }
+                                    sources_finished = topology.sources_finished();
                             }
                             Control::Reload => {
                                 // Reload paths
