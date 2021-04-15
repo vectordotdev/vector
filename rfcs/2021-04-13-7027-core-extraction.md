@@ -84,7 +84,7 @@ and make them more broadly available in the vector project.
 Today there are 168 top-level features in the project, as measured on commit
 48d2a84b1b11ba54db7bd892944f2a479238edb4:
 
-```
+```sh
 > cargo read-manifest | jq ".features" | jq 'keys' | wc -l
 [
   "all-integration-tests",
