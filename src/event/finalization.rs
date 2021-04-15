@@ -12,22 +12,74 @@ use std::{fmt, sync::Arc};
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
+type ImmutVec<T> = Box<[T]>;
+
 lazy_static::lazy_static! {
     static ref BATCHES: DashMap<Uuid, Arc<BatchNotifier>> = DashMap::new();
     static ref EVENTS: DashMap<Uuid,Arc<EventFinalizer>> = DashMap::new();
 }
 
+/// Wrapper type for an array of event finalizers, used to support
+/// custom serialization and deserialization protocols for the included
+/// `Arc` elements.
+#[derive(Debug, Eq, PartialEq)]
+pub struct EventFinalizers(ImmutVec<Arc<EventFinalizer>>);
+
+impl Serialize for EventFinalizers {
+    /// Custom serializer for an array of event finaliers.  This
+    /// registers and then serializes each finalizer as just the
+    /// identifier.
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
+        for event in self.0.iter() {
+            // Only register finalizers on serialization, to avoid the
+            // expense of registration if the event is never serialized.
+            EventFinalizer::register(Arc::clone(&event));
+            seq.serialize_element(&event.identifier)?;
+        }
+        seq.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for EventFinalizers {
+    /// Custom serializer for an array of event finalizers. This
+    /// deserializes the identifier and then looks up the associated
+    /// finalizer. If the finalizer is no longer present (ie due to
+    /// reload or restart), the element is skipped.
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct MyVisitor;
+
+        impl<'de> Visitor<'de> for MyVisitor {
+            type Value = EventFinalizers;
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a sequence of batch finalizer UUIDs")
+            }
+
+            fn visit_seq<S>(self, mut seq: S) -> Result<Self::Value, S::Error>
+            where
+                S: SeqAccess<'de>,
+            {
+                let mut result = Vec::new();
+                while let Some(identifier) = seq.next_element::<Uuid>()? {
+                    if let Some(notifier) = EventFinalizer::lookup(identifier) {
+                        result.push(notifier);
+                    }
+                }
+                Ok(EventFinalizers(result.into()))
+            }
+        }
+
+        deserializer.deserialize_seq(MyVisitor)
+    }
+}
+
 /// An event finalizer is the shared data required to handle tracking
 /// the status of an event, and updating the status of a batch with that
 /// when the event is dropped.
-#[derive(CopyGetters, Debug, Deserialize, Serialize)]
+#[derive(CopyGetters, Debug)]
 pub struct EventFinalizer {
     status: Atomic<EventStatus>,
-    #[serde(
-        serialize_with = "serialize_batch_notifiers",
-        deserialize_with = "deserialize_batch_notifiers"
-    )]
-    sources: Vec<Arc<BatchNotifier>>,
+    sources: BatchNotifiers,
     /// The unique identifier for this event
     #[get_copy = "pub"]
     identifier: Uuid,
@@ -57,7 +109,7 @@ impl EventFinalizer {
         let batch_id = batch.identifier();
         Self {
             status: Atomic::new(EventStatus::Dropped),
-            sources: vec![batch],
+            sources: BatchNotifiers(vec![batch].into()),
             identifier: Uuid::new_v5(&batch_id, &sequence.to_ne_bytes()),
         }
     }
@@ -80,11 +132,7 @@ impl EventFinalizer {
                 Some(EventStatus::NoOp)
             })
             .unwrap_or_else(|_| unreachable!());
-        if status != EventStatus::NoOp {
-            for source in &self.sources {
-                source.update_status(status);
-            }
-        }
+        self.sources.update_status(status);
     }
 }
 
@@ -94,65 +142,78 @@ impl Drop for EventFinalizer {
     }
 }
 
-impl PartialEq for EventFinalizer {
-    fn eq(&self, other: &Self) -> bool {
-        (self.sources.iter())
-            .zip(other.sources.iter())
-            .all(|(a, b)| a.identifier == b.identifier)
-            && self.status.load(Ordering::Relaxed) == other.status.load(Ordering::Relaxed)
-    }
-}
-
 impl Eq for EventFinalizer {}
 
-/// Custom serializer for the array of batch notifiers. This form is
-/// required because we can't implmenet a serializer for `Arc<T>`.  This
-/// registers and then serializes each finalizer as just the identifier.
-fn serialize_batch_notifiers<S: Serializer>(
-    sources: &[Arc<BatchNotifier>],
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    let mut seq = serializer.serialize_seq(Some(sources.len()))?;
-    for source in sources {
-        // Only register notifiers on serialization, to avoid the
-        // expense of registration if the event is never serialized.
-        BatchNotifier::register(Arc::clone(&source));
-        seq.serialize_element(&source.identifier)?;
+impl PartialEq for EventFinalizer {
+    fn eq(&self, other: &Self) -> bool {
+        // Only need to compare for equal identifiers because they are
+        // globally unique.
+        self.identifier == other.identifier
     }
-    seq.end()
 }
 
-/// Custom serializer for the array of batch notifiers. This form is
-/// required because we can't implmenet a deserializer for `Arc<T>`.
-/// This deserializes the identifier and then looks up the associated
-/// notifier. If the notifier is no longer present (ie due to reload or
-/// restart), the element is skipped.
-fn deserialize_batch_notifiers<'de, D: Deserializer<'de>>(
-    deserializer: D,
-) -> Result<Vec<Arc<BatchNotifier>>, D::Error> {
-    struct NotifierVisitor;
+/// Wrapper type for an array of batch notifiers, used to support custom
+/// serialization and deserialization protocols for the included `Arc`
+/// elements.
+#[derive(Debug, Eq, PartialEq)]
+pub struct BatchNotifiers(ImmutVec<Arc<BatchNotifier>>);
 
-    impl<'de> Visitor<'de> for NotifierVisitor {
-        type Value = Vec<Arc<BatchNotifier>>;
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a sequence of batch notifier UUIDs")
-        }
-
-        fn visit_seq<S>(self, mut seq: S) -> Result<Self::Value, S::Error>
-        where
-            S: SeqAccess<'de>,
-        {
-            let mut result = Vec::new();
-            while let Some(identifier) = seq.next_element::<Uuid>()? {
-                if let Some(notifier) = BatchNotifier::lookup(identifier) {
-                    result.push(notifier);
-                }
+impl BatchNotifiers {
+    fn update_status(&self, status: EventStatus) {
+        if status != EventStatus::NoOp {
+            for notifier in self.0.iter() {
+                notifier.update_status(status);
             }
-            Ok(result)
         }
     }
+}
 
-    deserializer.deserialize_seq(NotifierVisitor)
+impl Serialize for BatchNotifiers {
+    /// Custom serializer for the array of batch notifiers. This
+    /// registers and then serializes each finalizer as just the
+    /// identifier.
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
+        for source in self.0.iter() {
+            // Only register notifiers on serialization, to avoid the
+            // expense of registration if the event is never serialized.
+            BatchNotifier::register(Arc::clone(&source));
+            seq.serialize_element(&source.identifier)?;
+        }
+        seq.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for BatchNotifiers {
+    /// Custom serializer for the array of batch notifiers.  This
+    /// deserializes the identifier and then looks up the associated
+    /// notifier. If the notifier is no longer present (ie due to reload
+    /// or restart), the element is skipped.
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct MyVisitor;
+
+        impl<'de> Visitor<'de> for MyVisitor {
+            type Value = BatchNotifiers;
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a sequence of batch notifier UUIDs")
+            }
+
+            fn visit_seq<S>(self, mut seq: S) -> Result<Self::Value, S::Error>
+            where
+                S: SeqAccess<'de>,
+            {
+                let mut result = Vec::new();
+                while let Some(identifier) = seq.next_element::<Uuid>()? {
+                    if let Some(notifier) = BatchNotifier::lookup(identifier) {
+                        result.push(notifier);
+                    }
+                }
+                Ok(BatchNotifiers(result.into()))
+            }
+        }
+
+        deserializer.deserialize_seq(MyVisitor)
+    }
 }
 
 /// A batch notifier contains the status
@@ -210,6 +271,16 @@ impl BatchNotifier {
 impl Drop for BatchNotifier {
     fn drop(&mut self) {
         todo!();
+    }
+}
+
+impl Eq for BatchNotifier {}
+
+impl PartialEq for BatchNotifier {
+    fn eq(&self, other: &Self) -> bool {
+        // Only need to compare for equal identifiers because they are
+        // globally unique.
+        self.identifier == other.identifier
     }
 }
 
