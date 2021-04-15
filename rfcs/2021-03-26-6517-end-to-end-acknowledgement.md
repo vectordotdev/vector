@@ -45,8 +45,7 @@ transforms represented here are all those not listed explicitly
 below. When the destination sink finishes handling the event, a
 notification needs to be delivered to the source indicating the
 finalization status. Thus, the event needs to contain a reference to the
-source and a unique message identifier. Different sources will have
-varying requirements on the message identifier.
+source and a unique message identifier.
 
 ### Multiple sources to a single sink
 
@@ -214,7 +213,7 @@ struct EventFinalizer {
 struct BatchNotifier {
     status: Mutex<BatchStatus>,
     notifier: tokio::sync::oneshot::Sender<BatchStatus>,
-    identifier: Box<str>,
+    identifier: Uuid,
 }
 
 struct EventFinalization {
@@ -254,7 +253,7 @@ carry the data.
 ```rust
 struct SourceContext<'a> {
     name: &'a str,
-    identifier: Box<str>,
+    identifier: Uuid,
     globals: &'a GlobalOptions,
     shutdown: ShutdownSignal,
     out: Pipeline,
