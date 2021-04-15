@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: get_hostname: {
+remap: functions: get_host_ip: {
 	category: "System"
 	description: """
 		Returns the first discoverable IP of the host Vector is running on.
@@ -19,7 +19,6 @@ remap: functions: get_hostname: {
 				The network interface to pull the first IP from. Otherwise the first non-loopback interface that is up will be chosen.
 				"""
 			required: false
-			default:  null
 			type: ["string"]
 		},
 		{
@@ -30,7 +29,6 @@ remap: functions: get_hostname: {
 				"IPv6": "IPv6 addresses"
 			}
 			required: false
-			default:  null
 			type: ["string"]
 		},
 	]
