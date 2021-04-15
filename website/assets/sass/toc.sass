@@ -6,10 +6,11 @@ $toc-indent-lg: 0.75rem
 $toc-indent-sm: 0.6rem
 $h2-font-size: 0.9rem
 $h3-font-size: 0.75rem
+$toc-spacing: 0.2rem
 
 #docs-toc
   border-left: 2px solid $grey-lighter
-  overflow-y: auto
+  overflow-y: scroll
 
   .toc-list // h2
     margin: 0
@@ -18,8 +19,8 @@ $h3-font-size: 0.75rem
 
     .toc-list // h3
       font-size: $h3-font-size
-      padding-top: 0.25rem
-      padding-bottom: 0.25rem
+      padding-top: $toc-spacing
+      padding-bottom: $toc-spacing
       color: $grey
       padding-left: $toc-indent-sm
 
