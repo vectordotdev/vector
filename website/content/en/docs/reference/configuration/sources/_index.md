@@ -7,7 +7,7 @@ layout: components
 weight: 1
 ---
 
-Vector **sources** enable you to take in observability data from a wide variety of...
+Vector enables you to take in observability data from a wide variety of **sources**.
 
 ## Available sources
 

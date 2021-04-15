@@ -228,6 +228,7 @@ $admonition-border-radius: 0.5rem
 $admonition-padding: 1rem 1.25rem
 $admonition-top-margin: 1rem
 $admonition-code-border-radius: 5px
+$admonition-title-font-size: 1.1rem
 
 .admonition
   =admonition-type($type, $color)
@@ -248,12 +249,20 @@ $admonition-code-border-radius: 5px
   border-radius: $admonition-border-radius
 
   .admonition-title
+    font-size: $admonition-title-font-size
     font-weight: $weight-bold
 
   code
-    background-color: $black
-    color: $light
     border-radius: $admonition-code-border-radius
 
   & + p
     margin-top: $admonition-top-margin
+
+.vrl-examples
+  .example
+    border: 1px solid $grey-lighter
+    border-radius: 0.25rem
+    padding: 1rem
+
+    .highlight .chroma
+      padding: 0.5rem

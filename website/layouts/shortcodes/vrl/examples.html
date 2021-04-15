@@ -1,2 +1,67 @@
 {{ $key := .Get 0 }}
 {{ $examples := site.Data.docs.remap.examples }}
+{{ $first := index $examples 0 }}
+<div class="vrl-examples" x-data="{ shown: '{{ $first.title }}', open: false }">
+  <div class="dropdown" :class="{ 'is-active': open }">
+    <div class="dropdown-trigger" @click="open = !open" @click.away="open = false">
+      <button class="button is-black is-small" aria-haspopup="true" aria-controls="dropdown-menu">
+        <span x-text="shown" class="has-text-weight-bold"></span>
+        <span class="icon is-small has-text-primary">
+          <i class="fas" :class="{ 'fa-angle-down': !open, 'fa-angle-right': open }" aria-hidden="true"></i>
+        </span>
+      </button>
+    </div>
+    <div class="dropdown-menu" id="dropdown-menu" role="menu">
+      <div class="dropdown-content">
+        {{ range $examples }}
+        <a class="dropdown-item" @click="shown = '{{ .title }}'; open = false">
+          {{ .title }}
+        </a>
+        {{ end }}
+      </div>
+    </div>
+  </div>
+
+  <div class="example mt-4">
+    {{ range $examples }}
+    {{ $input := dict "message" .input.log.message | jsonify }}
+    {{ $config := printf `[transforms.remap]\ntype="remap"\nsource='''\n%s\n'''` .source }}
+    {{ $configCode := highlight $config "toml" "" }}
+    {{ $output := .output | jsonify (dict "indent" "  ") }}
+    {{ $outputCode := highlight $output "json" "" }}
+    <div x-show="shown == '{{ .title }}'">
+      {{ with .input.log }}
+      {{ $json := . | jsonify (dict "indent" "  ") }}
+      {{ $code := highlight $json "json" "" }}
+      <p>
+        Given the following <a href="/docs/about/under-the-hood/architecture/data-model/log">Vector log event</a>...
+      </p>
+
+<div class="highlight p-0"><pre class="chroma"><code class="language-json" data-lang="json">{{ $code }}</code></pre></div>
+      {{ end }}
+
+      {{ with .input.metric }}
+      <p>
+        Given the following <a href="/docs/about/under-the-hood/architecture/data-model/metric">Vector metric event</a>...
+      </p>
+
+<pre><code>{{ . | jsonify (dict "indent" "  ") }}</code></pre>
+      {{ end }}
+
+      <p>...and the following configuration...</p>
+
+      <div class="highlight p-0"><pre class="chroma"><code class="language-toml" data-lang="toml">{{ $configCode }}</code></pre></div>
+
+      {{ with .input.log }}
+      <p>...the following log event is output:</p>
+      {{ end }}
+
+      {{ with .input.metric }}
+      <p>...the following metric event is output:</p>
+      {{ end }}
+
+<div class="highlight p-0"><pre class="chroma"><code class="language-json" data-lang="json">{{ $outputCode }}</code></pre></div>
+    </div>
+    {{ end }}
+  </div>
+</div>

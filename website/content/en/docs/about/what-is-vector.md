@@ -7,7 +7,9 @@ Vector is a high-performance observability data pipeline that puts organizations
 
 Vector is downloaded millions of times per month and relied on by companies like T-Mobile, Comcast, Zendesk, and Discord to own their observability data.
 
-{{< jump "/guides/getting-started" >}}
+## How to get started
+
+{{< jump "/docs/setup/quickstart" >}}
 
 [collect]: /docs/components/sources
 [route]: /docs/components/sinks
