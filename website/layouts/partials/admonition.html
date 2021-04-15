@@ -1,4 +1,4 @@
-<div class="notification is-{{ .type }}">
+<div class="admonition is-{{ .type }}">
   <article class="media">
     <div class="media-left">
       <span class="icon">
@@ -8,9 +8,9 @@
     <div class="media-content">
       <div class="content">
         {{ if ne .title nil }}
-        <h5 class="has-text-weight-bold">
+        <p class="admonition-title">
           {{ .title | markdownify }}
-        </h5>
+        </p>
         {{ end }}
 
         {{ .content | markdownify }}

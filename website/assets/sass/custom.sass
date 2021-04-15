@@ -218,13 +218,42 @@ sup.ml-tiny
   padding: 1rem 1.25rem
   font-size: 1.25rem
 
-.notification
-  code
-    background-color: $black
-    color: $light
-    border-radius: 5px
-
 .navbar
   .navbar-item
     &.is-active
       font-weight: $weight-bold
+
+// Admonition blocks (info, success, warning, etc.)
+$admonition-border-radius: 0.5rem
+$admonition-padding: 1rem 1.25rem
+$admonition-top-margin: 1rem
+$admonition-code-border-radius: 5px
+
+.admonition
+  =admonition-type($type, $color)
+    &.is-#{$type}
+      border: 3px solid $color
+
+      .icon
+        color: $color
+
+  +admonition-type("info", $info)
+  +admonition-type("warning", $warning)
+  +admonition-type("success", $success)
+  +admonition-type("danger", $danger)
+  +admonition-type("requirement", $purple)
+
+  margin-top: $admonition-top-margin
+  padding: $admonition-padding
+  border-radius: $admonition-border-radius
+
+  .admonition-title
+    font-weight: $weight-bold
+
+  code
+    background-color: $black
+    color: $light
+    border-radius: $admonition-code-border-radius
+
+  & + p
+    margin-top: $admonition-top-margin
