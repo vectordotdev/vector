@@ -7,7 +7,13 @@ process we'll take to do said extraction.
 * [Summary](#summary)
 * [Motivation](#motivation)
 * [The Structure of the Project](#the-structure-of-the-project)
+* [What is "core" to vector?](#what-is-core-to-vector)
 * [Alternatives for Future Work](#alternatives-for-future-work)
+  * ["Do Nothing"](#do-nothing)
+  * [Reduce Features, Leave Structure](#reduce-features-leave-structure)
+    * [Default Features is Empty](#default-features-is-empty)
+  * [Top-Level is Core, Concepts Become Packages](#top-level-is-core-concepts-become-packages)
+  * [Core is Just Another Package](#core-is-just-another-package)
 * [Proposal](#proposal)
 * [Plan of Action](#plan-of-action)
 
@@ -165,6 +171,29 @@ addition to those present in "default" feature when I make changes. Tools like
 [cargo-all-features](https://lib.rs/crates/cargo-all-features) will help as
 well.
 
+## What is "core" to vector?
+
+I argue that the following are "core":
+
+* the `Event` type,
+* the `Pipeline` type,
+* the `VectorSink` type,
+* the `Source` type,
+* the `Transform` type,
+* the `topology` module,
+* the `metrics` module,
+* the `buffers` module and possibly
+* the `adaptive_concurrency` module.
+
+I do not believe this list is final and I recognize that some items here draw in
+other unlisted types, like the `topology` module draws in `DisabledTrigger`. My
+understanding of what is core versus not depends on whether the lack of a thing
+would make vector other than what it is in its absence or leave us blind to
+vector's runtime behavior. The loss of VRL makes vector significantly less
+useful to our users but the loss of `Transform` makes vector something else
+entirely. The core of vector should, as well, be a crate of useful pieces for
+_building_ a vector, not vector but with a bunch of pieces ripped out.
+
 ## Alternatives for Future Work
 
 In this section we will describe the alternatives for future work we might take
@@ -178,38 +207,113 @@ alternatives. Please keep in mind that our goals are to:
 
 ### "Do Nothing"
 
-In this alter
+In this alternative we change nothing about the structure of our project and our
+approach to it. This does not address any of our goals in this RFC.
+
+### Reduce Features, Leave Structure
+
+This alternative reduces the overall features in the project -- say, introducing
+an "aws" flag that flips on all AWS related code -- but does not change its
+overall structure. This would reduce the total number of features in the project
+but maybe not as many as we would hope. For instance, if optimizing total
+features is a goal do we excise flags like `transforms-add_fields`? If all
+transforms were put behind a singular "transforms" flag this would optimize
+feature totals but would pessimize current workflows that selectively build only
+the transform being worked. The "core" is here extracted as the code that
+remains when all feature flags are flipped off, though this will not be apparent
+in the structure of the code necessarily.
+
+This alternative does reduce iteration costs, potentially, but does not reduce
+the burden for casual development, lead to more focused testing or reduce
+overall experimentation costs. For instance, an engineer working on a single
+transform would still be responsible for linking all of vector if they were in a
+benchmark/optimize loop.
+
+#### Default Features is Empty
+
+As a sub-alternative to "Reduce Features" I will note that today we often
+encourage our engineers to compile with `--no-default-features` flagged on. This
+_does_ reduce build times and can, depending on the area of the code base you're
+working on, improve iteration loop speed. We might make this the official
+default. This alternative would require us to modify our "release" build to flip
+on the specific features we intend to ship. However, while this alternative does
+potentially reduce iteration costs and experimentation costs depending on the
+area being worked it does nothing for reducing burden for casual contributors
+nor does it lead to more focused tests. A non-representative default may be
+surprising to casual contributors, leading to CI dings that would otherwise have
+happened locally.
+
+### Top-Level is Core, Concepts Become Packages
+
+This alternative pushes as much as possible into packages, leaving whatever
+remains as the "core" of vector. All transforms would go into a "transforms"
+package with sub-packages for large conceptual areas, similar for sinks and
+sources. VRL would remain as-is and we'd need to debate in the future what is
+and isn't "core". Once done this alternative would reduce iteration costs on
+core and, if documented, give casual contributors guideposts about where to add
+code. Experimentation costs could also be reduced, with packages in need of
+modification because of changes to core being delt with only after the changes
+to core as shown to be worthwhile. This alternative does not make for a more
+focused testing environment. With "core" as the top-level package we can't
+follow the sub-package model of exposing internal interfaces for experimentation
+as easily: our `vector` binary lives at the top-level, what if we want to create
+a `core` binary at the top-level that takes no configuration and just sends data
+through itself for testing purposes. Is that confusing to our users? I, at
+least, would find it so. Should configuration be a "core" issue or a package
+used exclusively by "core"? How granular should a package be? Must all sources
+go in a "sources" package or can `file-source` continue, or should it be a crate
+in a package? These are important questions and they'll need answered ahead of
+time in this alternative. That is, "core" is extracted by bulk movement of code
+in this approach.
+
+### Core is Just Another Package
+
+This alternative is the inverse of the previous: core is just another
+package. We extract what code is "core" to vector and move it into its own
+package, rigged with private tests, interfaces in the manner of VRL. This will
+allow work on core to happen in a similar manner to VRL today, with tighter
+iteration and more focus. Experimentation in core specifically need not include
+the rest of the project, until after the experiment is shown to be
+positive. Casual contributors will be unlikely to work with core -- most outside
+contributions have historically been sources or sinks -- but, if they do, we'll
+have a less resource intensive package for them to work against. Core as just
+another package lends itself to an iterative approach: extraction of core pieces
+need not happen in one burst but bit by bit. This approach has the added benefit
+of defering questions of non-core project structure, how our feature flags are
+set up etc. There will be some grey area of course -- I argue that configuration
+is not a core concern but am sympathetic to the counter -- but these can be
+resolved in the piecemeal process of moving things into "core".
 
 ## Proposal
 
+I argue that "Core is Just Another Package" is the best path forward. This
+approach addresses each of our major goals for extracting core without imposing
+significant secondary questions about total project organization, of which there
+has been nervous concern in the team. We don't want to "cut the project
+boundarys wrong" and I share this concern. I think we will eventually want more
+rigorous structure in the non-core parts of the project but I would like to see
+that deferred.
+
 ## Plan of Action
 
-We have, in Rust, the following concepts to use in the organization of a
-project:
+To extract the core of vector I propose that we do the following:
 
-* a "module" which contains functions, types etc
-* a "crate" which contains one or more modules
-* a "package" which contains one or crates
-* a "workspace" that contains one or more packages
+- Create a new, blank `core` package that top-level vector depends on.
+- Migrate one of the areas from 'What is "core" to vector?' into this package,
+  along with any existing test code.
+- Add any new test code that seems worthwhile for the migrated material.
+- Repeat.
+- Once a critical mass of core exists, create a core-private source for
+  generating `Event` load into a topology and a core-private sink that signals
+  for program termination after a set number of `Event`s have been
+  received. Bundle this into a `vector-core` for throughput trials of core only,
+  validating the package structure for cheap experimentation and for avoiding
+  core as "vector but with pieces missing".
+- Migrate any remaining core concepts.
 
-The vector project
-
-with no
-The core of vector is a data pipeline, expressed as a acyclic graph with nodes
-being separated by queues. between with the following feature set:
-
-* in-memory and on-disk paging . It , mostly in-memory with acks,
-retry/backoff functionality, durability across restarts and hooks for extension.
-
-
-Options:
-
-* leave things as they are
-* tidy up features, leave structure in place
-* everything in packages, top-level crate is where features live
-* top-level crate is core, packages are flagged on by features
-* top-level crate combines packages -- one of which is core -- and "default"
-  feature is untouched
-
-
-TODO
+By the end of this process we will have a "core" package that represents all the
+pieces needed to build the backbone of a vector, used in the top-level vector
+package but independently able to be rigged into test harnesses and experimented
+with in a manner that does not necessarily require chasing changes through the
+project tree. We can then start the process of pushing core to have perfect
+mechanical sympathy, in line with our goals in RFC 6531.
