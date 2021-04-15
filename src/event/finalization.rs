@@ -15,7 +15,6 @@ use uuid::Uuid;
 type ImmutVec<T> = Box<[T]>;
 
 lazy_static::lazy_static! {
-    static ref BATCHES: DashMap<Uuid, Arc<BatchNotifier>> = DashMap::new();
     static ref EVENTS: DashMap<Uuid,Arc<EventFinalizer>> = DashMap::new();
 }
 
@@ -196,54 +195,6 @@ impl BatchNotifiers {
     }
 }
 
-impl Serialize for BatchNotifiers {
-    /// Custom serializer for the array of batch notifiers. This
-    /// registers and then serializes each finalizer as just the
-    /// identifier.
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
-        for source in self.0.iter() {
-            // Only register notifiers on serialization, to avoid the
-            // expense of registration if the event is never serialized.
-            BatchNotifier::register(&source);
-            seq.serialize_element(&source.identifier)?;
-        }
-        seq.end()
-    }
-}
-
-impl<'de> Deserialize<'de> for BatchNotifiers {
-    /// Custom serializer for the array of batch notifiers.  This
-    /// deserializes the identifier and then looks up the associated
-    /// notifier. If the notifier is no longer present (ie due to reload
-    /// or restart), the element is skipped.
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct MyVisitor;
-
-        impl<'de> Visitor<'de> for MyVisitor {
-            type Value = BatchNotifiers;
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a sequence of batch notifier UUIDs")
-            }
-
-            fn visit_seq<S>(self, mut seq: S) -> Result<Self::Value, S::Error>
-            where
-                S: SeqAccess<'de>,
-            {
-                let mut result = Vec::new();
-                while let Some(identifier) = seq.next_element::<Uuid>()? {
-                    if let Some(notifier) = BatchNotifier::lookup(identifier) {
-                        result.push(notifier);
-                    }
-                }
-                Ok(BatchNotifiers(result.into()))
-            }
-        }
-
-        deserializer.deserialize_seq(MyVisitor)
-    }
-}
-
 /// A batch notifier contains the status
 #[derive(CopyGetters, Debug)]
 pub struct BatchNotifier {
@@ -255,21 +206,6 @@ pub struct BatchNotifier {
 }
 
 impl BatchNotifier {
-    fn register(notifier: &Arc<Self>) {
-        // This explicitly does not overwrite existing entries, as that
-        // will simply just increment and decrement the reference counts
-        // because the identifier key is meant to be globally unique.
-        BATCHES
-            .entry(notifier.identifier())
-            .or_insert(Arc::clone(notifier));
-    }
-
-    fn lookup(identifier: Uuid) -> Option<Arc<Self>> {
-        BATCHES
-            .get(&identifier)
-            .map(|notifier| Arc::clone(notifier.value()))
-    }
-
     /// Create a new `BatchNotifier` along with the receiver used to
     /// await its finalization status. This takes the source identifier
     /// and a batch sequence number as parameters. *NOTE* the sequence
