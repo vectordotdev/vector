@@ -22,8 +22,34 @@ lazy_static::lazy_static! {
 /// Wrapper type for an array of event finalizers, used to support
 /// custom serialization and deserialization protocols for the included
 /// `Arc` elements.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EventFinalizers(ImmutVec<Arc<EventFinalizer>>);
+
+impl EventFinalizers {
+    /// Create a new array of event finalizer with the single event.
+    pub fn new(finalizer: EventFinalizer) -> Self {
+        Self(vec![Arc::new(finalizer)].into())
+    }
+
+    /// Merge the given list of finalizers into this array.
+    pub fn merge(&mut self, other: Self) {
+        if !other.0.is_empty() {
+            // This requires a bit of extra work both to avoid cloning
+            // the actual elements and because `self.0` cannot be
+            // mutated in place.
+            let finalizers = std::mem::replace(&mut self.0, vec![].into());
+            let mut result: Vec<_> = finalizers.into();
+            // This is the only step that may cause a (re)allocation.
+            result.reserve_exact(other.0.len());
+            // Box<[T]> is missing IntoIterator
+            let other: Vec<_> = other.0.into();
+            for entry in other.into_iter() {
+                result.push(entry);
+            }
+            self.0 = result.into();
+        }
+    }
+}
 
 impl Serialize for EventFinalizers {
     /// Custom serializer for an array of event finaliers.  This

@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap};
 
 pub mod discriminant;
 pub mod merge_state;
-pub mod metadata;
+mod metadata;
 pub mod metric;
 pub mod util;
 
@@ -15,7 +15,9 @@ mod log_event;
 mod lookup;
 mod value;
 
-pub use finalization::{BatchNotifier, BatchStatus, EventFinalizer, EventStatus};
+pub use finalization::{
+    BatchNotifier, BatchNotifiers, BatchStatus, EventFinalizer, EventFinalizers, EventStatus,
+};
 pub use log_event::LogEvent;
 pub use lookup::Lookup;
 pub use metadata::EventMetadata;

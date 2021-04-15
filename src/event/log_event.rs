@@ -168,7 +168,7 @@ impl LogEvent {
                 Some(current_val) => current_val.merge(incoming_val),
             }
         }
-        self.metadata.merge(incoming.metadata());
+        self.metadata.merge(incoming.metadata);
     }
 }
 
