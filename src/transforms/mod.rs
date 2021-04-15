@@ -65,8 +65,6 @@ pub mod split;
 pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-tokenizer")]
 pub mod tokenizer;
-#[cfg(feature = "wasm")]
-pub mod wasm;
 
 /// Transforms come in two variants. Functions, or tasks.
 ///
