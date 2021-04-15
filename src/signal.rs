@@ -1,18 +1,9 @@
+use crate::control::Control;
 use futures::Stream;
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum SignalTo {
-    /// Signal to reload config.
-    Reload,
-    /// Signal to shutdown process.
-    Shutdown,
-    /// Shutdown process immediately.
-    Quit,
-}
 
 /// Signals from OS/user.
 #[cfg(unix)]
-pub fn signals() -> impl Stream<Item = SignalTo> {
+pub fn signals() -> impl Stream<Item = Control> {
     use tokio::signal::unix::{signal, SignalKind};
 
     let mut sigint = signal(SignalKind::interrupt()).expect("Signal handlers should not panic.");
@@ -23,10 +14,10 @@ pub fn signals() -> impl Stream<Item = SignalTo> {
     async_stream::stream! {
         loop {
             let signal = tokio::select! {
-                _ = sigint.recv() => SignalTo::Shutdown,
-                _ = sigterm.recv() => SignalTo::Shutdown,
-                _ = sigquit.recv() => SignalTo::Quit,
-                _ = sighup.recv() => SignalTo::Reload,
+                _ = sigint.recv() => Control::Shutdown,
+                _ = sigterm.recv() => Control::Shutdown,
+                _ = sigquit.recv() => Control::Quit,
+                _ = sighup.recv() => Control::Reload,
             };
             yield signal;
         }
@@ -40,7 +31,7 @@ pub fn signals() -> impl Stream<Item = SignalTo> {
 
     async_stream::stream! {
         loop {
-            let signal = tokio::signal::ctrl_c().map(|_| SignalTo::Shutdown).await;
+            let signal = tokio::signal::ctrl_c().map(|_| Control::Shutdown).await;
             yield signal;
         }
     }

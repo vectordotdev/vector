@@ -237,7 +237,7 @@ tokio-postgres = { version = "0.7.1", default-features = false, features = ["run
 toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.6", default-features = false }
 twox-hash = { version = "1.6", default-features = false }
-url = { version = "2.2.1", default-features = false }
+url = { version = "2.2.1", default-features = false, features = ["serde"] }
 uuid = { version = "0.8", default-features = false, features = ["serde", "v4"], optional = true }
 warp = { version = "0.3.0", default-features = false, optional = true }
 cfg-if = { version = "1.0.0", default-features = false }

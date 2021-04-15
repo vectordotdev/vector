@@ -2,7 +2,6 @@ use super::{ProviderControl, ProviderRx};
 use crate::config::{
     load_from_str,
     provider::{ProviderConfig, ProviderDescription},
-    Config,
 };
 use crate::{
     http::HttpClient,
@@ -61,7 +60,7 @@ impl Default for HttpConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl ProviderConfig for HttpConfig {
-    async fn build(&self) -> Result<Provider, &'static str> {
+    async fn build(&self) -> Result<ProviderRx, &'static str> {
         let url = self
             .url
             .as_ref()
@@ -109,7 +108,7 @@ impl ProviderConfig for HttpConfig {
             }
         }
 
-        Ok(Provider::new(provider_rx))
+        Ok(provider_rx)
     }
 
     fn provider_type(&self) -> &'static str {

@@ -1,5 +1,5 @@
 use super::{component::ExampleError, GenerateConfig};
-use crate::providers::Provider;
+use crate::providers::ProviderRx;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use toml::Value;
@@ -17,7 +17,7 @@ impl Default for Options {
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait ProviderConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    async fn build(&self) -> Result<Provider, &'static str>;
+    async fn build(&self) -> Result<ProviderRx, &'static str>;
     fn provider_type(&self) -> &'static str;
 }
 
