@@ -3,19 +3,15 @@
 {{ $github := printf "https://github.com/%s" $social.github_repo }}
 {{ $discord := $social.discord }}
 <div class="buttons">
-  <a class="button is-twitter-blue" href="{{ $twitter }}" target="_blank">
-    <span class="icon">
-      <i class="fab fa-lg fa-twitter"></i>
-    </span>
-  </a>
-  <a class="button" href="{{ $github }}" target="_blank">
-    <span class="icon">
-      <i class="fab fa-lg fa-github"></i>
-    </span>
-  </a>
-  <a class="button is-discord-purple" href="{{ $discord }}" target="_blank">
-    <span class="icon">
-      <i class="fab fa-lg fa-discord"></i>
-    </span>
-  </a>
+  {{ template "button" (dict "color" "twitter-blue" "url" $twitter "icon" "fa-twitter") }}
+  {{ template "button" (dict "color" "white" "url" $github "icon" "fa-github") }}
+  {{ template "button" (dict "color" "discord-purple" "url" $discord "icon" "fa-discord") }}
 </div>
+
+{{ define "button" }}
+<a class="button is-small is-{{ .color }}" href="{{ .url }}" target="_blank">
+  <span class="icon">
+    <i class="fab {{ .icon }}"></i>
+  </span>
+</a>
+{{ end }}
