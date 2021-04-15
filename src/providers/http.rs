@@ -9,15 +9,14 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use hyper::Body;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields, default)]
-pub struct HttpConfig {
-    url: Option<Url>,
-    #[serde(flatten)]
-    tls_options: Option<TlsOptions>,
+pub struct RequestConfig {
+    #[serde(default)]
+    pub headers: IndexMap<String, String>,
     pub timeout_secs: Option<u64>,               // 60
     pub rate_limit_duration_secs: Option<u64>,   // 1
     pub rate_limit_num: Option<u64>,             // 5
@@ -26,11 +25,10 @@ pub struct HttpConfig {
     pub retry_initial_backoff_secs: Option<u64>, // 1
 }
 
-impl Default for HttpConfig {
+impl Default for RequestConfig {
     fn default() -> Self {
         Self {
-            url: None,
-            tls_options: None,
+            headers: IndexMap::new(),
             timeout_secs: Some(60),
             rate_limit_duration_secs: Some(1),
             rate_limit_num: Some(5),
@@ -41,10 +39,29 @@ impl Default for HttpConfig {
     }
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(deny_unknown_fields, default)]
+pub struct HttpConfig {
+    url: Option<Url>,
+    request: RequestConfig,
+    #[serde(flatten)]
+    tls_options: Option<TlsOptions>,
+}
+
+impl Default for HttpConfig {
+    fn default() -> Self {
+        Self {
+            url: None,
+            request: RequestConfig::default(),
+            tls_options: None,
+        }
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl ProviderConfig for HttpConfig {
-    async fn build(&self) -> Result<ProviderRx, &'static str> {
+    async fn build(&self) -> Result<Provider, &'static str> {
         let url = self
             .url
             .as_ref()
@@ -59,12 +76,16 @@ impl ProviderConfig for HttpConfig {
 
         info!(message = "Attempting to retrieve config from HTTP provider.", url = ?url);
 
-        let request = http::request::Builder::new()
-            .uri(url.to_string())
+        let mut builder = http::request::Builder::new().uri(url.to_string());
+
+        for (header, value) in self.request.headers.iter() {
+            builder = builder.header(header.as_str(), value.as_str());
+        }
+
+        let request = builder
             .body(Body::empty())
             .map_err(|_| "Couldn't create HTTP request")?;
 
-        // Attempt to fetch remote resource
         match http_client.send(request).await {
             Ok(response) => {
                 info!("A response was received.");
@@ -88,7 +109,7 @@ impl ProviderConfig for HttpConfig {
             }
         }
 
-        Ok(provider_rx)
+        Ok(Provider::new(provider_rx))
     }
 
     fn provider_type(&self) -> &'static str {

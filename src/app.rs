@@ -219,7 +219,7 @@ impl Application {
             emit!(VectorStarted);
             tokio::spawn(heartbeat::heartbeat());
 
-            // Using cfg_if flattens nesting.
+            // Configure the API server, if applicable.
             cfg_if! (
                 if #[cfg(feature = "api")] {
                     // Assigned to prevent the API terminating when falling out of scope.
@@ -237,115 +237,135 @@ impl Application {
                 }
             );
 
-            let provider_rx = match provider {
-                Some(provider) => match provider.build().await {
-                    Ok(provider_rx) => {
-                        debug!(message = "Provider succeeded.", provider = ?provider.provider_type());
-                        Some(provider_rx)
-                    },
-                    Err(err) => {
-                        error!(message = "Provider error.", error = ?err);
-                        None
-                    }
-                },
-                _ => None
-            };
+            // Configure the provider, if applicable.
+            cfg_if! (
+                if #[cfg(feature = "providers")] {
+                     let mut provider_rx = match provider {
+                        Some(provider) => match provider.build().await {
+                            Ok(provider_rx) => {
+                                debug!(message = "Provider configured.", provider = ?provider.provider_type());
+                                Some(provider_rx)
+                            },
+                            Err(err) => {
+                                error!(message = "Provider error.", error = ?err);
+                                None
+                            }
+                        },
+                        _ => None
+                    };
+                }
+            );
 
             let signals = signal::signals();
             tokio::pin!(signals);
 
-            let signal = match provider_rx {
-                Some(mut provider_rx) => loop {
-                    use crate::providers::ProviderControl;
+            let mut sources_finished = topology.sources_finished();
 
-                    tokio::select! {
-                        Some(control) = provider_rx.recv() => {
-                            match control {
-                                ProviderControl::Config(mut new_config) => {
-                                    new_config.healthchecks.set_require_healthy(opts.require_healthy);
-                                    match topology
-                                        .reload_config_and_respawn(new_config)
-                                        .await
-                                    {
-                                        Ok(true) => {
-                                            #[cfg(feature = "api")]
-                                            // Pass the new config to the API server.
-                                            if let Some(ref api_server) = api_server {
-                                                api_server.update_config(topology.config());
-                                            }
-
-                                            emit!(VectorReloaded { config_paths: &config_paths })
-                                        },
-                                        Ok(false) => emit!(VectorReloadFailed),
-                                        // Trigger graceful shutdown for what remains of the topology
-                                        Err(()) => {
-                                            emit!(VectorReloadFailed);
-                                            emit!(VectorRecoveryFailed);
-                                            break SignalTo::Shutdown;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        Some(signal) = signals.next() => {
-                            break signal;
-                        }
-                        // Trigger graceful shutdown if a component crashed, or all sources have ended.
-                        _ = graceful_crash.next() => break SignalTo::Shutdown,
-                        else => unreachable!("Signal streams never end"),
-                    }
-                },
-                _ => {
-                    let mut sources_finished = topology.sources_finished();
-
-                    loop {
-                        tokio::select! {
-                            Some(signal) = signals.next() => {
-                                if signal == SignalTo::Reload {
-                                    // Reload paths
-                                    config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
-                                    // Reload config
-                                    let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
-
-                                    if let Some(mut new_config) = new_config {
-                                        new_config.healthchecks.set_require_healthy(opts.require_healthy);
-                                        match topology
-                                            .reload_config_and_respawn(new_config)
-                                            .await
-                                        {
-                                            Ok(true) => {
-                                                #[cfg(feature = "api")]
-                                                // Pass the new config to the API server.
-                                                if let Some(ref api_server) = api_server {
-                                                    api_server.update_config(topology.config());
-                                                }
-
-                                                emit!(VectorReloaded { config_paths: &config_paths })
-                                            },
-                                            Ok(false) => emit!(VectorReloadFailed),
-                                            // Trigger graceful shutdown for what remains of the topology
-                                            Err(()) => {
-                                                emit!(VectorReloadFailed);
-                                                emit!(VectorRecoveryFailed);
-                                                break SignalTo::Shutdown;
-                                            }
-                                        }
-                                        sources_finished = topology.sources_finished();
-                                    } else {
-                                        emit!(VectorConfigLoadFailed);
-                                    }
-                                } else {
-                                    break signal;
-                                }
-                            }
-                            // Trigger graceful shutdown if a component crashed, or all sources have ended.
-                            _ = graceful_crash.next() => break SignalTo::Shutdown,
-                            _ = &mut sources_finished => break SignalTo::Shutdown,
-                            else => unreachable!("Signal streams never end"),
-                        }
+            let signal = loop {
+                #[cfg(feature = "providers")]
+                if let Some(provider_rx) = provider_rx.as_mut() {
+                    if let Some(control) = provider_rx.await {
+                        println!("Found something!");
                     }
                 }
+
+                tokio::select! {
+                    Some(signal) = signals.next() => {
+                        if signal == SignalTo::Reload {
+                            // Reload paths
+                            config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
+                            // Reload config
+                            let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
+
+                            if let Some(mut new_config) = new_config {
+                                new_config.healthchecks.set_require_healthy(opts.require_healthy);
+                                match topology
+                                    .reload_config_and_respawn(new_config)
+                                    .await
+                                {
+                                    Ok(true) => {
+                                        #[cfg(feature = "api")]
+                                        // Pass the new config to the API server.
+                                        if let Some(ref api_server) = api_server {
+                                            api_server.update_config(topology.config());
+                                        }
+
+                                        emit!(VectorReloaded { config_paths: &config_paths })
+                                    },
+                                    Ok(false) => emit!(VectorReloadFailed),
+                                    // Trigger graceful shutdown for what remains of the topology
+                                    Err(()) => {
+                                        emit!(VectorReloadFailed);
+                                        emit!(VectorRecoveryFailed);
+                                        break SignalTo::Shutdown;
+                                    }
+                                }
+                                sources_finished = topology.sources_finished();
+                            } else {
+                                emit!(VectorConfigLoadFailed);
+                            }
+                        } else {
+                            break signal;
+                        }
+                    }
+                    // Trigger graceful shutdown if a component crashed, or all sources have ended.
+                    _ = graceful_crash.next() => break SignalTo::Shutdown,
+                    _ = &mut sources_finished => break SignalTo::Shutdown,
+                    else => unreachable!("Signal streams never end"),
+                }
             };
+
+            // let signal = match provider_rx {
+            //     Some(mut provider_rx) => loop {
+            //         use crate::providers::ProviderControl;
+            // 
+            //         tokio::select! {
+            //             Some(control) = provider_rx.recv() => {
+            //                 match control {
+            //                     ProviderControl::Config(mut new_config) => {
+            //                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
+            //                         match topology
+            //                             .reload_config_and_respawn(new_config)
+            //                             .await
+            //                         {
+            //                             Ok(true) => {
+            //                                 #[cfg(feature = "api")]
+            //                                 // Pass the new config to the API server.
+            //                                 if let Some(ref api_server) = api_server {
+            //                                     api_server.update_config(topology.config());
+            //                                 }
+            // 
+            //                                 emit!(VectorReloaded { config_paths: &config_paths })
+            //                             },
+            //                             Ok(false) => emit!(VectorReloadFailed),
+            //                             // Trigger graceful shutdown for what remains of the topology
+            //                             Err(()) => {
+            //                                 emit!(VectorReloadFailed);
+            //                                 emit!(VectorRecoveryFailed);
+            //                                 break SignalTo::Shutdown;
+            //                             }
+            //                         }
+            //                     }
+            //                 }
+            //             }
+            //             Some(signal) = signals.next() => {
+            //                 break signal;
+            //             }
+            //             // Trigger graceful shutdown if a component crashed, or all sources have ended.
+            //             _ = graceful_crash.next() => break SignalTo::Shutdown,
+            //             else => unreachable!("Signal streams never end"),
+            //         }
+            //     },
+            //     _ => {
+            // 
+            // 
+            //         loop {
+            //             tokio::select! {
+            // 
+            //             }
+            //         }
+            //     }
+            // };
 
             match signal {
                 SignalTo::Shutdown => {
