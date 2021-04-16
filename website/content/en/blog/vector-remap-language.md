@@ -163,29 +163,24 @@ filter {
 ```
 {{< /tab >}}
 {{< tab title="Fluentd" >}}
-```text title="logstash.conf"
-# ... inputs ...
+```text title="fluentd.conf"
+<source>
+  # ... source options ...
+  format apache2
+  tag apache.access
+</source>
 
-filter {
-  grok {
-    match => { "message" => ["%{IPORHOST:[apache2][access][remote_ip]} - %{DATA:[apache2][access][user_name]} \[%{HTTPDATE:[apache2][access][time]}\] \"%{WORD:[apache2][access][method]} %{DATA:[apache2][access][url]} HTTP/%{NUMBER:[apache2][access][http_version]}\" %{NUMBER:[apache2][access][response_code]} %{NUMBER:[apache2][access][body_sent][bytes]}( \"%{DATA:[apache2][access][referrer]}\")?( \"%{DATA:[apache2][access][agent]}\")?",
-      "%{IPORHOST:[apache2][access][remote_ip]} - %{DATA:[apache2][access][user_name]} \\[%{HTTPDATE:[apache2][access][time]}\\] \"-\" %{NUMBER:[apache2][access][response_code]} -" ] }
-    remove_field => "message"
-  }
-  mutate {
-    remove_field => [ "time", "log" ]
-  }
-  date {
-    match => [ "[apache2][access][time]", "dd/MMM/YYYY:H:m:s Z" ]
-    remove_field => "[apache2][access][time]"
-  }
-  mutate {
-    coerce => {
-      "[apache2][access][body_sent][bytes]" => "integer"
-      "[apache2][access][response_code]" => "integer"
-    }
-  }
-}
+<parse>
+  @type regexp
+  expression /^(?<host>[^ ]*) [^ ]* (?<user>[^ ]*) \[(?<time>[^\]]*)\] "(?<method>\S+)(?: +(?<path>[^ ]*) +\S*)?" (?<code>[^ ]*) (?<size>[^ ]*)(?: "(?<referer>[^\"]*)" "(?<agent>[^\"]*)")?$/
+  time_format %d/%b/%Y:%H:%M:%S %z
+  types code:integer,size:integer
+</parse>
+
+<filter apache.access>
+  @type record_transformer
+  remove_keys time,log
+</filter>
 
 # ... outputs ...
 ```

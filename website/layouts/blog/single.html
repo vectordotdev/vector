@@ -24,8 +24,17 @@
                 <span class="icon has-text-primary">
                   <i class="fas fa-calendar-alt"></i>
                 </span>
-                <span class="has-text-weight-bold">
+                <span class="has-text-weight-semibold">
                   {{ $date }}
+                </span>
+              </p>
+
+              <p>
+                <span class="icon has-text-primary">
+                  <i class="fas fa-clock"></i>
+                </span>
+                <span class="has-text-weight-semibold">
+                  {{ .ReadingTime }} min
                 </span>
               </p>
 
@@ -70,6 +79,8 @@
         <div class="content with-limited-chars mb-12 mt-4">
           {{ .Content }}
         </div>
+
+        {{ partial "blog/pagination.html" . }}
       </div>
     </div>
   </div>
@@ -77,6 +88,5 @@
 {{ end }}
 
 {{ define "below" }}
-{{ partial "blog/pagination.html" . }}
 {{ partial "footer.html" . }}
 {{ end }}
