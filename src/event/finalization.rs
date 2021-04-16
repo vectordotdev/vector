@@ -1,7 +1,7 @@
 #![deny(missing_docs)]
 
 use atomig::{Atom, AtomInteger, Atomic, Ordering};
-use dashmap::DashMap;
+use counting_dashmap::CountingDashMap;
 use getset::CopyGetters;
 use serde::{
     de::{SeqAccess, Visitor},
@@ -15,7 +15,7 @@ use uuid::Uuid;
 type ImmutVec<T> = Box<[T]>;
 
 lazy_static::lazy_static! {
-    static ref EVENTS: DashMap<Uuid,Arc<EventFinalizer>> = DashMap::new();
+    static ref EVENTS: CountingDashMap<Uuid, Arc<EventFinalizer>> = Default::default();
 }
 
 /// Wrapper type for an array of event finalizers, used to support
@@ -86,7 +86,7 @@ impl<'de> Deserialize<'de> for EventFinalizers {
             {
                 let mut result = Vec::new();
                 while let Some(identifier) = seq.next_element::<Uuid>()? {
-                    if let Some(notifier) = EventFinalizer::lookup(identifier) {
+                    if let Some(notifier) = EventFinalizer::remove(identifier) {
                         result.push(notifier);
                     }
                 }
@@ -113,20 +113,13 @@ pub struct EventFinalizer {
 impl EventFinalizer {
     /// Register a finalizer for later retrieval after serialization
     pub fn register(finalizer: &Arc<Self>) {
-        // This explicitly does not overwrite existing entries, as that
-        // will simply just increment and decrement the reference counts
-        // because the identifier key is meant to be globally unique.
-        EVENTS
-            .entry(finalizer.identifier())
-            .or_insert(Arc::clone(finalizer));
+        // TODO Pass a closure to `fn insert` to avoid the unconditional clone.
+        EVENTS.insert_with(finalizer.identifier(), || Arc::clone(finalizer));
     }
 
-    /// Look up a registered finalizer. TODO Some solution will be
-    /// needed to clean out this table to allow drops to happen.
-    pub fn lookup(identifier: Uuid) -> Option<Arc<Self>> {
-        EVENTS
-            .get(&identifier)
-            .map(|notifier| Arc::clone(notifier.value()))
+    /// Look up and remove a registered finalizer.
+    pub fn remove(identifier: Uuid) -> Option<Arc<Self>> {
+        EVENTS.remove(identifier)
     }
 
     /// Create a new event in a batch. *NOTE* the sequence number MUST
@@ -326,4 +319,74 @@ impl EventStatus {
             (Self::Failed, _) => self,
         }
     }
+}
+
+mod counting_dashmap {
+    #![deny(missing_docs)]
+
+    use dashmap::{mapref::entry::Entry, DashMap};
+    use std::hash::{Hash, Hasher};
+
+    /// This is a wrapper around `DashMap` that provides bag-like
+    /// semantics, where a given element, as identified by its key, may
+    /// be stored multiple times and subsequently retrieved as many
+    /// times as it is stored.
+    #[derive(Derivative)]
+    #[derivative(Default(bound = ""))]
+    pub(super) struct CountingDashMap<K: Eq + Hash, V> {
+        inner: DashMap<K, CountingEntry<V>>,
+    }
+
+    impl<K: Copy + Eq + Hash, V: Clone> CountingDashMap<K, V> {
+        /// Insert the value into the map, but if the key was already
+        /// present, just increment its count.
+        pub(super) fn insert_with(&self, key: K, value: impl FnOnce() -> V) {
+            self.inner
+                .entry(key)
+                .and_modify(|mut entry| entry.count += 1)
+                .or_insert_with(|| {
+                    let value = value();
+                    CountingEntry { value, count: 1 }
+                });
+        }
+
+        /// Decrement the count for the named entry and return a copy of
+        /// the stored value. If the count drops to zero, the entry is
+        /// dropped.
+        pub(super) fn remove(&self, key: K) -> Option<V> {
+            match self.inner.entry(key).and_modify(|mut entry| {
+                entry.count = entry.count.saturating_sub(1);
+            }) {
+                Entry::Vacant(_) => None,
+                Entry::Occupied(mut entry) => {
+                    let mut_ref = entry.get_mut();
+                    mut_ref.count = mut_ref.count.saturating_sub(1);
+                    Some(if mut_ref.count == 0 {
+                        entry.remove_entry().1.value
+                    } else {
+                        mut_ref.value.clone()
+                    })
+                }
+            }
+        }
+    }
+
+    struct CountingEntry<V> {
+        value: V,
+        count: usize,
+    }
+
+    impl<V: Hash> Hash for CountingEntry<V> {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.value.hash(state);
+        }
+    }
+
+    impl<V: PartialEq> PartialEq for CountingEntry<V> {
+        fn eq(&self, other: &Self) -> bool {
+            self.value == other.value
+        }
+    }
+
+    impl<V: Eq> Eq for CountingEntry<V> {}
 }
