@@ -3,7 +3,7 @@ use crate::{
     topology::{self, RunningTopology},
     trace, Event,
 };
-use flate2::read::GzDecoder;
+use flate2::read::MultiGzDecoder;
 use futures::{
     ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
 };
@@ -274,7 +274,20 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     let mut gzip_bytes = Vec::new();
     file.read_to_end(&mut gzip_bytes).unwrap();
     let mut output = String::new();
-    GzDecoder::new(&gzip_bytes[..])
+    MultiGzDecoder::new(&gzip_bytes[..])
+        .read_to_string(&mut output)
+        .unwrap();
+    output.lines().map(|s| s.to_owned()).collect()
+}
+
+pub fn lines_from_zst_file<P: AsRef<Path>>(path: P) -> Vec<String> {
+    trace!(message = "Reading zst file.", path = %path.as_ref().display());
+    let mut file = File::open(path).unwrap();
+    let mut zst_bytes = Vec::new();
+    file.read_to_end(&mut zst_bytes).unwrap();
+    let mut output = String::new();
+    zstd::stream::Decoder::new(&zst_bytes[..])
+        .unwrap()
         .read_to_string(&mut output)
         .unwrap();
     output.lines().map(|s| s.to_owned()).collect()

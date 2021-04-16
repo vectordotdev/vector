@@ -240,6 +240,7 @@ twox-hash = { version = "1.6", default-features = false }
 url = { version = "2.2.1", default-features = false }
 uuid = { version = "0.8", default-features = false, features = ["serde", "v4"], optional = true }
 warp = { version = "0.3.0", default-features = false, optional = true }
+zstd = { version = "0.6", default-features = false }
 cfg-if = { version = "1.0.0", default-features = false }
 
 # For WASM
