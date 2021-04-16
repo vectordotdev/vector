@@ -1,6 +1,6 @@
+use crate::map;
 use crate::value::Kind;
-use crate::{map, path};
-use lookup::{LookupBuf, SegmentBuf, FieldBuf};
+use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Sub,
@@ -155,7 +155,7 @@ impl KindInfo {
     pub fn for_path(mut self, path: LookupBuf) -> Self {
         for segment in path.iter().rev() {
             match segment {
-                SegmentBuf::Field(FieldBuf {name, ..}) => {
+                SegmentBuf::Field(FieldBuf { name, .. }) => {
                     let mut map = BTreeMap::default();
                     map.insert(Field::Field(name.as_str().to_owned()), self);
 
@@ -164,7 +164,9 @@ impl KindInfo {
 
                     self = KindInfo::Known(set);
                 }
-                SegmentBuf::Coalesce(fields) => todo!(), /* {
+                SegmentBuf::Coalesce(fields) => {
+                    // TODO: I'm not sure this is right - it should be the
+                    // combined typedef of all the fields in the coalesce.
                     let field = fields.last().unwrap();
                     let mut map = BTreeMap::default();
                     map.insert(Field::Field(field.as_str().to_owned()), self);
@@ -173,7 +175,7 @@ impl KindInfo {
                     set.insert(TypeKind::Object(map));
 
                     self = KindInfo::Known(set);
-                } */
+                }
                 SegmentBuf::Index(index) => {
                     // For negative indices, we have to mark the array contents
                     // as unknown.
@@ -220,7 +222,7 @@ impl KindInfo {
                 let new = match iter.next() {
                     None => return kind.clone(),
                     Some(segment) => match segment {
-                        SegmentBuf::Coalesce(fields) => todo!(), /* match kind.object() {
+                        SegmentBuf::Coalesce(fields) => match kind.object() {
                             None => KindInfo::Unknown,
                             Some(kind) => fields
                                 .into_iter()
@@ -235,7 +237,7 @@ impl KindInfo {
                                         KindInfo::Unknown
                                     }
                                 }),
-                        }, */
+                        },
                         SegmentBuf::Field(FieldBuf { name: field, .. }) => match kind.object() {
                             None => KindInfo::Unknown,
                             Some(kind) => {
@@ -1077,7 +1079,7 @@ mod tests {
                         set
                     }),
                     path: vec![Segment::Index(1)],
-                    want: KindInfo::Known({
+
                         let map = {
                             let mut set = BTreeSet::new();
                             set.insert(TypeKind::Integer);

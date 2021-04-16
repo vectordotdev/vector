@@ -15,12 +15,12 @@ impl Value {
                     map.insert(name.as_str().to_owned(), self);
                     self = Value::Object(map);
                 }
-                SegmentBuf::Coalesce(fields) => todo!(), /*{
+                SegmentBuf::Coalesce(fields) => {
                 let field = fields.last().unwrap();
                 let mut map = BTreeMap::default();
                 map.insert(field.as_str().to_owned(), self);
                 self = Value::Object(map);
-                }*/
+                }
                 SegmentBuf::Index(index) => {
                     let mut array = vec![];
 

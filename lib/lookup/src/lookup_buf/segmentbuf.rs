@@ -9,6 +9,12 @@ pub struct FieldBuf {
     pub requires_quoting: bool,
 }
 
+impl FieldBuf {
+    pub fn as_str(&self) -> &str {
+        &self.name
+    }
+}
+
 impl Display for FieldBuf {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         if self.requires_quoting {
