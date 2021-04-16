@@ -273,7 +273,7 @@ httpmock = { version = "0.5.7", default-features = false }
 libc = "0.2.93"
 libz-sys = "1.1.2"
 matches = "0.1.8"
-pretty_assertions = "0.7.1"
+pretty_assertions = "0.7.2"
 reqwest = { version = "0.11.3", features = ["json"] }
 tempfile = "3.0.6"
 tokio = { version = "1.5.0", features = ["test-util"] }
