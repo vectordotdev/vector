@@ -262,6 +262,9 @@ impl Application {
                 tokio::select! {
                     Some(control) = control_rx.recv() => {
                         match control {
+                            // Receive new configuration, and apply. This is typically sent from
+                            // a provider. Only topology components are applied; API or other
+                            // providers can only be applied from the 'root' filesystem config.
                             Control::Config(mut new_config) => {
                                 new_config.healthchecks.set_require_healthy(opts.require_healthy);
                                     match topology
@@ -285,6 +288,8 @@ impl Application {
                                     }
                                     sources_finished = topology.sources_finished();
                             }
+                            // Reload a configuration from the filesystem. If a new provider is
+                            // given, the previous drops out of scope and will be cleaned up.
                             Control::Reload => {
                                 // Reload paths
                                 config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);

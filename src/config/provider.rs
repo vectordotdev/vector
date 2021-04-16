@@ -1,18 +1,7 @@
 use super::{component::ExampleError, GenerateConfig};
 use crate::providers::ProviderRx;
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use toml::Value;
-
-#[derive(Debug, Deserialize, Serialize, PartialEq, Copy, Clone)]
-#[serde(default, deny_unknown_fields)]
-pub struct Options {}
-
-impl Default for Options {
-    fn default() -> Self {
-        Self {}
-    }
-}
 
 #[async_trait]
 #[typetag::serde(tag = "type")]
@@ -20,6 +9,8 @@ pub trait ProviderConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
     async fn build(&self) -> Result<ProviderRx, &'static str>;
     fn provider_type(&self) -> &'static str;
 }
+
+dyn_clone::clone_trait_object!(ProviderConfig);
 
 /// Describes a provider plugin storing its type name and an optional example config.
 pub struct ProviderDescription {
@@ -53,16 +44,15 @@ where
     }
 }
 
-dyn_clone::clone_trait_object!(ProviderConfig);
-
 inventory::collect!(ProviderDescription);
 
+/// Takes an optional provider. If the provider builds successfully, it returns a `ProviderRx`
+/// channel for receiving control messages from the provider.
 pub async fn init_provider(provider: Option<Box<dyn ProviderConfig>>) -> Option<ProviderRx> {
     match provider {
         Some(provider) => match provider.build().await {
             Ok(provider_rx) => {
                 debug!(message = "Provider configured.", provider = ?provider.provider_type());
-                // Some(controller.with_shutdown(ReceiverStream::new(provider_rx)))
                 Some(provider_rx)
             }
             Err(err) => {
