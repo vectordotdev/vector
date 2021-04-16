@@ -1,0 +1,33 @@
+{{ if or (ne nil .NextInSection) (ne nil .PrevInSection) }}
+<section class="section">
+  <div class="container">
+    <nav class="pagination is-centered is-small is-rounded" role="navigation" aria-label="pagination">
+      <div class="pagination-list"></div>
+
+      {{ with .NextInSection }}
+      {{ $title := .Params.short | default .Title }}
+      <a class="pagination-previous" href="{{ .RelPermalink }}">
+        <span>
+          <span class="icon has-text-primary">
+            <i class="fas fa-chevron-left"></i>
+          </span>
+          Previous:<span class="ml-2 has-text-weight-bold">{{ $title }}</span>
+        </span>
+      </a>
+      {{ end }}
+
+      {{ with .PrevInSection }}
+      {{ $title := .Params.short | default .Title }}
+      <a class="pagination-next" href="{{ .RelPermalink }}">
+        <span>
+          Next:<span class="ml-2 has-text-weight-bold">{{ $title }}</span>
+          <span class="icon has-text-primary">
+            <i class="fas fa-chevron-right"></i>
+          </span>
+        </span>
+      </a>
+      {{ end }}
+    </nav>
+  </div>
+</section>
+{{ end }}

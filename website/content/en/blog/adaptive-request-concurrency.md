@@ -30,7 +30,9 @@ The answer to the first question is simple: Vector has _internally_ rate-limited
 
 The answer to the second question—how to fix it—is more complex because it depends on a variety of factors that change over time (covered in more detail [below](#the-second-problem-rate-limiting-is-not-a-panacea)). Telling the user to raise their limits would be irresponsible since we'd then risk overwhelming the downstream service and causing an outage; but not changing them could mean limiting performance in a dramatic way.
 
-> "In one case, we found that rate limits were limiting performance by over 80%."
+{{< quote >}}
+In one case, we found that rate limits were limiting performance by over 80%.
+{{< /quote >}}
 
 The crux of the matter is that Vector's high throughput presents a major challenge for HTTP-based sinks like [Elasticsearch] because those services can't always handle event payloads as quickly as Vector can send them. And when data services are heavily interdependent—which is almost always!—letting Vector overhwelm one of them can lead to system-wide performance degradation or even cascading failures.
 
@@ -40,7 +42,7 @@ In versions of Vector prior to 0.11, you could address this problem by setting [
 
 Rate limiting is nice to have as a fallback but it's a blunt instrument, a static half-solution to a dynamic problem. The core problem is that configuring your own rate limits locks you into a perpetual loop:
 
-![The rate limiting decision loop](/img/rate-limiting-loop.png)
+![The rate limiting decision loop](/img/blog/rate-limiting-loop.png)
 
 Within this vicious loop, you need to constantly avoid two outcomes:
 

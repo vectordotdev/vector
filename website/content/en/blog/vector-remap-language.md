@@ -71,9 +71,7 @@ VRL:
 
 The classic quadrant analysis looks something like this:
 
-import SVG from 'react-inlinesvg';
-
-<SVG src="/img/vrl-quadrant-comparison.svg" />
+{{< svg "/img/blog/vrl-quadrant-comparison.svg" >}}
 
 VRL eliminates this trade-off. Let's dig deeper on each of these points.
 
@@ -84,10 +82,12 @@ transforms that leverage a configuration syntax. Some call them "transforms",
 others call them "filters" or "functions". If you zoom in, they make more sense
 -- they perform a single task and make it difficult for users to do the wrong
 thing. If you zoom out, they start to look like poorly designed programming
-languages trying to be both a configuration and data transformation language.
+languages trying to be both a configuration *and* data transformation language.
 
-> If you zoom out, they start to look like poorly designed programming languages
-> trying to be both a configuration and data transformation language.
+{{< quote >}}
+If you zoom out, they start to look like poorly designed programming languages,
+trying to be both a configuration *and* data transformation language.
+{{< /quote >}}
 
 If you've worked with observability pipelines, it's not uncommon to have
 hundreds of lines of configuration for relatively simple pipelines.
@@ -105,19 +105,8 @@ common use case:
 
 Parsing this log, without VRL, looks like this:
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
-<Tabs
-  className="mini code"
-  defaultValue="vector"
-  values={[
-    {"label": "Vector", "value": "vector"},
-    {"label": "Logstash", "value": "logstash"},
-    {"label": "Fluentd", "value": "fluentd"}
-  ]}>
-<TabItem value="vector">
-
+{{< tabs default="Vector" >}}
+{{< tab title="Vector" >}}
 ```toml title="vector.toml"
 # ... sources ...
 
@@ -144,10 +133,8 @@ types.bytes_out = "int"
 
 # ... sinks ...
 ```
-
-</TabItem>
-<TabItem value="logstash">
-
+{{< /tab >}}
+{{< tab title="Logstash" >}}
 ```text title="logstash.conf"
 # ... inputs ...
 
@@ -174,34 +161,37 @@ filter {
 
 # ... outputs ...
 ```
+{{< /tab >}}
+{{< tab title="Fluentd" >}}
+```text title="logstash.conf"
+# ... inputs ...
 
-</TabItem>
-<TabItem value="fluentd">
-
-```text title="fluentd.conf"
-<source>
-  # ... source options ...
-  format apache2
-  tag apache.access
-</source>
-
-<parse>
-  @type regexp
-  expression /^(?<host>[^ ]*) [^ ]* (?<user>[^ ]*) \[(?<time>[^\]]*)\] "(?<method>\S+)(?: +(?<path>[^ ]*) +\S*)?" (?<code>[^ ]*) (?<size>[^ ]*)(?: "(?<referer>[^\"]*)" "(?<agent>[^\"]*)")?$/
-  time_format %d/%b/%Y:%H:%M:%S %z
-  types code:integer,size:integer
-</parse>
-
-<filter apache.access>
-  @type record_transformer
-  remove_keys time,log
-</filter>
+filter {
+  grok {
+    match => { "message" => ["%{IPORHOST:[apache2][access][remote_ip]} - %{DATA:[apache2][access][user_name]} \[%{HTTPDATE:[apache2][access][time]}\] \"%{WORD:[apache2][access][method]} %{DATA:[apache2][access][url]} HTTP/%{NUMBER:[apache2][access][http_version]}\" %{NUMBER:[apache2][access][response_code]} %{NUMBER:[apache2][access][body_sent][bytes]}( \"%{DATA:[apache2][access][referrer]}\")?( \"%{DATA:[apache2][access][agent]}\")?",
+      "%{IPORHOST:[apache2][access][remote_ip]} - %{DATA:[apache2][access][user_name]} \\[%{HTTPDATE:[apache2][access][time]}\\] \"-\" %{NUMBER:[apache2][access][response_code]} -" ] }
+    remove_field => "message"
+  }
+  mutate {
+    remove_field => [ "time", "log" ]
+  }
+  date {
+    match => [ "[apache2][access][time]", "dd/MMM/YYYY:H:m:s Z" ]
+    remove_field => "[apache2][access][time]"
+  }
+  mutate {
+    coerce => {
+      "[apache2][access][body_sent][bytes]" => "integer"
+      "[apache2][access][response_code]" => "integer"
+    }
+  }
+}
 
 # ... outputs ...
 ```
+{{< /tab >}}
+{{< /tabs >}}
 
-</TabItem>
-</Tabs>
 
 Which results in this general output:
 
@@ -224,8 +214,10 @@ pipelines, making them non-ideal for expressing data transformations. This is
 because they have competing concerns: the better a language is at configuration,
 the worse it is at data transformation.
 
-> The better a language is at configuration, the worse it is at data
-> transformation.
+{{< quote >}}
+The better a language is at configuration, the worse it is at data
+transformation.
+{{< /quote >}}
 
 Instead of conflating these concerns, like Logstash, Fluentd, and others, Vector
 separates them, allowing you to choose your preferred configuration language
@@ -258,9 +250,6 @@ Runtime transforms acted as robust escape hatches for Vector users, unblocking
 exotic use cases and allowing us to learn more about the many ways people use
 Vector. Still, we've seen the dark side of using them:
 
-<a name="runtime-problems"></a>
-<div className="list--icons list--icons--warnings">
-
 * Unexpected malformed data bringing pipelines down and waking operators up in
   the middle of the night.
 
@@ -271,14 +260,10 @@ Vector. Still, we've seen the dark side of using them:
 
 * Complicated code leaving pipelines in an unmanageable state.
 
-</div>
-
 Because of these risks we recommend static transforms if given the choice, but
 you shouldn't have to choose...
 
-<a name="solution"></a>
-
-## Our solution: Vector Remap Language
+## Our solution: Vector Remap Language {#solution}
 
 Before I dive into the specifics of VRL, let's look at the Docker, common-log
 (Apache) example from above. If you skipped to this section we'll be parsing the
@@ -294,7 +279,7 @@ following log:
 
 Which can be achieved with the following VRL program:
 
-```vrl
+```ruby
 . = parse_common_log!(.log)
 .total_bytes = del(.size)
 .internal_request = ip_cidr_contains("5.86.0.0/16", .host) ?? false
@@ -330,9 +315,7 @@ constructs, check out the [reference documentation][vrl_reference]. Here you
 will find a comprehensive list of [expressions][vrl_expressions],
 [functions][vrl_functions], and [examples][vrl_examples].
 
-<a name="features"></a>
-
-### VRL principles & features
+### VRL principles and features {#features}
 
 VRL was designed to exploit two principles: *safety* and *performance*, while
 maintaining flexibility. This makes VRL ideal for always-up,
@@ -341,12 +324,12 @@ how we achieve this, below is a VRL feature matrix across these two principles:
 
 | Feature                   | Safety | Performance |
 |:--------------------------|:------:|:-----------:|
-| [Progressive type safety] |   ✔    |             |
-| [Fail safety]             |   ✔    |             |
-| [Memory safety]           |   ✔    |             |
-| [Ergonomic safety]        |   ✔    |      ✔      |
-| [Vector/Rust native]      |   ✔    |      ✔      |
-| [Stateless]               |   ✔    |      ✔      |
+| [Progressive type safety] |   ✅    |             |
+| [Fail safety]             |   ✅    |             |
+| [Memory safety]           |   ✅    |             |
+| [Ergonomic safety]        |   ✅    |      ✅      |
+| [Vector/Rust native]      |   ✅    |      ✅      |
+| [Stateless]               |   ✅    |      ✅      |
 
 For more info on each click on the feature, but for the purposes of
 demonstrating how VRL is unique, let's touch on the first two: *progressive type

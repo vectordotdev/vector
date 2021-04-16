@@ -64,13 +64,13 @@ To give a real-world example of agent fatigue, let's look at a telecom enterpris
 
 Prior to adopting Vector, the company deployed four or more agents (!) on each of their Kubernetes Nodes:
 
-![The crowded Kubernetes Node](/img/k8s-before.png)
+![The crowded Kubernetes Node](/img/blog/k8s-before.png)
 
 That's one agent for each of the following: logs, metrics, traces, and security (e.g. breach detection). And then on top of four agents per Node, they needed to run a cluster of observability data aggregators for cross-Node analysis and batching/archiving as well as a Kafka cluster in front of those aggregators (to address reliability and durability concerns).
 
 All together, those four agents consumed ~30% of the Node's computing resources, while Kafka/aggregator combination was the company's largest services in terms of resource usage (what!?). In total, a whopping ~40% of their resources were dedicated to observability infrastructure. And this resource intensity doesn't even include in the engineering time and effort required to deploy and manage all of it:
 
-![The crowded Kubernetes Node](/img/k8s-resources-before.png)
+![The crowded Kubernetes Node](/img/blog/k8s-resources-before.png)
 
 Although this is an extreme case, we'd bet that you can relate to some—though hopefully not all!—of these troubles. What makes this problem so pernicious is that it happens over time. This heavy resource usage was not the result of an elaborate master plan by these engineers; it was the byproduct of evolving company needs, fast-paced engineering, fragmentation in the observability space, and vendor lock-in. That last one can be a real killer.
 
@@ -78,11 +78,11 @@ Although this is an extreme case, we'd bet that you can relate to some—though 
 
 By switching to Vector, the telecom company from the "before" scenario was able to consolidate the logs, metrics, and tracing agents:
 
-![The quiet Kubernetes Node](/img/k8s-after.png)
+![The quiet Kubernetes Node](/img/blog/k8s-after.png)
 
 This reduced observability resource usage by 90%. This brought resource usage from 40% of the total down to 5%. In addition, Vector reduced Splunk data volume through sampling and cleaning, afforded by using AWS S3 as the system of record. All in all, Vector significantly reduced the overall observability costs. The result looked like this:
 
-![The quiet Kubernetes Node](/img/k8s-resources-after.png)
+![The quiet Kubernetes Node](/img/blog/k8s-resources-after.png)
 
 To summarize, adopting the new Vector-based architecture meant:
 
@@ -99,11 +99,7 @@ We're confident that this initial integration is up to the task of dramatically 
 
 We want Vector to become the backbone of observability in Kubernetes. If you share our vision of a single, ultra-fast, ultra-reliable, open-source observability platform, give us a try! As a user-first company, our entire engineering team is [actively engaged][chat] with our community and eager to work with you.
 
-<br />
-
-import Jump from '@site/src/components/Jump';
-
-<Jump to="/docs/setup/installation/platforms/kubernetes/" size="lg" className="jump-to--highlight">Install Vector on Kubernetes</Jump>
+{{< jump "/docs/setup/installation/platforms/kubernetes" >}}
 
 [agent]: /docs/setup/deployment/topologies/#distributed
 [aggregator]: /docs/setup/deployment/topologies/#centralized

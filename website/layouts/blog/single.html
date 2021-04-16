@@ -3,13 +3,80 @@
 {{ end }}
 
 {{ define "main" }}
-<section class="hero is-medium is-black">
-  <div class="hero-body">
-    <div class="container">
-      <p class="title">
-        {{ .Title }}
-      </p>
+{{ $date := .Date | dateFormat "January 2, 2006" }}
+{{ $allAuthors := .CurrentSection.Params.authors }}
+<section class="section">
+  <div class="container">
+    <div class="columns">
+      <div class="column is-one-third">
+        <section class="hero is-sticky">
+          <div class="hero-body">
+            <div class="container">
+              <p class="title is-size-2 is-size-3-mobile has-text-weight-light is-spaced">
+                {{ .Title }}
+              </p>
+
+              <p class="subtitle has-text-grey">
+                {{ .Description }}
+              </p>
+
+              <p>
+                <span class="icon has-text-primary">
+                  <i class="fas fa-calendar-alt"></i>
+                </span>
+                <span class="has-text-weight-bold">
+                  {{ $date }}
+                </span>
+              </p>
+
+              {{ with .Params.authors }}
+              <div class="mt-5">
+                {{ range . }}
+                {{ $author := index (where $allAuthors "handle" "==" .) 0 }}
+                {{ $authorImg := printf "https://github.com/%s.png" $author.handle }}
+                {{ $authorUrl := printf "https://github.com/%s" $author.handle }}
+                <div class="media">
+                  <div class="media-left">
+                    <figure class="image is-48x48">
+                      <img class="is-rounded" src="{{ $authorImg }}" alt="GitHub avatar for author {{ $author.name }}">
+                    </figure>
+                  </div>
+                  <div class="media-content">
+                    <a href="{{ $authorUrl }}" target="_blank">
+                      {{ $author.name }}
+                    </a>
+                  </div>
+                </div>
+                {{ end }}
+              </div>
+              {{ end }}
+
+              <div class="mt-6">
+                <p>
+                  <span class="icon has-text-purple">
+                    <i class="fas fa-arrow-left"></i>
+                  </span>
+                  <a href="{{ .CurrentSection.RelPermalink }}">
+                    Back to blog
+                  </a>
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="column is-two-thirds">
+        <div class="content with-limited-chars mb-12 mt-4">
+          {{ .Content }}
+        </div>
+      </div>
     </div>
   </div>
 </section>
+{{ end }}
+
+{{ define "below" }}
+{{ partial "blog/pagination.html" . }}
+{{ partial "footer.html" . }}
 {{ end }}

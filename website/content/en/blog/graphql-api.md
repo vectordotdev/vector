@@ -35,8 +35,7 @@ Try our new [**GraphQL public playground
 today**](https://playground.vector.dev:8686/playground), which enables you to
 execute queries against a live Vector instance that we host and manage:
 
-[![Vector GraphQL API Public
-Playground](/img/blog/2020-12-07-graphql-api/vector-api-public-playground.png)](https://playground.vector.dev:8686/playground)
+![Vector GraphQL API Public Playground](/img/blog/vector-api-public-playground.png)
 
 Here are a few queries you can try:
 
@@ -188,7 +187,7 @@ vector top # pass --url <http://path/to/graphql> for remote observability
 
 On Linux, Windows and macOS, you'll get an interface like this:
 
-![Vector top](/img/blog/2020-12-07-graphql-api/vector-top.png)
+![Vector top](/img/blog/vector-top.png)
 
 This will display your configured components and metrics, updating
 every second (pass a millisecond `--interval` to adjust). If you run Vector in
