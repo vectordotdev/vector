@@ -107,11 +107,13 @@ impl BatchNotifiers {
     }
 }
 
-/// A batch notifier contains the status
+/// A batch notifier contains the status of the current batch along with
+/// a one-shot notifier to send that status back to the source. It is
+/// shared among all events of a batch.
 #[derive(Debug)]
 pub struct BatchNotifier {
     status: Atomic<BatchStatus>,
-    notifier: oneshot::Sender<BatchStatus>,
+    notifier: Option<oneshot::Sender<BatchStatus>>,
 }
 
 impl BatchNotifier {
@@ -121,7 +123,7 @@ impl BatchNotifier {
         let (sender, receiver) = oneshot::channel();
         let notifier = Self {
             status: Atomic::new(BatchStatus::Delivered),
-            notifier: sender,
+            notifier: Some(sender),
         };
         (notifier, receiver)
     }
@@ -134,11 +136,21 @@ impl BatchNotifier {
             })
             .unwrap_or_else(|_| unreachable!());
     }
+
+    /// Send this notifier's status up to the source
+    pub fn send_status(&mut self) {
+        if let Some(notifier) = self.notifier.take() {
+            let status = self.status.load(Ordering::Relaxed);
+            if notifier.send(status).is_err() {
+                warn!(message = "Could not send batch acknowledgement notifier");
+            }
+        }
+    }
 }
 
 impl Drop for BatchNotifier {
     fn drop(&mut self) {
-        todo!();
+        self.send_status();
     }
 }
 
