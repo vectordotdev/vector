@@ -244,23 +244,17 @@ impl Application {
 
             // Handle OS signals.
             let signals = signal::signals();
-            controller.with_shutdown(signals);
+            controller.handler(signals);
 
             // Configure the provider, if applicable.
             #[cfg(feature = "providers")]
-            if let Some(provider) = provider {
-                match provider.build().await {
-                    Ok(provider_rx) => {
-                        debug!(message = "Provider configured.", provider = ?provider.provider_type());
-                        controller.with_shutdown(ReceiverStream::new(provider_rx));
-                    },
-                    Err(err) => {
-                        error!(message = "Provider error.", error = ?err);
-                    }
-                }
-            }
+            let mut _provider = config::provider::init_provider(provider)
+                .await
+                .map(|provider| controller.with_shutdown(ReceiverStream::new(provider)));
 
-            let mut control_rx = controller.take_rx().expect("couldn't get controller receiver");
+            let mut control_rx = controller
+                .take_rx()
+                .expect("couldn't get controller receiver");
 
             let mut sources_finished = topology.sources_finished();
 
@@ -298,6 +292,14 @@ impl Application {
                                 let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
 
                                 if let Some(mut new_config) = new_config {
+                                    #[cfg(feature = "providers")]
+                                    // If there's a new provider, (re)instantiate it.
+                                    if new_config.provider.is_some() {
+                                        _provider = config::provider::init_provider(new_config.provider.take())
+                                            .await
+                                            .map(|provider| controller.with_shutdown(ReceiverStream::new(provider)));
+                                    }
+
                                     new_config.healthchecks.set_require_healthy(opts.require_healthy);
                                     match topology
                                         .reload_config_and_respawn(new_config)
@@ -331,10 +333,9 @@ impl Application {
                     // Trigger graceful shutdown if a component crashed, or all sources have ended.
                     _ = graceful_crash.next() => break Control::Shutdown,
                     _ = &mut sources_finished => break Control::Shutdown,
-                    else => unreachable!("Control never end"),
+                    else => unreachable!("control signals never end"),
                 }
             };
-
 
             match control {
                 Control::Shutdown => {

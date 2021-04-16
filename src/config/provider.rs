@@ -56,3 +56,20 @@ where
 dyn_clone::clone_trait_object!(ProviderConfig);
 
 inventory::collect!(ProviderDescription);
+
+pub async fn init_provider(provider: Option<Box<dyn ProviderConfig>>) -> Option<ProviderRx> {
+    match provider {
+        Some(provider) => match provider.build().await {
+            Ok(provider_rx) => {
+                debug!(message = "Provider configured.", provider = ?provider.provider_type());
+                // Some(controller.with_shutdown(ReceiverStream::new(provider_rx)))
+                Some(provider_rx)
+            }
+            Err(err) => {
+                error!(message = "Provider error.", error = ?err);
+                None
+            }
+        },
+        _ => None,
+    }
+}

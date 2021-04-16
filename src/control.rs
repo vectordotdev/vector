@@ -2,6 +2,8 @@ use crate::config::Config;
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::{Stream, StreamExt};
 
+pub type ShutdownTx = oneshot::Sender<()>;
+
 #[derive(Debug)]
 pub enum Control {
     /// Receive a new configuration.
@@ -17,21 +19,35 @@ pub enum Control {
 pub struct Controller {
     tx: mpsc::Sender<Control>,
     rx: Option<mpsc::Receiver<Control>>,
-    shutdowns: Vec<oneshot::Sender<()>>,
 }
 
 impl Controller {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::channel(2);
 
-        Self {
-            tx,
-            rx: Some(rx),
-            shutdowns: vec![],
-        }
+        Self { tx, rx: Some(rx) }
     }
 
-    pub fn with_shutdown<T, S>(&mut self, stream: S)
+    pub fn handler<T, S>(&mut self, stream: S)
+    where
+        T: Into<Control> + Send + Sync,
+        S: Stream<Item = T> + 'static + Send + Sync,
+    {
+        let tx = self.tx.clone();
+
+        tokio::spawn(async move {
+            tokio::pin!(stream);
+
+            while let Some(value) = stream.next().await {
+                if tx.send(value.into()).await.is_err() {
+                    error!(message = "Couldn't send control message");
+                    break;
+                }
+            }
+        });
+    }
+
+    pub fn with_shutdown<T, S>(&mut self, stream: S) -> ShutdownTx
     where
         T: Into<Control> + Send + Sync,
         S: Stream<Item = T> + 'static + Send + Sync,
@@ -39,7 +55,6 @@ impl Controller {
         let tx = self.tx.clone();
 
         let (shutdown_tx, mut shutdown_rx) = oneshot::channel();
-        self.shutdowns.push(shutdown_tx);
 
         tokio::spawn(async move {
             tokio::pin!(stream);
@@ -59,6 +74,8 @@ impl Controller {
                 }
             }
         });
+
+        shutdown_tx
     }
 
     pub fn take_rx(&mut self) -> Option<mpsc::Receiver<Control>> {
