@@ -114,7 +114,8 @@ impl Expression for SliceFn {
         let td = TypeDef::new().fallible();
 
         match self.value.type_def(state) {
-            v if v.is_bytes() || v.is_array() => td.merge(v),
+            v if v.is_bytes() => td.merge(v),
+            v if v.is_array() => td.merge(v).collect_subtypes(),
             _ => td.bytes().add_array_mapped::<(), Kind>(map! {
                 (): Kind::all(),
             }),
@@ -218,10 +219,7 @@ mod tests {
                              start: 0
             ],
             want: Ok(vec![0, 1, 2]),
-            tdef: TypeDef::new().fallible().array_mapped::<i32, Kind>(map! { 0: Kind::Integer,
-                                                                             1: Kind::Integer,
-                                                                             2: Kind::Integer
-            }),
+            tdef: TypeDef::new().fallible().array_mapped::<(), Kind>(map! { (): Kind::Integer }),
         }
 
         array_1 {
@@ -229,11 +227,7 @@ mod tests {
                              start: 1
             ],
             want: Ok(vec![1, 2]),
-            // TODO: This is wrong! See https://github.com/timberio/vector/issues/6676
-            tdef: TypeDef::new().fallible().array_mapped::<i32, Kind>(map! { 0: Kind::Integer,
-                                                                             1: Kind::Integer,
-                                                                             2: Kind::Integer
-            }),
+            tdef: TypeDef::new().fallible().array_mapped::<(), Kind>(map! { (): Kind::Integer }),
         }
 
         array_minus_2 {
@@ -241,11 +235,17 @@ mod tests {
                              start: -2
             ],
             want: Ok(vec![1, 2]),
-            // TODO: This is wrong! See https://github.com/timberio/vector/issues/6676
-            tdef: TypeDef::new().fallible().array_mapped::<i32, Kind>(map! { 0: Kind::Integer,
-                                                                             1: Kind::Integer,
-                                                                             2: Kind::Integer
-            }),
+            tdef: TypeDef::new().fallible().array_mapped::<(), Kind>(map! { (): Kind::Integer }),
+        }
+
+        array_mixed_types {
+            args: func_args![value: value!([0, "ook", true]),
+                             start: 1
+            ],
+            want: Ok(value!(["ook", true])),
+            tdef: TypeDef::new().fallible().array_mapped::<(), Kind>(
+                map! { (): Kind::Integer | Kind::Bytes | Kind::Boolean }
+            ),
         }
 
         error_after_end {

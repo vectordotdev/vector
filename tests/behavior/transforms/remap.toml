@@ -1,3 +1,45 @@
+[transforms.remap_abort]
+  inputs = []
+  type = "remap"
+  drop_on_abort = false
+  source = """
+    .foo = false
+    abort
+    .bar = false
+  """
+[[tests]]
+  name = "remap_abort"
+  [tests.input]
+    insert_at = "remap_abort"
+    type = "log"
+    [tests.input.log_fields]
+      foo = true
+      bar = true
+  [[tests.outputs]]
+    extract_from = "remap_abort"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = ".foo == true && .bar == true"
+
+[transforms.remap_abort_drop_on_abort]
+  inputs = []
+  type = "remap"
+  drop_on_abort = true
+  source = """
+    .foo = false
+    abort
+    .bar = false
+  """
+[[tests]]
+  name = "remap_abort_drop_on_abort"
+  no_outputs_from = ["remap_abort_drop_on_abort"]
+  [tests.input]
+    insert_at = "remap_abort_drop_on_abort"
+    type = "log"
+    [tests.input.log_fields]
+      foo = true
+      bar = true
+
 [transforms.remap_nested]
   inputs = []
   type = "remap"
@@ -83,7 +125,7 @@
 [transforms.remap_arithmetic_error]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     a = 10
     b = 0
@@ -99,7 +141,7 @@
     extract_from = "remap_arithmetic_error"
     [[tests.outputs.conditions]]
       type = "remap"
-      source = ".a == null"
+      source = ".a == 0.0"
 
 [transforms.remap_boolean_arithmetic]
   inputs = []
@@ -319,7 +361,7 @@
 [transforms.remap_function_upcase_error]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     .a = upcase(string!(.a))
     .b = upcase(string!(.b))
@@ -337,7 +379,7 @@
 [transforms.remap_function_downcase]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     .a = downcase(string!(.a))
     .b = downcase(string!(.b))
@@ -371,7 +413,7 @@
 [transforms.remap_function_downcase_error]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     .a = downcase(string!(.a))
     .b = downcase(string!(.b))
@@ -442,7 +484,7 @@
 [transforms.remap_function_sha1_error]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     .a = sha1(string!(.a))
     .b = sha1(string!(.b))
@@ -487,7 +529,7 @@
 [transforms.remap_function_md5_error]
   inputs = []
   type = "remap"
-  drop_on_err = true
+  drop_on_error = true
   source = """
     .a = md5(string!(.a))
     .b = md5(string!(.b))
@@ -1331,7 +1373,7 @@
 # [transforms.remap_function_assert_pass]
 #   inputs = []
 #   type = "remap"
-#   drop_on_err = true
+#   drop_on_error = true
 #   source = """
 #     assert!(.foo, message: "assert failed")
 #     .check = "checked"
@@ -1354,7 +1396,7 @@
 # [transforms.remap_function_assert_fail]
 #   inputs = []
 #   type = "remap"
-#   drop_on_err = true
+#   drop_on_error = true
 #   source = """
 #     assert!(.foo, message: "assert failed")
 #   """

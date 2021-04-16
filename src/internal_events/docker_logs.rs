@@ -7,6 +7,7 @@ use metrics::counter;
 pub struct DockerLogsEventReceived<'a> {
     pub byte_size: usize,
     pub container_id: &'a str,
+    pub container_name: &'a str,
 }
 
 impl<'a> InternalEvent for DockerLogsEventReceived<'a> {
@@ -20,7 +21,14 @@ impl<'a> InternalEvent for DockerLogsEventReceived<'a> {
 
     fn emit_metrics(&self) {
         counter!("processed_events_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
+        counter!(
+            "events_in_total", 1,
+            "container_name" => self.container_name.to_owned()
+        );
+        counter!(
+            "processed_bytes_total", self.byte_size as u64,
+            "container_name" => self.container_name.to_owned()
+        );
     }
 }
 

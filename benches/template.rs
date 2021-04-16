@@ -8,7 +8,7 @@ use vector::{config::log_schema, event::Event};
 fn bench_elasticsearch_index(c: &mut Criterion) {
     use vector::template::Template;
 
-    let mut group = c.benchmark_group("elasticsearch_indexes");
+    let mut group = c.benchmark_group("template");
 
     group.bench_function("dynamic", |b| {
         let index = Template::try_from("index-%Y.%m.%d").unwrap();

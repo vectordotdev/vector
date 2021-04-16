@@ -4,7 +4,7 @@ use std::{
     collections::HashSet,
     fs::{self, metadata, File},
     io::{self, Read, Seek, SeekFrom, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 #[derive(Clone)]
@@ -63,7 +63,7 @@ impl From<u64> for FileFingerprint {
 impl Fingerprinter {
     pub fn get_fingerprint_of_file(
         &self,
-        path: &PathBuf,
+        path: &Path,
         buffer: &mut Vec<u8>,
     ) -> Result<FileFingerprint, io::Error> {
         use FileFingerprint::*;
@@ -94,7 +94,7 @@ impl Fingerprinter {
 
     pub fn get_fingerprint_or_log_error(
         &self,
-        path: &PathBuf,
+        path: &Path,
         buffer: &mut Vec<u8>,
         known_small_files: &mut HashSet<PathBuf>,
         emitter: &impl FileSourceInternalEvents,
@@ -111,7 +111,7 @@ impl Fingerprinter {
                 io::ErrorKind::UnexpectedEof => {
                     if !known_small_files.contains(path) {
                         emitter.emit_file_checksum_failed(path);
-                        known_small_files.insert(path.clone());
+                        known_small_files.insert(path.to_path_buf());
                     }
                 }
                 io::ErrorKind::NotFound => {
@@ -129,7 +129,7 @@ impl Fingerprinter {
 
     pub fn get_bytes_checksum(
         &self,
-        path: &PathBuf,
+        path: &Path,
         buffer: &mut Vec<u8>,
     ) -> Result<Option<FileFingerprint>, io::Error> {
         match self.strategy {

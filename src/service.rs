@@ -66,9 +66,9 @@ impl InstallOpts {
     fn config_paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
         config::merge_path_lists(vec![
             (&self.config_paths, None),
-            (&self.config_paths_toml, Some(config::Format::TOML)),
-            (&self.config_paths_json, Some(config::Format::JSON)),
-            (&self.config_paths_yaml, Some(config::Format::YAML)),
+            (&self.config_paths_toml, Some(config::Format::Toml)),
+            (&self.config_paths_json, Some(config::Format::Json)),
+            (&self.config_paths_yaml, Some(config::Format::Yaml)),
         ])
     }
 }
@@ -222,9 +222,9 @@ fn create_service_arguments(
                 .flat_map(|(path, format)| {
                     let key = match format {
                         None => "--config",
-                        Some(config::Format::TOML) => "--config-toml",
-                        Some(config::Format::JSON) => "--config-json",
-                        Some(config::Format::YAML) => "--config-yaml",
+                        Some(config::Format::Toml) => "--config-toml",
+                        Some(config::Format::Json) => "--config-json",
+                        Some(config::Format::Yaml) => "--config-yaml",
                     };
                     vec![OsString::from(key), path.as_os_str().into()]
                 })

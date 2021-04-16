@@ -11,17 +11,19 @@ remap: functions: to_string: {
 			name:        "value"
 			description: "The value to convert to a string."
 			required:    true
-			type: ["any"]
+			type: ["integer", "float", "boolean", "string", "timestamp", "null"]
 		},
 	]
-	internal_failure_reasons: []
+	internal_failure_reasons: [
+		"`value` is not an integer, float, boolean, string, timestamp, or null",
+	]
 	return: {
 		types: ["string"]
 		rules: [
 			#"If `value` is an integer or float, returns the string representation."#,
-			#"If `value` is a Boolean, returns `"true"` or `"false"`."#,
+			#"If `value` is a boolean, returns `"true"` or `"false"`."#,
 			#"If `value` is a timestamp, returns an [RFC 3339](\(urls.rfc3339)) representation."#,
-			#"If `value` is an object or array, returns a JSON-encoded string."#,
+			#"If `value` is a null, returns `""`."#,
 		]
 	}
 

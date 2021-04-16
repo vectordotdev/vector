@@ -2,6 +2,7 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)] // some features only use some variants
 pub(crate) enum SocketMode {
     Tcp,
     Udp,
@@ -31,6 +32,7 @@ impl InternalEvent for SocketEventReceived {
 
     fn emit_metrics(&self) {
         counter!("processed_events_total", 1, "mode" => self.mode.as_str());
+        counter!("events_in_total", 1, "mode" => self.mode.as_str());
         counter!("processed_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
     }
 }

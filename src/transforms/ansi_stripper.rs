@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     event::Value,
-    internal_events::{ANSIStripperFailed, ANSIStripperFieldInvalid, ANSIStripperFieldMissing},
+    internal_events::{AnsiStripperFailed, AnsiStripperFieldInvalid, AnsiStripperFieldMissing},
     transforms::{FunctionTransform, Transform},
     Event, Result,
 };
@@ -58,17 +58,17 @@ impl FunctionTransform for AnsiStripper {
         let log = event.as_mut_log();
 
         match log.get_mut(&self.field) {
-            None => emit!(ANSIStripperFieldMissing { field: &self.field }),
+            None => emit!(AnsiStripperFieldMissing { field: &self.field }),
             Some(Value::Bytes(ref mut bytes)) => {
                 match strip_ansi_escapes::strip(&bytes) {
                     Ok(b) => *bytes = b.into(),
-                    Err(error) => emit!(ANSIStripperFailed {
+                    Err(error) => emit!(AnsiStripperFailed {
                         field: &self.field,
                         error
                     }),
                 };
             }
-            _ => emit!(ANSIStripperFieldInvalid { field: &self.field }),
+            _ => emit!(AnsiStripperFieldInvalid { field: &self.field }),
         }
 
         output.push(event);
@@ -78,7 +78,7 @@ impl FunctionTransform for AnsiStripper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{Event, Value};
+    use crate::event::LogEvent;
 
     #[test]
     fn generate_config() {
@@ -92,13 +92,12 @@ mod tests {
                     field: "message".into(),
                 };
 
-                let event = Event::from($in);
-                let event = transform.transform_one(event).unwrap();
+                let log = LogEvent::from($in);
+                let mut expected = log.clone();
+                expected.insert("message", "foo bar");
+                let event = transform.transform_one(log.into()).unwrap();
 
-                assert_eq!(
-                    event.into_log().remove(crate::config::log_schema().message_key()).unwrap(),
-                    Value::from("foo bar")
-                );
+                assert_eq!(event.into_log(), expected);
             )+
         };
     }

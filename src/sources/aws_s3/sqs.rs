@@ -4,7 +4,7 @@ use crate::{
     internal_events::aws_s3::source::{
         SqsMessageDeleteFailed, SqsMessageDeleteSucceeded, SqsMessageProcessingFailed,
         SqsMessageProcessingSucceeded, SqsMessageReceiveFailed, SqsMessageReceiveSucceeded,
-        SqsS3EventRecordInvalidEventIgnored,
+        SqsS3EventReceived, SqsS3EventRecordInvalidEventIgnored,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -25,6 +25,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
 use std::{future::ready, time::Duration};
 use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::FramedRead;
 
 lazy_static! {
@@ -156,7 +157,7 @@ impl Ingestor {
     }
 
     pub(super) async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
-        time::interval(self.poll_interval)
+        IntervalStream::new(time::interval(self.poll_interval))
             .take_until(shutdown)
             .for_each(|_| self.run_once(&out))
             .await;
@@ -352,6 +353,10 @@ impl Ingestor {
                 };
 
                 let stream = lines.filter_map(|line| {
+                    emit!(SqsS3EventReceived {
+                        byte_size: line.len()
+                    });
+
                     let mut event = Event::from(line);
 
                     let log = event.as_mut_log();

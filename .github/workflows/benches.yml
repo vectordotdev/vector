@@ -44,9 +44,10 @@ jobs:
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.8.0
+      - uses: styfle/cancel-workflow-action@0.9.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
+          all_but_latest: true # can cancel workflows scheduled later
 
   bench:
     name: Bench - Linux
@@ -56,7 +57,7 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2.1.4
+      - uses: actions/cache@v2.1.5
         with:
           path: |
             ~/.cargo/registry
@@ -92,11 +93,10 @@ jobs:
           mkdir -p target/criterion
           setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench-all | tee target/criterion/out
 
-      - run: zip --recurse-paths target/criterion.zip target/criterion
       - uses: actions/upload-artifact@v2
         with:
           name: "criterion"
-          path: "./target/criterion.zip"
+          path: "./target/criterion"
       - name: Upload criterion data to S3
         run: scripts/upload-benchmarks-s3.sh
         if: github.ref == 'refs/heads/master'

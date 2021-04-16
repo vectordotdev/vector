@@ -376,7 +376,9 @@ mod tests {
         let now = Utc::now().timestamp_millis() as f64 / 1000f64;
         assert!(
             (hec_event.time - now).abs() < 0.2,
-            format!("hec_event.time = {}, now = {}", hec_event.time, now)
+            "hec_event.time = {}, now = {}",
+            hec_event.time,
+            now
         );
         assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
     }
@@ -413,7 +415,9 @@ mod tests {
         let now = Utc::now().timestamp_millis() as f64 / 1000f64;
         assert!(
             (hec_event.time - now).abs() < 0.2,
-            format!("hec_event.time = {}, now = {}", hec_event.time, now)
+            "hec_event.time = {}, now = {}",
+            hec_event.time,
+            now
         );
         assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
     }
@@ -453,7 +457,7 @@ mod integration_tests {
     use futures::stream;
     use serde_json::Value as JsonValue;
     use std::{future::ready, net::SocketAddr};
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
     use warp::Filter;
 
     const USERNAME: &str = "admin";
@@ -572,7 +576,7 @@ mod integration_tests {
                 break;
             }
 
-            delay_for(Duration::from_millis(100)).await;
+            sleep(Duration::from_millis(100)).await;
         }
 
         assert!(found_all);

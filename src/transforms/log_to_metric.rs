@@ -204,6 +204,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
         .get(log_schema().timestamp_key())
         .and_then(Value::as_timestamp)
         .cloned();
+    let metadata = event.metadata().clone();
 
     match config {
         MetricConfig::Counter(counter) => {
@@ -233,10 +234,11 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&counter.tags, &event)?;
 
-            Ok(Metric::new(
+            Ok(Metric::new_with_metadata(
                 name,
                 MetricKind::Incremental,
                 MetricValue::Counter { value },
+                metadata,
             )
             .with_namespace(namespace)
             .with_tags(tags)
@@ -255,13 +257,14 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&hist.tags, &event)?;
 
-            Ok(Metric::new(
+            Ok(Metric::new_with_metadata(
                 name,
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: crate::samples![value => 1],
                     statistic: StatisticKind::Histogram,
                 },
+                metadata,
             )
             .with_namespace(namespace)
             .with_tags(tags)
@@ -280,13 +283,14 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&summary.tags, &event)?;
 
-            Ok(Metric::new(
+            Ok(Metric::new_with_metadata(
                 name,
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: crate::samples![value => 1],
                     statistic: StatisticKind::Summary,
                 },
+                metadata,
             )
             .with_namespace(namespace)
             .with_tags(tags)
@@ -305,12 +309,15 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&gauge.tags, &event)?;
 
-            Ok(
-                Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
-                    .with_namespace(namespace)
-                    .with_tags(tags)
-                    .with_timestamp(timestamp),
+            Ok(Metric::new_with_metadata(
+                name,
+                MetricKind::Absolute,
+                MetricValue::Gauge { value },
+                metadata,
             )
+            .with_namespace(namespace)
+            .with_tags(tags)
+            .with_timestamp(timestamp))
         }
         MetricConfig::Set(set) => {
             let value = log
@@ -330,12 +337,13 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             let tags = render_tags(&set.tags, &event)?;
 
-            Ok(Metric::new(
+            Ok(Metric::new_with_metadata(
                 name,
                 MetricKind::Incremental,
                 MetricValue::Set {
                     values: std::iter::once(value).collect(),
                 },
+                metadata,
             )
             .with_namespace(namespace)
             .with_tags(tags)
@@ -416,15 +424,17 @@ mod tests {
         );
 
         let event = create_event("status", "42");
+        let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
-            Metric::new(
+            Metric::new_with_metadata(
                 "status",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
+                metadata,
             )
             .with_timestamp(Some(ts()))
         );
@@ -446,16 +456,18 @@ mod tests {
         let mut event = create_event("message", "i am log");
         event.as_mut_log().insert("method", "post");
         event.as_mut_log().insert("code", "200");
+        let metadata = event.metadata().clone();
 
         let mut transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
-            Metric::new(
+            Metric::new_with_metadata(
                 "http_requests_total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
+                metadata,
             )
             .with_namespace(Some("app"))
             .with_tags(Some(
@@ -483,15 +495,17 @@ mod tests {
         );
 
         let event = create_event("backtrace", "message");
+        let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
-            Metric::new(
+            Metric::new_with_metadata(
                 "exception_total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
+                metadata
             )
             .with_timestamp(Some(ts()))
         );
@@ -527,15 +541,17 @@ mod tests {
         );
 
         let event = create_event("amount", "33.99");
+        let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
-            Metric::new(
+            Metric::new_with_metadata(
                 "amount_total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 33.99 },
+                metadata,
             )
             .with_timestamp(Some(ts()))
         );
@@ -553,15 +569,17 @@ mod tests {
         );
 
         let event = create_event("memory_rss", "123");
+        let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
-            Metric::new(
+            Metric::new_with_metadata(
                 "memory_rss_bytes",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 123.0 },
+                metadata,
             )
             .with_timestamp(Some(ts()))
         );
@@ -623,6 +641,7 @@ mod tests {
             .insert(log_schema().timestamp_key(), ts());
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
+        let metadata = event.metadata().clone();
 
         let mut transform = LogToMetric::new(config);
 
@@ -631,19 +650,21 @@ mod tests {
         assert_eq!(2, output.len());
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric::new(
+            Metric::new_with_metadata(
                 "exception_total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
+                metadata.clone(),
             )
             .with_timestamp(Some(ts()))
         );
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric::new(
+            Metric::new_with_metadata(
                 "status",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
+                metadata,
             )
             .with_timestamp(Some(ts()))
         );
@@ -675,6 +696,7 @@ mod tests {
         event.as_mut_log().insert("host", "local");
         event.as_mut_log().insert("worker", "abc");
         event.as_mut_log().insert("service", "xyz");
+        let metadata = event.metadata().clone();
 
         let mut transform = LogToMetric::new(config);
 
@@ -683,22 +705,24 @@ mod tests {
         assert_eq!(2, output.len());
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric::new(
+            Metric::new_with_metadata(
                 "xyz_exception_total",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
+                metadata.clone(),
             )
             .with_namespace(Some("local"))
             .with_timestamp(Some(ts()))
         );
         assert_eq!(
             output.pop().unwrap().into_metric(),
-            Metric::new(
+            Metric::new_with_metadata(
                 "local_abc_status_set",
                 MetricKind::Incremental,
                 MetricValue::Set {
                     values: vec!["42".into()].into_iter().collect()
                 },
+                metadata,
             )
             .with_timestamp(Some(ts()))
         );
@@ -716,17 +740,19 @@ mod tests {
         );
 
         let event = create_event("user_ip", "1.2.3.4");
+        let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
-            Metric::new(
+            Metric::new_with_metadata(
                 "unique_user_ip",
                 MetricKind::Incremental,
                 MetricValue::Set {
                     values: vec!["1.2.3.4".into()].into_iter().collect()
                 },
+                metadata,
             )
             .with_timestamp(Some(ts()))
         );
@@ -743,18 +769,20 @@ mod tests {
         );
 
         let event = create_event("response_time", "2.5");
+        let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
-            Metric::new(
+            Metric::new_with_metadata(
                 "response_time",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: crate::samples![2.5 => 1],
                     statistic: StatisticKind::Histogram
                 },
+                metadata
             )
             .with_timestamp(Some(ts()))
         );
@@ -771,18 +799,20 @@ mod tests {
         );
 
         let event = create_event("response_time", "2.5");
+        let metadata = event.metadata().clone();
         let mut transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
-            Metric::new(
+            Metric::new_with_metadata(
                 "response_time",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: crate::samples![2.5 => 1],
                     statistic: StatisticKind::Summary
                 },
+                metadata
             )
             .with_timestamp(Some(ts()))
         );

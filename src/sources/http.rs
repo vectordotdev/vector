@@ -1,23 +1,19 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::{Event, Value},
-    shutdown::ShutdownSignal,
-    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+    sources::util::{
+        add_query_parameters, decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
+    },
     tls::TlsConfig,
-    Pipeline,
 };
-use bytes::{Bytes, BytesMut};
-use chrono::Utc;
-use codec::BytesDelimitedCodec;
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
 use std::{collections::HashMap, net::SocketAddr};
 
-use tokio_util::codec::Decoder;
-use warp::http::{HeaderMap, HeaderValue, StatusCode};
+use warp::http::{HeaderMap, HeaderValue};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SimpleHttpConfig {
@@ -75,16 +71,6 @@ struct SimpleHttpSource {
     path_key: String,
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative, Copy)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Text,
-    Ndjson,
-    Json,
-}
-
 impl HttpSource for SimpleHttpSource {
     fn build_event(
         &self,
@@ -111,13 +97,7 @@ impl HttpSource for SimpleHttpSource {
 #[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl SourceConfig for SimpleHttpConfig {
-    async fn build(
-        &self,
-        _: &str,
-        _: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = SimpleHttpSource {
             encoding: self.encoding,
             headers: self.headers.clone(),
@@ -130,8 +110,8 @@ impl SourceConfig for SimpleHttpConfig {
             self.strict_path,
             &self.tls,
             &self.auth,
-            out,
-            shutdown,
+            cx.out,
+            cx.shutdown,
         )
     }
 
@@ -177,105 +157,11 @@ fn add_headers(
     events
 }
 
-fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>> {
-    let mut body = BytesMut::new();
-    body.extend_from_slice(&buf);
-
-    let mut decoder = BytesDelimitedCodec::new(b'\n');
-    std::iter::from_fn(move || {
-        match decoder.decode_eof(&mut body) {
-            Err(error) => Some(Err(ErrorMessage::new(
-                StatusCode::BAD_REQUEST,
-                format!("Bad request: {}", error),
-            ))),
-            Ok(Some(b)) => Some(Ok(b)),
-            Ok(None) => None, // actually done
-        }
-    })
-    .filter(|s| match s {
-        // filter empty lines
-        Ok(b) => !b.is_empty(),
-        _ => true,
-    })
-}
-
-fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
-    match enc {
-        Encoding::Text => body_to_lines(body)
-            .map(|r| Ok(Event::from(r?)))
-            .collect::<Result<_, _>>(),
-        Encoding::Ndjson => body_to_lines(body)
-            .map(|j| {
-                let parsed_json = serde_json::from_slice(&j?)
-                    .map_err(|error| json_error(format!("Error parsing Ndjson: {:?}", error)))?;
-                json_parse_object(parsed_json)
-            })
-            .collect::<Result<_, _>>(),
-        Encoding::Json => {
-            let parsed_json = serde_json::from_slice(&body)
-                .map_err(|error| json_error(format!("Error parsing Json: {:?}", error)))?;
-            json_parse_array_of_object(parsed_json)
-        }
-    }
-}
-
-fn json_parse_object(value: JsonValue) -> Result<Event, ErrorMessage> {
-    let mut event = Event::new_empty_log();
-    let log = event.as_mut_log();
-    log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
-    match value {
-        JsonValue::Object(map) => {
-            for (k, v) in map {
-                log.insert_flat(k, v);
-            }
-            Ok(event)
-        }
-        _ => Err(json_error(format!(
-            "Expected Object, got {}",
-            json_value_to_type_string(&value)
-        ))),
-    }
-}
-
-fn json_parse_array_of_object(value: JsonValue) -> Result<Vec<Event>, ErrorMessage> {
-    match value {
-        JsonValue::Array(v) => v
-            .into_iter()
-            .map(json_parse_object)
-            .collect::<Result<_, _>>(),
-        JsonValue::Object(map) => {
-            //treat like an array of one object
-            Ok(vec![json_parse_object(JsonValue::Object(map))?])
-        }
-        _ => Err(json_error(format!(
-            "Expected Array or Object, got {}.",
-            json_value_to_type_string(&value)
-        ))),
-    }
-}
-
-fn json_error(s: String) -> ErrorMessage {
-    ErrorMessage::new(StatusCode::BAD_REQUEST, format!("Bad JSON: {}", s))
-}
-
-fn json_value_to_type_string(value: &JsonValue) -> &'static str {
-    match value {
-        JsonValue::Object(_) => "Object",
-        JsonValue::Array(_) => "Array",
-        JsonValue::String(_) => "String",
-        JsonValue::Number(_) => "Number",
-        JsonValue::Bool(_) => "Bool",
-        JsonValue::Null => "Null",
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{Encoding, SimpleHttpConfig};
-
-    use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{log_schema, GlobalOptions, SourceConfig},
+        config::{log_schema, SourceConfig, SourceContext},
         event::{Event, Value},
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
@@ -284,12 +170,12 @@ mod tests {
         write::{DeflateEncoder, GzEncoder},
         Compression,
     };
+    use futures::channel::mpsc;
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
     use std::io::Write;
     use std::net::SocketAddr;
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {
@@ -320,12 +206,7 @@ mod tests {
                 path_key,
                 path,
             }
-            .build(
-                "default",
-                &GlobalOptions::default(),
-                ShutdownSignal::noop(),
-                sender,
-            )
+            .build(SourceContext::new_test(sender))
             .await
             .unwrap()
             .await

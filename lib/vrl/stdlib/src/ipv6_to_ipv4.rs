@@ -60,49 +60,42 @@ impl Expression for Ipv6ToIpV4Fn {
         TypeDef::new().fallible().bytes()
     }
 }
-/*
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    remap::test_type_def![value_string {
-        expr: |_| Ipv6ToIpV4Fn {
-            value: Literal::from("192.168.0.1").boxed()
-        },
-        def: TypeDef {
-            kind: value::Kind::Bytes,
-            fallible: true,
-            ..Default::default()
-        },
-    }];
 
     test_function![
         ipv6_to_ipv4 => Ipv6ToIpV4;
 
         error {
             args: func_args![value: "i am not an ipaddress"],
-            want: Err("function call error: unable to parse IP address: invalid IP address syntax".to_string()),
+            want: Err(r#"unable to parse IP address: invalid IP address syntax"#.to_string()),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         incompatible {
             args: func_args![value: "2001:0db8:85a3::8a2e:0370:7334"],
-            want: Err("function call error: IPV6 address 2001:db8:85a3::8a2e:370:7334 is not compatible with IPV4".to_string()),
+            want: Err("IPV6 address 2001:db8:85a3::8a2e:370:7334 is not compatible with IPV4".to_string()),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         ipv4_compatible {
             args: func_args![value: "::ffff:192.168.0.1"],
             want: Ok(Value::from("192.168.0.1")),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         ipv6 {
             args: func_args![value: "0:0:0:0:0:ffff:c633:6410"],
             want: Ok(Value::from("198.51.100.16")),
+            tdef: TypeDef::new().fallible().bytes(),
         }
 
         ipv4 {
             args: func_args![value: "198.51.100.16"],
             want: Ok(Value::from("198.51.100.16")),
+            tdef: TypeDef::new().fallible().bytes(),
         }
     ];
 }
-*/

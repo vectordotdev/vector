@@ -10,11 +10,10 @@ diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
 
 bitflags = "1"
-bytes = "0.5.6"
+bytes = "1.0.0"
 chrono = "0.4"
 dyn-clone = "1.0.4"
 lalrpop-util = "0.19"
-ngrammatic = "0.3"
 ordered-float = "2"
 paste = "1"
 regex = "1"
@@ -24,3 +23,12 @@ tracing = "0.1"
 
 [dev-dependencies]
 shared = { path = "../../shared", default-features = false, features = ["btreemap"] }
+criterion = "0.3"
+
+[[bench]]
+name = "path"
+harness = false
+
+[[bench]]
+name = "kind"
+harness = false

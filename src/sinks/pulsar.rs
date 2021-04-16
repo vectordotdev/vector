@@ -134,7 +134,7 @@ impl PulsarSinkConfig {
                 .with_options(pulsar::producer::ProducerOptions {
                     schema: Some(proto::Schema {
                         schema_data: avro_schema.to_string().into_bytes(),
-                        type_: proto::schema::Type::Avro as i32,
+                        r#type: proto::schema::Type::Avro as i32,
                         ..Default::default()
                     }),
                     ..Default::default()

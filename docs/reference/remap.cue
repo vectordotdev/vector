@@ -20,6 +20,7 @@ package metadata
 		diff?:   string
 		return?: _
 		output?: #Event
+		raises?: _
 
 		notes?: [string, ...string]
 		warnings?: [string, ...string]
@@ -31,12 +32,13 @@ package metadata
 	description: string
 	errors:      _
 	examples: [#Example, ...#Example]
-	expressions: _
-	features:    _
-	functions:   _
-	literals:    _
-	principles:  _
-	syntax:      _
+	expressions:  _
+	features:     _
+	functions:    _
+	how_it_works: #HowItWorks
+	literals:     _
+	principles:   _
+	syntax:       _
 }
 
 remap: #Remap & {
@@ -102,19 +104,12 @@ remap: #Remap & {
 				.tid = to_int!(.tid)
 
 				# Extract structured data
-				message_parts = split(.message, ", ", limit: 2) ?? []
+				message_parts = split(.message, ", ", limit: 2)
 				structured = parse_key_value(message_parts[1], key_value_delimiter: ":", field_delimiter: ",") ?? {}
 				.message = message_parts[0]
 				. = merge(., structured)
 				"""#
 			output: log: {
-				"0":       "2021/01/20 06:39:15 +0000 [error] 17755#17755: *3569904 open() \"/usr/share/nginx/html/test.php\" failed (2: No such file or directory), client: xxx.xxx.xxx.xxx, server: localhost, request: \"GET /test.php HTTP/1.1\", host: \"yyy.yyy.yyy.yyy\""
-				"1":       "2021/01/20 06:39:15 +0000"
-				"2":       "error"
-				"3":       "17755"
-				"4":       "17755"
-				"5":       "3569904"
-				"6":       "open() \"/usr/share/nginx/html/test.php\" failed (2: No such file or directory), client: xxx.xxx.xxx.xxx, server: localhost, request: \"GET /test.php HTTP/1.1\", host: \"yyy.yyy.yyy.yyy\""
 				timestamp: "2021-01-20T06:39:15Z"
 				severity:  "error"
 				pid:       17755
@@ -213,13 +208,13 @@ remap: #Remap & {
 				"""
 		},
 		{
-			title: "Unhandled error"
+			title: "Unhandled fallible assignment"
 			input: log: message: "key1=value1 key2=value2"
 			source: """
 				structured = parse_key_value(.message)
 				"""
 			raises: compiletime: """
-				error[E103]: unhandled error
+				error[E103]: unhandled fallible assignment
 				  ┌─ :1:14
 				  │
 				1 │ structured = parse_key_value(.message)
@@ -236,4 +231,16 @@ remap: #Remap & {
 				"""
 		},
 	]
+
+	how_it_works: {
+		event_data_model: {
+			title: "Event Data Model"
+			body:  """
+				You can use the `remap` transform with both log and metric events. Log events in the `remap` transform
+				correspond directly to Vector's [log schem](\(urls.vector_log)), which means that the transform has
+				access to the whole event. With metric events, however, the remap transform only has access to the
+				event's tags.
+				"""
+		}
+	}
 }

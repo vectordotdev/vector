@@ -123,12 +123,13 @@ fn expand_wildcards_inner(inputs: &mut Vec<String>, name: &str, candidates: &[St
 mod test {
     use super::*;
     use crate::{
-        config::{DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig},
-        shutdown::ShutdownSignal,
+        config::{
+            DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext,
+            TransformConfig,
+        },
         sinks::{Healthcheck, VectorSink},
         sources::Source,
         transforms::Transform,
-        Pipeline,
     };
     use async_trait::async_trait;
     use serde::{Deserialize, Serialize};
@@ -145,13 +146,7 @@ mod test {
     #[async_trait]
     #[typetag::serde(name = "mock")]
     impl SourceConfig for MockSourceConfig {
-        async fn build(
-            &self,
-            _name: &str,
-            _globals: &GlobalOptions,
-            _shutdown: ShutdownSignal,
-            _out: Pipeline,
-        ) -> crate::Result<Source> {
+        async fn build(&self, _cx: SourceContext) -> crate::Result<Source> {
             unimplemented!()
         }
 

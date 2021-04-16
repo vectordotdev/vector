@@ -114,8 +114,7 @@ impl HttpSink for ClickhouseConfig {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
 
-        let mut body =
-            serde_json::to_vec(&event.as_log().all_fields()).expect("Events should be valid json!");
+        let mut body = serde_json::to_vec(&event.as_log()).expect("Events should be valid json!");
         body.push(b'\n');
 
         Some(body)
@@ -181,7 +180,7 @@ fn set_uri_query(uri: &Uri, database: &str, table: &str) -> crate::Result<Uri> {
     if !uri.ends_with('/') {
         uri.push('/');
     }
-    uri.push('?');
+    uri.push_str("?input_format_import_nested_json=1&");
     uri.push_str(query.as_str());
 
     uri.parse::<Uri>()
@@ -245,7 +244,7 @@ mod tests {
             "my_table",
         )
         .unwrap();
-        assert_eq!(uri, "http://localhost:80/?query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow");
+        assert_eq!(uri.to_string(), "http://localhost:80/?input_format_import_nested_json=1&query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow");
 
         let uri = set_uri_query(
             &"http://localhost:80".parse().unwrap(),
@@ -253,7 +252,7 @@ mod tests {
             "my_\"table\"",
         )
         .unwrap();
-        assert_eq!(uri, "http://localhost:80/?query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow");
+        assert_eq!(uri.to_string(), "http://localhost:80/?input_format_import_nested_json=1&query=INSERT+INTO+%22my_database%22.%22my_%5C%22table%5C%22%22+FORMAT+JSONEachRow");
     }
 
     #[test]
@@ -310,13 +309,19 @@ mod integration_tests {
 
         let client = ClickhouseClient::new(host);
         client
-            .create_table(&table, "host String, timestamp String, message String")
+            .create_table(
+                &table,
+                "host String, timestamp String, message String, items Array(String)",
+            )
             .await;
 
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
+        input_event
+            .as_mut_log()
+            .insert("items", vec!["item1", "item2"]);
 
         sink.run(stream::once(ready(input_event.clone())))
             .await
@@ -325,7 +330,7 @@ mod integration_tests {
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
 
-        let expected = serde_json::to_value(input_event.into_log().all_fields()).unwrap();
+        let expected = serde_json::to_value(input_event.into_log()).unwrap();
         assert_eq!(expected, output.data[0]);
     }
 
@@ -390,7 +395,7 @@ mod integration_tests {
             ),
         );
 
-        let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
+        let expected = serde_json::to_value(exp_event).unwrap();
         assert_eq!(expected, output.data[0]);
     }
 
@@ -450,7 +455,7 @@ timestamp_format = "unix""#,
             ),
         );
 
-        let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
+        let expected = serde_json::to_value(exp_event).unwrap();
         assert_eq!(expected, output.data[0]);
     }
 

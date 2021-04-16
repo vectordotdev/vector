@@ -68,9 +68,9 @@ or [**install Vector**][docs.installation].
 ### Reference
 
 * **Configuration**
-  * [**Sources**][docs.configuration.sources] - [docker_logs][docs.sources.docker_logs], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [dozens more...][docs.sources]
-  * [**Transforms**][docs.configuration.transforms] - [filter][docs.transforms.filter], [log_to_metric][docs.transforms.log_to_metric], [lua][docs.transforms.lua], [remap][docs.transforms.remap], and [dozens more...][docs.transforms]
-  * [**Sinks**][docs.configuration.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], and [dozens more...][docs.sinks]
+  * [**Sources**][docs.configuration.sources] - [docker_logs][docs.sources.docker_logs], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [many more...][docs.sources]
+  * [**Transforms**][docs.configuration.transforms] - [dedupe][docs.transforms.dedupe], [filter][docs.transforms.filter], [geoip][docs.transforms.geoip], [log_to_metric][docs.transforms.log_to_metric], [lua][docs.transforms.lua], [remap][docs.transforms.remap], and [many more...][docs.transforms]
+  * [**Sinks**][docs.configuration.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], and [many more...][docs.sinks]
   * [**Unit tests**][docs.configuration.tests]
 * [**Remap Language**][docs.reference.vrl]
 * [**API**][docs.reference.api]
@@ -88,7 +88,7 @@ or [**install Vector**][docs.installation].
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter]
 * [**Releases**][urls.vector_releases] - [latest][urls.vector_releases]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
-* **Policies** - [Security][urls.vector_security_policy], [Privacy][urls.vector_privacy_policy], [Code of Conduct][urls.vector_code_of_conduct]
+* **Policies** - [Code of Conduct][urls.vector_code_of_conduct], [Privacy][urls.vector_privacy_policy], [Releasing][urls.vector_release_policy], [Security][urls.vector_security_policy]
 
 ## Comparisons
 
@@ -200,7 +200,9 @@ Vector is an end-to-end, unified, open data platform.
 [docs.sources.kafka]: https://vector.dev/docs/reference/configuration/sources/kafka/
 [docs.sources.socket]: https://vector.dev/docs/reference/configuration/sources/socket/
 [docs.sources]: https://vector.dev/docs/reference/configuration/sources/
+[docs.transforms.dedupe]: https://vector.dev/docs/reference/configuration/transforms/dedupe/
 [docs.transforms.filter]: https://vector.dev/docs/reference/configuration/transforms/filter/
+[docs.transforms.geoip]: https://vector.dev/docs/reference/configuration/transforms/geoip/
 [docs.transforms.log_to_metric]: https://vector.dev/docs/reference/configuration/transforms/log_to_metric/
 [docs.transforms.lua]: https://vector.dev/docs/reference/configuration/transforms/lua/
 [docs.transforms.remap]: https://vector.dev/docs/reference/configuration/transforms/remap/
@@ -214,6 +216,7 @@ Vector is an end-to-end, unified, open data platform.
 [urls.vector_code_of_conduct]: https://github.com/timberio/vector/blob/master/CODE_OF_CONDUCT.md
 [urls.vector_community]: https://vector.dev/community/
 [urls.vector_privacy_policy]: https://github.com/timberio/vector/blob/master/PRIVACY.md
+[urls.vector_release_policy]: https://github.com/timberio/vector/blob/master/RELEASING.md
 [urls.vector_releases]: https://vector.dev/releases/latest/
 [urls.vector_roadmap]: https://roadmap.vector.dev
 [urls.vector_security_policy]: https://github.com/timberio/vector/security/policy

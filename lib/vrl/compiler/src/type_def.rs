@@ -436,6 +436,36 @@ impl TypeKind {
             Object(_) => Kind::Object,
         }
     }
+
+    /// Collects the kinds into a single kind.
+    /// Array and objects may have different kinds for each key/index, this collects those
+    /// into a single kind.
+    pub fn collect_kinds(self) -> TypeKind {
+        match self {
+            TypeKind::Array(kinds) => {
+                let mut newkinds = BTreeMap::new();
+                newkinds.insert(
+                    Index::Any,
+                    kinds
+                        .into_iter()
+                        .fold(KindInfo::Unknown, |acc, (_, k)| acc.merge(k, false, true)),
+                );
+                TypeKind::Array(newkinds)
+            }
+
+            TypeKind::Object(kinds) => {
+                let mut newkinds = BTreeMap::new();
+                newkinds.insert(
+                    Field::Any,
+                    kinds
+                        .into_iter()
+                        .fold(KindInfo::Unknown, |acc, (_, k)| acc.merge(k, false, true)),
+                );
+                TypeKind::Object(newkinds)
+            }
+            _ => self,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
@@ -784,6 +814,20 @@ impl TypeDef {
         self
     }
 
+    /// Collects any subtypes that can contain multiple indexed types (array, object) and collects them into
+    /// a single type for all indexes.
+    /// Used for functions that cant determine which indexes of a collection have been used in the result.
+    pub fn collect_subtypes(mut self) -> Self {
+        self.kind = match self.kind {
+            KindInfo::Known(set) => {
+                KindInfo::Known(set.into_iter().map(|k| k.collect_kinds()).collect())
+            }
+            v => v,
+        };
+
+        self
+    }
+
     #[inline]
     pub fn is_unknown(&self) -> bool {
         matches!(self.kind, KindInfo::Unknown)
@@ -933,6 +977,35 @@ mod tests {
     use super::*;
     use path::{self, Segment};
     use std::str::FromStr;
+
+    #[test]
+    fn collect_subtypes() {
+        let kind = TypeKind::Array({
+            let mut set1 = BTreeSet::new();
+            set1.insert(TypeKind::Integer);
+            let mut set2 = BTreeSet::new();
+            set2.insert(TypeKind::Bytes);
+
+            let mut map = BTreeMap::new();
+            map.insert(Index::Index(1), KindInfo::Known(set1));
+            map.insert(Index::Index(2), KindInfo::Known(set2));
+            map
+        });
+
+        let kind = kind.collect_kinds();
+
+        let expected = TypeKind::Array({
+            let mut set = BTreeSet::new();
+            set.insert(TypeKind::Integer);
+            set.insert(TypeKind::Bytes);
+
+            let mut map = BTreeMap::new();
+            map.insert(Index::Any, KindInfo::Known(set));
+            map
+        });
+
+        assert_eq!(kind, expected);
+    }
 
     mod kind_info {
         use super::*;

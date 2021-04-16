@@ -1,12 +1,11 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig, SourceDescription},
+    config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
     event::proto,
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
-    shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    Event, Pipeline,
+    Event,
 };
 use bytes::{Bytes, BytesMut};
 use getset::Setters;
@@ -58,13 +57,7 @@ impl GenerateConfig for VectorConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let vector = VectorSource;
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         vector.run(
@@ -73,8 +66,8 @@ impl SourceConfig for VectorConfig {
             self.shutdown_timeout_secs,
             tls,
             self.receive_buffer_bytes,
-            shutdown,
-            out,
+            cx.shutdown,
+            cx.out,
         )
     }
 
@@ -123,7 +116,7 @@ mod test {
     use super::VectorConfig;
     use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
+        config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::{
             metric::{MetricKind, MetricValue},
             Metric,
@@ -134,14 +127,12 @@ mod test {
         Event, Pipeline,
     };
     use futures::stream;
-    use std::{
-        net::{Shutdown, SocketAddr},
-        thread,
-    };
+    use shared::assert_event_data_eq;
+    use std::net::SocketAddr;
     use tokio::{
         io::AsyncWriteExt,
         net::TcpStream,
-        time::{delay_for, Duration},
+        time::{sleep, Duration},
     };
 
     #[cfg(not(target_os = "windows"))]
@@ -161,15 +152,7 @@ mod test {
     async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: VectorSinkConfig) {
         let (tx, rx) = Pipeline::new_test();
 
-        let server = source
-            .build(
-                "default",
-                &GlobalOptions::default(),
-                ShutdownSignal::noop(),
-                tx,
-            )
-            .await
-            .unwrap();
+        let server = source.build(SourceContext::new_test(tx)).await.unwrap();
         tokio::spawn(server);
         wait_for_tcp(addr).await;
 
@@ -194,10 +177,10 @@ mod test {
 
         sink.run(stream::iter(events.clone())).await.unwrap();
 
-        delay_for(Duration::from_millis(50)).await;
+        sleep(Duration::from_millis(50)).await;
 
         let output = collect_ready(rx).await;
-        assert_eq!(events, output);
+        assert_event_data_eq!(events, output);
     }
 
     #[tokio::test]
@@ -248,7 +231,12 @@ mod test {
         let (trigger_shutdown, shutdown, shutdown_down) = ShutdownSignal::new_wired();
 
         let server = config
-            .build("default", &GlobalOptions::default(), shutdown, tx)
+            .build(SourceContext {
+                name: "default".into(),
+                globals: GlobalOptions::default(),
+                shutdown,
+                out: tx,
+            })
             .await
             .unwrap();
         tokio::spawn(server);
@@ -258,8 +246,8 @@ mod test {
         let mut stream = TcpStream::connect(&addr).await.unwrap();
         stream.write(b"hello world \n").await.unwrap();
 
-        thread::sleep(Duration::from_secs(2));
-        stream.shutdown(Shutdown::Both).unwrap();
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        stream.shutdown().await.unwrap();
         drop(trigger_shutdown);
         shutdown_down.await;
 
@@ -279,7 +267,12 @@ mod test {
         let (trigger_shutdown, shutdown, shutdown_down) = ShutdownSignal::new_wired();
 
         let server = config
-            .build("default", &GlobalOptions::default(), shutdown, tx)
+            .build(SourceContext {
+                name: "default".into(),
+                globals: GlobalOptions::default(),
+                shutdown,
+                out: tx,
+            })
             .await
             .unwrap();
         tokio::spawn(server);
@@ -298,13 +291,13 @@ mod test {
         let mut sink = FramedWrite::new(stream, encoder);
         sink.send(out.into()).await.unwrap();
 
-        let stream = sink.into_inner();
-        thread::sleep(Duration::from_secs(2));
-        stream.shutdown(Shutdown::Both).unwrap();
+        let mut stream = sink.into_inner();
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        stream.shutdown().await.unwrap();
         drop(trigger_shutdown);
         shutdown_down.await;
 
         let output = collect_ready(rx).await;
-        assert_eq!(Event::from(event), output[0]);
+        assert_event_data_eq!([Event::from(event)][..], output.as_slice());
     }
 }

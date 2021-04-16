@@ -1,10 +1,8 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, SourceConfig, SourceContext, SourceDescription},
     line_agg,
-    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
-    shutdown::ShutdownSignal,
-    Pipeline,
+    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
 };
 use rusoto_core::Region;
 use rusoto_s3::S3Client;
@@ -49,7 +47,7 @@ struct AwsS3Config {
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
-    auth: AWSAuthentication,
+    auth: AwsAuthentication,
 
     multiline: Option<MultilineConfig>,
 }
@@ -63,13 +61,7 @@ impl_generate_config_from_default!(AwsS3Config);
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_s3")]
 impl SourceConfig for AwsS3Config {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let multiline_config: Option<line_agg::Config> = self
             .multiline
             .as_ref()
@@ -80,7 +72,7 @@ impl SourceConfig for AwsS3Config {
             Strategy::Sqs => Ok(Box::pin(
                 self.create_sqs_ingestor(multiline_config)
                     .await?
-                    .run(out, shutdown),
+                    .run(cx.out, cx.shutdown),
             )),
         }
     }
@@ -160,7 +152,7 @@ fn s3_object_decoder(
     content_type: Option<&str>,
     body: rusoto_s3::StreamingBody,
 ) -> Box<dyn tokio::io::AsyncRead + Send + Unpin> {
-    use async_compression::tokio_02::bufread;
+    use async_compression::tokio::bufread;
 
     let r = tokio::io::BufReader::new(body.into_async_read());
 
@@ -261,10 +253,9 @@ mod test {
 mod integration_tests {
     use super::{sqs, AwsS3Config, Compression, Strategy};
     use crate::{
-        config::{GlobalOptions, SourceConfig},
+        config::{SourceConfig, SourceContext},
         line_agg,
         rusoto::RegionOrEndpoint,
-        shutdown::ShutdownSignal,
         sources::util::MultilineConfig,
         test_util::{collect_n, random_lines},
         Pipeline,
@@ -369,12 +360,7 @@ mod integration_tests {
         let (tx, rx) = Pipeline::new_test();
         tokio::spawn(async move {
             config
-                .build(
-                    "default",
-                    &GlobalOptions::default(),
-                    ShutdownSignal::noop(),
-                    tx,
-                )
+                .build(SourceContext::new_test(tx))
                 .await
                 .unwrap()
                 .await
@@ -436,6 +422,7 @@ mod integration_tests {
         client
             .put_bucket_notification_configuration(PutBucketNotificationConfigurationRequest {
                 bucket: bucket_name.clone(),
+                expected_bucket_owner: None,
                 notification_configuration: NotificationConfiguration {
                     queue_configurations: Some(vec![QueueConfiguration {
                         events: vec!["s3:ObjectCreated:*".to_string()],

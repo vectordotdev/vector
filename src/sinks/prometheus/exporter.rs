@@ -337,14 +337,16 @@ impl StreamSink for PrometheusExporter {
 mod tests {
     use super::*;
     use crate::{
-        event::metric::{Metric, MetricData, MetricSeries, MetricValue},
+        event::metric::{Metric, MetricValue},
         http::HttpClient,
-        test_util::{random_string, trace_init},
+        test_util::{next_addr, random_string, trace_init},
         tls::MaybeTlsSettings,
     };
+    use chrono::Duration;
+    use indoc::indoc;
+    use pretty_assertions::assert_eq;
     use tokio::{sync::mpsc, time};
-
-    const PROMETHEUS_ADDRESS_TLS: &str = "127.0.0.1:9102";
+    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     #[test]
     fn generate_config() {
@@ -352,39 +354,109 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn prometheus_tls() {
-        trace_init();
+    async fn prometheus_notls() {
+        export_and_fetch_simple(None).await;
+    }
 
+    #[tokio::test]
+    async fn prometheus_tls() {
         let mut tls_config = TlsConfig::test_config();
         tls_config.options.verify_hostname = Some(false);
+        export_and_fetch_simple(Some(tls_config)).await;
+    }
 
+    #[tokio::test]
+    async fn updates_timestamps() {
+        let timestamp1 = Utc::now();
+        let (name, event1) = create_metric_gauge(None, 123.4);
+        let event1 = Event::from(event1.into_metric().with_timestamp(Some(timestamp1)));
+        let (_, event2) = create_metric_gauge(Some(name.clone()), 12.0);
+        let timestamp2 = timestamp1 + Duration::seconds(1);
+        let event2 = Event::from(event2.into_metric().with_timestamp(Some(timestamp2)));
+        let events = vec![event1, event2];
+
+        let body = export_and_fetch(None, events).await;
+        let timestamp = timestamp2.timestamp_millis();
+        assert_eq!(
+            body,
+            format!(
+                indoc! {r#"
+                    # HELP {name} {name}
+                    # TYPE {name} gauge
+                    {name}{{some_tag="some_value"}} 135.4 {timestamp}
+                "#},
+                name = name,
+                timestamp = timestamp
+            )
+        );
+    }
+
+    async fn export_and_fetch(tls_config: Option<TlsConfig>, events: Vec<Event>) -> String {
+        trace_init();
+
+        let client_settings = MaybeTlsSettings::from_config(&tls_config, false).unwrap();
+        let proto = match &tls_config {
+            Some(_) => "https",
+            None => "http",
+        };
+
+        let address = next_addr();
         let config = PrometheusExporterConfig {
-            address: PROMETHEUS_ADDRESS_TLS.parse().unwrap(),
-            tls: Some(tls_config.clone()),
+            address,
+            tls: tls_config,
             ..Default::default()
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(rx)));
+        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
 
-        let (_name, event) = create_metric_gauge(None, 123.4);
-        tx.send(event).expect("Failed to send.");
-        let (_name, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
-        tx.send(event).expect("Failed to send.");
+        for event in events {
+            tx.send(event).expect("Failed to send event.");
+        }
 
-        time::delay_for(time::Duration::from_millis(100)).await;
+        time::sleep(time::Duration::from_millis(100)).await;
 
-        let request = Request::get(format!("https://{}/metrics", PROMETHEUS_ADDRESS_TLS))
+        let request = Request::get(format!("{}://{}/metrics", proto, address))
             .body(Body::empty())
             .expect("Error creating request.");
-        let settings = MaybeTlsSettings::from_config(&Some(tls_config), false).unwrap();
-        let result = HttpClient::new(settings)
+        let result = HttpClient::new(client_settings)
             .unwrap()
             .send(request)
             .await
             .expect("Could not fetch query");
 
         assert!(result.status().is_success());
+
+        let body = result.into_body();
+        let bytes = hyper::body::to_bytes(body)
+            .await
+            .expect("Reading body failed");
+        String::from_utf8(bytes.to_vec()).unwrap()
+    }
+
+    async fn export_and_fetch_simple(tls_config: Option<TlsConfig>) {
+        let (name1, event1) = create_metric_gauge(None, 123.4);
+        let (name2, event2) = tests::create_metric_set(None, vec!["0", "1", "2"]);
+        let events = vec![event1, event2];
+
+        let body = export_and_fetch(tls_config, events).await;
+
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{some_tag="some_value"}} 123.4
+            "#},
+            name = name1
+        )));
+        assert!(body.contains(&format!(
+            indoc! {r#"
+               # HELP {name} {name}
+               # TYPE {name} gauge
+               {name}{{some_tag="some_value"}} 3
+            "#},
+            name = name2
+        )));
     }
 
     pub fn create_metric_gauge(name: Option<String>, value: f64) -> (String, Event) {
@@ -415,7 +487,7 @@ mod tests {
     #[tokio::test]
     async fn sink_absolute() {
         let config = PrometheusExporterConfig {
-            address: PROMETHEUS_ADDRESS_TLS.parse().unwrap(),
+            address: next_addr(), // Not actually bound, just needed to fill config
             tls: None,
             ..Default::default()
         };
@@ -434,40 +506,16 @@ mod tests {
                 .collect(),
         ));
 
-        let m2 = Metric {
-            series: MetricSeries {
-                tags: Some(
-                    vec![("tag1".to_owned(), "value2".to_owned())]
-                        .into_iter()
-                        .collect(),
-                ),
-                ..m1.series.clone()
-            },
-            data: m1.data.clone(),
-        };
+        let m2 = m1.clone().with_tags(Some(
+            vec![("tag1".to_owned(), "value2".to_owned())]
+                .into_iter()
+                .collect(),
+        ));
 
         let metrics = vec![
-            Event::Metric(Metric {
-                series: m1.series.clone(),
-                data: MetricData {
-                    value: MetricValue::Counter { value: 32. },
-                    ..m1.data.clone()
-                },
-            }),
-            Event::Metric(Metric {
-                series: m2.series.clone(),
-                data: MetricData {
-                    value: MetricValue::Counter { value: 33. },
-                    ..m2.data.clone()
-                },
-            }),
-            Event::Metric(Metric {
-                series: m1.series.clone(),
-                data: MetricData {
-                    value: MetricValue::Counter { value: 40. },
-                    ..m1.data.clone()
-                },
-            }),
+            Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 32. })),
+            Event::Metric(m2.clone().with_value(MetricValue::Counter { value: 33. })),
+            Event::Metric(m1.clone().with_value(MetricValue::Counter { value: 40. })),
         ];
 
         sink.run(Box::pin(futures::stream::iter(metrics)))
@@ -495,6 +543,7 @@ mod integration_tests {
     use chrono::Utc;
     use serde_json::Value;
     use tokio::{sync::mpsc, time};
+    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     const PROMETHEUS_ADDRESS: &str = "127.0.0.1:9101";
 
@@ -503,7 +552,7 @@ mod integration_tests {
         trace_init();
 
         prometheus_scrapes_metrics().await;
-        time::delay_for(time::Duration::from_millis(500)).await;
+        time::sleep(time::Duration::from_millis(500)).await;
         reset_on_flush_period().await;
     }
 
@@ -516,13 +565,13 @@ mod integration_tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(rx)));
+        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
 
         let (name, event) = tests::create_metric_gauge(None, 123.4);
         tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
-        time::delay_for(time::Duration::from_secs(2)).await;
+        time::sleep(time::Duration::from_secs(2)).await;
 
         // Now try to download them from prometheus
         let result = prometheus_query(&name).await;
@@ -549,7 +598,7 @@ mod integration_tests {
         };
         let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sink.run(Box::pin(rx)));
+        tokio::spawn(sink.run(Box::pin(UnboundedReceiverStream::new(rx))));
 
         let (name1, event) = tests::create_metric_set(None, vec!["0", "1", "2"]);
         tx.send(event).expect("Failed to send.");
@@ -557,7 +606,7 @@ mod integration_tests {
         tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
-        time::delay_for(time::Duration::from_secs(2)).await;
+        time::sleep(time::Duration::from_secs(2)).await;
 
         // Now try to download them from prometheus
         let result = prometheus_query(&name1).await;
@@ -572,7 +621,7 @@ mod integration_tests {
         );
 
         // Wait a bit for expired metrics
-        time::delay_for(time::Duration::from_secs(3)).await;
+        time::sleep(time::Duration::from_secs(3)).await;
 
         let (name1, event) = tests::create_metric_set(Some(name1), vec!["6", "7"]);
         tx.send(event).expect("Failed to send.");
@@ -580,7 +629,7 @@ mod integration_tests {
         tx.send(event).expect("Failed to send.");
 
         // Wait a bit for the prometheus server to scrape the metrics
-        time::delay_for(time::Duration::from_secs(2)).await;
+        time::sleep(time::Duration::from_secs(2)).await;
 
         // Now try to download them from prometheus
         let result = prometheus_query(&name1).await;

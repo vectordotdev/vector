@@ -23,6 +23,15 @@ trait ThousandsFormatter {
     fn thousands_format(&self) -> String;
 }
 
+impl ThousandsFormatter for u32 {
+    fn thousands_format(&self) -> String {
+        match self {
+            0 => "--".into(),
+            _ => self.to_formatted_string(&Locale::en),
+        }
+    }
+}
+
 impl ThousandsFormatter for u64 {
     fn thousands_format(&self) -> String {
         match self {

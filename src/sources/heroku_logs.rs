@@ -1,16 +1,14 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
-    shutdown::ShutdownSignal,
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
-    Pipeline,
 };
-use bytes::{buf::BufExt, Bytes};
+use bytes::{Buf, Bytes};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -72,13 +70,7 @@ impl HttpSource for LogplexSource {
 #[async_trait::async_trait]
 #[typetag::serde(name = "heroku_logs")]
 impl SourceConfig for LogplexConfig {
-    async fn build(
-        &self,
-        _: &str,
-        _: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = LogplexSource {
             query_parameters: self.query_parameters.clone(),
         };
@@ -88,8 +80,8 @@ impl SourceConfig for LogplexConfig {
             true,
             &self.tls,
             &self.auth,
-            out,
-            shutdown,
+            cx.out,
+            cx.shutdown,
         )
     }
 
@@ -113,14 +105,8 @@ pub struct LogplexCompatConfig(LogplexConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "logplex")]
 impl SourceConfig for LogplexCompatConfig {
-    async fn build(
-        &self,
-        name: &str,
-        options: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        self.0.build(name, options, shutdown, out).await
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        self.0.build(cx).await
     }
 
     fn output_type(&self) -> DataType {
@@ -162,7 +148,7 @@ fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, Erro
         );
 
         if cfg!(test) {
-            panic!(error_msg);
+            panic!("{}", error_msg);
         }
         return Err(header_error_message("Logplex-Msg-Count", &error_msg));
     }
@@ -242,17 +228,16 @@ fn line_to_event(line: String) -> Event {
 #[cfg(test)]
 mod tests {
     use super::{HttpSourceAuthConfig, LogplexConfig};
-    use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{log_schema, GlobalOptions, SourceConfig},
+        config::{log_schema, SourceConfig, SourceContext},
         event::{Event, Value},
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
     use chrono::{DateTime, Utc};
+    use futures::channel::mpsc;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {
@@ -272,12 +257,7 @@ mod tests {
                 tls: None,
                 auth,
             }
-            .build(
-                "default",
-                &GlobalOptions::default(),
-                ShutdownSignal::noop(),
-                sender,
-            )
+            .build(SourceContext::new_test(sender))
             .await
             .unwrap()
             .await

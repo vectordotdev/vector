@@ -33,7 +33,16 @@ criterion_group!(
               ip_subnet,
               ip_to_ipv6,
               ipv6_to_ipv4,
+              is_array,
+              is_boolean,
+              is_float,
+              is_integer,
+              is_null,
               is_nullish,
+              is_object,
+              is_regex,
+              is_string,
+              is_timestamp,
               join,
               length,
               log,
@@ -47,11 +56,14 @@ criterion_group!(
               parse_aws_cloudwatch_log_subscription_message,
               parse_aws_vpc_flow_log,
               parse_common_log,
+              parse_csv,
               parse_duration,
               parse_glog,
               parse_grok,
               parse_key_value,
               parse_json,
+              parse_nginx_log,
+              parse_query_string,
               parse_regex,
               parse_regex_all,
               parse_syslog,
@@ -354,6 +366,76 @@ bench_function! {
 }
 
 bench_function! {
+    is_array => vrl_stdlib::IsArray;
+
+    string {
+        args: func_args![value: "foobar"],
+        want: Ok(false),
+    }
+
+    array {
+        args: func_args![value: value!([1, 2, 3])],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
+    is_boolean => vrl_stdlib::IsBoolean;
+
+    string {
+        args: func_args![value: "foobar"],
+        want: Ok(false),
+    }
+
+    boolean {
+        args: func_args![value: true],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
+    is_float => vrl_stdlib::IsFloat;
+
+    array {
+        args: func_args![value: value!([1, 2, 3])],
+        want: Ok(false),
+    }
+
+    float {
+        args: func_args![value: 0.577],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
+    is_integer => vrl_stdlib::IsInteger;
+
+    integer {
+        args: func_args![value: 1701],
+        want: Ok(true),
+    }
+
+    object {
+        args: func_args![value: value!({"foo": "bar"})],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
+    is_null => vrl_stdlib::IsNull;
+
+    string {
+        args: func_args![value: "foobar"],
+        want: Ok(false),
+    }
+
+    null {
+        args: func_args![value: value!(null)],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
     is_nullish => vrl_stdlib::IsNullish;
 
     whitespace {
@@ -373,6 +455,62 @@ bench_function! {
 
     not_empty {
         args: func_args![value: "foo"],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
+    is_object => vrl_stdlib::IsObject;
+
+    integer {
+        args: func_args![value: 1701],
+        want: Ok(false),
+    }
+
+    object {
+        args: func_args![value: value!({"foo": "bar"})],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
+    is_regex => vrl_stdlib::IsRegex;
+
+    regex {
+        args: func_args![value: value!(Regex::new(r"\d+").unwrap())],
+        want: Ok(true),
+    }
+
+    object {
+        args: func_args![value: value!({"foo": "bar"})],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
+    is_string => vrl_stdlib::IsString;
+
+    string {
+        args: func_args![value: "foobar"],
+        want: Ok(true),
+    }
+
+    array {
+        args: func_args![value: value!([1, 2, 3])],
+        want: Ok(false),
+    }
+}
+
+bench_function! {
+    is_timestamp => vrl_stdlib::IsTimestamp;
+
+    string {
+        args: func_args![value: Utc.ymd(2021, 1, 1).and_hms_milli(0, 0, 0, 0)],
+        want: Ok(true),
+    }
+
+    array {
+        args: func_args![value: value!([1, 2, 3])],
         want: Ok(false),
     }
 }
@@ -686,6 +824,15 @@ bench_function! {
 }
 
 bench_function! {
+    parse_csv => vrl_stdlib::ParseCsv;
+
+    literal {
+        args: func_args![value: "foo,bar"],
+        want: Ok(value!(["foo","bar"]))
+    }
+}
+
+bench_function! {
     parse_duration => vrl_stdlib::ParseDuration;
 
     literal {
@@ -754,13 +901,69 @@ bench_function! {
 }
 
 bench_function! {
+    parse_nginx_log => vrl_stdlib::ParseNginxLog;
+
+    combined {
+        args: func_args![
+            value: r#"172.17.0.1 alice - [01/Apr/2021:12:02:31 +0000] "POST /not-found HTTP/1.1" 404 153 "http://localhost/somewhere" "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36" "2.75""#,
+            format: "combined",
+        ],
+        want: Ok(value!({
+            "client": "172.17.0.1",
+            "user": "alice",
+            "timestamp": (DateTime::parse_from_rfc3339("2021-04-01T12:02:31Z").unwrap().with_timezone(&Utc)),
+            "request": "POST /not-found HTTP/1.1",
+            "method": "POST",
+            "path": "/not-found",
+            "protocol": "HTTP/1.1",
+            "status": 404,
+            "size": 153,
+            "referer": "http://localhost/somewhere",
+            "agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36",
+            "compression": "2.75",
+        })),
+    }
+
+    error {
+        args: func_args![value: r#"2021/04/01 13:02:31 [error] 31#31: *1 open() "/usr/share/nginx/html/not-found" failed (2: No such file or directory), client: 172.17.0.1, server: localhost, request: "POST /not-found HTTP/1.1", host: "localhost:8081""#,
+                         format: "error"
+        ],
+        want: Ok(value!({
+            "timestamp": (DateTime::parse_from_rfc3339("2021-04-01T13:02:31Z").unwrap().with_timezone(&Utc)),
+            "severity": "error",
+            "pid": 31,
+            "tid": 31,
+            "cid": 1,
+            "message": "open() \"/usr/share/nginx/html/not-found\" failed (2: No such file or directory)",
+            "client": "172.17.0.1",
+            "server": "localhost",
+            "request": "POST /not-found HTTP/1.1",
+            "host": "localhost:8081",
+        })),
+    }
+}
+
+bench_function! {
+    parse_query_string => vrl_stdlib::ParseQueryString;
+
+    literal {
+        args: func_args![value: "foo=%2B1&bar=2"],
+        want: Ok(value!({
+            foo: "+1",
+            bar: "2",
+        }))
+    }
+}
+
+bench_function! {
     parse_regex => vrl_stdlib::ParseRegex;
 
     matches {
         args: func_args! [
             value: "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574",
             pattern: Regex::new(r#"^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$"#)
-                .unwrap()
+                .unwrap(),
+            numeric_groups: true
         ],
         want: Ok(value!({
             "bytes_in": "5667",
@@ -790,8 +993,6 @@ bench_function! {
         ],
         want: Ok(value!({
             "number": "first",
-            "0": "first group",
-            "1": "first"
         }))
     }
 }
@@ -802,7 +1003,8 @@ bench_function! {
     matches {
         args: func_args![
             value: "apples and carrots, peaches and peas",
-            pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap()
+            pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap(),
+            numeric_groups: true
         ],
         want: Ok(value!([
                 {

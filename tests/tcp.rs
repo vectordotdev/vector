@@ -161,7 +161,7 @@ async fn fork() {
 // are needed to finish processing all the events before
 // sources are forcefully shutted down.
 // Although that's still not a guarantee.
-#[tokio::test(core_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn merge_and_fork() {
     trace_init();
 

@@ -90,7 +90,7 @@ components: sources: splunk_hec: {
 		fields: {
 			message: fields._raw_line
 			splunk_channel: {
-				description: "The Splunk channel, value of the `X-Splunk-Request-Channel` header."
+				description: "The Splunk channel, value of the `X-Splunk-Request-Channel` header or `channel` query parameter, in that order of precedence."
 				required:    true
 				type: timestamp: {}
 			}
@@ -99,6 +99,7 @@ components: sources: splunk_hec: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:           components.sources.internal_metrics.output.metrics.events_in_total
 		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
 		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
 	}

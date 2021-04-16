@@ -8,7 +8,7 @@ remap: expressions: assignment: {
 		"""
 	return: """
 		Returns the value of the right-hand-side expression only if the expression succeeds. If the expression errors,
-		the error must be [handled](\(urls.vrl_errors_reference)) and null is returned.
+		the error must be [handled](\(urls.vrl_errors_reference)).
 		"""
 
 	grammar: {

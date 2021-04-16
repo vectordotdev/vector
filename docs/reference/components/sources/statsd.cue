@@ -32,7 +32,7 @@ components: sources: statsd: {
 			}
 			receive_buffer_bytes: {
 				enabled:       true
-				relevant_when: "mode = `tcp` or mode = `udp` && os = `unix`"
+				relevant_when: "mode = `tcp` or mode = `udp`"
 			}
 			keepalive: enabled: true
 			tls: enabled:       false
@@ -130,6 +130,7 @@ components: sources: statsd: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:            components.sources.internal_metrics.output.metrics.events_in_total
 		connection_errors_total:    components.sources.internal_metrics.output.metrics.connection_errors_total
 		invalid_record_total:       components.sources.internal_metrics.output.metrics.invalid_record_total
 		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
