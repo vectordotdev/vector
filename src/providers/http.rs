@@ -10,30 +10,19 @@ use crate::{
 use hyper::Body;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use tokio::time;
 use url::Url;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct RequestConfig {
     #[serde(default)]
     pub headers: IndexMap<String, String>,
-    pub timeout_secs: Option<u64>,               // 60
-    pub rate_limit_duration_secs: Option<u64>,   // 1
-    pub rate_limit_num: Option<u64>,             // 5
-    pub retry_attempts: Option<usize>,           // max_value()
-    pub retry_max_duration_secs: Option<u64>,    // 3600
-    pub retry_initial_backoff_secs: Option<u64>, // 1
 }
 
 impl Default for RequestConfig {
     fn default() -> Self {
         Self {
             headers: IndexMap::new(),
-            timeout_secs: Some(60),
-            rate_limit_duration_secs: Some(1),
-            rate_limit_num: Some(5),
-            retry_attempts: Some(usize::MAX),
-            retry_max_duration_secs: Some(3600),
-            retry_initial_backoff_secs: Some(1),
         }
     }
 }
@@ -43,6 +32,7 @@ impl Default for RequestConfig {
 pub struct HttpConfig {
     url: Option<Url>,
     request: RequestConfig,
+    poll_interval_secs: u64,
     #[serde(flatten)]
     tls_options: Option<TlsOptions>,
 }
@@ -52,6 +42,7 @@ impl Default for HttpConfig {
         Self {
             url: None,
             request: RequestConfig::default(),
+            poll_interval_secs: 30,
             tls_options: None,
         }
     }
@@ -60,10 +51,10 @@ impl Default for HttpConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl ProviderConfig for HttpConfig {
-    async fn build(&self) -> Result<ProviderRx, &'static str> {
+    async fn build(&mut self) -> Result<ProviderRx, &'static str> {
         let url = self
             .url
-            .as_ref()
+            .take()
             .ok_or("URL is required for the `http` provider.")?;
 
         let (provider_tx, provider_rx) = super::provider_control();
@@ -73,40 +64,79 @@ impl ProviderConfig for HttpConfig {
         let http_client =
             HttpClient::<Body>::new(tls_settings).map_err(|_| "Invalid TLS settings")?;
 
-        info!(message = "Attempting to retrieve config from HTTP provider.", url = ?url);
+        let poll_interval_secs = self.poll_interval_secs;
+        let request = self.request.clone();
 
-        let mut builder = http::request::Builder::new().uri(url.to_string());
+        // Spawn an event that will poll the endpoint continuously, surfacing new
+        // configuration as it's found.
+        tokio::spawn(async move {
+            let mut interval = time::interval(time::Duration::from_secs(poll_interval_secs));
 
-        for (header, value) in self.request.headers.iter() {
-            builder = builder.header(header.as_str(), value.as_str());
-        }
-
-        let request = builder
-            .body(Body::empty())
-            .map_err(|_| "Couldn't create HTTP request")?;
-
-        match http_client.send(request).await {
-            Ok(response) => {
-                info!("A response was received.");
-                let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-                let text = String::from_utf8_lossy(body.as_ref());
-                let config = load_from_str(&text, None);
-
-                if let Ok(mut config) = config {
-                    info!("Configuration was successfully received.");
-                    // Explicitly set provider to `None`.
-                    config.provider = None;
-
-                    // Send down the control channel.
-                    let _ = provider_tx.send(ProviderControl::Config(config)).await;
-                } else {
-                    error!("Invalid configuration received.");
+            loop {
+                // Sanity check that the control channel is still available.
+                if provider_tx.is_closed() {
+                    info!("HTTP provider control channel has gone away.");
+                    break;
                 }
+
+                // Wait for the polling interval to elapse.
+                interval.tick().await;
+
+                // Build HTTP request.
+                let mut builder = http::request::Builder::new().uri(url.to_string());
+
+                for (header, value) in request.headers.iter() {
+                    builder = builder.header(header.as_str(), value.as_str());
+                }
+
+                let request = builder
+                    .body(Body::empty())
+                    .map_err(|_| "Couldn't create HTTP request")
+                    .unwrap();
+
+                // Send the request and attempt to parse the remote configurtion.
+                match http_client.send(request).await {
+                    Ok(response) => {
+                        info!("A response was received.");
+                        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+                        let text = String::from_utf8_lossy(body.as_ref());
+                        let config = load_from_str(&text, None);
+
+                        if let Ok(mut config) = config {
+                            info!("Configuration was successfully received.");
+                            // Explicitly set provider to `None`.
+                            config.provider = None;
+
+                            // Send down the control channel.
+                            if provider_tx
+                                .send(ProviderControl::Config(config))
+                                .await
+                                .is_err()
+                            {
+                                info!("Couldn't apply config. HTTP provider control channel has gone away.");
+                                break;
+                            }
+                        } else {
+                            error!(
+                                message = "Invalid configuration received.",
+                                poll_interval_secs = ?poll_interval_secs
+                            );
+                        }
+                    }
+                    Err(_) => {
+                        error!(
+                            message = "Couldn't retrieve configuration.",
+                            poll_interval_secs = ?poll_interval_secs
+                        );
+                    }
+                }
+
+                info!(
+                    message = "HTTP provider is waiting.",
+                    poll_interval_secs = ?poll_interval_secs
+                )
             }
-            Err(_) => {
-                error!("Couldn't retrieve configuration.");
-            }
-        }
+        });
 
         Ok(provider_rx)
     }

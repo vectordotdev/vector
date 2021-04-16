@@ -6,7 +6,7 @@ use toml::Value;
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait ProviderConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    async fn build(&self) -> Result<ProviderRx, &'static str>;
+    async fn build(&mut self) -> Result<ProviderRx, &'static str>;
     fn provider_type(&self) -> &'static str;
 }
 
@@ -50,7 +50,7 @@ inventory::collect!(ProviderDescription);
 /// channel for receiving control messages from the provider.
 pub async fn init_provider(provider: Option<Box<dyn ProviderConfig>>) -> Option<ProviderRx> {
     match provider {
-        Some(provider) => match provider.build().await {
+        Some(mut provider) => match provider.build().await {
             Ok(provider_rx) => {
                 debug!(message = "Provider configured.", provider = ?provider.provider_type());
                 Some(provider_rx)
