@@ -239,7 +239,7 @@ toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.7", default-features = false }
 twox-hash = { version = "1.6.0", default-features = false }
 url = { version = "2.2.1", default-features = false }
-uuid = { version = "0.8.2", default-features = false, features = ["serde", "v4", "v5"] }
+uuid = { version = "0.8.2", default-features = false, features = ["serde", "v4"], optional = true }
 warp = { version = "0.3.1", default-features = false, optional = true }
 zstd = { version = "0.6", default-features = false }
 cfg-if = { version = "1.0.0", default-features = false }
@@ -388,7 +388,7 @@ sources-metrics = [
 sources-apache_metrics = []
 sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
-sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver"]
+sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
 sources-datadog = ["sources-utils-http"]
 sources-docker_logs = ["bollard", "dirs-next"]
 sources-file = ["bytesize", "file-source"]
@@ -542,7 +542,7 @@ sinks-aws_cloudwatch_logs = ["rusoto", "rusoto_logs"]
 sinks-aws_cloudwatch_metrics = ["rusoto", "rusoto_cloudwatch"]
 sinks-aws_kinesis_firehose = ["rusoto", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto", "rusoto_kinesis"]
-sinks-aws_s3 = ["bytesize", "rusoto", "rusoto_s3"]
+sinks-aws_s3 = ["bytesize", "rusoto", "rusoto_s3", "uuid"]
 sinks-aws_sqs = ["rusoto", "rusoto_sqs"]
 sinks-azure_monitor_logs = ["bytesize"]
 sinks-blackhole = []
@@ -551,14 +551,14 @@ sinks-console = []
 sinks-datadog = ["bytesize"]
 sinks-elasticsearch = ["bytesize", "rusoto"]
 sinks-file = []
-sinks-gcp = ["base64", "bytesize", "goauth", "gouth", "smpl_jwt"]
+sinks-gcp = ["base64", "bytesize", "goauth", "gouth", "smpl_jwt", "uuid"]
 sinks-honeycomb = ["bytesize"]
 sinks-http = ["bytesize"]
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = ["bytesize"]
 sinks-kafka = []
 sinks-logdna = ["bytesize"]
-sinks-loki = ["bytesize"]
+sinks-loki = ["bytesize", "uuid"]
 sinks-nats = ["async-nats"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-papertrail = ["syslog"]

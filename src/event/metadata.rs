@@ -8,6 +8,7 @@ use shared::EventDataEq;
 /// and `struct LogEvent` types.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct EventMetadata {
+    #[serde(default, skip)]
     finalizers: Option<EventFinalizers>,
 }
 
