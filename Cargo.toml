@@ -282,6 +282,7 @@ tokio01-test = "0.1.1"
 tower-test = "0.4.0"
 walkdir = "2.3.2"
 quickcheck = "1"
+zstd = { version = "0.6", default-features = false }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin

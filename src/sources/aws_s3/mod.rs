@@ -265,7 +265,7 @@ mod integration_tests {
         line_agg,
         rusoto::RegionOrEndpoint,
         sources::util::MultilineConfig,
-        test_util::{collect_n, lines_from_gzip_file, random_lines},
+        test_util::{collect_n, lines_from_gzip_file, lines_from_zst_file, random_lines},
         Pipeline,
     };
     use pretty_assertions::assert_eq;
@@ -314,6 +314,24 @@ mod integration_tests {
         };
 
         test_event(key, Some("gzip"), None, None, buffer, logs).await;
+    }
+
+    #[tokio::test]
+    async fn s3_process_message_multipart_zstd() {
+        use std::io::Read;
+
+        let key = uuid::Uuid::new_v4().to_string();
+        let logs = lines_from_zst_file("tests/data/multipart-zst.log.zst");
+
+        let buffer = {
+            let mut file = std::fs::File::open("tests/data/multipart-zst.log.zst")
+                .expect("file can be opened");
+            let mut data = Vec::new();
+            file.read_to_end(&mut data).expect("file can be read");
+            data
+        };
+
+        test_event(key, Some("zstd"), None, None, buffer, logs).await;
     }
 
     #[tokio::test]
