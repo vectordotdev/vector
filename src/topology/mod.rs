@@ -123,7 +123,8 @@ pub fn take_healthchecks(diff: &ConfigDiff, pieces: &mut Pieces) -> Vec<(String,
 }
 
 impl RunningTopology {
-    /// Returned future will finish once all current sources have finished.
+    /// Returned future will finish once all current sources have finished. If there are no
+    /// outputs, this will remain pending until re-called to allow for a provider to finish.
     pub fn sources_finished(&self) -> future::BoxFuture<'static, ()> {
         if self.outputs.is_empty() {
             future::pending().boxed()

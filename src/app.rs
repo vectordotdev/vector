@@ -277,6 +277,8 @@ impl Application {
                                             if let Some(ref api_server) = api_server {
                                                 api_server.update_config(topology.config());
                                             }
+
+                                            emit!(VectorReloaded { config_paths: &config_paths })
                                         },
                                         Ok(false) => emit!(VectorReloadFailed),
                                         // Trigger graceful shutdown for what remains of the topology
