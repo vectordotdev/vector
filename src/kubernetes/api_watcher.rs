@@ -263,14 +263,18 @@ mod tests {
                 .expect("expected an invocation error here");
 
             let (actual_status, actual_is_desync) = match error {
+                watcher::invocation::Error::Desync {
+                    source: invocation::Error::BadStatus { status },
+                } => (Some(status), true),
+                watcher::invocation::Error::Desync { .. } => (None, true),
                 watcher::invocation::Error::Recoverable {
                     source: invocation::Error::BadStatus { status },
                 } => (Some(status), false),
+                watcher::invocation::Error::Recoverable { .. } => (None, false),
                 watcher::invocation::Error::Other {
                     source: invocation::Error::BadStatus { status },
                 } => (Some(status), false),
                 watcher::invocation::Error::Other { .. } => (None, false),
-                watcher::invocation::Error::Recoverable { .. } => (None, false),
             };
 
             assert_eq!(

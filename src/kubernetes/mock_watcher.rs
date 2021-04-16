@@ -26,6 +26,8 @@ where
     /// Return successfully and prepare the stream with responses from the
     /// passed [`Receiver`].
     Ok(Receiver<ScenarioActionStream<T>>),
+    /// Return a desync error.
+    ErrDesync,
     /// Return a recoverable error.
     ErrRecoverable,
     /// Return an "other" (i.e. non-desync) error.
@@ -129,6 +131,9 @@ where
                             Result<WatchEvent<Self::Object>, watcher::stream::Error<StreamError>>,
                         >;
                     Ok(stream)
+                }
+                ScenarioActionInvocation::ErrDesync => {
+                    Err(watcher::invocation::Error::desync(InvocationError))
                 }
                 ScenarioActionInvocation::ErrRecoverable => {
                     Err(watcher::invocation::Error::recoverable(InvocationError))

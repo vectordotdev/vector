@@ -101,6 +101,12 @@ pub mod invocation {
     where
         T: std::error::Error + Send + 'static,
     {
+        /// Desync error signals that the server went out of sync and the resource
+        /// version specified in the call can no longer be used.
+        Desync {
+            /// The underlying error.
+            source: T,
+        },
         /// Errors that signal a possibility they can be recovered and as such should be
         /// logged and bubbled up but shouldn't stop processing.
         Recoverable {
@@ -119,6 +125,12 @@ pub mod invocation {
     where
         T: std::error::Error + Send + 'static,
     {
+        /// Create an `Error::Desync`.
+        #[inline]
+        pub fn desync(source: T) -> Self {
+            Self::Desync { source }
+        }
+
         /// Create an `Error::Recoverable`.
         #[inline]
         pub fn recoverable(source: T) -> Self {
@@ -138,7 +150,8 @@ pub mod invocation {
     {
         fn eq(&self, other: &Self) -> bool {
             match (self, other) {
-                (Error::Recoverable { source: a }, Error::Recoverable { source: b })
+                (Error::Desync { source: a }, Error::Desync { source: b })
+                | (Error::Recoverable { source: a }, Error::Recoverable { source: b })
                 | (Error::Other { source: a }, Error::Other { source: b }) => a.eq(b),
                 _ => false,
             }
