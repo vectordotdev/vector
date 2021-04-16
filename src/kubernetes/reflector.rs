@@ -96,6 +96,7 @@ where
                 Err(watcher::invocation::Error::Other { source }) => {
                     // Unrecoverable error
                     // TODO: retry these errors
+                    // https://github.com/timberio/vector/issues/7149
                     error!(message = "Watcher error.", error = ?source);
                     return Err(Error::Invocation { source });
                 }
@@ -136,6 +137,7 @@ where
                         // This is considered a fatal error, do not attempt
                         // to retry and just quit.
                         // TODO: retry these errors
+                        // https://github.com/timberio/vector/issues/7149
                         Err(watcher::stream::Error::Other { source }) => {
                             return Err(Error::Streaming { source });
                         }
