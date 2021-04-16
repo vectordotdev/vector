@@ -124,7 +124,7 @@ cli: {
 				`/etc/vector/vector.toml` will be targeted.
 				TOML, YAML and JSON file formats are supported.
 				The format to interpret the file with is determined from
-				the file extension (.toml, .yaml, .json).
+				the file extension (`.toml`, `.yaml`, `.json`).
 				We will fallback to TOML if we are unable to detect
 				a supported format.
 				"""
@@ -229,7 +229,7 @@ cli: {
 			description: """
 				Run Vector config unit tests, then exit. This command is experimental and
 				therefore subject to change. For guidance on how to write unit tests check
-				out: \(urls.vector_unit_testing)
+				out the [unit testing documentation](\(urls.vector_unit_testing)).
 				"""
 
 			options: {

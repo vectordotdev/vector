@@ -67,10 +67,10 @@ Here's how that plays out in some example scenarios:
 
 Change |   | Response
 :------|:-:|:--------
-***You deploy more Vector instances*** | ➔ |Vector automatically redistributes HTTP throughput across both current and new instances
-***You scale up your Elasticsearch cluster*** | ➔ | Vector automatically increases concurrency to take full advantage of the new capacity
-***You scale your Elasticsearch cluster back down*** | ➔ | Vector lowers concurrency to avoid any risk of destabilizing the cluster (while still taking full of advantage of the now-decreased bandwidth)
-***Your Elasticsearch cluster experiences a temporary outage*** | ➔ |Vector lowers concurrency dramatically and provides backpressure by [buffering][buffer] events
+**You deploy more Vector instances** | ➔ |Vector automatically redistributes HTTP throughput across both current and new instances
+**You scale up your Elasticsearch cluster** | ➔ | Vector automatically increases concurrency to take full advantage of the new capacity
+**You scale your Elasticsearch cluster back down** | ➔ | Vector lowers concurrency to avoid any risk of destabilizing the cluster (while still taking full of advantage of the now-decreased bandwidth)
+**Your Elasticsearch cluster experiences a temporary outage** | ➔ |Vector lowers concurrency dramatically and provides backpressure by [buffering][buffer] events
 
 With ARC, these scenarios require no human intervention. Vector quietly hums along making these decisions for you with a speed and granularity that rate limits simply cannot provide.
 

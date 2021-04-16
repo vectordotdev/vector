@@ -1,0 +1,104 @@
+{{ $commands := site.Data.docs.cli.commands }}
+
+<div class="cli">
+  {{ range $k, $v := $commands }}
+  <div class="command">
+    <h3 class="is-family-monospace has-text-weight-bold has-text-grey" id="{{ $k }}">
+      {{ $k }}
+    </h3>
+
+    <p>
+      {{ $v.description | markdownify }}
+    </p>
+
+    {{ with $v.flags }}
+    <h4 class="has-text-weight-light" id="{{ $k }}-flags">
+      Flags
+    </h4>
+
+    <table>
+      <thead>
+        <tr>
+          <th>
+            Flag (long)
+          </th>
+          <th>
+            Flag (short)
+          </th>
+          <th>
+            Description
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ range . }}
+        <tr>
+          <td>
+            <code class="no-break">{{ .flag }}</code>
+          </td>
+          <td>
+            {{ with .short }}
+            <code class="no-break">{{ . }}</code>
+            {{ end }}
+          </td>
+          <td>
+            {{ .description | markdownify }}
+          </td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+    {{ end }}
+
+    {{ with $v.options }}
+    <h4 class="has-text-weight-light" id="{{ $k }}-options">
+      Options
+    </h4>
+
+    <table>
+      <thead>
+        <tr>
+          <th>
+            Option
+          </th>
+          <th>
+            Description
+          </th>
+          <th>
+            Required?
+          </th>
+          <th>
+            Default
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ range . }}
+        {{ . }}
+        <tr>
+          <td>
+            <code class="no-break">
+              {{ .option }} <{{ .type }}>
+            </code>
+          </td>
+          <td>
+            {{ .description | markdownify }}
+          </td>
+          <td>
+            {{ cond .required "yes" "no" }}
+          </td>
+          <td>
+            {{ with .default }}
+            <code>{{ . }}</code>
+            {{ else }}
+            none
+            {{ end }}
+          </td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+    {{ end }}
+  </div>
+  {{ end }}
+</div>
