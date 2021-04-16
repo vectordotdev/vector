@@ -59,6 +59,10 @@ hr.narrow
 
 // Small fixes for text content CSS
 .content
+  ul
+    li + li
+      margin-top: 0.75rem
+
   h1, h2, h3, h4, h5, h6
     font-weight: $weight-normal
 
@@ -76,8 +80,11 @@ hr.narrow
     color: $secondary
 
   .highlight
-    & + p, & + h5, & + h6, & + .notification
-      margin-top: 0.75rem
+    pre
+      border-radius: 0.3rem
+
+    & + p, & + h4, & + h5, & + h6, & + .highlight, & + .notification
+      margin-top: 1.25rem
 
   h6
     margin-top: 1rem

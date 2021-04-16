@@ -35,7 +35,7 @@ flexible to build. Such as streaming, batching, partitioning, networking, retrie
 
 ## Scheduler
 
-Vectur uses the [Tokio][tokio] runtime for task scheduling.
+Vector uses the [Tokio][tokio] runtime for task scheduling.
 
 ## Data plane
 

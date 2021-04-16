@@ -13,6 +13,7 @@
 // Get fonts from site params
 {{ $sansSerifFont := (index (where $fonts "type" "eq" "sans_serif") 0).name }}
 {{ $monospaceFont := (index (where $fonts "type" "eq" "monospace") 0).name }}
+{{ $secondaryFont := (index (where $fonts "type" "eq" "secondary") 0).name }}
 
 @charset "utf-8"
 @import url("{{ $fontsUrl }}")
@@ -46,6 +47,7 @@ $purple: $vector-purple
 
 // Fonts
 $family-sans-serif: "{{ $sansSerifFont }}", BlinkMacSystemFont, -apple-system, "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", "Helvetica", "Arial", sans-serif
+$family-secondary: "{{ $secondaryFont }}"
 $family-monospace: "{{ $monospaceFont }}", monospace
 
 // Component-specific attributes
@@ -56,6 +58,7 @@ $footer-color: $white-bis
 $tabs-border-bottom-width: 3px
 $tabs-link-hover-color: $secondary
 $tabs-link-hover-border-bottom-color: $secondary
+$section-padding: 2rem 1rem
 $hr-height: 1px
 $hr-margin: 1rem 0.5rem
 $code: $primary
@@ -72,7 +75,7 @@ $navbar-item-active-color: $vector-light-blue !important
 @import "bulma/sass/utilities/derived-variables"
 
 // Bulma variable overwrites that require derived variables
-$hero-body-padding: 3rem 1.5rem
+$hero-body-padding: $section-padding
 $hr-background-color: $grey-lighter
 $menu-item-active-background-color: $white
 $menu-item-active-color: $vector-magenta

@@ -1,7 +1,7 @@
 ---
 title: Vector Remap Language (VRL)
 description: A domain-specific language for modifying your observability data
-short: Remap Language
+short: VRL
 weight: 4
 ---
 
@@ -87,16 +87,6 @@ All language constructs are contained in the following reference pages. Use thes
 
 {{< pages >}}
 
-## Safety
-
-## Performance
-
-## Reference
-
-All language constructs are laid out in the following reference pages. Use these references as you write your VRL programs:
-
-{{< pages >}}
-
 ## Learn
 
 VRL is designed to minimize the learning curve. These resources can help you get acquainted with Vector and VRL:
@@ -110,12 +100,12 @@ VRL is built by the Vector team and its development is guided by two core goals,
 
 Feature | Safety | Performance
 :-------|:-------|:-----------
-[Compilation](#compilation) | &check; | &check;
-[Ergonomic safety](#ergonomic-safety) | &check; | &check;
-[Fail safety](#fail-safety) | &check; |
-[Memory safety](#memory-safety) | &check; |
-[Vector and Rust native](#vector-rust-native) | &check; | &check;
-[Statelessness](#statelessness) | &check; | &check;
+[Compilation](#compilation) | ✅ | ✅
+[Ergonomic safety](#ergonomic-safety) | ✅ | ✅
+[Fail safety](#fail-safety) | ✅ |
+[Memory safety](#memory-safety) | ✅ |
+[Vector and Rust native](#vector-rust-native) | ✅ | ✅
+[Statelessness](#statelessness) | ✅ | ✅
 
 ### Features
 

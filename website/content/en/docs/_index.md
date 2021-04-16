@@ -1,6 +1,7 @@
 ---
 title: The Vector documentation
 description: Your gateway to the world of Vector
+breadcrumb: Docs
 short: Docs home
 icon: fas fa-home
 ---

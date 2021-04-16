@@ -41,6 +41,11 @@ sizes = [300, 400, 600, 700]
 type = "sans_serif"
 
 [[params.fonts]]
+name = "Noto Serif"
+sizes = [300, 400, 600, 700]
+type = "secondary"
+
+[[params.fonts]]
 name = "Source Code Pro"
 sizes = [300, 400, 600, 700]
 type = "monospace"
