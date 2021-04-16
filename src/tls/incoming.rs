@@ -1,27 +1,25 @@
-#[cfg(feature = "listenfd")]
-use super::Handshake;
 use super::{
-    CreateAcceptor, IncomingListener, MaybeTlsSettings, MaybeTlsStream, TcpBind, TlsError,
-    TlsSettings,
+    CreateAcceptor, Handshake, IncomingListener, MaybeTlsSettings, MaybeTlsStream, SslBuildError,
+    TcpBind, TlsError, TlsSettings,
 };
+#[cfg(feature = "sources-utils-tcp-socket")]
+use crate::tcp;
 #[cfg(feature = "sources-utils-tcp-keepalive")]
 use crate::tcp::TcpKeepaliveConfig;
-use bytes::{Buf, BufMut};
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
-use openssl::ssl::{SslAcceptor, SslMethod};
+use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
 use snafu::ResultExt;
 use std::{
     future::Future,
-    mem::MaybeUninit,
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
 };
 use tokio::{
-    io::{self, AsyncRead, AsyncWrite},
+    io::{self, AsyncRead, AsyncWrite, ReadBuf},
     net::{TcpListener, TcpStream},
 };
-use tokio_openssl::{HandshakeError, SslStream};
+use tokio_openssl::SslStream;
 
 impl TlsSettings {
     pub(crate) fn acceptor(&self) -> crate::tls::Result<SslAcceptor> {
@@ -110,8 +108,9 @@ pub struct MaybeTlsIncomingStream<S> {
 
 enum StreamState<S> {
     Accepted(MaybeTlsStream<S>),
-    Accepting(BoxFuture<'static, Result<SslStream<S>, HandshakeError<S>>>),
+    Accepting(BoxFuture<'static, Result<SslStream<S>, TlsError>>),
     AcceptError(String),
+    Closed,
 }
 
 impl<S> MaybeTlsIncomingStream<S> {
@@ -136,6 +135,27 @@ impl<S> MaybeTlsIncomingStream<S> {
             }),
             StreamState::Accepting(_) => None,
             StreamState::AcceptError(_) => None,
+            StreamState::Closed => None,
+        }
+    }
+
+    #[cfg(all(
+        test,
+        feature = "sinks-socket",
+        feature = "sources-utils-tls",
+        feature = "listenfd"
+    ))]
+    pub fn get_mut(&mut self) -> Option<&mut S> {
+        use super::MaybeTls;
+
+        match &mut self.state {
+            StreamState::Accepted(ref mut stream) => Some(match stream {
+                MaybeTls::Raw(ref mut s) => s,
+                MaybeTls::Tls(s) => s.get_mut(),
+            }),
+            StreamState::Accepting(_) => None,
+            StreamState::AcceptError(_) => None,
+            StreamState::Closed => None,
         }
     }
 }
@@ -148,7 +168,13 @@ impl MaybeTlsIncomingStream<TcpStream> {
     ) -> Self {
         let state = match acceptor {
             Some(acceptor) => StreamState::Accepting(
-                async move { tokio_openssl::accept(&acceptor, stream).await }.boxed(),
+                async move {
+                    let ssl = Ssl::new(acceptor.context()).context(SslBuildError)?;
+                    let mut stream = SslStream::new(ssl, stream).context(SslBuildError)?;
+                    Pin::new(&mut stream).accept().await.context(Handshake)?;
+                    Ok(stream)
+                }
+                .boxed(),
             ),
             None => StreamState::Accepted(MaybeTlsStream::Raw(stream)),
         };
@@ -159,7 +185,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
     #[cfg(feature = "listenfd")]
     pub(crate) async fn handshake(&mut self) -> crate::tls::Result<()> {
         if let StreamState::Accepting(fut) = &mut self.state {
-            let stream = fut.await.context(Handshake)?;
+            let stream = fut.await?;
             self.state = StreamState::Accepted(MaybeTlsStream::Tls(stream));
         }
 
@@ -175,7 +201,12 @@ impl MaybeTlsIncomingStream<TcpStream> {
             )
         })?;
 
-        stream.set_keepalive(keepalive.time_secs.map(std::time::Duration::from_secs))?;
+        if let Some(time_secs) = keepalive.time_secs {
+            let config =
+                socket2::TcpKeepalive::new().with_time(std::time::Duration::from_secs(time_secs));
+
+            tcp::set_keepalive(stream, &config)?;
+        }
 
         Ok(())
     }
@@ -189,9 +220,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
             )
         })?;
 
-        stream.set_recv_buffer_size(bytes)?;
-
-        Ok(())
+        tcp::set_receive_buffer_size(stream, bytes)
     }
 
     fn poll_io<T, F>(self: Pin<&mut Self>, cx: &mut Context, poll_fn: F) -> Poll<io::Result<T>>
@@ -216,6 +245,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
                 StreamState::AcceptError(error) => {
                     Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, error.to_owned())))
                 }
+                StreamState::Closed => Poll::Ready(Err(io::ErrorKind::BrokenPipe.into())),
             };
         }
     }
@@ -225,23 +255,9 @@ impl AsyncRead for MaybeTlsIncomingStream<TcpStream> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context,
-        buf: &mut [u8],
-    ) -> Poll<io::Result<usize>> {
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
         self.poll_io(cx, |s, cx| s.poll_read(cx, buf))
-    }
-
-    unsafe fn prepare_uninitialized_buffer(&self, _buf: &mut [MaybeUninit<u8>]) -> bool {
-        // Both, TcpStream & SslStream return false
-        // We can not use `poll_io` here, because need Context for polling handshake
-        false
-    }
-
-    fn poll_read_buf<B: BufMut>(
-        self: Pin<&mut Self>,
-        cx: &mut Context,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        self.poll_io(cx, |s, cx| s.poll_read_buf(cx, buf))
     }
 }
 
@@ -255,14 +271,30 @@ impl AsyncWrite for MaybeTlsIncomingStream<TcpStream> {
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context) -> Poll<io::Result<()>> {
-        self.poll_io(cx, |s, cx| s.poll_shutdown(cx))
-    }
-
-    fn poll_write_buf<B: Buf>(
-        self: Pin<&mut Self>,
-        cx: &mut Context,
-        buf: &mut B,
-    ) -> Poll<io::Result<usize>> {
-        self.poll_io(cx, |s, cx| s.poll_write_buf(cx, buf))
+        let mut this = self.get_mut();
+        match &mut this.state {
+            StreamState::Accepted(stream) => match Pin::new(stream).poll_shutdown(cx) {
+                Poll::Ready(Ok(())) => {
+                    this.state = StreamState::Closed;
+                    Poll::Ready(Ok(()))
+                }
+                poll_result => poll_result,
+            },
+            StreamState::Accepting(fut) => match futures::ready!(fut.as_mut().poll(cx)) {
+                Ok(stream) => {
+                    this.state = StreamState::Accepted(MaybeTlsStream::Tls(stream));
+                    Poll::Pending
+                }
+                Err(error) => {
+                    let error = io::Error::new(io::ErrorKind::Other, error);
+                    this.state = StreamState::AcceptError(error.to_string());
+                    Poll::Ready(Err(error))
+                }
+            },
+            StreamState::AcceptError(error) => {
+                Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, error.to_owned())))
+            }
+            StreamState::Closed => Poll::Ready(Ok(())),
+        }
     }
 }

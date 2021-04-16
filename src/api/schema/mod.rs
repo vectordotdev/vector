@@ -1,9 +1,11 @@
 pub mod components;
+mod events;
 pub mod filter;
 mod health;
 mod meta;
 mod metrics;
 mod relay;
+mod scalar;
 pub mod sort;
 
 use async_graphql::{EmptyMutation, MergedObject, MergedSubscription, Schema, SchemaBuilder};
@@ -21,6 +23,7 @@ pub struct Subscription(
     health::HealthSubscription,
     metrics::MetricsSubscription,
     components::ComponentsSubscription,
+    events::EventsSubscription,
 );
 
 /// Build a new GraphQL schema, comprised of Query, Mutation and Subscription types

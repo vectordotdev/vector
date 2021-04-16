@@ -45,9 +45,9 @@ impl Opts {
     fn paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
         config::merge_path_lists(vec![
             (&self.paths, None),
-            (&self.paths_toml, Some(config::Format::TOML)),
-            (&self.paths_json, Some(config::Format::JSON)),
-            (&self.paths_yaml, Some(config::Format::YAML)),
+            (&self.paths_toml, Some(config::Format::Toml)),
+            (&self.paths_json, Some(config::Format::Json)),
+            (&self.paths_yaml, Some(config::Format::Yaml)),
         ])
     }
 }

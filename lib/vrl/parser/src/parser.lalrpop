@@ -35,6 +35,7 @@ extern {
         "null" => Token::Null,
         "true" => Token::True,
         "false" => Token::False,
+        "abort" => Token::Abort,
 
         ";" => Token::SemiColon,
         "\n" => Token::Newline,
@@ -208,6 +209,7 @@ Exprs: Vec<Node<Expr>> = {
 
 Expr: Node<Expr> = {
     Sp<IfStatement> => Node::new(<>.span(), Expr::IfStatement(<>)),
+    Sp<AbortExpr>,
     AssignmentExpr,
 };
 
@@ -222,6 +224,8 @@ Ident: Ident = "identifier" => Ident(<>.to_owned());
 
 PathField: Ident = "path field" => Ident(<>.to_owned());
 
+AbortExpr: Expr = Sp<"abort"> => Expr::Abort(<>.map(|_| ()));
+
 // An identifier that is allowed to include reserved keywords.
 AnyIdent: Ident = {
     "identifier" => Ident(<>.to_owned()),
@@ -231,6 +235,7 @@ AnyIdent: Ident = {
     "null" => Ident("null".to_owned()),
     "true" => Ident("true".to_owned()),
     "false" => Ident("false".to_owned()),
+    "abort" => Ident("abort".to_owned()),
 };
 
 // -----------------------------------------------------------------------------
@@ -413,9 +418,12 @@ FunctionArgument: FunctionArgument = {
 // -----------------------------------------------------------------------------
 
 IfStatement: IfStatement =
-    "if" <predicate: Sp<Predicate>> <consequent: Sp<Block>>
+    "if"
+    <predicate: Sp<Predicate>>
+    NonterminalNewline*
+    <consequent: Sp<Block>>
     <alternatives: (Sp<ElseIf>)*>
-    <alternative: ("else" <Sp<Block>>)?> => {
+    <alternative: ("else" NonterminalNewline* <Sp<Block>>)?> => {
         let mut alternative = alternative;
 
         for Node { span, mut node } in alternatives {
@@ -428,7 +436,11 @@ IfStatement: IfStatement =
         IfStatement { predicate, consequent, alternative }
 };
 
-ElseIf: IfStatement = "else" "if" <predicate: Sp<Predicate>> <consequent: Sp<Block>> => {
+ElseIf: IfStatement =
+    "else" NonterminalNewline* "if"
+    <predicate: Sp<Predicate>>
+    NonterminalNewline*
+    <consequent: Sp<Block>> => {
     IfStatement { predicate, consequent, alternative: None }
 };
 

@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
-    event::{Event, Value},
+    event::{Event, LogEvent, Value},
     internal_events::CoercerConversionFailed,
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
@@ -64,8 +64,7 @@ impl FunctionTransform for Coercer {
             // below, as it will be fewer steps to fully recreate the
             // event than to scan the event for extraneous fields after
             // conversion.
-            let mut new_event = Event::new_empty_log();
-            let new_log = new_event.as_mut_log();
+            let mut new_log = LogEvent::new_with_metadata(log.metadata().clone());
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field) {
                     match conv.convert::<Value>(value.into_bytes()) {
@@ -76,7 +75,7 @@ impl FunctionTransform for Coercer {
                     }
                 }
             }
-            output.push(new_event);
+            output.push(new_log.into());
             return;
         } else {
             for (field, conv) in &self.types {
@@ -119,6 +118,7 @@ mod tests {
         ] {
             event.as_mut_log().insert(key, value);
         }
+        let metadata = event.metadata().clone();
 
         let mut coercer = toml::from_str::<CoercerConfig>(&format!(
             r#"{}
@@ -134,7 +134,9 @@ mod tests {
         .await
         .unwrap();
         let coercer = coercer.as_function();
-        coercer.transform_one(event).unwrap().into_log()
+        let result = coercer.transform_one(event).unwrap().into_log();
+        assert_eq!(&metadata, result.metadata());
+        result
     }
 
     #[tokio::test]
@@ -164,6 +166,6 @@ mod tests {
         expected.as_mut_log().insert("bool", true);
         expected.as_mut_log().insert("number", 1234);
 
-        assert_eq!(log, expected.into_log());
+        shared::assert_event_data_eq!(log, expected.into_log());
     }
 }

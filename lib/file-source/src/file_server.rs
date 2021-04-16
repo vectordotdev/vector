@@ -21,7 +21,7 @@ use std::{
     sync::Arc,
     time::{self, Duration},
 };
-use tokio::time::delay_for;
+use tokio::time::sleep;
 use tracing::{debug, error, info, trace};
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
@@ -141,17 +141,17 @@ where
         // aren't going to get away with anything, but none of it should have
         // any perf impact.
         let mut shutdown = shutdown.shared();
-        let shutdown2 = shutdown.clone();
+        let mut shutdown2 = shutdown.clone();
         let emitter = self.emitter.clone();
         let checkpointer = Arc::new(checkpointer);
         let sleep_duration = self.glob_minimum_cooldown;
         self.handle.spawn(async move {
             let mut done = false;
             loop {
-                let sleep = tokio::time::delay_for(sleep_duration);
-                match select(shutdown2.clone(), sleep).await {
-                    Either::Left((_, _)) => done = true,
-                    Either::Right((_, _)) => {}
+                let sleep = sleep(sleep_duration);
+                tokio::select! {
+                    _ = &mut shutdown2 => done = true,
+                    _ = sleep => {},
                 }
 
                 let emitter = emitter.clone();
@@ -369,7 +369,7 @@ where
             // all of these requirements.
             let sleep = async move {
                 if backoff > 0 {
-                    delay_for(Duration::from_millis(backoff as u64)).await;
+                    sleep(Duration::from_millis(backoff as u64)).await;
                 }
             };
             futures::pin_mut!(sleep);
@@ -392,22 +392,27 @@ where
         // Determine the initial _requested_ starting point in the file. This can be overridden
         // once the file is actually opened and we determine it is compressed, older than we're
         // configured to read, etc.
-        let read_from = if startup {
-            // If we are starting up, use the stored checkpoint unless the user has opted out. If
-            // they have opted out or there is no checkpoint present, fall back to `read_from`.
-            if self.ignore_checkpoints {
-                self.read_from
-            } else {
-                checkpoints
-                    .get(file_id)
-                    .map(ReadFrom::Checkpoint)
-                    .unwrap_or(self.read_from)
-            }
+        let fallback = if startup {
+            self.read_from
         } else {
             // Always read new files that show up while we're running from the beginning. There's
             // not a good way to determine if they were moved or just created and written very
             // quickly, so just make sure we're not missing any data.
             ReadFrom::Beginning
+        };
+
+        // Always prefer the stored checkpoint unless the user has opted out.  Previously, the
+        // checkpoint was only loaded for new files when Vector was started up, but the
+        // `kubernetes_logs` source returns the files well after start-up, once it has populated
+        // them from the k8s metadata, so we now just always use the checkpoints unless opted out.
+        // https://github.com/timberio/vector/issues/7139
+        let read_from = if !self.ignore_checkpoints {
+            checkpoints
+                .get(file_id)
+                .map(ReadFrom::Checkpoint)
+                .unwrap_or(fallback)
+        } else {
+            fallback
         };
 
         match FileWatcher::new(

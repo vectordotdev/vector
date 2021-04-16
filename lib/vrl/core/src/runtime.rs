@@ -1,24 +1,38 @@
 use crate::{state, Context, Path, Program, Target, Value};
+use compiler::ExpressionError;
 use std::{error::Error, fmt};
 
-pub type RuntimeResult = Result<Value, Abort>;
+pub type RuntimeResult = Result<Value, Terminate>;
 
 #[derive(Debug, Default)]
 pub struct Runtime {
     state: state::Runtime,
 }
 
-/// The error raised if the runtime is aborted.
+/// The error raised if the runtime is terminated.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Abort(String);
+pub enum Terminate {
+    /// A manual `abort` call.
+    ///
+    /// This is an intentional termination that does not result in an
+    /// `Ok(Value)` result, but should neither be interpreted as an unexpected
+    /// outcome.
+    Abort,
 
-impl fmt::Display for Abort {
+    /// An unexpected program termination.
+    Error(String),
+}
+
+impl fmt::Display for Terminate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
+        match self {
+            Terminate::Abort => Ok(()),
+            Terminate::Error(error) => f.write_str(&error),
+        }
     }
 }
 
-impl Error for Abort {
+impl Error for Terminate {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         None
     }
@@ -39,14 +53,23 @@ impl Runtime {
         match target.get(&Path::root()) {
             Ok(Some(Value::Object(_))) => {}
             Ok(Some(value)) => {
-                return Err(Abort(format!(
+                return Err(Terminate::Error(format!(
                     "target must be a valid object, got {}: {}",
                     value.kind(),
                     value
                 )))
             }
-            Ok(None) => return Err(Abort("expected target object, got nothing".to_owned())),
-            Err(err) => return Err(Abort(format!("error querying target object: {}", err))),
+            Ok(None) => {
+                return Err(Terminate::Error(
+                    "expected target object, got nothing".to_owned(),
+                ))
+            }
+            Err(err) => {
+                return Err(Terminate::Error(format!(
+                    "error querying target object: {}",
+                    err
+                )))
+            }
         };
 
         let mut context = Context::new(target, &mut self.state);
@@ -54,8 +77,10 @@ impl Runtime {
         let mut values = program
             .iter()
             .map(|expr| {
-                expr.resolve(&mut context)
-                    .map_err(|err| Abort(err.to_string()))
+                expr.resolve(&mut context).map_err(|err| match err {
+                    ExpressionError::Abort => Terminate::Abort,
+                    err @ ExpressionError::Error { .. } => Terminate::Error(err.to_string()),
+                })
             })
             .collect::<Result<Vec<_>, _>>()?;
 

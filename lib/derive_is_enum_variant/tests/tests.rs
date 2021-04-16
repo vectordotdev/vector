@@ -48,6 +48,7 @@ fn variant_kinds() {
 /// Various funky case names.
 #[allow(non_camel_case_types)]
 #[derive(is_enum_variant)]
+#[allow(clippy::upper_case_acronyms)] // we want to test these other casings
 pub enum Funky {
     /// doc
     CAPS,

@@ -58,7 +58,7 @@ pub async fn complete_with_deadline_on_signal<F, S>(
     future: F,
     signal: S,
     deadline: Duration,
-) -> Result<<F as Future>::Output, tokio::time::Elapsed>
+) -> Result<<F as Future>::Output, tokio::time::error::Elapsed>
 where
     F: Future,
     S: Future<Output = ()>,

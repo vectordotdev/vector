@@ -38,6 +38,10 @@ impl OpenGauge {
             emitter,
         }
     }
+
+    pub fn any_open(&self) -> bool {
+        self.gauge.load(Ordering::Acquire) != 0
+    }
 }
 
 impl Default for OpenGauge {

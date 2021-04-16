@@ -15,7 +15,7 @@ fn benchmark_simple_pipes(c: &mut Criterion) {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let mut group = c.benchmark_group("pipe");
+    let mut group = c.benchmark_group("topology");
     group.sampling_mode(SamplingMode::Flat);
 
     let benchmarks = [
@@ -27,7 +27,7 @@ fn benchmark_simple_pipes(c: &mut Criterion) {
 
     for (name, num_lines, line_size, num_writers) in benchmarks.iter() {
         group.throughput(Throughput::Bytes((num_lines * line_size) as u64));
-        group.bench_function(format!("pipe_{}", name), |b| {
+        group.bench_function(format!("pipe/{}", name), |b| {
             b.iter_batched(
                 || {
                     let mut config = config::Config::builder();
@@ -43,7 +43,7 @@ fn benchmark_simple_pipes(c: &mut Criterion) {
                         ),
                     );
 
-                    let mut rt = runtime();
+                    let rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
                         let (topology, _crash) =
@@ -53,7 +53,7 @@ fn benchmark_simple_pipes(c: &mut Criterion) {
                     });
                     (rt, topology, output_lines)
                 },
-                |(mut rt, topology, output_lines)| {
+                |(rt, topology, output_lines)| {
                     rt.block_on(async move {
                         let sends = stream::iter(0..*num_writers)
                             .map(|_| {
@@ -90,7 +90,7 @@ fn benchmark_interconnected(c: &mut Criterion) {
     let out_addr1 = next_addr();
     let out_addr2 = next_addr();
 
-    let mut group = c.benchmark_group("interconnected");
+    let mut group = c.benchmark_group("topology");
     group.throughput(Throughput::Bytes((num_lines * line_size * 2) as u64));
     group.sampling_mode(SamplingMode::Flat);
 
@@ -117,7 +117,7 @@ fn benchmark_interconnected(c: &mut Criterion) {
                     sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr2.to_string()),
                 );
 
-                let mut rt = runtime();
+                let rt = runtime();
                 let (output_lines1, output_lines2, topology) = rt.block_on(async move {
                     let output_lines1 = CountReceiver::receive_lines(out_addr1);
                     let output_lines2 = CountReceiver::receive_lines(out_addr2);
@@ -128,7 +128,7 @@ fn benchmark_interconnected(c: &mut Criterion) {
                 });
                 (rt, topology, output_lines1, output_lines2)
             },
-            |(mut rt, topology, output_lines1, output_lines2)| {
+            |(rt, topology, output_lines1, output_lines2)| {
                 rt.block_on(async move {
                     let lines1 = random_lines(line_size).take(num_lines);
                     send_lines(in_addr1, lines1).await.unwrap();
@@ -160,7 +160,7 @@ fn benchmark_transforms(c: &mut Criterion) {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let mut group = c.benchmark_group("transforms");
+    let mut group = c.benchmark_group("topology");
     group.throughput(Throughput::Bytes(
         (num_lines * (line_size + "status=404".len())) as u64,
     ));
@@ -197,7 +197,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                     sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
                 );
 
-                let mut rt = runtime();
+                let rt = runtime();
                 let (output_lines, topology) = rt.block_on(async move {
                     let output_lines = CountReceiver::receive_lines(out_addr);
                     let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
@@ -206,7 +206,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                 });
                 (rt, topology, output_lines)
             },
-            |(mut rt, topology, output_lines)| {
+            |(rt, topology, output_lines)| {
                 rt.block_on(async move {
                     let lines = random_lines(line_size)
                         .map(|l| l + "status=404")
@@ -241,7 +241,7 @@ fn benchmark_complex(c: &mut Criterion) {
     let out_addr_404 = next_addr();
     let out_addr_500 = next_addr();
 
-    let mut group = c.benchmark_group("complex");
+    let mut group = c.benchmark_group("topology");
     group.sampling_mode(SamplingMode::Flat);
 
     group.bench_function("complex", |b| {
@@ -335,7 +335,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     ),
                 );
 
-                let mut rt = runtime();
+                let rt = runtime();
                 let (
                     output_lines_all,
                     output_lines_sampled,
@@ -372,7 +372,7 @@ fn benchmark_complex(c: &mut Criterion) {
                 )
             },
             |(
-                mut rt,
+                rt,
                 topology,
                 output_lines_all,
                 output_lines_sampled,
@@ -453,10 +453,10 @@ fn benchmark_real_world_1(c: &mut Criterion) {
     let out_addr_company_unfurler = next_addr();
     let out_addr_audit = next_addr();
 
-    let mut group = c.benchmark_group("real_world_1");
+    let mut group = c.benchmark_group("topology");
     group.sampling_mode(SamplingMode::Flat);
     group.throughput(Throughput::Elements(num_lines as u64));
-    group.bench_function("topology", |b| {
+    group.bench_function("real_world_1", |b| {
         b.iter_batched(
             || {
                 let mut config = config::Config::builder();
@@ -665,7 +665,7 @@ fn benchmark_real_world_1(c: &mut Criterion) {
                 "#};
 
                 let parsed =
-                    config::format::deserialize(toml_cfg, Some(config::Format::TOML)).unwrap();
+                    config::format::deserialize(toml_cfg, Some(config::Format::Toml)).unwrap();
                 config.append(parsed).unwrap();
 
                 config.add_sink(
@@ -704,7 +704,7 @@ fn benchmark_real_world_1(c: &mut Criterion) {
                     ),
                 );
 
-                let mut rt = runtime();
+                let rt = runtime();
                 let (
                     output_lines_company_api,
                     output_lines_company_admin,
@@ -754,7 +754,7 @@ fn benchmark_real_world_1(c: &mut Criterion) {
                 )
             },
             |(
-                mut rt,
+                rt,
                 topology,
                 output_lines_company_api,
                 output_lines_company_admin,

@@ -40,7 +40,7 @@ struct Timer {
     span_start: Instant,
     waiting: bool,
     total_wait: Duration,
-    ewma: stats::EWMA,
+    ewma: stats::Ewma,
 }
 
 /// A simple, specialized timer for tracking spans of waiting vs not-waiting time and reporting
@@ -57,7 +57,7 @@ impl Timer {
             span_start: Instant::now(),
             waiting: false,
             total_wait: Duration::new(0, 0),
-            ewma: stats::EWMA::new(0.9),
+            ewma: stats::Ewma::new(0.9),
         }
     }
 

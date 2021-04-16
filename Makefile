@@ -20,7 +20,7 @@ export SCOPE ?= ""
 # Override this with any extra flags for cargo bench
 export CARGO_BENCH_FLAGS ?= ""
 # override this to put criterion output elsewhere
-export CRITERION_HOME ?= "$(mkfile_dir)target/criterion"
+export CRITERION_HOME ?= $(mkfile_dir)target/criterion
 # Override to false to disable autospawning services on integration tests.
 export AUTOSPAWN ?= true
 # Override to control if services are turned off after integration tests.
@@ -441,7 +441,7 @@ ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh nginx stop
 	@scripts/setup_integration_env.sh nginx start
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nginx-integration-tests --lib ::nginx:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nginx-integration-tests --lib ::nginx_metrics:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh nginx stop
 endif
@@ -515,7 +515,7 @@ endif
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --test cli -- --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features cli-tests --test cli -- --test-threads 4
 
 .PHONY: test-wasm-build-modules
 test-wasm-build-modules: $(WASM_MODULE_OUTPUTS) ### Build all WASM test modules
