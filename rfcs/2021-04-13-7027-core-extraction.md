@@ -124,10 +124,10 @@ Today there are 168 top-level features in the project, as measured on commit
 ```
 
 The features are split in their purposes. Some flag on tests, some are for build
-targets, some map -- not quite precisely -- to source/transform/sinks being
-enabled. I had hoped to provide a dependency graph of these features but their
-number and relation meant that what was generated was not explicable. Some
-features seem to do almost but not exactly quite the same things.
+targets, some map to source/transform/sinks being enabled. I had hoped to
+provide a dependency graph of these features but their number and relation meant
+that what was generated was not explicable. Some features seem to do almost but
+not exactly quite the same things.
 
 Taken in the abstract the core of vector is a data ingest, transformation and
 egress framework, expressed as an acyclic graph with nodes being separated by a
@@ -176,6 +176,7 @@ well.
 I argue that the following are "core":
 
 * the `Event` type,
+* the `Value` type,
 * the `Pipeline` type,
 * the `VectorSink` type,
 * the `Source` type,
