@@ -7,8 +7,20 @@ authors: [
     name: Ben Johnson
   },
   {
+    handle: lukesteensen,
+    name: Luke Steensen
+  },
+  {
     handle: lucperkins,
     name: Luc Perkins
+  },
+  {
+    handle: leebenson,
+    name: Lee Benson
+  },
+  {
+    handle: zsherman,
+    name: Zach Sherman
   }
 ]
 ---

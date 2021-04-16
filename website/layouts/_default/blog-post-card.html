@@ -1,11 +1,8 @@
 {{ $title := .Params.short | default .Title }}
-{{ $authors := .CurrentSection.Params.authors }}
-{{ $author := index (where $authors "handle" "==" .Params.author) 0 }}
+{{ $allAuthors := .CurrentSection.Params.authors }}
 {{ $date := .Date | dateFormat "January 2, 2006" }}
 {{ $type := .Params.tags.type | default "announcement" }}
 {{ $domains := .Params.tags.domains }}
-{{ $authorImg := printf "https://github.com/%s.png" $author.handle }}
-
 <div class="card is-hoverable has-medium-padding" x-data="{ type: '{{ $type }}' }">
   <div class="card-content">
     <div class="media">
@@ -30,6 +27,11 @@
       </div>
     </div>
 
+    {{ with .Params.authors }}
+    {{ range . }}
+    {{ $author := index (where $allAuthors "handle" "==" .) 0 }}
+    {{ $authorImg := printf "https://github.com/%s.png" $author.handle }}
+    {{ $authorUrl := printf "https://github.com/%s" $author.handle }}
     <div class="media">
       <div class="media-left">
         <figure class="image is-48x48">
@@ -37,9 +39,13 @@
         </figure>
       </div>
       <div class="media-content">
-        {{ $author.name }}
+        <a href="{{ $authorUrl }}" target="_blank">
+          {{ $author.name }}
+        </a>
       </div>
     </div>
+    {{ end }}
+    {{ end }}
 
     {{ with .Description }}
     <div class="content has-text-grey">

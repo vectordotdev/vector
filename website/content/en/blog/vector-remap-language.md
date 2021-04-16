@@ -1,7 +1,7 @@
 ---
 title: Vector Remap Language
 description: A fast and safe way to transform observability data
-author: binarylogic
+authors: ["binarylogic"]
 date: "2021-02-15"
 tags:
   type: announcement
