@@ -11,4 +11,11 @@ async-graphql = { version = "=2.6.4", features = ["chrono"] }
 serde = { version = "1.0.117", features = ["derive"] }
 tracing = { version = "0.1" }
 snafu = { version = "0.6" }
+lalrpop-util = "0.19.5"
 
+[dev-dependencies]
+lazy_static = "1.3.0"
+serde_json = { version = "1.0.64", features = ["raw_value"] }
+
+[build-dependencies] 
+lalrpop = "0.19"

@@ -1,6 +1,6 @@
 use crate::value::Kind;
 use crate::{map, path};
-use lookup::{LookupBuf, SegmentBuf};
+use lookup::{LookupBuf, SegmentBuf, FieldBuf};
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Sub,
@@ -155,7 +155,7 @@ impl KindInfo {
     pub fn for_path(mut self, path: LookupBuf) -> Self {
         for segment in path.iter().rev() {
             match segment {
-                SegmentBuf::Field{name, ..} => {
+                SegmentBuf::Field(FieldBuf {name, ..}) => {
                     let mut map = BTreeMap::default();
                     map.insert(Field::Field(name.as_str().to_owned()), self);
 
@@ -236,7 +236,7 @@ impl KindInfo {
                                     }
                                 }),
                         }, */
-                        SegmentBuf::Field{ name: field, .. } => match kind.object() {
+                        SegmentBuf::Field(FieldBuf { name: field, .. }) => match kind.object() {
                             None => KindInfo::Unknown,
                             Some(kind) => {
                                 let field = Field::Field(field.as_str().to_owned());

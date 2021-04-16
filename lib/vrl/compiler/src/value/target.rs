@@ -1,5 +1,5 @@
 use crate::{Target, Value};
-use lookup::{LookupBuf, SegmentBuf};
+use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use std::collections::BTreeMap;
 
 impl Target for Value {
@@ -160,7 +160,7 @@ impl Value {
 
     fn get_by_segment(&self, segment: &SegmentBuf) -> Option<&Value> {
         match segment {
-            SegmentBuf::Field { name, .. } => {
+            SegmentBuf::Field(FieldBuf { name, .. }) => {
                 self.as_object().and_then(|map| map.get(name.as_str()))
             }
             SegmentBuf::Coalesce(fields) => todo!(), /*self
@@ -195,7 +195,7 @@ impl Value {
 
     fn get_by_segment_mut(&mut self, segment: &SegmentBuf) -> Option<&mut Value> {
         match segment {
-            SegmentBuf::Field { name, .. } => self
+            SegmentBuf::Field(FieldBuf { name, .. }) => self
                 .as_object_mut()
                 .and_then(|map| map.get_mut(name.as_str())),
             SegmentBuf::Coalesce(fields) => todo!(), /*self.as_object_mut().and_then(|map| {
@@ -251,7 +251,7 @@ impl Value {
 
     fn remove_by_segment(&mut self, segment: &SegmentBuf) {
         match segment {
-            SegmentBuf::Field { name, .. } => self
+            SegmentBuf::Field(FieldBuf { name, .. }) => self
                 .as_object_mut()
                 .and_then(|map| map.remove(name.as_str())),
 
@@ -346,7 +346,7 @@ impl Value {
         };
 
         match segment {
-            SegmentBuf::Field { name, .. } => handle_field(name, new, segments),
+            SegmentBuf::Field(FieldBuf { name, .. }) => handle_field(name, new, segments),
 
             SegmentBuf::Coalesce(fields) => todo!(), /*{
             // At this point, we know that the coalesced field query did not

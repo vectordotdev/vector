@@ -13,7 +13,7 @@ use tracing::instrument;
 mod test;
 
 mod segment;
-pub use segment::Segment;
+pub use segment::{Field, Segment};
 
 /// `Lookup`s are pre-validated event, unowned lookup paths.
 ///
@@ -27,7 +27,7 @@ pub use segment::Segment;
 /// call. **These do not parse the buffer.**
 ///
 /// ```rust
-/// use shared::lookup::Lookup;
+/// use lookup::Lookup;
 /// let mut lookup = Lookup::from("foo");
 /// lookup.push_back(1);
 /// lookup.push_back("bar");
@@ -46,7 +46,7 @@ pub use segment::Segment;
 /// possible error.
 ///
 /// ```rust
-/// use shared::lookup::Lookup;
+/// use lookup::Lookup;
 /// let mut lookup = Lookup::from_str("foo").unwrap();
 /// lookup.push_back(1);
 /// lookup.push_back("bar");
@@ -65,7 +65,7 @@ pub use segment::Segment;
 /// `lookup.into()`.
 ///
 /// ```rust
-/// use shared::lookup::Lookup;
+/// use lookup::Lookup;
 /// let mut lookup = Lookup::from_str("foo.bar").unwrap();
 /// let mut owned = lookup.clone().into_buf();
 /// owned.push_back(1);
@@ -91,10 +91,7 @@ impl<'a> Display for Lookup<'a> {
         let mut maybe_next = peeker.peek();
         while let Some(segment) = next {
             match segment {
-                Segment::Field {
-                    name: _,
-                    requires_quoting: _,
-                } => match maybe_next {
+                Segment::Field(_) => match maybe_next {
                     Some(next) if next.is_field() || next.is_coalesce() => {
                         write!(f, r#"{}."#, segment)?
                     }
@@ -170,10 +167,9 @@ impl<'a> Lookup<'a> {
     /// Parse the lookup from a str.
     #[instrument(level = "trace")]
     pub fn from_str(input: &'a str) -> Result<Self, LookupError> {
-        todo!()
-        //let mut pairs = RemapParser::parse(ParserRule::lookup, input)?;
-        //let pair = pairs.next().ok_or(LookupError::NoTokens)?;
-        //Self::try_from(pair)
+        crate::parser::parse_lookup(input).map_err(|err| LookupError::Invalid {
+            message: format!("{}", err),
+        })
     }
 
     /// Dump the value to a `String`.
@@ -248,6 +244,14 @@ impl<'a> From<&'a String> for Lookup<'a> {
     }
 }
 
+impl<'a> From<Segment<'a>> for Lookup<'a> {
+    fn from(input: Segment<'a>) -> Self {
+        let mut segments = VecDeque::with_capacity(1);
+        segments.push_back(input);
+        Self { segments }
+    }
+}
+
 impl<'a> TryFrom<VecDeque<Segment<'a>>> for Lookup<'a> {
     type Error = LookupError;
 
@@ -279,6 +283,14 @@ impl<'collection: 'item, 'item> TryFrom<&'collection VecDeque<SegmentBuf>> for L
         };
         retval.is_valid()?;
         Ok(retval)
+    }
+}
+
+impl<'a> From<Field<'a>> for Lookup<'a> {
+    fn from(field: Field<'a>) -> Self {
+        let mut segments = VecDeque::with_capacity(1);
+        segments.push_back(Segment::Field(field));
+        Self { segments }
     }
 }
 

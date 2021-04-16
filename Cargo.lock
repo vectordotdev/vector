@@ -3457,7 +3457,11 @@ name = "lookup"
 version = "0.1.0"
 dependencies = [
  "async-graphql",
+ "lalrpop",
+ "lalrpop-util",
+ "lazy_static",
  "serde",
+ "serde_json",
  "snafu",
  "tracing 0.1.25",
 ]

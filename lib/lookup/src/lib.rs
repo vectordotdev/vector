@@ -1,14 +1,14 @@
-use std::collections::VecDeque;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
 pub use error::LookupError;
-pub use lookup_buf::{LookupBuf, SegmentBuf};
-pub use lookup_view::{Lookup, Segment};
+pub use lookup_buf::{LookupBuf, SegmentBuf, FieldBuf};
+pub use lookup_view::{Lookup, Segment, Field};
 
 mod error;
 mod lookup_buf;
 mod lookup_view;
+mod parser;
 
 // This trait, while it is not necessarily imported and used, exists
 // to enforce parity among view/buf types.
@@ -127,7 +127,7 @@ impl Look<'static> for LookupBuf {
 trait LookSegment<'a>: Debug + PartialEq + Eq + PartialOrd + Ord + Clone + Hash + Sized {
     type Field: Debug + PartialEq + Eq + PartialOrd + Ord + Clone + Hash + Sized;
 
-    fn field(name: Self::Field, requires_quoting: bool) -> Self;
+    fn field(field: Self::Field) -> Self;
 
     fn is_field(&self) -> bool;
 
@@ -135,7 +135,7 @@ trait LookSegment<'a>: Debug + PartialEq + Eq + PartialOrd + Ord + Clone + Hash 
 
     fn is_index(&self) -> bool;
 
-    fn coalesce(v: Vec<VecDeque<Self>>) -> Self;
+    fn coalesce(v: Vec<Self::Field>) -> Self;
 
     fn is_coalesce(&self) -> bool;
 }
@@ -143,9 +143,9 @@ trait LookSegment<'a>: Debug + PartialEq + Eq + PartialOrd + Ord + Clone + Hash 
 // It is convention to only proxy to the struct implementations **without modification**.
 // This is so the functions are always available to users, but we are required to expose the same API.
 impl<'a> LookSegment<'a> for SegmentBuf {
-    type Field = String;
-    fn field(name: <Self as LookSegment>::Field, requires_quoting: bool) -> Self {
-        Self::field(name, requires_quoting)
+    type Field = FieldBuf;
+    fn field(field: <Self as LookSegment>::Field) -> Self {
+        Self::field(field)
     }
     fn is_field(&self) -> bool {
         self.is_field()
@@ -156,7 +156,7 @@ impl<'a> LookSegment<'a> for SegmentBuf {
     fn is_index(&self) -> bool {
         self.is_index()
     }
-    fn coalesce(v: Vec<VecDeque<Self>>) -> Self {
+    fn coalesce(v: Vec<FieldBuf>) -> Self {
         Self::coalesce(v)
     }
     fn is_coalesce(&self) -> bool {
@@ -167,9 +167,9 @@ impl<'a> LookSegment<'a> for SegmentBuf {
 // It is convention to only proxy to the struct implementations **without modification**.
 // This is so the functions are always available to users, but we are required to expose the same API.
 impl<'a> LookSegment<'a> for Segment<'a> {
-    type Field = &'a str;
-    fn field(name: <Self as LookSegment<'a>>::Field, requires_quoting: bool) -> Self {
-        Self::field(name, requires_quoting)
+    type Field = Field<'a>;
+    fn field(field: <Self as LookSegment<'a>>::Field) -> Self {
+        Self::field(field)
     }
     fn is_field(&self) -> bool {
         self.is_field()
@@ -180,7 +180,7 @@ impl<'a> LookSegment<'a> for Segment<'a> {
     fn is_index(&self) -> bool {
         self.is_index()
     }
-    fn coalesce(v: Vec<VecDeque<Self>>) -> Self {
+    fn coalesce(v: Vec<Field<'a>>) -> Self {
         Self::coalesce(v)
     }
     fn is_coalesce(&self) -> bool {

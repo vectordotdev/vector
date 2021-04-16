@@ -16,7 +16,7 @@ use tracing::instrument;
 mod test;
 
 mod segmentbuf;
-pub use segmentbuf::SegmentBuf;
+pub use segmentbuf::{FieldBuf, SegmentBuf};
 
 /// `LookupBuf`s are pre-validated, owned event lookup paths.
 ///
@@ -32,7 +32,7 @@ pub use segmentbuf::SegmentBuf;
 /// From there, you can `push` and `pop` onto the `LookupBuf`.
 ///
 /// ```rust
-/// use shared::lookup::LookupBuf;
+/// use lookup::LookupBuf;
 /// let mut lookup = LookupBuf::from("foo");
 /// lookup.push_back(1);
 /// lookup.push_back("bar");
@@ -49,7 +49,7 @@ pub use segmentbuf::SegmentBuf;
 /// possible error.
 ///
 /// ```rust
-/// use shared::lookup::LookupBuf;
+/// use lookup::LookupBuf;
 /// let mut lookup = LookupBuf::from_str("foo").unwrap();
 /// lookup.push_back(1);
 /// lookup.push_back("bar");
@@ -68,7 +68,7 @@ pub use segmentbuf::SegmentBuf;
 /// `lookup.into()`.
 ///
 /// ```rust
-/// use shared::lookup::LookupBuf;
+/// use lookup::LookupBuf;
 /// let mut lookup = LookupBuf::from_str("foo.bar").unwrap();
 /// let mut unowned_view = lookup.clone_lookup();
 /// unowned_view.push_back(1);
@@ -99,10 +99,7 @@ impl Display for LookupBuf {
         let mut maybe_next = peeker.peek();
         while let Some(segment) = next {
             match segment {
-                SegmentBuf::Field {
-                    name: _,
-                    requires_quoting: _,
-                } => match maybe_next {
+                SegmentBuf::Field(_) => match maybe_next {
                     Some(next) if next.is_field() || next.is_coalesce() => {
                         write!(f, r#"{}."#, segment)?
                     }
@@ -132,7 +129,7 @@ impl LookupBuf {
     /// Creates an lookup to the root
     pub fn root() -> Self {
         Self {
-            segments: VecDeque::new()
+            segments: VecDeque::new(),
         }
     }
 
@@ -283,7 +280,7 @@ impl LookupBuf {
 
     pub fn from_segments(segments: Vec<SegmentBuf>) -> Self {
         Self {
-            segments: segments.into_iter().collect()
+            segments: segments.into_iter().collect(),
         }
     }
 
@@ -375,6 +372,15 @@ impl From<&str> for LookupBuf {
         // We know this must be at least one segment.
     }
 }
+
+impl From<FieldBuf> for LookupBuf {
+    fn from(field: FieldBuf) -> Self {
+        let mut segments = VecDeque::with_capacity(1);
+        segments.push_back(SegmentBuf::Field(field));
+        Self { segments }
+    }
+}
+
 
 impl Index<usize> for LookupBuf {
     type Output = SegmentBuf;

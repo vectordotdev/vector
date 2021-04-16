@@ -9,4 +9,6 @@ pub enum LookupError {
     MissingInnerSegment,
     #[snafu(display("No tokens found to parse."))]
     NoTokens,
+    #[snafu(display("Invalid path."))]
+    Invalid { message: String },
 }

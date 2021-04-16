@@ -1,9 +1,10 @@
-use crate::lookup::*;
+use crate::*;
 use std::{fs, io::Read, path::Path};
 use tracing::trace;
 
 const SUFFICIENTLY_COMPLEX: &str =
     r#"regular."quoted"."quoted but spaces"."quoted.but.periods".lookup[0].nested_lookup[0][0]"#;
+
 lazy_static::lazy_static! {
     static ref SUFFICIENTLY_DECOMPOSED: [Segment<'static>; 9] = [
         Segment::from(r#"regular"#),
@@ -18,14 +19,14 @@ lazy_static::lazy_static! {
     ];
 }
 
-#[test_env_log::test]
+#[test]
 fn zero_len_not_allowed() {
     let input = "";
     let maybe_lookup = Lookup::from_str(input);
     assert!(maybe_lookup.is_err());
 }
 
-#[test_env_log::test]
+#[test]
 fn we_dont_parse_plain_strings_in_from() {
     let input = "some_key.still_the_same_key.this.is.going.in.via.from.and.should.not.get.parsed";
     let lookup = Lookup::from(input);
@@ -33,7 +34,7 @@ fn we_dont_parse_plain_strings_in_from() {
     assert_eq!(lookup.to_string(), input);
 }
 
-#[test_env_log::test]
+#[test]
 fn simple() {
     let input = "some_key";
     let lookup = Lookup::from_str(input).unwrap();
@@ -41,7 +42,17 @@ fn simple() {
     assert_eq!(lookup.to_string(), input);
 }
 
-#[test_env_log::test]
+#[test]
+fn unquoted() {
+    let input = "start.after";
+    let lookup = Lookup::from_str(input).unwrap();
+    assert_eq!(lookup[0], Segment::from("start"));
+    assert_eq!(lookup[1], Segment::from("after"));
+    assert_eq!(lookup.to_string(), input);
+}
+
+
+#[test]
 fn quoted() {
     let input = "\"start\".\"after\"";
     let lookup = Lookup::from_str(input).unwrap();
@@ -50,7 +61,17 @@ fn quoted() {
     assert_eq!(lookup.to_string(), input);
 }
 
-#[test_env_log::test]
+#[test]
+fn quoted_special_characters() {
+    let input = "\"start@noog\".\"after nork\"";
+    let lookup = Lookup::from_str(input).unwrap();
+    assert_eq!(lookup[0], Segment::from("\"start@noog\""));
+    assert_eq!(lookup[1], Segment::from("\"after nork\""));
+    assert_eq!(lookup.to_string(), input);
+}
+
+
+#[test]
 fn push() {
     let input = "some_key";
     let mut lookup = Lookup::from_str(input).unwrap();
@@ -59,7 +80,7 @@ fn push() {
     assert_eq!(lookup[1], Segment::from("some_key"));
 }
 
-#[test_env_log::test]
+#[test]
 fn pop() {
     let input = "some_key";
     let mut lookup = Lookup::from_str(input).unwrap();
@@ -67,7 +88,7 @@ fn pop() {
     assert_eq!(out, Some(Segment::from("some_key")));
 }
 
-#[test_env_log::test]
+#[test]
 fn array() {
     let input = "foo[0]";
     let lookup = Lookup::from_str(input).unwrap();
@@ -76,7 +97,7 @@ fn array() {
     assert_eq!(lookup.to_string(), input);
 }
 
-#[test_env_log::test]
+#[test]
 fn fields() {
     let input = "florp.flop";
     let lookup = Lookup::from_str(input).unwrap();
@@ -85,7 +106,7 @@ fn fields() {
     assert_eq!(lookup.to_string(), input);
 }
 
-#[test_env_log::test]
+#[test]
 fn fields_with_quotes() {
     let input = "florp.\"flop fleep\"";
     let lookup = Lookup::from_str(input).unwrap();
@@ -94,7 +115,7 @@ fn fields_with_quotes() {
     assert_eq!(lookup.to_string(), input);
 }
 
-#[test_env_log::test]
+#[test]
 fn coalesced() {
     let input = "plain.(option_one | option_two)";
     let lookup = Lookup::from_str(input).unwrap();
@@ -102,34 +123,26 @@ fn coalesced() {
     assert_eq!(
         lookup[1],
         Segment::from(vec![
-            vec![Segment::from("option_one")],
-            vec![Segment::from("option_two")],
+            Field::from("option_one"),
+            Field::from("option_two"),
         ])
     );
 }
 
-#[test_env_log::test]
+#[test]
 fn coalesced_nesting() {
     let input = "plain.(option_one.inner | option_two.other_inner)";
-    let lookup = Lookup::from_str(input).unwrap();
-    assert_eq!(lookup[0], Segment::from("plain"));
-    assert_eq!(
-        lookup[1],
-        Segment::from(vec![
-            vec![Segment::from("option_one"), Segment::from("inner")],
-            vec![Segment::from("option_two"), Segment::from("other_inner")],
-        ])
-    );
+    assert!(Lookup::from_str(input).is_err());
 }
 
-#[test_env_log::test]
+#[test]
 fn to_string() {
     let input = SUFFICIENTLY_COMPLEX;
     let lookup = Lookup::from_str(input).unwrap();
     assert_eq!(lookup.to_string(), input);
 }
 
-#[test_env_log::test]
+#[test]
 fn impl_index_usize() {
     let lookup = Lookup::from_str(SUFFICIENTLY_COMPLEX).unwrap();
 
@@ -138,7 +151,7 @@ fn impl_index_usize() {
     }
 }
 
-#[test_env_log::test]
+#[test]
 fn impl_index_mut_index_mut() {
     let mut lookup = Lookup::from_str(SUFFICIENTLY_COMPLEX).unwrap();
 
@@ -148,7 +161,7 @@ fn impl_index_mut_index_mut() {
     }
 }
 
-#[test_env_log::test]
+#[test]
 fn iter() {
     let lookup = Lookup::from_str(SUFFICIENTLY_COMPLEX).unwrap();
 
@@ -161,7 +174,7 @@ fn iter() {
     }
 }
 
-#[test_env_log::test]
+#[test]
 fn into_iter() {
     let lookup = Lookup::from_str(SUFFICIENTLY_COMPLEX).unwrap();
     let mut iter = lookup.into_iter();
@@ -188,23 +201,20 @@ fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<String> {
 
 // This test iterates over the `tests/data/fixtures/lookup` folder and ensures the lookup parsed,
 // then turned into a string again is the same.
-#[test_env_log::test]
+#[test]
 fn lookup_to_string_and_serialize() {
     const FIXTURE_ROOT: &str = "tests/fixtures/lookup";
 
-    trace!(?FIXTURE_ROOT, "Opening.");
     std::fs::read_dir(FIXTURE_ROOT)
         .unwrap()
         .for_each(|fixture_file| match fixture_file {
             Ok(fixture_file) => {
                 let path = fixture_file.path();
-                tracing::trace!(?path, "Opening.");
                 let buf = parse_artifact(&path).unwrap();
 
                 let buf_serialized =
                     serde_json::to_string(&serde_json::to_value(&buf).unwrap()).unwrap();
                 let lookup = Lookup::from_str(&buf).unwrap();
-                tracing::trace!(?path, ?lookup, ?buf, "Asserting equal.");
                 assert_eq!(lookup.to_string(), buf);
 
                 // **WARNING:**: You **can not** deserialize lookups (that is, views, the buffers

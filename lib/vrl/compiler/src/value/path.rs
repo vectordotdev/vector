@@ -1,5 +1,5 @@
 use super::Value;
-use lookup::{LookupBuf, SegmentBuf};
+use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use std::collections::BTreeMap;
 
 impl Value {
@@ -10,7 +10,7 @@ impl Value {
     pub fn at_path(mut self, path: &LookupBuf) -> Self {
         for segment in path.as_segments().iter().rev() {
             match segment {
-                SegmentBuf::Field{name, .. } => {
+                SegmentBuf::Field(FieldBuf { name, .. }) => {
                     let mut map = BTreeMap::default();
                     map.insert(name.as_str().to_owned(), self);
                     self = Value::Object(map);

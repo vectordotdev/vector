@@ -3,7 +3,7 @@ use crate::metrics::Handle;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use getset::Getters;
-use lookup::{LookupBuf, SegmentBuf};
+use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
 use snafu::Snafu;
@@ -757,8 +757,9 @@ impl Target for Metric {
             return Err(MetricPathError::SetPathError.to_string());
         }
 
+        // TODO This is no longer efficient!
         match path.as_slice().as_slice() {
-            [SegmentBuf::Field { name: tags, .. }] if tags.as_str() == "tags" => {
+            [SegmentBuf::Field (FieldBuf { name: tags, .. })] if tags.as_str() == "tags" => {
                 let value = value.try_object().map_err(|e| e.to_string())?;
                 for (field, value) in value.iter() {
                     self.set_tag_value(
@@ -771,7 +772,7 @@ impl Target for Metric {
                 }
                 Ok(())
             }
-            [SegmentBuf::Field { name: tags, .. }, SegmentBuf::Field { name: field, .. }]
+            [SegmentBuf::Field (FieldBuf { name: tags, .. }), SegmentBuf::Field (FieldBuf { name: field, .. })]
                 if tags.as_str() == "tags" =>
             {
                 let value = value.try_bytes().map_err(|e| e.to_string())?;
@@ -781,26 +782,26 @@ impl Target for Metric {
                 );
                 Ok(())
             }
-            [SegmentBuf::Field { name, .. }] if name.as_str() == "name" => {
+            [SegmentBuf::Field(FieldBuf { name, .. })] if name.as_str() == "name" => {
                 let value = value.try_bytes().map_err(|e| e.to_string())?;
                 self.series.name.name = String::from_utf8_lossy(&value).into_owned();
                 Ok(())
             }
-            [SegmentBuf::Field {
+            [SegmentBuf::Field(FieldBuf {
                 name: namespace, ..
-            }] if namespace.as_str() == "namespace" => {
+            })] if namespace.as_str() == "namespace" => {
                 let value = value.try_bytes().map_err(|e| e.to_string())?;
                 self.series.name.namespace = Some(String::from_utf8_lossy(&value).into_owned());
                 Ok(())
             }
-            [SegmentBuf::Field {
+            [SegmentBuf::Field(FieldBuf {
                 name: timestamp, ..
-            }] if timestamp.as_str() == "timestamp" => {
+            })] if timestamp.as_str() == "timestamp" => {
                 let value = value.try_timestamp().map_err(|e| e.to_string())?;
                 self.data.timestamp = Some(value);
                 Ok(())
             }
-            [SegmentBuf::Field { name: kind, .. }] if kind.as_str() == "kind" => {
+            [SegmentBuf::Field(FieldBuf { name: kind, .. })] if kind.as_str() == "kind" => {
                 self.data.kind = MetricKind::try_from(value)?;
                 Ok(())
             }
@@ -838,32 +839,32 @@ impl Target for Metric {
         }
 
         match path.as_slice().as_slice() {
-            [SegmentBuf::Field { name, .. }] if name.as_str() == "name" => {
+            [SegmentBuf::Field(FieldBuf { name, .. })] if name.as_str() == "name" => {
                 Ok(Some(self.name().to_string().into()))
             }
-            [SegmentBuf::Field {
+            [SegmentBuf::Field(FieldBuf {
                 name: namespace, ..
-            }] if namespace.as_str() == "namespace" => {
+            })] if namespace.as_str() == "namespace" => {
                 Ok(self.series.name.namespace.clone().map(Into::into))
             }
-            [SegmentBuf::Field {
+            [SegmentBuf::Field(FieldBuf {
                 name: timestamp, ..
-            }] if timestamp.as_str() == "timestamp" => Ok(self.data.timestamp.map(Into::into)),
-            [SegmentBuf::Field { name: kind, .. }] if kind.as_str() == "kind" => {
+            })] if timestamp.as_str() == "timestamp" => Ok(self.data.timestamp.map(Into::into)),
+            [SegmentBuf::Field(FieldBuf { name: kind, .. })] if kind.as_str() == "kind" => {
                 Ok(Some(self.data.kind.clone().into()))
             }
-            [SegmentBuf::Field { name: tags, .. }] if tags.as_str() == "tags" => {
+            [SegmentBuf::Field(FieldBuf { name: tags, .. })] if tags.as_str() == "tags" => {
                 Ok(self.tags().map(|map| {
                     let iter = map.iter().map(|(k, v)| (k.to_owned(), v.to_owned().into()));
                     vrl::Value::from_iter(iter)
                 }))
             }
-            [SegmentBuf::Field { name: tags, .. }, SegmentBuf::Field { name: field, .. }]
+            [SegmentBuf::Field(FieldBuf { name: tags, .. }), SegmentBuf::Field(FieldBuf { name: field, .. })]
                 if tags.as_str() == "tags" =>
             {
                 Ok(self.tag_value(field.as_str()).map(|value| value.into()))
             }
-            [SegmentBuf::Field { name: type_, .. }] if type_.as_str() == "type" => {
+            [SegmentBuf::Field(FieldBuf { name: type_, .. })] if type_.as_str() == "type" => {
                 Ok(Some(self.data.value.clone().into()))
             }
             _ => Err(MetricPathError::InvalidPath {
@@ -880,23 +881,23 @@ impl Target for Metric {
         }
 
         match path.as_slice().as_slice() {
-            [SegmentBuf::Field {
+            [SegmentBuf::Field(FieldBuf {
                 name: namespace, ..
-            }] if namespace.as_str() == "namespace" => {
+            })] if namespace.as_str() == "namespace" => {
                 Ok(self.series.name.namespace.take().map(Into::into))
             }
-            [SegmentBuf::Field {
+            [SegmentBuf::Field(FieldBuf {
                 name: timestamp, ..
-            }] if timestamp.as_str() == "timestamp" => {
+            })] if timestamp.as_str() == "timestamp" => {
                 Ok(self.data.timestamp.take().map(Into::into))
             }
-            [SegmentBuf::Field { name: tags, .. }] if tags.as_str() == "tags" => {
+            [SegmentBuf::Field(FieldBuf { name: tags, .. })] if tags.as_str() == "tags" => {
                 Ok(self.series.tags.take().map(|map| {
                     let iter = map.into_iter().map(|(k, v)| (k, v.into()));
                     vrl::Value::from_iter(iter)
                 }))
             }
-            [SegmentBuf::Field { name: tags, .. }, SegmentBuf::Field { name: field, .. }]
+            [SegmentBuf::Field(FieldBuf { name: tags, .. }), SegmentBuf::Field(FieldBuf { name: field, .. })]
                 if tags.as_str() == "tags" =>
             {
                 Ok(self.delete_tag(field.as_str()).map(Into::into))
