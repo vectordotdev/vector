@@ -110,9 +110,10 @@ impl ProviderConfig for HttpConfig {
                         let body = match hyper::body::to_bytes(response.into_body()).await {
                             Ok(body) => body,
                             Err(err) => {
+                                let cause = err.into_cause();
                                 error!(
                                     message = "Error interpreting response",
-                                    error = ?err.into_cause());
+                                    error = ?cause);
 
                                 continue;
                             }
@@ -120,7 +121,7 @@ impl ProviderConfig for HttpConfig {
                         let text = String::from_utf8_lossy(body.as_ref());
                         let config = load_from_str(&text, None);
 
-                        if let Ok(mut config) = config {
+                        if let Ok(config) = config {
                             info!("Configuration appears to be valid.");
 
                             // Send down the control channel.
