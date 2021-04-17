@@ -94,18 +94,35 @@ impl ProviderConfig for HttpConfig {
                     .map_err(|_| "Couldn't create HTTP request")
                     .unwrap();
 
+                info!(
+                    message = "Attempting to retrieve configuration.",
+                    url = ?url.as_str()
+                );
+
                 // Send the request and attempt to parse the remote configurtion.
                 match http_client.send(request).await {
                     Ok(response) => {
-                        info!("A response was received.");
-                        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+                        info!(
+                            message = "Response received.",
+                            url = ?url.as_str());
+
+                        // Attempt the parse the body into bytes.
+                        let body = match hyper::body::to_bytes(response.into_body()).await {
+                            Ok(body) => body,
+                            Err(err) => {
+                                error!(
+                                    message = "Error interpreting response",
+                                    error = ?err.into_cause().unwrap_or(Box::new("unknown error"))
+                                );
+
+                                continue;
+                            }
+                        };
                         let text = String::from_utf8_lossy(body.as_ref());
                         let config = load_from_str(&text, None);
 
                         if let Ok(mut config) = config {
-                            info!("Configuration was successfully received.");
-                            // Explicitly set provider to `None`.
-                            config.provider = None;
+                            info!("Configuration appears to be valid.");
 
                             // Send down the control channel.
                             if provider_tx
@@ -113,28 +130,30 @@ impl ProviderConfig for HttpConfig {
                                 .await
                                 .is_err()
                             {
-                                info!("Couldn't apply config. HTTP provider control channel has gone away.");
+                                info!(
+                                    message = "Couldn't apply config."
+                                    error = "provider control channel has gone away");
+
                                 break;
                             }
                         } else {
                             error!(
-                                message = "Invalid configuration received.",
-                                poll_interval_secs = ?poll_interval_secs
-                            );
+                                message = "Invalid configuration.",
+                                url = ?url.as_str());
                         }
                     }
-                    Err(_) => {
+                    Err(err) => {
                         error!(
-                            message = "Couldn't retrieve configuration.",
-                            poll_interval_secs = ?poll_interval_secs
-                        );
+                            message = "HTTP error",
+                            error = ?err
+                            url = ?url.as_str());
                     }
                 }
 
                 info!(
                     message = "HTTP provider is waiting.",
-                    poll_interval_secs = ?poll_interval_secs
-                )
+                    poll_interval_secs = ?poll_interval_secs,
+                    url = ?url.as_str());
             }
         });
 
