@@ -167,8 +167,16 @@ fn s3_object_decoder(
     match compression {
         Auto => unreachable!(), // is mapped above
         None => Box::new(r),
-        Gzip => Box::new(bufread::GzipDecoder::new(r)),
-        Zstd => Box::new(bufread::ZstdDecoder::new(r)),
+        Gzip => Box::new({
+            let mut decoder = bufread::GzipDecoder::new(r);
+            decoder.multiple_members(true);
+            decoder
+        }),
+        Zstd => Box::new({
+            let mut decoder = bufread::ZstdDecoder::new(r);
+            decoder.multiple_members(true);
+            decoder
+        }),
     }
 }
 
@@ -257,7 +265,7 @@ mod integration_tests {
         line_agg,
         rusoto::RegionOrEndpoint,
         sources::util::MultilineConfig,
-        test_util::{collect_n, random_lines},
+        test_util::{collect_n, lines_from_gzip_file, lines_from_zst_file, random_lines},
         Pipeline,
     };
     use pretty_assertions::assert_eq;
@@ -288,6 +296,42 @@ mod integration_tests {
         gz.read_to_end(&mut buffer).unwrap();
 
         test_event(key, Some("gzip"), None, None, buffer, logs).await;
+    }
+
+    #[tokio::test]
+    async fn s3_process_message_multipart_gzip() {
+        use std::io::Read;
+
+        let key = uuid::Uuid::new_v4().to_string();
+        let logs = lines_from_gzip_file("tests/data/multipart-gzip.log.gz");
+
+        let buffer = {
+            let mut file = std::fs::File::open("tests/data/multipart-gzip.log.gz")
+                .expect("file can be opened");
+            let mut data = Vec::new();
+            file.read_to_end(&mut data).expect("file can be read");
+            data
+        };
+
+        test_event(key, Some("gzip"), None, None, buffer, logs).await;
+    }
+
+    #[tokio::test]
+    async fn s3_process_message_multipart_zstd() {
+        use std::io::Read;
+
+        let key = uuid::Uuid::new_v4().to_string();
+        let logs = lines_from_zst_file("tests/data/multipart-zst.log.zst");
+
+        let buffer = {
+            let mut file = std::fs::File::open("tests/data/multipart-zst.log.zst")
+                .expect("file can be opened");
+            let mut data = Vec::new();
+            file.read_to_end(&mut data).expect("file can be read");
+            data
+        };
+
+        test_event(key, Some("zstd"), None, None, buffer, logs).await;
     }
 
     #[tokio::test]

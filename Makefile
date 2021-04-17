@@ -20,7 +20,7 @@ export SCOPE ?= ""
 # Override this with any extra flags for cargo bench
 export CARGO_BENCH_FLAGS ?= ""
 # override this to put criterion output elsewhere
-export CRITERION_HOME ?= "$(mkfile_dir)target/criterion"
+export CRITERION_HOME ?= $(mkfile_dir)target/criterion
 # Override to false to disable autospawning services on integration tests.
 export AUTOSPAWN ?= true
 # Override to control if services are turned off after integration tests.

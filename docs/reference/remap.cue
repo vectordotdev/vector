@@ -104,7 +104,7 @@ remap: #Remap & {
 				.tid = to_int!(.tid)
 
 				# Extract structured data
-				message_parts = split(.message, ", ", limit: 2) ?? []
+				message_parts = split(.message, ", ", limit: 2)
 				structured = parse_key_value(message_parts[1], key_value_delimiter: ":", field_delimiter: ",") ?? {}
 				.message = message_parts[0]
 				. = merge(., structured)

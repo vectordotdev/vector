@@ -9,7 +9,7 @@ use crate::{
 };
 use bytes::{Buf, Bytes};
 use chrono::Utc;
-use flate2::read::GzDecoder;
+use flate2::read::MultiGzDecoder;
 use snafu::ResultExt;
 use std::{convert::Infallible, io};
 use warp::{http::StatusCode, Filter};
@@ -55,7 +55,7 @@ fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::rejec
             |encoding: Option<String>, request_id: String, body: Bytes| async move {
                 match encoding {
                     Some(s) if s == "gzip" => {
-                        Ok(Box::new(GzDecoder::new(body.reader())) as Box<dyn io::Read>)
+                        Ok(Box::new(MultiGzDecoder::new(body.reader())) as Box<dyn io::Read>)
                     }
                     Some(s) => Err(warp::reject::Rejection::from(
                         RequestError::UnsupportedEncoding {

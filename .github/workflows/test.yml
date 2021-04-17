@@ -61,6 +61,8 @@ jobs:
               - "Cargo.toml"
               - "Makefile"
               - "rust-toolchain"
+            deny:
+              - 'deny.toml'
             docs:
               - 'docs/**'
             markdown:
@@ -284,12 +286,12 @@ jobs:
         if: needs.changes.outputs.source == 'true'
         run: make check-events
       - name: Check cargo deny advisories
-        if: needs.changes.outputs.dependencies == 'true'
+        if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
         uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories
       - name: Check cargo deny licenses
-        if: needs.changes.outputs.dependencies == 'true'
+        if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
         uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check licenses
