@@ -112,8 +112,7 @@ impl ProviderConfig for HttpConfig {
                             Err(err) => {
                                 error!(
                                     message = "Error interpreting response",
-                                    error = ?err.into_cause().unwrap_or(Box::new("unknown error"))
-                                );
+                                    error = ?err.into_cause());
 
                                 continue;
                             }
@@ -131,8 +130,9 @@ impl ProviderConfig for HttpConfig {
                                 .is_err()
                             {
                                 info!(
-                                    message = "Couldn't apply config."
-                                    error = "provider control channel has gone away");
+                                    message = "Couldn't apply config.",
+                                    error = "provider control channel has gone away"
+                                );
 
                                 break;
                             }
@@ -145,7 +145,7 @@ impl ProviderConfig for HttpConfig {
                     Err(err) => {
                         error!(
                             message = "HTTP error",
-                            error = ?err
+                            error = ?err,
                             url = ?url.as_str());
                     }
                 }
