@@ -491,6 +491,7 @@ urls: {
 	vector_transform_aws_cloudwatch_logs_subscription_parser: "\(vector_website)/docs/reference/configuration/transforms/aws_cloudwatch_logs_subscription_parser"
 	vector_transforms:                                        "\(vector_website)/docs/reference/configuration/transforms/"
 	vector_twitter:                                           "https://twitter.com/vectordotdev"
+	vector_unit_testing:                                      "\(vector_website)/guides/level-up/unit-testing/"
 	vector_version_branches:                                  "\(vector_repo)/branches/all?query=v"
 	vector_website:                                           "https://vector.dev"
 	vrl_announcement:                                         "\(vector_website)/blog/vector-remap-language"

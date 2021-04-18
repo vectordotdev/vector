@@ -25,9 +25,10 @@ jobs:
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.8.0
+      - uses: styfle/cancel-workflow-action@0.9.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
+          all_but_latest: true # can cancel workflows scheduled later
 
   changes:
       runs-on: ubuntu-20.04
@@ -60,6 +61,8 @@ jobs:
               - "Cargo.toml"
               - "Makefile"
               - "rust-toolchain"
+            deny:
+              - 'deny.toml'
             docs:
               - 'docs/**'
             markdown:
@@ -87,7 +90,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2.1.4
+      - uses: actions/cache@v2.1.5
         with:
           path: |
             ~/.cargo/registry
@@ -108,7 +111,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.4
+      - uses: actions/cache@v2.1.5
         with:
           path: |
             ~/.cargo/registry
@@ -143,7 +146,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.4
+      - uses: actions/cache@v2.1.5
         with:
           path: |
             ~/.cargo/registry
@@ -170,7 +173,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2.1.4
+      - uses: actions/cache@v2.1.5
         with:
           path: |
             ~/.cargo/registry
@@ -208,10 +211,10 @@ jobs:
       - run: |
           TEMP=$(mktemp -d)
           curl \
-              -L https://github.com/cuelang/cue/releases/download/v0.3.0/cue_v0.3.0_linux_amd64.tar.gz \
-              -o "${TEMP}/cue_v0.3.0_linux_amd64.tar.gz"
+              -L https://github.com/cuelang/cue/releases/download/v0.3.2/cue_v0.3.2_linux_amd64.tar.gz \
+              -o "${TEMP}/cue_v0.3.2_linux_amd64.tar.gz"
           tar \
-              -xvf "${TEMP}/cue_v0.3.0_linux_amd64.tar.gz" \
+              -xvf "${TEMP}/cue_v0.3.2_linux_amd64.tar.gz" \
               -C "${TEMP}"
           sudo cp "${TEMP}/cue" /usr/bin/cue
       - run: make test-vrl
@@ -241,7 +244,7 @@ jobs:
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
-      - uses: actions/cache@v2.1.4
+      - uses: actions/cache@v2.1.5
         with:
           path: |
             ~/.cargo/registry
@@ -283,12 +286,12 @@ jobs:
         if: needs.changes.outputs.source == 'true'
         run: make check-events
       - name: Check cargo deny advisories
-        if: needs.changes.outputs.dependencies == 'true'
+        if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
         uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories
       - name: Check cargo deny licenses
-        if: needs.changes.outputs.dependencies == 'true'
+        if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
         uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check licenses
@@ -312,6 +315,6 @@ jobs:
     - name: Discord notification
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.0
+      uses: Ilshidur/action-discord@0.3.2
       with:
         args: "Master tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"

@@ -7,7 +7,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use bytes::{Buf, Bytes};
-use flate2::read::{DeflateDecoder, GzDecoder};
+use flate2::read::{DeflateDecoder, MultiGzDecoder};
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use headers::{Authorization, HeaderMapExt};
 use serde::{Deserialize, Serialize};
@@ -133,7 +133,7 @@ pub fn decode(header: &Option<String>, mut body: Bytes) -> Result<Bytes, ErrorMe
                 "identity" => body,
                 "gzip" => {
                     let mut decoded = Vec::new();
-                    GzDecoder::new(body.reader())
+                    MultiGzDecoder::new(body.reader())
                         .read_to_end(&mut decoded)
                         .map_err(|error| handle_decode_error(encoding, error))?;
                     decoded.into()
