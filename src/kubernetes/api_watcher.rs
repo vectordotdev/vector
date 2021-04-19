@@ -230,6 +230,17 @@ mod tests {
     #[tokio::test]
     async fn test_invocation_errors() {
         let cases: Vec<(Box<dyn FnOnce(When, Then)>, _, _)> = vec![
+            // Desync.
+            (
+                Box::new(|when, then| {
+                    when.method(GET).path("/api/v1/pods");
+                    then.status(410)
+                        .header("Content-Type", "application/json")
+                        .body("body");
+                }),
+                Some(StatusCode::GONE),
+                true,
+            ),
             // Other error.
             (
                 Box::new(|when, then| {
