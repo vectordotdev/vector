@@ -240,14 +240,12 @@ impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
 #[cfg(test)]
 mod test {
     use super::{Acker, BufferConfig, DropWhenFull, WhenFull};
-    use futures::channel::mpsc;
-    use futures::{future, Sink, Stream};
-    use futures01::task::AtomicTask;
+    use futures::{channel::mpsc, future, task::AtomicWaker, Sink, Stream};
     use std::{
         sync::{atomic::AtomicUsize, Arc},
         task::Poll,
     };
-    use tokio01_test::task::MockTask;
+    use tokio_test::task::spawn;
 
     #[tokio::test]
     async fn drop_when_full() {
@@ -278,18 +276,20 @@ mod test {
     #[test]
     fn ack_with_none() {
         let counter = Arc::new(AtomicUsize::new(0));
-        let task = Arc::new(AtomicTask::new());
+        let task = Arc::new(AtomicWaker::new());
         let acker = Acker::Disk(counter, Arc::clone(&task));
 
-        let mut mock = MockTask::new();
+        let mut mock = spawn(future::poll_fn::<(), _>(|cx| {
+            task.register(cx.waker());
+            Poll::Pending
+        }));
+        let _ = mock.poll();
 
-        mock.enter(|| task.register());
-
-        assert!(!mock.is_notified());
+        assert!(!mock.is_woken());
         acker.ack(0);
-        assert!(!mock.is_notified());
+        assert!(!mock.is_woken());
         acker.ack(1);
-        assert!(mock.is_notified());
+        assert!(mock.is_woken());
     }
 
     #[test]
