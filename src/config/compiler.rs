@@ -1,6 +1,8 @@
 use super::{builder::ConfigBuilder, validation, Config, TransformOuter};
 use indexmap::IndexMap;
 
+/// Compile defers to either building a "stub" config, deferring the rest to a provider...
+/// or configuring components directly.
 pub fn compile(builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     if builder.provider.is_some() {
         compile_provider(builder)
@@ -9,7 +11,8 @@ pub fn compile(builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<Stri
     }
 }
 
-fn compile_provider(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
+/// Validates provider configuration, and returns a "stub" config with empty topology.
+fn compile_provider(builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     validation::check_provider(&builder)?;
 
     Ok((
@@ -29,6 +32,8 @@ fn compile_provider(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>),
     ))
 }
 
+/// Compiles a "full" config, with topology components. This is used either when a provider is
+/// not selected, or the provider has already returned a configuration.
 fn compile_components(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
 
