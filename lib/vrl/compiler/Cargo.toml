@@ -26,9 +26,5 @@ dyn-clone = "1.0.4"
 criterion = "0.3"
 
 [[bench]]
-name = "path"
-harness = false
-
-[[bench]]
 name = "kind"
 harness = false

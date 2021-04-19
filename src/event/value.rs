@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 use serde::{Deserialize, Serialize, Serializer};
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 use std::iter::FromIterator;
@@ -287,6 +287,34 @@ impl Value {
         }
     }
 
+    pub fn as_map(&self) -> &BTreeMap<String, Value> {
+        match self {
+            Value::Map(ref m) => m,
+            _ => panic!("Tried to call `Value::as_map` on a non-map value."),
+        }
+    }
+
+    pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
+        match self {
+            Value::Map(ref mut m) => m,
+            _ => panic!("Tried to call `Value::as_map` on a non-map value."),
+        }
+    }
+
+    pub fn as_array(&self) -> &Vec<Value> {
+        match self {
+            Value::Array(ref a) => a,
+            _ => panic!("Tried to call `Value::as_array` on a non-array value."),
+        }
+    }
+
+    pub fn as_array_mut(&mut self) -> &mut Vec<Value> {
+        match self {
+            Value::Array(ref mut a) => a,
+            _ => panic!("Tried to call `Value::as_array` on a non-array value."),
+        }
+    }
+
     pub fn kind(&self) -> &str {
         match self {
             Value::Bytes(_) => "string",
@@ -445,11 +473,8 @@ impl Value {
                                                    // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
                                                    // contains cost extra. It's super unfortunate, hopefully future work can solve this.
             if !sub_value.contains(&lookup) {
-                trace!(option = %lookup, "Found coalesce option.");
                 needle = Some(lookup);
                 break;
-            } else {
-                trace!(option = %lookup, "Did not find coalesce option.");
             }
         }
         match needle {
@@ -465,45 +490,36 @@ impl Value {
         map: &mut BTreeMap<String, Value>,
         value: Value,
     ) -> std::result::Result<Option<Value>, EventError> {
-        trace!(field = %name, "Seeking into map.");
-        let next_value = match working_lookup.get(0) {
-            Some(SegmentBuf::Index(next_len)) => {
-                Value::Array(Vec::with_capacity(*next_len as usize))
-            }
-            Some(SegmentBuf::Field(FieldBuf { .. })) => Value::Map(Default::default()),
-            Some(SegmentBuf::Coalesce(set)) => {
-                Value::Map(Default::default())
-                /*
-                let mut cursor_set = set;
-                loop {
-                    match cursor_set.get(0).and_then(|v| v.get(0)) {
-                        None => return Err(EventError::EmptyCoalesceSubSegment),
-                        Some(SegmentBuf::Field(FieldBuf { .. })) => {
-                            break {
-                                trace!("Preparing inner map.");
-                                Value::Map(Default::default())
-                            }
-                        }
-                        Some(SegmentBuf::Index(_)) => {
-                            break {
-                                trace!("Preparing inner array.");
-                                Value::Array(Vec::with_capacity(0))
-                            }
-                        }
-                        Some(SegmentBuf::Coalesce(set)) => cursor_set = &set,
-                    }
-                }
-                */
-            }
+        let next_segment = match working_lookup.get(0) {
+            Some(segment) => segment,
             None => {
-                trace!(field = %name, "Inserted.");
                 return Ok(map.insert(name.to_string(), value));
             }
         };
+
         map.entry(name.to_string())
+            .and_modify(|entry| match next_segment {
+                SegmentBuf::Index(next_len) if !matches!(entry, Value::Array(_)) => {
+                    *entry = Value::Array(Vec::with_capacity(*next_len as usize));
+                }
+                SegmentBuf::Field(_) if !matches!(entry, Value::Map(_)) => {
+                    *entry = Value::Map(Default::default());
+                }
+                SegmentBuf::Coalesce(_set) if !matches!(entry, Value::Map(_)) => {
+                    *entry = Value::Map(Default::default());
+                }
+                _ => (),
+            })
             .or_insert_with(|| {
-                trace!(key = ?name, "Pushing required next value onto map.");
-                next_value
+                // The entry this segment is referring to doesn't exist, so we must push the appropriate type
+                // into the value.
+                match next_segment {
+                    SegmentBuf::Index(next_len) => {
+                        Value::Array(Vec::with_capacity(*next_len as usize))
+                    }
+                    SegmentBuf::Field(_) => Value::Map(Default::default()),
+                    SegmentBuf::Coalesce(_) => Value::Map(Default::default()),
+                }
             })
             .insert(working_lookup, value)
             .map_err(|mut e| {
@@ -534,31 +550,26 @@ impl Value {
     ) -> std::result::Result<Option<Value>, EventError> {
         {
             match array.get_mut(i as usize) {
-                Some(inner) => {
-                    trace!(index = ?i, "Seeking into array.");
-                    inner.insert(working_lookup, value).map_err(|mut e| {
-                        if let EventError::PrimitiveDescent {
-                            original_target,
-                            primitive_at,
-                            original_value: _,
-                        } = &mut e
-                        {
-                            let segment = SegmentBuf::Index(i);
-                            original_target.push_front(segment.clone());
-                            primitive_at.push_front(segment);
-                        };
-                        e
-                    })
-                }
+                Some(inner) => inner.insert(working_lookup, value).map_err(|mut e| {
+                    if let EventError::PrimitiveDescent {
+                        original_target,
+                        primitive_at,
+                        original_value: _,
+                    } = &mut e
+                    {
+                        let segment = SegmentBuf::Index(i);
+                        original_target.push_front(segment.clone());
+                        primitive_at.push_front(segment);
+                    };
+                    e
+                }),
                 None => {
-                    trace!(lenth = ?i, "Array too small, resizing array to fit.");
                     // Fill the vector to the index.
                     array.resize(i as usize, Value::Null);
                     let mut retval = Ok(None);
                     let next_val = match working_lookup.get(0) {
                         Some(SegmentBuf::Index(next_len)) => {
                             let mut inner = Value::Array(Vec::with_capacity(*next_len as usize));
-                            trace!("Preparing inner array.");
                             retval = inner.insert(working_lookup, value).map_err(|mut e| {
                                 if let EventError::PrimitiveDescent {
                                     original_target,
@@ -581,7 +592,6 @@ impl Value {
                             let mut inner = Value::Map(Default::default());
                             let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
                             let requires_quoting = *requires_quoting; // This is for navigating an ownership issue in the error stack reporting.
-                            trace!("Preparing inner map.");
                             retval = inner.insert(working_lookup, value).map_err(|mut e| {
                                 if let EventError::PrimitiveDescent {
                                     original_target,
@@ -600,86 +610,28 @@ impl Value {
                             });
                             inner
                         }
-                        Some(SegmentBuf::Coalesce(set)) => {
-                            match set.get(0) {
-                                None => return Err(EventError::EmptyCoalesceSubSegment),
-                                Some(_) => {
-                                    let mut inner = Value::Map(Default::default());
-                                    trace!("Preparing inner map.");
-                                    let set = SegmentBuf::Coalesce(set.clone());
-                                    retval =
-                                        inner.insert(working_lookup, value).map_err(|mut e| {
-                                            if let EventError::PrimitiveDescent {
-                                                original_target,
-                                                primitive_at,
-                                                original_value: _,
-                                            } = &mut e
-                                            {
-                                                original_target.push_front(set.clone());
-                                                primitive_at.push_front(set.clone());
-                                            };
-                                            e
-                                        });
-                                    inner
-                                }
+                        Some(SegmentBuf::Coalesce(set)) => match set.get(0) {
+                            None => return Err(EventError::EmptyCoalesceSubSegment),
+                            Some(_) => {
+                                let mut inner = Value::Map(Default::default());
+                                let set = SegmentBuf::Coalesce(set.clone());
+                                retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                                    if let EventError::PrimitiveDescent {
+                                        original_target,
+                                        primitive_at,
+                                        original_value: _,
+                                    } = &mut e
+                                    {
+                                        original_target.push_front(set.clone());
+                                        primitive_at.push_front(set.clone());
+                                    };
+                                    e
+                                });
+                                inner
                             }
-                            /*
-                            let mut cursor_set = set;
-                            loop {
-                                match cursor_set.get(0).and_then(|v| v.get(0)) {
-                                    None => return Err(EventError::EmptyCoalesceSubSegment),
-                                    Some(SegmentBuf::Field(FieldBuf { .. })) => {
-                                        break {
-                                            let mut inner = Value::Map(Default::default());
-                                            trace!("Preparing inner map.");
-                                            let set = SegmentBuf::Coalesce(set.clone());
-                                            retval = inner.insert(working_lookup, value).map_err(
-                                                |mut e| {
-                                                    if let EventError::PrimitiveDescent {
-                                                        original_target,
-                                                        primitive_at,
-                                                        original_value: _,
-                                                    } = &mut e
-                                                    {
-                                                        original_target.push_front(set.clone());
-                                                        primitive_at.push_front(set.clone());
-                                                    };
-                                                    e
-                                                },
-                                            );
-                                            inner
-                                        }
-                                    }
-                                    Some(SegmentBuf::Index(i)) => {
-                                        break {
-                                            let mut inner = Value::Array(Vec::with_capacity(0));
-                                            trace!("Preparing inner array.");
-                                            let segment = SegmentBuf::Index(*i); // This is for navigating an ownership issue in the error stack reporting.
-                                            retval = inner.insert(working_lookup, value).map_err(
-                                                |mut e| {
-                                                    if let EventError::PrimitiveDescent {
-                                                        original_target,
-                                                        primitive_at,
-                                                        original_value: _,
-                                                    } = &mut e
-                                                    {
-                                                        original_target.push_front(segment.clone());
-                                                        primitive_at.push_front(segment.clone());
-                                                    };
-                                                    e
-                                                },
-                                            );
-                                            inner
-                                        };
-                                    }
-                                    Some(SegmentBuf::Coalesce(set)) => cursor_set = set,
-                                }
-                            }
-                             */
-                        }
+                        },
                         None => value,
                     };
-                    trace!(?next_val, "Setting index to value.");
                     array.push(next_val);
                     retval
                 }
@@ -698,7 +650,6 @@ impl Value {
         let this_val = match segment {
             SegmentBuf::Index(_) => {
                 let mut inner = Value::Array(Vec::with_capacity(0));
-                trace!("Preparing inner array.");
                 working_lookup.push_front(segment.clone());
                 retval = inner.insert(working_lookup, value).map_err(|mut e| {
                     if let EventError::PrimitiveDescent {
@@ -716,7 +667,6 @@ impl Value {
             }
             SegmentBuf::Field(FieldBuf { .. }) => {
                 let mut inner = Value::Map(Default::default());
-                trace!("Preparing inner map.");
                 working_lookup.push_front(segment.clone());
                 retval = inner.insert(working_lookup, value).map_err(|mut e| {
                     if let EventError::PrimitiveDescent {
@@ -733,56 +683,21 @@ impl Value {
                 inner
             }
             SegmentBuf::Coalesce(set) => {
-                todo!()
-                /*
-                let mut cursor_set = &set;
-                loop {
-                    match cursor_set.get(0).and_then(|v| v.get(0)) {
-                        None => return Err(EventError::EmptyCoalesceSubSegment),
-                        Some(SegmentBuf::Field(FieldBuf { .. })) => {
-                            break {
-                                let mut inner = Value::Map(Default::default());
-                                trace!("Preparing inner map.");
-                                let set = SegmentBuf::Coalesce(set.clone());
-                                retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                                    if let EventError::PrimitiveDescent {
-                                        original_target,
-                                        primitive_at,
-                                        original_value: _,
-                                    } = &mut e
-                                    {
-                                        original_target.push_front(set.clone());
-                                        primitive_at.push_front(set.clone());
-                                    };
-                                    e
-                                });
-                                inner
-                            }
-                        }
-                        Some(SegmentBuf::Index(_)) => {
-                            break {
-                                let mut inner = Value::Array(Vec::with_capacity(0));
-                                trace!("Preparing inner array.");
-                                let set = SegmentBuf::Coalesce(set.clone());
-                                retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                                    if let EventError::PrimitiveDescent {
-                                        original_target,
-                                        primitive_at,
-                                        original_value: _,
-                                    } = &mut e
-                                    {
-                                        original_target.push_front(set.clone());
-                                        primitive_at.push_front(set.clone());
-                                    };
-                                    e
-                                });
-                                inner
-                            }
-                        }
-                        Some(SegmentBuf::Coalesce(set)) => cursor_set = &set,
-                    }
-                }
-                */
+                let mut inner = Value::Map(Default::default());
+                let set = SegmentBuf::Coalesce(set.clone());
+                retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                    if let EventError::PrimitiveDescent {
+                        original_target,
+                        primitive_at,
+                        original_value: _,
+                    } = &mut e
+                    {
+                        original_target.push_front(set.clone());
+                        primitive_at.push_front(set.clone());
+                    };
+                    e
+                });
+                inner
             }
         };
         trace!(val = ?this_val, "Setting previously existing null to value.");
@@ -944,11 +859,8 @@ impl Value {
                     // contains cost extra. It's super unfortunate, hopefully future work can solve this.
                     lookup.extend(working_lookup.clone()); // We need to include the rest of the removal.
                     if value.contains(lookup.clone()) {
-                        trace!(option = %lookup, "Found coalesce option.");
                         needle = Some(lookup);
                         break;
-                    } else {
-                        trace!(option = %lookup, "Did not find coalesce option.");
                     }
                 }
                 match needle {
@@ -959,43 +871,21 @@ impl Value {
             // Descend into a map
             (Some(Segment::Field(Field { ref name, .. })), Value::Map(map)) => {
                 if working_lookup.len() == 0 {
-                    trace!(field = ?name, "Removing from map.");
-                    let retval = Ok(map.remove(*name));
-                    if map.is_empty() {
-                        trace!(prune, "Map is empty. May need to prune.");
-                    } else {
-                        trace!(
-                            prune,
-                            items = map.len(),
-                            "Map is not empty, no possible pruning."
-                        );
-                    };
-                    retval
+                    Ok(map.remove(*name))
                 } else {
-                    trace!(field = ?name, "Descending into map.");
                     let mut inner_is_empty = false;
                     let retval = match map.get_mut(*name) {
                         Some(inner) => {
                             let ret = inner.remove(working_lookup.clone(), prune);
                             if inner.is_empty() {
-                                trace!(prune, "Map is empty. May need to prune.");
                                 inner_is_empty = true;
-                            } else {
-                                trace!(
-                                    prune,
-                                    items = ?inner.len(),
-                                    "Map is not empty, no possible pruning."
-                                );
                             };
                             ret
                         }
                         None => Ok(None),
                     };
                     if inner_is_empty && prune {
-                        trace!(field = %name, "Pruning.");
                         map.remove(*name);
-                    } else {
-                        trace!("Pruning not required.");
                     }
                     retval
                 }
@@ -1004,44 +894,27 @@ impl Value {
             // Descend into an array
             (Some(Segment::Index(i)), Value::Array(array)) => {
                 if working_lookup.len() == 0 {
-                    trace!(index = ?i, "Removing from array.");
                     // We don't **actually** want to remove the index, we just want to swap it with a null.
                     let retval = if array.len() > i as usize {
                         Ok(Some(array.remove(i as usize)))
                     } else {
                         Ok(None)
                     };
-                    if array.is_empty() {
-                        trace!(prune, "Array is empty. May need to prune.");
-                    } else {
-                        trace!(
-                            prune,
-                            items = array.len(),
-                            "Array is not empty, no possible pruning."
-                        );
-                    };
                     retval
                 } else {
-                    trace!(index = ?i, "Descending into array.");
                     let mut inner_is_empty = false;
                     let retval = match array.get_mut(i as usize) {
                         Some(inner) => {
                             let ret = inner.remove(working_lookup.clone(), prune);
                             if inner.is_empty() {
-                                trace!(prune, "Inner Array is empty. May need to prune.");
                                 inner_is_empty = true
-                            } else {
-                                trace!(prune, "Inner Array is not empty, no possible pruning.");
-                            };
+                            }
                             ret
                         }
                         None => Ok(None),
                     };
                     if inner_is_empty && prune {
-                        trace!("Pruning.");
                         array.remove(i as usize);
-                    } else {
-                        trace!("Pruning not required.");
                     }
                     retval
                 }
@@ -1080,10 +953,7 @@ impl Value {
         let this_segment = working_lookup.pop_front();
         match (this_segment, self) {
             // We've met an end and found our value.
-            (None, item) => {
-                trace!(?item, "Found.");
-                Ok(Some(item))
-            }
+            (None, item) => Ok(Some(item)),
             // Descend into a coalesce
             (Some(Segment::Coalesce(sub_segments)), value) => {
                 // Creating a needle with a back out of the loop is very important.
@@ -1094,47 +964,28 @@ impl Value {
                     // contains cost extra. It's super unfortunate, hopefully future work can solve this.
                     lookup.extend(working_lookup.clone()); // We need to include the rest of the get.
                     if value.contains(lookup.clone()) {
-                        trace!(option = %lookup, "Found coalesce option.");
                         needle = Some(lookup);
                         break;
-                    } else {
-                        trace!(option = %lookup, "Did not find coalesce option.");
                     }
                 }
                 match needle {
-                    Some(needle) => {
-                        trace!(?needle, "Getting inside coalesce option.");
-                        value.get(needle)
-                    }
+                    Some(needle) => value.get(needle),
                     None => Ok(None),
                 }
             }
             // Descend into a map
             (Some(Segment::Field(Field { ref name, .. })), Value::Map(map)) => {
-                trace!(field = %name, "Descending into map.");
                 match map.get(*name) {
                     Some(inner) => inner.get(working_lookup.clone()),
-                    None => {
-                        trace!("Found nothing.");
-                        Ok(None)
-                    }
+                    None => Ok(None),
                 }
             }
-            (Some(Segment::Index(_)), Value::Map(_)) => {
-                trace!("Mismatched index trying to access map.");
-                Ok(None)
-            }
+            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
             // Descend into an array
-            (Some(Segment::Index(i)), Value::Array(array)) => {
-                trace!(index = %i, "Descending into array.");
-                match array.get(i as usize) {
-                    Some(inner) => inner.get(working_lookup.clone()),
-                    None => {
-                        trace!("Found nothing.");
-                        Ok(None)
-                    }
-                }
-            }
+            (Some(Segment::Index(i)), Value::Array(array)) => match array.get(i as usize) {
+                Some(inner) => inner.get(working_lookup.clone()),
+                None => Ok(None),
+            },
             (Some(Segment::Field(Field { .. })), Value::Array(_)) => {
                 trace!("Mismatched field trying to access array.");
                 Ok(None)
@@ -1180,10 +1031,7 @@ impl Value {
         let this_segment = working_lookup.pop_front();
         match (this_segment, self) {
             // We've met an end and found our value.
-            (None, item) => {
-                trace!(?item, "Found.");
-                Ok(Some(item))
-            }
+            (None, item) => Ok(Some(item)),
             // This is just not allowed!
             (_, Value::Boolean(_))
             | (_, Value::Bytes(_))
@@ -1201,50 +1049,29 @@ impl Value {
                                                            // Notice we cannot take multiple mutable borrows in a loop, so we must pay the
                                                            // contains cost extra. It's super unfortunate, hopefully future work can solve this.
                     if value.contains(lookup.clone()) {
-                        trace!(option = %lookup, "Found coalesce option.");
                         needle = Some(lookup);
                         break;
-                    } else {
-                        trace!(option = %lookup, "Did not find coalesce option.");
                     }
                 }
                 match needle {
-                    Some(needle) => {
-                        trace!(?needle, "Getting inside coalesce option.");
-                        value.get_mut(needle)
-                    }
+                    Some(needle) => value.get_mut(needle),
                     None => Ok(None),
                 }
             }
             // Descend into a map
             (Some(Segment::Field(Field { ref name, .. })), Value::Map(map)) => {
                 match map.get_mut(*name) {
-                    Some(inner) => {
-                        trace!(field = %name, "Seeking into map.");
-                        inner.get_mut(working_lookup.clone())
-                    }
-                    None => {
-                        trace!(field = %name, "Discovered no value to see into.");
-                        Ok(None)
-                    }
-                }
-            }
-            (Some(Segment::Index(_)), Value::Map(_)) => {
-                trace!("Mismatched index trying to access map.");
-                Ok(None)
-            }
-            // Descend into an array
-            (Some(Segment::Index(i)), Value::Array(array)) => {
-                trace!(index = %i, "Seeking into array.");
-                match array.get_mut(i as usize) {
                     Some(inner) => inner.get_mut(working_lookup.clone()),
                     None => Ok(None),
                 }
             }
-            (Some(Segment::Field(_)), Value::Array(_)) => {
-                trace!("Mismatched field trying to access array.");
-                Ok(None)
-            }
+            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
+            // Descend into an array
+            (Some(Segment::Index(i)), Value::Array(array)) => match array.get_mut(i as usize) {
+                Some(inner) => inner.get_mut(working_lookup.clone()),
+                None => Ok(None),
+            },
+            (Some(Segment::Field(_)), Value::Array(_)) => Ok(None),
         }
     }
 
@@ -1308,11 +1135,8 @@ impl Value {
             | Value::Timestamp(_)
             | Value::Float(_)
             | Value::Integer(_)
-            | Value::Null => Box::new(prefix.into_iter().inspect(|v| {
-                trace!(prefix = ?v, "Enqueuing leaf for iteration.");
-            })),
+            | Value::Null => Box::new(prefix.into_iter()),
             Value::Map(m) => {
-                trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
                 let this = prefix
                     .clone()
                     .or_else(|| Some(Lookup::default()))
@@ -1327,7 +1151,6 @@ impl Value {
                                 l
                             },
                         );
-                        trace!(lookup = ?lookup, "Seeking lookups inside non-leaf element.");
                         v.lookups(Some(lookup), only_leaves)
                     })
                     .flatten();
@@ -1339,7 +1162,6 @@ impl Value {
                 }
             }
             Value::Array(a) => {
-                trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
                 let this = prefix
                     .clone()
                     .or_else(|| Some(Lookup::default()))
@@ -1355,7 +1177,6 @@ impl Value {
                                 l
                             },
                         );
-                        trace!(lookup = ?lookup, "Seeking lookups inside non-leaf element.");
                         v.lookups(Some(lookup), only_leaves)
                     })
                     .flatten();
@@ -1426,16 +1247,8 @@ impl Value {
             | Value::Timestamp(_)
             | Value::Float(_)
             | Value::Integer(_)
-            | Value::Null => Box::new(
-                prefix
-                    .map(move |v| {
-                        trace!(prefix = ?v, "Enqueuing leaf for iteration.");
-                        (v, self)
-                    })
-                    .into_iter(),
-            ),
+            | Value::Null => Box::new(prefix.map(move |v| (v, self)).into_iter()),
             Value::Map(m) => {
-                trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
                 let this = prefix
                     .clone()
                     .or_else(|| Some(Lookup::default()))
@@ -1451,7 +1264,6 @@ impl Value {
                                 l
                             },
                         );
-                        trace!(lookup = ?lookup, "Seeking lookups inside non-leaf element.");
                         v.pairs(Some(lookup), only_leaves)
                     })
                     .flatten();
@@ -1463,7 +1275,6 @@ impl Value {
                 }
             }
             Value::Array(a) => {
-                trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
                 let this = prefix
                     .clone()
                     .or_else(|| Some(Lookup::default()))
@@ -1480,7 +1291,6 @@ impl Value {
                                 l
                             },
                         );
-                        trace!(lookup = ?lookup, "Seeking lookups inside non-leaf element.");
                         v.pairs(Some(lookup), only_leaves)
                     })
                     .flatten();
@@ -1510,6 +1320,219 @@ mod test {
         test_file.read_to_end(&mut buf)?;
 
         Ok(buf)
+    }
+
+    mod insert_get_remove {
+        use super::*;
+
+        #[test]
+        fn single_field() {
+            let mut value = Value::from(BTreeMap::default());
+            let key = "root";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_map()[key], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
+        }
+
+        #[test]
+        fn nested_field() {
+            let mut value = Value::from(BTreeMap::default());
+            let key = "root.doot";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_map()["root"].as_map()["doot"], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
+        }
+
+        #[test]
+        fn double_nested_field() {
+            let mut value = Value::from(BTreeMap::default());
+            println!("NORK");
+            let key = "root.doot.toot";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(
+                value.as_map()["root"].as_map()["doot"].as_map()["toot"],
+                marker
+            );
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
+        }
+
+        #[test]
+        fn single_index() {
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "[0]";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_array()[0], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
+        }
+
+        #[test]
+        fn nested_index() {
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "[0][0]";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_array()[0].as_array()[0], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
+        }
+
+        #[test]
+        fn field_index() {
+            let mut value = Value::from(BTreeMap::default());
+            let key = "root[0]";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_map()["root"].as_array()[0], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
+        }
+
+        #[test]
+        fn index_field() {
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "[0].boot";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_array()[0].as_map()["boot"], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
+        }
+
+        #[test]
+        fn nested_index_field() {
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "[0][0].boot";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_array()[0].as_array()[0].as_map()["boot"], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
+        }
+
+        #[test]
+        fn field_with_nested_index_field() {
+            let mut value = Value::from(BTreeMap::default());
+            let key = "root[0][0].boot";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(
+                value.as_map()["root"].as_array()[0].as_array()[0].as_map()["boot"],
+                marker
+            );
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
+        }
+
+        #[test]
+        fn coalesced_index() {
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "([0] | [1])";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_array()[0], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
+        }
+
+        #[test]
+        fn coalesced_index_with_tail() {
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "([0] | [1]).bloop";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None); // Duplicated on purpose.
+            assert_eq!(value.as_array()[0].as_map()["bloop"], marker);
+            assert_eq!(value.as_array()[1].as_map()["bloop"], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone()));
+
+            assert_eq!(value.as_array()[1].as_map()["bloop"], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker)); // Duplicated on purpose.
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker)); // Duplicated on purpose.
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker)); // Duplicated on purpose.
+        }
+    }
+
+    mod corner_cases {
+        use super::*;
+
+        #[test]
+        fn remove_prune_map_with_map() {
+            let mut value = Value::from(BTreeMap::default());
+            let key = "foo.bar";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            // Since the `foo` map is now empty, this should get cleaned.
+            assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker));
+            assert!(!value.contains("foo"));
+        }
+
+        #[test]
+        fn remove_prune_map_with_array() {
+            let mut value = Value::from(BTreeMap::default());
+            let key = "foo[0]";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            // Since the `foo` map is now empty, this should get cleaned.
+            assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker));
+            assert!(!value.contains("foo"));
+        }
+
+        #[test]
+        fn remove_prune_array_with_map() {
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "[0].bar";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            // Since the `foo` map is now empty, this should get cleaned.
+            assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker));
+            assert!(!value.contains(0));
+        }
+
+        #[test]
+        fn remove_prune_array_with_array() {
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "[0][0]";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            // Since the `foo` map is now empty, this should get cleaned.
+            assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker));
+            assert!(!value.contains(0));
+        }
     }
 
     // This test iterates over the `tests/data/fixtures/value` folder and:

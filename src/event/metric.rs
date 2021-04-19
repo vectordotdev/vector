@@ -944,8 +944,7 @@ mod test {
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
     use shared::btreemap;
-    use std::str::FromStr;
-    use vrl::{Path, Value};
+    use vrl::Value;
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -1222,7 +1221,7 @@ mod test {
                 }
                 .into()
             )),
-            metric.get(&Path::from_str(".").unwrap())
+            metric.get(&LookupBuf::root())
         );
     }
 
@@ -1263,7 +1262,7 @@ mod test {
         ];
 
         for (path, current, new, delete) in cases {
-            let path = Path::from_str(path).unwrap();
+            let path = LookupBuf::from_str(path).unwrap();
 
             assert_eq!(Ok(current), metric.get(&path));
             assert_eq!(Ok(()), metric.insert(&path, new.clone()));
@@ -1297,34 +1296,34 @@ mod test {
 
         assert_eq!(
             Err(format!(
-                "invalid path .zork: expected one of {}",
+                "invalid path zork: expected one of {}",
                 validpaths_get.join(", ")
             )),
-            metric.get(&Path::from_str("zork").unwrap())
+            metric.get(&LookupBuf::from_str("zork").unwrap())
         );
 
         assert_eq!(
             Err(format!(
-                "invalid path .zork: expected one of {}",
+                "invalid path zork: expected one of {}",
                 validpaths_set.join(", ")
             )),
-            metric.insert(&Path::from_str("zork").unwrap(), "thing".into())
+            metric.insert(&LookupBuf::from_str("zork").unwrap(), "thing".into())
         );
 
         assert_eq!(
             Err(format!(
-                "invalid path .zork: expected one of {}",
+                "invalid path zork: expected one of {}",
                 validpaths_set.join(", ")
             )),
-            metric.remove(&Path::from_str("zork").unwrap(), true)
+            metric.remove(&LookupBuf::from_str("zork").unwrap(), true)
         );
 
         assert_eq!(
             Err(format!(
-                "invalid path .tags.foo.flork: expected one of {}",
+                "invalid path tags.foo.flork: expected one of {}",
                 validpaths_get.join(", ")
             )),
-            metric.get(&Path::from_str("tags.foo.flork").unwrap())
+            metric.get(&LookupBuf::from_str("tags.foo.flork").unwrap())
         );
     }
 }

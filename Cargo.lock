@@ -7965,6 +7965,7 @@ dependencies = [
  "hex",
  "hostname",
  "lazy_static",
+ "lookup",
  "md-5",
  "nom 6.1.2",
  "regex",
