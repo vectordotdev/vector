@@ -96,7 +96,7 @@ vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures
 async-trait = "0.1.49"
-futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
+futures = { version = "0.3.14", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 futures01 = { version = "0.1.25", package = "futures", default-features = false }
 tokio = { version = "1.5.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.1", default-features = false }
@@ -106,15 +106,15 @@ tokio-util = { version = "0.6.6", default-features = false, features = ["codec",
 # Tracing
 tracing = { version = "0.1.25", default-features = false }
 tracing-core = { version = "0.1.17", default-features = false }
-tracing-futures = { version = "0.2", default-features = false, features = ["futures-01", "futures-03"]}
-tracing-log = { version = "0.1.0", default-features = false }
+tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-01", "futures-03"] }
+tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.2.17", default-features = false }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
-metrics = { version = "0.14", default-features = false }
-metrics-tracing-context = { version = "0.3", default-features = false }
-metrics-util = { version = "0.6", default-features = false }
+metrics = { version = "0.14.2", default-features = false }
+metrics-tracing-context = { version = "0.3.0", default-features = false }
+metrics-util = { version = "0.6.2", default-features = false }
 
 # Aws
 rusoto_cloudwatch = { version = "0.46.0", optional = true }
@@ -130,21 +130,21 @@ rusoto_sqs = { version = "0.46.0", optional = true }
 rusoto_sts = { version = "0.46.0", optional = true }
 
 # Tower
-tower = { version = "0.4.0", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
+tower = { version = "0.4.6", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
 tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
-serde = { version = "1.0.125", default-features = false,  features = ["derive"] }
+serde = { version = "1.0.125", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.64", default-features = false, features = ["raw_value"] }
-serde_yaml = { version ="0.8.13", default-features = false }
+serde_yaml = { version = "0.8.17", default-features = false }
 
 # Prost
-prost = { version = "0.7.0", default-features = false  }
+prost = { version = "0.7.0", default-features = false }
 prost-types = { version = "0.7.0", default-features = false }
 
 # GCP
-goauth = { version = "0.9.0", default-features = false, optional = true }
-gouth = { version = "0.2", default-features = false, optional = true }
+goauth = { version = "0.10.0", default-features = false, optional = true }
+gouth = { version = "0.2.0", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
@@ -155,7 +155,7 @@ itertools = { version = "0.10.0", default-features = false, optional = true }
 # API client
 crossterm = { version = "0.19.0", default-features = false, optional = true }
 num-format = { version = "0.4.0", default-features = false, features = ["with-num-bigint"], optional = true }
-number_prefix = { version = "0.4", default-features = false, features = ["std"], optional = true }
+number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
 tui = { version = "0.14.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # VRL Lang
@@ -169,77 +169,77 @@ avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
 bollard = { version = "0.10.1", default-features = false, features = ["ssl"], optional = true }
-bytes = { version = "1.0.0", default-features = false, features = ["serde"] }
-bytesize = { version = "1.0.0", default-features = false, optional = true }
+bytes = { version = "1.0.1", default-features = false, features = ["serde"] }
+bytesize = { version = "1.0.1", default-features = false, optional = true }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
 cidr-utils = { version = "0.5.1", default-features = false }
-colored = { version = "2.0", default-features = false }
-dashmap = { version = "4", default-features = false }
+colored = { version = "2.0.0", default-features = false }
+dashmap = { version = "4.0.2", default-features = false }
 db-key = { version = "0.0.5", default-features = false }
-derivative = { version = "2.1.1", default-features = false }
+derivative = { version = "2.2.0", default-features = false }
 dirs-next = { version = "2.0.0", default-features = false, optional = true }
-dyn-clone = { version = "1.0.3", default-features = false }
-encoding_rs = { version = "0.8", features = ["serde"] }
+dyn-clone = { version = "1.0.4", default-features = false }
+encoding_rs = { version = "0.8.28", features = ["serde"] }
 evmap = { git = "https://github.com/lukesteensen/evmap.git", rev = "45ba973c22715a68c5e99efad4b072421f7ad40b", default-features = false, features = ["bytes"], optional = true }
 exitcode = { version = "1.1.2", default-features = false }
-flate2 = { version = "1.0.19", default-features = false }
+flate2 = { version = "1.0.20", default-features = false }
 getset = { version = "0.1.1", default-features = false }
 glob = { version = "0.3.0", default-features = false }
 grok = { version = "~1.0.1", default-features = false, optional = true }
-headers = { version = "0.3", default-features = false }
+headers = { version = "0.3.4", default-features = false }
 heim = { version = "0.1.0-rc.1", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 hostname = { version = "0.3.1", default-features = false }
-http = { version = "0.2", default-features = false }
-hyper = { version = "0.14", default-features = false, features = ["stream"] }
+http = { version = "0.2.4", default-features = false }
+hyper = { version = "0.14.5", default-features = false, features = ["stream"] }
 hyper-openssl = { version = "0.9.1", default-features = false }
 indexmap = { version = "1.6.2", default-features = false, features = ["serde"] }
 indoc = { version = "1.0.3", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
-jemallocator = { version = "0.3.0", default-features = false, optional = true }
+jemallocator = { version = "0.3.2", default-features = false, optional = true }
 k8s-openapi = { version = "0.11.0", default-features = true, features = ["api", "v1_16"], optional = true }
-lazy_static = { version = "1.3.0", default-features = false }
-leveldb = { version = "0.8", default-features = false, optional = true }
+lazy_static = { version = "1.4.0", default-features = false }
+leveldb = { version = "0.8.6", default-features = false, optional = true }
 listenfd = { version = "0.3.3", default-features = false, optional = true }
 logfmt = { version = "0.0.2", default-features = false, optional = true }
-lru = { version = "0.6.3", default-features = false, optional = true }
-maxminddb = { version = "0.17.0", default-features = false, optional = true }
+lru = { version = "0.6.5", default-features = false, optional = true }
+maxminddb = { version = "0.17.2", default-features = false, optional = true }
 mongodb = { version = "2.0.0-alpha.1", default-features = false, features = ["tokio-runtime"], optional = true }
 async-nats = { version = "0.9.12", default-features = false, optional = true }
-nom = { version = "6.0.1", default-features = false, optional = true }
+nom = { version = "6.1.2", default-features = false, optional = true }
 notify = { version = "4.0.16", default-features = false }
-num_cpus = { version = "1.10.0", default-features = false }
+num_cpus = { version = "1.13.0", default-features = false }
 once_cell = { version = "1.3", default-features = false }
 openssl = { version = "0.10.33", default-features = false }
 openssl-probe = { version = "0.1.2", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
 pest = { version = "2.1.3", default-features = false }
 pest_derive = { version = "2.1.0", default-features = false }
-pin-project = { version = "1.0.6", default-features = false }
+pin-project = { version = "1.0.7", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
 pulsar = { version = "2.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
-rand = { version = "0.8.0", default-features = false, features = ["small_rng"] }
+rand = { version = "0.8.3", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.0", default-features = false }
 rdkafka = { version = "0.26.0", default-features = false, features = ["libz", "ssl", "zstd"], optional = true }
 regex = { version = "1.4.5", default-features = false, features = ["std", "perf"] }
 # make sure to update the external docs when the Lua version changes
 rlua = { version = "0.17.0", default-features = true, optional = true }
-seahash = { version = "4.0.1", default-features = false, optional = true }
+seahash = { version = "4.1.0", default-features = false, optional = true }
 semver = { version = "0.11.0", default-features = false, features = ["serde"], optional = true }
 snafu = { version = "0.6.10", default-features = false, features = ["futures", "futures-01"] }
-snap = { version = "1.0.3", default-features = false, optional = true }
+snap = { version = "1.0.4", default-features = false, optional = true }
 socket2 = { version = "0.4.0", default-features = false }
 stream-cancel = { version = "0.8.0", default-features = false }
 strip-ansi-escapes = { version = "0.1.0", default-features = false }
 structopt = { version = "0.3.21", default-features = false }
-syslog = { version = "5", default-features = false, optional = true }
+syslog = { version = "5.0.0", default-features = false, optional = true }
 syslog_loose = { version = "0.10.0", default-features = false, optional = true }
 tokio-postgres = { version = "0.7.1", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
-typetag = { version = "0.1.6", default-features = false }
-twox-hash = { version = "1.6", default-features = false }
+typetag = { version = "0.1.7", default-features = false }
+twox-hash = { version = "1.6.0", default-features = false }
 url = { version = "2.2.1", default-features = false }
-uuid = { version = "0.8", default-features = false, features = ["serde", "v4"], optional = true }
-warp = { version = "0.3.0", default-features = false, optional = true }
+uuid = { version = "0.8.2", default-features = false, features = ["serde", "v4"], optional = true }
+warp = { version = "0.3.1", default-features = false, optional = true }
 zstd = { version = "0.6", default-features = false }
 cfg-if = { version = "1.0.0", default-features = false }
 
@@ -251,14 +251,14 @@ lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863da
 vector-wasm = { path = "lib/vector-wasm", optional = true }
 
 [target.'cfg(windows)'.dependencies]
-schannel = "0.1"
+schannel = "0.1.19"
 windows-service = "0.3.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-security-framework = "2.0"
+security-framework = "2.2.0"
 
 [target.'cfg(unix)'.dependencies]
-atty = "0.2"
+atty = "0.2.14"
 nix = "0.20.0"
 
 [build-dependencies]
@@ -267,22 +267,22 @@ built = { version = "0.4.4", features = ["chrono", "git2"] }
 
 [dev-dependencies]
 approx = "0.4.0"
-assert_cmd = "1.0.2"
-base64 = "0.13"
-criterion = { version = "0.3", features = ["html_reports"] }
+assert_cmd = "1.0.3"
+base64 = "0.13.0"
+criterion = { version = "0.3.4", features = ["html_reports"] }
 httpmock = { version = "0.5.7", default-features = false }
 libc = "0.2.93"
 libz-sys = "1.1.2"
 matches = "0.1.8"
 pretty_assertions = "0.7.2"
 reqwest = { version = "0.11.3", features = ["json"] }
-tempfile = "3.0.6"
+tempfile = "3.2.0"
 tokio = { version = "1.5.0", features = ["test-util"] }
 tokio-test = "0.4.1"
 tokio01-test = "0.1.1"
 tower-test = "0.4.0"
 walkdir = "2.3.2"
-quickcheck = "1"
+quickcheck = "1.0.3"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
