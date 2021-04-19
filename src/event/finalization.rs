@@ -25,6 +25,27 @@ impl MaybeEventFinalizer {
             }
         };
     }
+
+    pub fn update_status(&self, status: EventStatus) {
+        if let Some(finalizers) = &self.0 {
+            for finalizer in finalizers.0.iter() {
+                finalizer.update_status(status);
+            }
+        }
+    }
+
+    pub fn update_sources(&mut self) {
+        if let Some(finalizers) = self.0.take() {
+            for finalizer in finalizers.0.iter() {
+                finalizer.update_sources();
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn count_finalizers(&self) -> usize {
+        self.0.as_ref().map(|f| f.0.len()).unwrap_or(0)
+    }
 }
 
 impl From<EventFinalizer> for MaybeEventFinalizer {
@@ -66,7 +87,10 @@ impl EventFinalizers {
             // Box<[T]> is missing IntoIterator
             let other: Vec<_> = other.0.into();
             for entry in other.into_iter() {
-                result.push(entry);
+                // deduplicate by hand, assume the list is trivially small
+                if !result.iter().any(|existing| Arc::ptr_eq(existing, &entry)) {
+                    result.push(entry);
+                }
             }
             self.0 = result.into();
         }
@@ -121,7 +145,7 @@ impl Drop for EventFinalizer {
 
 /// Wrapper type for an array of batch notifiers.
 #[derive(Debug)]
-pub struct BatchNotifiers(ImmutVec<Arc<BatchNotifier>>);
+struct BatchNotifiers(ImmutVec<Arc<BatchNotifier>>);
 
 impl BatchNotifiers {
     fn update_status(&self, status: EventStatus) {
@@ -130,6 +154,12 @@ impl BatchNotifiers {
                 notifier.update_status(status);
             }
         }
+    }
+}
+
+impl From<BatchNotifier> for BatchNotifiers {
+    fn from(notifier: BatchNotifier) -> Self {
+        Self(vec![Arc::new(notifier)].into())
     }
 }
 
@@ -145,13 +175,13 @@ pub struct BatchNotifier {
 impl BatchNotifier {
     /// Create a new `BatchNotifier` along with the receiver used to
     /// await its finalization status.
-    pub fn new_with_receiver() -> (Self, oneshot::Receiver<BatchStatus>) {
+    pub fn new_with_receiver() -> (Arc<Self>, oneshot::Receiver<BatchStatus>) {
         let (sender, receiver) = oneshot::channel();
         let notifier = Self {
             status: Atomic::new(BatchStatus::Delivered),
             notifier: Some(sender),
         };
-        (notifier, receiver)
+        (Arc::new(notifier), receiver)
     }
 
     /// Update this notifier's status from the status of a finalized event.
@@ -255,5 +285,119 @@ impl EventStatus {
             // Failed does not otherwise update
             (Self::Failed, _) => self,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::sync::oneshot::{error::TryRecvError::Empty, Receiver};
+
+    #[test]
+    fn defaults() {
+        let finalizer = MaybeEventFinalizer::default();
+        assert_eq!(finalizer.count_finalizers(), 0);
+    }
+
+    #[test]
+    fn sends_notification() {
+        let (fin, mut receiver) = make_finalizer();
+        assert_eq!(receiver.try_recv(), Err(Empty));
+        drop(fin);
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    }
+
+    #[test]
+    fn early_update() {
+        let (mut fin, mut receiver) = make_finalizer();
+        fin.update_status(EventStatus::Failed);
+        assert_eq!(receiver.try_recv(), Err(Empty));
+        fin.update_sources();
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
+    }
+
+    #[test]
+    fn clone_events() {
+        let (fin1, mut receiver) = make_finalizer();
+        let fin2 = fin1.clone();
+        assert_eq!(fin1.count_finalizers(), 1);
+        assert_eq!(fin2.count_finalizers(), 1);
+        assert_eq!(fin1, fin2);
+
+        assert_eq!(receiver.try_recv(), Err(Empty));
+        drop(fin1);
+        assert_eq!(receiver.try_recv(), Err(Empty));
+        drop(fin2);
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    }
+
+    #[test]
+    fn merge_events() {
+        let mut fin0 = MaybeEventFinalizer::default();
+        let (fin1, mut receiver1) = make_finalizer();
+        let (fin2, mut receiver2) = make_finalizer();
+
+        assert_eq!(fin0.count_finalizers(), 0);
+        fin0.merge(fin1);
+        assert_eq!(fin0.count_finalizers(), 1);
+        fin0.merge(fin2);
+        assert_eq!(fin0.count_finalizers(), 2);
+
+        assert_eq!(receiver1.try_recv(), Err(Empty));
+        assert_eq!(receiver2.try_recv(), Err(Empty));
+        drop(fin0);
+        assert_eq!(receiver1.try_recv(), Ok(BatchStatus::Delivered));
+        assert_eq!(receiver2.try_recv(), Ok(BatchStatus::Delivered));
+    }
+
+    #[test]
+    fn clone_and_merge_events() {
+        let (mut fin1, mut receiver) = make_finalizer();
+        let fin2 = fin1.clone();
+        fin1.merge(fin2);
+        assert_eq!(fin1.count_finalizers(), 1);
+
+        assert_eq!(receiver.try_recv(), Err(Empty));
+        drop(fin1);
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    }
+
+    #[test]
+    fn multi_event_batch() {
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let event1: MaybeEventFinalizer = EventFinalizer::new(Arc::clone(&batch)).into();
+        let mut event2: MaybeEventFinalizer = EventFinalizer::new(Arc::clone(&batch)).into();
+        let event3: MaybeEventFinalizer = EventFinalizer::new(Arc::clone(&batch)).into();
+        // Also clone one…
+        let event4 = event1.clone();
+        drop(batch);
+        assert_eq!(event1.count_finalizers(), 1);
+        assert_eq!(event2.count_finalizers(), 1);
+        assert_eq!(event3.count_finalizers(), 1);
+        assert_eq!(event4.count_finalizers(), 1);
+        assert_ne!(event1, event2);
+        assert_ne!(event1, event3);
+        assert_eq!(event1, event4);
+        assert_ne!(event2, event3);
+        assert_ne!(event2, event4);
+        assert_ne!(event3, event4);
+        // …and merge another
+        event2.merge(event3);
+        assert_eq!(event2.count_finalizers(), 2);
+
+        assert_eq!(receiver.try_recv(), Err(Empty));
+        drop(event1);
+        assert_eq!(receiver.try_recv(), Err(Empty));
+        drop(event2);
+        assert_eq!(receiver.try_recv(), Err(Empty));
+        drop(event4);
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    }
+
+    fn make_finalizer() -> (MaybeEventFinalizer, Receiver<BatchStatus>) {
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let finalizer: MaybeEventFinalizer = EventFinalizer::new(batch).into();
+        assert_eq!(finalizer.count_finalizers(), 1);
+        (finalizer, receiver)
     }
 }

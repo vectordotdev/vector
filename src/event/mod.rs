@@ -16,7 +16,7 @@ mod lookup;
 mod value;
 
 pub use finalization::{
-    BatchNotifier, BatchNotifiers, BatchStatus, EventFinalizer, EventStatus, MaybeEventFinalizer,
+    BatchNotifier, BatchStatus, EventFinalizer, EventStatus, MaybeEventFinalizer,
 };
 pub use log_event::LogEvent;
 pub use lookup::Lookup;
