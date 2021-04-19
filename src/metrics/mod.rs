@@ -12,7 +12,7 @@ use crate::metrics::registry::VectorRegistry;
 use crate::{event::Metric, Event};
 use metrics::{Key, KeyData, SharedString};
 use metrics_tracing_context::TracingContextLayer;
-use metrics_util::layers::Layer;
+use metrics_util::layers::{AbsoluteLayer, Layer};
 use metrics_util::{CompositeKey, MetricKind};
 use once_cell::sync::OnceCell;
 
@@ -78,6 +78,22 @@ pub fn init() -> crate::Result<()> {
     // case it doesn't _do_ much other than shepherd into the registry and
     // update the cardinality counter, see above, as needed.
     let recorder = VectorRecorder::new(registry);
+
+    #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
+    let recorder = {
+        let patterns = vec![
+            "kafka_requests_total",
+            "kafka_requests_bytes_total",
+            "kafka_responses_total",
+            "kafka_responses_bytes_total",
+            "kafka_produced_messages_total",
+            "kafka_produced_messages_bytes_total",
+            "kafka_consumed_messages_total",
+            "kafka_consumed_messages_bytes_total",
+        ];
+        AbsoluteLayer::from_patterns(patterns).layer(recorder)
+    };
+
     let recorder: Box<dyn metrics::Recorder> = if tracing_context_layer_enabled() {
         // Apply a layer to capture tracing span fields as labels.
         Box::new(TracingContextLayer::new(VectorLabelFilter).layer(recorder))

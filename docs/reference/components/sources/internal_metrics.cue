@@ -347,49 +347,49 @@ components: sources: internal_metrics: {
 		}
 		kafka_requests_total: {
 			description:       "Total number of requests sent to Kafka brokers."
-			type:              "gauge"
+			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
 		kafka_requests_bytes_total: {
 			description:       "Total number of bytes transmitted to Kafka brokers."
-			type:              "gauge"
+			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
 		kafka_responses_total: {
 			description:       "Total number of responses received from Kafka brokers."
-			type:              "gauge"
+			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
 		kafka_responses_bytes_total: {
 			description:       "Total number of bytes received from Kafka brokers."
-			type:              "gauge"
+			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
 		kafka_produced_messages_total: {
 			description:       "Total number of messages transmitted (produced) to Kafka brokers."
-			type:              "gauge"
+			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
 		kafka_produced_messages_bytes_total: {
 			description:       "Total number of message bytes (including framing, such as per-Message framing and MessageSet/batch framing) transmitted to Kafka brokers."
-			type:              "gauge"
+			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
 		kafka_consumed_messages_total: {
 			description:       "Total number of messages consumed, not including ignored messages (due to offset, etc), from Kafka brokers.."
-			type:              "gauge"
+			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
 		kafka_consumed_messages_bytes_total: {
 			description:       "Total number of message bytes (including framing) received from Kafka brokers."
-			type:              "gauge"
+			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
