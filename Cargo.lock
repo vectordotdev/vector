@@ -754,7 +754,7 @@ dependencies = [
  "hyper-rustls",
  "hyper-unix-connector",
  "log",
- "pin-project 1.0.6",
+ "pin-project 1.0.7",
  "rustls 0.19.0",
  "rustls-native-certs",
  "serde",
@@ -2075,7 +2075,7 @@ checksum = "531a685ab99b8f60a271b44d5dd1a76e55124a8c9fa0407b7a8e9cd172d5b588"
 dependencies = [
  "futures-core",
  "futures-sink",
- "pin-project 1.0.6",
+ "pin-project 1.0.7",
  "spinning_top",
 ]
 
@@ -2854,7 +2854,7 @@ dependencies = [
  "httparse",
  "httpdate",
  "itoa",
- "pin-project 1.0.6",
+ "pin-project 1.0.7",
  "socket2 0.4.0",
  "tokio",
  "tower-service",
@@ -2919,7 +2919,7 @@ dependencies = [
  "anyhow",
  "hex",
  "hyper",
- "pin-project 1.0.6",
+ "pin-project 1.0.7",
  "tokio",
 ]
 
@@ -4612,11 +4612,11 @@ dependencies = [
 
 [[package]]
 name = "pin-project"
-version = "1.0.6"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc174859768806e91ae575187ada95c91a29e96a98dc5d2cd9a1fed039501ba6"
+checksum = "c7509cc106041c40a4518d2af7a61530e1eed0e6285296a3d8c5472806ccc4a4"
 dependencies = [
- "pin-project-internal 1.0.6",
+ "pin-project-internal 1.0.7",
 ]
 
 [[package]]
@@ -4632,9 +4632,9 @@ dependencies = [
 
 [[package]]
 name = "pin-project-internal"
-version = "1.0.6"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a490329918e856ed1b083f244e3bfe2d8c4f336407e4ea9e1a9f479ff09049e5"
+checksum = "48c950132583b500556b1efd71d45b319029f2b71518d979fcc208e16b42426f"
 dependencies = [
  "proc-macro2 1.0.26",
  "quote 1.0.9",
@@ -6547,7 +6547,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f36848ff9e3e8af125e00ab244aca7af0a8b270d4c6afcc9ccb4e523f7972c4c"
 dependencies = [
  "futures-core",
- "pin-project 1.0.6",
+ "pin-project 1.0.7",
  "tokio",
 ]
 
@@ -6991,7 +6991,7 @@ checksum = "ac1bec5c0a4aa71e3459802c7a12e8912c2091ce2151004f9ce95cc5d1c6124e"
 dependencies = [
  "futures 0.3.14",
  "openssl",
- "pin-project 1.0.6",
+ "pin-project 1.0.7",
  "tokio",
 ]
 
@@ -7075,7 +7075,7 @@ dependencies = [
  "futures-util",
  "log",
  "native-tls",
- "pin-project 1.0.6",
+ "pin-project 1.0.7",
  "tokio",
  "tokio-native-tls",
  "tungstenite",
@@ -7124,7 +7124,7 @@ checksum = "f715efe02c0862926eb463e49368d38ddb119383475686178e32e26d15d06a66"
 dependencies = [
  "futures-core",
  "futures-util",
- "pin-project 1.0.6",
+ "pin-project 1.0.7",
  "tokio",
  "tokio-util",
  "tower-layer",
@@ -7151,7 +7151,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4546773ffeab9e4ea02b8872faa49bb616a80a7da66afc2f32688943f97efa7"
 dependencies = [
  "futures-util",
- "pin-project 1.0.6",
+ "pin-project 1.0.7",
  "tokio",
  "tokio-test",
  "tower-layer",
@@ -7228,7 +7228,7 @@ dependencies = [
  "futures 0.1.30",
  "futures 0.3.14",
  "futures-task",
- "pin-project 1.0.6",
+ "pin-project 1.0.7",
  "tracing 0.1.25",
 ]
 
@@ -7753,7 +7753,7 @@ dependencies = [
  "percent-encoding",
  "pest",
  "pest_derive",
- "pin-project 1.0.6",
+ "pin-project 1.0.7",
  "portpicker",
  "postgres-openssl",
  "pretty_assertions",
@@ -8089,7 +8089,7 @@ dependencies = [
  "mime",
  "mime_guess",
  "percent-encoding",
- "pin-project 1.0.6",
+ "pin-project 1.0.7",
  "scoped-tls",
  "serde",
  "serde_json",
