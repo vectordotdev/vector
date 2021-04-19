@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-use super::{EventFinalizer, EventFinalizers};
+use super::{EventFinalizer, MaybeEventFinalizer};
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
 
@@ -9,28 +9,20 @@ use shared::EventDataEq;
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct EventMetadata {
     #[serde(default, skip)]
-    finalizers: Option<EventFinalizers>,
+    finalizer: MaybeEventFinalizer,
 }
 
 impl EventMetadata {
     /// Replace the finalizers array with the given one.
     pub fn with_finalizer(self, finalizer: EventFinalizer) -> Self {
         Self {
-            finalizers: Some(EventFinalizers::new(finalizer)),
+            finalizer: finalizer.into(),
         }
     }
 
     /// Merge the other `EventMetadata` into this.
     pub fn merge(&mut self, other: Self) {
-        self.finalizers = match (self.finalizers.take(), other.finalizers) {
-            (None, None) => None,
-            (Some(f), None) => Some(f),
-            (None, Some(f)) => Some(f),
-            (Some(mut f1), Some(f2)) => {
-                f1.merge(f2);
-                Some(f1)
-            }
-        };
+        self.finalizer.merge(other.finalizer);
     }
 }
 

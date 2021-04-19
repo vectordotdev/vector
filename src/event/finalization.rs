@@ -7,9 +7,35 @@ use tokio::sync::oneshot;
 
 type ImmutVec<T> = Box<[T]>;
 
+/// Wrapper type for an optional finalizer,
+/// to go into the top-level event metadata.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct MaybeEventFinalizer(Option<EventFinalizers>);
+
+impl MaybeEventFinalizer {
+    /// Merge another finalizer into this one.
+    pub fn merge(&mut self, other: Self) {
+        self.0 = match (self.0.take(), other.0) {
+            (None, None) => None,
+            (Some(f), None) => Some(f),
+            (None, Some(f)) => Some(f),
+            (Some(mut f1), Some(f2)) => {
+                f1.merge(f2);
+                Some(f1)
+            }
+        };
+    }
+}
+
+impl From<EventFinalizer> for MaybeEventFinalizer {
+    fn from(finalizer: EventFinalizer) -> Self {
+        Self(Some(EventFinalizers::new(finalizer)))
+    }
+}
+
 /// Wrapper type for an array of event finalizers.
 #[derive(Clone, Debug)]
-pub struct EventFinalizers(ImmutVec<Arc<EventFinalizer>>);
+struct EventFinalizers(ImmutVec<Arc<EventFinalizer>>);
 
 impl Eq for EventFinalizers {}
 
@@ -23,12 +49,12 @@ impl PartialEq for EventFinalizers {
 
 impl EventFinalizers {
     /// Create a new array of event finalizer with the single event.
-    pub fn new(finalizer: EventFinalizer) -> Self {
+    fn new(finalizer: EventFinalizer) -> Self {
         Self(vec![Arc::new(finalizer)].into())
     }
 
     /// Merge the given list of finalizers into this array.
-    pub fn merge(&mut self, other: Self) {
+    fn merge(&mut self, other: Self) {
         if !other.0.is_empty() {
             // This requires a bit of extra work both to avoid cloning
             // the actual elements and because `self.0` cannot be
