@@ -78,7 +78,6 @@ impl Clone for Writer {
 }
 
 impl Sink<Event> for Writer {
-    /// The type of value produced by the sink when an error occurs.
     type Error = ();
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -101,7 +100,11 @@ impl Sink<Event> for Writer {
         if let Some(event) = self.slot.take() {
             if let Some(event) = self.try_send(event) {
                 self.slot = Some(event);
-                self.pending(cx);
+
+                self.blocked_write_tasks
+                    .lock()
+                    .unwrap()
+                    .push(cx.waker().clone());
 
                 if self.current_size.load(Ordering::Acquire) == 0 {
                     // This is a rare case where the reader managed to consume
@@ -155,13 +158,6 @@ impl Writer {
         }
 
         None
-    }
-
-    fn pending(&mut self, cx: &mut Context<'_>) {
-        self.blocked_write_tasks
-            .lock()
-            .unwrap()
-            .push(cx.waker().clone());
     }
 
     fn flush(&mut self) {
