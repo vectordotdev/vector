@@ -307,7 +307,7 @@ To extract the core of vector I propose that we do the following:
 * Once a critical mass of core exists, create a core-private source for
   generating `Event` load into a topology and a core-private sink that signals
   for program termination after a set number of `Event`s have been
-  received. Bundle this into a `vector*core` for throughput trials of core only,
+  received. Bundle this into a `vector-core` for throughput trials of core only,
   validating the package structure for cheap experimentation and for avoiding
   core as "vector but with pieces missing".
 * Migrate any remaining core concepts.
