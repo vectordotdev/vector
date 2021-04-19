@@ -1,10 +1,16 @@
 #![cfg(feature = "leveldb")]
 
 use crate::event::Event;
-use futures01::{Async, AsyncSink, Poll, Sink, Stream};
+use futures::Sink;
+use futures01::Stream;
+use pin_project::{pin_project};
 use snafu::Snafu;
-use std::io;
-use std::path::{Path, PathBuf};
+use std::{
+    io,
+    path::{Path, PathBuf},
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 pub mod leveldb_buffer;
 
@@ -27,7 +33,7 @@ pub enum Error {
 }
 
 pub trait DiskBuffer {
-    type Writer: Sink<SinkItem = Event, SinkError = ()>;
+    type Writer: Sink<Event, Error = ()>;
     type Reader: Stream<Item = Event, Error = ()> + Send;
 
     fn build(
@@ -36,28 +42,29 @@ pub trait DiskBuffer {
     ) -> Result<(Self::Writer, Self::Reader, super::Acker), Error>;
 }
 
+#[pin_project]
 #[derive(Clone)]
 pub struct Writer {
+    #[pin]
     inner: leveldb_buffer::Writer,
 }
 
-impl Sink for Writer {
-    type SinkItem = Event;
-    type SinkError = ();
-
-    fn start_send(
-        &mut self,
-        event: Self::SinkItem,
-    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
-        self.inner.start_send(event)
+impl Sink<Event> for Writer {
+    type Error = ();
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_ready(cx)
     }
 
-    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        self.inner.poll_complete()
+    fn start_send(self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
+        self.project().inner.start_send(item)
     }
 
-    fn close(&mut self) -> Poll<(), Self::SinkError> {
-        self.inner.close()
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().inner.poll_close(cx)
     }
 }
 

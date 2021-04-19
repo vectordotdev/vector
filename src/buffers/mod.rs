@@ -1,6 +1,6 @@
 use crate::{config::Resource, internal_events::EventOut, Event};
 #[cfg(feature = "leveldb")]
-use futures::compat::{Sink01CompatExt, Stream01CompatExt};
+use futures::compat::Stream01CompatExt;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use futures01::task::AtomicTask;
 use pin_project::pin_project;
@@ -83,7 +83,7 @@ impl BufferInputCloner {
 
             #[cfg(feature = "leveldb")]
             BufferInputCloner::Disk(writer, when_full) => {
-                let inner = writer.clone().sink_compat();
+                let inner = writer.clone();
                 if when_full == &WhenFull::DropNewest {
                     Box::new(DropWhenFull::new(inner))
                 } else {
