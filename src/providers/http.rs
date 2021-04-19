@@ -85,6 +85,8 @@ impl ProviderConfig for HttpConfig {
                 // Build HTTP request.
                 let mut builder = http::request::Builder::new().uri(url.to_string());
 
+                // Augment with headers. These may be required e.g. for authentication to
+                // private endpoints.
                 for (header, value) in request.headers.iter() {
                     builder = builder.header(header.as_str(), value.as_str());
                 }
@@ -121,6 +123,7 @@ impl ProviderConfig for HttpConfig {
                         let text = String::from_utf8_lossy(body.as_ref());
                         let config = load_from_str(&text, None);
 
+                        // Check if the configuration is valid. If so, send it upstream.
                         if let Ok(config) = config {
                             info!("Configuration appears to be valid.");
 

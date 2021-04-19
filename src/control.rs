@@ -25,6 +25,8 @@ pub struct Controller {
 }
 
 impl Controller {
+    /// Create a new controller. We'll have space for 2 control messages at a time, to
+    /// ensure the channel isn't blocking.
     pub fn new() -> Self {
         let (tx, rx) = mpsc::channel(2);
 
@@ -60,7 +62,6 @@ impl Controller {
         S: Stream<Item = T> + 'static + Send + Sync,
     {
         let tx = self.tx.clone();
-
         let (shutdown_tx, mut shutdown_rx) = oneshot::channel();
 
         tokio::spawn(async move {
@@ -86,7 +87,7 @@ impl Controller {
     }
 
     /// Takes the receiver, replacing it with `None`. A controller is intended to have only one
-    /// consumer, at the root of the application.
+    /// consumer, typically at the root of the application.
     pub fn take_rx(&mut self) -> Option<mpsc::Receiver<Control>> {
         self.rx.take()
     }

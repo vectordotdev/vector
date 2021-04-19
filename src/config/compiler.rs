@@ -10,7 +10,7 @@ pub fn compile(builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<Stri
 }
 
 fn compile_provider(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
-    validation::check_provider(&mut builder)?;
+    validation::check_provider(&builder)?;
 
     Ok((
         Config {
