@@ -8,7 +8,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-
+use indoc::indoc;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 
@@ -26,7 +26,7 @@ inventory::submit! {
 
 impl GenerateConfig for SyslogRemapConfig {
     fn generate_config() -> toml::Value {
-        return SocketConfig::generate_config();
+        SocketConfig::generate_config()
     }
 }
 
@@ -35,10 +35,10 @@ impl GenerateConfig for SyslogRemapConfig {
 impl SourceConfig for SyslogRemapConfig {
     async fn build(&self, mut cx: SourceContext) -> crate::Result<super::Source> {
         let conf = RemapConfig {
-            source: r#"
-structured = parse_syslog!(.message)
-. = merge(., structured)
-"#
+            source: indoc! {r#"
+                structured = parse_syslog!(.message)
+                . = merge(., structured)
+            "#}
             .to_string(),
             drop_on_abort: false,
             drop_on_error: false,
