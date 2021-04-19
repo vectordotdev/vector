@@ -473,9 +473,9 @@ dependencies = [
 
 [[package]]
 name = "attohttpc"
-version = "0.16.3"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdb8867f378f33f78a811a8eb9bf108ad99430d7aad43315dd9319c827ef6247"
+checksum = "9a8bda305457262b339322106c776e3fd21df860018e566eb6a5b1aa4b6ae02d"
 dependencies = [
  "flate2",
  "http",
@@ -2436,11 +2436,11 @@ dependencies = [
 
 [[package]]
 name = "gouth"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f60d0f7f508e9354fb3d9f734655e47ac525177e60dbdcb120ed482f58f385c"
+checksum = "c138d157085ba4eb1aaa86e622dc348b956d5ac9d2e446b65941467ebffefdd6"
 dependencies = [
- "attohttpc 0.16.3",
+ "attohttpc 0.17.0",
  "gcemeta",
  "jsonwebtoken",
  "serde",
