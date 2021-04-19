@@ -1,8 +1,6 @@
 use crate::{config::Resource, internal_events::EventOut, Event};
-#[cfg(feature = "leveldb")]
-use futures::compat::Stream01CompatExt;
-use futures::{channel::mpsc, Sink, SinkExt, Stream};
-use futures01::task::AtomicTask;
+
+use futures::{channel::mpsc, task::AtomicWaker, Sink, SinkExt, Stream};
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -14,8 +12,6 @@ use std::{
     },
     task::{Context, Poll},
 };
-#[cfg(feature = "leveldb")]
-use tokio_stream::StreamExt;
 
 #[cfg(feature = "leveldb")]
 pub mod disk;
@@ -137,11 +133,6 @@ impl BufferConfig {
                 let (tx, rx, acker) = disk::open(&data_dir, buffer_dir.as_ref(), *max_size)
                     .map_err(|error| error.to_string())?;
                 let tx = BufferInputCloner::Disk(tx, *when_full);
-                let rx = Box::new(
-                    rx.compat()
-                        .take_while(|event| event.is_ok())
-                        .map(|event| event.unwrap()),
-                );
                 Ok((tx, rx, acker))
             }
         }
@@ -160,7 +151,7 @@ impl BufferConfig {
 
 #[derive(Debug, Clone)]
 pub enum Acker {
-    Disk(Arc<AtomicUsize>, Arc<AtomicTask>),
+    Disk(Arc<AtomicUsize>, Arc<AtomicWaker>),
     Null,
 }
 
@@ -178,7 +169,7 @@ impl Acker {
                 Acker::Null => {}
                 Acker::Disk(counter, notifier) => {
                     counter.fetch_add(num, Ordering::Relaxed);
-                    notifier.notify();
+                    notifier.wake();
                 }
             }
             emit!(EventOut { count: num });
@@ -187,7 +178,7 @@ impl Acker {
 
     pub fn new_for_testing() -> (Self, Arc<AtomicUsize>) {
         let ack_counter = Arc::new(AtomicUsize::new(0));
-        let notifier = Arc::new(AtomicTask::new());
+        let notifier = Arc::new(AtomicWaker::new());
         let acker = Acker::Disk(Arc::clone(&ack_counter), Arc::clone(&notifier));
 
         (acker, ack_counter)

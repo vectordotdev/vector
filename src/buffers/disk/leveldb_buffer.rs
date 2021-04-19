@@ -1,7 +1,6 @@
 use crate::event::{proto, Event};
 use bytes::Bytes;
-use futures::Sink;
-use futures01::{task::AtomicTask, Async, Poll as Poll01, Stream};
+use futures::{task::AtomicWaker, Sink, Stream};
 use leveldb::database::{
     batch::{Batch, Writebatch},
     compaction::Compaction,
@@ -50,7 +49,7 @@ impl db_key::Key for Key {
 pub struct Writer {
     db: Option<Arc<Database<Key>>>,
     offset: Arc<AtomicUsize>,
-    write_notifier: Arc<AtomicTask>,
+    write_notifier: Arc<AtomicWaker>,
     blocked_write_tasks: Arc<Mutex<Vec<Waker>>>,
     writebatch: Writebatch<Key>,
     batch_size: usize,
@@ -111,7 +110,7 @@ impl Sink<Event> for Writer {
                     // this sink will never be notified again so this will stall.
                     //
                     // To avoid this we notify the reader to notify this writer.
-                    self.write_notifier.notify();
+                    self.write_notifier.wake();
                 }
 
                 return Poll::Pending;
@@ -182,7 +181,7 @@ impl Writer {
             .unwrap();
         self.writebatch = Writebatch::new();
         self.batch_size = 0;
-        self.write_notifier.notify();
+        self.write_notifier.wake();
     }
 }
 
@@ -205,7 +204,7 @@ impl Drop for Writer {
         // and then we drop the Arc which would cause a stall.
         self.db.take();
         // We need to wake up the reader so it can return None if there are no more writers
-        self.write_notifier.notify();
+        self.write_notifier.wake();
     }
 }
 
@@ -213,7 +212,7 @@ pub struct Reader {
     db: Arc<Database<Key>>,
     read_offset: usize,
     delete_offset: usize,
-    write_notifier: Arc<AtomicTask>,
+    write_notifier: Arc<AtomicWaker>,
     blocked_write_tasks: Arc<Mutex<Vec<Waker>>>,
     current_size: Arc<AtomicUsize>,
     ack_counter: Arc<AtomicUsize>,
@@ -228,12 +227,11 @@ unsafe impl Send for Reader {}
 
 impl Stream for Reader {
     type Item = Event;
-    type Error = ();
 
-    fn poll(&mut self) -> Poll01<Option<Self::Item>, Self::Error> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // If there's no value at read_offset, we return NotReady and rely on Writer
         // using write_notifier to wake this task up after the next write.
-        self.write_notifier.register();
+        self.write_notifier.register(cx.waker());
 
         self.delete_acked();
 
@@ -259,19 +257,19 @@ impl Stream for Reader {
             match proto::EventWrapper::decode(buf) {
                 Ok(event) => {
                     let event = Event::from(event);
-                    Ok(Async::Ready(Some(event)))
+                    Poll::Ready(Some(event))
                 }
                 Err(error) => {
                     error!(message = "Error deserializing proto.", %error);
                     debug_assert!(false);
-                    self.poll()
+                    self.poll_next(cx)
                 }
             }
         } else if Arc::strong_count(&self.db) == 1 {
             // There are no writers left
-            Ok(Async::Ready(None))
+            Poll::Ready(None)
         } else {
-            Ok(Async::NotReady)
+            Poll::Pending
         }
     }
 }
@@ -362,7 +360,7 @@ impl super::DiskBuffer for Buffer {
         let initial_size = db.value_iter(ReadOptions::new()).map(|v| v.len()).sum();
         let current_size = Arc::new(AtomicUsize::new(initial_size));
 
-        let write_notifier = Arc::new(AtomicTask::new());
+        let write_notifier = Arc::new(AtomicWaker::new());
 
         let blocked_write_tasks = Arc::new(Mutex::new(Vec::new()));
 

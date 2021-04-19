@@ -1,9 +1,8 @@
 #![cfg(feature = "leveldb")]
 
 use crate::event::Event;
-use futures::Sink;
-use futures01::Stream;
-use pin_project::{pin_project};
+use futures::{Sink, Stream};
+use pin_project::pin_project;
 use snafu::Snafu;
 use std::{
     io,
@@ -34,7 +33,7 @@ pub enum Error {
 
 pub trait DiskBuffer {
     type Writer: Sink<Event, Error = ()>;
-    type Reader: Stream<Item = Event, Error = ()> + Send;
+    type Reader: Stream<Item = Event> + Send;
 
     fn build(
         path: PathBuf,
@@ -72,14 +71,7 @@ pub fn open(
     data_dir: &Path,
     name: &str,
     max_size: usize,
-) -> Result<
-    (
-        Writer,
-        Box<dyn Stream<Item = Event, Error = ()> + Send>,
-        super::Acker,
-    ),
-    Error,
-> {
+) -> Result<(Writer, Box<dyn Stream<Item = Event> + Send>, super::Acker), Error> {
     let path = data_dir.join(name);
 
     // Check data dir
