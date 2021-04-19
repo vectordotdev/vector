@@ -86,7 +86,12 @@ where
         let status = response.status();
         if status != StatusCode::OK {
             let source = invocation::Error::BadStatus { status };
-            return Err(watcher::invocation::Error::other(source));
+            let err = if status == StatusCode::GONE {
+                watcher::invocation::Error::desync(source)
+            } else {
+                watcher::invocation::Error::other(source)
+            };
+            return Err(err);
         }
 
         // Stream response body.
