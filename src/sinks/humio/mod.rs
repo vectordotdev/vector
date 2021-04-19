@@ -20,6 +20,6 @@ impl From<Encoding> for splunk_hec::Encoding {
     }
 }
 
-fn default_host_key() -> String {
-    crate::config::LogSchema::default().host_key().to_string()
+fn host_key() -> String {
+    crate::config::log_schema().host_key().to_string()
 }

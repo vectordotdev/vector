@@ -1,12 +1,12 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, SourceConfig, SourceContext, SourceDescription},
     event::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
     },
     internal_events::HostMetricsEventReceived,
     shutdown::ShutdownSignal,
-    BoolAndSome, Pipeline,
+    Pipeline,
 };
 use chrono::{DateTime, Utc};
 use futures::{stream, SinkExt, StreamExt};
@@ -27,15 +27,16 @@ use heim::{
     units::{information::byte, time::second},
     Error,
 };
-
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
+use shared::btreemap;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
 use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -44,6 +45,7 @@ enum Collector {
     Disk,
     Filesystem,
     Load,
+    Host,
     Memory,
     Network,
 }
@@ -116,17 +118,11 @@ impl_generate_config_from_default!(HostMetricsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "host_metrics")]
 impl SourceConfig for HostMetricsConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let mut config = self.clone();
         config.namespace.0 = config.namespace.0.filter(|namespace| !namespace.is_empty());
 
-        Ok(Box::pin(config.run(out, shutdown)))
+        Ok(Box::pin(config.run(cx.out, cx.shutdown)))
     }
 
     fn output_type(&self) -> DataType {
@@ -138,22 +134,13 @@ impl SourceConfig for HostMetricsConfig {
     }
 }
 
-macro_rules! tags {
-    ( $( $key:expr => $value:expr ),* ) => {{
-        #[allow(unused_mut)]
-        let mut result = std::collections::BTreeMap::default();
-        $( result.insert($key.to_string(), $value.to_string()); )*
-            result
-    }}
-}
-
 impl HostMetricsConfig {
     async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut out =
             out.sink_map_err(|error| error!(message = "Error sending host metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
-        let mut interval = time::interval(duration).take_until(shutdown);
+        let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
         while interval.next().await.is_some() {
             let metrics = self.capture_metrics().await;
             out.send_all(&mut stream::iter(metrics).map(Ok)).await?;
@@ -183,6 +170,9 @@ impl HostMetricsConfig {
         }
         if self.has_collector(Collector::Load) {
             metrics.extend(add_collector("load", self.loadavg_metrics().await));
+        }
+        if self.has_collector(Collector::Host) {
+            metrics.extend(add_collector("host", self.host_metrics().await));
         }
         if self.has_collector(Collector::Memory) {
             metrics.extend(add_collector("memory", self.memory_metrics().await));
@@ -217,26 +207,26 @@ impl HostMetricsConfig {
                                     name,
                                     timestamp,
                                     times.idle().get::<second>(),
-                                    tags!["mode" => "idle", "cpu" => index.to_string()],
+                                    btreemap! { "mode" => "idle", "cpu" => index.to_string() },
                                 ),
                                 #[cfg(target_os = "linux")]
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.nice().get::<second>(),
-                                    tags!["mode" => "nice", "cpu" => index.to_string()],
+                                    btreemap! { "mode" => "nice", "cpu" => index.to_string() },
                                 ),
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.system().get::<second>(),
-                                    tags!["mode" => "system", "cpu" => index.to_string()],
+                                    btreemap! { "mode" => "system", "cpu" => index.to_string() },
                                 ),
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.user().get::<second>(),
-                                    tags!["mode" => "user", "cpu" => index.to_string()],
+                                    btreemap! { "mode" => "user", "cpu" => index.to_string() },
                                 ),
                             ]
                             .into_iter(),
@@ -262,68 +252,68 @@ impl HostMetricsConfig {
                         "memory_total_bytes",
                         timestamp,
                         memory.total().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     self.gauge(
                         "memory_free_bytes",
                         timestamp,
                         memory.free().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     self.gauge(
                         "memory_available_bytes",
                         timestamp,
                         memory.available().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(any(target_os = "linux", target_os = "macos"))]
                     self.gauge(
                         "memory_active_bytes",
                         timestamp,
                         memory.active().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_buffers_bytes",
                         timestamp,
                         memory.buffers().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_cached_bytes",
                         timestamp,
                         memory.cached().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_shared_bytes",
                         timestamp,
                         memory.shared().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "linux")]
                     self.gauge(
                         "memory_used_bytes",
                         timestamp,
                         memory.used().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "macos")]
                     self.gauge(
                         "memory_inactive_bytes",
                         timestamp,
                         memory.inactive().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(target_os = "macos")]
                     self.gauge(
                         "memory_wired_bytes",
                         timestamp,
                         memory.wire().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                 ]
             }
@@ -343,33 +333,33 @@ impl HostMetricsConfig {
                         "memory_swap_free_bytes",
                         timestamp,
                         swap.free().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     self.gauge(
                         "memory_swap_total_bytes",
                         timestamp,
                         swap.total().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     self.gauge(
                         "memory_swap_used_bytes",
                         timestamp,
                         swap.used().get::<byte>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(not(target_os = "windows"))]
                     self.counter(
                         "memory_swapped_in_bytes_total",
                         timestamp,
                         swap.sin().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                     #[cfg(not(target_os = "windows"))]
                     self.counter(
                         "memory_swapped_out_bytes_total",
                         timestamp,
                         swap.sout().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                 ]
             }
@@ -386,13 +376,23 @@ impl HostMetricsConfig {
             Ok(loadavg) => {
                 let timestamp = Utc::now();
                 vec![
-                    self.gauge("load1", timestamp, loadavg.0.get::<ratio>() as f64, tags![]),
-                    self.gauge("load5", timestamp, loadavg.1.get::<ratio>() as f64, tags![]),
+                    self.gauge(
+                        "load1",
+                        timestamp,
+                        loadavg.0.get::<ratio>() as f64,
+                        btreemap! {},
+                    ),
+                    self.gauge(
+                        "load5",
+                        timestamp,
+                        loadavg.1.get::<ratio>() as f64,
+                        btreemap! {},
+                    ),
                     self.gauge(
                         "load15",
                         timestamp,
                         loadavg.2.get::<ratio>() as f64,
-                        tags![],
+                        btreemap! {},
                     ),
                 ]
             }
@@ -405,6 +405,41 @@ impl HostMetricsConfig {
         let result = vec![];
 
         result
+    }
+
+    pub async fn host_metrics(&self) -> Vec<Metric> {
+        let mut metrics = Vec::new();
+        match heim::host::uptime().await {
+            Ok(time) => {
+                let timestamp = Utc::now();
+                metrics.push(self.gauge(
+                    "uptime",
+                    timestamp,
+                    time.get::<second>() as f64,
+                    BTreeMap::default(),
+                ));
+            }
+            Err(error) => {
+                error!(message = "Failed to load host uptime info.", %error, internal_log_rate_secs = 60);
+            }
+        }
+
+        match heim::host::boot_time().await {
+            Ok(time) => {
+                let timestamp = Utc::now();
+                metrics.push(self.gauge(
+                    "boot_time",
+                    timestamp,
+                    time.get::<second>() as f64,
+                    BTreeMap::default(),
+                ));
+            }
+            Err(error) => {
+                error!(message = "Failed to load host boot time info.", %error, internal_log_rate_secs = 60);
+            }
+        }
+
+        metrics
     }
 
     pub async fn network_metrics(&self) -> Vec<Metric> {
@@ -420,8 +455,8 @@ impl HostMetricsConfig {
                     .map(|counter| {
                         self.network
                             .devices
-                            .contains_str(counter.interface())
-                            .and_some(counter)
+                            .contains_str(Some(counter.interface()))
+                            .then(|| counter)
                     })
                     .filter_map(|counter| async { counter })
                     .map(|counter| {
@@ -433,45 +468,45 @@ impl HostMetricsConfig {
                                     "network_receive_bytes_total",
                                     timestamp,
                                     counter.bytes_recv().get::<byte>() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_receive_errs_total",
                                     timestamp,
                                     counter.errors_recv() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_receive_packets_total",
                                     timestamp,
                                     counter.packets_recv() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_transmit_bytes_total",
                                     timestamp,
                                     counter.bytes_sent().get::<byte>() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 self.counter(
                                     "network_transmit_errs_total",
                                     timestamp,
                                     counter.errors_sent() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 #[cfg(any(target_os = "linux", target_os = "windows"))]
                                 self.counter(
                                     "network_transmit_packets_drop_total",
                                     timestamp,
                                     counter.drop_sent() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                                 #[cfg(any(target_os = "linux", target_os = "windows"))]
                                 self.counter(
                                     "network_transmit_packets_total",
                                     timestamp,
                                     counter.packets_sent() as f64,
-                                    tags!["device" => interface],
+                                    btreemap! { "device" => interface },
                                 ),
                             ]
                             .into_iter(),
@@ -499,28 +534,24 @@ impl HostMetricsConfig {
                     .map(|partition| {
                         self.filesystem
                             .mountpoints
-                            .contains_path(partition.mount_point())
-                            .and_some(partition)
+                            .contains_path(Some(partition.mount_point()))
+                            .then(|| partition)
                     })
                     .filter_map(|partition| async { partition })
                     // Filter on configured devices
                     .map(|partition| {
-                        (self.filesystem.devices.is_empty()
-                            && partition
-                                .device()
-                                .map(|device| {
-                                    self.filesystem.devices.contains_path(device.as_ref())
-                                })
-                                .unwrap_or(true))
-                        .and_some(partition)
+                        self.filesystem
+                            .devices
+                            .contains_path(partition.device().map(|d| d.as_ref()))
+                            .then(|| partition)
                     })
                     .filter_map(|partition| async { partition })
                     // Filter on configured filesystems
                     .map(|partition| {
                         self.filesystem
                             .filesystems
-                            .contains_str(partition.file_system().as_str())
-                            .and_some(partition)
+                            .contains_str(Some(partition.file_system().as_str()))
+                            .then(|| partition)
                     })
                     .filter_map(|partition| async { partition })
                     // Load usage from the partition mount point
@@ -541,10 +572,10 @@ impl HostMetricsConfig {
                     .map(|(partition, usage)| {
                         let timestamp = Utc::now();
                         let fs = partition.file_system();
-                        let mut tags = tags![
+                        let mut tags = btreemap! {
                             "filesystem" => fs.as_str(),
                             "mountpoint" => partition.mount_point().to_string_lossy()
-                        ];
+                        };
                         if let Some(device) = partition.device() {
                             tags.insert("device".into(), device.to_string_lossy().into());
                         }
@@ -593,15 +624,15 @@ impl HostMetricsConfig {
                     .map(|counter| {
                         self.disk
                             .devices
-                            .contains_path(counter.device_name().as_ref())
-                            .and_some(counter)
+                            .contains_path(Some(counter.device_name().as_ref()))
+                            .then(|| counter)
                     })
                     .filter_map(|counter| async { counter })
                     .map(|counter| {
                         let timestamp = Utc::now();
-                        let tags = tags![
+                        let tags = btreemap! {
                             "device" => counter.device_name().to_string_lossy()
-                        ];
+                        };
                         stream::iter(
                             vec![
                                 self.counter(
@@ -650,14 +681,10 @@ impl HostMetricsConfig {
         value: f64,
         tags: BTreeMap<String, String>,
     ) -> Metric {
-        Metric::new(
-            name.into(),
-            MetricKind::Absolute,
-            MetricValue::Counter { value },
-        )
-        .with_namespace(self.namespace.0.clone())
-        .with_tags(Some(tags))
-        .with_timestamp(Some(timestamp))
+        Metric::new(name, MetricKind::Absolute, MetricValue::Counter { value })
+            .with_namespace(self.namespace.0.clone())
+            .with_tags(Some(tags))
+            .with_timestamp(Some(timestamp))
     }
 
     fn gauge(
@@ -667,14 +694,10 @@ impl HostMetricsConfig {
         value: f64,
         tags: BTreeMap<String, String>,
     ) -> Metric {
-        Metric::new(
-            name.into(),
-            MetricKind::Absolute,
-            MetricValue::Gauge { value },
-        )
-        .with_namespace(self.namespace.0.clone())
-        .with_tags(Some(tags))
-        .with_timestamp(Some(timestamp))
+        Metric::new(name, MetricKind::Absolute, MetricValue::Gauge { value })
+            .with_namespace(self.namespace.0.clone())
+            .with_tags(Some(tags))
+            .with_timestamp(Some(timestamp))
     }
 }
 
@@ -719,42 +742,44 @@ pub fn init_roots() {
 }
 
 impl FilterList {
-    fn is_empty(&self) -> bool {
-        self.includes.is_none() && self.excludes.is_none()
-    }
-
-    fn contains_str(&self, value: &str) -> bool {
-        (match &self.includes {
+    fn contains<T, M>(&self, value: &Option<T>, matches: M) -> bool
+    where
+        M: Fn(&PatternWrapper, &T) -> bool,
+    {
+        (match (&self.includes, value) {
             // No includes list includes everything
-            None => true,
+            (None, _) => true,
+            // Includes list matched against empty value returns false
+            (Some(_), None) => false,
             // Otherwise find the given value
-            Some(includes) => includes.iter().any(|pattern| pattern.matches_str(value)),
-        }) && match &self.excludes {
+            (Some(includes), Some(value)) => includes.iter().any(|pattern| matches(pattern, value)),
+        }) && match (&self.excludes, value) {
             // No excludes, list excludes nothing
-            None => true,
+            (None, _) => true,
+            // No value, never excluded
+            (Some(_), None) => true,
             // Otherwise find the given value
-            Some(excludes) => !excludes.iter().any(|pattern| pattern.matches_str(value)),
+            (Some(excludes), Some(value)) => {
+                !excludes.iter().any(|pattern| matches(pattern, value))
+            }
         }
     }
 
-    fn contains_path(&self, value: &Path) -> bool {
-        (match &self.includes {
-            // No includes list includes everything
-            None => true,
-            // Otherwise find the given value
-            Some(includes) => includes.iter().any(|pattern| pattern.matches_path(value)),
-        }) && match &self.excludes {
-            // No excludes, list excludes nothing
-            None => true,
-            // Otherwise find the given value
-            Some(excludes) => !excludes.iter().any(|pattern| pattern.matches_path(value)),
-        }
+    fn contains_str(&self, value: Option<&str>) -> bool {
+        self.contains(&value, |pattern, s| pattern.matches_str(s))
+    }
+
+    fn contains_path(&self, value: Option<&Path>) -> bool {
+        self.contains(&value, |pattern, path| pattern.matches_path(path))
     }
 
     #[cfg(test)]
-    fn contains_test(&self, value: &str) -> bool {
+    fn contains_test(&self, value: Option<&str>) -> bool {
         let result = self.contains_str(value);
-        assert_eq!(result, self.contains_path(&std::path::PathBuf::from(value)));
+        assert_eq!(
+            result,
+            self.contains_path(value.map(|value| std::path::Path::new(value)))
+        );
         result
     }
 }
@@ -813,10 +838,10 @@ mod tests {
     #[test]
     fn filterlist_default_includes_everything() {
         let filters = FilterList::default();
-        assert!(filters.is_empty());
-        assert!(filters.contains_test("anything"));
-        assert!(filters.contains_test("should"));
-        assert!(filters.contains_test("work"));
+        assert!(filters.contains_test(Some("anything")));
+        assert!(filters.contains_test(Some("should")));
+        assert!(filters.contains_test(Some("work")));
+        assert!(filters.contains_test(None));
     }
 
     #[test]
@@ -828,12 +853,13 @@ mod tests {
             ]),
             excludes: None,
         };
-        assert!(!filters.contains_test("sd"));
-        assert!(filters.contains_test("sda"));
-        assert!(!filters.contains_test("sda1"));
-        assert!(filters.contains_test("dm-"));
-        assert!(filters.contains_test("dm-5"));
-        assert!(!filters.contains_test("xda"));
+        assert!(!filters.contains_test(Some("sd")));
+        assert!(filters.contains_test(Some("sda")));
+        assert!(!filters.contains_test(Some("sda1")));
+        assert!(filters.contains_test(Some("dm-")));
+        assert!(filters.contains_test(Some("dm-5")));
+        assert!(!filters.contains_test(Some("xda")));
+        assert!(!filters.contains_test(None));
     }
 
     #[test]
@@ -845,12 +871,13 @@ mod tests {
                 PatternWrapper::new("dm-*").unwrap(),
             ]),
         };
-        assert!(filters.contains_test("sd"));
-        assert!(!filters.contains_test("sda"));
-        assert!(filters.contains_test("sda1"));
-        assert!(!filters.contains_test("dm-"));
-        assert!(!filters.contains_test("dm-5"));
-        assert!(filters.contains_test("xda"));
+        assert!(filters.contains_test(Some("sd")));
+        assert!(!filters.contains_test(Some("sda")));
+        assert!(filters.contains_test(Some("sda1")));
+        assert!(!filters.contains_test(Some("dm-")));
+        assert!(!filters.contains_test(Some("dm-5")));
+        assert!(filters.contains_test(Some("xda")));
+        assert!(filters.contains_test(None));
     }
 
     #[test]
@@ -862,13 +889,14 @@ mod tests {
             ]),
             excludes: Some(vec![PatternWrapper::new("dm-5").unwrap()]),
         };
-        assert!(!filters.contains_test("sd"));
-        assert!(filters.contains_test("sda"));
-        assert!(!filters.contains_test("sda1"));
-        assert!(filters.contains_test("dm-"));
-        assert!(filters.contains_test("dm-1"));
-        assert!(!filters.contains_test("dm-5"));
-        assert!(!filters.contains_test("xda"));
+        assert!(!filters.contains_test(Some("sd")));
+        assert!(filters.contains_test(Some("sda")));
+        assert!(!filters.contains_test(Some("sda1")));
+        assert!(filters.contains_test(Some("dm-")));
+        assert!(filters.contains_test(Some("dm-1")));
+        assert!(!filters.contains_test(Some("dm-5")));
+        assert!(!filters.contains_test(Some("xda")));
+        assert!(!filters.contains_test(None));
     }
 
     #[tokio::test]
@@ -880,6 +908,7 @@ mod tests {
             Collector::Disk,
             Collector::Filesystem,
             Collector::Load,
+            Collector::Host,
             Collector::Memory,
             Collector::Network,
         ] {
@@ -1106,6 +1135,13 @@ mod tests {
             .any(|metric| !metric.name().starts_with("load")));
     }
 
+    #[tokio::test]
+    async fn generates_host_metrics() {
+        let metrics = HostMetricsConfig::default().host_metrics().await;
+        assert_eq!(metrics.len(), 2);
+        assert!(all_gauges(&metrics));
+    }
+
     fn all_counters(metrics: &[Metric]) -> bool {
         !metrics
             .iter()
@@ -1174,6 +1210,7 @@ mod tests {
             .await;
 
             assert!(filtered_metrics_with.len() <= all_metrics.len());
+            assert!(!filtered_metrics_with.is_empty());
             assert!(all_tags_match(&filtered_metrics_with, tag, |s| s == key));
 
             let filtered_metrics_with_match = get_metrics(FilterList {

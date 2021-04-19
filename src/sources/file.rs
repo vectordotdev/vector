@@ -1,6 +1,6 @@
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     encoding_transcode::{Decoder, Encoder},
     event::Event,
     internal_events::{FileEventReceived, FileOpen, FileSourceInternalEventsEmitter},
@@ -13,7 +13,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
-    FileServer, FingerprintStrategy, Fingerprinter,
+    FileServer, FingerprintStrategy, Fingerprinter, ReadFrom,
 };
 use futures::{
     future::TryFutureExt,
@@ -63,13 +63,18 @@ pub struct FileConfig {
     pub include: Vec<PathBuf>,
     pub exclude: Vec<PathBuf>,
     pub file_key: Option<String>,
-    pub start_at_beginning: bool,
-    pub ignore_older: Option<u64>, // secs
+    pub start_at_beginning: Option<bool>,
+    pub ignore_checkpoints: Option<bool>,
+    pub read_from: Option<ReadFromConfig>,
+    // Deprecated name
+    #[serde(alias = "ignore_older")]
+    pub ignore_older_secs: Option<u64>,
     #[serde(default = "default_max_line_bytes")]
     pub max_line_bytes: usize,
     pub host_key: Option<String>,
     pub data_dir: Option<PathBuf>,
-    pub glob_minimum_cooldown: u64, // millis
+    #[serde(alias = "glob_minimum_cooldown")]
+    pub glob_minimum_cooldown_ms: u64,
     // Deprecated name
     #[serde(alias = "fingerprinting")]
     pub fingerprint: FingerprintConfig,
@@ -79,7 +84,8 @@ pub struct FileConfig {
     pub multiline: Option<MultilineConfig>,
     pub max_read_bytes: usize,
     pub oldest_first: bool,
-    pub remove_after: Option<u64>,
+    #[serde(alias = "remove_after")]
+    pub remove_after_secs: Option<u64>,
     pub line_delimiter: String,
     pub encoding: Option<EncodingConfig>,
 }
@@ -90,11 +96,27 @@ pub enum FingerprintConfig {
     Checksum {
         // Deprecated name
         #[serde(alias = "fingerprint_bytes")]
-        bytes: usize,
+        bytes: Option<usize>,
         ignored_header_bytes: usize,
     },
     #[serde(rename = "device_and_inode")]
     DevInode,
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ReadFromConfig {
+    Beginning,
+    End,
+}
+
+impl From<ReadFromConfig> for ReadFrom {
+    fn from(rfc: ReadFromConfig) -> Self {
+        match rfc {
+            ReadFromConfig::Beginning => ReadFrom::Beginning,
+            ReadFromConfig::End => ReadFrom::End,
+        }
+    }
 }
 
 impl From<FingerprintConfig> for FingerprintStrategy {
@@ -103,10 +125,19 @@ impl From<FingerprintConfig> for FingerprintStrategy {
             FingerprintConfig::Checksum {
                 bytes,
                 ignored_header_bytes,
-            } => FingerprintStrategy::Checksum {
-                bytes,
-                ignored_header_bytes,
-            },
+            } => {
+                let bytes = match bytes {
+                    Some(bytes) => {
+                        warn!(message = "The `fingerprint.bytes` option will be used to convert old file fingerprints created by vector < v0.11.0, but are not supported for new file fingerprints. The first line will be used instead.");
+                        bytes
+                    }
+                    None => 256,
+                };
+                FingerprintStrategy::Checksum {
+                    bytes,
+                    ignored_header_bytes,
+                }
+            }
             FingerprintConfig::DevInode => FingerprintStrategy::DevInode,
         }
     }
@@ -122,23 +153,25 @@ impl Default for FileConfig {
             include: vec![],
             exclude: vec![],
             file_key: Some("file".to_string()),
-            start_at_beginning: false,
-            ignore_older: None,
+            start_at_beginning: None,
+            ignore_checkpoints: None,
+            read_from: None,
+            ignore_older_secs: None,
             max_line_bytes: default_max_line_bytes(),
             fingerprint: FingerprintConfig::Checksum {
-                bytes: 256,
+                bytes: None,
                 ignored_header_bytes: 0,
             },
             ignore_not_found: false,
             host_key: None,
             data_dir: None,
-            glob_minimum_cooldown: 1000, // millis
+            glob_minimum_cooldown_ms: 1000, // millis
             message_start_indicator: None,
             multi_line_timeout: 1000, // millis
             multiline: None,
             max_read_bytes: 2048,
             oldest_first: false,
-            remove_after: None,
+            remove_after_secs: None,
             line_delimiter: "\n".to_string(),
             encoding: None,
         }
@@ -154,18 +187,14 @@ impl_generate_config_from_default!(FileConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
-    async fn build(
-        &self,
-        name: &str,
-        globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         // add the source name as a subdir, so that multiple sources can
         // operate within the same given data_dir (e.g. the global one)
         // without the file servers' checkpointers interfering with each
         // other
-        let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
+        let data_dir = cx
+            .globals
+            .resolve_and_make_data_subdir(self.data_dir.as_ref(), &cx.name)?;
 
         // Clippy rule, because async_trait?
         #[allow(clippy::suspicious_else_formatting)]
@@ -180,7 +209,7 @@ impl SourceConfig for FileConfig {
             }
         }
 
-        Ok(file_source(self, data_dir, shutdown, out))
+        Ok(file_source(self, data_dir, cx.shutdown, cx.out))
     }
 
     fn output_type(&self) -> DataType {
@@ -199,12 +228,22 @@ pub fn file_source(
     mut out: Pipeline,
 ) -> super::Source {
     let ignore_before = config
-        .ignore_older
+        .ignore_older_secs
         .map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64));
-    let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown);
+    let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown_ms);
+    let (ignore_checkpoints, read_from) = reconcile_position_options(
+        config.start_at_beginning,
+        config.ignore_checkpoints,
+        config.read_from,
+    );
 
-    let paths_provider = Glob::new(&config.include, &config.exclude, MatchOptions::default())
-        .expect("invalid glob patterns");
+    let paths_provider = Glob::new(
+        &config.include,
+        &config.exclude,
+        MatchOptions::default(),
+        FileSourceInternalEventsEmitter,
+    )
+    .expect("invalid glob patterns");
 
     let encoding_charset = config.encoding.clone().map(|e| e.charset);
 
@@ -218,7 +257,8 @@ pub fn file_source(
     let file_server = FileServer {
         paths_provider,
         max_read_bytes: config.max_read_bytes,
-        start_at_beginning: config.start_at_beginning,
+        ignore_checkpoints,
+        read_from,
         ignore_before,
         max_line_bytes: config.max_line_bytes,
         line_delimiter: line_delimiter_as_bytes,
@@ -230,7 +270,7 @@ pub fn file_source(
             ignore_not_found: config.ignore_not_found,
         },
         oldest_first: config.oldest_first,
-        remove_after: config.remove_after.map(Duration::from_secs),
+        remove_after: config.remove_after_secs.map(Duration::from_secs),
         emitter: FileSourceInternalEventsEmitter,
         handle: tokio::runtime::Handle::current(),
     };
@@ -311,6 +351,29 @@ pub fn file_source(
     })
 }
 
+/// Emit deprecation warning if the old option is used, and take it into account when determining
+/// defaults. Any of the newer options will override it when set directly.
+fn reconcile_position_options(
+    start_at_beginning: Option<bool>,
+    ignore_checkpoints: Option<bool>,
+    read_from: Option<ReadFromConfig>,
+) -> (bool, ReadFrom) {
+    if start_at_beginning.is_some() {
+        warn!(message = "Use of deprecated option `start_at_beginning`. Please use `ignore_checkpoints` and `read_from` options instead.")
+    }
+
+    match start_at_beginning {
+        Some(true) => (
+            ignore_checkpoints.unwrap_or(true),
+            read_from.map(Into::into).unwrap_or(ReadFrom::Beginning),
+        ),
+        _ => (
+            ignore_checkpoints.unwrap_or(false),
+            read_from.map(Into::into).unwrap_or_default(),
+        ),
+    }
+}
+
 fn wrap_with_line_agg(
     rx: impl Stream<Item = (Bytes, String)> + Send + std::marker::Unpin + 'static,
     config: line_agg::Config,
@@ -364,9 +427,8 @@ mod tests {
         future::Future,
         io::{Seek, Write},
     };
-
     use tempfile::tempdir;
-    use tokio::time::{delay_for, timeout, Duration};
+    use tokio::time::{sleep, timeout, Duration};
 
     #[test]
     fn generate_config() {
@@ -376,19 +438,19 @@ mod tests {
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
             fingerprint: FingerprintConfig::Checksum {
-                bytes: 8,
+                bytes: Some(8),
                 ignored_header_bytes: 0,
             },
             data_dir: Some(dir.path().to_path_buf()),
-            glob_minimum_cooldown: 0, // millis
+            glob_minimum_cooldown_ms: 0, // millis
             ..Default::default()
         }
     }
 
     async fn wait_with_timeout<F, R>(future: F) -> R
     where
-        F: Future<Output = R> + Send + 'static,
-        R: Send + 'static,
+        F: Future<Output = R> + Send,
+        R: Send,
     {
         timeout(Duration::from_secs(5), future)
             .await
@@ -398,7 +460,7 @@ mod tests {
     }
 
     async fn sleep_500_millis() {
-        delay_for(Duration::from_millis(500)).await;
+        sleep(Duration::from_millis(500)).await;
     }
 
     #[test]
@@ -412,7 +474,7 @@ mod tests {
         assert_eq!(
             config.fingerprint,
             FingerprintConfig::Checksum {
-                bytes: 256,
+                bytes: None,
                 ignored_header_bytes: 0,
             }
         );
@@ -438,7 +500,7 @@ mod tests {
         assert_eq!(
             config.fingerprint,
             FingerprintConfig::Checksum {
-                bytes: 128,
+                bytes: Some(128),
                 ignored_header_bytes: 512,
             }
         );
@@ -451,6 +513,22 @@ mod tests {
         )
         .unwrap();
         assert_eq!(config.encoding, Some(EncodingConfig { charset: UTF_16LE }));
+
+        let config: FileConfig = toml::from_str(
+            r#"
+        read_from = "beginning"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.read_from, Some(ReadFromConfig::Beginning));
+
+        let config: FileConfig = toml::from_str(
+            r#"
+        read_from = "end"
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.read_from, Some(ReadFromConfig::End));
     }
 
     #[test]
@@ -741,7 +819,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test();
+            let (tx, mut rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -763,7 +841,7 @@ mod tests {
             drop(trigger_shutdown);
             shutdown_done.await;
 
-            let received = wait_with_timeout(rx.into_future()).await.0.unwrap();
+            let received = wait_with_timeout(rx.next()).await.unwrap();
             assert_eq!(
                 received.as_log()["file"].to_string_lossy(),
                 path.to_str().unwrap()
@@ -774,7 +852,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test();
+            let (tx, mut rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -797,7 +875,7 @@ mod tests {
             drop(trigger_shutdown);
             shutdown_done.await;
 
-            let received = wait_with_timeout(rx.into_future()).await.0.unwrap();
+            let received = wait_with_timeout(rx.next()).await.unwrap();
             assert_eq!(
                 received.as_log()["source"].to_string_lossy(),
                 path.to_str().unwrap()
@@ -808,7 +886,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test();
+            let (tx, mut rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -831,7 +909,7 @@ mod tests {
             drop(trigger_shutdown);
             shutdown_done.await;
 
-            let received = wait_with_timeout(rx.into_future()).await.0.unwrap();
+            let received = wait_with_timeout(rx.next()).await.unwrap();
             assert_eq!(
                 received.as_log().keys().collect::<HashSet<_>>(),
                 vec![
@@ -907,7 +985,8 @@ mod tests {
 
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
-                start_at_beginning: true,
+                ignore_checkpoints: Some(true),
+                read_from: Some(ReadFromConfig::Beginning),
                 ..test_default_file_config(&dir)
             };
             let (tx, rx) = Pipeline::new_test();
@@ -1002,8 +1081,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            start_at_beginning: true,
-            ignore_older: Some(5),
+            ignore_older_secs: Some(5),
             ..test_default_file_config(&dir)
         };
 
@@ -1279,7 +1357,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            start_at_beginning: true,
             max_read_bytes: 1,
             oldest_first: false,
             ..test_default_file_config(&dir)
@@ -1343,7 +1420,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            start_at_beginning: true,
             max_read_bytes: 1,
             oldest_first: true,
             ..test_default_file_config(&dir)
@@ -1407,7 +1483,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            start_at_beginning: true,
             max_read_bytes: 1,
             ..test_default_file_config(&dir)
         };
@@ -1603,7 +1678,7 @@ mod tests {
     #[tokio::test]
     async fn remove_file() {
         let n = 5;
-        let remove_after = 1;
+        let remove_after_secs = 1;
 
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -1611,8 +1686,8 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
-            remove_after: Some(remove_after),
-            glob_minimum_cooldown: 100,
+            remove_after_secs: Some(remove_after_secs),
+            glob_minimum_cooldown_ms: 100,
             ..test_default_file_config(&dir)
         };
 
@@ -1631,7 +1706,7 @@ mod tests {
 
         for _ in 0..10 {
             // Wait for remove grace period to end.
-            delay_for(Duration::from_secs(remove_after + 1)).await;
+            sleep(Duration::from_secs(remove_after_secs + 1)).await;
 
             if File::open(&path).is_err() {
                 break;

@@ -48,7 +48,7 @@ impl SocketSinkConfig {
 
     pub fn make_basic_tcp_config(address: String) -> Self {
         Self::new(
-            Mode::Tcp(TcpSinkConfig::new(address, None, None)),
+            Mode::Tcp(TcpSinkConfig::from_address(address)),
             EncodingConfig::from(Encoding::Text),
         )
     }
@@ -96,8 +96,9 @@ mod test {
     };
     use tokio::{
         net::TcpListener,
-        time::{delay_for, timeout, Duration},
+        time::{sleep, timeout, Duration},
     };
+    use tokio_stream::wrappers::TcpListenerStream;
     use tokio_util::codec::{FramedRead, LinesCodec};
 
     #[test]
@@ -109,9 +110,7 @@ mod test {
         let receiver = UdpSocket::bind(addr).unwrap();
 
         let config = SocketSinkConfig {
-            mode: Mode::Udp(UdpSinkConfig {
-                address: addr.to_string(),
-            }),
+            mode: Mode::Udp(UdpSinkConfig::from_address(addr.to_string())),
             encoding: Encoding::Json.into(),
         };
         let context = SinkContext::new_test();
@@ -153,7 +152,7 @@ mod test {
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig::new(addr.to_string(), None, None)),
+            mode: Mode::Tcp(TcpSinkConfig::from_address(addr.to_string())),
             encoding: Encoding::Json.into(),
         };
 
@@ -190,9 +189,8 @@ mod test {
     #[tokio::test]
     async fn tcp_stream_detects_disconnect() {
         use crate::tls::{self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
-        use futures::{future, FutureExt, StreamExt};
+        use futures::{channel::mpsc, future, FutureExt, SinkExt, StreamExt};
         use std::{
-            net::Shutdown,
             pin::Pin,
             sync::{
                 atomic::{AtomicUsize, Ordering},
@@ -201,12 +199,12 @@ mod test {
             task::Poll,
         };
         use tokio::{
-            io::AsyncRead,
+            io::{AsyncRead, AsyncWriteExt, ReadBuf},
             net::TcpStream,
-            sync::mpsc,
             task::yield_now,
             time::{interval, Duration},
         };
+        use tokio_stream::wrappers::IntervalStream;
 
         trace_init();
 
@@ -224,12 +222,13 @@ mod test {
                         ..Default::default()
                     },
                 }),
+                None,
             )),
             encoding: Encoding::Text.into(),
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
-        let (mut sender, receiver) = mpsc::channel::<Option<Event>>(1);
+        let (mut sender, receiver) = mpsc::channel::<Option<Event>>(0);
         let jh1 = tokio::spawn(async move {
             let stream = receiver
                 .take_while(|event| ready(event.is_some()))
@@ -262,17 +261,26 @@ mod test {
                     let msg_counter1 = Arc::clone(&msg_counter1);
 
                     let mut stream: MaybeTlsIncomingStream<TcpStream> = connection.unwrap();
+
                     future::poll_fn(move |cx| loop {
                         if let Some(fut) = close_rx.as_mut() {
                             if let Poll::Ready(()) = fut.poll_unpin(cx) {
-                                stream.get_ref().unwrap().shutdown(Shutdown::Write).unwrap();
+                                stream
+                                    .get_mut()
+                                    .unwrap()
+                                    .shutdown()
+                                    .now_or_never()
+                                    .unwrap()
+                                    .unwrap();
                                 close_rx = None;
                             }
                         }
 
-                        return match Pin::new(&mut stream).poll_read(cx, &mut [0u8; 11]) {
-                            Poll::Ready(Ok(n)) => {
-                                if n == 0 {
+                        let mut buf = [0u8; 11];
+                        let mut buf = ReadBuf::new(&mut buf);
+                        return match Pin::new(&mut stream).poll_read(cx, &mut buf) {
+                            Poll::Ready(Ok(())) => {
+                                if buf.filled().is_empty() {
                                     Poll::Ready(())
                                 } else {
                                     msg_counter1.fetch_add(1, Ordering::SeqCst);
@@ -295,7 +303,7 @@ mod test {
         // Loop and check for 10 events, we should always get 10 events. Once,
         // we have 10 events we can tell the server to shutdown to simulate the
         // remote shutting down on an idle connection.
-        interval(Duration::from_millis(100))
+        IntervalStream::new(interval(Duration::from_millis(100)))
             .take(500)
             .take_while(|_| ready(msg_counter.load(Ordering::SeqCst) != 10))
             .for_each(|_| ready(()))
@@ -331,7 +339,7 @@ mod test {
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig::new(addr.to_string(), None, None)),
+            mode: Mode::Tcp(TcpSinkConfig::from_address(addr.to_string())),
             encoding: Encoding::Text.into(),
         };
 
@@ -343,9 +351,7 @@ mod test {
 
         // First listener
         let mut count = 20usize;
-        TcpListener::bind(addr)
-            .await
-            .unwrap()
+        TcpListenerStream::new(TcpListener::bind(addr).await.unwrap())
             .next()
             .await
             .unwrap()
@@ -366,7 +372,7 @@ mod test {
         // Disconnect
         if cfg!(windows) {
             // Gives Windows time to release the addr port.
-            delay_for(Duration::from_secs(1)).await;
+            sleep(Duration::from_secs(1)).await;
         }
 
         // Second listener

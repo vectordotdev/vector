@@ -206,6 +206,8 @@ impl fmt::Display for ParseError {
     }
 }
 
+shared::impl_event_data_eq!(ParseError);
+
 impl error::Error for ParseError {}
 
 impl From<ParseIntError> for ParseError {
@@ -224,13 +226,14 @@ impl From<ParseFloatError> for ParseError {
 mod test {
     use super::{parse, sanitize_key, sanitize_sampling};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+    use shared::assert_event_data_eq;
 
     #[test]
     fn basic_counter() {
-        assert_eq!(
+        assert_event_data_eq!(
             parse("foo:1|c"),
             Ok(Metric::new(
-                "foo".into(),
+                "foo",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )),
@@ -239,10 +242,10 @@ mod test {
 
     #[test]
     fn tagged_counter() {
-        assert_eq!(
+        assert_event_data_eq!(
             parse("foo:1|c|#tag1,tag2:value"),
             Ok(Metric::new(
-                "foo".into(),
+                "foo",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 1.0 },
             )
@@ -259,10 +262,10 @@ mod test {
 
     #[test]
     fn sampled_counter() {
-        assert_eq!(
+        assert_event_data_eq!(
             parse("bar:2|c|@0.1"),
             Ok(Metric::new(
-                "bar".into(),
+                "bar",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 20.0 },
             )),
@@ -271,10 +274,10 @@ mod test {
 
     #[test]
     fn zero_sampled_counter() {
-        assert_eq!(
+        assert_event_data_eq!(
             parse("bar:2|c|@0"),
             Ok(Metric::new(
-                "bar".into(),
+                "bar",
                 MetricKind::Incremental,
                 MetricValue::Counter { value: 2.0 },
             )),
@@ -283,10 +286,10 @@ mod test {
 
     #[test]
     fn sampled_timer() {
-        assert_eq!(
+        assert_event_data_eq!(
             parse("glork:320|ms|@0.1"),
             Ok(Metric::new(
-                "glork".into(),
+                "glork",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: crate::samples![0.320 => 10],
@@ -298,10 +301,10 @@ mod test {
 
     #[test]
     fn sampled_tagged_histogram() {
-        assert_eq!(
+        assert_event_data_eq!(
             parse("glork:320|h|@0.1|#region:us-west1,production,e:"),
             Ok(Metric::new(
-                "glork".into(),
+                "glork",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: crate::samples![320.0 => 10],
@@ -322,10 +325,10 @@ mod test {
 
     #[test]
     fn sampled_distribution() {
-        assert_eq!(
+        assert_event_data_eq!(
             parse("glork:320|d|@0.1|#region:us-west1,production,e:"),
             Ok(Metric::new(
-                "glork".into(),
+                "glork",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
                     samples: crate::samples![320.0 => 10],
@@ -346,10 +349,10 @@ mod test {
 
     #[test]
     fn simple_gauge() {
-        assert_eq!(
+        assert_event_data_eq!(
             parse("gaugor:333|g"),
             Ok(Metric::new(
-                "gaugor".into(),
+                "gaugor",
                 MetricKind::Absolute,
                 MetricValue::Gauge { value: 333.0 },
             )),
@@ -358,18 +361,18 @@ mod test {
 
     #[test]
     fn signed_gauge() {
-        assert_eq!(
+        assert_event_data_eq!(
             parse("gaugor:-4|g"),
             Ok(Metric::new(
-                "gaugor".into(),
+                "gaugor",
                 MetricKind::Incremental,
                 MetricValue::Gauge { value: -4.0 },
             )),
         );
-        assert_eq!(
+        assert_event_data_eq!(
             parse("gaugor:+10|g"),
             Ok(Metric::new(
-                "gaugor".into(),
+                "gaugor",
                 MetricKind::Incremental,
                 MetricValue::Gauge { value: 10.0 },
             )),
@@ -378,10 +381,10 @@ mod test {
 
     #[test]
     fn sets() {
-        assert_eq!(
+        assert_event_data_eq!(
             parse("uniques:765|s"),
             Ok(Metric::new(
-                "uniques".into(),
+                "uniques",
                 MetricKind::Incremental,
                 MetricValue::Set {
                     values: vec!["765".into()].into_iter().collect()

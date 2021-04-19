@@ -5,6 +5,7 @@ use futures::{
 };
 use std::{future::ready, pin::Pin};
 use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
 
 /// A structure representing user-defined timer.
 #[derive(Clone, Copy, Debug)]
@@ -81,6 +82,7 @@ where
         Box::pin(
             input_rx
                 .map(Message::Process)
+                .fuse()
                 .into_future()
                 .map(move |(first, rest)| {
                     // The first message is always `Message::Init`.
@@ -137,7 +139,7 @@ where
 fn make_timer_msgs_stream(timers: Vec<Timer>) -> BoxStream<'static, Message> {
     let streams = timers.into_iter().map(|timer| {
         let period = time::Duration::from_secs(timer.interval_seconds);
-        time::interval(period).map(move |_| Message::Timer(timer))
+        IntervalStream::new(time::interval(period)).map(move |_| Message::Timer(timer))
     });
     stream::select_all(streams).boxed()
 }

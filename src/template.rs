@@ -1,4 +1,8 @@
-use crate::{config::log_schema, event::Value, Event};
+use crate::{
+    config::log_schema,
+    event::{Metric, Value},
+    Event,
+};
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
@@ -10,9 +14,9 @@ use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
     ser::{Serialize, Serializer},
 };
+use snafu::Snafu;
 use std::borrow::Cow;
 use std::convert::TryFrom;
-use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -27,23 +31,20 @@ pub struct Template {
     has_fields: bool,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum TemplateError {
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Snafu)]
+pub enum TemplateParseError {
+    #[snafu(display("Invalid strftime item"))]
     StrftimeError,
 }
 
-impl Error for TemplateError {}
-
-impl fmt::Display for TemplateError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::StrftimeError => write!(f, "Invalid strftime item"),
-        }
-    }
+#[derive(Clone, Debug, Eq, PartialEq, Snafu)]
+pub enum TemplateRenderingError {
+    #[snafu(display("Missing fields on event: {:?}", missing_keys))]
+    MissingKeys { missing_keys: Vec<String> },
 }
 
 impl TryFrom<&str> for Template {
-    type Error = TemplateError;
+    type Error = TemplateParseError;
 
     fn try_from(src: &str) -> Result<Self, Self::Error> {
         Template::try_from(Cow::Borrowed(src))
@@ -51,7 +52,7 @@ impl TryFrom<&str> for Template {
 }
 
 impl TryFrom<String> for Template {
-    type Error = TemplateError;
+    type Error = TemplateParseError;
 
     fn try_from(src: String) -> Result<Self, Self::Error> {
         Template::try_from(Cow::Owned(src))
@@ -59,7 +60,7 @@ impl TryFrom<String> for Template {
 }
 
 impl TryFrom<PathBuf> for Template {
-    type Error = TemplateError;
+    type Error = TemplateParseError;
 
     fn try_from(p: PathBuf) -> Result<Self, Self::Error> {
         Template::try_from(p.to_string_lossy().into_owned())
@@ -67,15 +68,15 @@ impl TryFrom<PathBuf> for Template {
 }
 
 impl TryFrom<Cow<'_, str>> for Template {
-    type Error = TemplateError;
+    type Error = TemplateParseError;
 
     fn try_from(src: Cow<'_, str>) -> Result<Self, Self::Error> {
         let (has_error, is_dynamic) = StrftimeItems::new(&src)
-            .fold((false, false), |pair, item| {
-                (pair.0 || is_error(&item), pair.1 || is_dynamic(&item))
+            .fold((false, false), |(error, dynamic), item| {
+                (error || is_error(&item), dynamic || is_dynamic(&item))
             });
         if has_error {
-            Err(TemplateError::StrftimeError)
+            Err(TemplateParseError::StrftimeError)
         } else {
             Ok(Template {
                 has_fields: RE.is_match(&src),
@@ -92,20 +93,20 @@ fn is_error(item: &Item) -> bool {
 
 fn is_dynamic(item: &Item) -> bool {
     match item {
-        Item::Error => false,
         Item::Fixed(_) => true,
         Item::Numeric(_, _) => true,
+        Item::Error => false,
         Item::Space(_) | Item::OwnedSpace(_) => false,
         Item::Literal(_) | Item::OwnedLiteral(_) => false,
     }
 }
 
 impl Template {
-    pub fn render(&self, event: &Event) -> Result<Bytes, Vec<String>> {
+    pub fn render(&self, event: &Event) -> Result<Bytes, TemplateRenderingError> {
         self.render_string(event).map(Into::into)
     }
 
-    pub fn render_string(&self, event: &Event) -> Result<String, Vec<String>> {
+    pub fn render_string(&self, event: &Event) -> Result<String, TemplateRenderingError> {
         match (self.has_fields, self.has_ts) {
             (false, false) => Ok(self.src.clone()),
             (true, false) => render_fields(&self.src, event),
@@ -141,8 +142,8 @@ impl Template {
     }
 }
 
-fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
-    let mut missing_fields = Vec::new();
+fn render_fields(src: &str, event: &Event) -> Result<String, TemplateRenderingError> {
+    let mut missing_keys = Vec::new();
     let out = RE
         .replace_all(src, |caps: &Captures<'_>| {
             let key = caps
@@ -150,20 +151,32 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
                 .map(|s| s.as_str().trim())
                 .expect("src should match regex");
             match event {
-                Event::Metric(_) => None, // See issue #5985
-                Event::Log(log) => log.get(&key),
+                Event::Log(log) => log.get(&key).map(|val| val.to_string_lossy()),
+                Event::Metric(metric) => render_metric_field(key, metric),
             }
-            .map(|val| val.to_string_lossy())
             .unwrap_or_else(|| {
-                missing_fields.push(key.to_owned());
+                missing_keys.push(key.to_owned());
                 String::new()
             })
         })
         .into_owned();
-    if missing_fields.is_empty() {
+    if missing_keys.is_empty() {
         Ok(out)
     } else {
-        Err(missing_fields)
+        Err(TemplateRenderingError::MissingKeys { missing_keys })
+    }
+}
+
+fn render_metric_field(key: &str, metric: &Metric) -> Option<String> {
+    match key {
+        "name" => Some(metric.name().into()),
+        "namespace" => metric.namespace().map(Into::into),
+        _ if key.starts_with("tags.") => metric
+            .series
+            .tags
+            .as_ref()
+            .and_then(|tags| tags.get(&key[5..]).cloned()),
+        _ => None,
     }
 }
 
@@ -172,7 +185,7 @@ fn render_timestamp(src: &str, event: &Event) -> String {
         Event::Log(log) => log
             .get(log_schema().timestamp_key())
             .and_then(Value::as_timestamp),
-        _ => None,
+        Event::Metric(metric) => metric.data.timestamp.as_ref(),
     };
     if let Some(ts) = timestamp {
         ts.format(src).to_string()
@@ -221,7 +234,9 @@ impl Serialize for Template {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::{MetricKind, MetricValue};
     use chrono::TimeZone;
+    use shared::btreemap;
 
     #[test]
     fn get_fields() {
@@ -267,7 +282,7 @@ mod tests {
     }
 
     #[test]
-    fn render_static() {
+    fn render_log_static() {
         let event = Event::from("hello world");
         let template = Template::try_from("foo").unwrap();
 
@@ -275,7 +290,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic() {
+    fn render_log_dynamic() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("log_stream", "stream");
         let template = Template::try_from("{{log_stream}}").unwrap();
@@ -284,7 +299,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_with_prefix() {
+    fn render_log_dynamic_with_prefix() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("log_stream", "stream");
         let template = Template::try_from("abcd-{{log_stream}}").unwrap();
@@ -293,7 +308,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_with_postfix() {
+    fn render_log_dynamic_with_postfix() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("log_stream", "stream");
         let template = Template::try_from("{{log_stream}}-abcd").unwrap();
@@ -302,18 +317,20 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_missing_key() {
+    fn render_log_dynamic_missing_key() {
         let event = Event::from("hello world");
         let template = Template::try_from("{{log_stream}}-{{foo}}").unwrap();
 
         assert_eq!(
-            Err(vec!["log_stream".to_string(), "foo".to_string()]),
+            Err(TemplateRenderingError::MissingKeys {
+                missing_keys: vec!["log_stream".to_string(), "foo".to_string()]
+            }),
             template.render(&event)
         );
     }
 
     #[test]
-    fn render_dynamic_multiple_keys() {
+    fn render_log_dynamic_multiple_keys() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("baz", "quux");
@@ -326,7 +343,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_weird_junk() {
+    fn render_log_dynamic_weird_junk() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("baz", "quux");
@@ -339,7 +356,7 @@ mod tests {
     }
 
     #[test]
-    fn render_timestamp_strftime_style() {
+    fn render_log_timestamp_strftime_style() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
@@ -351,7 +368,7 @@ mod tests {
     }
 
     #[test]
-    fn render_timestamp_multiple_strftime_style() {
+    fn render_log_timestamp_multiple_strftime_style() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
@@ -366,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_with_strftime() {
+    fn render_log_dynamic_with_strftime() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
@@ -382,7 +399,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_with_nested_strftime() {
+    fn render_log_dynamic_with_nested_strftime() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
@@ -398,7 +415,7 @@ mod tests {
     }
 
     #[test]
-    fn render_dynamic_with_reverse_nested_strftime() {
+    fn render_log_dynamic_with_reverse_nested_strftime() {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
@@ -414,10 +431,74 @@ mod tests {
     }
 
     #[test]
+    fn render_metric_timestamp() {
+        let template = Template::try_from("timestamp %F %T").unwrap();
+
+        assert_eq!(
+            Ok(Bytes::from("timestamp 2002-03-04 05:06:07")),
+            template.render(&sample_metric().into())
+        );
+    }
+
+    #[test]
+    fn render_metric_with_tags() {
+        let template = Template::try_from("name={{name}} component={{tags.component}}").unwrap();
+        let metric = sample_metric().with_tags(Some(
+            btreemap! { "test" => "true", "component" => "template" },
+        ));
+        assert_eq!(
+            Ok(Bytes::from("name=a-counter component=template")),
+            template.render(&metric.into())
+        );
+    }
+
+    #[test]
+    fn render_metric_without_tags() {
+        let template = Template::try_from("name={{name}} component={{tags.component}}").unwrap();
+        assert_eq!(
+            Err(TemplateRenderingError::MissingKeys {
+                missing_keys: vec!["tags.component".into()]
+            }),
+            template.render(&sample_metric().into())
+        );
+    }
+
+    #[test]
+    fn render_metric_with_namespace() {
+        let template = Template::try_from("namespace={{namespace}} name={{name}}").unwrap();
+        let metric = sample_metric().with_namespace(Some("vector-test"));
+        assert_eq!(
+            Ok(Bytes::from("namespace=vector-test name=a-counter")),
+            template.render(&metric.into())
+        );
+    }
+
+    #[test]
+    fn render_metric_without_namespace() {
+        let template = Template::try_from("namespace={{namespace}} name={{name}}").unwrap();
+        let metric = sample_metric();
+        assert_eq!(
+            Err(TemplateRenderingError::MissingKeys {
+                missing_keys: vec!["namespace".into()]
+            }),
+            template.render(&metric.into())
+        );
+    }
+
+    fn sample_metric() -> Metric {
+        Metric::new(
+            "a-counter",
+            MetricKind::Absolute,
+            MetricValue::Counter { value: 1.1 },
+        )
+        .with_timestamp(Some(Utc.ymd(2002, 3, 4).and_hms(5, 6, 7)))
+    }
+
+    #[test]
     fn strftime_error() {
         assert_eq!(
             Template::try_from("%E").unwrap_err(),
-            TemplateError::StrftimeError
+            TemplateParseError::StrftimeError
         );
     }
 }

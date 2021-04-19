@@ -1,4 +1,4 @@
-use super::{default_host_key, logs::HumioLogsConfig, Encoding};
+use super::{host_key, logs::HumioLogsConfig, Encoding};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig},
     sinks::util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
@@ -8,6 +8,7 @@ use crate::{
     transforms::metric_to_log::MetricToLogConfig,
 };
 use futures::{stream, SinkExt, StreamExt};
+use indoc::indoc;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -24,7 +25,7 @@ pub struct HumioMetricsConfig {
 
     event_type: Option<Template>,
 
-    #[serde(default = "default_host_key")]
+    #[serde(default = "host_key")]
     host_key: String,
 
     #[serde(default)]
@@ -53,11 +54,11 @@ inventory::submit! {
 
 impl GenerateConfig for HumioMetricsConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"host_key = "hostname"
-            token = "${HUMIO_TOKEN}"
-            encoding.codec = "json""#,
-        )
+        toml::from_str(indoc! {r#"
+                host_key = "hostname"
+                token = "${HUMIO_TOKEN}"
+                encoding.codec = "json"
+            "#})
         .unwrap()
     }
 }
@@ -66,7 +67,7 @@ impl GenerateConfig for HumioMetricsConfig {
 #[typetag::serde(name = "humio_metrics")]
 impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut transform = self.transform.clone().build().await?;
+        let mut transform = self.transform.clone().build(&cx.globals).await?;
         let sink = HumioLogsConfig {
             token: self.token.clone(),
             endpoint: self.endpoint.clone(),
@@ -112,6 +113,7 @@ mod tests {
         test_util, Event,
     };
     use chrono::{offset::TimeZone, Utc};
+    use indoc::indoc;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -121,25 +123,21 @@ mod tests {
 
     #[test]
     fn test_endpoint_field() {
-        let (config, _) = load_sink::<HumioMetricsConfig>(
-            r#"
+        let (config, _) = load_sink::<HumioMetricsConfig>(indoc! {r#"
             token = "atoken"
             batch.max_events = 1
             endpoint = "https://localhost:9200/"
             encoding = "json"
-            "#,
-        )
+        "#})
         .unwrap();
 
         assert_eq!(Some("https://localhost:9200/".to_string()), config.endpoint);
-        let (config, _) = load_sink::<HumioMetricsConfig>(
-            r#"
+        let (config, _) = load_sink::<HumioMetricsConfig>(indoc! {r#"
             token = "atoken"
             batch.max_events = 1
             host = "https://localhost:9200/"
             encoding = "json"
-            "#,
-        )
+        "#})
         .unwrap();
 
         assert_eq!(Some("https://localhost:9200/".to_string()), config.endpoint);
@@ -147,13 +145,11 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_json() {
-        let (mut config, cx) = load_sink::<HumioMetricsConfig>(
-            r#"
+        let (mut config, cx) = load_sink::<HumioMetricsConfig>(indoc! {r#"
             token = "atoken"
             batch.max_events = 1
             encoding = "json"
-            "#,
-        )
+        "#})
         .unwrap();
 
         let addr = test_util::next_addr();
@@ -171,7 +167,7 @@ mod tests {
         let metrics = vec![
             Event::from(
                 Metric::new(
-                    "metric1".to_string(),
+                    "metric1",
                     MetricKind::Incremental,
                     MetricValue::Counter { value: 42.0 },
                 )
@@ -184,7 +180,7 @@ mod tests {
             ),
             Event::from(
                 Metric::new(
-                    "metric2".to_string(),
+                    "metric2",
                     MetricKind::Absolute,
                     MetricValue::Distribution {
                         samples: crate::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],

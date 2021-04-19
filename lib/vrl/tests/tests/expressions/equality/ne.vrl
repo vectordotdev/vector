@@ -1,0 +1,3 @@
+# result: [false, true, true, true]
+
+[1 != 1, 0 != 1, "true" != true, (5 / 4 ?? 0) != 0]

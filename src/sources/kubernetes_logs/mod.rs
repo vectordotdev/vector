@@ -12,16 +12,18 @@ use crate::internal_events::{
 };
 use crate::kubernetes as k8s;
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{
+        DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceContext, SourceDescription,
+    },
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, TaskTransform},
-    Pipeline,
 };
 use bytes::Bytes;
-use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter};
+use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter, ReadFrom};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
+use shared::TimeZone;
 use std::convert::TryInto;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -95,6 +97,13 @@ pub struct Config {
     /// stages, i.e. the time delta between log line was written and when it was
     /// processed by the `kubernetes_logs` source.
     ingestion_timestamp_field: Option<String>,
+
+    /// The default time zone for timestamps without an explicit zone.
+    timezone: Option<TimeZone>,
+
+    /// Optional path to a kubeconfig file readable by Vector. If not set,
+    /// Vector will try to connect to Kubernetes using in-cluster configuration.
+    kube_config_file: Option<PathBuf>,
 }
 
 inventory::submit! {
@@ -117,15 +126,9 @@ const COMPONENT_NAME: &str = "kubernetes_logs";
 #[async_trait::async_trait]
 #[typetag::serde(name = "kubernetes_logs")]
 impl SourceConfig for Config {
-    async fn build(
-        &self,
-        name: &str,
-        globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<sources::Source> {
-        let source = Source::new(self, globals, name)?;
-        Ok(Box::pin(source.run(out, shutdown).map(|result| {
+    async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        let source = Source::new(self, &cx.globals, &cx.name)?;
+        Ok(Box::pin(source.run(cx.out, cx.shutdown).map(|result| {
             result.map_err(|error| {
                 error!(message = "Source future failed.", %error);
             })
@@ -153,6 +156,7 @@ struct Source {
     max_read_bytes: usize,
     glob_minimum_cooldown: Duration,
     ingestion_timestamp_field: Option<String>,
+    timezone: TimeZone,
 }
 
 impl Source {
@@ -160,10 +164,14 @@ impl Source {
         let field_selector = prepare_field_selector(config)?;
         let label_selector = prepare_label_selector(config);
 
-        let k8s_config = k8s::client::config::Config::in_cluster()?;
+        let k8s_config = match &config.kube_config_file {
+            Some(kc) => k8s::client::config::Config::kubeconfig(kc)?,
+            None => k8s::client::config::Config::in_cluster()?,
+        };
         let client = k8s::client::Client::new(k8s_config)?;
 
         let data_dir = globals.resolve_and_make_data_subdir(None, name)?;
+        let timezone = config.timezone.unwrap_or(globals.timezone);
 
         let exclude_paths = config
             .exclude_paths_glob_patterns
@@ -192,6 +200,7 @@ impl Source {
             max_read_bytes: config.max_read_bytes,
             glob_minimum_cooldown,
             ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
+            timezone,
         })
     }
 
@@ -211,6 +220,7 @@ impl Source {
             max_read_bytes,
             glob_minimum_cooldown,
             ingestion_timestamp_field,
+            timezone,
         } = self;
 
         let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
@@ -252,7 +262,9 @@ impl Source {
             max_read_bytes,
             // We want to use checkpoining mechanism, and resume from where we
             // left off.
-            start_at_beginning: false,
+            ignore_checkpoints: false,
+            // Match the default behavior
+            read_from: ReadFrom::Beginning,
             // We're now aware of the use cases that would require specifying
             // the starting point in time since when we should collect the logs,
             // so we just disable it. If users ask, we can expose it. There may
@@ -299,20 +311,25 @@ impl Source {
         let (file_source_tx, file_source_rx) =
             futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
 
-        let mut parser = parser::build();
+        let mut parser = parser::build(timezone);
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
         let events = file_source_rx.map(futures::stream::iter);
         let events = events.flatten();
         let events = events.map(move |(bytes, file)| {
+            let byte_size = bytes.len();
+            let mut event = create_event(bytes, &file, ingestion_timestamp_field.as_deref());
+            let file_info = annotator.annotate(&mut event, &file);
+
             emit!(KubernetesLogsEventReceived {
                 file: &file,
-                byte_size: bytes.len(),
+                byte_size,
+                pod_name: file_info.as_ref().map(|info| info.pod_name),
             });
-            let mut event = create_event(bytes, &file, ingestion_timestamp_field.as_deref());
-            if annotator.annotate(&mut event, &file).is_none() {
+            if file_info.is_none() {
                 emit!(KubernetesLogsEventAnnotationFailed { event: &event });
             }
+
             event
         });
         let events = events.flat_map(move |event| {

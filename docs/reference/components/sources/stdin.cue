@@ -9,6 +9,7 @@ components: sources: stdin: {
 		deployment_roles: ["sidecar"]
 		development:   "stable"
 		egress_method: "stream"
+		stateful:      false
 	}
 
 	features: {
@@ -50,7 +51,10 @@ components: sources: stdin: {
 			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.configuration.global-options#host_key]."
 			required:    false
 			warnings: []
-			type: string: default: "host"
+			type: string: {
+				default: "host"
+				syntax:  "literal"
+			}
 		}
 		max_length: {
 			common:      false
@@ -103,6 +107,7 @@ components: sources: stdin: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:          components.sources.internal_metrics.output.metrics.events_in_total
 		processed_bytes_total:    components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:   components.sources.internal_metrics.output.metrics.processed_events_total
 		stdin_reads_failed_total: components.sources.internal_metrics.output.metrics.stdin_reads_failed_total

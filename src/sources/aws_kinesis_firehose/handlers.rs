@@ -1,9 +1,11 @@
 use super::errors::{ParseRecords, RequestError};
 use super::models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse};
-use crate::{config::log_schema, event::Event, Pipeline};
+use crate::{
+    config::log_schema, event::Event, internal_events::AwsKinesisFirehoseEventReceived, Pipeline,
+};
 use bytes::Bytes;
 use chrono::Utc;
-use flate2::read::GzDecoder;
+use flate2::read::MultiGzDecoder;
 use futures::{SinkExt, StreamExt, TryFutureExt};
 use snafu::ResultExt;
 use std::io::Read;
@@ -57,6 +59,10 @@ fn parse_records(
         .iter()
         .map(|record| {
             decode_record(record).map(|record| {
+                emit!(AwsKinesisFirehoseEventReceived {
+                    byte_size: record.len()
+                });
+
                 let mut event = Event::new_empty_log();
                 let log = event.as_mut_log();
 
@@ -76,7 +82,7 @@ fn decode_record(record: &EncodedFirehoseRecord) -> std::io::Result<Bytes> {
     let mut cursor = std::io::Cursor::new(record.data.as_bytes());
     let base64decoder = base64::read::DecoderReader::new(&mut cursor, base64::STANDARD);
 
-    let mut gz = GzDecoder::new(base64decoder);
+    let mut gz = MultiGzDecoder::new(base64decoder);
     let mut buffer = Vec::new();
     gz.read_to_end(&mut buffer)?;
 

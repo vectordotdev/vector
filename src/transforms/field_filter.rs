@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
     transforms::{FunctionTransform, Transform},
 };
@@ -29,7 +29,7 @@ impl GenerateConfig for FieldFilterConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "field_filter")]
 impl TransformConfig for FieldFilterConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         warn!(
             message =
                 r#"The "field_filter" transform is deprecated, use the "filter" transform instead"#
@@ -80,8 +80,35 @@ impl FunctionTransform for FieldFilter {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use crate::Event;
+
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::FieldFilterConfig>();
+    }
+
+    fn transform_it(msg: &str) -> Option<Event> {
+        let mut transform = FieldFilter {
+            field_name: "message".into(),
+            value: "something".into(),
+        };
+        let event = Event::from(msg);
+        let metadata = event.metadata().clone();
+        let result = transform.transform_one(event);
+        if let Some(event) = &result {
+            assert_eq!(event.metadata(), &metadata);
+        }
+        result
+    }
+
+    #[test]
+    fn passes_matching() {
+        assert!(transform_it("something").is_some());
+    }
+
+    #[test]
+    fn drops_not_matching() {
+        assert!(transform_it("nothing").is_none());
     }
 }

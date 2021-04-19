@@ -32,7 +32,11 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tokio::{io::AsyncRead, net::TcpStream, time::delay_for};
+use tokio::{
+    io::{AsyncRead, ReadBuf},
+    net::TcpStream,
+    time::sleep,
+};
 
 #[derive(Debug, Snafu)]
 enum TcpError {
@@ -52,6 +56,7 @@ pub struct TcpSinkConfig {
     address: String,
     keepalive: Option<TcpKeepaliveConfig>,
     tls: Option<TlsConfig>,
+    send_buffer_bytes: Option<usize>,
 }
 
 impl TcpSinkConfig {
@@ -59,11 +64,22 @@ impl TcpSinkConfig {
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
+        send_buffer_bytes: Option<usize>,
     ) -> Self {
         Self {
             address,
             keepalive,
             tls,
+            send_buffer_bytes,
+        }
+    }
+
+    pub fn from_address(address: String) -> Self {
+        Self {
+            address,
+            keepalive: None,
+            tls: None,
+            send_buffer_bytes: None,
         }
     }
 
@@ -75,10 +91,8 @@ impl TcpSinkConfig {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
-        let keepalive = self.keepalive;
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
-
-        let connector = TcpConnector::new(host, port, keepalive, tls);
+        let connector = TcpConnector::new(host, port, self.keepalive, tls, self.send_buffer_bytes);
         let sink = TcpSink::new(connector.clone(), cx.acker(), encode_event);
 
         Ok((
@@ -94,6 +108,7 @@ struct TcpConnector {
     port: u16,
     keepalive: Option<TcpKeepaliveConfig>,
     tls: MaybeTlsSettings,
+    send_buffer_bytes: Option<usize>,
 }
 
 impl TcpConnector {
@@ -102,13 +117,20 @@ impl TcpConnector {
         port: u16,
         keepalive: Option<TcpKeepaliveConfig>,
         tls: MaybeTlsSettings,
+        send_buffer_bytes: Option<usize>,
     ) -> Self {
         Self {
             host,
             port,
             keepalive,
             tls,
+            send_buffer_bytes,
         }
+    }
+
+    #[cfg(test)]
+    fn from_host_port(host: String, port: u16) -> Self {
+        Self::new(host, port, None, None.into(), None)
     }
 
     fn fresh_backoff() -> ExponentialBackoff {
@@ -138,6 +160,12 @@ impl TcpConnector {
                     }
                 }
 
+                if let Some(send_buffer_bytes) = self.send_buffer_bytes {
+                    if let Err(error) = maybe_tls.set_send_buffer_bytes(send_buffer_bytes) {
+                        warn!(message = "Failed configuring send buffer size on TCP socket.", %error);
+                    }
+                }
+
                 maybe_tls
             })
     }
@@ -154,7 +182,7 @@ impl TcpConnector {
                 }
                 Err(error) => {
                     emit!(TcpSocketConnectionFailed { error });
-                    delay_for(backoff.next().unwrap()).await;
+                    sleep(backoff.next().unwrap()).await;
                 }
             }
         }
@@ -204,9 +232,11 @@ impl TcpSink {
         // If this returns `Poll::Pending` we know the connection is still
         // valid and the write will most likely succeed.
         let mut cx = Context::from_waker(noop_waker_ref());
-        match Pin::new(stream).poll_read(&mut cx, &mut [0u8; 1]) {
+        let mut buf = [0u8; 1];
+        let mut buf = ReadBuf::new(&mut buf);
+        match Pin::new(stream).poll_read(&mut cx, &mut buf) {
             Poll::Ready(Err(error)) => ShutdownCheck::Error(error),
-            Poll::Ready(Ok(0)) => {
+            Poll::Ready(Ok(())) if buf.filled().is_empty() => {
                 // Maybe this is only a sign to close the channel,
                 // in which case we should try to flush our buffers
                 // before disconnecting.
@@ -261,11 +291,11 @@ mod test {
 
         let addr = next_addr();
         let _listener = TcpListener::bind(&addr).await.unwrap();
-        let good = TcpConnector::new(addr.ip().to_string(), addr.port(), None, None.into());
+        let good = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
         assert!(good.healthcheck().await.is_ok());
 
         let addr = next_addr();
-        let bad = TcpConnector::new(addr.ip().to_string(), addr.port(), None, None.into());
+        let bad = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
         assert!(bad.healthcheck().await.is_err());
     }
 }

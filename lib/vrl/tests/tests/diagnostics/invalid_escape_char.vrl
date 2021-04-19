@@ -1,0 +1,13 @@
+# result:
+#
+# error[E202]: syntax error
+#   ┌─ :1:1
+#   │
+# 1 │ ╭
+# 2 │ │ . |= parse_grok!("1.2.3.4 - - [23/Mar/2021:06:46:35 +0000]", "%{IPORHOST:remote_ip} %{USER:ident} %{USER:user_name} \[%{HTTPDATE:timestamp}\]"
+# 3 │ │
+#   │ ╰^ unexpected error: invalid escape character: \[
+#   │
+#   = see language documentation at https://vrl.dev
+
+. |= parse_grok!("1.2.3.4 - - [23/Mar/2021:06:46:35 +0000]", "%{IPORHOST:remote_ip} %{USER:ident} %{USER:user_name} \[%{HTTPDATE:timestamp}\]"

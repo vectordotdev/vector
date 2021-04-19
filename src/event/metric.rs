@@ -1,21 +1,28 @@
+use super::EventMetadata;
+use crate::metrics::Handle;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use remap::{Object, Segment};
+use getset::Getters;
 use serde::{Deserialize, Serialize};
+use shared::EventDataEq;
 use snafu::Snafu;
-use std::collections::{BTreeMap, BTreeSet};
 use std::{
+    collections::{BTreeMap, BTreeSet},
     convert::TryFrom,
     fmt::{self, Display, Formatter},
     iter::FromIterator,
 };
+use vrl::{path::Segment, Target};
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Getters, PartialEq, Serialize)]
 pub struct Metric {
     #[serde(flatten)]
     pub series: MetricSeries,
     #[serde(flatten)]
     pub data: MetricData,
+    #[getset(get = "pub")]
+    #[serde(skip_serializing, default = "EventMetadata::default")]
+    metadata: EventMetadata,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -54,10 +61,10 @@ pub enum MetricKind {
     Absolute,
 }
 
-impl TryFrom<remap::Value> for MetricKind {
+impl TryFrom<vrl::Value> for MetricKind {
     type Error = String;
 
-    fn try_from(value: remap::Value) -> Result<Self, Self::Error> {
+    fn try_from(value: vrl::Value) -> Result<Self, Self::Error> {
         let value = value.try_bytes().map_err(|e| e.to_string())?;
         match std::str::from_utf8(&value).map_err(|e| e.to_string())? {
             "incremental" => Ok(Self::Incremental),
@@ -70,7 +77,7 @@ impl TryFrom<remap::Value> for MetricKind {
     }
 }
 
-impl From<MetricKind> for remap::Value {
+impl From<MetricKind> for vrl::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
             MetricKind::Incremental => "incremental".into(),
@@ -198,10 +205,10 @@ pub fn zip_quantiles(
         .collect()
 }
 
-/// Convert the Metric value into a remap value.
-/// Currently remap can only read the type of the value and doesn't consider
+/// Convert the Metric value into a vrl value.
+/// Currently vrl can only read the type of the value and doesn't consider
 /// any actual metric values.
-impl From<MetricValue> for remap::Value {
+impl From<MetricValue> for vrl::Value {
     fn from(value: MetricValue) -> Self {
         match value {
             MetricValue::Counter { .. } => "counter",
@@ -225,11 +232,20 @@ pub enum StatisticKind {
 }
 
 impl Metric {
-    pub fn new(name: String, kind: MetricKind, value: MetricValue) -> Self {
+    pub fn new<T: Into<String>>(name: T, kind: MetricKind, value: MetricValue) -> Self {
+        Self::new_with_metadata(name, kind, value, EventMetadata::default())
+    }
+
+    pub fn new_with_metadata<T: Into<String>>(
+        name: T,
+        kind: MetricKind,
+        value: MetricValue,
+        metadata: EventMetadata,
+    ) -> Self {
         Self {
             series: MetricSeries {
                 name: MetricName {
-                    name,
+                    name: name.into(),
                     namespace: None,
                 },
                 tags: None,
@@ -239,11 +255,12 @@ impl Metric {
                 kind,
                 value,
             },
+            metadata,
         }
     }
 
-    pub fn with_namespace(mut self, namespace: Option<String>) -> Self {
-        self.series.name.namespace = namespace;
+    pub fn with_namespace<T: Into<String>>(mut self, namespace: Option<T>) -> Self {
+        self.series.name.namespace = namespace.map(Into::into);
         self
     }
 
@@ -257,38 +274,49 @@ impl Metric {
         self
     }
 
-    /// Create a new Metric from this with all the data but marked as absolute.
-    pub fn to_absolute(&self) -> Self {
+    pub fn with_value(mut self, value: MetricValue) -> Self {
+        self.data.value = value;
+        self
+    }
+
+    /// Rewrite this into a Metric with the data marked as absolute.
+    pub fn into_absolute(self) -> Self {
         Self {
-            series: self.series.clone(),
-            data: self.data.to_absolute(),
+            series: self.series,
+            data: self.data.into_absolute(),
+            metadata: self.metadata,
+        }
+    }
+
+    /// Rewrite this into a Metric with the data marked as incremental.
+    pub fn into_incremental(self) -> Self {
+        Self {
+            series: self.series,
+            data: self.data.into_incremental(),
+            metadata: self.metadata,
         }
     }
 
     /// Convert the metrics_runtime::Measurement value plus the name and
     /// labels from a Key into our internal Metric format.
-    pub fn from_metric_kv(key: &metrics::Key, handle: &metrics_util::Handle) -> Self {
+    pub fn from_metric_kv(key: &metrics::Key, handle: &Handle) -> Self {
         let value = match handle {
-            metrics_util::Handle::Counter(_) => MetricValue::Counter {
-                value: handle.read_counter() as f64,
+            Handle::Counter(counter) => MetricValue::Counter {
+                value: counter.count() as f64,
             },
-            metrics_util::Handle::Gauge(_) => MetricValue::Gauge {
-                value: handle.read_gauge() as f64,
+            Handle::Gauge(gauge) => MetricValue::Gauge {
+                value: gauge.gauge(),
             },
-            metrics_util::Handle::Histogram(_) => {
-                let values = handle.read_histogram();
-                // Each sample in the source measurement has an
-                // effective sample rate of 1.
-                let samples = values
-                    .into_iter()
-                    .map(|i| Sample {
-                        value: i as f64,
-                        rate: 1,
-                    })
+            Handle::Histogram(histogram) => {
+                let buckets: Vec<Bucket> = histogram
+                    .buckets()
+                    .map(|(upper_limit, count)| Bucket { upper_limit, count })
                     .collect();
-                MetricValue::Distribution {
-                    samples,
-                    statistic: StatisticKind::Histogram,
+
+                MetricValue::AggregatedHistogram {
+                    buckets,
+                    sum: histogram.sum() as f64,
+                    count: histogram.count(),
                 }
             }
         };
@@ -299,7 +327,7 @@ impl Metric {
             .collect::<MetricTags>();
 
         Self::new(key.name().to_string(), MetricKind::Absolute, value)
-            .with_namespace(Some("vector".to_string()))
+            .with_namespace(Some("vector"))
             .with_timestamp(Some(Utc::now()))
             .with_tags(if labels.is_empty() {
                 None
@@ -347,36 +375,133 @@ impl Metric {
     pub fn delete_tag(&mut self, name: &str) -> Option<String> {
         self.series.tags.as_mut().and_then(|tags| tags.remove(name))
     }
+
+    /// Create a new metric from this with the data zeroed.
+    pub fn zero(&self) -> Self {
+        Self {
+            series: self.series.clone(),
+            data: self.data.zero(),
+            metadata: self.metadata.clone(),
+        }
+    }
+}
+
+impl EventDataEq for Metric {
+    fn event_data_eq(&self, other: &Self) -> bool {
+        self.series == other.series
+            && self.data == other.data
+            && self.metadata.event_data_eq(&other.metadata)
+    }
 }
 
 impl MetricData {
-    /// Create new MetricData from this with all the data but marked as absolute.
-    pub fn to_absolute(&self) -> Self {
+    /// Rewrite this data to mark it as absolute.
+    pub fn into_absolute(self) -> Self {
         Self {
             timestamp: self.timestamp,
             kind: MetricKind::Absolute,
-            value: self.value.clone(),
+            value: self.value,
+        }
+    }
+
+    /// Rewrite this data to mark it as incremental.
+    pub fn into_incremental(self) -> Self {
+        Self {
+            timestamp: self.timestamp,
+            kind: MetricKind::Incremental,
+            value: self.value,
         }
     }
 
     /// Update this MetricData by adding the value from another.
     pub fn update(&mut self, other: &Self) {
-        match (&mut self.value, &other.value) {
-            (MetricValue::Counter { ref mut value }, MetricValue::Counter { value: value2 }) => {
+        self.value.add(&other.value);
+        // Update the timestamp to the latest one
+        self.timestamp = match (self.timestamp, other.timestamp) {
+            (None, None) => None,
+            (Some(t), None) => Some(t),
+            (None, Some(t)) => Some(t),
+            (Some(t1), Some(t2)) => Some(t1.max(t2)),
+        };
+    }
+
+    /// Add the data from the other metric to this one. The `other` must
+    /// be relative and contain the same value type as this one.
+    pub fn add(&mut self, other: &Self) {
+        if other.kind.is_incremental() {
+            self.update(other);
+        }
+    }
+
+    /// Create a new metric data from this with a zero value.
+    pub fn zero(&self) -> Self {
+        Self {
+            timestamp: self.timestamp,
+            kind: self.kind,
+            value: self.value.zero(),
+        }
+    }
+}
+
+impl MetricValue {
+    /// Create a new metric value with all the contained values set to
+    /// zero. This keeps all the bucket/value vectors for the histogram
+    /// and summary metric types intact while zeroing the
+    /// counts. Distribution metrics are emptied of all their values.
+    pub fn zero(&self) -> Self {
+        match self {
+            Self::Counter { .. } => Self::Counter { value: 0.0 },
+            Self::Gauge { .. } => Self::Gauge { value: 0.0 },
+            Self::Set { .. } => Self::Set {
+                values: BTreeSet::default(),
+            },
+            Self::Distribution { samples, statistic } => Self::Distribution {
+                samples: Vec::with_capacity(samples.len()),
+                statistic: *statistic,
+            },
+            Self::AggregatedHistogram { buckets, .. } => Self::AggregatedHistogram {
+                buckets: buckets
+                    .iter()
+                    .map(|&Bucket { upper_limit, .. }| Bucket {
+                        upper_limit,
+                        count: 0,
+                    })
+                    .collect(),
+                count: 0,
+                sum: 0.0,
+            },
+            Self::AggregatedSummary { quantiles, .. } => Self::AggregatedSummary {
+                quantiles: quantiles
+                    .iter()
+                    .map(|&Quantile { upper_limit, .. }| Quantile {
+                        upper_limit,
+                        value: 0.0,
+                    })
+                    .collect(),
+                count: 0,
+                sum: 0.0,
+            },
+        }
+    }
+
+    /// Add another same value to this.
+    pub fn add(&mut self, other: &Self) {
+        match (self, other) {
+            (Self::Counter { ref mut value }, Self::Counter { value: value2 }) => {
                 *value += value2;
             }
-            (MetricValue::Gauge { ref mut value }, MetricValue::Gauge { value: value2 }) => {
+            (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
                 *value += value2;
             }
-            (MetricValue::Set { ref mut values }, MetricValue::Set { values: values2 }) => {
+            (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
                 values.extend(values2.iter().map(Into::into));
             }
             (
-                MetricValue::Distribution {
+                Self::Distribution {
                     ref mut samples,
                     statistic: statistic_a,
                 },
-                MetricValue::Distribution {
+                Self::Distribution {
                     samples: samples2,
                     statistic: statistic_b,
                 },
@@ -384,12 +509,12 @@ impl MetricData {
                 samples.extend_from_slice(&samples2);
             }
             (
-                MetricValue::AggregatedHistogram {
+                Self::AggregatedHistogram {
                     ref mut buckets,
                     ref mut count,
                     ref mut sum,
                 },
-                MetricValue::AggregatedHistogram {
+                Self::AggregatedHistogram {
                     buckets: buckets2,
                     count: count2,
                     sum: sum2,
@@ -408,62 +533,119 @@ impl MetricData {
                     *sum += sum2;
                 }
             }
+            (
+                Self::AggregatedSummary {
+                    ref mut quantiles,
+                    ref mut count,
+                    ref mut sum,
+                },
+                Self::AggregatedSummary {
+                    quantiles: quantiles2,
+                    count: count2,
+                    sum: sum2,
+                },
+            ) => {
+                if quantiles.len() == quantiles2.len()
+                    && quantiles
+                        .iter()
+                        .zip(quantiles2.iter())
+                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                {
+                    for (b1, b2) in quantiles.iter_mut().zip(quantiles2) {
+                        b1.value += b2.value;
+                    }
+                    *count += count2;
+                    *sum += sum2;
+                }
+            }
             _ => {}
         }
     }
 
-    /// Add the data from the other metric to this one. The `other` must
-    /// be relative and contain the same value type as this one.
-    pub fn add(&mut self, other: &Self) {
-        if other.kind.is_incremental() {
-            self.update(other);
-        }
-    }
-
-    /// Set all the values of this metric to zero without emptying
-    /// it. This keeps all the bucket/value vectors for the histogram
-    /// and summary metric types intact while zeroing the
-    /// counts. Distribution metrics are emptied of all their values.
-    pub fn reset(&mut self) {
-        match &mut self.value {
-            MetricValue::Counter { ref mut value } => {
-                *value = 0.0;
+    /// Subtract another (same type) value from this.
+    pub fn subtract(&mut self, other: &Self) {
+        match (self, other) {
+            (Self::Counter { ref mut value }, Self::Counter { value: value2 }) => {
+                *value -= value2;
             }
-            MetricValue::Gauge { ref mut value } => {
-                *value = 0.0;
+            (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
+                *value -= value2;
             }
-            MetricValue::Set { ref mut values } => {
-                values.clear();
-            }
-            MetricValue::Distribution {
-                ref mut samples, ..
-            } => {
-                samples.clear();
-            }
-            MetricValue::AggregatedHistogram {
-                ref mut buckets,
-                ref mut count,
-                ref mut sum,
-                ..
-            } => {
-                for bucket in buckets {
-                    bucket.count = 0;
+            (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
+                for item in values2 {
+                    values.remove(item);
                 }
-                *count = 0;
-                *sum = 0.0;
             }
-            MetricValue::AggregatedSummary {
-                ref mut quantiles,
-                ref mut count,
-                ref mut sum,
-                ..
-            } => {
-                for quantile in quantiles {
-                    quantile.value = 0.0;
+            (
+                Self::Distribution {
+                    ref mut samples,
+                    statistic: statistic_a,
+                },
+                Self::Distribution {
+                    samples: samples2,
+                    statistic: statistic_b,
+                },
+            ) if statistic_a == statistic_b => {
+                // This is an ugly algorithm, but the use of a HashSet
+                // or equivalent is complicated by neither Hash nor Eq
+                // being implemented for the f64 part of Sample.
+                *samples = samples
+                    .iter()
+                    .copied()
+                    .filter(|sample| samples2.iter().find(|sample2| sample == *sample2).is_none())
+                    .collect();
+            }
+            (
+                Self::AggregatedHistogram {
+                    ref mut buckets,
+                    ref mut count,
+                    ref mut sum,
+                },
+                Self::AggregatedHistogram {
+                    buckets: buckets2,
+                    count: count2,
+                    sum: sum2,
+                },
+            ) => {
+                if buckets.len() == buckets2.len()
+                    && buckets
+                        .iter()
+                        .zip(buckets2.iter())
+                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                {
+                    for (b1, b2) in buckets.iter_mut().zip(buckets2) {
+                        b1.count -= b2.count;
+                    }
+                    *count -= count2;
+                    *sum -= sum2;
                 }
-                *count = 0;
-                *sum = 0.0;
             }
+            (
+                Self::AggregatedSummary {
+                    ref mut quantiles,
+                    ref mut count,
+                    ref mut sum,
+                },
+                Self::AggregatedSummary {
+                    quantiles: quantiles2,
+                    count: count2,
+                    sum: sum2,
+                },
+            ) => {
+                if quantiles.len() == quantiles2.len()
+                    && quantiles
+                        .iter()
+                        .zip(quantiles2.iter())
+                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
+                {
+                    for (b1, b2) in quantiles.iter_mut().zip(quantiles2) {
+                        b1.value -= b2.value;
+                    }
+                    *count -= count2;
+                    *sum -= sum2;
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -568,13 +750,26 @@ enum MetricPathError<'a> {
     InvalidPath { path: &'a str, expected: &'a str },
 }
 
-impl Object for Metric {
-    fn insert(&mut self, path: &remap::Path, value: remap::Value) -> Result<(), String> {
+impl Target for Metric {
+    fn insert(&mut self, path: &vrl::Path, value: vrl::Value) -> Result<(), String> {
         if path.is_root() {
             return Err(MetricPathError::SetPathError.to_string());
         }
 
         match path.segments() {
+            [Segment::Field(tags)] if tags.as_str() == "tags" => {
+                let value = value.try_object().map_err(|e| e.to_string())?;
+                for (field, value) in value.iter() {
+                    self.set_tag_value(
+                        field.as_str().to_owned(),
+                        value
+                            .try_bytes_utf8_lossy()
+                            .map_err(|e| e.to_string())?
+                            .into_owned(),
+                    );
+                }
+                Ok(())
+            }
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
                 let value = value.try_bytes().map_err(|e| e.to_string())?;
                 self.set_tag_value(
@@ -610,9 +805,9 @@ impl Object for Metric {
         }
     }
 
-    fn get(&self, path: &remap::Path) -> Result<Option<remap::Value>, String> {
+    fn get(&self, path: &vrl::Path) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
-            let mut map = BTreeMap::<String, remap::Value>::new();
+            let mut map = BTreeMap::<String, vrl::Value>::new();
             map.insert("name".to_string(), self.series.name.name.clone().into());
             if let Some(ref namespace) = self.series.name.namespace {
                 map.insert("namespace".to_string(), namespace.clone().into());
@@ -650,7 +845,7 @@ impl Object for Metric {
             }
             [Segment::Field(tags)] if tags.as_str() == "tags" => Ok(self.tags().map(|map| {
                 let iter = map.iter().map(|(k, v)| (k.to_owned(), v.to_owned().into()));
-                remap::Value::from_iter(iter)
+                vrl::Value::from_iter(iter)
             })),
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
                 Ok(self.tag_value(field.as_str()).map(|value| value.into()))
@@ -666,11 +861,7 @@ impl Object for Metric {
         }
     }
 
-    fn remove(
-        &mut self,
-        path: &remap::Path,
-        _compact: bool,
-    ) -> Result<Option<remap::Value>, String> {
+    fn remove(&mut self, path: &vrl::Path, _compact: bool) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             return Err(MetricPathError::SetPathError.to_string());
         }
@@ -685,7 +876,7 @@ impl Object for Metric {
             [Segment::Field(tags)] if tags.as_str() == "tags" => {
                 Ok(self.series.tags.take().map(|map| {
                     let iter = map.into_iter().map(|(k, v)| (k, v.into()));
-                    remap::Value::from_iter(iter)
+                    vrl::Value::from_iter(iter)
                 }))
             }
             [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
@@ -730,10 +921,11 @@ fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::map;
     use chrono::{offset::TimeZone, DateTime, Utc};
-    use remap::{Path, Value};
+    use pretty_assertions::assert_eq;
+    use shared::btreemap;
     use std::str::FromStr;
+    use vrl::{Path, Value};
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -752,63 +944,59 @@ mod test {
     #[test]
     fn merge_counters() {
         let mut counter = Metric::new(
-            "counter".into(),
+            "counter",
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.0 },
         );
 
         let delta = Metric::new(
-            "counter".into(),
+            "counter",
             MetricKind::Incremental,
             MetricValue::Counter { value: 2.0 },
         )
-        .with_namespace(Some("vector".to_string()))
+        .with_namespace(Some("vector"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
+        let expected = counter
+            .clone()
+            .with_value(MetricValue::Counter { value: 3.0 })
+            .with_timestamp(Some(ts()));
+
         counter.data.add(&delta.data);
-        assert_eq!(
-            counter,
-            Metric::new(
-                "counter".into(),
-                MetricKind::Incremental,
-                MetricValue::Counter { value: 3.0 },
-            )
-        )
+        assert_eq!(counter, expected);
     }
 
     #[test]
     fn merge_gauges() {
         let mut gauge = Metric::new(
-            "gauge".into(),
+            "gauge",
             MetricKind::Incremental,
             MetricValue::Gauge { value: 1.0 },
         );
 
         let delta = Metric::new(
-            "gauge".into(),
+            "gauge",
             MetricKind::Incremental,
             MetricValue::Gauge { value: -2.0 },
         )
-        .with_namespace(Some("vector".to_string()))
+        .with_namespace(Some("vector"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
+        let expected = gauge
+            .clone()
+            .with_value(MetricValue::Gauge { value: -1.0 })
+            .with_timestamp(Some(ts()));
+
         gauge.data.add(&delta.data);
-        assert_eq!(
-            gauge,
-            Metric::new(
-                "gauge".into(),
-                MetricKind::Incremental,
-                MetricValue::Gauge { value: -1.0 },
-            )
-        )
+        assert_eq!(gauge, expected);
     }
 
     #[test]
     fn merge_sets() {
         let mut set = Metric::new(
-            "set".into(),
+            "set",
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["old".into()].into_iter().collect(),
@@ -816,33 +1004,31 @@ mod test {
         );
 
         let delta = Metric::new(
-            "set".into(),
+            "set",
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["new".into()].into_iter().collect(),
             },
         )
-        .with_namespace(Some("vector".to_string()))
+        .with_namespace(Some("vector"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
+        let expected = set
+            .clone()
+            .with_value(MetricValue::Set {
+                values: vec!["old".into(), "new".into()].into_iter().collect(),
+            })
+            .with_timestamp(Some(ts()));
+
         set.data.add(&delta.data);
-        assert_eq!(
-            set,
-            Metric::new(
-                "set".into(),
-                MetricKind::Incremental,
-                MetricValue::Set {
-                    values: vec!["old".into(), "new".into()].into_iter().collect()
-                },
-            )
-        )
+        assert_eq!(set, expected);
     }
 
     #[test]
     fn merge_histograms() {
         let mut dist = Metric::new(
-            "hist".into(),
+            "hist",
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: samples![1.0 => 10],
@@ -851,29 +1037,27 @@ mod test {
         );
 
         let delta = Metric::new(
-            "hist".into(),
+            "hist",
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: samples![1.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
         )
-        .with_namespace(Some("vector".to_string()))
+        .with_namespace(Some("vector"))
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
 
+        let expected = dist
+            .clone()
+            .with_value(MetricValue::Distribution {
+                samples: samples![1.0 => 10, 1.0 => 20],
+                statistic: StatisticKind::Histogram,
+            })
+            .with_timestamp(Some(ts()));
+
         dist.data.add(&delta.data);
-        assert_eq!(
-            dist,
-            Metric::new(
-                "hist".into(),
-                MetricKind::Incremental,
-                MetricValue::Distribution {
-                    samples: samples![1.0 => 10, 1.0 => 20],
-                    statistic: StatisticKind::Histogram
-                },
-            )
-        )
+        assert_eq!(dist, expected);
     }
 
     #[test]
@@ -882,7 +1066,7 @@ mod test {
             format!(
                 "{}",
                 Metric::new(
-                    "one".into(),
+                    "one",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.23 },
                 )
@@ -895,7 +1079,7 @@ mod test {
             format!(
                 "{}",
                 Metric::new(
-                    "two word".into(),
+                    "two word",
                     MetricKind::Incremental,
                     MetricValue::Gauge { value: 2.0 }
                 )
@@ -908,11 +1092,11 @@ mod test {
             format!(
                 "{}",
                 Metric::new(
-                    "namespace".into(),
+                    "namespace",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.23 },
                 )
-                .with_namespace(Some("vector".to_string()))
+                .with_namespace(Some("vector"))
             ),
             r#"vector_namespace{} = 1.23"#
         );
@@ -921,11 +1105,11 @@ mod test {
             format!(
                 "{}",
                 Metric::new(
-                    "namespace".into(),
+                    "namespace",
                     MetricKind::Absolute,
                     MetricValue::Counter { value: 1.23 },
                 )
-                .with_namespace(Some("vector host".to_string()))
+                .with_namespace(Some("vector host"))
             ),
             r#""vector host"_namespace{} = 1.23"#
         );
@@ -938,11 +1122,7 @@ mod test {
         assert_eq!(
             format!(
                 "{}",
-                Metric::new(
-                    "three".into(),
-                    MetricKind::Absolute,
-                    MetricValue::Set { values }
-                )
+                Metric::new("three", MetricKind::Absolute, MetricValue::Set { values })
             ),
             r#"three{} = "four=4" "thrəë" v1 v2_two"#
         );
@@ -951,7 +1131,7 @@ mod test {
             format!(
                 "{}",
                 Metric::new(
-                    "four".into(),
+                    "four",
                     MetricKind::Absolute,
                     MetricValue::Distribution {
                         samples: samples![1.0 => 3, 2.0 => 4],
@@ -966,7 +1146,7 @@ mod test {
             format!(
                 "{}",
                 Metric::new(
-                    "five".into(),
+                    "five",
                     MetricKind::Absolute,
                     MetricValue::AggregatedHistogram {
                         buckets: buckets![51.0 => 53, 52.0 => 54],
@@ -982,7 +1162,7 @@ mod test {
             format!(
                 "{}",
                 Metric::new(
-                    "six".into(),
+                    "six",
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
                         quantiles: quantiles![1.0 => 63.0, 2.0 => 64.0],
@@ -998,11 +1178,11 @@ mod test {
     #[test]
     fn object_metric_all_fields() {
         let metric = Metric::new(
-            "zub".into(),
+            "zub",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.23 },
         )
-        .with_namespace(Some("zoob".into()))
+        .with_namespace(Some("zoob"))
         .with_tags(Some({
             let mut map = MetricTags::new();
             map.insert("tig".to_string(), "tog".to_string());
@@ -1012,13 +1192,14 @@ mod test {
 
         assert_eq!(
             Ok(Some(
-                map!["name": "zub",
-                     "namespace": "zoob",
-                     "timestamp": Utc.ymd(2020, 12, 10).and_hms(12, 0, 0),
-                     "tags": map!["tig": "tog"],
-                     "kind": "absolute",
-                     "type": "counter"
-                ]
+                btreemap! {
+                    "name" => "zub",
+                    "namespace" => "zoob",
+                    "timestamp" => Utc.ymd(2020, 12, 10).and_hms(12, 0, 0),
+                    "tags" => btreemap! { "tig" => "tog" },
+                    "kind" => "absolute",
+                    "type" => "counter",
+                }
                 .into()
             )),
             metric.get(&Path::from_str(".").unwrap())
@@ -1028,7 +1209,7 @@ mod test {
     #[test]
     fn object_metric_fields() {
         let mut metric = Metric::new(
-            "name".into(),
+            "name",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.23 },
         )
@@ -1078,7 +1259,7 @@ mod test {
     #[test]
     fn object_metric_invalid_paths() {
         let mut metric = Metric::new(
-            "name".into(),
+            "name",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.23 },
         );

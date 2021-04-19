@@ -1,0 +1,3 @@
+# result: r'foo?bar"baz"\'qux'
+
+r'foo?bar"baz"\'qux'

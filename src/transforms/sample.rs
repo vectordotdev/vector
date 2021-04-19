@@ -1,6 +1,6 @@
 use crate::{
     conditions::{CheckFieldsConfig, Condition, ConditionConfig},
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
     internal_events::SampleEventDiscarded,
     transforms::{FunctionTransform, Transform},
@@ -37,7 +37,7 @@ impl GenerateConfig for SampleConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "sample")]
 impl TransformConfig for SampleConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         Ok(Transform::function(Sample::new(
             self.rate,
             self.key_field.clone(),
@@ -68,8 +68,8 @@ struct SampleCompatConfig(SampleConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "sampler")]
 impl TransformConfig for SampleCompatConfig {
-    async fn build(&self) -> crate::Result<Transform> {
-        self.0.build().await
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+        self.0.build(globals).await
     }
 
     fn input_type(&self) -> DataType {
@@ -230,7 +230,11 @@ mod tests {
                 Sample::new(0, key_field.clone(), Some(condition_contains("important")));
             let iterations = 0..1000;
             let total_passed = iterations
-                .filter_map(|_| sampler.transform_one(event.clone()))
+                .filter_map(|_| {
+                    sampler
+                        .transform_one(event.clone())
+                        .map(|result| assert_eq!(result, event))
+                })
                 .count();
             assert_eq!(total_passed, 1000);
         }
@@ -247,7 +251,11 @@ mod tests {
             );
             let iterations = 0..1000;
             let total_passed = iterations
-                .filter_map(|_| sampler.transform_one(event.clone()))
+                .filter_map(|_| {
+                    sampler
+                        .transform_one(event.clone())
+                        .map(|result| assert_eq!(result, event))
+                })
                 .count();
             assert_eq!(total_passed, 1000);
         }

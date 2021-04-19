@@ -11,6 +11,7 @@ components: sources: splunk_hec: {
 		deployment_roles: ["aggregator"]
 		development:   "stable"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -68,6 +69,7 @@ components: sources: splunk_hec: {
 			warnings: []
 			type: string: {
 				default: "0.0.0.0:\(_port)"
+				syntax:  "literal"
 			}
 		}
 		token: {
@@ -78,6 +80,7 @@ components: sources: splunk_hec: {
 			type: string: {
 				default: null
 				examples: ["A94A8FE5CCB19BA61C4C08"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -87,7 +90,7 @@ components: sources: splunk_hec: {
 		fields: {
 			message: fields._raw_line
 			splunk_channel: {
-				description: "The Splunk channel, value of the `X-Splunk-Request-Channel` header."
+				description: "The Splunk channel, value of the `X-Splunk-Request-Channel` header or `channel` query parameter, in that order of precedence."
 				required:    true
 				type: timestamp: {}
 			}
@@ -96,6 +99,7 @@ components: sources: splunk_hec: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:           components.sources.internal_metrics.output.metrics.events_in_total
 		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
 		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
 	}

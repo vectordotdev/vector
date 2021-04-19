@@ -1,6 +1,6 @@
 use super::{TaskTransform, Transform};
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     event::Event,
     wasm::WasmModule,
 };
@@ -64,7 +64,7 @@ impl GenerateConfig for WasmConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "wasm")]
 impl TransformConfig for WasmConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         Ok(Transform::task(Wasm::new(self.clone())?))
     }
 
@@ -309,6 +309,44 @@ mod tests {
             config,
             "tests/data/wasm/parse_syslog/fixtures/a/input.json",
             "tests/data/wasm/parse_syslog/fixtures/a/expected.json",
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn parse_json() {
+        crate::test_util::trace_init();
+        let span = span!(tracing::Level::TRACE, "transforms::wasm::parse_json");
+        let _enter = span.enter();
+
+        let config = r#"
+            module = "tests/data/wasm/parse_json/target/wasm32-wasi/release/parse_json.wasm"
+            artifact_cache = "target/artifacts"
+            "#;
+
+        test_config(
+            config,
+            "tests/data/wasm/parse_json/fixtures/a/input.json",
+            "tests/data/wasm/parse_json/fixtures/a/expected.json",
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn multifaceted() {
+        crate::test_util::trace_init();
+        let span = span!(tracing::Level::TRACE, "transforms::wasm::multifaceted");
+        let _enter = span.enter();
+
+        let config = r#"
+            module = "tests/data/wasm/multifaceted/target/wasm32-wasi/release/multifaceted.wasm"
+            artifact_cache = "target/artifacts"
+            "#;
+
+        test_config(
+            config,
+            "tests/data/wasm/multifaceted/fixtures/a/input.json",
+            "tests/data/wasm/multifaceted/fixtures/a/expected.json",
         )
         .await;
     }

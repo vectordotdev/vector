@@ -9,6 +9,7 @@ components: sources: mongodb_metrics: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -64,7 +65,10 @@ components: sources: mongodb_metrics: {
 			description: "MongoDB [Connection String URI Format][urls.mongodb_connection_string_uri_format]"
 			required:    true
 			type: array: {
-				items: type: string: examples: ["mongodb://localhost:27017"]
+				items: type: string: {
+					examples: ["mongodb://localhost:27017"]
+					syntax: "literal"
+				}
 			}
 		}
 		scrape_interval_secs: {
@@ -80,7 +84,10 @@ components: sources: mongodb_metrics: {
 			description: "The namespace of metrics. Disabled if empty."
 			common:      false
 			required:    false
-			type: string: default: "mongodb"
+			type: string: {
+				default: "mongodb"
+				syntax:  "literal"
+			}
 		}
 	}
 
@@ -753,6 +760,7 @@ components: sources: mongodb_metrics: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:              components.sources.internal_metrics.output.metrics.events_in_total
 		collect_completed_total:      components.sources.internal_metrics.output.metrics.collect_completed_total
 		collect_duration_nanoseconds: components.sources.internal_metrics.output.metrics.collect_duration_nanoseconds
 		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total

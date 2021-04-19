@@ -67,9 +67,7 @@ impl GenerateConfig for StatsdSinkConfig {
             default_namespace: None,
             mode: Mode::Udp(StatsdUdpConfig {
                 batch: Default::default(),
-                udp: UdpSinkConfig {
-                    address: default_address().to_string(),
-                },
+                udp: UdpSinkConfig::from_address(default_address().to_string()),
             }),
         })
         .unwrap()
@@ -242,9 +240,8 @@ mod test {
     use super::*;
     use crate::{event::Metric, test_util::*};
     use bytes::Bytes;
-    use futures::TryStreamExt;
+    use futures::{channel::mpsc, TryStreamExt};
     use tokio::net::UdpSocket;
-    use tokio::sync::mpsc;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 
     #[cfg(feature = "sources-statsd")]
@@ -296,7 +293,7 @@ mod test {
     #[test]
     fn test_encode_counter() {
         let metric1 = Metric::new(
-            "counter".to_owned(),
+            "counter",
             MetricKind::Incremental,
             MetricValue::Counter { value: 1.5 },
         )
@@ -304,14 +301,14 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        assert_eq!(metric1, metric2);
+        shared::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
     #[test]
     fn test_encode_absolute_counter() {
         let metric1 = Metric::new(
-            "counter".to_owned(),
+            "counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.5 },
         );
@@ -326,7 +323,7 @@ mod test {
     #[test]
     fn test_encode_gauge() {
         let metric1 = Metric::new(
-            "gauge".to_owned(),
+            "gauge",
             MetricKind::Incremental,
             MetricValue::Gauge { value: -1.5 },
         )
@@ -334,14 +331,14 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        assert_eq!(metric1, metric2);
+        shared::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
     #[test]
     fn test_encode_absolute_gauge() {
         let metric1 = Metric::new(
-            "gauge".to_owned(),
+            "gauge",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.5 },
         )
@@ -349,14 +346,14 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        assert_eq!(metric1, metric2);
+        shared::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
     #[test]
     fn test_encode_distribution() {
         let metric1 = Metric::new(
-            "distribution".to_owned(),
+            "distribution",
             MetricKind::Incremental,
             MetricValue::Distribution {
                 samples: crate::samples![1.5 => 1],
@@ -367,14 +364,14 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        assert_eq!(metric1, metric2);
+        shared::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
     #[test]
     fn test_encode_set() {
         let metric1 = Metric::new(
-            "set".to_owned(),
+            "set",
             MetricKind::Incremental,
             MetricValue::Set {
                 values: vec!["abc".to_owned()].into_iter().collect(),
@@ -384,7 +381,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        assert_eq!(metric1, metric2);
+        shared::assert_event_data_eq!(metric1, metric2);
     }
 
     #[tokio::test]
@@ -401,9 +398,7 @@ mod test {
                     timeout_secs: Some(1),
                     ..Default::default()
                 },
-                udp: UdpSinkConfig {
-                    address: addr.to_string(),
-                },
+                udp: UdpSinkConfig::from_address(addr.to_string()),
             }),
         };
 
@@ -413,26 +408,26 @@ mod test {
         let events = vec![
             Event::Metric(
                 Metric::new(
-                    "counter".to_owned(),
+                    "counter",
                     MetricKind::Incremental,
                     MetricValue::Counter { value: 1.5 },
                 )
-                .with_namespace(Some("vector".into()))
+                .with_namespace(Some("vector"))
                 .with_tags(Some(tags())),
             ),
             Event::Metric(
                 Metric::new(
-                    "histogram".to_owned(),
+                    "histogram",
                     MetricKind::Incremental,
                     MetricValue::Distribution {
                         samples: crate::samples![2.0 => 100],
                         statistic: StatisticKind::Histogram,
                     },
                 )
-                .with_namespace(Some("vector".into())),
+                .with_namespace(Some("vector")),
             ),
         ];
-        let (mut tx, rx) = mpsc::channel(1);
+        let (mut tx, rx) = mpsc::channel(0);
 
         let socket = UdpSocket::bind(addr).await.unwrap();
         tokio::spawn(async move {

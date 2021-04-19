@@ -1,6 +1,12 @@
 package metadata
 
 remap: functions: downcase: {
+	category: "String"
+	description: """
+		Downcases the `value` string, where "downcase" is defined according to the terms of the
+		Unicode Derived Core Property Lowercase.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -11,12 +17,7 @@ remap: functions: downcase: {
 	]
 	internal_failure_reasons: []
 	return: types: ["string"]
-	category: "String"
-	description: #"""
-		Returns a copy of `value` that is entirely lowercase.
 
-		"Lowercase" is defined according to the terms of the Unicode Derived Core Property Lowercase.
-		"""#
 	examples: [
 		{
 			title: "Downcase a string"

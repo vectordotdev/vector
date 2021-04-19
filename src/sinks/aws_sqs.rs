@@ -1,14 +1,14 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    internal_events::{AwsSqsEventSent, AwsSqsMessageGroupIdMissingKeys},
-    rusoto::{self, AWSAuthentication, RegionOrEndpoint},
+    internal_events::{AwsSqsEventSent, TemplateRenderingFailed},
+    rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
         BatchSettings, EncodedLength, TowerRequestConfig, VecBuffer,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     Event,
 };
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
@@ -34,7 +34,7 @@ enum BuildError {
     #[snafu(display("`message_group_id` is not allowed with non-FIFO queue."))]
     MessageGroupIdNotAllowed,
     #[snafu(display("invalid topic template: {}", source))]
-    TopicTemplate { source: TemplateError },
+    TopicTemplate { source: TemplateParseError },
 }
 
 #[derive(Debug, Snafu)]
@@ -64,7 +64,7 @@ pub struct SqsSinkConfig {
     // Deprecated name. Moved to auth.
     assume_role: Option<String>,
     #[serde(default)]
-    pub auth: AWSAuthentication,
+    pub auth: AwsAuthentication,
 }
 
 lazy_static! {
@@ -258,9 +258,11 @@ fn encode_event(
     let message_group_id = match message_group_id {
         Some(tpl) => match tpl.render_string(&event) {
             Ok(value) => Some(value),
-            Err(missing_keys) => {
-                emit!(AwsSqsMessageGroupIdMissingKeys {
-                    keys: &missing_keys
+            Err(error) => {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("message_group_id"),
+                    drop_event: true
                 });
                 return None;
             }
@@ -318,7 +320,7 @@ mod integration_tests {
     use rusoto_core::Region;
     use rusoto_sqs::{CreateQueueRequest, GetQueueUrlRequest, ReceiveMessageRequest};
     use std::collections::HashMap;
-    use tokio::time::{delay_for, Duration};
+    use tokio::time::{sleep, Duration};
 
     #[tokio::test]
     async fn sqs_send_message_batch() {
@@ -352,7 +354,7 @@ mod integration_tests {
         let (mut input_lines, events) = random_lines_with_stream(100, 10);
         sink.send_all(&mut events.map(Ok)).await.unwrap();
 
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         let response = client
             .receive_message(ReceiveMessageRequest {

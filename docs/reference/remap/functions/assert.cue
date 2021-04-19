@@ -1,6 +1,19 @@
 package metadata
 
 remap: functions: assert: {
+	category: "Debug"
+	description: """
+		Asserts the `condition`, which must be a Boolean expression. The program is aborted with the `message` if the
+		condition evaluates to `false`.
+		"""
+	notices: [
+		"""
+			The `assert` function should be used in a standalone fashion and only when you want to abort the program. You
+			should avoid it in logical expressions and other situations in which you want the program to continue if the
+			condition evalues to `false`.
+			""",
+	]
+
 	arguments: [
 		{
 			name:        "condition"
@@ -10,7 +23,7 @@ remap: functions: assert: {
 		},
 		{
 			name:        "message"
-			description: "Should condition be false, message will be reported as the failure message."
+			description: "The failure message that's reported if `condition` evalues to `false`."
 			required:    true
 			type: ["string"]
 		},
@@ -19,26 +32,21 @@ remap: functions: assert: {
 		"`condition` evaluates to `false`",
 	]
 	return: types: ["null"]
-	category: "Debug"
-	description: #"""
-		Checks a given condition.
 
-		If that condition evaluates to `false` the event is aborted with the provided `message`.
-		"""#
 	examples: [
 		{
 			title: "Assertion (true)"
 			source: #"""
-				assert("foo" == "foo", message: "Foo must be foo!")
+				ok, err = assert("foo" == "foo", message: "Foo must be foo!")
 				"""#
-			return: null
+			return: true
 		},
 		{
 			title: "Assertion (false)"
 			source: #"""
-				assert("foo" == "bar", message: "Foo must be foo!")
+				ok, err = assert("foo" == "bar", message: "Foo must be foo!")
 				"""#
-			raises: runtime: "Foo must be foo!"
+			return: #"function call error for "assert" at (10:61): Foo must be foo!"#
 		},
 	]
 }

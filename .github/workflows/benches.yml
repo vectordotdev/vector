@@ -1,7 +1,19 @@
 name: Benchmark Suite
 
 on:
-  pull_request: {}
+  pull_request:
+    paths:
+      - ".github/workflows/benches.yml"
+      - ".cargo/**"
+      - "benches/**"
+      - "lib/**"
+      - "proto/**"
+      - "src/**"
+      - "tests/**"
+      - "build.rs"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "rust-toolchain"
   push:
     branches:
       - master
@@ -28,13 +40,14 @@ env:
 
 jobs:
   cancel-previous:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.6.0
+      - uses: styfle/cancel-workflow-action@0.9.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
+          all_but_latest: true # can cancel workflows scheduled later
 
   bench:
     name: Bench - Linux
@@ -44,7 +57,7 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2
+      - uses: actions/cache@v2.1.5
         with:
           path: |
             ~/.cargo/registry
@@ -80,11 +93,10 @@ jobs:
           mkdir -p target/criterion
           setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench-all | tee target/criterion/out
 
-      - run: zip --recurse-paths target/criterion.zip target/criterion
       - uses: actions/upload-artifact@v2
         with:
           name: "criterion"
-          path: "./target/criterion.zip"
+          path: "./target/criterion"
       - name: Upload criterion data to S3
         run: scripts/upload-benchmarks-s3.sh
         if: github.ref == 'refs/heads/master'
@@ -103,7 +115,7 @@ jobs:
     needs:
       - cancel-previous
       - bench
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - name: Discord notification
       env:

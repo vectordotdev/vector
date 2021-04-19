@@ -1,8 +1,6 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig, SourceDescription},
-    shutdown::ShutdownSignal,
+    config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
     tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
 };
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
@@ -23,27 +21,20 @@ pub struct AwsKinesisFirehoseConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SourceConfig for AwsKinesisFirehoseConfig {
-    async fn build(
-        &self,
-        _: &str,
-        _: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        let svc = filters::firehose(self.access_key.clone(), out);
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        let svc = filters::firehose(self.access_key.clone(), cx.out);
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
 
+        let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
-            let _ = warp::serve(svc)
+            warp::serve(svc)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
-                    shutdown.clone().map(|_| ()),
+                    shutdown.map(|_| ()),
                 )
                 .await;
-            // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
-            drop(shutdown);
             Ok(())
         }))
     }
@@ -83,15 +74,17 @@ mod tests {
         event::Event,
         log_event,
         test_util::{collect_ready, next_addr, wait_for_tcp},
+        Pipeline,
     };
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::{read::GzEncoder, Compression};
+    use futures::channel::mpsc;
     use pretty_assertions::assert_eq;
+    use shared::assert_event_data_eq;
     use std::{
         io::{Cursor, Read},
         net::SocketAddr,
     };
-    use tokio::sync::mpsc;
 
     #[test]
     fn generate_config() {
@@ -107,12 +100,7 @@ mod tests {
                 tls: None,
                 access_key,
             }
-            .build(
-                "default",
-                &GlobalOptions::default(),
-                ShutdownSignal::noop(),
-                sender,
-            )
+            .build(SourceContext::new_test(sender))
             .await
             .unwrap()
             .await
@@ -234,7 +222,7 @@ mod tests {
         assert_eq!(200, res.status().as_u16());
 
         let events = collect_ready(rx).await;
-        assert_eq!(
+        assert_event_data_eq!(
             events,
             vec![log_event! {
                 "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
@@ -295,7 +283,7 @@ mod tests {
         assert_eq!(200, res.status().as_u16());
 
         let events = collect_ready(rx).await;
-        assert_eq!(
+        assert_event_data_eq!(
             events,
             vec![log_event! {
                 "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms

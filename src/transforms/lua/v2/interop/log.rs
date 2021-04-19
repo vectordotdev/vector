@@ -1,9 +1,12 @@
+use super::util::type_name;
 use crate::event::{LogEvent, Value};
 use rlua::prelude::*;
 
 impl<'a> ToLua<'a> for LogEvent {
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
-        ctx.create_table_from(self.into_iter().map(|(k, v)| (k, v)))
+        let (fields, _metadata) = self.into_parts();
+        // The metadata is handled when converting the enclosing `Event`.
+        ctx.create_table_from(fields.into_iter().map(|(k, v)| (k, v)))
             .map(LuaValue::Table)
     }
 }
@@ -20,7 +23,7 @@ impl<'a> FromLua<'a> for LogEvent {
                 Ok(log)
             }
             _ => Err(rlua::Error::FromLuaConversionError {
-                from: value.type_name(),
+                from: type_name(&value),
                 to: "LogEvent",
                 message: Some("LogEvent should ba a Lua table".to_string()),
             }),
@@ -60,7 +63,7 @@ mod test {
                     .load(assertion)
                     .eval()
                     .unwrap_or_else(|_| panic!("Failed to verify assertion {:?}", assertion));
-                assert!(result, assertion);
+                assert!(result, "{}", assertion);
             }
         });
     }

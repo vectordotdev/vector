@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: truncate: {
+	category: "String"
+	description: """
+		Truncates the `value` string up to the `limit` number of characters.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -15,9 +20,12 @@ remap: functions: truncate: {
 			type: ["integer", "float"]
 		},
 		{
-			name:        "ellipsis"
-			description: "If true, an ellipsis (...) is appended should the string be truncated."
-			required:    true
+			name: "ellipsis"
+			description: """
+				An ellipsis (`...`) is appended if this is set to `true` _and_ the `value` string ends up being
+				truncated because it's exceeded the `limit`.
+				"""
+			required: true
 			type: ["boolean"]
 		},
 	]
@@ -25,19 +33,16 @@ remap: functions: truncate: {
 	return: {
 		types: ["string"]
 		rules: [
-			"If `limit` is larger than the length of the string, the string is returned unchanged.",
-			"If `ellipsis` is `true`, then an ellipsis (...) will be appended to the string (beyond the specified limit).",
+			"The string is returned unchanged its length is less than `limit`.",
+			"If `ellipsis` is `true`, then an ellipsis (`...`) is appended to the string (beyond the specified `limit`).",
 		]
 	}
-	category: "String"
-	description: #"""
-		Truncates the provided `value` up to the provided `limit`.
-		"""#
+
 	examples: [
 		{
 			title: "Truncate a string"
 			source: #"""
-				truncate("A rather long sentence.", limit = 11, ellipsis = true)
+				truncate("A rather long sentence.", limit: 11, ellipsis: true)
 				"""#
 			return: "A rather lo..."
 		},

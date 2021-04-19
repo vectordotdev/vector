@@ -4,13 +4,14 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::FileOpen,
+    internal_events::TemplateRenderingFailed,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
     },
     template::Template,
 };
-use async_compression::tokio_02::write::GzipEncoder;
+use async_compression::tokio::write::GzipEncoder;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{
@@ -170,11 +171,12 @@ impl FileSink {
     fn partition_event(&mut self, event: &Event) -> Option<bytes::Bytes> {
         let bytes = match self.path.render(event) {
             Ok(b) => b,
-            Err(missing_keys) => {
-                warn!(
-                    message = "Keys do not exist on the event; dropping event.",
-                    ?missing_keys
-                );
+            Err(error) => {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field: Some("path"),
+                    drop_event: true,
+                });
                 return None;
             }
         };
@@ -347,7 +349,7 @@ mod tests {
         lines_from_file, lines_from_gzip_file, random_events_with_stream, random_lines_with_stream,
         temp_dir, temp_file, trace_init,
     };
-    use futures::stream;
+    use futures::{stream, SinkExt};
     use std::convert::TryInto;
 
     #[test]
@@ -507,7 +509,7 @@ mod tests {
         let mut sink = FileSink::new(&config, Acker::Null);
         let (mut input, _events) = random_lines_with_stream(10, 64);
 
-        let (mut tx, rx) = tokio::sync::mpsc::channel(1);
+        let (mut tx, rx) = futures::channel::mpsc::channel(0);
 
         let _ = tokio::spawn(async move { sink.run(Box::pin(rx)).await });
 
@@ -517,7 +519,7 @@ mod tests {
         }
 
         // wait for file to go idle and be closed
-        tokio::time::delay_for(Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_secs(2)).await;
 
         // trigger another write
         let last_line = "i should go at the end";
@@ -525,7 +527,7 @@ mod tests {
         input.push(String::from(last_line));
 
         // wait for another flush
-        tokio::time::delay_for(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
         // make sure we appended instead of overwriting
         let output = lines_from_file(template);

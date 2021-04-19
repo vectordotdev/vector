@@ -10,6 +10,7 @@ components: sources: prometheus_scrape: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -65,7 +66,10 @@ components: sources: prometheus_scrape: {
 			required:    true
 			warnings: ["You must explicitly add the path to your endpoints. Vector will _not_ automatically add `/metics`."]
 			type: array: {
-				items: type: string: examples: ["http://localhost:9090/metrics"]
+				items: type: string: {
+					examples: ["http://localhost:9090/metrics"]
+					syntax: "literal"
+				}
 			}
 		}
 		scrape_interval_secs: {
@@ -89,5 +93,16 @@ components: sources: prometheus_scrape: {
 		gauge:     output._passthrough_gauge
 		histogram: output._passthrough_histogram
 		summary:   output._passthrough_summary
+	}
+
+	telemetry: metrics: {
+		events_in_total:              components.sources.internal_metrics.output.metrics.events_in_total
+		http_error_response_total:    components.sources.internal_metrics.output.metrics.http_error_response_total
+		http_request_errors_total:    components.sources.internal_metrics.output.metrics.http_request_errors_total
+		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
+		processed_bytes_total:        components.sources.internal_metrics.output.metrics.processed_bytes_total
+		processed_events_total:       components.sources.internal_metrics.output.metrics.processed_events_total
+		requests_completed_total:     components.sources.internal_metrics.output.metrics.requests_completed_total
+		request_duration_nanoseconds: components.sources.internal_metrics.output.metrics.request_duration_nanoseconds
 	}
 }

@@ -1,7 +1,6 @@
-use crate::{transforms::FunctionTransform, Event};
-use futures::{task::Poll, Sink};
+use crate::{internal_events::EventOut, transforms::FunctionTransform, Event};
+use futures::{channel::mpsc, task::Poll, Sink};
 use std::{collections::VecDeque, fmt, pin::Pin, task::Context};
-use tokio::sync::mpsc;
 
 #[derive(Debug)]
 pub struct ClosedError;
@@ -31,8 +30,6 @@ impl Pipeline {
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<Result<(), <Self as Sink<Event>>::Error>> {
-        use mpsc::error::TrySendError::*;
-
         while let Some(event) = self.enqueued.pop_front() {
             match self.inner.poll_ready(cx) {
                 Poll::Pending => {
@@ -49,15 +46,16 @@ impl Pipeline {
                 Ok(()) => {
                     // we good, keep looping
                 }
-                Err(Full(_item)) => {
+                Err(error) if error.is_full() => {
                     // We only try to send after a successful call to poll_ready, which reserves
                     // space for us in the channel. That makes this branch unreachable as long as
                     // the channel implementation fulfills its own contract.
                     panic!("Channel was both ready and full; this is a bug.")
                 }
-                Err(Closed(_item)) => {
+                Err(error) if error.is_disconnected() => {
                     return Poll::Ready(Err(ClosedError));
                 }
+                Err(_) => unreachable!(),
             }
         }
         Poll::Ready(Ok(()))
@@ -76,6 +74,7 @@ impl Sink<Event> for Pipeline {
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
+        emit!(EventOut { count: 1 });
         // Note how this gets **swapped** with `new_working_set` in the loop.
         // At the end of the loop, it will only contain finalized events.
         let mut working_set = vec![item];

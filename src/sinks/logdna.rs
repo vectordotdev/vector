@@ -2,13 +2,14 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient},
+    internal_events::TemplateRenderingFailed,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, PartitionBuffer,
         PartitionInnerBuffer, TowerRequestConfig, UriSerde,
     },
-    template::Template,
+    template::{Template, TemplateRenderingError},
 };
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
@@ -124,12 +125,12 @@ impl HttpSink for LogdnaConfig {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let key = self
             .render_key(&event)
-            .map_err(|missing| {
-                error!(
-                    message = "Error rendering template.",
-                    ?missing,
-                    internal_log_rate_secs = 30
-                );
+            .map_err(|(field, error)| {
+                emit!(TemplateRenderingFailed {
+                    error,
+                    field,
+                    drop_event: true,
+                });
             })
             .ok()?;
 
@@ -248,15 +249,21 @@ impl LogdnaConfig {
             .expect("This should be a valid uri")
     }
 
-    fn render_key(&self, event: &Event) -> Result<PartitionKey, Vec<String>> {
-        let hostname = self.hostname.render_string(&event)?;
+    fn render_key(
+        &self,
+        event: &Event,
+    ) -> Result<PartitionKey, (Option<&str>, TemplateRenderingError)> {
+        let hostname = self
+            .hostname
+            .render_string(&event)
+            .map_err(|e| (Some("hostname"), e))?;
         let tags = self
             .tags
             .as_ref()
-            .map(|tags| -> Result<Option<Vec<String>>, Vec<String>> {
+            .map(|tags| {
                 let mut vec = Vec::with_capacity(tags.len());
                 for tag in tags {
-                    vec.push(tag.render_string(event)?);
+                    vec.push(tag.render_string(event).map_err(|e| (None, e))?);
                 }
                 Ok(Some(vec))
             })

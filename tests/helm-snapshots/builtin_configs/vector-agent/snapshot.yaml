@@ -15,6 +15,7 @@ metadata:
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
 ---
 # Source: vector-agent/templates/configmap.yaml
 apiVersion: v1
@@ -35,6 +36,11 @@ data:
     # Docs: https://vector.dev/docs/
     
     data_dir = "/vector-data-dir"
+    
+    [api]
+      enabled = false
+      address = "0.0.0.0:8686"
+      playground = true
     
     [log_schema]
       host_key = "host"

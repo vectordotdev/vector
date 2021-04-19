@@ -31,6 +31,8 @@ serviceAccount:
   # If not set and `create` is true, a name is generated using the `fullname`
   # template.
   name: ""
+  # Automount API credentials for a service account.
+  automountServiceAccountToken: true
 
 # Add an annotation to the `Pod`s managed by `DaemonSet` with a random value,
 # generated at Helm Chart template evaluation time.
@@ -117,6 +119,16 @@ logSchema:
   messageKey: "message"
   sourceTypeKey: "source_type"
   timestampKey: "timestamp"
+
+# The Vector API.
+# Will be disabled by default.
+vectorApi:
+  # Turn the Vector API on or off.
+  enabled: false
+  # The address to listen at.
+  address: "0.0.0.0:8686"
+  # Enable or disable the built-in GraphQL Playground (a web IDE for working on GraphQL queries).
+  playground: true
 
 # The "built-in" kubernetes logs source to collect logs from the `Pod`s running
 # on the `Node`.

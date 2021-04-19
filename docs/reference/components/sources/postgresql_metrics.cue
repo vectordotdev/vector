@@ -10,6 +10,7 @@ components: sources: postgresql_metrics: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -61,7 +62,10 @@ components: sources: postgresql_metrics: {
 			description: "PostgreSQL server endpoint in libpq-style connection strings."
 			required:    true
 			type: array: {
-				items: type: string: examples: ["postgresql://postgres:vector@localhost:5432/postgres"]
+				items: type: string: {
+					examples: ["postgresql://postgres:vector@localhost:5432/postgres"]
+					syntax: "literal"
+				}
 			}
 		}
 		scrape_interval_secs: {
@@ -77,7 +81,10 @@ components: sources: postgresql_metrics: {
 			description: "The namespace of metrics. Disabled if empty."
 			common:      false
 			required:    false
-			type: string: default: "postgresql"
+			type: string: {
+				default: "postgresql"
+				syntax:  "literal"
+			}
 		}
 		include_databases: {
 			description: """
@@ -91,7 +98,10 @@ components: sources: postgresql_metrics: {
 			required: false
 			type: array: {
 				default: null
-				items: type: string: examples: ["^postgres$", "^vector$", "^foo"]
+				items: type: string: {
+					examples: ["^postgres$", "^vector$", "^foo"]
+					syntax: "literal"
+				}
 			}
 		}
 		exclude_databases: {
@@ -105,7 +115,10 @@ components: sources: postgresql_metrics: {
 			required: false
 			type: array: {
 				default: null
-				items: type: string: examples: ["^postgres$", "^template.*", ""]
+				items: type: string: {
+					examples: ["^postgres$", "^template.*", ""]
+					syntax: "literal"
+				}
 			}
 		}
 		tls: {
@@ -121,6 +134,7 @@ components: sources: postgresql_metrics: {
 						warnings: []
 						type: string: {
 							examples: ["certs/ca.pem"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -143,6 +157,7 @@ components: sources: postgresql_metrics: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:              components.sources.internal_metrics.output.metrics.events_in_total
 		collect_completed_total:      components.sources.internal_metrics.output.metrics.collect_completed_total
 		collect_duration_nanoseconds: components.sources.internal_metrics.output.metrics.collect_duration_nanoseconds
 		request_errors_total:         components.sources.internal_metrics.output.metrics.request_errors_total

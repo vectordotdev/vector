@@ -7,7 +7,7 @@
 //! each type of component.
 
 pub mod builder;
-mod fanout;
+pub mod fanout;
 mod task;
 
 use crate::{
@@ -21,22 +21,19 @@ use crate::{
     },
     trigger::DisabledTrigger,
 };
-use futures::{compat::Future01CompatExt, future, FutureExt, Stream, StreamExt, TryFutureExt};
-use futures01::Future;
+use futures::{future, Future, FutureExt, SinkExt, Stream};
 use std::{
     collections::{HashMap, HashSet},
-    future::ready,
     panic::AssertUnwindSafe,
     pin::Pin,
     sync::{Arc, Mutex},
 };
 use tokio::{
-    sync::mpsc,
-    time::{delay_until, interval, Duration, Instant},
+    sync::{mpsc, watch},
+    time::{interval, sleep_until, Duration, Instant},
 };
 use tracing_futures::Instrument;
 
-// TODO: Result is only for compat, remove when not needed
 type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
 type BuiltBuffer = (
@@ -44,6 +41,14 @@ type BuiltBuffer = (
     Arc<Mutex<Option<Pin<Box<dyn Stream<Item = Event> + Send>>>>>,
     buffers::Acker,
 );
+
+type Outputs = HashMap<String, fanout::ControlChannel>;
+
+// Watcher types for topology changes. These are currently specific to receiving
+// `Outputs`. This could be expanded in the future to send an enum of types if, for example,
+// this included a new 'Inputs' type.
+type WatchTx = watch::Sender<Outputs>;
+pub type WatchRx = watch::Receiver<Outputs>;
 
 #[allow(dead_code)]
 pub struct RunningTopology {
@@ -55,6 +60,7 @@ pub struct RunningTopology {
     detach_triggers: HashMap<String, DisabledTrigger>,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
+    watch: (WatchTx, WatchRx),
 }
 
 pub async fn start_validated(
@@ -73,6 +79,7 @@ pub async fn start_validated(
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
         abort_tx,
+        watch: watch::channel(HashMap::new()),
     };
 
     if !running_topology
@@ -126,10 +133,10 @@ impl RunningTopology {
     /// Transforms and sinks should shut down automatically once their input tasks finish.
     /// Note that this takes ownership of `self`, so once this function returns everything in the
     /// RunningTopology instance has been dropped except for the `tasks` map, which gets moved
-    /// into the returned future and is used to poll for when the tasks have completed. One the
+    /// into the returned future and is used to poll for when the tasks have completed. Once the
     /// returned future is dropped then everything from this RunningTopology instance is fully
     /// dropped.
-    pub fn stop(self) -> impl Future<Item = (), Error = ()> {
+    pub fn stop(self) -> impl Future<Output = ()> {
         // Create handy handles collections of all tasks for the subsequent operations.
         let mut wait_handles = Vec::new();
         // We need a Vec here since source components have two tasks. One for pump in self.tasks,
@@ -139,10 +146,7 @@ impl RunningTopology {
         // We need to give some time to the sources to gracefully shutdown, so we will merge
         // them with other tasks.
         for (name, task) in self.tasks.into_iter().chain(self.source_tasks.into_iter()) {
-            let task = futures::compat::Compat::new(task)
-                .map(|_result| ())
-                .or_else(|_| futures01::future::ok(())) // Consider an errored task to be shutdown
-                .shared();
+            let task = task.map(|_result| ()).shared();
 
             wait_handles.push(task.clone());
             check_handles.entry(name).or_default().push(task);
@@ -154,12 +158,11 @@ impl RunningTopology {
         // If we reach the deadline, this future will print out which components won't
         // gracefully shutdown since we will start to forcefully shutdown the sources.
         let mut check_handles2 = check_handles.clone();
-        let timeout = delay_until(deadline).map(move |_| {
+        let timeout = async move {
+            sleep_until(deadline).await;
             // Remove all tasks that have shutdown.
             check_handles2.retain(|_name, handles| {
-                retain(handles, |handle| {
-                    handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
-                });
+                retain(handles, |handle| handle.peek().is_none());
                 !handles.is_empty()
             });
             let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
@@ -168,18 +171,16 @@ impl RunningTopology {
               message = "Failed to gracefully shut down in time. Killing components.",
                 components = ?remaining_components.join(", ")
             );
-
-            Ok(())
-        });
+        };
 
         // Reports in intervals which components are still running.
-        let reporter = interval(Duration::from_secs(5))
-            .inspect(move |_| {
+        let mut interval = interval(Duration::from_secs(5));
+        let reporter = async move {
+            loop {
+                interval.tick().await;
                 // Remove all tasks that have shutdown.
                 check_handles.retain(|_name, handles| {
-                    retain(handles, |handle| {
-                        handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
-                    });
+                    retain(handles, |handle| handle.peek().is_none());
                     !handles.is_empty()
                 });
                 let remaining_components = check_handles.keys().cloned().collect::<Vec<_>>();
@@ -194,39 +195,33 @@ impl RunningTopology {
                 info!(
                     message = "Shutting down... Waiting on running components.", remaining_components = ?remaining_components.join(", "), time_remaining = ?time_remaining
                 );
-            })
-            .filter(|_| ready(false)) // Run indefinitely without emitting items
-            .into_future()
-            .map(|_| Ok(()));
+            }
+        };
 
         // Finishes once all tasks have shutdown.
-        let success = futures01::future::join_all(wait_handles)
-            .map(|_| ())
-            .map_err(|_: futures01::future::SharedError<()>| ())
-            .compat();
+        let success = futures::future::join_all(wait_handles).map(|_| ());
 
         // Aggregate future that ends once anything detects that all tasks have shutdown.
         let shutdown_complete_future = future::select_all(vec![
-            Box::pin(timeout) as future::BoxFuture<'static, Result<(), ()>>,
-            Box::pin(reporter) as future::BoxFuture<'static, Result<(), ()>>,
-            Box::pin(success) as future::BoxFuture<'static, Result<(), ()>>,
-        ])
-        .map(|(result, _, _)| result.map(|_| ()).map_err(|_| ()))
-        .compat();
+            Box::pin(timeout) as future::BoxFuture<'static, ()>,
+            Box::pin(reporter) as future::BoxFuture<'static, ()>,
+            Box::pin(success) as future::BoxFuture<'static, ()>,
+        ]);
 
         // Now kick off the shutdown process by shutting down the sources.
         let source_shutdown_complete = self.shutdown_coordinator.shutdown_all(deadline);
 
-        source_shutdown_complete
-            .join(shutdown_complete_future)
-            .map(|_| ())
+        futures::future::join(source_shutdown_complete, shutdown_complete_future).map(|_| ())
     }
 
     /// On Error, topology is in invalid state.
     /// May change componenets even if reload fails.
     pub async fn reload_config_and_respawn(&mut self, new_config: Config) -> Result<bool, ()> {
-        if self.config.global.data_dir != new_config.global.data_dir {
-            error!(message = "The data_dir cannot be changed while reloading config file; reload aborted.", data_dir = ?self.config.global.data_dir);
+        if self.config.global != new_config.global {
+            error!(
+                message =
+                "Global options can't be changed while reloading config file; reload aborted. Please restart vector to reload the configuration file."
+            );
             return Ok(false);
         }
 
@@ -240,7 +235,7 @@ impl RunningTopology {
         // Issue: https://github.com/timberio/vector/issues/3035
         if cfg!(windows) {
             // This value is guess work.
-            tokio::time::delay_for(Duration::from_millis(200)).await;
+            tokio::time::sleep(Duration::from_millis(200)).await;
         }
 
         // Now let's actually build the new pieces.
@@ -359,10 +354,7 @@ impl RunningTopology {
             );
         }
 
-        futures01::future::join_all(source_shutdown_complete_futures)
-            .compat()
-            .await
-            .unwrap();
+        futures::future::join_all(source_shutdown_complete_futures).await;
 
         // Second pass now that all sources have shut down for final cleanup.
         for name in diff.sources.removed_and_changed() {
@@ -378,7 +370,7 @@ impl RunningTopology {
             let previous = self.tasks.remove(name).unwrap();
             drop(previous); // detach and forget
 
-            self.remove_inputs(&name);
+            self.remove_inputs(&name).await;
             self.remove_outputs(&name);
         }
 
@@ -436,7 +428,7 @@ impl RunningTopology {
         // Detach removed sinks
         for name in &diff.sinks.to_remove {
             info!(message = "Removing sink.", name = ?name);
-            self.remove_inputs(&name);
+            self.remove_inputs(&name).await;
         }
 
         // Detach changed sinks
@@ -448,7 +440,7 @@ impl RunningTopology {
                     .into_inner()
                     .cancel();
             } else if wait_for_sinks.contains(name) {
-                self.detach_inputs(name);
+                self.detach_inputs(name).await;
             }
         }
 
@@ -492,31 +484,39 @@ impl RunningTopology {
     async fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
         // Sources
         for name in diff.sources.changed_and_added() {
-            self.setup_outputs(&name, new_pieces);
+            self.setup_outputs(&name, new_pieces).await;
         }
 
         // Transforms
         // Make sure all transform outputs are set up before another transform might try use
         // it as an input
         for name in diff.transforms.changed_and_added() {
-            self.setup_outputs(&name, new_pieces);
+            self.setup_outputs(&name, new_pieces).await;
         }
 
         for name in &diff.transforms.to_change {
-            self.replace_inputs(&name, new_pieces);
+            self.replace_inputs(&name, new_pieces).await;
         }
 
         for name in &diff.transforms.to_add {
-            self.setup_inputs(&name, new_pieces);
+            self.setup_inputs(&name, new_pieces).await;
         }
 
         // Sinks
         for name in &diff.sinks.to_change {
-            self.replace_inputs(&name, new_pieces);
+            self.replace_inputs(&name, new_pieces).await;
         }
 
         for name in &diff.sinks.to_add {
-            self.setup_inputs(&name, new_pieces);
+            self.setup_inputs(&name, new_pieces).await;
+        }
+
+        // Broadcast changes to subscribers.
+        if !self.watch.0.is_closed() {
+            self.watch
+                .0
+                .send(self.outputs.clone())
+                .expect("Couldn't broadcast config changes.");
         }
     }
 
@@ -564,8 +564,8 @@ impl RunningTopology {
             component_name = %task.name(),
             component_type = %task.typetag(),
         );
-        let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
-        let spawned = tokio::spawn(task.compat());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
+        let spawned = tokio::spawn(task);
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             drop(previous); // detach and forget
         }
@@ -579,8 +579,8 @@ impl RunningTopology {
             component_name = %task.name(),
             component_type = %task.typetag(),
         );
-        let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
-        let spawned = tokio::spawn(task.compat());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
+        let spawned = tokio::spawn(task);
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             drop(previous); // detach and forget
         }
@@ -594,8 +594,8 @@ impl RunningTopology {
             component_name = %task.name(),
             component_type = %task.typetag(),
         );
-        let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span.clone());
-        let spawned = tokio::spawn(task.compat());
+        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
+        let spawned = tokio::spawn(task);
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             drop(previous); // detach and forget
         }
@@ -604,17 +604,16 @@ impl RunningTopology {
             .takeover_source(name, &mut new_pieces.shutdown_coordinator);
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
-        let source_task =
-            handle_errors(source_task.compat(), self.abort_tx.clone()).instrument(span);
+        let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(span);
         self.source_tasks
-            .insert(name.to_string(), tokio::spawn(source_task.compat()));
+            .insert(name.to_string(), tokio::spawn(source_task));
     }
 
     fn remove_outputs(&mut self, name: &str) {
         self.outputs.remove(name);
     }
 
-    fn remove_inputs(&mut self, name: &str) {
+    async fn remove_inputs(&mut self, name: &str) {
         self.inputs.remove(name);
         self.detach_triggers.remove(name);
 
@@ -625,24 +624,26 @@ impl RunningTopology {
 
         if let Some(inputs) = inputs {
             for input in inputs {
-                if let Some(output) = self.outputs.get(input) {
+                if let Some(output) = self.outputs.get_mut(input) {
                     // This can only fail if we are disconnected, which is a valid situation.
-                    let _ = output.send(fanout::ControlMessage::Remove(name.to_string()));
+                    let _ = output
+                        .send(fanout::ControlMessage::Remove(name.to_string()))
+                        .await;
                 }
             }
         }
     }
 
-    fn setup_outputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
-        let output = new_pieces.outputs.remove(name).unwrap();
+    async fn setup_outputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
+        let mut output = new_pieces.outputs.remove(name).unwrap();
 
         for (sink_name, sink) in &self.config.sinks {
             if sink.inputs.iter().any(|i| i == name) {
                 // Sink may have been removed with the new config so it may not be present.
                 if let Some(input) = self.inputs.get(sink_name) {
-                    output
+                    let _ = output
                         .send(fanout::ControlMessage::Add(sink_name.clone(), input.get()))
-                        .expect("Components shouldn't be spawned before connecting them together.");
+                        .await;
                 }
             }
         }
@@ -650,12 +651,12 @@ impl RunningTopology {
             if transform.inputs.iter().any(|i| i == name) {
                 // Transform may have been removed with the new config so it may not be present.
                 if let Some(input) = self.inputs.get(transform_name) {
-                    output
+                    let _ = output
                         .send(fanout::ControlMessage::Add(
                             transform_name.clone(),
                             input.get(),
                         ))
-                        .expect("Components shouldn't be spawned before connecting them together.");
+                        .await;
                 }
             }
         }
@@ -663,13 +664,17 @@ impl RunningTopology {
         self.outputs.insert(name.to_string(), output);
     }
 
-    fn setup_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
+    async fn setup_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(name).unwrap();
 
         for input in inputs {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ =
-                self.outputs[&input].send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
+            let _ = self
+                .outputs
+                .get_mut(&input)
+                .unwrap()
+                .send(fanout::ControlMessage::Add(name.to_string(), tx.get()))
+                .await;
         }
 
         self.inputs.insert(name.to_string(), tx);
@@ -679,7 +684,7 @@ impl RunningTopology {
         });
     }
 
-    fn replace_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
+    async fn replace_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let (tx, inputs) = new_pieces.inputs.remove(name).unwrap();
 
         let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
@@ -697,24 +702,35 @@ impl RunningTopology {
         let inputs_to_replace = old_inputs.intersection(&new_inputs);
 
         for input in inputs_to_remove {
-            if let Some(output) = self.outputs.get(input) {
+            if let Some(output) = self.outputs.get_mut(input) {
                 // This can only fail if we are disconnected, which is a valid situation.
-                let _ = output.send(fanout::ControlMessage::Remove(name.to_string()));
+                let _ = output
+                    .send(fanout::ControlMessage::Remove(name.to_string()))
+                    .await;
             }
         }
 
         for input in inputs_to_add {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ =
-                self.outputs[input].send(fanout::ControlMessage::Add(name.to_string(), tx.get()));
+            let _ = self
+                .outputs
+                .get_mut(input)
+                .unwrap()
+                .send(fanout::ControlMessage::Add(name.to_string(), tx.get()))
+                .await;
         }
 
         for &input in inputs_to_replace {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[input].send(fanout::ControlMessage::Replace(
-                name.to_string(),
-                Some(tx.get()),
-            ));
+            let _ = self
+                .outputs
+                .get_mut(input)
+                .unwrap()
+                .send(fanout::ControlMessage::Replace(
+                    name.to_string(),
+                    Some(tx.get()),
+                ))
+                .await;
         }
 
         self.inputs.insert(name.to_string(), tx);
@@ -724,7 +740,7 @@ impl RunningTopology {
         });
     }
 
-    fn detach_inputs(&mut self, name: &str) {
+    async fn detach_inputs(&mut self, name: &str) {
         self.inputs.remove(name);
         self.detach_triggers.remove(name);
 
@@ -734,8 +750,12 @@ impl RunningTopology {
 
         for input in old_inputs {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ =
-                self.outputs[input].send(fanout::ControlMessage::Replace(name.to_string(), None));
+            let _ = self
+                .outputs
+                .get_mut(input)
+                .unwrap()
+                .send(fanout::ControlMessage::Replace(name.to_string(), None))
+                .await;
         }
     }
 
@@ -743,20 +763,27 @@ impl RunningTopology {
     pub fn config(&self) -> &Config {
         &self.config
     }
+
+    /// Subscribe to topology changes. This will receive an `Outputs` currently, but may be
+    /// expanded in the future to accommodate `Inputs`. This is used by the 'tap' API to observe
+    /// config changes, and re-wire tap sinks.
+    pub fn watch(&self) -> watch::Receiver<Outputs> {
+        self.watch.1.clone()
+    }
 }
 
-fn handle_errors<T>(
-    task: impl Future<Item = T, Error = ()>,
+async fn handle_errors(
+    task: impl Future<Output = Result<TaskOutput, ()>>,
     abort_tx: mpsc::UnboundedSender<()>,
-) -> impl Future<Item = T, Error = ()> {
+) -> Result<TaskOutput, ()> {
     AssertUnwindSafe(task)
         .catch_unwind()
+        .await
         .map_err(|_| ())
-        .flatten()
-        .or_else(move |()| {
+        .and_then(|res| res)
+        .map_err(|_| {
             error!("An error occurred that vector couldn't handle.");
             let _ = abort_tx.send(());
-            Err(())
         })
 }
 
@@ -835,7 +862,8 @@ mod reload_tests {
     use futures::StreamExt;
     use std::net::{SocketAddr, TcpListener};
     use std::time::Duration;
-    use tokio::time::delay_for;
+    use tokio::time::sleep;
+    use tokio_stream::wrappers::UnboundedReceiverStream;
 
     #[tokio::test]
     async fn topology_reuse_old_port() {
@@ -1032,7 +1060,7 @@ mod reload_tests {
         .await;
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn topology_disk_buffer_conflict() {
         let address_0 = next_addr();
         let address_1 = next_addr();
@@ -1096,13 +1124,14 @@ mod reload_tests {
         old_address: SocketAddr,
         new_address: SocketAddr,
     ) {
-        let (mut topology, mut crash) = start_topology(old_config, false).await;
+        let (mut topology, crash) = start_topology(old_config, false).await;
+        let mut crash_stream = UnboundedReceiverStream::new(crash);
 
         // Wait for sink to come online
         wait_for_tcp(old_address).await;
 
         // Give topology some time to run
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
 
         assert!(topology
             .reload_config_and_respawn(new_config)
@@ -1110,11 +1139,11 @@ mod reload_tests {
             .unwrap());
 
         // Give old time to shutdown if it didn't, and new one to come online.
-        delay_for(Duration::from_secs(2)).await;
+        sleep(Duration::from_secs(2)).await;
 
         tokio::select! {
             _ = wait_for_tcp(new_address) => {}//Success
-            _ = crash.next() => panic!(),
+            _ = crash_stream.next() => panic!(),
         }
     }
 }
@@ -1159,23 +1188,24 @@ mod source_finished_tests {
 ))]
 mod transient_state_tests {
     use crate::{
-        config::{Config, DataType, GlobalOptions, SourceConfig},
-        shutdown::ShutdownSignal,
+        config::{Config, DataType, SourceConfig, SourceContext},
         sinks::blackhole::BlackholeConfig,
         sources::stdin::StdinConfig,
         sources::Source,
         test_util::{start_topology, trace_init},
         transforms::json_parser::JsonParserConfig,
-        Error, Pipeline,
+        Error,
     };
     use futures::{future, FutureExt};
     use serde::{Deserialize, Serialize};
+    use std::sync::Arc;
     use stream_cancel::{Trigger, Tripwire};
+    use tokio::sync::Mutex;
 
     #[derive(Debug, Deserialize, Serialize)]
     pub struct MockSourceConfig {
         #[serde(skip)]
-        tripwire: Option<Tripwire>,
+        tripwire: Arc<Mutex<Option<Tripwire>>>,
     }
 
     impl MockSourceConfig {
@@ -1184,7 +1214,7 @@ mod transient_state_tests {
             (
                 trigger,
                 Self {
-                    tripwire: Some(tripwire),
+                    tripwire: Arc::new(Mutex::new(Some(tripwire))),
                 },
             )
         }
@@ -1193,17 +1223,14 @@ mod transient_state_tests {
     #[async_trait::async_trait]
     #[typetag::serde(name = "mock")]
     impl SourceConfig for MockSourceConfig {
-        async fn build(
-            &self,
-            _name: &str,
-            _globals: &GlobalOptions,
-            shutdown: ShutdownSignal,
-            out: Pipeline,
-        ) -> Result<Source, Error> {
+        async fn build(&self, cx: SourceContext) -> Result<Source, Error> {
+            let tripwire = self.tripwire.lock().await;
+
+            let out = cx.out;
             Ok(Box::pin(
                 future::select(
-                    shutdown.map(|_| ()).boxed(),
-                    self.tripwire
+                    cx.shutdown.map(|_| ()).boxed(),
+                    tripwire
                         .clone()
                         .unwrap()
                         .then(crate::stream::tripwire_handler)

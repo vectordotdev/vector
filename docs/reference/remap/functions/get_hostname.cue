@@ -1,13 +1,17 @@
 package metadata
 
 remap: functions: get_hostname: {
-	arguments: []
-	internal_failure_reasons: []
-	return: types: ["string"]
 	category: "System"
-	description: #"""
-		Get system's hostname.
-		"""#
+	description: """
+		Returns the local system's hostname.
+		"""
+
+	arguments: []
+	internal_failure_reasons: [
+		"Internal hostname resolution failed.",
+	]
+	return: types: ["string"]
+
 	examples: [
 		{
 			title: "Get hostname"

@@ -16,7 +16,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        !exists(.a) && \
+        !exists(.a) &&
         .b == "example value"
       '''
 
@@ -39,6 +39,6 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        !exists(.a) && \
+        !exists(.a) &&
         .b == "example value"
       '''

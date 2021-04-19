@@ -9,6 +9,7 @@ components: sinks: pulsar: {
 		development:   "beta"
 		egress_method: "stream"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {
@@ -77,6 +78,7 @@ components: sinks: pulsar: {
 						type: string: {
 							default: null
 							examples: ["${PULSAR_NAME}", "name123"]
+							syntax: "literal"
 						}
 					}
 					token: {
@@ -87,6 +89,7 @@ components: sinks: pulsar: {
 						type: string: {
 							default: null
 							examples: ["${PULSAR_TOKEN}", "123456789"]
+							syntax: "literal"
 						}
 					}
 				}
@@ -97,6 +100,7 @@ components: sinks: pulsar: {
 			required:    true
 			type: string: {
 				examples: ["pulsar://127.0.0.1:6650"]
+				syntax: "literal"
 			}
 		}
 		topic: {
@@ -105,6 +109,7 @@ components: sinks: pulsar: {
 			warnings: []
 			type: string: {
 				examples: ["topic-1234"]
+				syntax: "literal"
 			}
 		}
 	}

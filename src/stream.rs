@@ -23,7 +23,7 @@
 // SOFTWARE.
 
 use futures::{future, stream::Fuse, Stream, StreamExt};
-use pin_project::pin_project;
+use pin_project::{pin_project, pinned_drop};
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -52,6 +52,22 @@ pub trait VecStreamExt: Stream {
             stream1: self.fuse(),
             stream2: stream2.fuse(),
             flag: false,
+        }
+    }
+
+    /// Calls function F after an item from this stream has been processed
+    /// by the consumer while the assumption holds.
+    /// This assumes that the stream is being consumed in a loop, so when
+    /// the consumer get's an item and then comes for another one
+    /// we assume that it has processed the first item.
+    fn on_processed<F: Fn()>(self, after: F) -> OnProcessed<Self, F>
+    where
+        Self: Sized,
+    {
+        OnProcessed {
+            stream: self,
+            after,
+            processing: false,
         }
     }
 }
@@ -118,4 +134,52 @@ pub(crate) async fn tripwire_handler(closed: bool) {
         }
     })
     .await
+}
+
+/// Calls function F after an item from stream has been processed
+/// by the consumer.
+///
+/// This assumes that the stream is being consumed in a loop, so when
+/// the consumer get's an item and then comes for another one
+/// we assume that it has processed the first item.
+/// This should hold in most cases. One example of when this doesn't
+/// hold is when the consumer batches items, or if it goes away and
+/// does something unrelated to the item which it has already processed.
+/// In such cases this construct can still be used, but it won't be accurate.
+#[pin_project(PinnedDrop)]
+pub struct OnProcessed<S: Stream, F: Fn()> {
+    #[pin]
+    stream: S,
+    after: F,
+    processing: bool,
+}
+
+impl<S: Stream, F: Fn()> Stream for OnProcessed<S, F> {
+    type Item = S::Item;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<S::Item>> {
+        let this = self.project();
+        if *this.processing {
+            *this.processing = false;
+            (this.after)();
+        }
+        match this.stream.poll_next(cx) {
+            Poll::Ready(Some(item)) => {
+                *this.processing = true;
+                Poll::Ready(Some(item))
+            }
+            poll => poll,
+        }
+    }
+}
+
+#[pinned_drop]
+impl<S: Stream, F: Fn()> PinnedDrop for OnProcessed<S, F> {
+    fn drop(self: Pin<&mut Self>) {
+        let this = self.project();
+        if *this.processing {
+            *this.processing = false;
+            (this.after)();
+        }
+    }
 }

@@ -1,6 +1,7 @@
 #![cfg(feature = "leveldb")]
 
-use futures::{compat::Future01CompatExt, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt};
+use shared::assert_event_data_eq;
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
 use tracing::trace;
@@ -56,7 +57,7 @@ fn test_buffering() {
         config.build().unwrap()
     };
 
-    let mut rt = runtime();
+    let rt = runtime();
     let (topology, input_events) = rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
         let (input_events, input_events_stream) =
@@ -64,7 +65,7 @@ fn test_buffering() {
         let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
-            .sink_map_err(|error| panic!(error))
+            .sink_map_err(|error| panic!("{}", error))
             .send_all(&mut input_events_stream)
             .await
             .unwrap();
@@ -105,7 +106,7 @@ fn test_buffering() {
         config.build().unwrap()
     };
 
-    let mut rt = runtime();
+    let rt = runtime();
     rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
 
@@ -114,14 +115,14 @@ fn test_buffering() {
         let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
-            .sink_map_err(|error| panic!(error))
+            .sink_map_err(|error| panic!("{}", error))
             .send_all(&mut input_events_stream)
             .await
             .unwrap();
 
         let output_events = CountReceiver::receive_events(out_rx);
 
-        topology.stop().compat().await.unwrap();
+        topology.stop().await;
 
         let output_events = output_events.await;
         assert_eq!(
@@ -132,7 +133,7 @@ fn test_buffering() {
             input_events2,
             output_events
         );
-        assert_eq!(input_events, &output_events[..num_events]);
-        assert_eq!(input_events2, &output_events[num_events..]);
+        assert_event_data_eq!(&input_events[..], &output_events[..num_events]);
+        assert_event_data_eq!(&input_events2[..], &output_events[num_events..]);
     });
 }

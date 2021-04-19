@@ -2,12 +2,12 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
-    internal_events::{NatsEventMissingKeys, NatsEventSendFail, NatsEventSendSuccess},
+    internal_events::{NatsEventSendFail, NatsEventSendSuccess, TemplateRenderingFailed},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
     },
-    template::{Template, TemplateError},
+    template::{Template, TemplateParseError},
     Event,
 };
 use async_trait::async_trait;
@@ -19,7 +19,7 @@ use std::convert::TryFrom;
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("invalid subject template: {}", source))]
-    SubjectTemplate { source: TemplateError },
+    SubjectTemplate { source: TemplateParseError },
 }
 
 /**
@@ -85,19 +85,17 @@ impl SinkConfig for NatsSinkConfig {
 }
 
 impl NatsSinkConfig {
-    fn to_nats_options(&self) -> crate::Result<nats::Options> {
+    fn to_nats_options(&self) -> async_nats::Options {
         // Set reconnect_buffer_size on the nats client to 0 bytes so that the
         // client doesn't buffer internally (to avoid message loss).
-        let options = nats::Options::new()
+        async_nats::Options::new()
             .with_name(&self.name)
-            .reconnect_buffer_size(0);
-
-        Ok(options)
+            .reconnect_buffer_size(0)
     }
 
-    async fn connect(&self) -> crate::Result<nats::asynk::Connection> {
-        self.to_nats_options()?
-            .connect_async(&self.url)
+    async fn connect(&self) -> crate::Result<async_nats::Connection> {
+        self.to_nats_options()
+            .connect(&self.url)
             .map_err(|e| e.into())
             .await
     }
@@ -136,9 +134,9 @@ impl NatsSink {
     }
 }
 
-impl From<NatsOptions> for nats::Options {
+impl From<NatsOptions> for async_nats::Options {
     fn from(options: NatsOptions) -> Self {
-        nats::Options::new()
+        async_nats::Options::new()
             .with_name(&options.name)
             .reconnect_buffer_size(0)
     }
@@ -155,19 +153,23 @@ impl From<&NatsSinkConfig> for NatsOptions {
 #[async_trait]
 impl StreamSink for NatsSink {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let nats_options: nats::Options = self.options.clone().into();
+        let nats_options: async_nats::Options = self.options.clone().into();
 
-        let nc = nats_options
-            .connect_async(&self.url)
-            .await
-            .map_err(|_| ())?;
+        let nc = nats_options.connect(&self.url).await.map_err(|_| ())?;
 
         while let Some(event) = input.next().await {
-            let subject = self.subject.render_string(&event).map_err(|missing_keys| {
-                emit!(NatsEventMissingKeys {
-                    keys: &missing_keys
-                });
-            })?;
+            let subject = match self.subject.render_string(&event) {
+                Ok(subject) => subject,
+                Err(error) => {
+                    emit!(TemplateRenderingFailed {
+                        error,
+                        field: Some("subject"),
+                        drop_event: true,
+                    });
+                    self.acker.ack(1);
+                    continue;
+                }
+            };
 
             let log = encode_event(event, &self.encoding);
             let message_len = log.len();
@@ -177,12 +179,13 @@ impl StreamSink for NatsSink {
                     emit!(NatsEventSendSuccess {
                         byte_size: message_len,
                     });
-                    self.acker.ack(1);
                 }
                 Err(error) => {
                     emit!(NatsEventSendFail { error });
                 }
             }
+
+            self.acker.ack(1);
         }
 
         Ok(())
@@ -241,7 +244,6 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
-    use futures::stream::StreamExt;
     use std::{thread, time::Duration};
 
     #[tokio::test]
@@ -278,10 +280,10 @@ mod integration_tests {
         thread::sleep(Duration::from_secs(3));
         let _ = sub.drain().await.unwrap();
 
-        let output: Vec<String> = sub
-            .map(|msg| String::from_utf8_lossy(&msg.data).to_string())
-            .collect()
-            .await;
+        let mut output: Vec<String> = Vec::new();
+        while let Some(msg) = sub.next().await {
+            output.push(String::from_utf8_lossy(&msg.data).to_string())
+        }
 
         assert_eq!(output.len(), input.len());
         assert_eq!(output, input);

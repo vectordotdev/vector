@@ -1,5 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
+    },
     event::{self, Event, LogEvent},
     internal_events::MetricToLogFailedSerialize,
     transforms::{FunctionTransform, Transform},
@@ -8,11 +10,13 @@ use crate::{
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use shared::TimeZone;
 
-#[derive(Clone, Deserialize, Serialize, Debug)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct MetricToLogConfig {
     pub host_tag: Option<String>,
+    pub timezone: Option<TimeZone>,
 }
 
 inventory::submit! {
@@ -23,6 +27,7 @@ impl GenerateConfig for MetricToLogConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             host_tag: Some("host-tag".to_string()),
+            timezone: None,
         })
         .unwrap()
     }
@@ -31,8 +36,11 @@ impl GenerateConfig for MetricToLogConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
-    async fn build(&self) -> crate::Result<Transform> {
-        Ok(Transform::function(MetricToLog::new(self.host_tag.clone())))
+    async fn build(&self, globals: &GlobalOptions) -> crate::Result<Transform> {
+        Ok(Transform::function(MetricToLog::new(
+            self.host_tag.clone(),
+            self.timezone.unwrap_or(globals.timezone),
+        )))
     }
 
     fn input_type(&self) -> DataType {
@@ -52,16 +60,18 @@ impl TransformConfig for MetricToLogConfig {
 pub struct MetricToLog {
     timestamp_key: String,
     host_tag: String,
+    timezone: TimeZone,
 }
 
 impl MetricToLog {
-    pub fn new(host_tag: Option<String>) -> Self {
+    pub fn new(host_tag: Option<String>, timezone: TimeZone) -> Self {
         Self {
             timestamp_key: "timestamp".into(),
             host_tag: format!(
                 "tags.{}",
                 host_tag.unwrap_or_else(|| log_schema().host_key().to_string())
             ),
+            timezone,
         }
     }
 }
@@ -75,7 +85,8 @@ impl FunctionTransform for MetricToLog {
             .ok()
             .and_then(|value| match value {
                 Value::Object(object) => {
-                    let mut log = LogEvent::default();
+                    // TODO: Avoid a clone here
+                    let mut log = LogEvent::new_with_metadata(metric.metadata().clone());
 
                     for (key, value) in object {
                         log.insert_flat(key, value);
@@ -83,7 +94,11 @@ impl FunctionTransform for MetricToLog {
 
                     let timestamp = log
                         .remove(&self.timestamp_key)
-                        .and_then(|value| Conversion::Timestamp.convert(value.into_bytes()).ok())
+                        .and_then(|value| {
+                            Conversion::Timestamp(self.timezone)
+                                .convert(value.into_bytes())
+                                .ok()
+                        })
                         .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
                     log.insert(&log_schema().timestamp_key(), timestamp);
 
@@ -117,7 +132,7 @@ mod tests {
 
     fn do_transform(metric: Metric) -> Option<LogEvent> {
         let event = Event::Metric(metric);
-        let mut transformer = MetricToLog::new(Some("host".into()));
+        let mut transformer = MetricToLog::new(Some("host".into()), Default::default());
 
         transformer
             .transform_one(event)
@@ -140,12 +155,13 @@ mod tests {
     #[test]
     fn transform_counter() {
         let counter = Metric::new(
-            "counter".into(),
+            "counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 1.0 },
         )
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
+        let metadata = counter.metadata().clone();
 
         let log = do_transform(counter).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -161,16 +177,18 @@ mod tests {
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
+        assert_eq!(log.metadata(), &metadata);
     }
 
     #[test]
     fn transform_gauge() {
         let gauge = Metric::new(
-            "gauge".into(),
+            "gauge",
             MetricKind::Absolute,
             MetricValue::Gauge { value: 1.0 },
         )
         .with_timestamp(Some(ts()));
+        let metadata = gauge.metadata().clone();
 
         let log = do_transform(gauge).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -184,18 +202,20 @@ mod tests {
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
+        assert_eq!(log.metadata(), &metadata);
     }
 
     #[test]
     fn transform_set() {
         let set = Metric::new(
-            "set".into(),
+            "set",
             MetricKind::Absolute,
             MetricValue::Set {
                 values: vec!["one".into(), "two".into()].into_iter().collect(),
             },
         )
         .with_timestamp(Some(ts()));
+        let metadata = set.metadata().clone();
 
         let log = do_transform(set).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -210,12 +230,13 @@ mod tests {
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
+        assert_eq!(log.metadata(), &metadata);
     }
 
     #[test]
     fn transform_distribution() {
         let distro = Metric::new(
-            "distro".into(),
+            "distro",
             MetricKind::Absolute,
             MetricValue::Distribution {
                 samples: crate::samples![1.0 => 10, 2.0 => 20],
@@ -223,6 +244,7 @@ mod tests {
             },
         )
         .with_timestamp(Some(ts()));
+        let metadata = distro.metadata().clone();
 
         let log = do_transform(distro).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -255,12 +277,13 @@ mod tests {
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
+        assert_eq!(log.metadata(), &metadata);
     }
 
     #[test]
     fn transform_histogram() {
         let histo = Metric::new(
-            "histo".into(),
+            "histo",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
                 buckets: crate::buckets![1.0 => 10, 2.0 => 20],
@@ -269,6 +292,7 @@ mod tests {
             },
         )
         .with_timestamp(Some(ts()));
+        let metadata = histo.metadata().clone();
 
         let log = do_transform(histo).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -299,12 +323,13 @@ mod tests {
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
+        assert_eq!(log.metadata(), &metadata);
     }
 
     #[test]
     fn transform_summary() {
         let summary = Metric::new(
-            "summary".into(),
+            "summary",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
                 quantiles: crate::quantiles![50.0 => 10.0, 90.0 => 20.0],
@@ -313,6 +338,7 @@ mod tests {
             },
         )
         .with_timestamp(Some(ts()));
+        let metadata = summary.metadata().clone();
 
         let log = do_transform(summary).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -343,5 +369,6 @@ mod tests {
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
+        assert_eq!(log.metadata(), &metadata);
     }
 }

@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: split: {
+	category: "String"
+	description: """
+		Splits the `value` string via the `pattern`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -25,13 +30,10 @@ remap: functions: split: {
 	return: {
 		types: ["string"]
 		rules: [
-			"If `limit` is specified, after `limit` has been reached, the remainder of the string is returned unsplit.",
+			"If `limit` is specified, the remainder of the string is returned unsplit after `limit` has been reached.",
 		]
 	}
-	category: "String"
-	description: #"""
-		Splits the given `value` via the provided `pattern`.
-		"""#
+
 	examples: [
 		{
 			title: "Split a string (no limit)"
@@ -43,7 +45,7 @@ remap: functions: split: {
 		{
 			title: "Split a string (with a limit)"
 			source: #"""
-				split("apples and pears and bananas", " and ", limit: 1)
+				split("apples and pears and bananas", " and ", limit: 2)
 				"""#
 			return: ["apples", "pears and bananas"]
 		},

@@ -4,7 +4,7 @@
 //! and the [`Debounce::debounced`] will be resolved only once.
 
 use std::{future::pending, time::Duration};
-use tokio::time::{delay_until, Instant};
+use tokio::time::{sleep_until, Instant};
 
 /// Provides an arbitrary signal debouncing.
 pub struct Debounce {
@@ -40,13 +40,13 @@ impl Debounce {
             None => pending().await,
         };
 
-        delay_until(sequence_start).await;
+        sleep_until(sequence_start).await;
         self.sequence_start = None;
     }
 
     /// This function exposes the state of the debounce logic.
-    /// If this returns `false`, you shouldn't `poll` on [`debounced`], as it's
-    /// pending indefinitely.
+    /// If this returns `false`, you shouldn't `poll` on [`Self::debounced`], as
+    /// it's pending indefinitely.
     pub fn is_debouncing(&self) -> bool {
         self.sequence_start.is_some()
     }

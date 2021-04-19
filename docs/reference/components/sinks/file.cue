@@ -10,6 +10,7 @@ components: sinks: file: {
 		development:   "beta"
 		egress_method: "stream"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {
@@ -68,7 +69,7 @@ components: sinks: file: {
 			warnings: []
 			type: string: {
 				examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log"]
-				templateable: true
+				syntax: "template"
 			}
 		}
 	}
@@ -88,5 +89,10 @@ components: sinks: file: {
 				to create and write to files in the specified directories.
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

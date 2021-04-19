@@ -1,0 +1,5 @@
+# issue: https://github.com/timberio/vector/issues/6266
+# object: { "foo": null }
+# result: {}
+
+. = compact(.)

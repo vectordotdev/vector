@@ -1,37 +1,39 @@
 package metadata
 
 remap: functions: to_string: {
+	category: "Coerce"
+	description: """
+		Coerces the `value` into a string.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
-			description: "The value to return a string representation of."
+			description: "The value to convert to a string."
 			required:    true
-			type: ["any"]
+			type: ["integer", "float", "boolean", "string", "timestamp", "null"]
 		},
 	]
-	internal_failure_reasons: []
+	internal_failure_reasons: [
+		"`value` is not an integer, float, boolean, string, timestamp, or null",
+	]
 	return: {
 		types: ["string"]
 		rules: [
-			#"If `value` is an integer then its string representation is returned."#,
-			#"If `value` is an float then its string representation is returned."#,
-			#"If `value` is an boolean then `"true"` or `"false"` is returned."#,
-			#"If `value` is an timestamp then its RFC3339 representation is returned."#,
-			#"If `value` is a map then it is encoded into JSON."#,
-			#"If `value` is a list then it is encoded into JSON."#,
+			#"If `value` is an integer or float, returns the string representation."#,
+			#"If `value` is a boolean, returns `"true"` or `"false"`."#,
+			#"If `value` is a timestamp, returns an [RFC 3339](\(urls.rfc3339)) representation."#,
+			#"If `value` is a null, returns `""`."#,
 		]
 	}
-	category: "Coerce"
-	description: #"""
-		Coerces the provided `value` into a `string`.
-		"""#
+
 	examples: [
 		{
-			title: "Coerce to a string (boolean)"
+			title: "Coerce to a string (Boolean)"
 			source: #"""
 				to_string(true)
 				"""#
-			return: true
+			return: "true"
 		},
 		{
 			title: "Coerce to a string (int)"

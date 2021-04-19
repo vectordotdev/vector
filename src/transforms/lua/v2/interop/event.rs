@@ -1,3 +1,4 @@
+use super::util::type_name;
 use crate::event::{Event, LogEvent, Metric};
 use rlua::prelude::*;
 
@@ -18,7 +19,7 @@ impl<'a> FromLua<'a> for Event {
             LuaValue::Table(t) => t,
             _ => {
                 return Err(LuaError::FromLuaConversionError {
-                    from: value.type_name(),
+                    from: type_name(&value),
                     to: "Event",
                     message: Some("Event should be a Lua table".to_string()),
                 })
@@ -33,7 +34,7 @@ impl<'a> FromLua<'a> for Event {
                 ctx,
             )?)),
             _ => Err(LuaError::FromLuaConversionError {
-                from: value.type_name(),
+                from: type_name(&value),
                 to: "Event",
                 message: Some(
                     "Event should contain either \"log\" or \"metric\" key at the top level"
@@ -58,6 +59,7 @@ mod test {
             for assertion in assertions {
                 assert!(
                     ctx.load(assertion).eval::<bool>().expect(assertion),
+                    "{}",
                     assertion
                 );
             }
@@ -82,7 +84,7 @@ mod test {
     #[test]
     fn to_lua_metric() {
         let event = Event::Metric(Metric::new(
-            "example counter".into(),
+            "example counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 0.57721566 },
         ));
@@ -130,14 +132,14 @@ mod test {
             }
         }"#;
         let expected = Event::Metric(Metric::new(
-            "example counter".into(),
+            "example counter",
             MetricKind::Absolute,
             MetricValue::Counter { value: 0.57721566 },
         ));
 
         Lua::new().context(|ctx| {
             let event = ctx.load(lua_event).eval::<Event>().unwrap();
-            assert_eq!(event, expected);
+            shared::assert_event_data_eq!(event, expected);
         });
     }
 

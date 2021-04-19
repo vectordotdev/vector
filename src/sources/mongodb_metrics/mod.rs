@@ -1,11 +1,11 @@
 use crate::{
-    config::{self, GlobalOptions, SourceConfig, SourceDescription},
+    config::{self, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
-        MongoDBMetricsBsonParseError, MongoDBMetricsCollectCompleted, MongoDBMetricsRequestError,
+        MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted, MongoDbMetricsEventsReceived,
+        MongoDbMetricsRequestError,
     },
-    shutdown::ShutdownSignal,
-    Event, Pipeline,
+    Event,
 };
 use chrono::Utc;
 use futures::{
@@ -20,8 +20,9 @@ use mongodb::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::BTreeMap, future::ready, time::Instant};
+use std::{collections::BTreeMap, time::Instant};
 use tokio::time;
+use tokio_stream::wrappers::IntervalStream;
 
 mod types;
 use types::{CommandBuildInfo, CommandIsMaster, CommandServerStatus, NodeType};
@@ -61,14 +62,6 @@ enum BuildError {
     InvalidEndpoint { source: MongoError },
     #[snafu(display("invalid client options: {}", source))]
     InvalidClientOptions { source: MongoError },
-    #[snafu(display("failed to execute `isMaster` command: {}", source))]
-    CommandIsMasterMongoError { source: MongoError },
-    #[snafu(display("failed to parse `isMaster` response: {}", source))]
-    CommandIsMasterParseError { source: bson::de::Error },
-    #[snafu(display("failed to execute `buildInfo` command: {}", source))]
-    CommandBuildInfoMongoError { source: MongoError },
-    #[snafu(display("failed to parse `buildInfo` response: {}", source))]
-    CommandBuildInfoParseError { source: bson::de::Error },
 }
 
 #[derive(Debug)]
@@ -79,7 +72,7 @@ enum CollectError {
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
-struct MongoDBMetricsConfig {
+struct MongoDbMetricsConfig {
     endpoints: Vec<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
@@ -88,7 +81,7 @@ struct MongoDBMetricsConfig {
 }
 
 #[derive(Debug)]
-struct MongoDBMetrics {
+struct MongoDbMetrics {
     client: Client,
     endpoint: String,
     namespace: Option<String>,
@@ -104,45 +97,45 @@ pub fn default_namespace() -> String {
 }
 
 inventory::submit! {
-    SourceDescription::new::<MongoDBMetricsConfig>("mongodb_metrics")
+    SourceDescription::new::<MongoDbMetricsConfig>("mongodb_metrics")
 }
 
-impl_generate_config_from_default!(MongoDBMetricsConfig);
+impl_generate_config_from_default!(MongoDbMetricsConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "mongodb_metrics")]
-impl SourceConfig for MongoDBMetricsConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+impl SourceConfig for MongoDbMetricsConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
         let sources = try_join_all(
             self.endpoints
                 .iter()
-                .map(|endpoint| MongoDBMetrics::new(endpoint, namespace.clone())),
+                .map(|endpoint| MongoDbMetrics::new(endpoint, namespace.clone())),
         )
         .await?;
 
-        let mut out =
-            out.sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
+        let mut out = cx
+            .out
+            .sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
+        let shutdown = cx.shutdown;
         Ok(Box::pin(async move {
-            let mut interval = time::interval(duration).take_until(shutdown);
+            let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
             while interval.next().await.is_some() {
                 let start = Instant::now();
                 let metrics = join_all(sources.iter().map(|mongodb| mongodb.collect())).await;
-                emit!(MongoDBMetricsCollectCompleted {
+                emit!(MongoDbMetricsCollectCompleted {
                     start,
                     end: Instant::now()
                 });
 
-                let mut stream = stream::iter(metrics).flatten().map(Event::Metric).map(Ok);
+                let mut stream = stream::iter(metrics)
+                    .map(stream::iter)
+                    .flatten()
+                    .map(Event::Metric)
+                    .map(Ok);
                 out.send_all(&mut stream).await?;
             }
 
@@ -159,10 +152,10 @@ impl SourceConfig for MongoDBMetricsConfig {
     }
 }
 
-impl MongoDBMetrics {
+impl MongoDbMetrics {
     /// Works only with Standalone connection-string. Collect metrics only from specified instance.
     /// https://docs.mongodb.com/manual/reference/connection-string/#standard-connection-string-format
-    async fn new(endpoint: &str, namespace: Option<String>) -> Result<MongoDBMetrics, BuildError> {
+    async fn new(endpoint: &str, namespace: Option<String>) -> Result<MongoDbMetrics, BuildError> {
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
 
         let mut client_options = ClientOptions::parse(endpoint)
@@ -170,96 +163,27 @@ impl MongoDBMetrics {
             .context(InvalidEndpoint)?;
         client_options.direct_connection = Some(true);
 
-        let endpoint = Self::sanitize_endpoint(endpoint, &client_options);
+        let endpoint = sanitize_endpoint(endpoint, &client_options);
         tags.insert("endpoint".into(), endpoint.clone());
         tags.insert("host".into(), client_options.hosts[0].to_string());
 
-        let client = Client::with_options(client_options).context(InvalidClientOptions)?;
-
-        let node_type = Self::get_node_type(&client).await?;
-        let build_info = Self::get_build_info(&client).await?;
-        debug!(
-            message = "Connected to server.", endpoint = %endpoint, node_type = ?node_type, server_version = ?serde_json::to_string(&build_info).unwrap()
-        );
-
         Ok(Self {
-            client,
+            client: Client::with_options(client_options).context(InvalidClientOptions)?,
             endpoint,
             namespace,
             tags,
         })
     }
 
-    /// Remove credentials from endpoint.
-    /// URI components: https://docs.mongodb.com/manual/reference/connection-string/#components
-    /// It's not possible to use [url::Url](https://docs.rs/url/2.1.1/url/struct.Url.html) because connection string can have multiple hosts.
-    /// Would be nice to serialize [ClientOptions][https://docs.rs/mongodb/1.1.1/mongodb/options/struct.ClientOptions.html] to String, but it's not supported.
-    /// `endpoint` argument would not be required, but field `original_uri` in `ClieotnOptions` is private.
-    /// `.unwrap()` in function is safe because endpoint was already verified by `ClientOptions`.
-    /// Based on ClientOptions::parse_uri -- https://github.com/mongodb/mongo-rust-driver/blob/09e1193f93dcd850ebebb7fb82f6ab786fd85de1/src/client/options/mod.rs#L708
-    fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {
-        let mut endpoint = endpoint.to_owned();
-        if options.credential.is_some() {
-            let start = endpoint.find("://").unwrap() + 3;
-
-            // Split `username:password@host[:port]` and `/defaultauthdb?<options>`
-            let pre_slash = match endpoint[start..].find('/') {
-                Some(index) => {
-                    let mut segments = endpoint[start..].split_at(index);
-                    // If we have databases and options
-                    if segments.1.len() > 1 {
-                        let lstart = start + segments.0.len() + 1;
-                        let post_slash = &segments.1[1..];
-                        // Split `/defaultauthdb` and `?<options>`
-                        if let Some(index) = post_slash.find('?') {
-                            let segments = post_slash.split_at(index);
-                            // If we have options
-                            if segments.1.len() > 1 {
-                                // Remove authentication options
-                                let options = segments.1[1..]
-                                    .split('&')
-                                    .filter(|pair| {
-                                        let (key, _) = pair.split_at(pair.find('=').unwrap());
-                                        !matches!(
-                                            key.to_lowercase().as_str(),
-                                            "authsource"
-                                                | "authmechanism"
-                                                | "authmechanismproperties"
-                                        )
-                                    })
-                                    .collect::<Vec<_>>()
-                                    .join("&");
-
-                                // Update options in endpoint
-                                endpoint = format!(
-                                    "{}{}",
-                                    &endpoint[..lstart + segments.0.len() + 1],
-                                    &options
-                                );
-                            }
-                        }
-                        segments = endpoint[start..].split_at(index);
-                    }
-                    segments.0
-                }
-                None => &endpoint[start..],
-            };
-
-            // Remove `username:password@`
-            let end = pre_slash.rfind('@').unwrap() + 1;
-            endpoint = format!("{}{}", &endpoint[0..start], &endpoint[start + end..]);
-        }
-        endpoint
-    }
-
     /// Finding node type for client with `isMaster` command.
-    async fn get_node_type(client: &Client) -> Result<NodeType, BuildError> {
-        let doc = client
+    async fn get_node_type(&self) -> Result<NodeType, CollectError> {
+        let doc = self
+            .client
             .database("admin")
             .run_command(doc! { "isMaster": 1 }, None)
             .await
-            .context(CommandIsMasterMongoError)?;
-        let msg: CommandIsMaster = from_document(doc).context(CommandIsMasterParseError)?;
+            .map_err(CollectError::Mongo)?;
+        let msg: CommandIsMaster = from_document(doc).map_err(CollectError::Bson)?;
 
         Ok(if msg.set_name.is_some() || msg.hosts.is_some() {
             NodeType::Replset
@@ -273,13 +197,26 @@ impl MongoDBMetrics {
         })
     }
 
-    async fn get_build_info(client: &Client) -> Result<CommandBuildInfo, BuildError> {
-        let doc = client
+    async fn get_build_info(&self) -> Result<CommandBuildInfo, CollectError> {
+        let doc = self
+            .client
             .database("admin")
             .run_command(doc! { "buildInfo": 1 }, None)
             .await
-            .context(CommandBuildInfoMongoError)?;
-        from_document(doc).context(CommandBuildInfoParseError)
+            .map_err(CollectError::Mongo)?;
+        from_document(doc).map_err(CollectError::Bson)
+    }
+
+    async fn print_version(&self) -> Result<(), CollectError> {
+        if tracing::level_enabled!(tracing::Level::DEBUG) {
+            let node_type = self.get_node_type().await?;
+            let build_info = self.get_build_info().await?;
+            debug!(
+                message = "Connected to server.", endpoint = %self.endpoint, node_type = ?node_type, server_version = ?serde_json::to_string(&build_info).unwrap()
+            );
+        }
+
+        Ok(())
     }
 
     fn create_metric(
@@ -288,23 +225,23 @@ impl MongoDBMetrics {
         value: MetricValue,
         tags: BTreeMap<String, String>,
     ) -> Metric {
-        Metric::new(name.into(), MetricKind::Absolute, value)
+        Metric::new(name, MetricKind::Absolute, value)
             .with_namespace(self.namespace.clone())
             .with_tags(Some(tags))
             .with_timestamp(Some(Utc::now()))
     }
 
-    async fn collect(&self) -> stream::BoxStream<'static, Metric> {
+    async fn collect(&self) -> Vec<Metric> {
         // `up` metric is `1` if collection is successful, otherwise `0`.
-        let (up_value, metrics) = match self.collect_server_status().await {
+        let (up_value, mut metrics) = match self.collect_server_status().await {
             Ok(metrics) => (1.0, metrics),
             Err(error) => {
                 match error {
-                    CollectError::Mongo(error) => emit!(MongoDBMetricsRequestError {
+                    CollectError::Mongo(error) => emit!(MongoDbMetricsRequestError {
                         error,
                         endpoint: &self.endpoint,
                     }),
-                    CollectError::Bson(error) => emit!(MongoDBMetricsBsonParseError {
+                    CollectError::Bson(error) => emit!(MongoDbMetricsBsonParseError {
                         error,
                         endpoint: &self.endpoint,
                     }),
@@ -314,18 +251,21 @@ impl MongoDBMetrics {
             }
         };
 
-        stream::once(ready(self.create_metric(
-            "up",
-            gauge!(up_value),
-            tags!(self.tags),
-        )))
-        .chain(stream::iter(metrics))
-        .boxed()
+        metrics.push(self.create_metric("up", gauge!(up_value), tags!(self.tags)));
+
+        emit!(MongoDbMetricsEventsReceived {
+            count: metrics.len(),
+            uri: &self.endpoint,
+        });
+
+        metrics
     }
 
     /// Collect metrics from `serverStatus` command.
     /// https://docs.mongodb.com/manual/reference/command/serverStatus/
     async fn collect_server_status(&self) -> Result<Vec<Metric>, CollectError> {
+        self.print_version().await?;
+
         let mut metrics = vec![];
 
         let command = doc! { "serverStatus": 1, "opLatencies": { "histograms": true }};
@@ -1014,20 +954,80 @@ impl MongoDBMetrics {
     }
 }
 
+/// Remove credentials from endpoint.
+/// URI components: https://docs.mongodb.com/manual/reference/connection-string/#components
+/// It's not possible to use [url::Url](https://docs.rs/url/2.1.1/url/struct.Url.html) because connection string can have multiple hosts.
+/// Would be nice to serialize [ClientOptions][https://docs.rs/mongodb/1.1.1/mongodb/options/struct.ClientOptions.html] to String, but it's not supported.
+/// `endpoint` argument would not be required, but field `original_uri` in `ClieotnOptions` is private.
+/// `.unwrap()` in function is safe because endpoint was already verified by `ClientOptions`.
+/// Based on ClientOptions::parse_uri -- https://github.com/mongodb/mongo-rust-driver/blob/09e1193f93dcd850ebebb7fb82f6ab786fd85de1/src/client/options/mod.rs#L708
+fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {
+    let mut endpoint = endpoint.to_owned();
+    if options.credential.is_some() {
+        let start = endpoint.find("://").unwrap() + 3;
+
+        // Split `username:password@host[:port]` and `/defaultauthdb?<options>`
+        let pre_slash = match endpoint[start..].find('/') {
+            Some(index) => {
+                let mut segments = endpoint[start..].split_at(index);
+                // If we have databases and options
+                if segments.1.len() > 1 {
+                    let lstart = start + segments.0.len() + 1;
+                    let post_slash = &segments.1[1..];
+                    // Split `/defaultauthdb` and `?<options>`
+                    if let Some(index) = post_slash.find('?') {
+                        let segments = post_slash.split_at(index);
+                        // If we have options
+                        if segments.1.len() > 1 {
+                            // Remove authentication options
+                            let options = segments.1[1..]
+                                .split('&')
+                                .filter(|pair| {
+                                    let (key, _) = pair.split_at(pair.find('=').unwrap());
+                                    !matches!(
+                                        key.to_lowercase().as_str(),
+                                        "authsource" | "authmechanism" | "authmechanismproperties"
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                                .join("&");
+
+                            // Update options in endpoint
+                            endpoint = format!(
+                                "{}{}",
+                                &endpoint[..lstart + segments.0.len() + 1],
+                                &options
+                            );
+                        }
+                    }
+                    segments = endpoint[start..].split_at(index);
+                }
+                segments.0
+            }
+            None => &endpoint[start..],
+        };
+
+        // Remove `username:password@`
+        let end = pre_slash.rfind('@').unwrap() + 1;
+        endpoint = format!("{}{}", &endpoint[0..start], &endpoint[start + end..]);
+    }
+    endpoint
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<MongoDBMetricsConfig>();
+        crate::test_util::test_generate_config::<MongoDbMetricsConfig>();
     }
 
     #[tokio::test]
-    async fn sanitize_endpoint() {
+    async fn sanitize_endpoint_test() {
         let endpoint = "mongodb://myDBReader:D1fficultP%40ssw0rd@mongos0.example.com:27017,mongos1.example.com:27017,mongos2.example.com:27017/?authSource=admin&tls=true";
         let client_options = ClientOptions::parse(endpoint).await.unwrap();
-        let endpoint = MongoDBMetrics::sanitize_endpoint(endpoint, &client_options);
+        let endpoint = sanitize_endpoint(endpoint, &client_options);
         assert_eq!(&endpoint, "mongodb://mongos0.example.com:27017,mongos1.example.com:27017,mongos2.example.com:27017/?tls=true");
     }
 }
@@ -1046,17 +1046,12 @@ mod integration_tests {
         let (sender, mut recv) = Pipeline::new_test();
 
         tokio::spawn(async move {
-            MongoDBMetricsConfig {
+            MongoDbMetricsConfig {
                 endpoints: vec![endpoint.to_owned()],
                 scrape_interval_secs: 15,
                 namespace: namespace.to_owned(),
             }
-            .build(
-                "default",
-                &GlobalOptions::default(),
-                ShutdownSignal::noop(),
-                sender,
-            )
+            .build(SourceContext::new_test(sender))
             .await
             .unwrap()
             .await

@@ -6,6 +6,7 @@
 
 use async_trait::async_trait;
 use futures::{
+    channel::mpsc,
     future,
     stream::{self, BoxStream},
     task::Poll,
@@ -15,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
     fs::{create_dir, OpenOptions},
-    io::{self, Write},
+    io::Write,
     path::PathBuf,
     pin::Pin,
     sync::{
@@ -24,19 +25,20 @@ use std::{
     },
     task::Context,
 };
-use tokio::sync::mpsc;
 use tracing::{error, info};
 use vector::{
     buffers::Acker,
-    config::{DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig},
+    config::{
+        DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext,
+        TransformConfig,
+    },
     event::{
         metric::{self, MetricValue},
         Value,
     },
-    shutdown::ShutdownSignal,
     sinks::{util::StreamSink, Healthcheck, VectorSink},
     sources::Source,
-    test_util::{runtime, temp_dir, temp_file},
+    test_util::{temp_dir, temp_file},
     transforms::{FunctionTransform, Transform},
     Event, Pipeline,
 };
@@ -141,18 +143,13 @@ impl MockSourceConfig {
 #[async_trait]
 #[typetag::serde(name = "mock")]
 impl SourceConfig for MockSourceConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> Result<Source, vector::Error> {
+    async fn build(&self, cx: SourceContext) -> Result<Source, vector::Error> {
         let wrapped = self.receiver.clone();
         let event_counter = self.event_counter.clone();
         let mut recv = wrapped.lock().unwrap().take().unwrap();
-        let mut shutdown = Some(shutdown);
+        let mut shutdown = Some(cx.shutdown);
         let mut _token = None;
+        let out = cx.out;
         Ok(Box::pin(async move {
             stream::poll_fn(move |cx| {
                 if let Some(until) = shutdown.as_mut() {
@@ -174,11 +171,7 @@ impl SourceConfig for MockSourceConfig {
                 }
             })
             .map(Ok)
-            .forward(
-                out.sink_map_err(
-                    |error| error!(message = "Error sending in sink..", error = ?error),
-                ),
-            )
+            .forward(out.sink_map_err(|error| error!(message = "Error sending in sink..", %error)))
             .inspect(|_| info!("Finished sending."))
             .await
         }))
@@ -266,7 +259,7 @@ impl MockTransformConfig {
 #[async_trait]
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    async fn build(&self) -> Result<Transform, vector::Error> {
+    async fn build(&self, _globals: &GlobalOptions) -> Result<Transform, vector::Error> {
         Ok(Transform::function(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,
@@ -290,7 +283,7 @@ impl TransformConfig for MockTransformConfig {
 pub struct MockSinkConfig<T>
 where
     T: Sink<Event> + Unpin + std::fmt::Debug + Clone + Send + Sync + 'static,
-    <T as Sink<Event>>::Error: std::fmt::Debug,
+    <T as Sink<Event>>::Error: std::fmt::Display,
 {
     #[serde(skip)]
     sink: Option<T>,
@@ -301,7 +294,7 @@ where
 impl<T> MockSinkConfig<T>
 where
     T: Sink<Event> + Unpin + std::fmt::Debug + Clone + Send + Sync + 'static,
-    <T as Sink<Event>>::Error: std::fmt::Debug,
+    <T as Sink<Event>>::Error: std::fmt::Display,
 {
     pub fn new(sink: T, healthy: bool) -> Self {
         Self {
@@ -322,7 +315,7 @@ enum HealthcheckError {
 impl<T> SinkConfig for MockSinkConfig<T>
 where
     T: Sink<Event> + Unpin + std::fmt::Debug + Clone + Send + Sync + 'static,
-    <T as Sink<Event>>::Error: std::fmt::Debug,
+    <T as Sink<Event>>::Error: std::fmt::Display,
 {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         let sink = MockSink {
@@ -361,12 +354,12 @@ struct MockSink<S> {
 impl<S> StreamSink for MockSink<S>
 where
     S: Sink<Event> + Send + std::marker::Unpin,
-    <S as Sink<Event>>::Error: std::fmt::Debug,
+    <S as Sink<Event>>::Error: std::fmt::Display,
 {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
             if let Err(error) = self.sink.send(event).await {
-                error!(message = "Ingesting an event failed at mock sink.", ?error);
+                error!(message = "Ingesting an event failed at mock sink.", %error);
             }
 
             self.acker.ack(1);
@@ -405,34 +398,4 @@ impl<T> Sink<T> for DeadSink<T> {
     fn start_send(self: Pin<&mut Self>, _item: T) -> Result<(), Self::Error> {
         Err("never ready")
     }
-}
-
-/// Takes a test name and a future, and uses `rusty_fork` to perform a cross-platform
-/// process fork. This allows us to test functionality without conflicting with global
-/// state that may have been set/mutated from previous tests
-pub fn fork_test<T: std::future::Future<Output = ()>>(test_name: &'static str, fut: T) {
-    let fork_id = rusty_fork::rusty_fork_id!();
-
-    rusty_fork::fork(
-        test_name,
-        fork_id,
-        |_| {},
-        |child, f| {
-            let status = child.wait().expect("Couldn't wait for child process");
-
-            // Copy all output
-            let mut stdout = io::stdout();
-            io::copy(f, &mut stdout).expect("Couldn't write to stdout");
-
-            // If the test failed, panic on the parent thread
-            if !status.success() {
-                panic!("Test failed");
-            }
-        },
-        || {
-            let mut rt = runtime();
-            rt.block_on(fut);
-        },
-    )
-    .expect("Couldn't fork test");
 }

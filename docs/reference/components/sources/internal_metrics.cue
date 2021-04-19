@@ -14,6 +14,7 @@ components: sources: internal_metrics: {
 		deployment_roles: ["aggregator", "daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -283,6 +284,47 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		events_in_total: {
+			description: """
+				The number of events accepted by this component either from tagged
+				origin like file and uri, or cumulatively from other origins.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags & {
+				file: {
+					description: "The file from which the event originates."
+					required:    false
+				}
+				uri: {
+					description: "The sanitized uri from which the event originates."
+					required:    false
+				}
+				container_name: {
+					description: "The name of the container from which the event originates."
+					required:    false
+				}
+				pod_name: {
+					description: "The name of the pod from which the event originates."
+					required:    false
+				}
+				peer_addr: {
+					description: "The IP from which the event originates."
+					required:    false
+				}
+				peer_path: {
+					description: "The pathname from which the event originates."
+					required:    false
+				}
+				mode: _mode
+			}
+		}
+		events_out_total: {
+			description:       "The total number of events emitted by this component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		processed_events_total: {
 			description:       "The total number of events processed by this component."
 			type:              "counter"
@@ -407,6 +449,14 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
+		glob_errors_total: {
+			description:       "The total number of errors encountered when globbing paths."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags & {
+				path: _path
+			}
+		}
 		http_bad_requests_total: {
 			description:       "The total number of HTTP `400 Bad Request` errors encountered."
 			type:              "counter"
@@ -470,12 +520,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		missing_keys_total: {
-			description:       "The total number of failed template renders due to missed keys from the event."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              _internal_metrics_tags
-		}
 		open_connections: {
 			description:       "The number of current open connections to Vector."
 			type:              "gauge"
@@ -489,10 +533,36 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		processed_bytes_total: {
-			description:       "The total number of bytes processed by the component."
+			description:       "The number of bytes processed by the component."
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags:              _component_tags & {
+				file: {
+					description: "The file from which the bytes originate."
+					required:    false
+				}
+				uri: {
+					description: "The sanitized uri from which the bytes originate."
+					required:    false
+				}
+				container_name: {
+					description: "The name of the container from which the bytes originate."
+					required:    false
+				}
+				pod_name: {
+					description: "The name of the pod from which the bytes originate."
+					required:    false
+				}
+				peer_addr: {
+					description: "The IP from which the bytes originate."
+					required:    false
+				}
+				peer_path: {
+					description: "The pathname from which the bytes originate."
+					required:    false
+				}
+				mode: _mode
+			}
 		}
 		processing_errors_total: {
 			description:       "The total number of processing errors encountered by this component."
@@ -784,6 +854,19 @@ components: sources: internal_metrics: {
 			description: "The name of the job producing Vector metrics."
 			required:    true
 			default:     "vector"
+		}
+		_mode: {
+			description: "The connection mode used by the component."
+			required:    false
+			enum: {
+				udp:  "User Datagram Protocol"
+				tcp:  "Transmission Control Protocol"
+				unix: "Unix domain socket"
+			}
+		}
+		_path: {
+			description: "The path that produced the error."
+			required:    true
 		}
 	}
 }

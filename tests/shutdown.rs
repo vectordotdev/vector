@@ -5,7 +5,9 @@ use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
 };
+use serde_json::{json, Value};
 use std::{
+    fs::read_dir,
     io::Write,
     net::SocketAddr,
     path::PathBuf,
@@ -19,7 +21,7 @@ mod support;
 use crate::support::{create_directory, create_file, overwrite_file};
 
 const STARTUP_TIME: Duration = Duration::from_secs(2);
-const SHUTDOWN_TIME: Duration = Duration::from_secs(3);
+const SHUTDOWN_TIME: Duration = Duration::from_secs(4);
 const RELOAD_TIME: Duration = Duration::from_secs(5);
 
 const STDIO_CONFIG: &'static str = r#"
@@ -153,6 +155,54 @@ fn auto_shutdown() {
 }
 
 #[test]
+fn log_schema() {
+    // Vector command
+    let mut cmd = Command::cargo_bin("vector").unwrap();
+    cmd.arg("--quiet")
+        .arg("-c")
+        .arg(create_file(
+            r#"
+        data_dir = "${VECTOR_DATA_DIR}"
+        log_schema.message_key = "test_msg"
+
+        [sources.in_console]
+            type = "stdin"
+
+        [sinks.out_console]
+            inputs = ["in_console"]
+            type = "console"
+            encoding = "json"
+    "#,
+        ))
+        .env("VECTOR_DATA_DIR", create_directory());
+
+    // Run vector
+    let mut vector = cmd
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    // Give vector time to start.
+    sleep(STARTUP_TIME);
+
+    vector
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all("42".as_bytes())
+        .unwrap();
+
+    // Wait for shutdown
+    let output = vector.wait_with_output().unwrap();
+    assert!(output.status.success(), "Vector didn't exit successfully.");
+
+    // Output
+    let event: Value = serde_json::from_slice(output.stdout.as_slice()).unwrap();
+    assert_eq!(event["test_msg"], json!("42"));
+}
+
+#[test]
 fn configuration_path_recomputed() {
     // Directory with configuration files
     let dir = create_directory();
@@ -206,6 +256,46 @@ fn configuration_path_recomputed() {
 
     // Output
     assert_eq!(output.stdout.as_slice(), "42\n".as_bytes());
+}
+
+#[test]
+fn remove_unix_socket_stream() {
+    let dir = support::create_directory();
+    let mut path = dir.clone();
+    path.push("tmp");
+    path.set_extension("sock");
+
+    test_timely_shutdown(source_vector(&format!(
+        r#"
+        type = "socket"
+        path = "{}"
+        mode = "unix"
+        "#,
+        path.to_string_lossy()
+    )));
+
+    // Assert that data folder is empty
+    assert!(read_dir(dir).unwrap().next().is_none());
+}
+
+#[test]
+fn remove_unix_socket_datagram() {
+    let dir = support::create_directory();
+    let mut path = dir.clone();
+    path.push("tmp");
+    path.set_extension("sock");
+
+    test_timely_shutdown(source_vector(&format!(
+        r#"
+        type = "socket"
+        path = "{}"
+        mode = "unix_datagram"
+        "#,
+        path.to_string_lossy()
+    )));
+
+    // Assert that data folder is empty
+    assert!(read_dir(dir).unwrap().next().is_none());
 }
 
 #[test]

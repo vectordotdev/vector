@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
     internal_events::RemoveFieldsFieldMissing,
     transforms::{FunctionTransform, Transform},
     Event,
@@ -36,7 +36,7 @@ impl GenerateConfig for RemoveFieldsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {
-    async fn build(&self) -> crate::Result<Transform> {
+    async fn build(&self, _globals: &GlobalOptions) -> crate::Result<Transform> {
         RemoveFields::new(self.fields.clone(), self.drop_empty.unwrap_or(false))
             .map(Transform::function)
     }
@@ -80,7 +80,7 @@ impl FunctionTransform for RemoveFields {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
+    use crate::event::LogEvent;
 
     #[test]
     fn generate_config() {
@@ -89,17 +89,16 @@ mod tests {
 
     #[test]
     fn remove_fields() {
-        let mut event = Event::from("message");
-        event.as_mut_log().insert("to_remove", "some value");
-        event.as_mut_log().insert("to_keep", "another value");
+        let mut log = LogEvent::from("message");
+        log.insert("to_keep", "another value");
+        let expected = log.clone();
+        log.insert("to_remove", "some value");
 
         let mut transform =
             RemoveFields::new(vec!["to_remove".into(), "unknown".into()], false).unwrap();
 
-        let new_event = transform.transform_one(event).unwrap();
+        let result = transform.transform_one(log.into()).unwrap().into_log();
 
-        assert!(new_event.as_log().get("to_remove").is_none());
-        assert!(new_event.as_log().get("unknown").is_none());
-        assert_eq!(new_event.as_log()["to_keep"], "another value".into());
+        assert_eq!(result, expected);
     }
 }

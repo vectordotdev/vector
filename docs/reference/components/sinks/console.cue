@@ -9,6 +9,7 @@ components: sinks: console: {
 		development:   "stable"
 		egress_method: "stream"
 		service_providers: []
+		stateful: false
 	}
 
 	features: {
@@ -61,6 +62,7 @@ components: sinks: console: {
 					stdout: "Output will be written to [STDOUT](\(urls.stdout))"
 					stderr: "Output will be written to [STDERR](\(urls.stderr))"
 				}
+				syntax: "literal"
 			}
 		}
 	}

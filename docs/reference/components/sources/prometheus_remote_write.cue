@@ -9,6 +9,7 @@ components: sources: prometheus_remote_write: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -61,7 +62,10 @@ components: sources: prometheus_remote_write: {
 		address: {
 			description: "The address to accept connections on. The address _must_ include a port."
 			required:    true
-			type: string: examples: ["0.0.0.0:9090"]
+			type: string: {
+				examples: ["0.0.0.0:9090"]
+				syntax: "literal"
+			}
 		}
 		auth: configuration._http_basic_auth
 	}
@@ -90,6 +94,7 @@ components: sources: prometheus_remote_write: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:              components.sources.internal_metrics.output.metrics.events_in_total
 		http_error_response_total:    components.sources.internal_metrics.output.metrics.http_error_response_total
 		http_request_errors_total:    components.sources.internal_metrics.output.metrics.http_request_errors_total
 		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total

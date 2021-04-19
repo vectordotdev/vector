@@ -9,6 +9,7 @@ components: sinks: splunk_hec: {
 		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["Splunk"]
+		stateful: false
 	}
 
 	features: {
@@ -59,8 +60,8 @@ components: sinks: splunk_hec: {
 				interface: {
 					socket: {
 						api: {
-							title: "Splunk HEC protocol"
-							url:   urls.splunk_hec_protocol
+							title: "Splunk HEC event endpoint"
+							url:   urls.splunk_hec_event_endpoint
 						}
 						direction: "outgoing"
 						protocols: ["http"]
@@ -93,6 +94,7 @@ components: sinks: splunk_hec: {
 			required:    true
 			type: string: {
 				examples: ["https://http-inputs-hec.splunkcloud.com", "https://hec.splunk.com:8088", "http://example.com"]
+				syntax: "literal"
 			}
 		}
 		host_key: {
@@ -103,16 +105,18 @@ components: sinks: splunk_hec: {
 			type: string: {
 				default: null
 				examples: ["hostname"]
+				syntax: "literal"
 			}
 		}
 		index: {
 			common:      false
-			description: "The name of the index where send the events to. If not specified, the default index is used.\n"
+			description: "The name of the index where send the events to. If not specified, the default index is used."
 			required:    false
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["custom_index"]
+				examples: ["{{ host }}", "custom_index"]
+				syntax: "template"
 			}
 		}
 		indexed_fields: {
@@ -122,27 +126,32 @@ components: sinks: splunk_hec: {
 			warnings: []
 			type: array: {
 				default: null
-				items: type: string: examples: ["field1", "field2"]
+				items: type: string: {
+					examples: ["field1", "field2"]
+					syntax: "field_path"
+				}
 			}
 		}
 		source: {
 			common:      false
-			description: "The source of events sent to this sink. Typically the filename the logs originated from. If unset, the Splunk collector will set it.\n"
+			description: "The source of events sent to this sink. Typically the filename the logs originated from. If unset, the Splunk collector will set it."
 			required:    false
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["/var/log/syslog", "UDP:514"]
+				examples: ["{{ file }}", "/var/log/syslog", "UDP:514"]
+				syntax: "template"
 			}
 		}
 		sourcetype: {
 			common:      false
-			description: "The sourcetype of events sent to this sink. If unset, Splunk will default to httpevent.\n"
+			description: "The sourcetype of events sent to this sink. If unset, Splunk will default to httpevent."
 			required:    false
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["_json", "httpevent"]
+				examples: ["{{ sourcetype }}", "_json", "httpevent"]
+				syntax: "template"
 			}
 		}
 		token: {
@@ -151,6 +160,7 @@ components: sinks: splunk_hec: {
 			warnings: []
 			type: string: {
 				examples: ["${SPLUNK_HEC_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
+				syntax: "literal"
 			}
 		}
 	}
@@ -163,7 +173,7 @@ components: sinks: splunk_hec: {
 	telemetry: metrics: {
 		encode_errors_total:       components.sources.internal_metrics.output.metrics.encode_errors_total
 		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
-		missing_keys_total:        components.sources.internal_metrics.output.metrics.missing_keys_total
+		processing_errors_total:   components.sources.internal_metrics.output.metrics.processing_errors_total
 		processed_bytes_total:     components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:    components.sources.internal_metrics.output.metrics.processed_events_total
 		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total

@@ -52,6 +52,7 @@ components: sinks: datadog_metrics: {
 	configuration: {
 		api_key:  sinks._datadog.configuration.api_key
 		endpoint: sinks._datadog.configuration.endpoint
+		region:   sinks._datadog.configuration.region
 		default_namespace: {
 			common: true
 			description: """
@@ -63,6 +64,7 @@ components: sinks: datadog_metrics: {
 			type: string: {
 				default: null
 				examples: ["service"]
+				syntax: "literal"
 			}
 		}
 	}

@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: round: {
+	category: "Number"
+	description: """
+		Rounds the `value` to the specified `precision`.
+		"""
+
 	arguments: [
 		{
 			name:        "value"
@@ -23,17 +28,14 @@ remap: functions: round: {
 			"If `precision` is `0`, then an integer is returned, otherwise a float is returned.",
 		]
 	}
-	category: "Number"
-	description: #"""
-		Rounds the provided `value` to number to the specified `precision`.
-		"""#
+
 	examples: [
 		{
 			title: "Round a number (without precision)"
 			source: #"""
 				round(4.345)
 				"""#
-			return: 4
+			return: 4.0
 		},
 		{
 			title: "Round a number (with precision)"

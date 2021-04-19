@@ -1,6 +1,18 @@
 package metadata
 
 remap: functions: parse_grok: {
+	category:    "Parse"
+	description: """
+		Parses the `value` using the [`grok` format](\(urls.grok)). All patterns [listed here](\(urls.grok_patterns))
+		are supported.
+		"""
+	notices: [
+		"""
+			We recommend using community-maintained Grok patterns when possible, as they're more likely to be properly
+			vetted and improved over time than bespoke patterns.
+			""",
+	]
+
 	arguments: [
 		{
 			name:        "value"
@@ -16,29 +28,22 @@ remap: functions: parse_grok: {
 		},
 		{
 			name:        "remove_empty"
-			description: "If set to true, any patterns that resolve to an empty value will be removed from the result."
+			description: "If set to `true`, any patterns that resolve to an empty value are removed from the result."
 			required:    false
 			default:     true
 			type: ["boolean"]
 		},
 	]
 	internal_failure_reasons: [
-		"`value` fails to parse via the provided `pattern`",
+		"`value` fails to parse using the provided `pattern`",
 	]
-	return: types: ["map"]
-	category: "Parse"
-	description: #"""
-		Parses the provided `value` using the Rust [`grok` library](https://github.com/daschl/grok).
+	return: types: ["object"]
 
-		All patterns [listed here](https://github.com/daschl/grok/tree/master/patterns) are supported.
-		It is recommended to use maintained patterns when possible since they will be improved over time
-		by the community.
-		"""#
 	examples: [
 		{
-			title: "Parse via Grok"
+			title: "Parse using Grok"
 			source: #"""
-				parse_grok(
+				parse_grok!(
 					"2020-10-02T23:22:12.223222Z info Hello world",
 					"%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
 				)

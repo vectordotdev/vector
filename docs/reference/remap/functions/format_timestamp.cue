@@ -1,6 +1,11 @@
 package metadata
 
 remap: functions: format_timestamp: {
+	category: "Timestamp"
+	description: #"""
+		Formats the `value` into a string representation of the timestamp.
+		"""#
+
 	arguments: [
 		{
 			name:        "value"
@@ -17,24 +22,21 @@ remap: functions: format_timestamp: {
 	]
 	internal_failure_reasons: []
 	return: types: ["string"]
-	category: "Timestamp"
-	description: #"""
-		Formats the provided `value` into a `string` as described by `format`.
-		"""#
+
 	examples: [
 		{
 			title: "Format a timestamp (ISO8601/RFC 3339)"
 			source: #"""
-				format_timestamp(now(), format: "%+")
+				format_timestamp!(t'2020-10-21T16:00:00Z', format: "%+")
 				"""#
-			return: "2020-10-21T16:00:00Z"
+			return: "2020-10-21T16:00:00+00:00"
 		},
 		{
 			title: "Format a timestamp (custom)"
 			source: #"""
-				format_timestamp(now(), format: "%v %R")
+				format_timestamp!(t'2020-10-21T16:00:00Z', format: "%v %R")
 				"""#
-			return: "10-Oct-2020 16:00"
+			return: "21-Oct-2020 16:00"
 		},
 	]
 }

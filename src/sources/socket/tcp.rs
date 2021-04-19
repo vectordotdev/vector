@@ -7,19 +7,27 @@ use crate::{
 };
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
+use getset::{CopyGetters, Getters, Setters};
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
+#[derive(Deserialize, Serialize, Debug, Clone, Getters, CopyGetters, Setters)]
 pub struct TcpConfig {
-    pub address: SocketListenAddr,
-    pub keepalive: Option<TcpKeepaliveConfig>,
+    #[get_copy = "pub"]
+    address: SocketListenAddr,
+    #[get_copy = "pub"]
+    keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default = "default_max_length")]
-    pub max_length: usize,
+    #[getset(get_copy = "pub", set = "pub")]
+    max_length: usize,
     #[serde(default = "default_shutdown_timeout_secs")]
-    pub shutdown_timeout_secs: u64,
-    pub host_key: Option<String>,
-    pub tls: Option<TlsConfig>,
+    #[getset(get_copy = "pub", set = "pub")]
+    shutdown_timeout_secs: u64,
+    #[get = "pub"]
+    host_key: Option<String>,
+    #[getset(get = "pub", set = "pub")]
+    tls: Option<TlsConfig>,
+    #[get_copy = "pub"]
+    receive_buffer_bytes: Option<usize>,
 }
 
 fn default_max_length() -> usize {
@@ -31,14 +39,35 @@ fn default_shutdown_timeout_secs() -> u64 {
 }
 
 impl TcpConfig {
-    pub fn new(address: SocketListenAddr) -> Self {
+    pub fn new(
+        address: SocketListenAddr,
+        keepalive: Option<TcpKeepaliveConfig>,
+        max_length: usize,
+        shutdown_timeout_secs: u64,
+        host_key: Option<String>,
+        tls: Option<TlsConfig>,
+        receive_buffer_bytes: Option<usize>,
+    ) -> Self {
+        Self {
+            address,
+            keepalive,
+            max_length,
+            shutdown_timeout_secs,
+            host_key,
+            tls,
+            receive_buffer_bytes,
+        }
+    }
+
+    pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
             keepalive: None,
             max_length: default_max_length(),
-            host_key: None,
             shutdown_timeout_secs: default_shutdown_timeout_secs(),
-            tls: Default::default(),
+            host_key: None,
+            tls: None,
+            receive_buffer_bytes: None,
         }
     }
 }

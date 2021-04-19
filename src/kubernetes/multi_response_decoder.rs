@@ -1,13 +1,13 @@
 //! Decode multiple [`Response`]s.
 
-use k8s_openapi::{http::StatusCode, Response, ResponseError};
+use super::{response, Response};
 
 /// Provides an algorithm to parse multiple [`Response`]s from multiple chunks
 /// of data represented as `&[u8]`.
 #[derive(Debug, Default)]
 pub struct MultiResponseDecoder<T> {
     pending_data: Vec<u8>,
-    responses_buffer: Vec<Result<T, ResponseError>>,
+    responses_buffer: Vec<Result<T, response::Error>>,
 }
 
 impl<T> MultiResponseDecoder<T>
@@ -26,16 +26,16 @@ where
     pub fn process_next_chunk(
         &mut self,
         chunk: &[u8],
-    ) -> std::vec::Drain<'_, Result<T, ResponseError>> {
+    ) -> std::vec::Drain<'_, Result<T, response::Error>> {
         self.pending_data.extend_from_slice(chunk);
         loop {
-            match T::try_from_parts(StatusCode::OK, &self.pending_data) {
+            match T::from_buf(&self.pending_data) {
                 Ok((response, consumed_bytes)) => {
                     debug_assert!(consumed_bytes > 0, "Parser must've consumed some data.");
                     self.pending_data.drain(..consumed_bytes);
                     self.responses_buffer.push(Ok(response));
                 }
-                Err(ResponseError::NeedMoreData) => break,
+                Err(response::Error::NeedMoreData) => break,
                 Err(error) => {
                     error!(message = "Error while decoding response.", pending_data = ?self.pending_data, %error);
                     self.responses_buffer.push(Err(error));
@@ -67,48 +67,42 @@ mod tests {
     use k8s_openapi::{
         api::core::v1::Pod,
         apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
-        WatchResponse,
     };
 
     /// Test object.
-    type TO = WatchResponse<Pod>;
+    type TestObject = WatchEvent<Pod>;
 
     // A helper function to make a test object.
-    fn make_to(uid: &str) -> TO {
-        WatchResponse::Ok(WatchEvent::Added(Pod {
+    fn make_to(uid: &str) -> TestObject {
+        WatchEvent::Added(Pod {
             metadata: ObjectMeta {
                 uid: Some(uid.to_owned()),
                 ..ObjectMeta::default()
             },
             ..Pod::default()
-        }))
+        })
     }
 
     fn assert_test_object(
-        tested_test_object: Option<Result<TO, ResponseError>>,
+        tested_test_object: Option<Result<TestObject, response::Error>>,
         expected_uid: &str,
     ) {
         let actual_to = tested_test_object
             .expect("expected an yielded entry, but none found")
             .expect("parsing failed");
         let expected_to = make_to(expected_uid);
-        match (actual_to, expected_to) {
-            (WatchResponse::Ok(actual_event), WatchResponse::Ok(expected_event)) => {
-                assert_eq!(actual_event, expected_event)
-            }
-            _ => panic!("Expected an event, got something else"),
-        }
+        assert_eq!(actual_to, expected_to);
     }
 
     #[test]
     fn test_empty() {
-        let dec = MultiResponseDecoder::<TO>::new();
+        let dec = MultiResponseDecoder::<TestObject>::new();
         assert!(dec.finish().is_ok());
     }
 
     #[test]
     fn test_incomplete() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(b"{");
@@ -120,7 +114,7 @@ mod tests {
 
     #[test]
     fn test_rubbish() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(b"qwerty");
@@ -133,7 +127,7 @@ mod tests {
 
     #[test]
     fn test_one() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(
@@ -157,7 +151,7 @@ mod tests {
 
     #[test]
     fn test_chunked() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(
@@ -188,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_two() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(
@@ -222,7 +216,7 @@ mod tests {
 
     #[test]
     fn test_many_chunked_1() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(
@@ -270,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_many_chunked_2() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(
@@ -348,7 +342,7 @@ mod tests {
 
     #[test]
     fn test_two_one_by_one() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(
@@ -389,7 +383,7 @@ mod tests {
 
     #[test]
     fn test_incomplete_after_valid_data() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(
@@ -413,7 +407,7 @@ mod tests {
 
     #[test]
     fn test_allows_unparsed_newlines_at_finish() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(b"\n");
@@ -425,7 +419,7 @@ mod tests {
 
     #[test]
     fn test_memory_usage() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         let chunk = br#"{
             "type": "ADDED",
@@ -466,7 +460,7 @@ mod tests {
 
     #[test]
     fn test_practical_error_case_1() {
-        let mut dec = MultiResponseDecoder::<TO>::new();
+        let mut dec = MultiResponseDecoder::<TestObject>::new();
 
         {
             let mut stream = dec.process_next_chunk(&[
@@ -484,13 +478,10 @@ mod tests {
                 .next()
                 .expect("expected an yielded entry, but none found")
                 .expect("parsing failed");
-            let expected_event = WatchEvent::Bookmark {
+            let expected_to = WatchEvent::Bookmark {
                 resource_version: "3845".into(),
             };
-            match actual_to {
-                WatchResponse::Ok(actual_event) => assert_eq!(actual_event, expected_event),
-                _ => panic!("Expected an event, got something else"),
-            }
+            assert_eq!(actual_to, expected_to);
         }
 
         assert!(dec.finish().is_ok());

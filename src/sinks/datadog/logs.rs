@@ -2,6 +2,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::HttpClient,
+    internal_events::DatadogLogEventProcessed,
     sinks::{
         util::{
             batch::{Batch, BatchError},
@@ -20,6 +21,7 @@ use flate2::write::GzEncoder;
 use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode};
 use hyper::body::Body;
+use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{io::Write, time::Duration};
@@ -59,10 +61,10 @@ inventory::submit! {
 
 impl GenerateConfig for DatadogLogsConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"api_key = "${DATADOG_API_KEY_ENV_VAR}"
-            encoding.codec = "json""#,
-        )
+        toml::from_str(indoc! {r#"
+            api_key = "${DATADOG_API_KEY_ENV_VAR}"
+            encoding.codec = "json"
+        "#})
         .unwrap()
     }
 }
@@ -230,6 +232,13 @@ impl HttpSink for DatadogLogsJsonService {
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let body = serde_json::to_vec(&events)?;
+        // check the number of events to ignore health-check requests
+        if !events.is_empty() {
+            emit!(DatadogLogEventProcessed {
+                byte_size: body.len(),
+                count: events.len(),
+            });
+        }
         self.config.build_request("application/json", body)
     }
 }
@@ -240,7 +249,13 @@ impl HttpSink for DatadogLogsTextService {
     type Output = Vec<Bytes>;
 
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
-        encode_event(event, &self.config.encoding)
+        encode_event(event, &self.config.encoding).map(|e| {
+            emit!(DatadogLogEventProcessed {
+                byte_size: e.len(),
+                count: 1,
+            });
+            e
+        })
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -296,6 +311,8 @@ mod tests {
         test_util::{next_addr, random_lines_with_stream},
     };
     use futures::StreamExt;
+    use indoc::indoc;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn generate_config() {
@@ -304,14 +321,12 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_text() {
-        let (mut config, cx) = load_sink::<DatadogLogsConfig>(
-            r#"
+        let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             api_key = "atoken"
             encoding = "text"
             compression = "none"
             batch.max_events = 1
-            "#,
-        )
+        "#})
         .unwrap();
 
         let addr = next_addr();
@@ -339,14 +354,12 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_json() {
-        let (mut config, cx) = load_sink::<DatadogLogsConfig>(
-            r#"
+        let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
             api_key = "atoken"
             encoding = "json"
             compression = "none"
             batch.max_events = 1
-            "#,
-        )
+        "#})
         .unwrap();
 
         let addr = next_addr();

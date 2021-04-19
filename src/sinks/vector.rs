@@ -7,16 +7,39 @@ use crate::{
     Event,
 };
 use bytes::{BufMut, Bytes, BytesMut};
+use getset::Setters;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Setters)]
 #[serde(deny_unknown_fields)]
 pub struct VectorSinkConfig {
-    pub address: String,
-    pub keepalive: Option<TcpKeepaliveConfig>,
-    pub tls: Option<TlsConfig>,
+    address: String,
+    keepalive: Option<TcpKeepaliveConfig>,
+    #[set = "pub"]
+    tls: Option<TlsConfig>,
+    send_buffer_bytes: Option<usize>,
+}
+
+impl VectorSinkConfig {
+    pub fn new(
+        address: String,
+        keepalive: Option<TcpKeepaliveConfig>,
+        tls: Option<TlsConfig>,
+        send_buffer_bytes: Option<usize>,
+    ) -> Self {
+        Self {
+            address,
+            keepalive,
+            tls,
+            send_buffer_bytes,
+        }
+    }
+
+    pub fn from_address(address: String) -> Self {
+        Self::new(address, None, None, None)
+    }
 }
 
 #[derive(Debug, Snafu)]
@@ -33,12 +56,7 @@ inventory::submit! {
 
 impl GenerateConfig for VectorSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
-            address: "127.0.0.1:5000".to_string(),
-            keepalive: None,
-            tls: None,
-        })
-        .unwrap()
+        toml::Value::try_from(Self::new("127.0.0.1:5000".to_string(), None, None, None)).unwrap()
     }
 }
 
@@ -49,9 +67,14 @@ impl SinkConfig for VectorSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink_config =
-            TcpSinkConfig::new(self.address.clone(), self.keepalive, self.tls.clone());
-        sink_config.build(cx, encode_event)
+        let sink_config = TcpSinkConfig::new(
+            self.address.clone(),
+            self.keepalive,
+            self.tls.clone(),
+            self.send_buffer_bytes,
+        );
+
+        sink_config.build(cx, |event| Some(encode_event(event)))
     }
 
     fn input_type(&self) -> DataType {
@@ -69,7 +92,7 @@ enum HealthcheckError {
     ConnectError { source: std::io::Error },
 }
 
-fn encode_event(event: Event) -> Option<Bytes> {
+fn encode_event(event: Event) -> Bytes {
     let event = proto::EventWrapper::from(event);
     let event_len = event.encoded_len();
     let full_len = event_len + 4;
@@ -78,7 +101,7 @@ fn encode_event(event: Event) -> Option<Bytes> {
     out.put_u32(event_len as u32);
     event.encode(&mut out).unwrap();
 
-    Some(out.into())
+    out.into()
 }
 
 #[cfg(test)]

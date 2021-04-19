@@ -14,6 +14,7 @@ components: sources: aws_ecs_metrics: {
 		deployment_roles: ["sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -71,6 +72,7 @@ components: sources: aws_ecs_metrics: {
 			required: false
 			type: string: {
 				default: "${ECS_CONTAINER_METADATA_URI_V4}"
+				syntax:  "literal"
 			}
 		}
 		namespace: {
@@ -79,6 +81,7 @@ components: sources: aws_ecs_metrics: {
 			required:    false
 			type: string: {
 				default: "awsecs"
+				syntax:  "literal"
 			}
 		}
 		scrape_interval_secs: {
@@ -104,6 +107,7 @@ components: sources: aws_ecs_metrics: {
 					v3: "When fails the v4 check, but the environment variable `ECS_CONTAINER_METADATA_URI` is defined."
 					v2: "When fails the v4 and v3 checks."
 				}
+				syntax: "literal"
 			}
 		}
 	}
@@ -240,6 +244,7 @@ components: sources: aws_ecs_metrics: {
 	}
 
 	telemetry: metrics: {
+		events_in_total:              components.sources.internal_metrics.output.metrics.events_in_total
 		http_error_response_total:    components.sources.internal_metrics.output.metrics.http_error_response_total
 		http_request_errors_total:    components.sources.internal_metrics.output.metrics.http_request_errors_total
 		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total

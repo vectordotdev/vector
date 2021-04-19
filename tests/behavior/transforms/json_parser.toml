@@ -12,7 +12,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a == 3 && \
+        .a == 3 &&
         .b.c == 4
       '''
 
@@ -49,6 +49,6 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .a == 3 && \
+        .a == 3 &&
         .b == null
       '''

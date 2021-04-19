@@ -1,6 +1,10 @@
-use crate::event::{lookup::Segment, util, Lookup, PathComponent, Value};
-use remap::{Object, Path};
+use super::{lookup::Segment, util, EventMetadata, Lookup, PathComponent, Value};
+use crate::config::log_schema;
+use bytes::Bytes;
+use chrono::Utc;
+use getset::Getters;
 use serde::{Serialize, Serializer};
+use shared::EventDataEq;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
@@ -8,12 +12,25 @@ use std::{
     iter::FromIterator,
 };
 
-#[derive(PartialEq, Debug, Clone, Default)]
+#[derive(Clone, Debug, Default, Getters, PartialEq)]
 pub struct LogEvent {
     fields: BTreeMap<String, Value>,
+    #[getset(get = "pub")]
+    metadata: EventMetadata,
 }
 
 impl LogEvent {
+    pub fn new_with_metadata(metadata: EventMetadata) -> Self {
+        Self {
+            fields: Default::default(),
+            metadata,
+        }
+    }
+
+    pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
+        (self.fields, self.metadata)
+    }
+
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
         util::log::get(&self.fields, key.as_ref())
@@ -136,18 +153,66 @@ impl LogEvent {
         trace!(entry = ?current_pointer, "Result.");
         Ok(current_pointer)
     }
+
+    /// Merge all fields specified at `fields` from `incoming` to `current`.
+    pub fn merge(&mut self, mut incoming: LogEvent, fields: &[impl AsRef<str>]) {
+        for field in fields {
+            let incoming_val = match incoming.remove(field) {
+                None => continue,
+                Some(val) => val,
+            };
+            match self.get_mut(&field) {
+                None => {
+                    self.insert(field, incoming_val);
+                }
+                Some(current_val) => current_val.merge(incoming_val),
+            }
+        }
+        self.metadata.merge(incoming.metadata());
+    }
+}
+
+impl EventDataEq for LogEvent {
+    fn event_data_eq(&self, other: &Self) -> bool {
+        self.fields == other.fields && self.metadata.event_data_eq(&other.metadata)
+    }
+}
+
+impl From<Bytes> for LogEvent {
+    fn from(message: Bytes) -> Self {
+        let mut log = LogEvent::default();
+
+        log.insert(log_schema().message_key(), message);
+        log.insert(log_schema().timestamp_key(), Utc::now());
+
+        log
+    }
+}
+
+impl From<&str> for LogEvent {
+    fn from(message: &str) -> Self {
+        message.to_owned().into()
+    }
+}
+
+impl From<String> for LogEvent {
+    fn from(message: String) -> Self {
+        Bytes::from(message).into()
+    }
 }
 
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
-        LogEvent { fields: map }
+        LogEvent {
+            fields: map,
+            metadata: EventMetadata::default(),
+        }
     }
 }
 
-impl Into<BTreeMap<String, Value>> for LogEvent {
-    fn into(self) -> BTreeMap<String, Value> {
-        let Self { fields } = self;
-        fields
+impl From<LogEvent> for BTreeMap<String, Value> {
+    fn from(event: LogEvent) -> BTreeMap<String, Value> {
+        event.fields
     }
 }
 
@@ -155,13 +220,14 @@ impl From<HashMap<String, Value>> for LogEvent {
     fn from(map: HashMap<String, Value>) -> Self {
         LogEvent {
             fields: map.into_iter().collect(),
+            metadata: EventMetadata::default(),
         }
     }
 }
 
-impl Into<HashMap<String, Value>> for LogEvent {
-    fn into(self) -> HashMap<String, Value> {
-        self.fields.into_iter().collect()
+impl From<LogEvent> for HashMap<String, Value> {
+    fn from(event: LogEvent) -> HashMap<String, Value> {
+        event.fields.into_iter().collect()
     }
 }
 
@@ -187,8 +253,7 @@ impl TryInto<serde_json::Value> for LogEvent {
     type Error = crate::Error;
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
-        let Self { fields } = self;
-        Ok(serde_json::to_value(fields)?)
+        Ok(serde_json::to_value(self.fields)?)
     }
 }
 
@@ -219,19 +284,9 @@ where
 // Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
 impl<K: AsRef<str>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let mut log_event = LogEvent::default();
+        let mut log_event = Self::default();
         log_event.extend(iter);
         log_event
-    }
-}
-
-/// Converts event into an iterator over top-level key/value pairs.
-impl IntoIterator for LogEvent {
-    type Item = (String, Value);
-    type IntoIter = std::collections::btree_map::IntoIter<String, Value>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.fields.into_iter()
     }
 }
 
@@ -244,8 +299,8 @@ impl Serialize for LogEvent {
     }
 }
 
-impl Object for LogEvent {
-    fn get(&self, path: &remap::Path) -> Result<Option<remap::Value>, String> {
+impl vrl::Target for LogEvent {
+    fn get(&self, path: &vrl::Path) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             let iter = self
                 .as_map()
@@ -253,7 +308,7 @@ impl Object for LogEvent {
                 .into_iter()
                 .map(|(k, v)| (k, v.into()));
 
-            return Ok(Some(remap::Value::from_iter(iter)));
+            return Ok(Some(vrl::Value::from_iter(iter)));
         }
 
         let value = path
@@ -266,7 +321,7 @@ impl Object for LogEvent {
         Ok(value)
     }
 
-    fn remove(&mut self, path: &Path, compact: bool) -> Result<Option<remap::Value>, String> {
+    fn remove(&mut self, path: &vrl::Path, compact: bool) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             return Ok(Some(
                 std::mem::take(&mut self.fields)
@@ -289,10 +344,10 @@ impl Object for LogEvent {
         Ok(None)
     }
 
-    fn insert(&mut self, path: &Path, value: remap::Value) -> Result<(), String> {
+    fn insert(&mut self, path: &vrl::Path, value: vrl::Value) -> Result<(), String> {
         if path.is_root() {
             match value {
-                remap::Value::Map(map) => {
+                vrl::Value::Object(map) => {
                     *self = map
                         .into_iter()
                         .map(|(k, v)| (k, v.into()))
@@ -420,28 +475,28 @@ mod test {
 
     #[test]
     fn object_get() {
-        use crate::map;
-        use remap::{Field::*, Object, Path, Segment::*};
+        use shared::btreemap;
+        use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
-            (map![], vec![], Ok(Some(map![].into()))),
+            (btreemap! {}, vec![], Ok(Some(btreemap! {}.into()))),
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![],
-                Ok(Some(map!["foo": "bar"].into())),
+                Ok(Some(btreemap! { "foo" => "bar" }.into())),
             ),
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned()))],
                 Ok(Some("bar".into())),
             ),
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![Field(Regular("bar".to_owned()))],
                 Ok(None),
             ),
             (
-                map!["foo": vec![map!["bar": true]]],
+                btreemap! { "foo" => vec![btreemap! { "bar" => true }] },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Index(0),
@@ -450,7 +505,7 @@ mod test {
                 Ok(Some(true.into())),
             ),
             (
-                map!["foo": map!["bar baz": map!["baz": 2]]],
+                btreemap! { "foo" => btreemap! { "bar baz" => btreemap! { "baz" => 2 } } },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Coalesce(vec![
@@ -466,34 +521,34 @@ mod test {
         for (value, segments, expect) in cases {
             let value: BTreeMap<String, Value> = value;
             let event = LogEvent::from(value);
-            let path = Path::new_unchecked(segments);
+            let path = vrl::Path::new_unchecked(segments);
 
-            assert_eq!(Object::get(&event, &path), expect)
+            assert_eq!(vrl::Target::get(&event, &path), expect)
         }
     }
 
     #[test]
     fn object_insert() {
-        use crate::map;
-        use remap::{Field::*, Object, Path, Segment::*};
+        use shared::btreemap;
+        use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![],
-                map!["baz": "qux"].into(),
-                map!["baz": "qux"],
+                btreemap! { "baz" => "qux" }.into(),
+                btreemap! { "baz" => "qux" },
                 Ok(()),
             ),
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned()))],
                 "baz".into(),
-                map!["foo": "baz"],
+                btreemap! { "foo" => "baz" },
                 Ok(()),
             ),
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Index(2),
@@ -502,66 +557,66 @@ mod test {
                     Field(Regular("b".to_owned())),
                 ],
                 true.into(),
-                map![
-                    "foo":
-                        vec![
-                            Value::Null,
-                            Value::Null,
-                            map!["bar baz": map!["a": map!["b": true]],].into()
-                        ]
-                ],
+                btreemap! {
+                    "foo" => vec![
+                        Value::Null,
+                        Value::Null,
+                        btreemap! {
+                            "bar baz" => btreemap! { "a" => btreemap! { "b" => true } },
+                        }.into()
+                    ]
+                },
                 Ok(()),
             ),
             (
-                map!["foo": vec![0, 1, 2]],
+                btreemap! { "foo" => vec![0, 1, 2] },
                 vec![Field(Regular("foo".to_owned())), Index(5)],
                 "baz".into(),
-                map![
-                    "foo":
-                        vec![
-                            0.into(),
-                            1.into(),
-                            2.into(),
-                            Value::Null,
-                            Value::Null,
-                            Value::from("baz"),
-                        ]
-                ],
+                btreemap! {
+                    "foo" => vec![
+                        0.into(),
+                        1.into(),
+                        2.into(),
+                        Value::Null,
+                        Value::Null,
+                        Value::from("baz"),
+                    ],
+                },
                 Ok(()),
             ),
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                map!["foo": vec!["baz"]],
+                btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                map!["foo": Value::Array(vec![])],
+                btreemap! { "foo" => Value::Array(vec![]) },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                map!["foo": vec!["baz"]],
+                btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                map!["foo": Value::Array(vec![0.into()])],
+                btreemap! { "foo" => Value::Array(vec![0.into()]) },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                map!["foo": vec!["baz"]],
+                btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
-                map!["foo": Value::Array(vec![0.into(), 1.into()])],
+                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 "baz".into(),
-                map!["foo": Value::Array(vec!["baz".into(), 1.into()])],
+                btreemap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
                 Ok(()),
             ),
             (
-                map!["foo": Value::Array(vec![0.into(), 1.into()])],
+                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
                 vec![Field(Regular("foo".to_owned())), Index(1)],
                 "baz".into(),
-                map!["foo": Value::Array(vec![0.into(), "baz".into()])],
+                btreemap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
                 Ok(()),
             ),
         ];
@@ -570,89 +625,192 @@ mod test {
             let object: BTreeMap<String, Value> = object;
             let mut event = LogEvent::from(object);
             let expect = LogEvent::from(expect);
-            let value: remap::Value = value;
-            let path = Path::new_unchecked(segments);
+            let value: vrl::Value = value;
+            let path = vrl::Path::new_unchecked(segments);
 
-            assert_eq!(Object::insert(&mut event, &path, value.clone()), result);
-            assert_eq!(event, expect);
-            assert_eq!(remap::Object::get(&event, &path), Ok(Some(value)));
+            assert_eq!(
+                vrl::Target::insert(&mut event, &path, value.clone()),
+                result
+            );
+            shared::assert_event_data_eq!(event, expect);
+            assert_eq!(vrl::Target::get(&event, &path), Ok(Some(value)));
         }
     }
 
     #[test]
     fn object_remove() {
-        use crate::map;
-        use remap::{Field::*, Object, Path, Segment::*};
+        use shared::btreemap;
+        use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![Field(Regular("foo".to_owned()))],
                 false,
-                Some(map![].into()),
+                Some(btreemap! {}.into()),
             ),
             (
-                map!["foo": "bar"],
+                btreemap! { "foo" => "bar" },
                 vec![Coalesce(vec![
                     Quoted("foo bar".to_owned()),
                     Regular("foo".to_owned()),
                 ])],
                 false,
-                Some(map![].into()),
+                Some(btreemap! {}.into()),
             ),
             (
-                map!["foo": "bar", "baz": "qux"],
+                btreemap! { "foo" => "bar", "baz" => "qux" },
                 vec![],
                 false,
-                Some(map![].into()),
+                Some(btreemap! {}.into()),
             ),
             (
-                map!["foo": "bar", "baz": "qux"],
+                btreemap! { "foo" => "bar", "baz" => "qux" },
                 vec![],
                 true,
-                Some(map![].into()),
+                Some(btreemap! {}.into()),
             ),
             (
-                map!["foo": vec![0]],
+                btreemap! { "foo" => vec![0] },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 false,
-                Some(map!["foo": Value::Array(vec![])].into()),
+                Some(btreemap! { "foo" => Value::Array(vec![]) }.into()),
             ),
             (
-                map!["foo": vec![0]],
+                btreemap! { "foo" => vec![0] },
                 vec![Field(Regular("foo".to_owned())), Index(0)],
                 true,
-                Some(map![].into()),
+                Some(btreemap! {}.into()),
             ),
             (
-                map!["foo": map!["bar baz": vec![0]], "bar": "baz"],
+                btreemap! {
+                    "foo" => btreemap! { "bar baz" => vec![0] },
+                    "bar" => "baz",
+                },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Field(Quoted("bar baz".to_owned())),
                     Index(0),
                 ],
                 false,
-                Some(map!["foo": map!["bar baz": Value::Array(vec![])], "bar": "baz"].into()),
+                Some(
+                    btreemap! {
+                        "foo" => btreemap! { "bar baz" => Value::Array(vec![]) },
+                        "bar" => "baz",
+                    }
+                    .into(),
+                ),
             ),
             (
-                map!["foo": map!["bar baz": vec![0]], "bar": "baz"],
+                btreemap! {
+                    "foo" => btreemap! { "bar baz" => vec![0] },
+                    "bar" => "baz",
+                },
                 vec![
                     Field(Regular("foo".to_owned())),
                     Field(Quoted("bar baz".to_owned())),
                     Index(0),
                 ],
                 true,
-                Some(map!["bar": "baz"].into()),
+                Some(btreemap! { "bar" => "baz" }.into()),
             ),
         ];
 
         for (object, segments, compact, expect) in cases {
             let mut event = LogEvent::from(object);
-            let path = Path::new_unchecked(segments);
-            let removed = Object::get(&event, &path).unwrap();
+            let path = vrl::Path::new_unchecked(segments);
+            let removed = vrl::Target::get(&event, &path).unwrap();
 
-            assert_eq!(Object::remove(&mut event, &path, compact), Ok(removed));
-            assert_eq!(Object::get(&event, &Path::root()), Ok(expect))
+            assert_eq!(vrl::Target::remove(&mut event, &path, compact), Ok(removed));
+            assert_eq!(vrl::Target::get(&event, &vrl::Path::root()), Ok(expect))
         }
+    }
+
+    fn assert_merge_value(
+        current: impl Into<Value>,
+        incoming: impl Into<Value>,
+        expected: impl Into<Value>,
+    ) {
+        let mut merged = current.into();
+        merged.merge(incoming.into());
+        assert_eq!(merged, expected.into());
+    }
+
+    #[test]
+    fn merge_value_works_correctly() {
+        assert_merge_value("hello ", "world", "hello world");
+
+        assert_merge_value(true, false, false);
+        assert_merge_value(false, true, true);
+
+        assert_merge_value("my_val", true, true);
+        assert_merge_value(true, "my_val", "my_val");
+
+        assert_merge_value(1, 2, 2);
+    }
+
+    #[test]
+    fn merge_event_combines_values_accordingly() {
+        // Specify the fields that will be merged.
+        // Only the ones listed will be merged from the `incoming` event
+        // to the `current`.
+        let fields_to_merge = vec![
+            "merge".to_string(),
+            "merge_a".to_string(),
+            "merge_b".to_string(),
+            "merge_c".to_string(),
+        ];
+
+        let current = {
+            let mut log = LogEvent::default();
+
+            log.insert("merge", "hello "); // will be concatenated with the `merged` from `incoming`.
+            log.insert("do_not_merge", "my_first_value"); // will remain as is, since it's not selected for merging.
+
+            log.insert("merge_a", true); // will be overwritten with the `merge_a` from `incoming` (since it's a non-bytes kind).
+            log.insert("merge_b", 123); // will be overwritten with the `merge_b` from `incoming` (since it's a non-bytes kind).
+
+            log.insert("a", true); // will remain as is since it's not selected for merge.
+            log.insert("b", 123); // will remain as is since it's not selected for merge.
+
+            // `c` is not present in the `current`, and not selected for merge,
+            // so it won't be included in the final event.
+
+            log
+        };
+
+        let incoming = {
+            let mut log = LogEvent::default();
+
+            log.insert("merge", "world"); // will be concatenated to the `merge` from `current`.
+            log.insert("do_not_merge", "my_second_value"); // will be ignored, since it's not selected for merge.
+
+            log.insert("merge_b", 456); // will be merged in as `456`.
+            log.insert("merge_c", false); // will be merged in as `false`.
+
+            // `a` will remain as-is, since it's not marked for merge and
+            // neither is it specified in the `incoming` event.
+            log.insert("b", 456); // `b` not marked for merge, will not change.
+            log.insert("c", true); // `c` not marked for merge, will be ignored.
+
+            log
+        };
+
+        let mut merged = current;
+        merged.merge(incoming, &fields_to_merge);
+
+        let expected = {
+            let mut log = LogEvent::default();
+            log.insert("merge", "hello world");
+            log.insert("do_not_merge", "my_first_value");
+            log.insert("a", true);
+            log.insert("b", 123);
+            log.insert("merge_a", true);
+            log.insert("merge_b", 456);
+            log.insert("merge_c", false);
+            log
+        };
+
+        shared::assert_event_data_eq!(merged, expected);
     }
 }

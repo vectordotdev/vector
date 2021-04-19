@@ -1,7 +1,7 @@
 mod support;
 
 use crate::support::{sink, sink_failing_healthcheck, source, transform, MockSourceConfig};
-use futures::{compat::Future01CompatExt, future, stream, FutureExt, SinkExt, StreamExt};
+use futures::{future, stream, FutureExt, SinkExt, StreamExt};
 use std::{
     collections::HashMap,
     iter,
@@ -10,8 +10,7 @@ use std::{
         Arc,
     },
 };
-
-use tokio::time::{delay_for, Duration};
+use tokio::time::{sleep, Duration};
 use vector::{config::Config, event::Event, test_util::start_topology, topology};
 
 fn basic_config() -> Config {
@@ -64,11 +63,11 @@ async fn topology_shutdown_while_active() {
     // Wait until at least 100 events have been seen by the source so we know the pump is running
     // and pushing events through the pipeline.
     while source_event_total.load(Ordering::SeqCst) < 100 {
-        delay_for(Duration::from_millis(10)).await;
+        sleep(Duration::from_millis(10)).await;
     }
 
     // Now shut down the RunningTopology while Events are still being processed.
-    let stop_complete = tokio::spawn(async move { topology.stop().compat().await });
+    let stop_complete = tokio::spawn(async move { topology.stop().await });
 
     // Now that shutdown has begun we should be able to drain the Sink without blocking forever,
     // as the source should shut down and close its output channel.
@@ -84,7 +83,7 @@ async fn topology_shutdown_while_active() {
         );
     }
 
-    stop_complete.await.unwrap().unwrap();
+    stop_complete.await.unwrap();
 
     // We expect the pump to fail with an error since we shut down the source it was sending to
     // while it was running.
@@ -105,7 +104,7 @@ async fn topology_source_and_sink() {
     let event = Event::from("this");
     in1.send(event.clone()).await.unwrap();
 
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let res = out1.collect::<Vec<_>>().await;
 
@@ -116,7 +115,7 @@ async fn topology_source_and_sink() {
 async fn topology_multiple_sources() {
     let (mut in1, source1) = source();
     let (mut in2, source2) = source();
-    let (out1, sink1) = sink(10);
+    let (mut out1, sink1) = sink(10);
 
     let mut config = Config::builder();
     config.add_source("in1", source1);
@@ -130,13 +129,13 @@ async fn topology_multiple_sources() {
 
     in1.send(event1.clone()).await.unwrap();
 
-    let (out_event1, out1) = out1.into_future().await;
+    let out_event1 = out1.next().await;
 
     in2.send(event2.clone()).await.unwrap();
 
-    let (out_event2, _out1) = out1.into_future().await;
+    let out_event2 = out1.next().await;
 
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     assert_eq!(out_event1, Some(event1));
     assert_eq!(out_event2, Some(event2));
@@ -159,7 +158,7 @@ async fn topology_multiple_sinks() {
 
     in1.send(event.clone()).await.unwrap();
 
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let res1 = out1.collect::<Vec<_>>().await;
     let res2 = out2.collect::<Vec<_>>().await;
@@ -187,7 +186,7 @@ async fn topology_transform_chain() {
 
     in1.send(event).await.unwrap();
 
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let res = out1.map(into_message).collect::<Vec<_>>().await;
 
@@ -223,7 +222,7 @@ async fn topology_remove_one_source() {
     let h_out1 = tokio::spawn(out1.collect::<Vec<_>>());
     in1.send(event1.clone()).await.unwrap();
     in2.send(event2.clone()).await.unwrap_err();
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let res = h_out1.await.unwrap();
     assert_eq!(vec![event1], res);
@@ -255,7 +254,7 @@ async fn topology_remove_one_sink() {
 
     in1.send(event.clone()).await.unwrap();
 
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let res1 = out1.collect::<Vec<_>>().await;
     let res2 = out2.collect::<Vec<_>>().await;
@@ -294,7 +293,7 @@ async fn topology_remove_one_transform() {
     let event = Event::from("this");
     let h_out1 = tokio::spawn(out1.map(into_message).collect::<Vec<_>>());
     in1.send(event.clone()).await.unwrap();
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
     let res = h_out1.await.unwrap();
     assert_eq!(vec!["this transformed"], res);
 }
@@ -329,7 +328,7 @@ async fn topology_swap_source() {
     let h_out1v2 = tokio::spawn(out1v2.collect::<Vec<_>>());
     in1.send(event1.clone()).await.unwrap_err();
     in2.send(event2.clone()).await.unwrap();
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
     let res1v1 = h_out1v1.await.unwrap();
     let res1v2 = h_out1v2.await.unwrap();
 
@@ -363,7 +362,7 @@ async fn topology_swap_sink() {
     let h_out1 = tokio::spawn(out1.collect::<Vec<_>>());
     let h_out2 = tokio::spawn(out2.collect::<Vec<_>>());
     in1.send(event.clone()).await.unwrap();
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
 
     let res1 = h_out1.await.unwrap();
     let res2 = h_out2.await.unwrap();
@@ -402,7 +401,7 @@ async fn topology_swap_transform() {
     let h_out1v1 = tokio::spawn(out1v1.map(into_message).collect::<Vec<_>>());
     let h_out1v2 = tokio::spawn(out1v2.map(into_message).collect::<Vec<_>>());
     in1.send(event.clone()).await.unwrap();
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
     let res1v1 = h_out1v1.await.unwrap();
     let res1v2 = h_out1v2.await.unwrap();
 
@@ -452,7 +451,7 @@ async fn topology_swap_transform_is_atomic() {
     config.add_sink("out1", &["t1"], sink1);
 
     let (mut topology, _crash) = start_topology(config.build().unwrap(), false).await;
-    delay_for(Duration::from_millis(10)).await;
+    sleep(Duration::from_millis(10)).await;
 
     let transform1v2 = transform(" replaced", 0.0);
 
@@ -465,11 +464,11 @@ async fn topology_swap_transform_is_atomic() {
         .reload_config_and_respawn(config.build().unwrap())
         .await
         .unwrap());
-    delay_for(Duration::from_millis(10)).await;
+    sleep(Duration::from_millis(10)).await;
 
     run_control.store(false, Ordering::Release);
     h_in.await.unwrap();
-    topology.stop().compat().await.unwrap();
+    topology.stop().await;
     h_out.await.unwrap();
 
     assert_eq!(

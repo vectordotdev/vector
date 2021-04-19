@@ -11,6 +11,7 @@ components: sources: http: {
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
+		stateful:      false
 	}
 
 	features: {
@@ -62,7 +63,10 @@ components: sources: http: {
 		address: {
 			description: "The address to accept connections on. The address _must_ include a port."
 			required:    true
-			type: string: examples: ["0.0.0.0:\(_port)", "localhost:\(_port)"]
+			type: string: {
+				examples: ["0.0.0.0:\(_port)", "localhost:\(_port)"]
+				syntax: "literal"
+			}
 		}
 		encoding: {
 			common:      true
@@ -75,6 +79,7 @@ components: sources: http: {
 					ndjson: "Newline-delimited JSON objects, where each line must contain a JSON object."
 					json:   "Array of JSON objects, which must be a JSON array containing JSON objects."
 				}
+				syntax: "literal"
 			}
 		}
 		headers: {
@@ -83,7 +88,10 @@ components: sources: http: {
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: examples: ["User-Agent", "X-My-Custom-Header"]
+				items: type: string: {
+					examples: ["User-Agent", "X-My-Custom-Header"]
+					syntax: "literal"
+				}
 			}
 		}
 		auth: configuration._http_basic_auth
@@ -93,11 +101,44 @@ components: sources: http: {
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: examples: ["application", "source"]
+				items: type: string: {
+					examples: ["application", "source"]
+					syntax: "literal"
+				}
+			}
+		}
+		path: {
+			common:      false
+			description: "The URL path on which log event POST requests shall be sent."
+			required:    false
+			type: string: {
+				default: "/"
+				examples: ["/event/path", "/logs"]
+				syntax: "literal"
+			}
+		}
+		strict_path: {
+			common: false
+			description: """
+				If set to `true`, only requests using the exact URL path specified in `path` will be accepted;
+				otherwise requests sent to a URL path that starts with the value of `path` will be accepted.
+				With `strict_path` set to `false` and `path` set to `""`, the configured HTTP source will
+				accept requests from any URL path.
+				"""
+			required: false
+			type: bool: default: true
+		}
+		path_key: {
+			common:      false
+			description: "The event key in which the requested URL path used to send the request will be stored."
+			required:    false
+			type: string: {
+				default: "path"
+				examples: ["vector_http_path"]
+				syntax: "literal"
 			}
 		}
 	}
-
 	output: logs: {
 		text: {
 			description: "An individual line from a `text/plain` request"
@@ -106,7 +147,18 @@ components: sources: http: {
 					description:   "The raw line line from the incoming payload."
 					relevant_when: "encoding == \"text\""
 					required:      true
-					type: string: examples: ["Hello world"]
+					type: string: {
+						examples: ["Hello world"]
+						syntax: "literal"
+					}
+				}
+				path: {
+					description: "The HTTP path the event was received from. The key can be changed using the `path_key` configuration setting"
+					required:    true
+					type: string: {
+						examples: ["/", "/logs/event712"]
+						syntax: "literal"
+					}
 				}
 				timestamp: fields._current_timestamp
 			}
@@ -121,6 +173,14 @@ components: sources: http: {
 					required:      false
 					type: "*": {}
 				}
+				path: {
+					description: "The HTTP path the event was received from. The key can be changed using the `path_key` configuration setting"
+					required:    true
+					type: string: {
+						examples: ["/", "/logs/event712"]
+						syntax: "literal"
+					}
+				}
 				timestamp: fields._current_timestamp
 			}
 		}
@@ -128,6 +188,7 @@ components: sources: http: {
 
 	examples: [
 		{
+			_path:       "/"
 			_line:       "Hello world"
 			_user_agent: "my-service/v2.1"
 			title:       "text/plain"
@@ -138,24 +199,28 @@ components: sources: http: {
 				headers: ["User-Agent"]
 			}
 			input: """
-             ```http
-             Content-Type: text/plain
-             User-Agent: \( _user_agent )
-             X-Forwarded-For: \( _values.local_host )
+				```http
+				POST \( _path ) HTTP/1.1
+				Content-Type: text/plain
+				User-Agent: \( _user_agent )
+				X-Forwarded-For: \( _values.local_host )
 
-             \( _line )
-             ```
-             """
+				\( _line )
+				```
+				"""
 			output: [{
 				log: {
 					host:         _values.local_host
 					message:      _line
 					timestamp:    _values.current_timestamp
+					path:         _path
 					"User-Agent": _user_agent
 				}
 			}]
 		},
 		{
+			_path:       "/events"
+			_path_key:   "vector_http_path"
 			_line:       "{\"key\": \"val\"}"
 			_user_agent: "my-service/v2.1"
 			title:       "application/json"
@@ -164,21 +229,24 @@ components: sources: http: {
 				address:  "0.0.0.0:\(_port)"
 				encoding: "json"
 				headers: ["User-Agent"]
+				_path:    _path
+				path_key: _path_key
 			}
 			input: """
-             ```http
-             Content-Type: application/json
-             User-Agent: \( _user_agent )
-             X-Forwarded-For: \( _values.local_host )
-
-             \( _line )
-             ```
-             """
+				```http
+				POST \( _path ) HTTP/1.1
+				Content-Type: application/json
+				User-Agent: \( _user_agent )
+				X-Forwarded-For: \( _values.local_host )
+				\( _line )
+				```
+				"""
 			output: [{
 				log: {
 					host:         _values.local_host
 					key:          "val"
 					timestamp:    _values.current_timestamp
+					_path_key:    _path
 					"User-Agent": _user_agent
 				}
 			}]
@@ -186,6 +254,7 @@ components: sources: http: {
 	]
 
 	telemetry: metrics: {
+		events_in_total:         components.sources.internal_metrics.output.metrics.events_in_total
 		http_bad_requests_total: components.sources.internal_metrics.output.metrics.http_bad_requests_total
 		parse_errors_total:      components.sources.internal_metrics.output.metrics.parse_errors_total
 	}

@@ -19,7 +19,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .message == "hello world" && \
+        .message == "hello world" &&
         !exists(."_partial")
       '''
 
@@ -45,7 +45,7 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .nested.message == "hello world" && \
+        .nested.message == "hello world" &&
         !exists(."_partial")
       '''
 
@@ -72,6 +72,6 @@
     [[tests.outputs.conditions]]
       type = "remap"
       source = '''
-        .nested.message == "hello world" && \
+        .nested.message == "hello world" &&
         !exists(.nested.is_partial)
       '''
