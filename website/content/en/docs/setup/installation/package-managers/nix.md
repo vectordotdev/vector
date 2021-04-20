@@ -4,7 +4,7 @@ short: Nix
 weight: 6
 ---
 
-[Nix] is a cross-platform package manager implemented on a functional deployment model where software is installed into unique directories generated through cryptographic hashes, it is also the name of the programming language. This page will cover installing and managing Vector through the Nix package repository.
+[Nix] is a cross-platform package manager implemented on a functional deployment model where software is installed into unique directories generated through cryptographic hashes, it is also the name of the programming language. This page covers installing and managing Vector through the Nix package repository.
 
 {{< warning title="Nix releases are delayed" >}}
 Because Nix releases for Vector must be manually updated, expect delays between official Vector releases and release of the Nix package. New Vector packages for Nix are typically available within a few days.

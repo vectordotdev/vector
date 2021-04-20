@@ -4,7 +4,7 @@ short: Helm
 weight: 3
 ---
 
-[Helm] is a package manager for Kubernetes that facilitates the deployment and management of applications and services on Kubernetes clusters. This page will cover installing and managing Vector through the Helm package repository.
+[Helm] is a package manager for Kubernetes that facilitates the deployment and management of applications and services on Kubernetes clusters. This page covers installing and managing Vector through the Helm package repository.
 
 ## Installation
 

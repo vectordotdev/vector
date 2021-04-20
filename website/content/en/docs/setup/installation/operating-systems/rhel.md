@@ -5,7 +5,7 @@ supported_installers: ["YUM", "RPM", "Vector installer", "Docker", "Helm"]
 weight: 5
 ---
 
-[Red Hat Enterprise Linux][rhel] is a Linux distribution developed by Red Hat for the commercial market. This page will cover installing and managing Vector on the RHEL operating system.
+[Red Hat Enterprise Linux][rhel] is a Linux distribution developed by Red Hat for the commercial market. This page covers installing and managing Vector on the RHEL operating system.
 
 ## Supported installers
 

@@ -5,7 +5,7 @@ supported_installers: ["APT", "dpkg", "Vector installer", "Docker", "Helm"]
 weight: 3
 ---
 
-[Debian], also known as Debian GNU/Linux, is a Linux distribution composed of free and open-source software, developed by the community-supported Debian Project. This page will cover installing and managing Vector on the Debian operating system.
+[Debian], also known as Debian GNU/Linux, is a Linux distribution composed of free and open-source software, developed by the community-supported Debian Project. This page covers installing and managing Vector on the Debian operating system.
 
 ## Supported installers
 

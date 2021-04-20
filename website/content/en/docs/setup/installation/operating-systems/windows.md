@@ -5,7 +5,7 @@ supported_installers: ["MSI", "Vector installer", "Docker"]
 weight: 7
 ---
 
-[Microsoft Windows][windows] is an operating system developed and sold by Microsoft. This page will cover installing and managing Vector on the Windows operating system.
+[Microsoft Windows][windows] is an operating system developed and sold by Microsoft. This page covers installing and managing Vector on the Windows operating system.
 
 ## Supported installers
 

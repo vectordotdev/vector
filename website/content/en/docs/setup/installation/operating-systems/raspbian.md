@@ -5,7 +5,7 @@ supported_installers: ["Vector installer", "Docker"]
 weight: 6
 ---
 
-[Raspbian] is the operating system used on Raspberry Pis. It is a Debian-based operating system designed for compact single-board computers. This page will cover installing and managing Vector on the Raspbian operating system.
+[Raspbian] is the operating system used on Raspberry Pis. It is a Debian-based operating system designed for compact single-board computers. This page covers installing and managing Vector on the Raspbian operating system.
 
 ## Supported installers
 
