@@ -42,7 +42,7 @@ For example, given the configuration:
 If you were to run `vector` and then, in another terminal, run `vector tap in`,
 you would see something like:
 
-```
+```json
 {"message":"13 Hello World","timestamp":"2021-04-20T19:40:32.359390Z"}
 {"message":"14 Hello World","timestamp":"2021-04-20T19:40:33.355298Z"}
 {"message":"15 Hello World","timestamp":"2021-04-20T19:40:34.353215Z"}
