@@ -152,7 +152,7 @@ impl BatchNotifier {
         if let Some(notifier) = self.notifier.take() {
             let status = self.status.load(Ordering::Relaxed);
             if notifier.send(status).is_err() {
-                warn!(message = "Could not send batch acknowledgement notifier");
+                warn!(message = "Could not send batch acknowledgement notifier.");
             }
         }
     }
