@@ -1,3 +1,4 @@
+use tracing::warn;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -25,6 +26,7 @@ impl Function for ToRegex {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
+        warn!("`to_regex` is an expensive function that could impact throughput.");
         let value = arguments.required("value");
         Ok(Box::new(ToRegexFn { value }))
     }
