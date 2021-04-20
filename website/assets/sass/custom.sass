@@ -253,7 +253,6 @@ $admonition-title-font-size: 1.1rem
   +admonition-type("requirement", $purple)
   +admonition-type("quote", $grey-light)
 
-  margin-top: $admonition-top-margin
   padding: $admonition-padding
   border-radius: $admonition-border-radius
 
@@ -264,7 +263,7 @@ $admonition-title-font-size: 1.1rem
   code
     border-radius: $admonition-code-border-radius
 
-  & + p
+  & + p, p + &, .highlight + &
     margin-top: $admonition-top-margin
 
 .vrl-examples

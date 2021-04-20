@@ -20,13 +20,86 @@ You can install Vector on Kubernetes using either [Helm](#helm) or [kubectl](#ku
 
 ### kubectl
 
-[kubectl] is the Kubernetes command-line tool. It enables you to manage Kubernetes clusters
+[kubectl] is the Kubernetes command-line tool. You can use it as an alternative to [Helm](#helm) to install Vector on Kubernetes The instructions below are for installing Vector in the [agent] role.
 
-## Roles
+{{< warning title="Aggregator role not yet supported" >}}
+Deploying Vector in the [aggregator] role using kubectl isn't yet supported.
 
-### Agent
+[aggregator]: /docs/setup/deployment/roles#aggregator
+{{< /warning >}}
 
-### Aggregator
+The [agent] role is designed to collect all log data on each Kubernetes [Node]. Vector runs as a [DaemonSet] and tails logs for the entire Pod, automatically enriching those logs with Kubernetes metadata via the [Kubernetes API][k8s_api]. Collection is handled automatically and it intended for you to adjust your pipeline as necessary using Vector's [sources], [transforms], and [sinks].
+
+#### Define Vector's namespace
+
+We recommend running Vector in its own Kubernetes namespace. In the instructions here we'll use `vector` as a namespace but you're free to choose your own.
+
+```shell
+kubectl create namespace --dry-run=client -o yaml vector > namespace.yaml
+```
+
+#### Prepare kustomization
+
+
+
+```shell
+cat <<-'KUSTOMIZATION' > kustomization.yaml
+# Override the namespace of all of the resources we manage.
+namespace: vector
+
+bases:
+  # Include Vector recommended base (from git).
+  - github.com/timberio/vector/distribution/kubernetes/kubectl?ref=v{{< version >}}
+
+images:
+  # Override the Vector image to avoid use of the sliding tag.
+  - name: timberio/vector
+    newName: timberio/vector
+    newTag: v{{< version >}}-debian
+
+resources:
+  # A namespace to keep the resources at.
+  - namespace.yaml
+
+configMapGenerator:
+  # Provide a custom `ConfigMap` for Vector.
+  - name: vector-agent-config
+    files:
+      - vector.toml
+
+generatorOptions:
+  # We don't want a suffix for the `ConfigMap` name.
+  disableNameSuffixHash: true
+KUSTOMIZATION
+```
+
+#### Configure Vector
+
+```shell
+cat <<-'VECTORCFG' > vector.toml
+# The Vector Kubernetes integration automatically defines a
+# `kubernetes_logs` source that is made available to you.
+# You do not need to define a log source.
+VECTORCFG
+```
+
+#### Verify the configuration
+
+```shell
+kubectl kustomize
+```
+
+#### Install Vector
+
+```shell
+kubectl install -k .
+```
+
+#### Tail Vector logs
+
+```shell
+"kubectl logs -n vector daemonset/\(_controller_resource_name)"
+```
 
 ## Deployment
 
@@ -44,7 +117,7 @@ Vector checkpoints the current read position after each successful read. This en
 
 The [`kubernetes_logs` source][kubernetes_logs] can skip the logs from the individual `container`s of a particular Pod. Add an annotation `vector.dev/exclude-containers` to the Pod and enumerate the names of all the containers to exclude in the value of the annotation like so:
 
-```shell
+```yaml
 vector.dev/exclude-containers: "container1,container2"
 ```
 
@@ -107,7 +180,7 @@ We recommend the resource limits listed below when running Vector on Kubernetes.
 
 #### Agent resource limits
 
-If you deploy Vector as an [agent] (collecting data for each of your Kubernetes Nodes), we recommend the following limits:
+If you deploy Vector as an [agent] (collecting data for each of your Kubernetes [Nodes][node]), we recommend the following limits:
 
 ```yaml
 resources:
@@ -139,6 +212,8 @@ Vector is tested extensively against Kubernetes. In addition to Kubernetes being
 
 [access_info]: https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/#accessing-the-api-from-a-pod
 [agent]: /docs/setup/deployment/roles#agent
+
+[daemonset]: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset
 [data_dir]: /docs/reference/configuration/global-options#data_dir
 [exclude_filter]: /docs/setup/installation/platforms/kubernetes/#pod-exclusion
 [k8s_api]: https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver
@@ -147,4 +222,9 @@ Vector is tested extensively against Kubernetes. In addition to Kubernetes being
 [kubernetes_logs]: /docs/reference/configuration/sources/kubernetes_logs
 [kubernetes_logs_config]: /docs/reference/configuration/sources/kubernetes_logs/#configuration
 [kubernetes_logs_output]: /docs/reference/configuration/sources/kubernetes_logs#output
+[kustomize]: https://kustomize.io
+[node]: https://kubernetes.io/docs/concepts/architecture/nodes
 [reduce]: /docs/reference/configuration/transforms/reduce
+[sinks]: /docs/reference/configuration/sinks
+[sources]: /docs/reference/configuration/sources
+[transforms]: /docs/reference/configuration/transforms
