@@ -227,3 +227,270 @@ impl FrameHandler for DnstapFrameHandler {
         self.timestamp_key.clone()
     }
 }
+
+#[cfg(all(test, feature = "dnstap-integration-tests"))]
+mod integration_tests {
+    use super::*;
+    use crate::{event::Value, test_util::trace_init, Pipeline};
+    use futures::StreamExt;
+    use serde_json::json;
+    use std::{env, path::Path, process::Command, thread};
+    use tokio::time;
+
+    async fn test_dnstap(raw_data: bool, query_type: &'static str) {
+        trace_init();
+
+        let (sender, mut recv) = Pipeline::new_test();
+
+        tokio::spawn(async move {
+            let socket = get_socket(raw_data, query_type);
+
+            DnstapConfig {
+                max_frame_length: 102400,
+                host_key: Some("key".to_string()),
+                socket_path: socket,
+                raw_data_only: Some(raw_data),
+                multithreaded: Some(true),
+                max_frame_handling_tasks: Some(100000),
+                socket_file_mode: Some(511),
+                socket_receive_buffer_size: Some(10485760),
+                socket_send_buffer_size: Some(10485760),
+            }
+            .build(SourceContext::new_test(sender))
+            .await
+            .unwrap()
+            .await
+            .unwrap()
+        });
+
+        send_query(raw_data, query_type);
+
+        let event = time::timeout(time::Duration::from_secs(10), recv.next())
+            .await
+            .expect("fetch dnstap source event timeout")
+            .expect("failed to get dnstap source event from a stream");
+        let mut events = vec![event];
+        loop {
+            match time::timeout(time::Duration::from_millis(10), recv.next()).await {
+                Ok(Some(event)) => events.push(event),
+                Ok(None) => break,
+                Err(_) => break,
+            }
+        }
+
+        verify_events(raw_data, query_type, &events);
+    }
+
+    fn send_query(raw_data: bool, query_type: &'static str) {
+        tokio::spawn(async move {
+            let socket = get_socket(raw_data, query_type);
+            let dnstap_sock_file = Path::new(&socket);
+            let container_tool = get_container_tool();
+            let (rndc_port, nslookup_port) = get_ports(raw_data, query_type);
+
+            loop {
+                thread::sleep(time::Duration::from_millis(100));
+                if dnstap_sock_file.exists() {
+                    thread::sleep(time::Duration::from_millis(100));
+                    rndc_reconfig(&container_tool, rndc_port);
+                    match query_type {
+                        "query" => {
+                            nslookup(&container_tool, nslookup_port);
+                            thread::sleep(time::Duration::from_secs(3));
+                            nslookup(&container_tool, nslookup_port);
+                        }
+                        "update" => {
+                            nsupdate(&container_tool);
+                            thread::sleep(time::Duration::from_secs(3));
+                            nsupdate(&container_tool);
+                        }
+                        _ => (),
+                    }
+                    break;
+                }
+            }
+        });
+    }
+
+    fn verify_events(raw_data: bool, query_event: &'static str, events: &[Event]) {
+        if raw_data {
+            assert_eq!(events.len(), 2);
+            assert!(
+                events.iter().all(|v| v.as_log().get("rawData") != None),
+                "No rawData field!"
+            );
+        } else if query_event == "query" {
+            assert_eq!(events.len(), 2);
+            assert!(
+                events
+                    .iter()
+                    .any(|v| v.as_log().get("messageType")
+                        == Some(&Value::Bytes("ClientQuery".into()))),
+                "No ClientQuery event!"
+            );
+            assert!(
+                events.iter().any(|v| v.as_log().get("messageType")
+                    == Some(&Value::Bytes("ClientResponse".into()))),
+                "No ClientResponse event!"
+            );
+        } else if query_event == "update" {
+            assert_eq!(events.len(), 4);
+            assert!(
+                events
+                    .iter()
+                    .any(|v| v.as_log().get("messageType")
+                        == Some(&Value::Bytes("UpdateQuery".into()))),
+                "No UpdateQuery event!"
+            );
+            assert!(
+                events.iter().any(|v| v.as_log().get("messageType")
+                    == Some(&Value::Bytes("UpdateResponse".into()))),
+                "No UpdateResponse event!"
+            );
+            assert!(
+                events
+                    .iter()
+                    .any(|v| v.as_log().get("messageType")
+                        == Some(&Value::Bytes("AuthQuery".into()))),
+                "No UpdateQuery event!"
+            );
+            assert!(
+                events
+                    .iter()
+                    .any(|v| v.as_log().get("messageType")
+                        == Some(&Value::Bytes("AuthResponse".into()))),
+                "No UpdateResponse event!"
+            );
+        }
+
+        for event in events {
+            let json = serde_json::to_value(event.as_log().all_fields()).unwrap();
+            match query_event {
+                "query" => {
+                    if json["messageType"] == json!("ClientQuery") {
+                        assert_eq!(
+                            json["requestData.question[0].domainName"],
+                            json!("h1.example.com.")
+                        );
+                        assert_eq!(json["requestData.rcodeName"], json!("NoError"));
+                    } else if json["messageType"] == json!("ClientResponse") {
+                        assert_eq!(
+                            json["responseData.answers[0].domainName"],
+                            json!("h1.example.com.")
+                        );
+                        assert_eq!(json["responseData.answers[0].rData"], json!("10.0.0.11"));
+                        assert_eq!(json["responseData.rcodeName"], json!("NoError"));
+                    }
+                }
+                "update" => {
+                    if json["messageType"] == json!("UpdateQuery") {
+                        assert_eq!(
+                            json["requestData.update[0].domainName"],
+                            json!("dh1.example.com.")
+                        );
+                        assert_eq!(json["requestData.update[0].rData"], json!("10.0.0.21"));
+                        assert_eq!(json["requestData.rcodeName"], json!("NoError"));
+                    } else if json["messageType"] == json!("UpdateResponse") {
+                        assert_eq!(json["responseData.rcodeName"], json!("NoError"));
+                    }
+                }
+                _ => (),
+            }
+        }
+    }
+
+    fn get_socket(raw_data: bool, query_type: &'static str) -> PathBuf {
+        let socket_folder = "tests/data/dnstap/socket/".to_owned();
+        match query_type {
+            "query" => {
+                if raw_data {
+                    env::current_dir()
+                        .unwrap()
+                        .join(socket_folder + "dnstap.sock1")
+                } else {
+                    env::current_dir()
+                        .unwrap()
+                        .join(socket_folder + "dnstap.sock2")
+                }
+            }
+            "update" => env::current_dir()
+                .unwrap()
+                .join(socket_folder + "dnstap.sock3"),
+            _ => env::current_dir()
+                .unwrap()
+                .join(socket_folder + "dnstap.sock.default"),
+        }
+    }
+
+    fn get_container_tool() -> String {
+        match env::var_os("CONTAINER_TOOL") {
+            Some(val) => val.to_str().unwrap().to_owned(),
+            None => String::from("podman"),
+        }
+    }
+
+    fn get_ports(raw_data: bool, query_type: &'static str) -> (&str, &str) {
+        match query_type {
+            "query" => {
+                if raw_data {
+                    ("9001", "8001")
+                } else {
+                    ("9002", "8002")
+                }
+            }
+            "update" => ("9003", "8003"),
+            _ => ("", ""),
+        }
+    }
+
+    fn rndc_reconfig(container: &str, port: &'static str) {
+        Command::new(container)
+            .arg("exec")
+            .arg("vector_dnstap")
+            .arg("rndc")
+            .arg("-p")
+            .arg(port)
+            .arg("reconfig")
+            .output()
+            .expect("Failed to execute command!");
+    }
+
+    fn nslookup(container: &str, port: &'static str) {
+        Command::new(container)
+            .arg("exec")
+            .arg("vector_dnstap")
+            .arg("nslookup")
+            .arg("-type=A")
+            .arg("-port=".to_owned() + port)
+            .arg("h1.example.com.")
+            .arg("localhost")
+            .output()
+            .expect("Failed to execute command!");
+    }
+
+    fn nsupdate(container: &str) {
+        Command::new(container)
+            .arg("exec")
+            .arg("vector_dnstap")
+            .arg("nsupdate")
+            .arg("-v")
+            .arg("/bind3/etc/bind/nsupdate.txt")
+            .output()
+            .expect("Failed to execute command!");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_dnstap_raw_event() {
+        test_dnstap(true, "query").await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_dnstap_query_event() {
+        test_dnstap(false, "query").await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_dnstap_update_event() {
+        test_dnstap(false, "update").await;
+    }
+}

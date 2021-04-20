@@ -301,7 +301,7 @@ test-integration: test-integration-aws test-integration-clickhouse test-integrat
 test-integration: test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
 test-integration: test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
-test-integration: test-integration-splunk
+test-integration: test-integration-splunk test-integration-dnstap
 
 .PHONY: test-integration-aws
 test-integration-aws: ## Runs AWS integration tests
@@ -488,6 +488,17 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features splunk-integration-tests --lib ::splunk_hec:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh splunk stop
+endif
+
+.PHONY: test-integration-dnstap
+test-integration-dnstap: ## Runs dnstap integration tests
+ifeq ($(AUTOSPAWN), true)
+	@scripts/setup_integration_env.sh dnstap stop
+	@scripts/setup_integration_env.sh dnstap start
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features dnstap-integration-tests --lib ::dnstap:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	@scripts/setup_integration_env.sh dnstap stop
 endif
 
 .PHONY: test-e2e-kubernetes

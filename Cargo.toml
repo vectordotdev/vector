@@ -146,7 +146,7 @@ serde_json = { version = "1.0.64", default-features = false, features = ["raw_va
 serde_yaml = { version = "0.8.17", default-features = false }
 
 # Prost
-prost = { version = "0.7.0", default-features = false }
+prost = { version = "0.7.0", default-features = false, features = ["std"]  }
 prost-types = { version = "0.7.0", default-features = false }
 
 # GCP
@@ -615,6 +615,7 @@ all-integration-tests = [
   "prometheus-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
+  "dnstap-integration-tests",
 ]
 
 aws-integration-tests = [
@@ -653,6 +654,7 @@ postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
 prometheus-integration-tests = ["bytesize", "sinks-prometheus", "sources-prometheus"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
+dnstap-integration-tests = ["sources-dnstap"]
 
 disable-resolv-conf = []
 shutdown-tests = ["rdkafka", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-log_to_metric", "transforms-lua", "unix"]
