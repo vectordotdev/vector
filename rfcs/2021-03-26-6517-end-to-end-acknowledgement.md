@@ -209,7 +209,7 @@ struct EventMetadata {
 
 struct EventFinalizer {
     status: EventStatus,
-    sources: Box<[Arc<BatchNotifier>]>,
+    source: Arc<BatchNotifier>,
     identifier: Uuid,
 }
 

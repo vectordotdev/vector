@@ -37,7 +37,7 @@ impl MaybeEventFinalizer {
     pub fn update_sources(&mut self) {
         if let Some(finalizers) = self.0.take() {
             for finalizer in finalizers.0.iter() {
-                finalizer.update_sources();
+                finalizer.update_batch();
             }
         }
     }
@@ -103,16 +103,14 @@ impl EventFinalizers {
 #[derive(Debug)]
 pub struct EventFinalizer {
     status: Atomic<EventStatus>,
-    sources: BatchNotifiers,
+    batch: Arc<BatchNotifier>,
 }
 
 impl EventFinalizer {
     /// Create a new event in a batch.
     pub fn new(batch: Arc<BatchNotifier>) -> Self {
-        Self {
-            status: Atomic::new(EventStatus::Dropped),
-            sources: BatchNotifiers(vec![batch].into()),
-        }
+        let status = Atomic::new(EventStatus::Dropped);
+        Self { status, batch }
     }
 
     /// Update this finalizer's status in place with the given `EventStatus`
@@ -124,42 +122,22 @@ impl EventFinalizer {
             .unwrap_or_else(|_| unreachable!());
     }
 
-    /// Update all the sources for this event with this finalizer's
+    /// Update the batch for this event with this finalizer's
     /// status, and mark this event as no longer requiring update.
-    pub fn update_sources(&self) {
+    pub fn update_batch(&self) {
         let status = self
             .status
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |_| {
                 Some(EventStatus::NoOp)
             })
             .unwrap_or_else(|_| unreachable!());
-        self.sources.update_status(status);
+        self.batch.update_status(status);
     }
 }
 
 impl Drop for EventFinalizer {
     fn drop(&mut self) {
-        self.update_sources();
-    }
-}
-
-/// Wrapper type for an array of batch notifiers.
-#[derive(Debug)]
-struct BatchNotifiers(ImmutVec<Arc<BatchNotifier>>);
-
-impl BatchNotifiers {
-    fn update_status(&self, status: EventStatus) {
-        if status != EventStatus::NoOp {
-            for notifier in self.0.iter() {
-                notifier.update_status(status);
-            }
-        }
-    }
-}
-
-impl From<BatchNotifier> for BatchNotifiers {
-    fn from(notifier: BatchNotifier) -> Self {
-        Self(vec![Arc::new(notifier)].into())
+        self.update_batch();
     }
 }
 
