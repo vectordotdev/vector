@@ -16,9 +16,10 @@ impl Eq for EventFinalizers {}
 
 impl PartialEq for EventFinalizers {
     fn eq(&self, other: &Self) -> bool {
-        (self.0.iter())
-            .zip(other.0.iter())
-            .all(|(a, b)| Arc::ptr_eq(a, b))
+        self.0.len() == other.0.len()
+            && (self.0.iter())
+                .zip(other.0.iter())
+                .all(|(a, b)| Arc::ptr_eq(a, b))
     }
 }
 
