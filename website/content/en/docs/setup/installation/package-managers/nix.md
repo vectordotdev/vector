@@ -1,5 +1,6 @@
 ---
 title: Nix
+short: Nix
 weight: 6
 ---
 

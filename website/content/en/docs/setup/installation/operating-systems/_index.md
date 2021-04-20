@@ -4,4 +4,6 @@ short: Operating systems
 weight: 3
 ---
 
+## Supported operating systems
+
 {{< pages >}}

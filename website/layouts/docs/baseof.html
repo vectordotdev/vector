@@ -23,7 +23,10 @@
               <div class="column is-three-fifths">
                 {{ partial "docs/breadcrumb.html" . }}
                 {{ partial "docs/hero.html" (dict "title" .Title "description" .Description) }}
+
+                {{ block "content" . }}
                 {{ partial "docs/content.html" . }}
+                {{ end }}
               </div>
 
               <div class="column is-one-fifth is-hidden-mobile">
