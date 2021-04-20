@@ -114,7 +114,7 @@ impl ProviderConfig for HttpConfig {
                             Err(err) => {
                                 let cause = err.into_cause();
                                 error!(
-                                    message = "Error interpreting response",
+                                    message = "Error interpreting response.",
                                     error = ?cause);
 
                                 continue;

@@ -47,7 +47,7 @@ impl Controller {
 
             while let Some(value) = stream.next().await {
                 if tx.send(value.into()).await.is_err() {
-                    error!(message = "Couldn't send control message");
+                    error!(message = "Couldn't send control message.");
                     break;
                 }
             }
@@ -74,7 +74,7 @@ impl Controller {
                     _ = &mut shutdown_rx => break,
                     Some(value) = stream.next() => {
                         if tx.send(value.into()).await.is_err() {
-                            error!("Couldn't send control message");
+                            error!("Couldn't send control message.");
                             break;
                         }
                     },
