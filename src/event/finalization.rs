@@ -152,9 +152,9 @@ impl BatchNotifier {
     fn send_status(&mut self) {
         if let Some(notifier) = self.notifier.take() {
             let status = self.status.load(Ordering::Relaxed);
-            if notifier.send(status).is_err() {
-                warn!(message = "Could not send batch acknowledgement notifier.");
-            }
+            // Ignore the error case, as it will happen during normal
+            // source shutdown and we can't detect that here.
+            let _ = notifier.send(status);
         }
     }
 }
