@@ -1,6 +1,0 @@
-error: Found argument '-n' which wasn't expected, or isn't valid in this context
-
-USAGE:
-    cargo build [OPTIONS]
-
-For more information try --help
