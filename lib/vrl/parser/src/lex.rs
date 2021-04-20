@@ -528,7 +528,7 @@ impl<'input> Iterator for Lexer<'input> {
 
                     ch if is_ident_start(ch) => Some(Ok(self.identifier_or_function_call(start))),
                     ch if is_digit(ch) || (ch == '-' && self.test_peek(is_digit)) => {
-                        Some(self.numeric_literal(start))
+                        Some(self.numeric_literal_or_identifier(start))
                     }
                     ch if is_operator(ch) => Some(Ok(self.operator(start))),
                     ch if ch.is_whitespace() => continue,
@@ -905,7 +905,7 @@ impl<'input> Lexer<'input> {
         self.quoted_literal(start, Token::TimestampLiteral)
     }
 
-    fn numeric_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
+    fn numeric_literal_or_identifier(&mut self, start: usize) -> SpannedResult<'input, usize> {
         let (end, int) = self.take_while(start, |ch| is_digit(ch) || ch == '_');
 
         let negative = self.input.get(start..start + 1) == Some("-");
