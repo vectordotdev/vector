@@ -369,7 +369,6 @@ sources-logs = [
   "sources-splunk_hec",
   "sources-stdin",
   "sources-syslog",
-  "sources-syslog_remap",
   "sources-vector",
 ]
 sources-metrics = [
@@ -409,8 +408,7 @@ sources-socket = ["bytesize", "listenfd", "tokio-util/net", "sources-utils-udp",
 sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
 sources-statsd = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-udp", "sources-utils-unix", "tokio-util/net"]
 sources-stdin = ["bytesize"]
-sources-syslog = ["bytesize", "listenfd", "tokio-util/net", "sources-utils-udp", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "sources-utils-unix", "syslog_loose"]
-sources-syslog_remap = ["sources-socket", "transforms-remap"]
+sources-syslog = ["sources-socket", "transforms-remap"]
 sources-utils-http = ["snap", "sources-utils-tls", "warp"]
 sources-utils-tcp-keepalive = []
 sources-utils-tcp-socket = []

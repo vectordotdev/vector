@@ -4,6 +4,8 @@ mod encoding_config;
 #[cfg(feature = "sources-utils-http")]
 mod http;
 pub mod multiline_config;
+#[cfg(feature = "sources-socket")]
+pub mod decoder;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
 mod tcp;
 #[cfg(all(unix, feature = "sources-socket"))]
@@ -27,3 +29,5 @@ pub use tcp::{SocketListenAddr, TcpSource};
 pub use unix_datagram::build_unix_datagram_source;
 #[cfg(all(unix, feature = "sources-utils-unix",))]
 pub use unix_stream::build_unix_stream_source;
+#[cfg(feature = "sources-socket")]
+pub use self::decoder::StreamDecoder;
