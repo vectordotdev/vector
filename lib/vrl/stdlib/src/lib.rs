@@ -176,6 +176,8 @@ mod to_bool;
 mod to_float;
 #[cfg(feature = "to_int")]
 mod to_int;
+#[cfg(feature = "to_regex")]
+mod to_regex;
 #[cfg(feature = "to_string")]
 mod to_string;
 #[cfg(feature = "to_syslog_facility")]
@@ -367,6 +369,8 @@ pub use to_bool::ToBool;
 pub use to_float::ToFloat;
 #[cfg(feature = "to_int")]
 pub use to_int::ToInt;
+#[cfg(feature = "to_regex")]
+pub use to_regex::ToRegex;
 #[cfg(feature = "to_string")]
 pub use to_string::ToString;
 #[cfg(feature = "to_syslog_facility")]
@@ -562,6 +566,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ToFloat),
         #[cfg(feature = "to_int")]
         Box::new(ToInt),
+        #[cfg(feature = "to_regex")]
+        Box::new(ToRegex),
         #[cfg(feature = "to_string")]
         Box::new(ToString),
         #[cfg(feature = "to_syslog_facility")]
