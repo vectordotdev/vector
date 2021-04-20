@@ -532,7 +532,7 @@ impl<'input> Iterator for Lexer<'input> {
 
                     ch if is_ident_start(ch) => Some(Ok(self.identifier_or_function_call(start))),
                     ch if is_digit(ch) || (ch == '-' && self.test_peek(is_digit)) => {
-                        Some(self.numeric_literal(start))
+                        Some(self.numeric_literal_or_identifier(start))
                     }
                     ch if is_operator(ch) => Some(Ok(self.operator(start))),
                     ch if ch.is_whitespace() => continue,
@@ -930,10 +930,16 @@ impl<'input> Lexer<'input> {
         self.quoted_literal(start, Token::TimestampLiteral)
     }
 
-    fn numeric_literal(&mut self, start: usize) -> SpannedResult<'input, usize> {
+    fn numeric_literal_or_identifier(&mut self, start: usize) -> SpannedResult<'input, usize> {
         let (end, int) = self.take_while(start, |ch| is_digit(ch) || ch == '_');
 
+        let negative = self.input.get(start..start + 1) == Some("-");
         match self.peek() {
+            Some((_, ch)) if is_ident_continue(ch) && !negative => {
+                self.bump();
+                let (end, ident) = self.take_while(start, is_ident_continue);
+                Ok((start, Token::ident(ident), end))
+            }
             Some((_, '.')) => {
                 self.bump();
                 let (end, float) = self.take_while(start, |ch| is_digit(ch) || ch == '_');
@@ -1766,6 +1772,26 @@ mod test {
                 (r#"                                     ~     "#, Dot),
                 (r#"                                      ~~~~~"#, Identifier("child")),
                 (r#"                                          ~"#, RQuery),
+            ],
+        );
+    }
+
+    #[test]
+    fn queries_digit_path() {
+        test(
+            data(r#".0foo foo.00_7bar.tar"#),
+            vec![
+                (r#"~                    "#, LQuery),
+                (r#"~                    "#, Dot),
+                (r#" ~~~~                "#, Identifier("0foo")),
+                (r#"    ~                "#, RQuery),
+                (r#"      ~              "#, LQuery),
+                (r#"      ~~~            "#, Identifier("foo")),
+                (r#"         ~           "#, Dot),
+                (r#"          ~~~~~~~    "#, Identifier("00_7bar")),
+                (r#"                 ~   "#, Dot),
+                (r#"                  ~~~"#, Identifier("tar")),
+                (r#"                    ~"#, RQuery),
             ],
         );
     }

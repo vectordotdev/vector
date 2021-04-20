@@ -87,8 +87,8 @@ remap: expressions: path: {
 						title: "Valid path characters"
 						description: """
 							Path segments only allow for underscores and ASCII alpha-numeric characters
-							(`[a-zA-Z0-9_]`). Segments must be delimited with periods (`.`). If a segment contains
-							characters outside of this list it must be quoted.
+							(`[a-zA-Z0-9_]`) where integers like `0` are not supported. Quoting
+							can be used to escape these constraints.
 							"""
 					}
 				}
