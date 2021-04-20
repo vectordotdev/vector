@@ -2,61 +2,15 @@
 
 use atomig::{Atom, AtomInteger, Atomic, Ordering};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{mem, sync::Arc};
 use tokio::sync::oneshot;
 
 type ImmutVec<T> = Box<[T]>;
 
-/// Wrapper type for an optional finalizer,
-/// to go into the top-level event metadata.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct MaybeEventFinalizer(Option<EventFinalizers>);
-
-impl MaybeEventFinalizer {
-    /// Merge another finalizer into this one.
-    pub fn merge(&mut self, other: Self) {
-        self.0 = match (self.0.take(), other.0) {
-            (None, None) => None,
-            (Some(f), None) => Some(f),
-            (None, Some(f)) => Some(f),
-            (Some(mut f1), Some(f2)) => {
-                f1.merge(f2);
-                Some(f1)
-            }
-        };
-    }
-
-    pub fn update_status(&self, status: EventStatus) {
-        if let Some(finalizers) = &self.0 {
-            for finalizer in finalizers.0.iter() {
-                finalizer.update_status(status);
-            }
-        }
-    }
-
-    pub fn update_sources(&mut self) {
-        if let Some(finalizers) = self.0.take() {
-            for finalizer in finalizers.0.iter() {
-                finalizer.update_batch();
-            }
-        }
-    }
-
-    #[cfg(test)]
-    fn count_finalizers(&self) -> usize {
-        self.0.as_ref().map(|f| f.0.len()).unwrap_or(0)
-    }
-}
-
-impl From<EventFinalizer> for MaybeEventFinalizer {
-    fn from(finalizer: EventFinalizer) -> Self {
-        Self(Some(EventFinalizers::new(finalizer)))
-    }
-}
-
-/// Wrapper type for an array of event finalizers.
-#[derive(Clone, Debug)]
-struct EventFinalizers(ImmutVec<Arc<EventFinalizer>>);
+/// Wrapper type for an array of event finalizers. This is the primary
+/// public interface to event finalization metadata.
+#[derive(Clone, Debug, Default)]
+pub struct EventFinalizers(ImmutVec<Arc<EventFinalizer>>);
 
 impl Eq for EventFinalizers {}
 
@@ -70,17 +24,17 @@ impl PartialEq for EventFinalizers {
 
 impl EventFinalizers {
     /// Create a new array of event finalizer with the single event.
-    fn new(finalizer: EventFinalizer) -> Self {
+    pub fn new(finalizer: EventFinalizer) -> Self {
         Self(vec![Arc::new(finalizer)].into())
     }
 
     /// Merge the given list of finalizers into this array.
-    fn merge(&mut self, other: Self) {
+    pub fn merge(&mut self, other: Self) {
         if !other.0.is_empty() {
             // This requires a bit of extra work both to avoid cloning
             // the actual elements and because `self.0` cannot be
             // mutated in place.
-            let finalizers = std::mem::replace(&mut self.0, vec![].into());
+            let finalizers = mem::replace(&mut self.0, vec![].into());
             let mut result: Vec<_> = finalizers.into();
             // This is the only step that may cause a (re)allocation.
             result.reserve_exact(other.0.len());
@@ -94,6 +48,28 @@ impl EventFinalizers {
             }
             self.0 = result.into();
         }
+    }
+
+    /// Update the status of all finalizers in this set.
+    pub fn update_status(&self, status: EventStatus) {
+        for finalizer in self.0.iter() {
+            finalizer.update_status(status);
+        }
+    }
+
+    /// Update all sources for this finalizer with the current
+    /// status. This *drops* the finalizer array elements so they may
+    /// immediately signal the source batch.
+    pub fn update_sources(&mut self) {
+        let finalizers = mem::replace(&mut self.0, vec![].into());
+        for finalizer in finalizers.iter() {
+            finalizer.update_batch();
+        }
+    }
+
+    #[cfg(test)]
+    fn count_finalizers(&self) -> usize {
+        self.0.len()
     }
 }
 
@@ -273,7 +249,7 @@ mod tests {
 
     #[test]
     fn defaults() {
-        let finalizer = MaybeEventFinalizer::default();
+        let finalizer = EventFinalizers::default();
         assert_eq!(finalizer.count_finalizers(), 0);
     }
 
@@ -291,6 +267,7 @@ mod tests {
         fin.update_status(EventStatus::Failed);
         assert_eq!(receiver.try_recv(), Err(Empty));
         fin.update_sources();
+        assert_eq!(fin.count_finalizers(), 0);
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
     }
 
@@ -311,7 +288,7 @@ mod tests {
 
     #[test]
     fn merge_events() {
-        let mut fin0 = MaybeEventFinalizer::default();
+        let mut fin0 = EventFinalizers::default();
         let (fin1, mut receiver1) = make_finalizer();
         let (fin2, mut receiver2) = make_finalizer();
 
@@ -343,9 +320,9 @@ mod tests {
     #[test]
     fn multi_event_batch() {
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let event1: MaybeEventFinalizer = EventFinalizer::new(Arc::clone(&batch)).into();
-        let mut event2: MaybeEventFinalizer = EventFinalizer::new(Arc::clone(&batch)).into();
-        let event3: MaybeEventFinalizer = EventFinalizer::new(Arc::clone(&batch)).into();
+        let event1 = EventFinalizers::new(EventFinalizer::new(Arc::clone(&batch)));
+        let mut event2 = EventFinalizers::new(EventFinalizer::new(Arc::clone(&batch)));
+        let event3 = EventFinalizers::new(EventFinalizer::new(Arc::clone(&batch)));
         // Also clone one…
         let event4 = event1.clone();
         drop(batch);
@@ -372,9 +349,9 @@ mod tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 
-    fn make_finalizer() -> (MaybeEventFinalizer, Receiver<BatchStatus>) {
+    fn make_finalizer() -> (EventFinalizers, Receiver<BatchStatus>) {
         let (batch, receiver) = BatchNotifier::new_with_receiver();
-        let finalizer: MaybeEventFinalizer = EventFinalizer::new(batch).into();
+        let finalizer = EventFinalizers::new(EventFinalizer::new(batch));
         assert_eq!(finalizer.count_finalizers(), 1);
         (finalizer, receiver)
     }

@@ -204,7 +204,7 @@ The structure added to the event metadata is as follows:
 ```rust
 struct EventMetadata {
     // … existing fields …
-    finalizer: Option<Arc<EventFinalizer>>,
+    finalizers: Box<[Arc<EventFinalizer>]>,
 }
 
 struct EventFinalizer {
