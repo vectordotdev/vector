@@ -6,7 +6,6 @@ mod test_util;
 
 pub mod expression;
 pub mod function;
-pub mod path;
 pub mod state;
 pub mod type_def;
 pub mod value;
@@ -17,7 +16,6 @@ pub(crate) use state::Compiler as State;
 pub use context::Context;
 pub use expression::{Expression, ExpressionError, Resolved};
 pub use function::{Function, Parameter};
-//pub use path::Path;
 pub use program::Program;
 pub use target::Target;
 pub use type_def::TypeDef;

@@ -2,8 +2,8 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash;
 
 pub use error::LookupError;
-pub use lookup_buf::{LookupBuf, SegmentBuf, FieldBuf};
-pub use lookup_view::{Lookup, Segment, Field};
+pub use lookup_buf::{FieldBuf, LookupBuf, SegmentBuf};
+pub use lookup_view::{Field, Lookup, Segment};
 
 mod error;
 mod lookup_buf;

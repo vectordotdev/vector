@@ -298,7 +298,7 @@ impl<'a> Compiler<'a> {
         let ast::Query { target, path } = node.into_inner();
         let target = self.compile_query_target(target);
 
-        Query::new(target, path.into_inner().into())
+        Query::new(target, path.into_inner())
     }
 
     fn compile_query_target(&mut self, node: Node<ast::QueryTarget>) -> query::Target {

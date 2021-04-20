@@ -16,10 +16,10 @@ impl Value {
                     self = Value::Object(map);
                 }
                 SegmentBuf::Coalesce(fields) => {
-                let field = fields.last().unwrap();
-                let mut map = BTreeMap::default();
-                map.insert(field.as_str().to_owned(), self);
-                self = Value::Object(map);
+                    let field = fields.last().unwrap();
+                    let mut map = BTreeMap::default();
+                    map.insert(field.as_str().to_owned(), self);
+                    self = Value::Object(map);
                 }
                 SegmentBuf::Index(index) => {
                     let mut array = vec![];
@@ -38,27 +38,13 @@ impl Value {
     }
 }
 
-/* TODO Restore!
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::value;
-    use std::str::FromStr;
-
-    #[test]
-    fn test_dotless() {
-        let path = Path::from_str("foo.bar.baz").unwrap();
-        let value = value!(12);
-
-        let object = value!({ "foo": { "bar": { "baz": 12 } } });
-
-        assert_eq!(value.at_path(&path), object);
-    }
 
     #[test]
     fn test_object() {
-        let path = Path::from_str(".foo.bar.baz").unwrap();
+        let path = parser::parse_path(".foo.bar.baz").unwrap();
         let value = value!(12);
 
         let object = value!({ "foo": { "bar": { "baz": 12 } } });
@@ -68,7 +54,7 @@ mod tests {
 
     #[test]
     fn test_root() {
-        let path = Path::from_str(".").unwrap();
+        let path = parser::parse_path(".").unwrap();
         let value = value!(12);
 
         let object = value!(12);
@@ -78,7 +64,7 @@ mod tests {
 
     #[test]
     fn test_array() {
-        let path = Path::from_str(".[2]").unwrap();
+        let path = parser::parse_path(".[2]").unwrap();
         let value = value!(12);
 
         let object = value!([null, null, 12]);
@@ -88,7 +74,7 @@ mod tests {
 
     #[test]
     fn test_complex() {
-        let path = Path::from_str(".[2].foo.(bar | baz )[1]").unwrap();
+        let path = parser::parse_path(".[2].foo.(bar | baz )[1]").unwrap();
         let value = value!({ "bar": [12] });
 
         let object = value!([null, null, { "foo": { "baz": [null, { "bar": [12] }] } } ]);
@@ -96,4 +82,3 @@ mod tests {
         assert_eq!(value.at_path(&path), object);
     }
 }
-*/

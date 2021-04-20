@@ -1,6 +1,6 @@
-use vrl::prelude::*;
 #[cfg(test)]
 use lookup::LookupBuf;
+use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Del;

@@ -37,13 +37,16 @@ impl Default for LogEvent {
 impl LogEvent {
     pub fn new_with_metadata(metadata: EventMetadata) -> Self {
         Self {
-            fields: Default::default(),
+            fields: Value::Map(Default::default()),
             metadata,
         }
     }
 
     pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
-        (self.fields, self.metadata)
+        (
+            self.fields.into_map().expect("fields must be a map"),
+            self.metadata,
+        )
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
@@ -390,7 +393,7 @@ impl vrl::Target for LogEvent {
 
     fn remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
-            return Ok(Some({
+            Ok(Some({
                 let mut value = LogEvent::default();
                 std::mem::swap(self, &mut value);
                 value
@@ -398,10 +401,10 @@ impl vrl::Target for LogEvent {
                     .map(|(key, value)| (key, value.into()))
                     .collect::<BTreeMap<_, _>>()
                     .into()
-            }));
+            }))
         } else {
             let val = self.fields.remove(path, compact);
-            val.map(|val| val.map(|val| val.clone().into()))
+            val.map(|val| val.map(|val| val.into()))
                 .map_err(|err| err.to_string())
         }
     }

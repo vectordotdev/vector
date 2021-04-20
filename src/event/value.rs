@@ -280,17 +280,17 @@ impl Value {
         }
     }
 
-    pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
-        match &self {
-            Value::Timestamp(ts) => Some(ts),
+    pub fn into_map(self) -> Option<BTreeMap<String, Value>> {
+        match self {
+            Value::Map(map) => Some(map),
             _ => None,
         }
     }
 
-    pub fn as_map(&self) -> &BTreeMap<String, Value> {
-        match self {
-            Value::Map(ref m) => m,
-            _ => panic!("Tried to call `Value::as_map` on a non-map value."),
+    pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
+        match &self {
+            Value::Timestamp(ts) => Some(ts),
+            _ => None,
         }
     }
 
@@ -895,12 +895,11 @@ impl Value {
             (Some(Segment::Index(i)), Value::Array(array)) => {
                 if working_lookup.len() == 0 {
                     // We don't **actually** want to remove the index, we just want to swap it with a null.
-                    let retval = if array.len() > i as usize {
+                    if array.len() > i as usize {
                         Ok(Some(array.remove(i as usize)))
                     } else {
                         Ok(None)
-                    };
-                    retval
+                    }
                 } else {
                     let mut inner_is_empty = false;
                     let retval = match array.get_mut(i as usize) {
@@ -1332,7 +1331,7 @@ mod test {
             let lookup = LookupBuf::from_str(key).unwrap();
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
-            assert_eq!(value.as_map()[key], marker);
+            assert_eq!(value.as_map().unwrap()[key], marker);
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
@@ -1345,7 +1344,10 @@ mod test {
             let lookup = LookupBuf::from_str(key).unwrap();
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
-            assert_eq!(value.as_map()["root"].as_map()["doot"], marker);
+            assert_eq!(
+                value.as_map().unwrap()["root"].as_map().unwrap()["doot"],
+                marker
+            );
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
@@ -1360,7 +1362,9 @@ mod test {
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
             assert_eq!(
-                value.as_map()["root"].as_map()["doot"].as_map()["toot"],
+                value.as_map().unwrap()["root"].as_map().unwrap()["doot"]
+                    .as_map()
+                    .unwrap()["toot"],
                 marker
             );
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
@@ -1401,7 +1405,7 @@ mod test {
             let lookup = LookupBuf::from_str(key).unwrap();
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
-            assert_eq!(value.as_map()["root"].as_array()[0], marker);
+            assert_eq!(value.as_map().unwrap()["root"].as_array()[0], marker);
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
@@ -1414,7 +1418,7 @@ mod test {
             let lookup = LookupBuf::from_str(key).unwrap();
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
-            assert_eq!(value.as_array()[0].as_map()["boot"], marker);
+            assert_eq!(value.as_array()[0].as_map().unwrap()["boot"], marker);
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
@@ -1427,7 +1431,10 @@ mod test {
             let lookup = LookupBuf::from_str(key).unwrap();
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
-            assert_eq!(value.as_array()[0].as_array()[0].as_map()["boot"], marker);
+            assert_eq!(
+                value.as_array()[0].as_array()[0].as_map().unwrap()["boot"],
+                marker
+            );
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
@@ -1441,7 +1448,9 @@ mod test {
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
             assert_eq!(
-                value.as_map()["root"].as_array()[0].as_array()[0].as_map()["boot"],
+                value.as_map().unwrap()["root"].as_array()[0].as_array()[0]
+                    .as_map()
+                    .unwrap()["boot"],
                 marker
             );
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
@@ -1470,13 +1479,13 @@ mod test {
             let mut marker = Value::from(true);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
             assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None); // Duplicated on purpose.
-            assert_eq!(value.as_array()[0].as_map()["bloop"], marker);
-            assert_eq!(value.as_array()[1].as_map()["bloop"], marker);
+            assert_eq!(value.as_array()[0].as_map().unwrap()["bloop"], marker);
+            assert_eq!(value.as_array()[1].as_map().unwrap()["bloop"], marker);
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone()));
 
-            assert_eq!(value.as_array()[1].as_map()["bloop"], marker);
+            assert_eq!(value.as_array()[1].as_map().unwrap()["bloop"], marker);
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker)); // Duplicated on purpose.
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker)); // Duplicated on purpose.
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker)); // Duplicated on purpose.

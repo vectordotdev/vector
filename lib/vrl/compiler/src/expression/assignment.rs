@@ -320,8 +320,8 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                 let span = Span::new(target_span.start(), path_span.end());
 
                 match target {
-                    ast::QueryTarget::Internal(ident) => Internal(ident, Some(path.into())),
-                    ast::QueryTarget::External => External(Some(path.into())),
+                    ast::QueryTarget::Internal(ident) => Internal(ident, Some(path)),
+                    ast::QueryTarget::External => External(Some(path)),
                     _ => {
                         return Err(Error {
                             variant: ErrorVariant::InvalidTarget(span),

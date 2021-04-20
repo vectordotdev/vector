@@ -1,7 +1,7 @@
 use crate::{state, Context, Program, Target, Value};
 use compiler::ExpressionError;
-use std::{error::Error, fmt};
 use lookup::LookupBuf;
+use std::{error::Error, fmt};
 
 pub type RuntimeResult = Result<Value, Terminate>;
 

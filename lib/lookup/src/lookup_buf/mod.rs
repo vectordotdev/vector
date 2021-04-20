@@ -165,22 +165,6 @@ impl LookupBuf {
         self.segments.iter()
     }
 
-    /*
-    #[instrument(level = "trace")]
-    pub fn from_indexmap(
-        values: IndexMap<String, TomlValue>,
-    ) -> crate::Result<IndexMap<LookupBuf, Value>> {
-        let mut discoveries = IndexMap::new();
-        for (key, value) in values
-                LookupBuf::try_from(key)?,
-                value,
-                &mut discoveries,
-            )?;
-        }
-        Ok(discoveries)
-    }
-    */
-
     #[instrument(level = "trace")]
     pub fn len(&self) -> usize {
         self.segments.len()
@@ -193,74 +177,8 @@ impl LookupBuf {
 
     #[instrument(level = "trace")]
     pub fn is_root(&self) -> bool {
-        self.len() == 0
+        self.is_empty()
     }
-
-    /*
-    #[instrument(level = "trace")]
-    pub fn from_toml_table(value: TomlValue) -> crate::Result<IndexMap<LookupBuf, Value>> {
-        let mut discoveries = IndexMap::new();
-        match value {
-            TomlValue::Table(map) => {
-                for (key, value) in map {
-                    Self::from_toml_table_recursive_step(
-                        LookupBuf::try_from(key)?,
-                        value,
-                        &mut discoveries,
-                    )?;
-                }
-                Ok(discoveries)
-            }
-            _ => Err(format!(
-                "A TOML table must be passed to the `from_toml_table` function. Passed: {:?}",
-                value
-            )
-            .into()),
-        }
-    }
-
-    #[instrument(level = "trace")]
-    fn from_toml_table_recursive_step(
-        lookup: LookupBuf,
-        value: TomlValue,
-        discoveries: &mut IndexMap<LookupBuf, Value>,
-    ) -> crate::Result<()> {
-        match value {
-            TomlValue::String(s) => discoveries.insert(lookup, Value::from(s)),
-            TomlValue::Integer(i) => discoveries.insert(lookup, Value::from(i)),
-            TomlValue::Float(f) => discoveries.insert(lookup, Value::from(f)),
-            TomlValue::Boolean(b) => discoveries.insert(lookup, Value::from(b)),
-            TomlValue::Datetime(dt) => {
-                let dt = dt.to_string();
-                discoveries.insert(lookup, Value::from(dt))
-            }
-            TomlValue::Array(vals) => {
-                for (i, val) in vals.into_iter().enumerate() {
-                    let key = format!("{}[{}]", lookup, i);
-                    Self::from_toml_table_recursive_step(
-                        LookupBuf::try_from(key)?,
-                        val,
-                        discoveries,
-                    )?;
-                }
-                None
-            }
-            TomlValue::Table(map) => {
-                for (table_key, value) in map {
-                    let key = format!("{}.{}", lookup, table_key);
-                    Self::from_toml_table_recursive_step(
-                        LookupBuf::try_from(key)?,
-                        value,
-                        discoveries,
-                    )?;
-                }
-                None
-            }
-        };
-        Ok(())
-    }
-
-    */
 
     /// Raise any errors that might stem from the lookup being invalid.
     #[instrument(level = "trace")]
@@ -308,13 +226,41 @@ impl LookupBuf {
         needle.iter().zip(&self.segments).all(|(n, s)| n == s)
     }
 
+    /// Create the possible fields that can be followed by this lookup.
+    /// Because of coalesced paths there can be a number of different combinations.
+    /// There is the potential for this function to create a vast number of different
+    /// combinations if there are multiple coalesced segments in a path.
     #[instrument(level = "trace")]
-    // TODO This is abysmal
-    pub fn as_slice(&self) -> Vec<SegmentBuf> {
-        let mut cloned = self.segments.clone();
-        cloned.make_contiguous();
-        let (slice, _) = cloned.as_slices();
-        Vec::from(slice)
+    pub fn to_alternative_components(&self) -> Vec<Vec<&str>> {
+        let mut components = vec![vec![]];
+        for segment in &self.segments {
+            match segment {
+                SegmentBuf::Field(FieldBuf { name, .. }) => {
+                    for component in &mut components {
+                        component.push(name.as_str());
+                    }
+                }
+
+                SegmentBuf::Coalesce(fields) => {
+                    components = components
+                        .iter()
+                        .flat_map(|path| {
+                            fields.iter().map(move |field| {
+                                let mut path = path.clone();
+                                path.push(field.name.as_str());
+                                path
+                            })
+                        })
+                        .collect();
+                }
+
+                SegmentBuf::Index(_) => {
+                    return Vec::new();
+                }
+            }
+        }
+
+        components
     }
 }
 
@@ -380,7 +326,6 @@ impl From<FieldBuf> for LookupBuf {
         Self { segments }
     }
 }
-
 
 impl Index<usize> for LookupBuf {
     type Output = SegmentBuf;

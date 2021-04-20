@@ -51,7 +51,6 @@ fn unquoted() {
     assert_eq!(lookup.to_string(), input);
 }
 
-
 #[test]
 fn quoted() {
     let input = "\"start\".\"after\"";
@@ -69,7 +68,6 @@ fn quoted_special_characters() {
     assert_eq!(lookup[1], Segment::from("\"after nork\""));
     assert_eq!(lookup.to_string(), input);
 }
-
 
 #[test]
 fn push() {
@@ -122,10 +120,7 @@ fn coalesced() {
     assert_eq!(lookup[0], Segment::from("plain"));
     assert_eq!(
         lookup[1],
-        Segment::from(vec![
-            Field::from("option_one"),
-            Field::from("option_two"),
-        ])
+        Segment::from(vec![Field::from("option_one"), Field::from("option_two"),])
     );
 }
 

@@ -830,7 +830,7 @@ impl AssignmentTarget {
                 span,
                 Query {
                     target: Node::new(span, QueryTarget::External),
-                    path: Node::new(span, path.clone().unwrap_or_else(|| LookupBuf::root())),
+                    path: Node::new(span, path.clone().unwrap_or_else(LookupBuf::root)),
                 },
             )),
         }
