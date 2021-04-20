@@ -60,6 +60,7 @@ depends = ""
 members = [
   ".",
   "lib/codec",
+  "lib/core",
   "lib/derive_is_enum_variant",
   "lib/fakedata",
   "lib/file-source",
@@ -95,7 +96,7 @@ vector-api-client = { path = "lib/vector-api-client", optional = true }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures
-async-trait = "0.1.49"
+async-trait = "0.1.50"
 futures = { version = "0.3.14", default-features = false, features = ["compat", "io-compat"], package = "futures" }
 futures01 = { version = "0.1.25", package = "futures", default-features = false }
 tokio = { version = "1.5.0", default-features = false, features = ["full"] }
@@ -144,7 +145,7 @@ prost-types = { version = "0.7.0", default-features = false }
 
 # GCP
 goauth = { version = "0.10.0", default-features = false, optional = true }
-gouth = { version = "0.2.0", default-features = false, optional = true }
+gouth = { version = "0.2.1", default-features = false, optional = true }
 smpl_jwt = { version = "0.6.1", default-features = false, optional = true }
 
 # API
