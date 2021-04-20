@@ -9,12 +9,11 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use chrono::Utc;
 use futures::{FutureExt, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::io;
 use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
 use std::process::ExitStatus;
@@ -23,7 +22,9 @@ use tokio::process::Command;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio::time::{self, sleep, Duration, Instant};
 use tokio_stream::wrappers::IntervalStream;
-use tokio_util::codec::{Decoder, FramedRead, LinesCodec};
+use tokio_util::codec::{FramedRead, LinesCodec};
+
+pub mod sized_bytes_codec;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(default, deny_unknown_fields)]
@@ -51,14 +52,14 @@ pub enum Mode {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct ScheduledConfig {
     #[serde(default = "default_exec_interval_secs")]
     exec_interval_secs: u64,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct StreamingConfig {
     #[serde(default = "default_respawn_on_exit")]
     respawn_on_exit: bool,
@@ -88,55 +89,6 @@ impl Default for ExecConfig {
             event_per_line: default_events_per_line(),
             maximum_buffer_size_bytes: default_maximum_buffer_size(),
         }
-    }
-}
-
-// TODO: Maybe split into a shared codec module
-#[derive(Debug)]
-pub struct SizedBytesCodec {
-    max_length: usize,
-}
-
-impl SizedBytesCodec {
-    pub fn new_with_max_length(max_length: usize) -> Self {
-        SizedBytesCodec { max_length }
-    }
-}
-
-// TODO: If needed it might be useful to return a list of BytesMut for
-//       a single call but returning a single seems to work fine.
-impl Decoder for SizedBytesCodec {
-    type Item = BytesMut;
-    type Error = io::Error;
-
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<BytesMut>, io::Error> {
-        if !buf.is_empty() {
-            let incoming_length = buf.len();
-            if incoming_length >= self.max_length {
-                // Buffer full
-                Ok(Some(buf.split_to(self.max_length)))
-            } else {
-                // Buffer not full yet
-                Ok(None)
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<BytesMut>, io::Error> {
-        Ok(match self.decode(buf)? {
-            Some(frame) => Some(frame),
-            None => {
-                if !buf.is_empty() {
-                    // Send what ever is left over
-                    Some(buf.split_to(buf.len()))
-                } else {
-                    // Nothing left ot send
-                    None
-                }
-            }
-        })
     }
 }
 
@@ -174,9 +126,7 @@ const STDOUT: &str = "stdout";
 const STDERR: &str = "stderr";
 const STREAM_KEY: &str = "stream";
 const PID_KEY: &str = "pid";
-const EXIT_STATUS_KEY: &str = "exit_status";
 const COMMAND_KEY: &str = "command";
-const EXEC_DURATION_MILLIS_KEY: &str = "exec_duration_millis";
 
 inventory::submit! {
     SourceDescription::new::<ExecConfig>("exec")
@@ -185,7 +135,7 @@ inventory::submit! {
 impl_generate_config_from_default!(ExecConfig);
 
 impl ExecConfig {
-    pub(self) fn validate(&self) -> Result<(), ExecConfigError> {
+    fn validate(&self) -> Result<(), ExecConfigError> {
         if self.command.is_empty() {
             Err(ExecConfigError::CommandEmpty)
         } else if self.maximum_buffer_size_bytes == 0 {
@@ -195,25 +145,25 @@ impl ExecConfig {
         }
     }
 
-    pub(self) fn command_line(&self) -> String {
+    fn command_line(&self) -> String {
         self.command.join(" ")
     }
 
-    pub(self) fn exec_interval_secs_or_default(&self) -> u64 {
+    fn exec_interval_secs_or_default(&self) -> u64 {
         match &self.scheduled {
             None => default_exec_interval_secs(),
             Some(config) => config.exec_interval_secs,
         }
     }
 
-    pub(self) fn respawn_on_exit_or_default(&self) -> bool {
+    fn respawn_on_exit_or_default(&self) -> bool {
         match &self.streaming {
             None => default_respawn_on_exit(),
             Some(config) => config.respawn_on_exit,
         }
     }
 
-    pub(self) fn respawn_interval_secs_or_default(&self) -> u64 {
+    fn respawn_interval_secs_or_default(&self) -> u64 {
         match &self.streaming {
             None => default_respawn_interval_secs(),
             Some(config) => config.respawn_interval_secs,
@@ -426,15 +376,7 @@ async fn run_command(
     );
 
     while let Some((line, stream)) = receiver.recv().await {
-        let event = create_event(
-            &config,
-            &hostname,
-            line,
-            &Some(stream.to_string()),
-            pid,
-            None,
-            &None,
-        );
+        let event = create_event(&config, &hostname, line, &Some(stream.to_string()), pid);
 
         let _ = out
             .send(event)
@@ -446,10 +388,7 @@ async fn run_command(
 
     let elapsed = start.elapsed();
 
-    debug!("Finished command run.");
-    let _ = out.flush().await;
-
-    match child.try_wait() {
+    let result = match child.try_wait() {
         Ok(Some(exit_status)) => {
             handle_exit_status(&config, Some(exit_status), elapsed).await;
             Ok(Some(exit_status))
@@ -464,7 +403,12 @@ async fn run_command(
             handle_exit_status(&config, None, elapsed).await;
             Ok(None)
         }
-    }
+    };
+
+    debug!("Finished command run.");
+    let _ = out.flush().await;
+
+    result
 }
 
 async fn handle_exit_status(
@@ -513,8 +457,6 @@ fn create_event(
     line: Bytes,
     data_stream: &Option<String>,
     pid: Option<u32>,
-    exit_status: Option<i32>,
-    exec_duration_millis: &Option<u128>,
 ) -> Event {
     emit!(ExecEventReceived {
         command: config.command_line().as_str(),
@@ -539,16 +481,6 @@ fn create_event(
     // Add pid (if needed)
     if let Some(pid) = pid {
         log_event.insert(PID_KEY, pid as i64);
-    }
-
-    // Add exit status (if needed)
-    if let Some(exit_status) = exit_status {
-        log_event.insert(EXIT_STATUS_KEY, exit_status as i64);
-    }
-
-    // Add exec duration millis (if needed)
-    if let Some(exec_duration_millis) = exec_duration_millis {
-        log_event.insert(EXEC_DURATION_MILLIS_KEY, *exec_duration_millis as i64);
     }
 
     // Add hostname (if needed)
@@ -594,7 +526,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
                 }
             }
         } else {
-            let codec = SizedBytesCodec::new_with_max_length(buf_size);
+            let codec = sized_bytes_codec::SizedBytesCodec::new_with_max_length(buf_size);
             let mut bytes_stream = FramedRead::new(reader, codec);
             while let Some(result) = bytes_stream.next().await {
                 match result {
@@ -637,18 +569,8 @@ mod tests {
         let line = Bytes::from("hello world");
         let data_stream = Some(STDOUT.to_string());
         let pid = Some(8888_u32);
-        let exit_status = None;
-        let exec_duration_millis = None;
 
-        let event = create_event(
-            &config,
-            &hostname,
-            line,
-            &data_stream,
-            pid,
-            exit_status,
-            &exec_duration_millis,
-        );
+        let event = create_event(&config, &hostname, line, &data_stream, pid);
         let log = event.into_log();
 
         assert_eq!(log[log_schema().host_key()], "Some.Machine".into());
@@ -667,18 +589,8 @@ mod tests {
         let line = Bytes::from("hello world");
         let data_stream = Some(STDOUT.to_string());
         let pid = Some(8888_u32);
-        let exit_status = None;
-        let exec_duration_millis = None;
 
-        let event = create_event(
-            &config,
-            &hostname,
-            line,
-            &data_stream,
-            pid,
-            exit_status,
-            &exec_duration_millis,
-        );
+        let event = create_event(&config, &hostname, line, &data_stream, pid);
         let log = event.into_log();
 
         assert_eq!(log[log_schema().host_key()], "Some.Machine".into());

@@ -182,24 +182,6 @@ components: sources: exec: {
 					}
 				}
 			}
-			exec_duration_millis: {
-				common:      false
-				description: "The duration in milliseconds a command took to complete. Only included in the event after the command has finished."
-				required:    false
-				type: uint: {
-					default: null
-					unit:    "milliseconds"
-				}
-			}
-			exit_status: {
-				common:      false
-				description: "The exit status of a scheduled command."
-				required:    false
-				type: uint: {
-					default: null
-					unit:    null
-				}
-			}
 		}
 	}
 
