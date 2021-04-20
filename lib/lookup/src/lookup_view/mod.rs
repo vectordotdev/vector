@@ -167,9 +167,7 @@ impl<'a> Lookup<'a> {
     /// Parse the lookup from a str.
     #[instrument(level = "trace")]
     pub fn from_str(input: &'a str) -> Result<Self, LookupError> {
-        crate::parser::parse_lookup(input).map_err(|err| LookupError::Invalid {
-            message: err,
-        })
+        crate::parser::parse_lookup(input).map_err(|err| LookupError::Invalid { message: err })
     }
 
     /// Dump the value to a `String`.
