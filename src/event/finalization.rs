@@ -140,7 +140,7 @@ impl BatchNotifier {
     }
 
     /// Update this notifier's status from the status of a finalized event.
-    pub fn update_status(&self, status: EventStatus) {
+    fn update_status(&self, status: EventStatus) {
         // The status starts as Delivered and can only change to Failed
         // here. A store cycle is much faster than fetch+update.
         if status == EventStatus::Failed {
@@ -149,7 +149,7 @@ impl BatchNotifier {
     }
 
     /// Send this notifier's status up to the source
-    pub fn send_status(&mut self) {
+    fn send_status(&mut self) {
         if let Some(notifier) = self.notifier.take() {
             let status = self.status.load(Ordering::Relaxed);
             if notifier.send(status).is_err() {
@@ -180,19 +180,6 @@ pub enum BatchStatus {
 // Can be dropped when this issue is closed:
 // https://github.com/LukasKalbertodt/atomig/issues/3
 impl AtomInteger for BatchStatus {}
-
-impl BatchStatus {
-    /// Update this status with the new status and return the result.
-    pub fn update(self, status: Self) -> Self {
-        match (self, status) {
-            // Delivered updates to Failed
-            (Self::Delivered, _) => status,
-            (_, Self::Failed) => status,
-            // Otherwise, stay the same
-            _ => self,
-        }
-    }
-}
 
 /// The status of an individual event.
 #[derive(Atom, Copy, Clone, Debug, Derivative, Deserialize, Eq, PartialEq, Serialize)]
