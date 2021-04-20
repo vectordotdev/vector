@@ -141,11 +141,11 @@ impl BatchNotifier {
 
     /// Update this notifier's status from the status of a finalized event.
     pub fn update_status(&self, status: EventStatus) {
-        self.status
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old_status| {
-                Some(old_status.update_from_event(status))
-            })
-            .unwrap_or_else(|_| unreachable!());
+        // The status starts as Delivered and can only change to Failed
+        // here. A store cycle is much faster than fetch+update.
+        if status == EventStatus::Failed {
+            self.status.store(BatchStatus::Failed, Ordering::Relaxed);
+        }
     }
 
     /// Send this notifier's status up to the source
@@ -189,16 +189,6 @@ impl BatchStatus {
             (Self::Delivered, _) => status,
             (_, Self::Failed) => status,
             // Otherwise, stay the same
-            _ => self,
-        }
-    }
-
-    /// Update this status with an `EventStatus` and return the result.
-    pub fn update_from_event(self, status: EventStatus) -> Self {
-        match (self, status) {
-            // Delivered updates to Failed
-            (Self::Delivered, EventStatus::Failed) => Self::Failed,
-            // Otherwise, no change needed
             _ => self,
         }
     }
