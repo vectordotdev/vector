@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "Merge existing `tcp` and `udp` sources into a single `socket` source"
 description: "We've simplified our socket based sources into a single `socket` source"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1485]
 release: "0.7.0"
 hide_on_release_notes: false

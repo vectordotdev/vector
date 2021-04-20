@@ -2,7 +2,7 @@
 date: "2020-04-16"
 title: "New Tag Cardinality Limit Transform"
 description: "Protect downstream metric storage sytems from metric tag explosion"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1959]
 release: "0.9.0"
 hide_on_release_notes: false

@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "Now supporting the bearer auth strategy"
 description: "Vector can now bear authentication tokens for relevant components."
-author_github: "hoverbear"
+authors: ["hoverbear"]
 hide_on_release_notes: false
 pr_numbers: [2607]
 release: "0.10.0"

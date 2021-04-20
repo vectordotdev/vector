@@ -2,7 +2,7 @@
 date: "2020-04-13"
 title: "New Swimlanes Transform"
 description: "Split log streams with ease"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1785]
 release: "0.8.0"
 hide_on_release_notes: false

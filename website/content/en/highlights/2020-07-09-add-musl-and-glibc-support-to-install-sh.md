@@ -2,7 +2,7 @@
 date: "2020-07-17"
 title: "Leveraging glibc when possible"
 description: "If your Linux uses glibc, Vector will too."
-author_github: "hoverbear"
+authors: ["hoverbear"]
 hide_on_release_notes: false
 pr_numbers: [2969, 2518]
 release: "0.10.0"

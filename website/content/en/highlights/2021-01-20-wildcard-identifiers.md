@@ -2,7 +2,7 @@
 date: "2021-01-20"
 title: "Wildcards are now supported in component IDs"
 description: "Wildcards allow for dynamic Vector topologies"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 featured: false
 pr_numbers: [6170]
 release: "0.12.0"

@@ -2,7 +2,7 @@
 date: "2020-04-16"
 title: "À la carte Custom Vector Builds"
 description: "Build Vector with select components"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1924]
 release: "0.9.0"
 hide_on_release_notes: false

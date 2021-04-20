@@ -2,7 +2,7 @@
 date: "2021-01-31"
 title: "Improved `file` source checkpointing"
 description: "The `file` source checkpointing strategy has been improved to solve surprising edge cases."
-author_github: "binarylogic"
+authors: ["binarylogic"]
 featured: false
 pr_numbers: [6178]
 release: "0.12.0"

@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "Automatically merge partial Docker events"
 description: "Docker splits long messages by default, and now Vector merges them back for you"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1457]
 release: "0.8.0"
 hide_on_release_notes: false

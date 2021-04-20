@@ -2,7 +2,7 @@
 date: "2020-07-17"
 title: "New Reduce transform"
 description: "Canonical Log Lines in Vector"
-author_github: "hoverbear"
+authors: ["hoverbear"]
 hide_on_release_notes: false
 pr_numbers: [2870]
 release: "0.10.0"

@@ -2,7 +2,7 @@
 date: "2020-10-27"
 title: "New AWS integrations"
 description: "Export observability data out of AWS."
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [4101, 4779]
 release: "0.11.0"
 hide_on_release_notes: false

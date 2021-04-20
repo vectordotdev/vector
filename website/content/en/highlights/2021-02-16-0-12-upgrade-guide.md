@@ -2,7 +2,7 @@
 date: "2021-02-16"
 title: "0.12 Upgrade Guide"
 description: "An upgrade guide that addresses breaking changes in 0.12.0"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [5281, 5978]
 release: "0.12.0"
 hide_on_release_notes: false

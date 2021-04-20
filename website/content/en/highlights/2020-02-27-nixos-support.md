@@ -2,7 +2,7 @@
 date: "2020-04-13"
 title: "NixOS Support"
 description: "Bringing Vector to NixOS"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1946]
 release: "0.9.0"
 hide_on_release_notes: true

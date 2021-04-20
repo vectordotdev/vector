@@ -2,7 +2,7 @@
 date: "2020-11-19"
 title: "Support for the Prometheus remote write protocol"
 description: "Interoperability with the Prometheus ecosystem."
-author_github: "jamtur01"
+authors: ["jamtur01"]
 pr_numbers: [4856, 5144]
 release: "0.11.0"
 hide_on_release_notes: false

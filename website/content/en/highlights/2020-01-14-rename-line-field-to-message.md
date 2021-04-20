@@ -2,7 +2,7 @@
 date: "2020-04-13"
 title: "Rename `line` field to `message` in `splunk_hec` source"
 description: "This change ensures the `splunk_hec` source conforms to Vector's schema"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1457]
 release: "0.7.0"
 hide_on_release_notes: false

@@ -2,7 +2,7 @@
 date: "2020-03-31"
 title: "Lua Transform v2"
 description: "The next iteration of our Lua transform."
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [2126]
 release: "0.9.0"
 hide_on_release_notes: false

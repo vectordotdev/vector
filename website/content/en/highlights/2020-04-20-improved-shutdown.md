@@ -2,7 +2,7 @@
 date: "2020-04-20"
 title: "Improved Shutdown"
 description: "A faster and more reliable shutdown process"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1994]
 release: "0.9.0"
 hide_on_release_notes: false

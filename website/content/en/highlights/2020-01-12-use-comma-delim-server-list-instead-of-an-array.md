@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "Use comma delim server list in `kafka` sink"
 description: "This change achieve consistency with our `kafka` source and other Kafka clients"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1502]
 release: "0.7.0"
 hide_on_release_notes: false

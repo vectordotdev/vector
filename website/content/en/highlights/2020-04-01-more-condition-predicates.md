@@ -2,7 +2,7 @@
 date: "2020-04-13"
 title: "More Condition Predicates"
 description: "More options when filtering and routing events"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1997, 2183, 2198]
 release: "0.9.0"
 hide_on_release_notes: true

@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "The `gcp_stackdriver_logging` sink has been renamed to `gcp_stackdriver_logs`"
 description: "This brings the sink naming inline with consistent naming pattern"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [2121]
 release: "0.9.0"
 hide_on_release_notes: false

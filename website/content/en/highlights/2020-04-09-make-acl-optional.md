@@ -1,8 +1,8 @@
 ---
 date: "2020-07-13"
 title: "ACL is now optional for the Google Cloud Storage sink"
-description: "ACL is not always required when creating objects in GCP Cloud Storage"
-author_github: "binarylogic"
+description: "ACL isn't always required when creating objects in GCP Cloud Storage"
+authors: ["binarylogic"]
 hide_on_release_notes: false
 pr_numbers: [2283]
 release: "0.9.0"

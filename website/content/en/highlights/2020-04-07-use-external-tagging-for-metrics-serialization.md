@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "Use external tagging for metrics serialization"
 description: "We've improved the way we serialize metrics data"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 hide_on_release_notes: true
 pr_numbers: [2231]
 release: "0.9.0"

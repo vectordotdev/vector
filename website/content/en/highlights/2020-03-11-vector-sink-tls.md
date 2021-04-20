@@ -2,7 +2,7 @@
 date: "2020-04-13"
 title: "The Vector Source & Sink Support TLS"
 description: "Securely forward data between Vector instances"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [2025]
 release: "0.9.0"
 hide_on_release_notes: true

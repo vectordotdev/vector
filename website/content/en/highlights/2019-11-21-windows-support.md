@@ -2,7 +2,7 @@
 date: "2020-03-31"
 title: "Windows Support Is Here!"
 description: "Bringing the performance and reliability of Vector to Windows"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1205]
 release: "0.6.0"
 hide_on_release_notes: false

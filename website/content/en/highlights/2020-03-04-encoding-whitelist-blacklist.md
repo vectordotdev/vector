@@ -2,7 +2,7 @@
 date: "2020-04-13"
 title: "Whitelist & Blacklist Fields When Encoding"
 description: "More control over which fields are included when encoding"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1915]
 release: "0.9.0"
 hide_on_release_notes: true

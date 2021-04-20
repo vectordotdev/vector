@@ -2,7 +2,7 @@
 date: "2020-04-13"
 title: "Improved Syslog Parsing"
 description: "Best effort parsing support for Syslog"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1757]
 release: "0.8.0"
 hide_on_release_notes: true

@@ -4,7 +4,7 @@
 
 {{ define "main" }}
 {{ $date := .Date | dateFormat "January 2, 2006" }}
-{{ $allAuthors := .CurrentSection.Params.authors }}
+{{ $allAuthors := site.Data.authors }}
 <section class="section">
   <div class="container">
     <div class="columns">

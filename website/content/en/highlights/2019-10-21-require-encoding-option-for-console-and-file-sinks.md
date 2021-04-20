@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "Require `encoding` option for console and file sinks"
 description: "The `encoding` option is now required for these sinks"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1033]
 release: "0.6.0"
 hide_on_release_notes: false

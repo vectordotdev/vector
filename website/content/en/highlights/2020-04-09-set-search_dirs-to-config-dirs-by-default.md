@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "Set the Lua transform `search_dirs` option to Vector's config dir by default"
 description: "This allows you to place Lua scripts in the same dir as your Vector config"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 hide_on_release_notes: true
 pr_numbers: [2274]
 release: "0.9.0"

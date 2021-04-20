@@ -2,7 +2,7 @@
 date: "2020-07-14"
 title: "New compression options for some sinks"
 description: "Stuff more data down a smaller hose in less time for cheaper."
-author_github: "hoverbear"
+authors: ["hoverbear"]
 hide_on_release_notes: false
 pr_numbers: [2953, 2637, 2679, 2682]
 release: "0.10.0"

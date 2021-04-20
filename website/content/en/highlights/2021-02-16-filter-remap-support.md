@@ -2,7 +2,7 @@
 title: "Remap support for the `filter` transform"
 description: "Use VRL to specify conditions for filtering events in a stream"
 date: "2021-02-16"
-author_github: "lucperkins"
+authors: ["lucperkins"]
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false

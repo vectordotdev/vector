@@ -2,7 +2,7 @@
 date: "2020-07-14"
 title: "Journald Unit Filtering Exclusions"
 description: "The journald source can now exclude units."
-author_github: "hoverbear"
+authors: ["hoverbear"]
 hide_on_release_notes: false
 pr_numbers: [2540]
 release: "0.10.0"

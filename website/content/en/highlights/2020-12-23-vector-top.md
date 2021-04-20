@@ -2,7 +2,7 @@
 date: "2020-12-23"
 title: "Introducing `vector top`"
 description: "A CLI dashboard interface for monitoring Vector instances."
-author_github: "lucperkins"
+authors: ["lucperkins"]
 featured: true
 pr_numbers: []
 release: "0.12.0"

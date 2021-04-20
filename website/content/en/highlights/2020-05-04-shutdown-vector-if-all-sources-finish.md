@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "Vector gracefully exits when specific sources finish"
 description: "One step closer to Vector replacing awk and sed!"
-author_github: "hoverbear"
+authors: ["hoverbear"]
 hide_on_release_notes: false
 pr_numbers: [2533]
 release: "0.10.0"

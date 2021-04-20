@@ -2,7 +2,7 @@
 date: "2020-03-31"
 title: "A New Guides Section"
 description: "High quality guides and education for Vector"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [2132]
 release: "0.9.0"
 hide_on_release_notes: false

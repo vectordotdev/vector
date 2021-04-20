@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "The `splunk_hec` sink does not index fields by default"
 description: "This gives you full control over which fields are indexed"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1537]
 release: "0.7.0"
 hide_on_release_notes: false

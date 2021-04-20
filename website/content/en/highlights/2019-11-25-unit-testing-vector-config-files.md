@@ -2,7 +2,7 @@
 date: "2020-03-31"
 title: "Unit Testing Your Vector Config Files"
 description: "Treating your Vector configuration files as code"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1220]
 release: "0.6.0"
 hide_on_release_notes: false

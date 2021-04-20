@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "Support for loading multiple CAs"
 description: "Complicated PEM? No PEM-blem with Vector!"
-author_github: "hoverbear"
+authors: ["hoverbear"]
 hide_on_release_notes: false
 pr_numbers: [2616]
 release: "0.10.0"

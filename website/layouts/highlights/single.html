@@ -5,6 +5,7 @@
 {{ define "main" }}
 {{ $desc := .Description }}
 {{ $release := .Params.release }}
+{{ $allAuthors := site.Data.authors }}
 <section class="section">
   <div class="container">
     <div class="columns is-variable is-8">
@@ -28,6 +29,28 @@
           <p class="subtitle has-text-grey">
             {{ . | markdownify }}
           </p>
+          {{ end }}
+
+          {{ with .Params.authors }}
+          <div class="mt-5">
+            {{ range . }}
+            {{ $author := index (where $allAuthors "handle" "==" .) 0 }}
+            {{ $authorImg := printf "https://github.com/%s.png" $author.handle }}
+            {{ $authorUrl := printf "https://github.com/%s" $author.handle }}
+            <div class="media">
+              <div class="media-left">
+                <figure class="image is-48x48">
+                  <img class="is-rounded" src="{{ $authorImg }}" alt="GitHub avatar for author {{ $author.name }}">
+                </figure>
+              </div>
+              <div class="media-content">
+                <a href="{{ $authorUrl }}" target="_blank">
+                  {{ $author.name }}
+                </a>
+              </div>
+            </div>
+            {{ end }}
+          </div>
           {{ end }}
         </section>
       </div>

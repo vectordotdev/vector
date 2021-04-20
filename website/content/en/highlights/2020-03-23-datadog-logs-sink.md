@@ -2,7 +2,7 @@
 date: "2020-04-13"
 title: "New Datadog Logs Sink"
 description: "Sink logs to the Datadog logging service"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1832]
 release: "0.9.0"
 hide_on_release_notes: true

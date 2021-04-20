@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "Use Custom DNS Servers"
 description: "Point Vector to custom DNS servers"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1118, 1362, 1371, 1400, 1451]
 release: "0.6.0"
 hide_on_release_notes: false

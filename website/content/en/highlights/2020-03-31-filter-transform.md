@@ -2,7 +2,7 @@
 date: "2020-04-16"
 title: "New Filter Transform"
 description: "Filter and route your logs based on defined conditions"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [2088]
 release: "0.9.0"
 hide_on_release_notes: false

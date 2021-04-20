@@ -2,7 +2,7 @@
 date: "2020-04-15"
 title: "AWS specific options have been dropped in the Elasticsearch sink"
 description: "We've dropped redundant AWS options that may break backward compatibility"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1703]
 release: "0.8.0"
 hide_on_release_notes: true

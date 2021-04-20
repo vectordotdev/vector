@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "Rename existing `tcp` sink to `socket` sink"
 description: "This renames the existing `tcp` sink to `socket`"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1404]
 release: "0.7.0"
 hide_on_release_notes: false

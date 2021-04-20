@@ -2,7 +2,7 @@
 date: "2021-02-16"
 title: "Introducing Vector Remap Language"
 description: "A lean, fast, and safe language for transforming observability data."
-author_github: "binarylogic"
+authors: ["binarylogic"]
 featured: true
 pr_numbers: []
 release: "0.12.0"

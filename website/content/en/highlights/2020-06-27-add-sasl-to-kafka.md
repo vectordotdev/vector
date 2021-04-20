@@ -2,7 +2,7 @@
 date: "2020-07-15"
 title: "Kafka components support SASL"
 description: "Vector has a new way to authenticate with Kafka!"
-author_github: "hoverbear"
+authors: ["hoverbear"]
 hide_on_release_notes: false
 pr_numbers: [2897]
 release: "0.10.0"

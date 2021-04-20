@@ -2,7 +2,7 @@
 date: "2020-03-31"
 title: "New Prometheus Source"
 description: "Scrape prometheus metrics with Vector"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1264]
 release: "0.7.0"
 hide_on_release_notes: false

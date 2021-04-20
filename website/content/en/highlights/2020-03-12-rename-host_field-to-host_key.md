@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "The `splunk_hec` source's `host_field` option has been renamed to `host_key`"
 description: "This change ensures that the `host_key` option is consistent across all sources"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [2037]
 release: "0.9.0"
 hide_on_release_notes: true

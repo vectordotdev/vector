@@ -2,7 +2,7 @@
 date: "2020-04-13"
 title: "Log Data Model Changes & Disk Buffers"
 description: "We're bringing our log data model closer to JSON"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1836, 1898]
 release: "0.8.0"
 hide_on_release_notes: true

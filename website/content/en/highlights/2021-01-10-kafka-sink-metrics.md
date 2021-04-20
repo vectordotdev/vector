@@ -2,7 +2,7 @@
 date: "2021-01-10"
 title: "The `kafka` sink now supports metrics"
 description: "Send metric events to Kafka"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 featured: false
 pr_numbers: []
 release: "0.12.0"

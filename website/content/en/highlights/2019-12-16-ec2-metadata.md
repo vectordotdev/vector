@@ -2,7 +2,7 @@
 date: "2020-03-31"
 title: "New AWS EC2 Medata Transform"
 description: "Enrich your events with EC2 metadata"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1325]
 release: "0.6.0"
 hide_on_release_notes: false

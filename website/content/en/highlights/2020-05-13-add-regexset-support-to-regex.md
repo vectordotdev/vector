@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "RegexSet support to `regex` transform"
 description: "Efficiently run multiple regexes in the same transform!"
-author_github: "hoverbear"
+authors: ["hoverbear"]
 hide_on_release_notes: false
 pr_numbers: [2493]
 release: "0.10.0"

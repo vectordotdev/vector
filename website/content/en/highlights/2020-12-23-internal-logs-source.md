@@ -2,7 +2,7 @@
 date: "2020-12-23"
 title: "The `internal_logs` source"
 description: "A new source for observing Vector itself"
-author_github: "lucperkins"
+authors: ["lucperkins"]
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false

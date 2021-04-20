@@ -2,7 +2,7 @@
 date: "2020-04-14"
 title: "Improved Multiline Support In The File Source"
 description: "Merge multiple lines together based on rules"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1852]
 release: "0.8.0"
 hide_on_release_notes: false

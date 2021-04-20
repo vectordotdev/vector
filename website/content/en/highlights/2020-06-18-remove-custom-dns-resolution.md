@@ -2,7 +2,7 @@
 date: "2020-07-23"
 title: "Custom DNS resolution removal"
 description: "Vector once again follows the guidance of the host on DNS lookups."
-author_github: "hoverbear"
+authors: ["hoverbear"]
 hide_on_release_notes: false
 pr_numbers: [2812]
 release: "0.10.0"

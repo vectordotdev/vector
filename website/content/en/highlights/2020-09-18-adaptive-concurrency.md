@@ -2,7 +2,7 @@
 date: "2020-09-18"
 title: "Adaptive Request Concurrency (ARC)"
 description: "Increasing reliability and performance across your entire observability infrastructure."
-author_github: "lucperkins"
+authors: ["lucperkins"]
 pr_numbers: [3094]
 release: "0.11.0"
 hide_on_release_notes: false

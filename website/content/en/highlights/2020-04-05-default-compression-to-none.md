@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "The `elasticsearch` sink `compression` option now defaults to `none`"
 description: "Compression is not supported by all Elasticsearch service providers"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 hide_on_release_notes: false
 pr_numbers: [2219]
 release: "0.9.0"

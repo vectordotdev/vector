@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "The `datadog` sink has been renamed to `datadog_metrics`"
 description: "This ensures that naming is consistent for the upcoming `datadog_logs` sink"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1314]
 release: "0.6.0"
 hide_on_release_notes: false

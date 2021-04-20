@@ -2,7 +2,7 @@
 date: "2020-04-16"
 title: "New Dedupe Transform"
 description: "Shed duplicate logs"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1848]
 release: "0.9.0"
 hide_on_release_notes: false

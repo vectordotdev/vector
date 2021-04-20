@@ -2,7 +2,7 @@
 date: "2020-10-27"
 title: "First-class Kubernetes integration"
 description: "Vector officially supports Kubernetes with a first-class integration."
-author_github: "binarylogic"
+authors: ["binarylogic"]
 featured: true
 pr_numbers: [1314]
 release: "0.11.0"

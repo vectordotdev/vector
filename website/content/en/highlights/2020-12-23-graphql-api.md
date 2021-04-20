@@ -2,7 +2,7 @@
 date: "2020-12-23"
 title: "The GraphQL API for Vector"
 description: "View Vector metrics and explore Vector topologies using GraphQL"
-author_github: "lucperkins"
+authors: ["lucperkins"]
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false

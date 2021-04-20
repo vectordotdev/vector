@@ -2,7 +2,7 @@
 date: "2020-07-13"
 title: "Sink options have been refactored"
 description: "We've simplified and organized our sink options"
-author_github: "binarylogic"
+authors: ["binarylogic"]
 pr_numbers: [1006, 1493, 1494, 1495]
 release: "0.7.0"
 hide_on_release_notes: false

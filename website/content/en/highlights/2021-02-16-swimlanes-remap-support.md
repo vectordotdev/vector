@@ -2,7 +2,7 @@
 date: "2021-02-16"
 title: "Remap support for the `swimlanes` transform (routing)"
 description: "Use VRL to specify conditions for routing events into multiple channels"
-author_github: "lucperkins"
+authors: ["lucperkins"]
 pr_numbers: []
 release: "0.12.0"
 hide_on_release_notes: false
