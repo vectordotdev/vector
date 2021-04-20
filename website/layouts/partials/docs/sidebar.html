@@ -1,5 +1,6 @@
 {{ $sections := where site.Sections "Section" "docs" }}
 {{ $page := .ctx }}
+{{ $metaLinks := site.Menus.meta }}
 <section class="section is-sticky">
   <!-- x-cloak hides the sidebar until it's loaded, which provides a smoother UX -->
   <aside class="sidebar" x-cloak>
@@ -18,6 +19,19 @@
     {{ end }}
     {{ end }}
     {{ end }}
+
+    {{/* Extra links */}}
+    <div class="sidebar-section">
+      <p class="sidebar-section-title">
+        Meta
+      </p>
+
+      {{ range $metaLinks  }}
+      <a class="sidebar-section-link" href="{{ .URL }}" target="_blank">
+        {{ .Name }}
+      </a>
+      {{ end }}
+    </div>
   </aside>
 </section>
 

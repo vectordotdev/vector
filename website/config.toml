@@ -36,12 +36,12 @@ vector_versions = ["0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.1", "0.8.0", "0.7
 
 # Aesthetics
 [[params.fonts]]
-name = "Segoe UI"
+name = "Lato"
 sizes = [300, 400, 600, 700]
 type = "sans_serif"
 
 [[params.fonts]]
-name = "Noto Serif"
+name = "Source Sans Pro"
 sizes = [300, 400, 600, 700]
 type = "secondary"
 
@@ -56,6 +56,22 @@ github_repo = "timberio/vector"
 discord = "https://chat.vector.dev"
 
 ## Menus
+
+# Extra links under the "Meta" section in the docs
+[[menu.meta]]
+name = "Privacy"
+url = "https://github.com/timberio/vector/blob/master/PRIVACY.md"
+weight = 1
+
+[[menu.meta]]
+name = "Release"
+url = "https://github.com/timberio/vector/blob/master/RELEASING.md"
+weight = 2
+
+[[menu.meta]]
+name = "Security"
+url = "https://github.com/timberio/vector/security/policy"
+weight = 3
 
 # Navbar menu
 [[menu.navbar]]

@@ -57,6 +57,10 @@ $subsection-left-border: 2px solid $grey-lighter
     &:not(:first-child)
       margin-bottom: $margin-xl
 
+    a.sidebar-section-title
+      &:hover
+        color: $secondary
+
     .sidebar-section-title
       +title
       color: $section-title-color
@@ -64,8 +68,6 @@ $subsection-left-border: 2px solid $grey-lighter
       &.is-active
         +active
 
-      &:hover
-        color: $secondary
 
       & + .sidebar-section-link, & + .sidebar-subsection
         +topped-md
