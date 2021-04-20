@@ -1,5 +1,5 @@
 {{ $title := .Params.short | default .Title }}
-{{ $allAuthors := site.Data.authors }}
+{{ $allAuthors := site.Data.docs.authors }}
 {{ $date := .Date | dateFormat "January 2, 2006" }}
 {{ $type := .Params.tags.type | default "announcement" }}
 {{ $domains := .Params.tags.domains }}
