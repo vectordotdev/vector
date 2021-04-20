@@ -116,7 +116,7 @@ impl MetricsSubscription {
         })
     }
 
-    /// Event inputting metrics.
+    /// Total incoming events metrics
     async fn events_in_total(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -127,7 +127,7 @@ impl MetricsSubscription {
         })
     }
 
-    /// Event inputting throughput sampled over the provided millisecond `interval`.
+    /// Total incoming events throughput sampled over the provided millisecond `interval`
     async fn events_in_throughput(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -136,7 +136,7 @@ impl MetricsSubscription {
             .map(|(_, throughput)| throughput as i64)
     }
 
-    /// Component event inputting throughput metrics over `interval`.
+    /// Total incoming component events throughput metrics over `interval`
     async fn component_events_in_throughputs(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -153,7 +153,7 @@ impl MetricsSubscription {
         })
     }
 
-    /// Component event inputting metrics over `interval`.
+    /// Total incoming component event metrics over `interval`
     async fn component_events_in_totals(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -162,7 +162,7 @@ impl MetricsSubscription {
             .map(|m| m.into_iter().map(ComponentEventsInTotal::new).collect())
     }
 
-    /// Event outputting metrics.
+    /// Total outgoing events metrics
     async fn events_out_total(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -173,7 +173,7 @@ impl MetricsSubscription {
         })
     }
 
-    /// Event outputting throughput sampled over the provided millisecond `interval`.
+    /// Total outgoing events throughput sampled over the provided millisecond `interval`
     async fn events_out_throughput(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -182,7 +182,7 @@ impl MetricsSubscription {
             .map(|(_, throughput)| throughput as i64)
     }
 
-    /// Component event outputting throughput metrics over `interval`.
+    /// Total outgoing component event throughput metrics over `interval`
     async fn component_events_out_throughputs(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -199,7 +199,7 @@ impl MetricsSubscription {
         })
     }
 
-    /// Component event outputting metrics over `interval`.
+    /// Total outgoing component event metrics over `interval`
     async fn component_events_out_totals(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,

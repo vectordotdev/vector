@@ -25,12 +25,12 @@ impl GenericSourceMetrics {
         self.0.processed_bytes_total()
     }
 
-    /// Events inputted for the current source
+    /// Total incoming events for the current source
     pub async fn events_in_total(&self) -> Option<metrics::EventsInTotal> {
         self.0.events_in_total()
     }
 
-    /// Events outputted for the current source
+    /// Total outgoing events for the current source
     pub async fn events_out_total(&self) -> Option<metrics::EventsOutTotal> {
         self.0.events_out_total()
     }

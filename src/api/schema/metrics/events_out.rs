@@ -28,7 +28,7 @@ impl EventsOutTotal {
         self.get_timestamp()
     }
 
-    /// Total number of events outputted
+    /// Total outgoing events
     pub async fn events_out_total(&self) -> f64 {
         self.get_events_out_total()
     }
@@ -47,7 +47,7 @@ pub struct ComponentEventsOutTotal {
 
 impl ComponentEventsOutTotal {
     /// Returns a new `ComponentEventsOutTotal` struct, which is a GraphQL type. The
-    /// component name is hoisted for clear field resolution in the resulting payload
+    /// component name is hoisted for clear field resolution in the resulting payload.
     pub fn new(metric: Metric) -> Self {
         let name = metric.tag_value("component_name").expect(
             "Returned a metric without a `component_name`, which shouldn't happen. Please report.",
@@ -64,7 +64,7 @@ impl ComponentEventsOutTotal {
         &self.name
     }
 
-    /// Events outputted total metric
+    /// Total outgoing events metric
     async fn metric(&self) -> EventsOutTotal {
         EventsOutTotal::new(self.metric.clone())
     }

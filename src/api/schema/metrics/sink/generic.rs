@@ -25,12 +25,12 @@ impl GenericSinkMetrics {
         self.0.processed_bytes_total()
     }
 
-    /// Events inputted for the current sink
+    /// Total incoming events for the current sink
     pub async fn events_in_total(&self) -> Option<metrics::EventsInTotal> {
         self.0.events_in_total()
     }
 
-    /// Events outputted for the current sink
+    /// Total outgoing events for the current sink
     pub async fn events_out_total(&self) -> Option<metrics::EventsOutTotal> {
         self.0.events_out_total()
     }

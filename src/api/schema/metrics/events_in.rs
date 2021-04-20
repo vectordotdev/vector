@@ -28,7 +28,7 @@ impl EventsInTotal {
         self.get_timestamp()
     }
 
-    /// Total number of events inputted
+    /// Total incoming events
     pub async fn events_in_total(&self) -> f64 {
         self.get_events_in_total()
     }
@@ -47,7 +47,7 @@ pub struct ComponentEventsInTotal {
 
 impl ComponentEventsInTotal {
     /// Returns a new `ComponentEventsInTotal` struct, which is a GraphQL type. The
-    /// component name is hoisted for clear field resolution in the resulting payload
+    /// component name is hoisted for clear field resolution in the resulting payload.
     pub fn new(metric: Metric) -> Self {
         let name = metric.tag_value("component_name").expect(
             "Returned a metric without a `component_name`, which shouldn't happen. Please report.",
@@ -64,7 +64,7 @@ impl ComponentEventsInTotal {
         &self.name
     }
 
-    /// Events inputted total metric
+    /// Total incoming events metric
     async fn metric(&self) -> EventsInTotal {
         EventsInTotal::new(self.metric.clone())
     }
@@ -76,7 +76,7 @@ pub struct ComponentEventsInThroughput {
 }
 
 impl ComponentEventsInThroughput {
-    /// Returns a new `ComponentEventsInThroughput`, set to the provided name/throughput values
+    /// Returns a new `ComponentEventsInThroughput`, set to the provided name/throughput values.
     pub fn new(name: String, throughput: i64) -> Self {
         Self { name, throughput }
     }

@@ -44,12 +44,12 @@ impl<'a> FileSourceMetricFile<'a> {
         self.metrics.processed_bytes_total()
     }
 
-    /// Metric indicating events inputted for the current file
+    /// Metric indicating incoming events for the current file
     async fn events_in_total(&self) -> Option<metrics::EventsInTotal> {
         self.metrics.events_in_total()
     }
 
-    /// Metric indicating events outputted for the current file
+    /// Metric indicating outgoing events for the current file
     async fn events_out_total(&self) -> Option<metrics::EventsOutTotal> {
         self.metrics.events_out_total()
     }
@@ -195,12 +195,12 @@ impl FileSourceMetrics {
         self.0.processed_bytes_total()
     }
 
-    /// Events inputted for the current file source
+    /// Total incoming events for the current file source
     pub async fn events_in_total(&self) -> Option<metrics::EventsInTotal> {
         self.0.events_in_total()
     }
 
-    /// Events outputted for the current file source
+    /// Total outgoing events for the current file source
     pub async fn events_out_total(&self) -> Option<metrics::EventsOutTotal> {
         self.0.events_out_total()
     }

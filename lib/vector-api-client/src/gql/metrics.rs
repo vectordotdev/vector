@@ -44,7 +44,7 @@ pub struct ProcessedEventsThroughputSubscription;
 pub struct ProcessedBytesThroughputSubscription;
 
 /// EventsInTotalSubscription contains metrics on the number of events
-/// that have been accepted for processing by a Vector instance
+/// that have been accepted for processing by a Vector instance.
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
@@ -54,7 +54,7 @@ pub struct ProcessedBytesThroughputSubscription;
 pub struct EventsInTotalSubscription;
 
 /// EventsInThroughputSubscription contains metrics on the number of events
-/// that have been accepted for processing between `interval` samples
+/// that have been accepted for processing between `interval` samples.
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
@@ -64,7 +64,7 @@ pub struct EventsInTotalSubscription;
 pub struct EventsInThroughputSubscription;
 
 /// EventsOutTotalSubscription contains metrics on the number of events
-/// that have been emitted by a Vector instance
+/// that have been emitted by a Vector instance.
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
@@ -74,7 +74,7 @@ pub struct EventsInThroughputSubscription;
 pub struct EventsOutTotalSubscription;
 
 /// EventsOutThroughputSubscription contains metrics on the number of events
-/// that have been emitted between `interval` samples
+/// that have been emitted between `interval` samples.
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
@@ -124,7 +124,7 @@ pub struct ComponentProcessedBytesThroughputsSubscription;
 pub struct ComponentProcessedBytesTotalsSubscription;
 
 /// ComponentEventsInThroughputsSubscription contains metrics on the number of events
-/// that have been accepted for processing between `interval` samples, against specific components
+/// that have been accepted for processing between `interval` samples, against specific components.
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
@@ -134,7 +134,7 @@ pub struct ComponentProcessedBytesTotalsSubscription;
 pub struct ComponentEventsInThroughputsSubscription;
 
 /// ComponentEventsInTotalsSubscription contains metrics on the number of events
-/// that have been accepted for processing by a Vector instance, against specific components
+/// that have been accepted for processing by a Vector instance, against specific components.
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
@@ -144,7 +144,7 @@ pub struct ComponentEventsInThroughputsSubscription;
 pub struct ComponentEventsInTotalsSubscription;
 
 /// ComponentEventsOutThroughputsSubscription contains metrics on the number of events
-/// that have been emitted between `interval` samples, against specific components
+/// that have been emitted between `interval` samples, against specific components.
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
@@ -154,7 +154,7 @@ pub struct ComponentEventsInTotalsSubscription;
 pub struct ComponentEventsOutThroughputsSubscription;
 
 /// ComponentEventsOutTotalsSubscription contains metrics on the number of events
-/// that have been emitted by a Vector instance, against specific components
+/// that have been emitted by a Vector instance, against specific components.
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
@@ -192,19 +192,19 @@ pub trait MetricsSubscriptionExt {
         interval: i64,
     ) -> crate::BoxedSubscription<EventsInTotalSubscription>;
 
-    /// Executes an events in throughput subscription
+    /// Executes an events in throughput subscription.
     fn events_in_throughput_subscription(
         &self,
         interval: i64,
     ) -> crate::BoxedSubscription<EventsInThroughputSubscription>;
 
-    /// Executes an events out metrics subscription
+    /// Executes an events out metrics subscription.
     fn events_out_total_subscription(
         &self,
         interval: i64,
     ) -> crate::BoxedSubscription<EventsOutTotalSubscription>;
 
-    /// Executes an events out throughput subscription
+    /// Executes an events out throughput subscription.
     fn events_out_throughput_subscription(
         &self,
         interval: i64,
@@ -234,25 +234,25 @@ pub trait MetricsSubscriptionExt {
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentProcessedBytesThroughputsSubscription>;
 
-    /// Executes an component events in totals subscription
+    /// Executes an component events in totals subscription.
     fn component_events_in_totals_subscription(
         &self,
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentEventsInTotalsSubscription>;
 
-    /// Executes an component events in throughputs subscription
+    /// Executes an component events in throughputs subscription.
     fn component_events_in_throughputs_subscription(
         &self,
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentEventsInThroughputsSubscription>;
 
-    /// Executes an component events out totals subscription
+    /// Executes an component events out totals subscription.
     fn component_events_out_totals_subscription(
         &self,
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentEventsOutTotalsSubscription>;
 
-    /// Executes an component events in throughputs subscription
+    /// Executes an component events in throughputs subscription.
     fn component_events_out_throughputs_subscription(
         &self,
         interval: i64,
@@ -303,7 +303,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ProcessedBytesThroughputSubscription>(&request_body)
     }
 
-    /// Executes an events in metrics subscription
+    /// Executes an events in metrics subscription.
     fn events_in_total_subscription(
         &self,
         interval: i64,
@@ -316,7 +316,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<EventsInTotalSubscription>(&request_body)
     }
 
-    /// Executes an events in throughput subscription
+    /// Executes an events in throughput subscription.
     fn events_in_throughput_subscription(
         &self,
         interval: i64,
@@ -328,7 +328,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<EventsInThroughputSubscription>(&request_body)
     }
 
-    /// Executes an events out metrics subscription
+    /// Executes an events out metrics subscription.
     fn events_out_total_subscription(
         &self,
         interval: i64,
@@ -341,7 +341,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<EventsOutTotalSubscription>(&request_body)
     }
 
-    /// Executes an events out throughput subscription
+    /// Executes an events out throughput subscription.
     fn events_out_throughput_subscription(
         &self,
         interval: i64,
@@ -353,7 +353,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<EventsOutThroughputSubscription>(&request_body)
     }
 
-    /// Executes an all component events processed totals subscription
+    /// Executes an all component events processed totals subscription.
     fn component_processed_events_totals_subscription(
         &self,
         interval: i64,
@@ -401,7 +401,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ComponentProcessedBytesThroughputsSubscription>(&request_body)
     }
 
-    /// Executes an all component events in totals subscription
+    /// Executes an all component events in totals subscription.
     fn component_events_in_totals_subscription(
         &self,
         interval: i64,
@@ -413,7 +413,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ComponentEventsInTotalsSubscription>(&request_body)
     }
 
-    /// Executes an all component events in throughputs subscription
+    /// Executes an all component events in throughputs subscription.
     fn component_events_in_throughputs_subscription(
         &self,
         interval: i64,
@@ -425,7 +425,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ComponentEventsInThroughputsSubscription>(&request_body)
     }
 
-    /// Executes an all component events out totals subscription
+    /// Executes an all component events out totals subscription.
     fn component_events_out_totals_subscription(
         &self,
         interval: i64,
@@ -437,7 +437,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ComponentEventsOutTotalsSubscription>(&request_body)
     }
 
-    /// Executes an all component events out throughputs subscription
+    /// Executes an all component events out throughputs subscription.
     fn component_events_out_throughputs_subscription(
         &self,
         interval: i64,
