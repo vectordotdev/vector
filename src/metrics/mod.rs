@@ -12,7 +12,9 @@ use crate::metrics::registry::VectorRegistry;
 use crate::{event::Metric, Event};
 use metrics::{Key, KeyData, SharedString};
 use metrics_tracing_context::TracingContextLayer;
-use metrics_util::layers::{AbsoluteLayer, Layer};
+#[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
+use metrics_util::layers::AbsoluteLayer;
+use metrics_util::layers::Layer;
 use metrics_util::{CompositeKey, MetricKind};
 use once_cell::sync::OnceCell;
 
