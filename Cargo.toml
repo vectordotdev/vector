@@ -60,7 +60,7 @@ depends = ""
 members = [
   ".",
   "lib/codec",
-  "lib/core",
+  "lib/vector-core",
   "lib/derive_is_enum_variant",
   "lib/fakedata",
   "lib/file-source",
