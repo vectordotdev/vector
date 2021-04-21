@@ -1,6 +1,8 @@
 use crate::{
-    event::metric::{Metric, MetricKind, MetricValue, Sample},
-    event::Event,
+    event::{
+        metric::{Metric, MetricKind, MetricValue, Sample},
+        Event,
+    },
     sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
 };
 use std::{
@@ -127,7 +129,7 @@ impl MetricsBuffer {
 }
 
 impl Batch for MetricsBuffer {
-    type Input = Event;
+    type Input = Metric;
     type Output = Vec<Metric>;
 
     fn get_settings_defaults(
@@ -144,7 +146,6 @@ impl Batch for MetricsBuffer {
         if self.num_items() >= self.max_events {
             PushResult::Overflow(item)
         } else {
-            let item = item.into_metric();
             let max_events = self.max_events;
             let metrics = self
                 .metrics
@@ -210,9 +211,9 @@ impl<N: MetricNormalize> MetricNormalizer<N> {
     }
 
     /// This wraps `MetricNormalize::apply_state`, converting to/from
-    /// the `Event` type wrapper. See that function for return values.
-    pub fn apply(&mut self, event: Event) -> Option<Event> {
-        N::apply_state(&mut self.state, event.into_metric()).map(Into::into)
+    /// the `Metric` type wrapper. See that function for return values.
+    pub fn apply(&mut self, event: Event) -> Option<Metric> {
+        N::apply_state(&mut self.state, event.into_metric())
     }
 }
 

@@ -141,8 +141,8 @@ impl DatadogEndpoint {
         ])
     }
 
-    fn from_metric(event: &Event) -> Self {
-        match event.as_metric().data.value {
+    fn from_metric(metric: &Metric) -> Self {
+        match metric.data.value {
             MetricValue::Distribution {
                 statistic: StatisticKind::Summary,
                 ..

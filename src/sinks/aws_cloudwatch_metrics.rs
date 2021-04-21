@@ -149,15 +149,14 @@ impl CloudWatchMetricsSvc {
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
             .with_flat_map(move |event: Event| {
-                stream::iter(normalizer.apply(event).map(|mut event| {
-                    let namespace = event
-                        .as_mut_metric()
+                stream::iter(normalizer.apply(event).map(|mut metric| {
+                    let namespace = metric
                         .series
                         .name
                         .namespace
                         .take()
                         .unwrap_or_else(|| default_namespace.clone());
-                    Ok(PartitionInnerBuffer::new(event, namespace))
+                    Ok(PartitionInnerBuffer::new(metric, namespace))
                 }))
             });
 
