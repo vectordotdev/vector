@@ -104,6 +104,7 @@ impl SourceConfig for SocketConfig {
                     config.max_length(),
                     host_key,
                     config.receive_buffer_bytes(),
+                    config.one_event_per_datagram(),
                     cx.shutdown,
                     cx.out,
                 ))
@@ -507,8 +508,25 @@ mod test {
         shutdown_signal: ShutdownSignal,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let address = next_addr();
+        (
+            address,
+            init_udp_from_config(
+                sender,
+                source_name,
+                shutdown_signal,
+                UdpConfig::from_address(address),
+            )
+            .await,
+        )
+    }
 
-        let server = SocketConfig::from(UdpConfig::from_address(address))
+    async fn init_udp_from_config(
+        sender: Pipeline,
+        source_name: &str,
+        shutdown_signal: ShutdownSignal,
+        config: UdpConfig,
+    ) -> JoinHandle<Result<(), ()>> {
+        let server = SocketConfig::from(config)
             .build(SourceContext {
                 name: source_name.into(),
                 globals: GlobalOptions::default(),
@@ -522,7 +540,7 @@ mod test {
         // Wait for UDP to start listening
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        (address, source_handle)
+        source_handle
     }
 
     #[tokio::test]
@@ -554,6 +572,30 @@ mod test {
         assert_eq!(
             events[1].as_log()[log_schema().message_key()],
             "test2".into()
+        );
+    }
+
+    #[tokio::test]
+    async fn udp_multiline_message() {
+        let (tx, rx) = Pipeline::new_test();
+        let address = next_addr();
+
+        let mut config = UdpConfig::from_address(address);
+        config.set_one_event_per_datagram(true);
+
+        init_udp_from_config(tx, "default", ShutdownSignal::noop(), config).await;
+
+        send_lines_udp(address, vec!["test\ntest2".to_string()]);
+        send_lines_udp(address, vec!["test3\ntest4".to_string()]);
+        let events = collect_n(rx, 2).await;
+
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key()],
+            "test\ntest2".into()
+        );
+        assert_eq!(
+            events[1].as_log()[log_schema().message_key()],
+            "test3\ntest4".into()
         );
     }
 

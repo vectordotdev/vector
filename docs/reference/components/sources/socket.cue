@@ -106,6 +106,13 @@ components: sources: socket: {
 				syntax: "literal"
 			}
 		}
+		one_event_per_datagram: {
+			common:        false
+			description:   "If set to `true` a single event will be generated for each UDP datagram, the event will then contain the entire datagram payload. If set to `false` datagram will be split every new line character and an several events (one per line) will be generated."
+			relevant_when: "mode = `udp`"
+			required:      false
+			type: bool: default: false
+		}
 		path: {
 			description:   "The unix socket path. *This should be an absolute path*."
 			relevant_when: "mode = `unix`"
