@@ -9,23 +9,65 @@
 {{ range $funcs }}
 {{ $example := index .examples 0 }}
 {{ $href := $example.title | urlize }}
-<h3 x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $href }}">
-  {{ $example.title }}
-  <a class="ml-1" x-cloak x-show="show" href="#{{ $href }}">
-    <span class="icon is-small is-anchor">
-      <i class="fas fa-hashtag fa-xs"></i>
-    </span>
-  </a>
-</h3>
+<div class="card">
+  <div class="card-content">
+    <h3 x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $href }}">
+      {{ $example.title }}
+      <a class="ml-1" x-cloak x-show="show" href="#{{ $href }}">
+        <span class="icon is-small is-anchor">
+          <i class="fas fa-hashtag fa-xs"></i>
+        </span>
+      </a>
+    </h3>
 
-<div class="highlight"><pre class="chroma"><code class="language-ruby" data-lang="ruby">TODO</code></pre></div>
+    {{ with $example.input }}
+    {{ $json := . | jsonify (dict "indent" "  ")}}
+    <p class="mb-2 has-text-weight-semibold">
+      Vector event (before)
+    </p>
 
-<p class="tip">
-  <span class="icon has-text-primary">
-    <i class="far fa-lightbulb"></i>
-  </span>
-  <span>
-    Learn more about the <a href="/docs/reference/vrl/functions/#{{ .name }}">{{ .name }}</a> function.
-  </span>
-</p>
+    {{ highlight $json "ruby" "" }}
+    {{ end }}
+
+    <p class="mb-2 has-text-weight-semibold">
+      VRL program
+    </p>
+
+    {{ highlight $example.source "ruby" "" }}
+
+    {{/* Program return (string) */}}
+    {{ with $example.return }}
+    <p class="mb-2 has-text-weight-semibold">
+      Return value
+    </p>
+
+    {{ if or (reflect.IsMap  .) (reflect.IsSlice . ) }}
+    {{ $json := . | jsonify (dict "indent" "  ") }}
+    {{ highlight $json "ruby" "" }}
+    {{ else }}
+    {{ highlight . "ruby" "" }}
+    {{ end }}
+    {{ end }}
+
+    {{/* Program output (JSON) */}}
+    {{ with $example.output }}
+    {{ $json := . | jsonify (dict "indent" "  ") }}
+
+    <p class="mb-2 has-text-weight-semibold">
+      Vector event (after)
+    </p>
+
+    {{ highlight $json "ruby" "" }}
+    {{ end }}
+
+    <p>
+      <span class="icon has-text-primary">
+        <i class="far fa-lightbulb"></i>
+      </span>
+      <span>
+        Learn more about the <a href="/docs/reference/vrl/functions/#{{ .name }}"><code>{{ .name }}</code></a> function.
+      </span>
+    </p>
+  </div>
+</div>
 {{ end }}

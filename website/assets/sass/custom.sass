@@ -59,6 +59,9 @@ hr.narrow
 
 // Small fixes for text content CSS
 .content
+  .card + .card
+    margin-top: 1rem
+
   ul
     li + li
       margin-top: 0.75rem
@@ -275,16 +278,6 @@ $admonition-title-font-size: 1.1rem
 
     .highlight .chroma
       padding: 0.75rem
-
-.tip
-  box-shadow: $card-shadow
-  padding: 0.5rem 0.75rem
-
-  a
-    font-weight: $weight-bold
-
-  .icon
-    color: $primary
 
 .button.no-hover
   &:hover
