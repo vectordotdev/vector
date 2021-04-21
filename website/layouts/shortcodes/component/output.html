@@ -11,17 +11,17 @@
 <div class="configs">
   {{ range $metric, $v := $v }}
   <div class="config">
-    <h3 class="config-title" id="{{ $metric }}">
-      <span class="name">
+    <span class="config-title">
+      <h4 class="name" id="{{ $metric }}">
         {{ $metric }}
-      </span>
+      </h4>
 
       <div class="config-buttons">
         <div class="config-button is-grey">
           {{ $v.type }}
         </div>
       </div>
-    </h3>
+    </span>
 
     <p class="config-description">
       {{ $v.description | markdownify }}
