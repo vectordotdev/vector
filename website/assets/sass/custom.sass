@@ -246,7 +246,7 @@ sup.ml-tiny
 
 // Admonition blocks (info, success, warning, etc.)
 $admonition-border-radius: 0.5rem
-$admonition-padding: 1rem 1.25rem
+$admonition-padding: 0.7rem 0.9rem
 $admonition-top-margin: 1rem
 $admonition-code-border-radius: 5px
 $admonition-title-font-size: 1.1rem
@@ -272,11 +272,12 @@ $admonition-title-font-size: 1.1rem
   .admonition-title
     font-size: $admonition-title-font-size
     font-weight: $weight-bold
+    margin-bottom: 0.5rem !important
 
   code
     border-radius: $admonition-code-border-radius
 
-  & + p, p + &, .highlight + &
+  & + p, p + &, .highlight + &, & + h2, & + h3, & + h4, & + &
     margin-top: $admonition-top-margin
 
 .vrl-examples

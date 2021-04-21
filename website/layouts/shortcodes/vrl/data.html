@@ -2,8 +2,15 @@
 {{ $data := index site.Data.docs.remap $key }}
 
 {{ range $k, $v := $data }}
-<h3 id="{{ $v.anchor }}">
+{{ $id := $v.title | urlize }}
+
+<h3 x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $id }}">
   {{ $v.title }}
+  <a class="ml-1" x-cloak x-show="show" href="#{{ $id }}">
+    <span class="icon is-small is-anchor">
+      <i class="fas fa-hashtag fa-xs"></i>
+    </span>
+  </a>
 </h3>
 
 <p>
@@ -11,8 +18,15 @@
 </p>
 
 {{ with $v.examples }}
-<h4 id="{{ $k }}-examples">
+{{ $id := printf "%s-examples" $k }}
+
+<h4 x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $id }}">
   Examples
+  <a class="ml-1" x-cloak x-show="show" href="#{{ $id }}">
+    <span class="icon is-small is-anchor">
+      <i class="fas fa-hashtag fa-xs"></i>
+    </span>
+  </a>
 </h4>
 
 {{ range . }}
