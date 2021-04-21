@@ -26,7 +26,7 @@ pub fn signals() -> impl Stream<Item = Control> {
 
 /// Signals from OS/user.
 #[cfg(windows)]
-pub fn signals() -> impl Stream<Item = SignalTo> {
+pub fn signals() -> impl Stream<Item = Control> {
     use futures::future::FutureExt;
 
     async_stream::stream! {
