@@ -282,9 +282,9 @@ impl fmt::Display for Target {
         match self {
             Noop => f.write_str("_"),
             Internal(ident, Some(path)) => write!(f, "{}{}", ident, path),
-            Internal(ident, _) => ident.fmt(f),
-            External(Some(path)) => path.fmt(f),
-            External(_) => f.write_str("."),
+            Internal(ident, None) => ident.fmt(f),
+            External(Some(path)) => write!(f, ".{}", path),
+            External(None) => f.write_str("."),
         }
     }
 }

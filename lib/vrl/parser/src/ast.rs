@@ -846,7 +846,7 @@ impl fmt::Display for AssignmentTarget {
             Query(query) => query.fmt(f),
             Internal(ident, Some(path)) => write!(f, "{}{}", ident, path),
             Internal(ident, _) => ident.fmt(f),
-            External(Some(path)) => path.fmt(f),
+            External(Some(path)) => write!(f, ".{}", path),
             External(_) => f.write_str("."),
         }
     }
@@ -903,7 +903,7 @@ impl fmt::Display for QueryTarget {
 
         match self {
             Internal(v) => v.fmt(f),
-            External => Ok(()),
+            External => write!(f, "."),
             FunctionCall(v) => v.fmt(f),
             Container(v) => v.fmt(f),
         }
