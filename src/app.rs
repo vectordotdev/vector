@@ -15,7 +15,7 @@ use tokio::{
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-#[cfg(features = "providers")]
+#[cfg(feature = "providers")]
 use tokio_stream::wrappers::ReceiverStream;
 
 #[cfg(feature = "sources-host_metrics")]
