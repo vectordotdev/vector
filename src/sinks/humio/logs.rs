@@ -148,9 +148,9 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{log_schema, SinkConfig, SinkContext},
+        event::Event,
         sinks::util::Compression,
         test_util::random_string,
-        Event,
     };
     use chrono::Utc;
     use futures::stream;

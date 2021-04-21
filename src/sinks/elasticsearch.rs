@@ -706,10 +706,10 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
+        event::Event,
         http::HttpClient,
         test_util::{random_events_with_stream, random_string, trace_init},
         tls::{self, TlsOptions},
-        Event,
     };
     use futures::{stream, StreamExt};
     use http::{Request, StatusCode};

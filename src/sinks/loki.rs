@@ -423,8 +423,8 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::SinkConfig, sinks::util::test::load_sink, template::Template,
-        test_util::random_lines, Event,
+        config::SinkConfig, event::Event, sinks::util::test::load_sink, template::Template,
+        test_util::random_lines,
     };
     use bytes::Bytes;
     use chrono::{DateTime, Duration, Utc};
