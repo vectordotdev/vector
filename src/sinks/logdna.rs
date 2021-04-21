@@ -255,7 +255,7 @@ impl LogdnaConfig {
     ) -> Result<PartitionKey, (Option<&str>, TemplateRenderingError)> {
         let hostname = self
             .hostname
-            .render_string(&event)
+            .render_string(event)
             .map_err(|e| (Some("hostname"), e))?;
         let tags = self
             .tags
