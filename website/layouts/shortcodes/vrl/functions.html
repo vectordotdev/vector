@@ -44,50 +44,23 @@
           <span class="arg{{ if .required }} is-required{{ end }}">{{ .name -}}</span>:
           <span class="types"><{{ delimit .type `<span class="bar"> | </span>` }}></span>{{ if not $isLast }}, {{ end -}}
           {{ end -}}
-        ){{- if $return }} :: <span class="types"><{{ delimit $return.types " | " }}</span>{{- end -}}>
+        ){{- if $return }} <span class="icon"><i class="fas fa-sm fa-arrow-right"></i></i></span> <span class="types"><{{ delimit $return.types " | " }}</span>{{- end -}}>
       </div>
 
-      <table class="function-args">
-        <thead>
-          <tr>
-            <th>
-              Argument
-            </th>
-            <th>
-              Description
-            </th>
-            <th>
-              Required?
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {{ range $args }}
-          <tr>
-            <td>
-              <code>
-                {{ .name }}
-              </code>
-            </td>
-            <td>
-              {{ .description | markdownify }}
-            </td>
-            <td>
-              {{ if .required }}
-              <span class="chip required">
-                required
-              </span>
-              {{ else }}
-              <span class="chip optional">
-                optional
-              </span>
-              {{ end }}
-            </td>
-          </tr>
-          {{ end }}
-        </tbody>
-      </table>
+      {{ template "key" }}
+
+      <p class="mt-3 has-text-weight-bold">
+        Arguments
+      </p>
     </div>
   </div>
   {{ end }}
 </div>
+
+{{ define "key" }}
+<p class="mt-1 is-family-monospace has-text-right has-text-weight-bold">
+  <span class="has-text-primary">required</span>
+  <span class="has-text-purple">optional</span>
+  <span class="has-text-grey">&lt;type(s)&gt;</span>
+</p>
+{{ end }}
