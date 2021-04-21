@@ -185,7 +185,10 @@ hostMetricsSource:
   # The name to use for the "built-in" host metrics source.
   sourceId: host_metrics
   # Additional config to embed at the host metrics source.
-  config: {}
+  config:
+    filesystem:
+      filesystems:
+        excludes: [binfmt_misc]
     # option: "value"
   # Raw TOML config to embed at the host metrics source (deprecated).
   rawConfig: null

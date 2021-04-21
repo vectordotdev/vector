@@ -316,7 +316,7 @@ mod tests {
         test_util::{next_addr, random_lines_with_stream},
     };
     use bytes::{Buf, Bytes};
-    use flate2::read::GzDecoder;
+    use flate2::read::MultiGzDecoder;
     use futures::{channel::mpsc, stream, StreamExt};
     use headers::{Authorization, HeaderMapExt};
     use http::request::Parts;
@@ -649,7 +649,7 @@ mod tests {
                 );
 
                 let lines: Vec<serde_json::Value> =
-                    serde_json::from_reader(GzDecoder::new(body.reader())).unwrap();
+                    serde_json::from_reader(MultiGzDecoder::new(body.reader())).unwrap();
                 stream::iter(lines)
             })
             .map(|line| line.get("message").unwrap().as_str().unwrap().to_owned())
@@ -666,7 +666,7 @@ mod tests {
     ) -> Vec<String> {
         rx.flat_map(|(parts, body)| {
             assert_parts(parts);
-            stream::iter(BufReader::new(GzDecoder::new(body.reader())).lines())
+            stream::iter(BufReader::new(MultiGzDecoder::new(body.reader())).lines())
         })
         .map(Result::unwrap)
         .map(|line| {

@@ -221,7 +221,7 @@ fn benchmark_multifaceted(c: &mut Criterion) {
                   . = parse_syslog!(string!(.message))
                   .timestamp = format_timestamp!(to_timestamp!(.timestamp), format: "%c")
                   del(.hostname)
-                  .message = downcase(string!(.message))
+                  .message = downcase(.message)
                   """
             "#},
         ),

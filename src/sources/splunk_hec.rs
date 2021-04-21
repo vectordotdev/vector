@@ -10,7 +10,7 @@ use crate::{
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
-use flate2::read::GzDecoder;
+use flate2::read::MultiGzDecoder;
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use futures01::{Async, Stream};
 use http::StatusCode;
@@ -305,7 +305,7 @@ async fn process_service_request(
     let mut out = out.sink_map_err(|_| Rejection::from(ApiError::ServerShutdown));
 
     let reader: Box<dyn Read + Send> = if gzip {
-        Box::new(GzDecoder::new(body.reader()))
+        Box::new(MultiGzDecoder::new(body.reader()))
     } else {
         Box::new(body.reader())
     };
@@ -582,7 +582,7 @@ fn raw_event(
     // Process gzip
     let message: Value = if gzip {
         let mut data = Vec::new();
-        match GzDecoder::new(bytes.reader()).read_to_end(&mut data) {
+        match MultiGzDecoder::new(bytes.reader()).read_to_end(&mut data) {
             Ok(0) => return Err(ApiError::NoData.into()),
             Ok(_) => Value::from(Bytes::from(data)),
             Err(error) => {
