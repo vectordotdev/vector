@@ -10,7 +10,7 @@ releases: "0.13.0": {
 		This release brings a new `datadog_logs` source to accept logs from [dd-agents](\(urls.datadog_agent)), a new
 		`gcp_stackdriver_metrics` sink to send metrics to [GCP Stackdriver](\(urls.gcp_stackdriver)), and a new
 		subcommand, `vector tap` that allows for inspecting events flowing out of a component. It also brings a number
-		of smaller enhancements, particuarly around the [Vector Remap Language](\(urls.vrl_reference)) used by our
+		of smaller enhancements, particularly around the [Vector Remap Language](\(urls.vrl_reference)) used by our
 		`remap`, `filter`, and `route` transforms.
 
 		Check out the [highlights](#highlights) and [changelog](#changelog) for more details.
@@ -41,7 +41,7 @@ releases: "0.13.0": {
 			description: """
 				We are hard at work at expanding the ability to run Vector as an [aggregator in
 				Kubernetes](\(urls.vector_aggregator_role)). This will allow you to build end-to-end observability
-				piplines in Kubernetes with Vector. Distributing processing on the edge, centralizing it with an
+				pipelines in Kubernetes with Vector. Distributing processing on the edge, centralizing it with an
 				aggregator, or both. If you are interested in beta testing, please [join our chat](\(urls.vector_chat))
 				and let us know.
 
