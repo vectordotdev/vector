@@ -1,12 +1,13 @@
 use crate::udp;
 use crate::{
     config::{self, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
+    event::Event,
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    Event, Pipeline,
+    Pipeline,
 };
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;

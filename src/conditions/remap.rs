@@ -1,8 +1,8 @@
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
     emit,
+    event::Event,
     internal_events::RemapConditionExecutionError,
-    Event,
 };
 use serde::{Deserialize, Serialize};
 use vrl::diagnostic::Formatter;

@@ -1,10 +1,9 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::proto,
+    event::{proto, Event},
     sinks::util::tcp::TcpSinkConfig,
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
-    Event,
 };
 use bytes::{BufMut, Bytes, BytesMut};
 use getset::Setters;

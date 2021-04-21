@@ -1,5 +1,5 @@
 use crate::config::component::ComponentDescription;
-use crate::Event;
+use crate::event::Event;
 use serde::{Deserialize, Serialize};
 
 pub mod check_fields;

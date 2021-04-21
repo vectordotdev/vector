@@ -1,13 +1,14 @@
 use crate::{
     config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
+    event::Event,
     http::HttpClient,
     internal_events::{
         ApacheMetricsErrorResponse, ApacheMetricsEventReceived, ApacheMetricsHttpError,
         ApacheMetricsParseError, ApacheMetricsRequestCompleted,
     },
     shutdown::ShutdownSignal,
-    Event, Pipeline,
+    Pipeline,
 };
 use chrono::Utc;
 use futures::{stream, FutureExt, SinkExt, StreamExt, TryFutureExt};

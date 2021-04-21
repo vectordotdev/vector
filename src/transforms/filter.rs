@@ -75,7 +75,7 @@ mod test {
     use super::*;
     use crate::{
         conditions::{is_log::IsLogConfig, ConditionConfig},
-        Event,
+        event::Event,
     };
 
     #[test]

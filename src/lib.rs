@@ -83,7 +83,6 @@ pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
 
-pub use event::{Event, Value};
 pub use pipeline::Pipeline;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;

@@ -34,13 +34,13 @@ use vector::{
     },
     event::{
         metric::{self, MetricValue},
-        Value,
+        Event, Value,
     },
     sinks::{util::StreamSink, Healthcheck, VectorSink},
     sources::Source,
     test_util::{temp_dir, temp_file},
     transforms::{FunctionTransform, Transform},
-    Event, Pipeline,
+    Pipeline,
 };
 
 pub fn sink(channel_size: usize) -> (mpsc::Receiver<Event>, MockSinkConfig<Pipeline>) {

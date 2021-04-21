@@ -1,4 +1,4 @@
-use crate::Event;
+use crate::event::Event;
 use futures::{channel::mpsc, future, stream::Fuse, Sink, Stream, StreamExt};
 use std::{
     fmt,
@@ -191,7 +191,7 @@ impl Sink<Event> for Fanout {
 #[cfg(test)]
 mod tests {
     use super::{ControlMessage, Fanout};
-    use crate::{test_util::collect_ready, Event};
+    use crate::{event::Event, test_util::collect_ready};
     use futures::{channel::mpsc, stream, FutureExt, Sink, SinkExt, StreamExt};
     use std::{
         pin::Pin,
