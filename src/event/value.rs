@@ -344,8 +344,6 @@ impl Value {
     }
 
     /// Lookup API methods
-    /// TODO Add the tests
-
     /// Return if the node is a leaf (meaning it has no children) or not.
     ///
     /// This is notably useful for things like influxdb logs where we list only leaves.
