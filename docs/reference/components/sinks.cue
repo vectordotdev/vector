@@ -161,9 +161,9 @@ components: sinks: [Name=string]: {
 							}
 						}
 
-						if features.healthcheck.enabled {except_fields: {
+						except_fields: {
 							common:      false
-							description: "Prevent the sink from encoding the specified labels."
+							description: "Prevent the sink from encoding the specified fields."
 							required:    false
 							type: array: {
 								default: null
@@ -174,31 +174,30 @@ components: sinks: [Name=string]: {
 							}
 						}
 
-							only_fields: {
-								common:      false
-								description: "Prevent the sink from encoding the specified labels."
-								required:    false
-								type: array: {
-									default: null
-									items: type: string: {
-										examples: ["message", "parent.child"]
-										syntax: "field_path"
-									}
+						only_fields: {
+							common:      false
+							description: "Prevent the sink from encoding the specified fields."
+							required:    false
+							type: array: {
+								default: null
+								items: type: string: {
+									examples: ["message", "parent.child"]
+									syntax: "field_path"
 								}
 							}
+						}
 
-							timestamp_format: {
-								common:      false
-								description: "How to format event timestamps."
-								required:    false
-								type: string: {
-									default: "rfc3339"
-									enum: {
-										rfc3339: "Formats as a RFC3339 string"
-										unix:    "Formats as a unix timestamp"
-									}
-									syntax: "literal"
+						timestamp_format: {
+							common:      false
+							description: "How to format event timestamps."
+							required:    false
+							type: string: {
+								default: "rfc3339"
+								enum: {
+									rfc3339: "Formats as a RFC3339 string"
+									unix:    "Formats as a unix timestamp"
 								}
+								syntax: "literal"
 							}
 						}
 					}
@@ -410,7 +409,7 @@ components: sinks: [Name=string]: {
 						buffers_batches: {
 							title: "Buffers & batches"
 							body: #"""
-									![Buffers and Batches](/optimized_svg/buffers-and-batches-serial_538_160.svg)
+									<SVG src="/optimized_svg/buffers-and-batches-serial_538_160.svg" />
 
 									This component buffers & batches data as shown in the diagram above. You'll notice that Vector treats these concepts
 									differently, instead of treating them as global concepts, Vector treats them

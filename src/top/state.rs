@@ -36,7 +36,7 @@ pub struct ComponentRow {
 /// represents the single destination for handling subscriptions and returning 'immutable' state
 /// for re-rendering the dashboard. This approach uses channels vs. mutexes.
 pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
-    let (mut tx, rx) = mpsc::channel(20);
+    let (tx, rx) = mpsc::channel(20);
 
     // Prime the receiver with the initial state
     let _ = tx.send(state.clone()).await;

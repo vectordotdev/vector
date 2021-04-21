@@ -6,6 +6,7 @@
 
 use async_trait::async_trait;
 use futures::{
+    channel::mpsc,
     future,
     stream::{self, BoxStream},
     task::Poll,
@@ -15,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
     fs::{create_dir, OpenOptions},
-    io::{self, Write},
+    io::Write,
     path::PathBuf,
     pin::Pin,
     sync::{
@@ -24,19 +25,20 @@ use std::{
     },
     task::Context,
 };
-use tokio::sync::mpsc;
 use tracing::{error, info};
 use vector::{
     buffers::Acker,
-    config::{DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig},
+    config::{
+        DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext,
+        TransformConfig,
+    },
     event::{
         metric::{self, MetricValue},
         Value,
     },
-    shutdown::ShutdownSignal,
     sinks::{util::StreamSink, Healthcheck, VectorSink},
     sources::Source,
-    test_util::{runtime, temp_dir, temp_file},
+    test_util::{temp_dir, temp_file},
     transforms::{FunctionTransform, Transform},
     Event, Pipeline,
 };
@@ -141,18 +143,13 @@ impl MockSourceConfig {
 #[async_trait]
 #[typetag::serde(name = "mock")]
 impl SourceConfig for MockSourceConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> Result<Source, vector::Error> {
+    async fn build(&self, cx: SourceContext) -> Result<Source, vector::Error> {
         let wrapped = self.receiver.clone();
         let event_counter = self.event_counter.clone();
         let mut recv = wrapped.lock().unwrap().take().unwrap();
-        let mut shutdown = Some(shutdown);
+        let mut shutdown = Some(cx.shutdown);
         let mut _token = None;
+        let out = cx.out;
         Ok(Box::pin(async move {
             stream::poll_fn(move |cx| {
                 if let Some(until) = shutdown.as_mut() {
@@ -401,34 +398,4 @@ impl<T> Sink<T> for DeadSink<T> {
     fn start_send(self: Pin<&mut Self>, _item: T) -> Result<(), Self::Error> {
         Err("never ready")
     }
-}
-
-/// Takes a test name and a future, and uses `rusty_fork` to perform a cross-platform
-/// process fork. This allows us to test functionality without conflicting with global
-/// state that may have been set/mutated from previous tests
-pub fn fork_test<T: std::future::Future<Output = ()>>(test_name: &'static str, fut: T) {
-    let fork_id = rusty_fork::rusty_fork_id!();
-
-    rusty_fork::fork(
-        test_name,
-        fork_id,
-        |_| {},
-        |child, f| {
-            let status = child.wait().expect("Couldn't wait for child process");
-
-            // Copy all output
-            let mut stdout = io::stdout();
-            io::copy(f, &mut stdout).expect("Couldn't write to stdout");
-
-            // If the test failed, panic on the parent thread
-            if !status.success() {
-                panic!("Test failed");
-            }
-        },
-        || {
-            let mut rt = runtime();
-            rt.block_on(fut);
-        },
-    )
-    .expect("Couldn't fork test");
 }

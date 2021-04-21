@@ -114,6 +114,7 @@ cli: {
 				auto:   "Detect ANSI terminal formatting and enable if supported."
 				never:  "Disable ANSI terminal formatting."
 			}
+			env_var: "VECTOR_COLOR"
 		}
 		"config": {
 			_short: "c"
@@ -171,6 +172,7 @@ cli: {
 				json: "Output Vector's logs as JSON."
 				text: "Output Vector's logs as text."
 			}
+			env_var: "VECTOR_LOG_FORMAT"
 		}
 	}
 
@@ -227,7 +229,7 @@ cli: {
 			description: """
 				Run Vector config unit tests, then exit. This command is experimental and
 				therefore subject to change. For guidance on how to write unit tests check
-				out: https://vector.dev/docs/setup/guides/unit-testing/
+				out: \(urls.vector_unit_testing)
 				"""
 
 			options: {

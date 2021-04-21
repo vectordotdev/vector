@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use structopt::{clap::AppSettings, StructOpt};
 
 #[cfg(feature = "api-client")]
+use crate::tap;
+#[cfg(feature = "api-client")]
 use crate::top;
 
 #[cfg(windows)]
@@ -97,7 +99,7 @@ pub struct RootOpts {
     pub quiet: u8,
 
     /// Set the logging format
-    #[structopt(long, default_value = "text", possible_values = &["text", "json"])]
+    #[structopt(long, default_value = "text", env = "VECTOR_LOG_FORMAT", possible_values = &["text", "json"])]
     pub log_format: LogFormat,
 
     /// Control when ANSI terminal formatting is used.
@@ -107,7 +109,7 @@ pub struct RootOpts {
     /// the `--color always` option will always enable ANSI terminal formatting. `--color never`
     /// will disable all ANSI terminal formatting. `--color auto` will attempt
     /// to detect it automatically.
-    #[structopt(long, default_value = "auto", possible_values = &["auto", "always", "never"])]
+    #[structopt(long, default_value = "auto", env = "VECTOR_COLOR", possible_values = &["auto", "always", "never"])]
     pub color: Color,
 
     /// Watch for changes in configuration file, and reload accordingly.
@@ -120,9 +122,9 @@ impl RootOpts {
     pub fn config_paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
         config::merge_path_lists(vec![
             (&self.config_paths, None),
-            (&self.config_paths_toml, Some(config::Format::TOML)),
-            (&self.config_paths_json, Some(config::Format::JSON)),
-            (&self.config_paths_yaml, Some(config::Format::YAML)),
+            (&self.config_paths_toml, Some(config::Format::Toml)),
+            (&self.config_paths_json, Some(config::Format::Json)),
+            (&self.config_paths_yaml, Some(config::Format::Yaml)),
         ])
     }
 }
@@ -140,12 +142,16 @@ pub enum SubCommand {
     List(list::Opts),
 
     /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
-    /// For guidance on how to write unit tests check out: https://vector.dev/docs/setup/guides/unit-testing/
+    /// For guidance on how to write unit tests check out: https://vector.dev/guides/level-up/unit-testing/
     Test(unit_test::Opts),
 
     /// Display topology and metrics in the console, for a local or remote Vector instance
     #[cfg(feature = "api-client")]
     Top(top::Opts),
+
+    /// Observe log events from topology components
+    #[cfg(feature = "api-client")]
+    Tap(tap::Opts),
 
     /// Manage the vector service.
     #[cfg(windows)]
@@ -153,7 +159,7 @@ pub enum SubCommand {
 
     /// Vector Remap Language CLI
     #[cfg(feature = "vrl-cli")]
-    VRL(vrl_cli::Opts),
+    Vrl(vrl_cli::Opts),
 }
 
 #[derive(Debug, Clone, PartialEq)]

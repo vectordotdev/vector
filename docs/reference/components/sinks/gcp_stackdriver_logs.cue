@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: gcp_stackdriver_logs: {
-	title: "GCP Operations (formerly Stackdrive) Logs"
+	title: "GCP Operations (formerly Stackdriver) Logs"
 
 	classes: {
 		commonly_used: true

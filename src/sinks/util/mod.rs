@@ -11,7 +11,6 @@ pub mod statistic;
 pub mod tcp;
 #[cfg(test)]
 pub mod test;
-#[cfg(feature = "socket2")]
 pub mod udp;
 #[cfg(all(any(feature = "sinks-socket", feature = "sinks-statsd"), unix))]
 pub mod unix;

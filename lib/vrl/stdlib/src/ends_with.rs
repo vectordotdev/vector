@@ -31,7 +31,7 @@ impl Function for EndsWith {
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
         let substring = arguments.required("substring");
-        let case_sensitive = arguments.optional("case_sensitive");
+        let case_sensitive = arguments.optional("case_sensitive").unwrap_or(expr!(true));
 
         Ok(Box::new(EndsWithFn {
             value,
@@ -41,11 +41,23 @@ impl Function for EndsWith {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
-            title: "ends with",
-            source: r#"ends_with("the restaurant", "restaurant")"#,
-            result: Ok("true"),
-        }]
+        &[
+            Example {
+                title: "case sensitive",
+                source: r#"ends_with("foobar", "R")"#,
+                result: Ok("false"),
+            },
+            Example {
+                title: "case insensitive",
+                source: r#"ends_with("foobar", "R", false)"#,
+                result: Ok("true"),
+            },
+            Example {
+                title: "mismatch",
+                source: r#"ends_with("foobar", "foo")"#,
+                result: Ok("false"),
+            },
+        ]
     }
 }
 
@@ -53,15 +65,12 @@ impl Function for EndsWith {
 struct EndsWithFn {
     value: Box<dyn Expression>,
     substring: Box<dyn Expression>,
-    case_sensitive: Option<Box<dyn Expression>>,
+    case_sensitive: Box<dyn Expression>,
 }
 
 impl Expression for EndsWithFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
-        let case_sensitive = match &self.case_sensitive {
-            Some(expr) => expr.resolve(ctx)?.try_boolean()?,
-            None => false,
-        };
+        let case_sensitive = self.case_sensitive.resolve(ctx)?.try_boolean()?;
 
         let substring = {
             let bytes = self.substring.resolve(ctx)?.try_bytes()?;
@@ -135,16 +144,16 @@ mod tests {
 
         uppercase {
             args: func_args![value: "fooBAR",
-                             substring: "BAR",
-                             case_sensitive: true],
+                             substring: "BAR"
+            ],
             want: Ok(value!(true)),
             tdef: TypeDef::new().infallible().boolean(),
         }
 
         case_sensitive {
             args: func_args![value: "foobar",
-                             substring: "BAR",
-                             case_sensitive: true],
+                             substring: "BAR"
+            ],
             want: Ok(value!(false)),
             tdef: TypeDef::new().infallible().boolean(),
         }

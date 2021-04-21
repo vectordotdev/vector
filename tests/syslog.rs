@@ -7,6 +7,8 @@ use serde_json::Value;
 use sinks::socket::{self, SocketSinkConfig};
 use sinks::util::{encoding::EncodingConfig, tcp::TcpSinkConfig, Encoding};
 use std::{collections::HashMap, fmt, str::FromStr};
+#[cfg(unix)]
+use tokio::io::AsyncWriteExt;
 use tokio_util::codec::BytesCodec;
 use vector::{
     config, sinks,
@@ -42,8 +44,8 @@ async fn test_tcp_syslog() {
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
 
-    let input_messages: Vec<SyslogMessageRFC5424> = (0..num_messages)
-        .map(|i| SyslogMessageRFC5424::random(i, 30, 4, 3, 3))
+    let input_messages: Vec<SyslogMessageRfc5424> = (0..num_messages)
+        .map(|i| SyslogMessageRfc5424::random(i, 30, 4, 3, 3))
         .collect();
 
     let input_lines: Vec<String> = input_messages.iter().map(|msg| msg.to_string()).collect();
@@ -56,7 +58,7 @@ async fn test_tcp_syslog() {
     let output_lines = output_lines.await;
     assert_eq!(output_lines.len(), num_messages);
 
-    let output_messages: Vec<SyslogMessageRFC5424> = output_lines
+    let output_messages: Vec<SyslogMessageRfc5424> = output_lines
         .iter()
         .map(|s| {
             let mut value = Value::from_str(s).unwrap();
@@ -98,8 +100,8 @@ async fn test_unix_stream_syslog() {
         yield_now().await;
     }
 
-    let input_messages: Vec<SyslogMessageRFC5424> = (0..num_messages)
-        .map(|i| SyslogMessageRFC5424::random(i, 30, 4, 3, 3))
+    let input_messages: Vec<SyslogMessageRfc5424> = (0..num_messages)
+        .map(|i| SyslogMessageRfc5424::random(i, 30, 4, 3, 3))
         .collect();
 
     let stream = UnixStream::connect(&in_path).await.unwrap();
@@ -110,10 +112,10 @@ async fn test_unix_stream_syslog() {
     sink.send_all(&mut lines).await.unwrap();
 
     let stream = sink.get_mut();
-    stream.shutdown(std::net::Shutdown::Both).unwrap();
+    stream.shutdown().await.unwrap();
 
     // Otherwise some lines will be lost
-    tokio::time::delay_for(std::time::Duration::from_millis(1000)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
 
     // Shut down server
     topology.stop().await;
@@ -121,7 +123,7 @@ async fn test_unix_stream_syslog() {
     let output_lines = output_lines.await;
     assert_eq!(output_lines.len(), num_messages);
 
-    let output_messages: Vec<SyslogMessageRFC5424> = output_lines
+    let output_messages: Vec<SyslogMessageRfc5424> = output_lines
         .iter()
         .map(|s| {
             let mut value = Value::from_str(s).unwrap();
@@ -160,9 +162,9 @@ async fn test_octet_counting_syslog() {
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
 
-    let input_messages: Vec<SyslogMessageRFC5424> = (0..num_messages)
+    let input_messages: Vec<SyslogMessageRfc5424> = (0..num_messages)
         .map(|i| {
-            let mut msg = SyslogMessageRFC5424::random(i, 30, 4, 3, 3);
+            let mut msg = SyslogMessageRfc5424::random(i, 30, 4, 3, 3);
             msg.message.push('\n');
             msg.message.push_str(&random_string(30));
             msg
@@ -186,7 +188,7 @@ async fn test_octet_counting_syslog() {
     let output_lines = output_lines.await;
     assert_eq!(output_lines.len(), num_messages);
 
-    let output_messages: Vec<SyslogMessageRFC5424> = output_lines
+    let output_messages: Vec<SyslogMessageRfc5424> = output_lines
         .iter()
         .map(|s| {
             let mut value = Value::from_str(s).unwrap();
@@ -199,7 +201,7 @@ async fn test_octet_counting_syslog() {
 }
 
 #[derive(Deserialize, PartialEq, Clone, Debug)]
-struct SyslogMessageRFC5424 {
+struct SyslogMessageRfc5424 {
     msgid: String,
     severity: Severity,
     facility: Facility,
@@ -214,7 +216,7 @@ struct SyslogMessageRFC5424 {
     structured_data: StructuredData,
 }
 
-impl SyslogMessageRFC5424 {
+impl SyslogMessageRfc5424 {
     fn random(
         id: usize,
         msg_len: usize,
@@ -244,7 +246,7 @@ impl SyslogMessageRFC5424 {
     }
 }
 
-impl fmt::Display for SyslogMessageRFC5424 {
+impl fmt::Display for SyslogMessageRfc5424 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -262,7 +264,7 @@ impl fmt::Display for SyslogMessageRFC5424 {
     }
 }
 
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Copy, Clone, Deserialize, PartialEq, Debug)]
 pub enum Severity {
     #[serde(rename(deserialize = "emergency"))]
@@ -283,7 +285,7 @@ pub enum Severity {
     LOG_DEBUG,
 }
 
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Copy, Clone, PartialEq, Deserialize, Debug)]
 pub enum Facility {
     #[serde(rename(deserialize = "kernel"))]

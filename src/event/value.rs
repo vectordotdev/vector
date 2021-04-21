@@ -1,14 +1,14 @@
 use crate::{event::timestamp_to_string, Result};
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::iter::FromIterator;
 use toml::value::Value as TomlValue;
 
-#[derive(PartialEq, Debug, Clone, is_enum_variant)]
+#[derive(PartialEq, Debug, Clone, Deserialize, is_enum_variant)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
@@ -271,6 +271,13 @@ impl Value {
         self.as_bytes()
     }
 
+    pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
+        match &self {
+            Value::Map(map) => Some(map),
+            _ => None,
+        }
+    }
+
     pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
         match &self {
             Value::Timestamp(ts) => Some(ts),
@@ -288,6 +295,21 @@ impl Value {
             Value::Map(_) => "map",
             Value::Array(_) => "array",
             Value::Null => "null",
+        }
+    }
+
+    /// Merges `incoming` value into self.
+    ///
+    /// Will concatenate `Bytes` and overwrite the rest value kinds.
+    pub fn merge(&mut self, incoming: Value) {
+        match (self, incoming) {
+            (Value::Bytes(self_bytes), Value::Bytes(ref incoming)) => {
+                let mut bytes = BytesMut::with_capacity(self_bytes.len() + incoming.len());
+                bytes.extend_from_slice(&self_bytes[..]);
+                bytes.extend_from_slice(&incoming[..]);
+                *self_bytes = bytes.freeze();
+            }
+            (current, incoming) => *current = incoming,
         }
     }
 }

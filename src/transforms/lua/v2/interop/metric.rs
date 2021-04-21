@@ -213,6 +213,7 @@ impl<'a> FromLua<'a> for Metric {
 mod test {
     use super::*;
     use chrono::{offset::TimeZone, Utc};
+    use shared::assert_event_data_eq;
 
     fn assert_metric(metric: Metric, assertions: Vec<&'static str>) {
         Lua::new().context(|ctx| {
@@ -220,6 +221,7 @@ mod test {
             for assertion in assertions {
                 assert!(
                     ctx.load(assertion).eval::<bool>().expect(assertion),
+                    "{}",
                     assertion
                 );
             }
@@ -394,7 +396,7 @@ mod test {
             MetricValue::Counter { value: 0.57721566 },
         );
         Lua::new().context(|ctx| {
-            assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
+            assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
     }
 
@@ -432,7 +434,7 @@ mod test {
         ))
         .with_timestamp(Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10)));
         Lua::new().context(|ctx| {
-            assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
+            assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
     }
 
@@ -450,7 +452,7 @@ mod test {
             MetricValue::Gauge { value: 1.6180339 },
         );
         Lua::new().context(|ctx| {
-            assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
+            assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
     }
 
@@ -472,7 +474,7 @@ mod test {
             },
         );
         Lua::new().context(|ctx| {
-            assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
+            assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
     }
 
@@ -495,7 +497,7 @@ mod test {
             },
         );
         Lua::new().context(|ctx| {
-            assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
+            assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
     }
 
@@ -519,7 +521,7 @@ mod test {
             },
         );
         Lua::new().context(|ctx| {
-            assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
+            assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
     }
 
@@ -546,7 +548,7 @@ mod test {
             },
         );
         Lua::new().context(|ctx| {
-            assert_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
+            assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
         });
     }
 }

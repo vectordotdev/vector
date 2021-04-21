@@ -17,7 +17,7 @@ git clone "https://$GITHUB_TOKEN:x-oauth-basic@github.com/timberio/homebrew-brew
 cd homebrew-brew
 
 PACKAGE_URL="https://packages.timber.io/vector/$VECTOR_VERSION/vector-$VECTOR_VERSION-x86_64-apple-darwin.tar.gz"
-PACKAGE_SHA256=$(curl -s "$PACKAGE_URL" | sha256sum | cut -d " " -f 1)
+PACKAGE_SHA256=$(curl -fsSL "$PACKAGE_URL" | sha256sum | cut -d " " -f 1)
 
 update-content() {
   sed "s|url \".*\"|url \"$PACKAGE_URL\"|" \

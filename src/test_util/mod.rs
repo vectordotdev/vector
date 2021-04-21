@@ -3,7 +3,7 @@ use crate::{
     topology::{self, RunningTopology},
     trace, Event,
 };
-use flate2::read::GzDecoder;
+use flate2::read::MultiGzDecoder;
 use futures::{
     ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
 };
@@ -18,7 +18,7 @@ use std::{
     future::{ready, Future},
     io::Read,
     iter,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     path::{Path, PathBuf},
     pin::Pin,
     sync::{
@@ -28,13 +28,16 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::{
-    io::{AsyncRead, AsyncWrite, Result as IoResult},
+    io::{AsyncRead, AsyncWrite, AsyncWriteExt, Result as IoResult},
     net::{TcpListener, TcpStream},
     runtime,
-    sync::{mpsc, oneshot},
+    sync::oneshot,
     task::JoinHandle,
-    time::{delay_for, Duration, Instant},
+    time::{sleep, Duration, Instant},
 };
+use tokio_stream::wrappers::TcpListenerStream;
+#[cfg(unix)]
+use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
 
 const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
@@ -127,7 +130,7 @@ pub async fn send_encodable<I, E: From<std::io::Error> + std::fmt::Debug>(
     sink.send_all(&mut lines).await.unwrap();
 
     let stream = sink.get_mut();
-    stream.shutdown(Shutdown::Both).unwrap();
+    stream.shutdown().await.unwrap();
 
     Ok(())
 }
@@ -147,16 +150,22 @@ pub async fn send_lines_tls(
         connector.set_verify(SslVerifyMode::NONE);
     }
 
-    let config = connector.build().configure().unwrap();
+    let ssl = connector
+        .build()
+        .configure()
+        .unwrap()
+        .into_ssl(&host)
+        .unwrap();
 
-    let stream = tokio_openssl::connect(config, &host, stream).await.unwrap();
+    let mut stream = tokio_openssl::SslStream::new(ssl, stream).unwrap();
+    Pin::new(&mut stream).connect().await.unwrap();
     let mut sink = FramedWrite::new(stream, LinesCodec::new());
 
     let mut lines = stream::iter(lines).map(Ok);
     sink.send_all(&mut lines).await.unwrap();
 
     let stream = sink.get_mut().get_mut();
-    stream.shutdown(Shutdown::Both).unwrap();
+    stream.shutdown().await.unwrap();
 
     Ok(())
 }
@@ -228,7 +237,10 @@ pub fn random_maps(
     iter::repeat(()).map(move |_| random_map(max_size, field_len))
 }
 
-pub async fn collect_n<T>(rx: mpsc::Receiver<T>, n: usize) -> Vec<T> {
+pub async fn collect_n<S>(rx: S, n: usize) -> Vec<S::Item>
+where
+    S: Stream + Unpin,
+{
     rx.take(n).collect().await
 }
 
@@ -262,15 +274,27 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     let mut gzip_bytes = Vec::new();
     file.read_to_end(&mut gzip_bytes).unwrap();
     let mut output = String::new();
-    GzDecoder::new(&gzip_bytes[..])
+    MultiGzDecoder::new(&gzip_bytes[..])
+        .read_to_string(&mut output)
+        .unwrap();
+    output.lines().map(|s| s.to_owned()).collect()
+}
+
+pub fn lines_from_zst_file<P: AsRef<Path>>(path: P) -> Vec<String> {
+    trace!(message = "Reading zst file.", path = %path.as_ref().display());
+    let mut file = File::open(path).unwrap();
+    let mut zst_bytes = Vec::new();
+    file.read_to_end(&mut zst_bytes).unwrap();
+    let mut output = String::new();
+    zstd::stream::Decoder::new(&zst_bytes[..])
+        .unwrap()
         .read_to_string(&mut output)
         .unwrap();
     output.lines().map(|s| s.to_owned()).collect()
 }
 
 pub fn runtime() -> runtime::Runtime {
-    runtime::Builder::new()
-        .threaded_scheduler()
+    runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap()
@@ -285,7 +309,7 @@ where
     let started = Instant::now();
     let mut delay = WAIT_FOR_MIN_MILLIS;
     while !f().await {
-        delay_for(Duration::from_millis(delay)).await;
+        sleep(Duration::from_millis(delay)).await;
         if started.elapsed() > duration {
             panic!("Timed out while waiting");
         }
@@ -336,7 +360,7 @@ where
     while started.elapsed() < until {
         match f().await {
             Ok(res) => return res,
-            Err(_) => tokio::time::delay_for(retry).await,
+            Err(_) => tokio::time::sleep(retry).await,
         }
     }
     panic!("Timeout")
@@ -426,9 +450,9 @@ impl<T> Future for CountReceiver<T> {
 impl CountReceiver<String> {
     pub fn receive_lines(addr: SocketAddr) -> CountReceiver<String> {
         CountReceiver::new(|count, tripwire, connected| async move {
-            let mut listener = TcpListener::bind(addr).await.unwrap();
+            let listener = TcpListener::bind(addr).await.unwrap();
             CountReceiver::receive_lines_stream(
-                listener.incoming(),
+                TcpListenerStream::new(listener),
                 count,
                 tripwire,
                 Some(connected),
@@ -443,9 +467,9 @@ impl CountReceiver<String> {
         P: AsRef<Path> + Send + 'static,
     {
         CountReceiver::new(|count, tripwire, connected| async move {
-            let mut listener = tokio::net::UnixListener::bind(path).unwrap();
+            let listener = tokio::net::UnixListener::bind(path).unwrap();
             CountReceiver::receive_lines_stream(
-                listener.incoming(),
+                UnixListenerStream::new(listener),
                 count,
                 tripwire,
                 Some(connected),

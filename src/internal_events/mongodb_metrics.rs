@@ -4,12 +4,12 @@ use mongodb::{bson, error::Error as MongoError};
 use std::time::Instant;
 
 #[derive(Debug)]
-pub(crate) struct MongoDBMetricsEventsReceived<'a> {
+pub(crate) struct MongoDbMetricsEventsReceived<'a> {
     pub count: usize,
     pub uri: &'a str,
 }
 
-impl<'a> InternalEvent for MongoDBMetricsEventsReceived<'a> {
+impl<'a> InternalEvent for MongoDbMetricsEventsReceived<'a> {
     fn emit_metrics(&self) {
         counter!(
             "events_in_total", self.count as u64,
@@ -19,12 +19,12 @@ impl<'a> InternalEvent for MongoDBMetricsEventsReceived<'a> {
 }
 
 #[derive(Debug)]
-pub struct MongoDBMetricsCollectCompleted {
+pub struct MongoDbMetricsCollectCompleted {
     pub start: Instant,
     pub end: Instant,
 }
 
-impl InternalEvent for MongoDBMetricsCollectCompleted {
+impl InternalEvent for MongoDbMetricsCollectCompleted {
     fn emit_logs(&self) {
         debug!(message = "Collection completed.");
     }
@@ -35,14 +35,14 @@ impl InternalEvent for MongoDBMetricsCollectCompleted {
     }
 }
 
-pub struct MongoDBMetricsRequestError<'a> {
+pub struct MongoDbMetricsRequestError<'a> {
     pub error: MongoError,
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for MongoDBMetricsRequestError<'a> {
+impl<'a> InternalEvent for MongoDbMetricsRequestError<'a> {
     fn emit_logs(&self) {
-        error!(message = "MongoDB request error.", endpoint = %self.endpoint, error = ?self.error)
+        error!(message = "MongoDb request error.", endpoint = %self.endpoint, error = ?self.error)
     }
 
     fn emit_metrics(&self) {
@@ -50,12 +50,12 @@ impl<'a> InternalEvent for MongoDBMetricsRequestError<'a> {
     }
 }
 
-pub struct MongoDBMetricsBsonParseError<'a> {
+pub struct MongoDbMetricsBsonParseError<'a> {
     pub error: bson::de::Error,
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for MongoDBMetricsBsonParseError<'a> {
+impl<'a> InternalEvent for MongoDbMetricsBsonParseError<'a> {
     fn emit_logs(&self) {
         error!(message = "BSON document parse error.", endpoint = %self.endpoint, error = ?self.error)
     }

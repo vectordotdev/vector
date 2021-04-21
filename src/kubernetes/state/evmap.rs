@@ -214,7 +214,7 @@ mod tests {
 
         assert_eq!(state_reader.is_empty(), true);
 
-        tokio::time::delay_for(flush_debounce_timeout * 2).await;
+        tokio::time::sleep(flush_debounce_timeout * 2).await;
         let mut state_writer = join.await.unwrap();
 
         assert_eq!(state_reader.is_empty(), false);
