@@ -6,30 +6,88 @@
 {{ end }}
 {{ end }}
 
-{{ range $funcs }}
-{{ $name := .name }}
-{{ $func := index site.Data.docs.remap.functions .name }}
-<div class="function">
-  <header class="function-header">
-    <span class="function-title">
-      {{/* The h3 ensures that the function name is picked up by Tocbot and added to the TOC */}}
-      <h3 id="{{ .name }}">
-        {{ .name }}
+<div class="configs">
+  {{ range $funcs }}
+  {{ $name := .name }}
+  {{ $func := index site.Data.docs.remap.functions .name }}
+  {{ $infallible := not $func.internal_failure_reasons }}
+  {{ $args := $func.arguments }}
+  {{ $lastArg := sub (len $args) 1 }}
+  {{ $return := $func.return }}
+  <div class="config">
+    <span class="config-title">
+      <h3 class="name" id="{{ $name }}">
+        {{ $name }}
       </h3>
 
-      {{ with $func.arguments }}
-      {{ $args := slice }}
-      {{ range . }}
-      {{ $args = $args | append .name }}
-      {{ end }}
-      {{ $lastArg := sub (len $args) 1 }}
-      <span class="name">
-        {{ $name }}(<span class="args">{{ range $idx, $arg := $args }}<span class="arg">{{ $arg }}</span>{{ if ne $idx $lastArg }}, {{ end }}{{ end }}</span>)
-      </span>
-      {{ else }}
-      {{ .name }}
-      {{ end }}
+      <div class="config-buttons">
+        {{ $color := cond $infallible "grey" "bold" }}
+        <span class="config-button is-{{ $color }}">
+          {{ cond $infallible "infallible" "fallible" }}
+        </span>
+      </div>
     </span>
-  </header>
+
+    <p class="config-description">
+      {{ $func.description | markdownify }}
+    </p>
+
+    <div class="config-spec">
+      <p class="has-text-weight-bold">
+        Function spec
+      </p>
+
+      <div class="function-spec">
+        <span class="name">{{ $name }}</span>(
+          {{- range $idx, $arg := $args -}}
+          {{ $isLast := eq $idx $lastArg -}}
+          <span class="arg{{ if .required }} is-required{{ end }}">{{ .name -}}</span>:
+          <span class="types"><{{ delimit .type `<span class="bar"> | </span>` }}></span>{{ if not $isLast }}, {{ end -}}
+          {{ end -}}
+        ){{- if $return }} :: <span class="types"><{{ delimit $return.types " | " }}</span>{{- end -}}>
+      </div>
+
+      <table class="function-args">
+        <thead>
+          <tr>
+            <th>
+              Argument
+            </th>
+            <th>
+              Description
+            </th>
+            <th>
+              Required?
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range $args }}
+          <tr>
+            <td>
+              <code>
+                {{ .name }}
+              </code>
+            </td>
+            <td>
+              {{ .description | markdownify }}
+            </td>
+            <td>
+              {{ if .required }}
+              <span class="chip required">
+                required
+              </span>
+              {{ else }}
+              <span class="chip optional">
+                optional
+              </span>
+              {{ end }}
+            </td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {{ end }}
 </div>
-{{ end }}

@@ -10,7 +10,7 @@ $button-font-weight: $weight-bold
 $button-padding: 0.25rem 0.4rem
 $button-border-radius: 5px
 $title-font-size: 1rem
-$title-bottom-margin: 0.75rem
+$title-bottom-margin: 1rem
 $title-font-size: 1.25rem
 $title-color: $black
 $text-font-size: 0.95rem
@@ -59,6 +59,14 @@ $button-bg-color-light: $grey
           & + .config-button
             margin-left: $button-spacing
 
+          &.is-grey
+            color: $black
+            background-color: $grey-lighter
+
+          &.is-purple
+            color: $black
+            background-color: $purple
+
           &.is-light
             background-color: $button-bg-color-light
 
@@ -84,3 +92,42 @@ $button-bg-color-light: $grey
           font-weight: $weight-bold
           background-color: $white
 
+.function-args
+  margin-top: 0.75rem
+
+  .chip
+    font-size: 0.6rem
+    border-radius: 5px
+    color: $white
+    padding: 0.3rem 0.5rem
+    font-weight: $weight-bold
+
+    &.required
+      background-color: $primary
+    &.optional
+      background-color: $purple
+
+.function-spec
+  border-radius: 5px
+  color: $black
+  font-size: 0.9rem
+  background-color: $white-bis
+  padding: 0.5rem 0.75rem
+  font-family: $family-monospace
+  font-weight: $weight-semibold
+
+  .name
+    font-weight: $weight-bold
+
+  .arg
+    font-weight: $weight-semibold
+    color: $purple
+
+    &.is-required
+      color: $primary
+
+  .bar
+    color: $grey
+
+  .types
+    color: $grey-dark

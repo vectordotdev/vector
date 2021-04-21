@@ -1,20 +1,17 @@
-.function
-  box-shadow: $box-shadow
-  border-radius: $border-radius
-  padding: $padding
+$func-padding: 1rem
+$margin-between-funcs: 1rem
 
-  & + .function
-    margin-top: $vertical-spacing
+.functions
+  .function
+    padding: $func-padding
+    box-shadow: $card-shadow
 
-  .function-header
-    +x-spaced
-    font-weight: $weight-bold
-    font-family: $family-monospace
+    .function-header
+      +x-spaced
+      +y-centered-row
 
-    .function-title
-      .name
-        color: $black
-        .args
-          .arg
-            color: $primary
-    .icon
+      .function-header-buttons
+
+
+    & + .function
+      margin-top: $margin-between-funcs
