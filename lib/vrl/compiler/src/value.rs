@@ -42,6 +42,7 @@ impl fmt::Display for Value {
                 String::from_utf8_lossy(val)
                     .replace(r#"\"#, r#"\\"#)
                     .replace(r#"""#, r#"\""#)
+                    .replace("\n", r#"\n"#)
             ),
             Value::Integer(val) => write!(f, "{}", val),
             Value::Float(val) => write!(f, "{}", val),
@@ -76,6 +77,7 @@ mod test {
     use super::Value;
     use bytes::Bytes;
     use chrono::DateTime;
+    use indoc::indoc;
     use ordered_float::NotNan;
     use regex::Regex;
     use shared::btreemap;
@@ -101,6 +103,19 @@ mod test {
         assert_eq!(
             Value::Bytes(Bytes::from(r#""Hello, world!""#)).to_string(),
             r#""\"Hello, world!\"""#
+        );
+    }
+
+    #[test]
+    fn test_display_string_with_newlines() {
+        assert_eq!(
+            Value::Bytes(Bytes::from(indoc! {"
+                Some
+                new
+                lines
+            "}))
+            .to_string(),
+            r#""Some\nnew\nlines\n""#
         );
     }
 

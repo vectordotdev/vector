@@ -7903,6 +7903,7 @@ dependencies = [
  "chrono",
  "criterion",
  "dyn-clone",
+ "indoc",
  "lalrpop-util",
  "ordered-float",
  "paste",

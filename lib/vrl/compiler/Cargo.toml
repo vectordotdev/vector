@@ -22,8 +22,9 @@ thiserror = "1"
 tracing = "0.1"
 
 [dev-dependencies]
-shared = { path = "../../shared", default-features = false, features = ["btreemap"] }
 criterion = "0.3"
+indoc = "1"
+shared = { path = "../../shared", default-features = false, features = ["btreemap"] }
 
 [[bench]]
 name = "path"
