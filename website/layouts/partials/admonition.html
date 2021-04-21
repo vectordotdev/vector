@@ -6,13 +6,13 @@
       </span>
     </div>
     <div class="media-content">
-      <div class="content">
-        {{ if ne .title nil }}
-        <p class="admonition-title">
-          {{ .title | markdownify }}
-        </p>
-        {{ end }}
+      {{ if ne .title nil }}
+      <p class="admonition-title">
+        {{ .title | markdownify }}
+      </p>
+      {{ end }}
 
+      <div class="content">
         {{ .content | markdownify }}
       </div>
     </div>

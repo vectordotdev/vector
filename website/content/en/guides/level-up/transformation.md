@@ -143,7 +143,7 @@ A few things to notice about this script:
 * VRL has language constructs like variables, `if` statements, comments, and
   logging.
 * The `.` acts as a sort of "container" for the event data. `.` by itself refers
-  to the root event, while you can use [paths][docs.vrl.expressions#path] like `.foo`,
+  to the root event, while you can use [paths] like `.foo`,
   `.foo[0]`, `.foo.bar`, `.foo.bar[0]`, and so on to reference subfields, array
   indices, and more.
 
@@ -204,10 +204,10 @@ recommend using these transforms only when truly necessary, for several reasons:
 [docs.transforms.wasm]: /docs/reference/configuration/transforms/wasm/
 [docs.transforms]: /docs/reference/configuration/transforms/
 [docs.vrl.examples]: /docs/reference/vrl/examples/
-[docs.vrl.expressions#path]: /docs/reference/vrl/expressions/#path
 [docs.vrl.expressions]: /docs/reference/vrl/expressions/
 [docs.vrl.functions]: /docs/reference/vrl/functions/
-[docs.vrl]: /docs/reference/vrl/
+[docs.vrl]: /docs/reference/vrl
+[paths]: /docs/reference/vrl/expressions/#path
 [urls.lua]: https://www.lua.org
 [urls.new_feature_request]: https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature
 [urls.rust]: https://www.rust-lang.org/

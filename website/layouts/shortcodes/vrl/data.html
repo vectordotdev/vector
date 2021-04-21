@@ -1,5 +1,6 @@
 {{ $key := .Get 0 }}
 {{ $data := index site.Data.docs.remap $key }}
+
 {{ range $k, $v := $data }}
 <h3 id="{{ $v.anchor }}">
   {{ $v.title }}
@@ -10,16 +11,59 @@
 </p>
 
 {{ with $v.examples }}
-<h4>
+<h4 id="{{ $k }}-examples">
   Examples
 </h4>
 
-<ul>
-  {{ range . }}
-  <li>
-    <code>{{ . }}</code>
-  </li>
-  {{ end }}
-</ul>
+{{ range . }}
+<div class="card" x-data="{ open: false }">
+  <header class="card-header">
+    <p class="card-header-title is-horizontally-spaced">
+      <span>
+        {{ .title }}
+      </span>
+
+      <a class="icon has-text-secondary" @click="open = !open">
+        <i :class="{ 'fa-plus': !open, 'fa-minus': open }" class="fas"></i>
+      </a>
+    </p>
+  </header>
+
+  <div class="card-content" x-show="open">
+    {{ with .source }}
+    <p class="has-text-weight-light mb-2">
+      Source
+    </p>
+
+    {{ template "code" . }}
+    {{ end }}
+
+    {{ with .return }}
+    <p class="has-text-weight-light mb-2">
+      Return
+    </p>
+
+    {{ template "code" . }}
+    {{ end }}
+
+    {{ with .output }}
+    <p class="has-text-weight-light mb-2">
+      Output
+    </p>
+
+    {{ template "code" . }}
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+{{ end }}
+{{ end }}
+
+{{ define "code" }}
+{{ if or (reflect.IsMap .) (reflect.IsSlice .) }}
+{{ $json := . | jsonify (dict "indent" "  ") }}
+{{ highlight $json "ruby" "" }}
+{{ else }}
+{{ highlight . "ruby" "" }}
 {{ end }}
 {{ end }}

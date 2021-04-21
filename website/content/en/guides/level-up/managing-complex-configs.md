@@ -12,8 +12,8 @@ Before you begin, this guide assumes the following:
 * You understand the [basic Vector concepts][docs.about.concepts]
 * You understand [how to set up a basic pipeline][docs.setup.quickstart].
 
-[docs.about.concepts]: /docs/about/concepts/
-[docs.setup.quickstart]: /docs/setup/quickstart/
+[docs.about.concepts]: /docs/about/concepts
+[docs.setup.quickstart]: /docs/setup/quickstart
 {{< /requirement >}}
 
 Writing large configuration files is not yet an official olympic event. However,

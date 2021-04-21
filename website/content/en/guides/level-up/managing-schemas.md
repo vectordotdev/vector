@@ -1,5 +1,5 @@
 ---
-title: Encoding, Decoding, & Managing Schemas
+title: Encoding, Decoding, and Managing Schemas
 description: Learn how to manage log schemas with Vector.
 author_github: https://github.com/hoverbear
 weight: 2
@@ -47,9 +47,9 @@ timestamp_key = "datetime" # default "timestamp"
 # Sources, transforms, and sinks...
 ```
 
-{{< info >}}
+{{< warning >}}
 Not all sources use the `host` field.
-{{< /info >}}
+{{< /warning >}}
 
 We find this feature is useful when used with simple configs! As your number of components grows, your needs will change
 and you'll likely need to configure this at a more fine grained level.
@@ -188,7 +188,7 @@ While it's often reasonable to remove this kind of data at the pipeline level, w
 using values in sinks from these fields in sink configuration.
 
 The applications for this include some of the reasons discussed in
-["Pipeline field filtering"](#pipeline-field-filtering), but also:
+[Pipeline field filtering](#pipeline-field-filtering), but also:
 
 * Stripping off routing related fields
 * Ensuring a specific sink will only ever output specific fields (or never output certain fields)
