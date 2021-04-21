@@ -1,6 +1,7 @@
 use super::{builder::ConfigBuilder, DataType, Resource};
 use std::collections::HashMap;
 
+#[cfg(feature = "providers")]
 pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     if !config.sources.is_empty() || !config.transforms.is_empty() || !config.sinks.is_empty() {
         Err(vec![

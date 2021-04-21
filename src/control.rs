@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::config::Config;
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::{Stream, StreamExt};
