@@ -8,7 +8,7 @@ releases: "0.13.0": {
 		The Vector team is pleased to announce version 0.13.0!
 
 		This release brings a new `datadog_logs` source to accept logs from [dd-agents](\(urls.datadog_agent)), a new
-		`gcp_stackdriver_metrics` sink to send metrics to [GCP Stackdriver](\(urls.gcp_stackdriver), and a new
+		`gcp_stackdriver_metrics` sink to send metrics to [GCP Stackdriver](\(urls.gcp_stackdriver)), and a new
 		subcommand, `vector tap` that allows for inspecting events flowing out of a component. It also brings a number
 		of smaller enhancements, particuarly around the [Vector Remap Language](\(urls.vrl_reference)) used by our
 		`remap`, `filter`, and `route` transforms.
