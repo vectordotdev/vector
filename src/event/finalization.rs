@@ -42,7 +42,7 @@ impl EventFinalizers {
             // Box<[T]> is missing IntoIterator
             let other: Vec<_> = other.0.into();
             for entry in other.into_iter() {
-                // deduplicate by hand, assume the list is trivially small
+                // Deduplicate by hand, assume the list is trivially small
                 if !result.iter().any(|existing| Arc::ptr_eq(existing, &entry)) {
                     result.push(entry);
                 }
@@ -90,7 +90,7 @@ impl EventFinalizer {
         Self { status, batch }
     }
 
-    /// Update this finalizer's status in place with the given `EventStatus`
+    /// Update this finalizer's status in place with the given `EventStatus`.
     pub fn update_status(&self, status: EventStatus) {
         self.status
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old_status| {
@@ -148,7 +148,7 @@ impl BatchNotifier {
         }
     }
 
-    /// Send this notifier's status up to the source
+    /// Send this notifier's status up to the source.
     fn send_status(&mut self) {
         if let Some(notifier) = self.notifier.take() {
             let status = self.status.load(Ordering::Relaxed);
@@ -170,7 +170,7 @@ impl Drop for BatchNotifier {
 #[derivative(Default)]
 #[repr(u8)]
 pub enum BatchStatus {
-    /// All events in the batch was accepted (the default)
+    /// All events in the batch were accepted (the default)
     #[derivative(Default)]
     Delivered,
     /// At least one event in the batch failed delivery.
@@ -205,16 +205,16 @@ impl EventStatus {
     /// Update this status with another event's finalization status and return the result.
     pub fn update(self, status: Self) -> Self {
         match (self, status) {
-            // NoOp always overwrites existing status
+            // NoOp always overwrites existing status.
             (_, Self::NoOp) => status,
-            // Dropped always updates to the new status
+            // Dropped always updates to the new status.
             (Self::Dropped, _) => status,
-            // NoOp is never updated
+            // NoOp is never updated.
             (Self::NoOp, _) => self,
-            // Delivered may update to Failed, but not to Dropped
+            // Delivered may update to `Failed`, but not to `Dropped`.
             (Self::Delivered, Self::Dropped) => self,
             (Self::Delivered, _) => status,
-            // Failed does not otherwise update
+            // Failed does not otherwise update.
             (Self::Failed, _) => self,
         }
     }
