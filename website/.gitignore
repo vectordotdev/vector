@@ -1,6 +1,7 @@
 # Hugo-generated assets
 public/
 resources/
+hugo_stats.json
 
 # JavaScript, Sass, CSS, etc.
 node_modules/

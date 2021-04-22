@@ -15,7 +15,6 @@ serve: setup build-cue
 # Live site
 production-build:
 	hugo \
-	--environment "production" \
 	--minify
 
 ci-production-build: setup build-cue production-build

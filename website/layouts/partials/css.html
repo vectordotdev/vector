@@ -5,7 +5,7 @@
 {{ $devOpts      := dict "targetPath" $cssOutput "includePaths" $includePaths "enableSourceMap" true }}
 {{ $prodOpts     := dict "targetPath" $cssOutput "includePaths" $includePaths "outputStyle" "compressed" }}
 {{ $cssOpts      := cond $serverMode $devOpts $prodOpts }}
-{{ $postCssOpts  := dict "config" "postcss.config.js" }}
+{{ $postCssOpts  := dict "inlineImports" true }}
 {{ $css          := resources.Get $sass | resources.ExecuteAsTemplate $sass . | toCSS $cssOpts | postCSS $postCssOpts }}
 
 {{/* Run CSS post-processing for production and preview builds */}}

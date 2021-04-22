@@ -3,6 +3,9 @@ baseURL = "/"
 disableKinds = ["taxonomy", "term"]
 copyright = "Datadog, Inc."
 
+[build]
+writeStats = true
+
 # Syntax highlighting
 [markup.highlight]
 noClasses = false
