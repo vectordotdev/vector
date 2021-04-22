@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html x-data="{ dark: localStorage.getItem('dark') === 'true' || false }" :class="{ 'dark': dark }">
   <head>
     {{ partial "meta.html" . }}
 
@@ -11,17 +11,34 @@
 
     {{ partial "css.html" . }}
   </head>
-  <body class="page has-navbar-fixed-top" id="page">
-    {{ partial "navbar.html" . }}
+  <body class="font-sans bg-gray-50 dark:bg-black">
+    <button @click="dark = !dark; localStorage.setItem('dark', dark)" class="dark:text-gray-100">
+      Switch
+    </button>
 
-    <main class="main">
-      {{ block "main" . }}
-      {{ end }}
-    </main>
+    <p class="dark:text-white">
+      Non sunt sunt exercitation dolore commodo et exercitation pariatur amet cillum pariatur. Nisi in amet commodo Lorem do qui labore enim aliquip sint occaecat. Sint commodo id laborum id officia consequat eiusmod sunt. Reprehenderit consequat proident in id ullamco veniam anim aliquip cupidatat pariatur minim.
 
-    {{ block "below" . }}
-    {{ partial "footer.html" . }}
-    {{ end }}
+Sint magna laboris consectetur eiusmod. Enim sit do amet sunt adipisicing est sunt. Ullamco veniam nisi laborum Lorem non qui fugiat veniam consequat consectetur sint. Nostrud sint anim veniam id reprehenderit do ea consequat id sit incididunt amet.
+
+Tempor ullamco non enim commodo do sunt voluptate. Tempor ea eu fugiat et. Minim cillum aute eu aliqua Lorem magna et elit amet eiusmod do proident nisi. Sit deserunt cupidatat minim occaecat nisi duis enim elit.
+
+Consequat mollit do non id velit laborum reprehenderit officia. Dolor aliquip cillum nisi magna nostrud veniam pariatur. Et ullamco dolor exercitation aute ea veniam tempor exercitation do aliquip. Dolor in officia anim culpa ex reprehenderit est ex anim. Laborum sint consectetur sunt nulla do dolore culpa et. Ut dolore irure reprehenderit sint mollit velit incididunt ut esse mollit. Consequat aliqua reprehenderit eu laboris adipisicing excepteur commodo.
+
+Labore excepteur commodo nulla aute. Ex nulla ut irure aliquip est cupidatat. Quis nostrud anim cupidatat magna enim eu non irure labore nostrud occaecat nisi pariatur. Deserunt incididunt consectetur consectetur nisi proident aliquip ea enim do in fugiat est cupidatat.
+
+Deserunt est non pariatur amet voluptate adipisicing in qui adipisicing consequat commodo non. Eu pariatur minim deserunt incididunt. Sit adipisicing quis dolore veniam do.
+
+Excepteur anim commodo labore cillum ex eu fugiat esse Lorem officia. Magna labore id et laboris commodo duis voluptate magna culpa nisi aliqua do Lorem dolor. Fugiat veniam cupidatat duis dolor ut reprehenderit enim. Nostrud voluptate culpa cupidatat pariatur. Dolore enim magna in laborum cupidatat aliquip. Dolor irure incididunt minim eu.
+
+Lorem veniam est nisi consequat id proident labore sunt officia nisi. Laboris sit magna mollit minim ea anim. Est fugiat sit minim officia id aliquip velit duis cupidatat labore officia. Do irure officia dolor do.
+
+Id nostrud ex qui elit. Esse qui voluptate duis occaecat eu occaecat exercitation non ut ipsum pariatur voluptate nostrud reprehenderit. Incididunt sint sint irure ut est mollit. Id ea incididunt eu esse id consectetur quis velit irure cillum eiusmod. Esse adipisicing et eiusmod tempor amet ut.
+
+Et do nisi enim aute adipisicing. Nostrud excepteur cupidatat exercitation minim ad excepteur veniam enim reprehenderit quis consectetur aute tempor. Esse duis pariatur ipsum nisi elit ipsum aliquip consectetur non in et excepteur culpa. Officia excepteur do sint enim nulla consequat elit ex non nulla sit commodo commodo. Tempor sit cillum nisi eu consectetur nostrud non aliqua ullamco enim incididunt ipsum incididunt ad. Laborum officia ad reprehenderit cillum consectetur cupidatat dolore aliqua id anim id nisi.
+    </p>
+
+    <span x-text="dark" class="dark:text-red"></span>
 
     {{ partial "javascript.html" . }}
   </body>

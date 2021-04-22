@@ -1,12 +1,14 @@
-{{ $serverMode   := site.IsServer }}
+{{ $prodMode     := hugo.IsProduction }}
 {{ $includePaths := (slice "node_modules") }}
 {{ $sass         := "sass/style.sass" }}
 {{ $cssOutput    := "css/style.css" }}
 {{ $devOpts      := (dict "targetPath" $cssOutput "includePaths" $includePaths "enableSourceMap" true) }}
 {{ $prodOpts     := (dict "targetPath" $cssOutput "includePaths" $includePaths "outputStyle" "compressed") }}
-{{ $cssOpts      := cond $serverMode $devOpts $prodOpts }}
+{{ $cssOpts      := cond $prodMode $prodOpts $devOpts }}
 {{ $css          := resources.Get $sass | resources.ExecuteAsTemplate $sass . | toCSS $cssOpts | postCSS | fingerprint }}
-{{ if not $serverMode }}
-{{ $css = $css | resources.PostProcess }}
+
+{{/* Run CSS post-processing for production and preview builds */}}
+{{ if $prodMode }}
+{{ $css = $css | minify | resources.PostProcess }}
 {{ end }}
 <link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">

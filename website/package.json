@@ -8,6 +8,7 @@
     "tocbot": "^4.12.2"
   },
   "devDependencies": {
+    "@fullhuman/postcss-purgecss": "^4.0.3",
     "postcss-cli": "^8.3.1"
   }
 }
