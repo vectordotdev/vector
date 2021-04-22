@@ -4,7 +4,10 @@
 
 {{ define "main" }}
 {{ $desc := .Description }}
+{{ $allGuides := where site.Sections "Section" "guides" }}
 {{ $numSections := len .Sections }}
+{{ $isRoot := eq .FirstSection .CurrentSection }}
+{{ $guides := cond $isRoot .Sections .RegularPages }}
 <section class="section mt-6">
   <div class="container">
     <div class="columns is-variable is-8">
@@ -16,16 +19,30 @@
         <p class="subtitle has-text-grey has-text-weight-light">
           {{ $desc }}
         </p>
+
+        {{ if not $isRoot }}
+        <a href="{{ .FirstSection.RelPermalink }}">
+          <span class="icon has-text-purple">
+            <i class="fas fa-arrow-left"></i>
+          </span>
+          <span>
+            Back to the main guides page
+          </span>
+        </a>
+        {{ end }}
       </div>
 
-      <div class="column is-two-thirds">
+      <div class="column is-two-thirds mb-6">
         <div class="container">
-          {{ range $idx, $section := .Sections }}
+          {{ if $isRoot }} {{/* Template for /guides */}}
+          {{ range $idx, $section := $guides }}
           {{ $isLast := eq $idx (sub $numSections 1) }}
           {{ $desc := .Description }}
-          <div{{ if not $isLast }} class="mb-5"{{ end }}>
-            <p class="title is-size-3 is-size-4-mobile has-text-weight-light{{ if $desc }} is-spaced{{ end }}">
-              {{ .Title }}
+          <div{{ if not $isLast }} class="mb-6"{{ end }}>
+            <p class="title is-size-3 is-size-4-mobile has-text-weight-normal{{ if $desc }} is-spaced{{ end }}">
+              <a href="{{ .RelPermalink }}">
+                {{ .Title }}
+              </a>
             </p>
 
             {{ with $desc }}
@@ -46,6 +63,15 @@
            </div>
           </div>
           {{ end }}
+          {{ end }}
+          {{ else }} {{/* Template for section pages, e.g. /guides/level-up */}}
+          <div class="columns is-multiline">
+            {{ range $guides }}
+            <div class="column is-half">
+              {{ .Render "guide-card" }}
+            </div>
+            {{ end }}
+          </div>
           {{ end }}
         </div>
       </div>

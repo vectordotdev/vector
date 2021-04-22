@@ -23,7 +23,9 @@ In order to achieve at-least-once delivery between restarts your source must be 
     max_size = 104900000 # 100MiB
 ```
 
-Refer to each [sink's](/docs/reference/configuration/sinks) documentation for further guidance on its buffer options.
+Refer to each [sink's][sinks] documentation for further guidance on its buffer options.
+
+[sinks]: /docs/reference/configuration/sinks
 {{< /warning >}}
 
 ### Best effort

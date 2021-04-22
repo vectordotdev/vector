@@ -1,12 +1,66 @@
-<div class="card is-hoverable">
-  <div class="card-header">
-    <a class="card-header-title is-space-between" href="{{ .RelPermalink }}">
-      <span class="text">
-        {{ with .Weight }}{{ . }}. {{ end }}{{ .Title }}
-      </span>
-    </a>
-  </div>
-  <div class="card-content">
-    {{ .Description | markdownify }}
+<div class="card">
+  <div class="card-content is-fullheight">
+    <article class="media">
+      <figure class="media-left">
+        <p class="title has-text-dark is-size-5 is-size-6-mobile">
+          {{ .Weight }}.
+        </p>
+      </figure>
+      <div class="media-content">
+        <p class="title is-size-5 is-size-6-mobile has-text-weight-bold mb-3">
+          <a href="{{ .RelPermalink }}">
+            {{ .Title }}
+          </a>
+        </p>
+
+        {{ with .Description }}
+        <div class="content">
+          {{ . | markdownify }}
+        </div>
+        {{ end }}
+      </div>
+    </article>
+
+    <nav class="level mt-2">
+      <div class="level-left"></div>
+      <div class="level-right">
+        <div class="level-item">
+          <div class="buttons are-small">
+            {{ with .Params.domain }}
+            <span class="button is-rounded is-primary is-outlined">
+              domain:&nbsp;<strong>{{ . }}</strong>
+            </span>
+            {{ end }}
+
+            {{ with .Params.transforms }}
+            {{ range . }}
+            {{ $url := printf "/docs/reference/configuration/transforms/%s" . | relURL }}
+            <a class="button is-rounded is-black is-outlined" href="{{ $url }}">
+              transform:&nbsp;<strong>{{ . }}</strong>
+            </a>
+            {{ end }}
+            {{ end }}
+
+            {{ with .Params.sources }}
+            {{ range . }}
+            {{ $url := printf "/docs/reference/configuration/sources/%s" . | relURL }}
+            <a class="button is-rounded is-black is-light" href="{{ $url }}">
+              source:&nbsp;<strong>{{ . }}</strong>
+            </a>
+            {{ end }}
+            {{ end }}
+
+            {{ with .Params.sinks }}
+            {{ range . }}
+            {{ $url := printf "/docs/reference/configuration/sinks/%s" . | relURL }}
+            <a class="button is-rounded is-black is-light" href="{{ $url }}">
+              sink:&nbsp;<strong>{{ . }}</strong>
+            </a>
+            {{ end }}
+            {{ end }}
+          </div>
+        </div>
+      </div>
+    </nav>
   </div>
 </div>

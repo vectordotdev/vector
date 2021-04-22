@@ -17,7 +17,7 @@ aspect missing, so we launched a new [new guides section][pages.guides]. This
 section is meant to house high-quality guides that will be maintained and
 updated continuously. To kick this new section off we've added the following guides:
 
-{{< jump "/guides/getting-started" >}}
+{{< jump "/docs/setup/quickstart" >}}
 {{< jump "/guides/advanced/custom-aggregations-with-lua" >}}
 {{< jump "/guides/advanced/parsing-csv-logs-with-lua" >}}
 

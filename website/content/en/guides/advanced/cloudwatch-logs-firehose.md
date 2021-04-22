@@ -1,8 +1,10 @@
 ---
 title: Ingesting AWS CloudWatch Logs via AWS Kinesis Firehose
 description: Use CloudWatch Log subscriptions and Kinesis Firehose to robustly collect and route your CloudWatch logs.
-author_github: https://github.com/jszwedko
-tags: ["type: guide", "domain: sources", "source: aws_kinesis_firehose", "domain: transforms", "transform: aws_cloudwatch_logs_subscription_parser"]
+authors: ["jszwedko"]
+domains: ["sources", "transforms"]
+transforms: ["aws_cloudwatch_logs_subscription_parser"]
+weight: 4
 ---
 
 {{< requirement title="Pre-requisites" >}}
@@ -107,14 +109,12 @@ port. These messages will then be transformed, via the
 to extract the individual log events, and then the `json_parser` to parse these
 events. Finally, they are written to the console.
 
-<Alert type="info">
-
+{{< info >}}
 AWS Kinesis Firehose will only forward to HTTPS (and not HTTP) endpoints running
 on port 443. You will need to either put a load balancer in front of the
 `vector` instance to handle TLS termination or configure the `tls` parameters of
 the `aws_kinesis_firehose` source to serve a valid certificate.
-
-</Alert>
+{{< /info >}}
 
 Parts of the rest of this guide are based on [AWS's Subscription Filters with
 Amazon Kinesis Data Firehose
@@ -126,12 +126,10 @@ See their guide for more examples.
 First, deploy vector with the `[aws_kinesis_firehose][aws_kinesis_firehose]` source. See example
 configuration above.
 
-<Alert type="info">
-
+{{< info >}}
 Remember that the port must be publicly accessible and the endpoint must be
 serving HTTPS.
-
-</Alert>
+{{< /info >}}
 
 ## Creating a log groups
 
@@ -341,12 +339,10 @@ $ aws logs put-subscription-filter \
   --role-arn "arn:aws:iam::${AWS_ACCOUNT_ID}:role/CWLtoKinesisFirehoseRole
 ```
 
-<Alert type="info">
-
-You can setup multiple subscription filters sending to the same Firehose
+{{< info >}}
+You can set up multiple subscription filters sending to the same Firehose
 delivery stream.
-
-</Alert>
+{{< /info >}}
 
 ## Testing it out
 
@@ -366,8 +362,7 @@ group we've setup. We can use Vector for this too!
 ```
 
 This will read lines from `stdin` and write them to CloudWatch Logs. See the
-[AWS
-Authentication](https://vector.dev/docs/reference/sinks/aws_cloudwatch_logs/#aws-authentication)
+[AWS Authentication](https://vector.dev/docs/reference/sinks/aws_cloudwatch_logs/#aws-authentication)
 section for this sink to see how to configure the AWS credentials Vector will
 need to write to AWS.
 
@@ -376,7 +371,7 @@ the AWS console. First create a log stream within the group, click into it, and
 you should see an option under Actions to "Create a log event"
 
 Let's send some logs. For this, I'm using
-`[flog](https://github.com/mingrammer/flog)`, a useful tool for generating fake
+[flog], a useful tool for generating fake
 log data.
 
 ```bash
@@ -614,13 +609,12 @@ This will give us the final result of:
 
 Here are original events with all of the additional context!
 
-
-
 [AWS CloudWatch Logs subscriptions]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Subscriptions.html
 [aws_kinesis_firehose]: https://vector.dev/docs/reference/source/aws_kinesis_firehose/
 [aws_cloudwatch_logs_subscription_parser]: https://vector.dev/docs/reference/transform/aws_cloudwatch_logs_subscription_parser/
 [AWS CloudWatch Logs]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html
 [AWS Kinesis Firehose]: https://aws.amazon.com/kinesis/data-firehose/?kinesis-blogs.sort-by=item.additionalFields.createdDate&kinesis-blogs.sort-order=desc
+[flog]: https://github.com/mingrammer/flog
 [json_parser]: https://vector.dev/docs/reference/transforms/json_parser/
 
 

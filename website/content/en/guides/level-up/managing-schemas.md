@@ -2,6 +2,7 @@
 title: Encoding, Decoding, and Managing Schemas
 description: Learn how to manage log schemas with Vector.
 author_github: https://github.com/hoverbear
+domain: schemas
 weight: 2
 ---
 
@@ -252,14 +253,10 @@ and a `last_name` field coming from a source, and we'd like to output a `name` f
   '''
 ```
 
-
-<Alert type="info">
-
+{{< info >}}
 What if you had to do this in reverse? Try using the [`regex_parser`][docs.transforms.regex_parser] or
 [`split`][docs.transforms.split] transforms.
-
-</Alert>
-
+{{< /info >}}
 
 ## Coercing Data Types
 

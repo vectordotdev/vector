@@ -169,9 +169,9 @@ them all as a larger topology:
 
 ```bash
 # These three examples run the same two configs together:
-$ vector -c ./configs/foo.toml -c ./configs/bar.toml
-$ vector -c ./configs/*.toml
-$ vector -c ./configs/foo.toml ./configs/bar.toml
+vector -c ./configs/foo.toml -c ./configs/bar.toml
+vector -c ./configs/*.toml
+vector -c ./configs/foo.toml ./configs/bar.toml
 ```
 
 If you have a large chain of components it's a good idea to break them out into

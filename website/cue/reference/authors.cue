@@ -21,6 +21,10 @@ authors: [
     name: "James Turnbull"
   },
   {
+	handle: "jszwedko",
+	name: "Jesse Szwedko"
+  },
+  {
     handle: "lukesteensen",
     name: "Luke Steensen"
   },

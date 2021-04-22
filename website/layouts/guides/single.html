@@ -11,7 +11,9 @@
       <div class="column is-one-third">
         <section class="is-sticky with-larger-margin">
           <p class="is-uppercase has-text-primary has-text-weight-semibold mb-2">
-            {{ .CurrentSection.Title }}
+            <a href="{{ .CurrentSection.RelPermalink }}">
+              {{ .CurrentSection.Title }}
+            </a>
           </p>
 
           <p class="title is-size-2 is-size-3-mobile has-text-weight-light{{ if $desc }} is-spaced{{ end }}">
