@@ -1,6 +1,7 @@
 {{ $year := now.Year }}
 {{ $menu := site.Menus.footer }}
 {{ $buttons := site.Menus.comms }}
+{{ $subfooterLinks := site.Menus.subfooter }}
 <footer class="footer">
   <section class="section">
     <div class="container">
@@ -32,9 +33,28 @@
 
       <hr class="has-background-purple" />
 
-      <p class="has-text-weight-light has-text-centered">
-        Copyright &copy; {{ $year }} {{ site.Copyright }}
-      </p>
+      <div class="columns">
+        <div class="column is-half has-text-left">
+          <p class="has-text-weight-light">
+            Copyright &copy; {{ $year }} {{ site.Copyright }}
+          </p>
+        </div>
+
+        <div class="column is-half has-text-right">
+          {{ $numLinks := len $subfooterLinks }}
+          {{ $lastLink := sub $numLinks 1 }}
+          {{ range $idx, $link := $subfooterLinks }}
+          {{ $isLast := eq $idx $lastLink }}
+          <a>
+            {{ .Name }}
+          </a>
+
+          {{ if not $isLast }}
+          &nbsp;|&nbsp;
+          {{ end }}
+          {{ end }}
+        </div>
+      </div>
     </div>
   </section>
 </footer>
