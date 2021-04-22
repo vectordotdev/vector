@@ -1,6 +1,6 @@
 # RFC 6330 - 2021-04-07 - Converting one log event into multiple log events
 
-This RFC describes an approach for emitting multiple log events from an `explode` transform.
+This RFC describes an approach for transforming one input log event into multiple log events.
 
 ## Scope
 
@@ -22,7 +22,136 @@ Currently, users are restricted to using the Lua or WASM transform for this, [in
 
 ## Internal Proposal
 
-The proposal is to add an `explode` transform that makes use of the Vector Remap Language (VRL) to emit a set of events from one input event by requiring the VRL program to resolve to an array. For each element of the array, a separate event will be published.
+The proposal is to:
+
+1. Extend `remap` so that if `.` is an array at the end, it will emit one event for each element in that array
+2. Add an `unnest` VRL function that will transform an object into an array of objects using a specified field on the input object
+3. Add an `unnest` transform that can be used for simple cases (could just "expand" into a `remap` transform)
+
+Example input:
+
+```json
+{ "host": "localhost", "events": [{ "message": "foo" }, { "message": "bar" }] }
+```
+
+Remap transform config:
+
+```toml
+[transforms.remap]
+type = "remap"
+source = """
+. = unnest(., "events")
+"""
+```
+
+Ouput:
+
+```json
+{ "host": "localhost", "message": "foo" }
+{ "host": "localhost", "message": "bar" }
+```
+
+This would also be available as an `unnest` transform for simple cases where the user does not need to do any additional mapping:
+
+```toml
+[transforms.unnest]
+type = "unnest"
+field = "events"
+```
+
+Which would have the same effect. I think the implementation could just take advantage of the "expand" feature of transforms that lets them replace themselves at vector start time with another transform.
+
+Additionally, we will provide `only_fields` and `except_fields` as options on the `unnest` function and transform to allow users to select which fields will be kept. These match similar semantics to the `encoding` options on sinks.
+
+Example input:
+
+```json
+{ "timestamp": "2020-12-09T16:09:53+00:00", "host": "localhost", "events": [{ "message": "foo" }, { "message": "bar" }] }
+```
+
+Remap transform config:
+
+```toml
+[transforms.remap]
+type = "remap"
+source = """
+. = unnest(., "events", only_fields: ["host"])
+"""
+```
+
+Ouput:
+
+```json
+{ "host": "localhost", "message": "foo" }
+{ "host": "localhost", "message": "bar" }
+```
+
+Here the `timestamp` field is not preserved.
+
+## Doc-level Proposal
+
+To convert an incoming event into multiple events, the `unnest` transform can be used.
+
+For example, given an input of:
+
+```json
+{ "host": "localhost", "events": [{ "message": "foo" }, { "message": "bar" }, 1] }
+```
+
+And a transform of:
+
+```toml
+[transforms.unnest]
+type = "unnest"
+field = "events"
+```
+
+The following events will be output:
+
+```json
+{ "host": "localhost", "message": "foo" }
+{ "host": "localhost", "message": "bar" }
+{ "host": "localhost", "message": "1" }
+```
+
+That is, each record in the indicated field will be emitted as its own event, merged with any other fields existing at the top-level of the event.
+
+If any elements in the array field are not an object, they will be turned into a string and set as the `message` key.
+
+The `remap` transform can also be used to emit multiple events from a single incoming event by setting the root path, `.`, to an array. The above transform is synonymous with:
+
+```toml
+[transforms.remap]
+type = "remap"
+source = """
+. = unnest(., "events")
+"""
+```
+
+## Rationale
+
+This enhances `remap` to be able to emit multiple events as well as provides a `unnest` transform for simple cases. Without this, users will continue to have to use Lua or WASM to acheive this, which introduces a performance bottleneck compared to this proposal.
+
+## Prior Art
+
+- [fluent-plugin-record_splitter](https://github.com/ixixi/fluent-plugin-record_splitter)
+- [Logstash split](https://www.elastic.co/guide/en/logstash/current/plugins-filters-split.html)
+
+These are similar to the proposed approach.
+
+## Drawbacks
+
+- Adds an additional transform to be aware of.
+- Less flexible than `emit_log` alternative which could emit arbitrary events from `remap` transform.
+- Ongoing maintenance burden should be minimal.
+
+## Alternatives
+
+### explode transform
+
+(previous proposal)
+
+We add an `explode` transform that makes use of the Vector Remap Language (VRL) to emit a set of events from one input event by requiring the VRL program to resolve to an array. For each element of the array, a separate event will be published.
 
 Example input:
 
@@ -69,54 +198,6 @@ Output:
 ```
 
 This is similar to the support that the current [`explode` transform PR](https://github.com/timberio/vector/pull/6545) has for merging in top-level fields when creating events from a subfield that has an array.
-
-
-## Doc-level Proposal
-
-To convert an incoming event into multiple events, the `explode` transform can be used. This transform takes a VRL program where it expects the last expression to return an array.
-
-For example, given an input of:
-
-```json
-{ "events": [{ "message": "foo" }, { "message": "bar" }] }
-```
-
-And a transform of:
-
-```toml
-[transforms.explode]
-type = "explode"
-source = "array!(.events) ?? []"
-```
-
-The following events will be output:
-
-```json
-{"message": "foo"}
-{"message": "bar"}
-```
-
-If any elements in the returned array are not an object, they will be turned into a string and set as the `message` key on event.
-
-## Rationale
-
-This enhances Vector with a native transform capable of transforming an event into multiple events. Without this, users will continue to have to use Lua or WASM to acheive this, which introduces a performance bottleneck compared to this proposal.
-
-## Prior Art
-
-- [fluent-plugin-record_splitter](https://github.com/ixixi/fluent-plugin-record_splitter)
-- [Logstash split](https://www.elastic.co/guide/en/logstash/current/plugins-filters-split.html)
-
-These are similar to the proposed approach.
-
-## Drawbacks
-
-- Adds an additional transform to be aware of.
-- Less flexible than `emit_log` alternative which could emit arbitrary events from `remap` transform.
-- This idea of the last line of the remap script being the "return value" could be a bit confusing to users in how it differs from `remap` which uses whatever `.` is at the end of the script. However, this is similar to VRL's use in unit tests and conditions for the `filter` and `route` transforms.
-- Ongoing maintenance burden should be minimal.
-
-## Alternatives
 
 ### emit_log function
 
@@ -170,9 +251,15 @@ This turned out to require a bigger change than I expected in that `.` is linked
 
 Using a separate `explode` transform keeps the responsibilities of the transform more clear and avoids having to refactor the `remap` transform to decouple `.` from the underlying Vector `Event` object; though we may still want to do this in the future anyway.
 
+## Open Questions
+
+1. Do we want the additional `unnest` transform? I included it based on [feedback that using VRL was offputting for simple cases](https://github.com/timberio/vector/pull/7038#issuecomment-817043491), but maybe the newly proposed `remap` modifications are easy enough to use that we don't need the additional transform.
+
 ## Plan Of Attack
 
-1. Implement `explode` transform
+1. Implement `unnest` VRL function
+2. Modify `remap` to treat setting `.` to an array to indicate that multiple events should be emitted
+3. Implement `unnest` transform
 
 [1]: https://github.com/timberio/vector/issues/6330#issue-799809382
 [2]: https://discord.com/channels/742820443487993987/764187584452493323/808744293945704479
