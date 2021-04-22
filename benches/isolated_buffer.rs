@@ -200,10 +200,8 @@ async fn send_random<E: std::fmt::Debug>(
     num_lines: usize,
     mut writer: impl Sink<Event, Error = E> + Unpin,
 ) {
-    let mut stream = random_events(line_size).take(num_lines);
-    while let Some(e) = stream.next().await {
-        writer.send(e).await.unwrap();
-    }
+    let mut stream = random_events(line_size).map(Ok).take(num_lines);
+    writer.send_all(&mut stream).await.unwrap();
 }
 
 fn random_events(size: usize) -> impl Stream<Item = Event> {
