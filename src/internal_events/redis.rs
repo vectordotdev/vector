@@ -18,29 +18,29 @@ impl InternalEvent for RedisEventReceived {
 }
 
 #[derive(Debug)]
-pub struct RedisEventReceivedFail {
+pub struct RedisReceiveEventFailed {
     pub error: redis::RedisError,
 }
 
-impl InternalEvent for RedisEventReceivedFail {
+impl InternalEvent for RedisReceiveEventFailed {
     fn emit_logs(&self) {
         error!(
             message = "Failed to read message.",
-            error = ?self.error ,
+            error = %self.error,
             rate_limit_secs = 30,
         );
     }
     fn emit_metrics(&self) {
-        counter!("events_failed_total", 1);
+        counter!("receive_event_errors_total", 1);
     }
 }
 
 #[derive(Debug)]
-pub struct RedisEventSend {
+pub struct RedisEventSent {
     pub byte_size: usize,
 }
 
-impl InternalEvent for RedisEventSend {
+impl InternalEvent for RedisEventSent {
     fn emit_logs(&self) {
         trace!(message = "Processed one event.", rate_limit_secs = 10);
     }
@@ -52,11 +52,11 @@ impl InternalEvent for RedisEventSend {
 }
 
 #[derive(Debug)]
-pub struct RedisEventSendFail {
+pub struct RedisSendEventFailed {
     pub error: redis::RedisError,
 }
 
-impl InternalEvent for RedisEventSendFail {
+impl InternalEvent for RedisSendEventFailed {
     fn emit_logs(&self) {
         error!(
             message = "Failed to send message.",
@@ -66,25 +66,25 @@ impl InternalEvent for RedisEventSendFail {
     }
 
     fn emit_metrics(&self) {
-        counter!("send_errors_total", 1);
+        counter!("send_event_errors_total", 1);
     }
 }
 
 #[derive(Debug)]
-pub(crate) struct RedisEventEncodeError {
+pub(crate) struct RedisEncodeEventFailed {
     pub error: serde_json::Error,
 }
 
-impl InternalEvent for RedisEventEncodeError {
+impl InternalEvent for RedisEncodeEventFailed {
     fn emit_logs(&self) {
         error!(
-            message = "Error encoding redis event to JSON.",
+            message = "Error encoding Redis event to JSON.",
             error = ?self.error,
             rate_limit_secs = 30,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("encode_errors_total", 1);
+        counter!("encode_event_errors_total", 1);
     }
 }

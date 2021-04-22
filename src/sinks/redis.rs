@@ -3,7 +3,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::{
-        RedisEventEncodeError, RedisEventSend, RedisEventSendFail, TemplateRenderingFailed,
+        RedisEncodeEventFailed, RedisEventSent, RedisSendEventFailed, TemplateRenderingFailed,
     },
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
     template::{Template, TemplateParseError},
@@ -22,7 +22,7 @@ use std::{
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("creating redis producer failed: {}", source))]
+    #[snafu(display("creating Redis producer failed: {}", source))]
     RedisCreateFailed { source: RedisError },
     #[snafu(display("invalid key template: {}", source))]
     KeyTemplate { source: TemplateParseError },
@@ -139,12 +139,12 @@ impl SinkConfig for RedisSinkConfig {
 
 impl RedisSinkConfig {
     async fn build_client(&self) -> RedisResult<ConnectionManager> {
-        trace!("Open redis client.");
+        trace!("Open Redis client.");
         let client = redis::Client::open(self.url.as_str())?;
-        trace!("Open redis client success.");
-        trace!("Get redis connection.");
+        trace!("Open Redis client success.");
+        trace!("Get Redis connection.");
         let conn = client.get_tokio_connection_manager().await;
-        trace!("Get redis connection success.");
+        trace!("Get Redis connection success.");
         conn
     }
 }
@@ -198,14 +198,9 @@ impl Sink<Event> for RedisSink {
     }
 
     fn start_send(mut self: Pin<&mut Self>, event: Event) -> Result<(), Self::Error> {
-        assert!(
-            matches!(self.state, RedisSinkState::Ready(_)),
-            "expected `poll_ready` to be called first."
-        );
-
         let conn = match std::mem::replace(&mut self.state, RedisSinkState::None) {
             RedisSinkState::Ready(conn) => conn,
-            _ => unreachable!(),
+            _ => panic!("Expected `poll_ready` to be called first."),
         };
 
         let key = self.key.render_string(&event).map_err(|error| {
@@ -222,50 +217,39 @@ impl Sink<Event> for RedisSink {
         match self.data_type {
             Type::List => match self.method {
                 Some(Method::Lpush) => {
-                    let _ = std::mem::replace(
-                        &mut self.state,
-                        RedisSinkState::Sending(Box::pin(async move {
-                            let result = lpush(conn.clone(), key.clone(), encoded.clone()).await;
-                            if result.is_ok() {
-                                emit!(RedisEventSend {
-                                    byte_size: message_len,
-                                });
-                            }
-                            (conn, result)
-                        })),
-                    );
-                }
-                Some(Method::Rpush) => {
-                    let _ = std::mem::replace(
-                        &mut self.state,
-                        RedisSinkState::Sending(Box::pin(async move {
-                            let result = rpush(conn.clone(), key.clone(), encoded.clone()).await;
-                            if result.is_ok() {
-                                emit!(RedisEventSend {
-                                    byte_size: message_len,
-                                });
-                            }
-                            (conn, result)
-                        })),
-                    );
-                }
-                None => {
-                    panic!("When `data_type` is `list`, `method` cannot be empty.")
-                }
-            },
-            Type::Channel => {
-                let _ = std::mem::replace(
-                    &mut self.state,
-                    RedisSinkState::Sending(Box::pin(async move {
-                        let result = publish(conn.clone(), key.clone(), encoded.clone()).await;
+                    self.state = RedisSinkState::Sending(Box::pin(async move {
+                        let result = lpush(conn.clone(), key.clone(), encoded.clone()).await;
                         if result.is_ok() {
-                            emit!(RedisEventSend {
+                            emit!(RedisEventSent {
                                 byte_size: message_len,
                             });
                         }
                         (conn, result)
-                    })),
-                );
+                    }));
+                }
+                Some(Method::Rpush) => {
+                    self.state = RedisSinkState::Sending(Box::pin(async move {
+                        let result = rpush(conn.clone(), key.clone(), encoded.clone()).await;
+                        if result.is_ok() {
+                            emit!(RedisEventSent {
+                                byte_size: message_len,
+                            });
+                        }
+                        (conn, result)
+                    }));
+                }
+                _ => {}
+            },
+            Type::Channel => {
+                self.state = RedisSinkState::Sending(Box::pin(async move {
+                    let result = publish(conn.clone(), key.clone(), encoded.clone()).await;
+                    if result.is_ok() {
+                        emit!(RedisEventSent {
+                            byte_size: message_len,
+                        });
+                    }
+                    (conn, result)
+                }));
             }
         }
         Ok(())
@@ -280,7 +264,7 @@ impl Sink<Event> for RedisSink {
                 Some((seqno, Ok(result))) => {
                     trace!(
                         message = "Redis sink produced message.",
-                        length = ?result,
+                        length = %result,
                     );
                     this.pending_acks.insert(seqno);
                     let mut num_to_ack = 0;
@@ -292,7 +276,7 @@ impl Sink<Event> for RedisSink {
                 }
                 Some((_, Err(error))) => {
                     error!(message = "Redis sink generated an error.", %error);
-                    emit!(RedisEventSendFail { error });
+                    emit!(RedisSendEventFailed { error });
                     return Poll::Ready(Err(()));
                 }
                 None => break,
@@ -307,19 +291,11 @@ impl Sink<Event> for RedisSink {
 }
 
 async fn lpush(mut conn: ConnectionManager, key: String, value: String) -> Result<i32, RedisError> {
-    let res: RedisResult<i32> = conn.lpush(key, value).await;
-    match res {
-        Ok(len) => Ok(len),
-        Err(e) => Err(e),
-    }
+    conn.lpush(key, value).await
 }
 
 async fn rpush(mut conn: ConnectionManager, key: String, value: String) -> Result<i32, RedisError> {
-    let res: RedisResult<i32> = conn.rpush(key, value).await;
-    match res {
-        Ok(len) => Ok(len),
-        Err(e) => Err(e),
-    }
+    conn.rpush(key, value).await
 }
 
 async fn publish(
@@ -327,11 +303,7 @@ async fn publish(
     key: String,
     value: String,
 ) -> Result<i32, RedisError> {
-    let res: RedisResult<i32> = conn.publish(key, value).await;
-    match res {
-        Ok(len) => Ok(len),
-        Err(e) => Err(e),
-    }
+    conn.publish(key, value).await
 }
 
 async fn healthcheck(mut conn: ConnectionManager) -> crate::Result<()> {
@@ -346,7 +318,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> String
 
     match encoding.codec() {
         Encoding::Json => serde_json::to_string(event.as_log())
-            .map_err(|error| emit!(RedisEventEncodeError { error }))
+            .map_err(|error| emit!(RedisEncodeEventFailed { error }))
             .unwrap_or_default(),
         Encoding::Text => event
             .as_log()
@@ -504,14 +476,14 @@ mod integration_tests {
         debug!("Test events num: {}.", num_events);
 
         let client = redis::Client::open(REDIS_SERVER).unwrap();
-        debug!("Get redis async connection.");
+        debug!("Get Redis async connection.");
         let conn = client
             .get_async_connection()
             .await
-            .expect("Failed to get redis async connection.");
-        debug!("Get redis async connection success.");
+            .expect("Failed to get Redis async connection.");
+        debug!("Get Redis async connection success.");
         let mut pubsub_conn = conn.into_pubsub();
-        debug!("Subscrib channel:{}.", key.as_str());
+        debug!("Subscribe channel:{}.", key.as_str());
         pubsub_conn
             .subscribe(key.as_str())
             .await

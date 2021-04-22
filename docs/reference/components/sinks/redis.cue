@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: redis: {
-	title:       "Redis"
-	description: "[Redis](\(urls.redis)) is an open source (BSD licensed), in-memory data structure store, used as a database, cache, and message broker."
+	title: "Redis"
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
@@ -20,19 +19,25 @@ components: sinks: redis: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: null
+					default: "json"
 					enum: ["json", "text"]
 				}
 			}
 			request: enabled: false
-			tls: enabled:     false
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: false
+				can_verify_hostname:    false
+				enabled_default:        false
+			}
 			to: {
 				service: services.redis
 				interface: {
 					socket: {
 						direction: "outgoing"
 						protocols: ["tcp"]
-						ssl: "disabled"
+						ssl: "optional"
 					}
 				}
 			}
@@ -58,7 +63,7 @@ components: sinks: redis: {
 
 	configuration: {
 		url: {
-			description: "The Redis URL to connect to. The url _must_ take the form of `redis://server:port/db`."
+			description: "The Redis URL to connect to. The url _must_ take the form of `protocol://server:port/db` where the protocol can either be `redis` or `rediss` for connections secured via TLS."
 			groups: ["tcp"]
 			required: true
 			warnings: []
@@ -78,26 +83,26 @@ components: sinks: redis: {
 		}
 		data_type: {
 			common:      false
-			description: "The Redis Data Type(list or channel) to use."
+			description: "The Redis data type (`list` or `channel`) to use."
 			required:    false
 			type: string: {
 				default: "list"
 				enum: {
-					list:    "Use list"
-					channel: "Use channel"
+					list:    "Use the Redis `list` data type."
+					channel: "Use the Redis `channel` data type."
 				}
 				syntax: "literal"
 			}
 		}
 		method: {
 			common:      false
-			description: "The Method(lpush or rpush) to publish messages when data_type is list."
+			description: "The method (`lpush` or `rpush`) to publish messages when `data_type` is list."
 			required:    false
 			type: string: {
 				default: "lpush"
 				enum: {
-					lpush: "Use lpush"
-					rpush: "Use rpush"
+					lpush: "Use the `lpush` method to publish messages."
+					rpush: "Use the `rpush` method to publish messages."
 				}
 				syntax: "literal"
 			}
@@ -113,10 +118,9 @@ components: sinks: redis: {
 		redis_rs: {
 			title: "redis-rs"
 			body:  """
-				The `redis` sink uses [`redis-rs`](\(urls.redis_rs)) under the hood. This
-				is a is a high level redis library for Rust. It provides convenient access to all Redis functionality through a very flexible but low-level API.
-				It uses a customizable type conversion trait so that any operation can return results in just the type you are expecting.
-				This makes for a very pleasant development experience.
+				The `redis` sink uses [`redis-rs`](\(urls.redis_rs)) under the hood, which is a high level Redis library
+				for Rust. It provides convenient access to all Redis functionality through a very flexible but low-level
+				API.
 				"""
 		}
 	}

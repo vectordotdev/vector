@@ -403,8 +403,8 @@ jobs:
       - test-integration-kafka
       - test-integration-loki
       - test-integration-pulsar
-      - test-integration-splunk
       - test-integration-redis
+      - test-integration-splunk
     runs-on: ubuntu-20.04
     steps:
     - name: Discord notification

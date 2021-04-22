@@ -300,15 +300,23 @@ test-behavior: ## Runs behaviorial test
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 <<<<<<< HEAD
+<<<<<<< HEAD
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-fluent test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
 =======
 test-integration: test-integration-aws  test-integration-docker-logs test-integration-elasticsearch
+=======
+test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
+>>>>>>> cedba6a7e (Update code to apply suggested)
 test-integration: test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
 >>>>>>> 490cc1e33 (add redis sink)
 test-integration: test-integration-loki test-integration-mongodb_metrics test-integration-nats
 test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus test-integration-pulsar
+<<<<<<< HEAD
 test-integration: test-integration-splunk test-integration-dnstap
+=======
+test-integration: test-integration-splunk test-integration-redis
+>>>>>>> cedba6a7e (Update code to apply suggested)
 
 .PHONY: test-integration-aws
 test-integration-aws: ## Runs AWS integration tests
@@ -322,7 +330,7 @@ ifeq ($(AUTODESPAWN), true)
 	@scripts/setup_integration_env.sh aws stop
 endif
 
-.PHONY:
+.PHONY: test-integration-clickhouse
 test-integration-clickhouse: ## Runs Clickhouse integration tests
 ifeq ($(AUTOSPAWN), true)
 	@scripts/setup_integration_env.sh clickhouse stop
