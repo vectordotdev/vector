@@ -42,7 +42,7 @@ impl Pipeline {
                 Poll::Ready(Err(_error)) => return Poll::Ready(Err(ClosedError)),
             }
 
-            match self.inner.try_send(event) {
+            match self.inner.start_send(event) {
                 Ok(()) => {
                     // we good, keep looping
                 }
