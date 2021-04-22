@@ -369,7 +369,7 @@ impl Value {
     /// val.insert("bar", 2);
     /// assert_eq!(val.is_leaf(), false);
     /// ```
-    pub fn is_leaf<'a>(&'a self) -> bool {
+    pub fn is_leaf(&self) -> bool {
         match &self {
             Value::Boolean(_)
             | Value::Bytes(_)
