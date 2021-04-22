@@ -63,7 +63,7 @@ async fn run(out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_util::collect_ready, trace, Event};
+    use crate::{event::Event, test_util::collect_ready, trace};
     use futures::channel::mpsc;
     use tokio::time::{sleep, Duration};
 

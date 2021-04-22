@@ -1,4 +1,4 @@
-use crate::{stats, Event};
+use crate::{event::Event, stats};
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use std::time::{Duration, Instant};

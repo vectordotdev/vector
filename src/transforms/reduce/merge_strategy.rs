@@ -425,7 +425,7 @@ pub fn get_value_merger(v: Value, m: &MergeStrategy) -> Result<Box<dyn ReduceVal
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Event;
+    use crate::event::Event;
     use serde_json::json;
 
     #[test]

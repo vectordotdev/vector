@@ -79,7 +79,6 @@ pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
 
-pub use event::{Event, Value};
 pub use pipeline::Pipeline;
 
 pub use vector_core::{Error, Result};

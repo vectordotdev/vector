@@ -81,7 +81,7 @@ impl FunctionTransform for FieldFilter {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Event;
+    use crate::event::Event;
 
     #[test]
     fn generate_config() {

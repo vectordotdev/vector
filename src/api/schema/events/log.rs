@@ -1,5 +1,5 @@
 use super::EventEncodingType;
-use crate::{event, Value};
+use crate::event::{self, Value};
 
 use async_graphql::Object;
 use chrono::{DateTime, Utc};

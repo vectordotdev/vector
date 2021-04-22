@@ -1,8 +1,8 @@
 use crate::{
     config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    event::Event,
     internal_events::RemoveFieldsFieldMissing,
     transforms::{FunctionTransform, Transform},
-    Event,
 };
 use serde::{Deserialize, Serialize};
 

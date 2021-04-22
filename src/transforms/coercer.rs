@@ -98,8 +98,7 @@ mod tests {
     use super::CoercerConfig;
     use crate::{
         config::{GlobalOptions, TransformConfig},
-        event::{LogEvent, Value},
-        Event,
+        event::{Event, LogEvent, Value},
     };
     use pretty_assertions::assert_eq;
 

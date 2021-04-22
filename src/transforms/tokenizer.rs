@@ -127,8 +127,7 @@ mod tests {
     use super::TokenizerConfig;
     use crate::{
         config::{GlobalOptions, TransformConfig},
-        event::{LogEvent, Value},
-        Event,
+        event::{Event, LogEvent, Value},
     };
 
     #[test]

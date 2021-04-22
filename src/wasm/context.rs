@@ -1,4 +1,4 @@
-use crate::Event;
+use crate::event::Event;
 use std::collections::LinkedList;
 
 #[derive(Default)]
