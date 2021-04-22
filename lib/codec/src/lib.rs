@@ -308,10 +308,7 @@ impl SyslogDecoder {
     }
 
     /// None if this is not octet counting encoded
-    fn checked_decode(
-        &mut self,
-        src: &mut BytesMut,
-    ) -> Option<Result<Option<Bytes>, io::Error>> {
+    fn checked_decode(&mut self, src: &mut BytesMut) -> Option<Result<Option<Bytes>, io::Error>> {
         if let Some(&first_byte) = src.get(0) {
             if (49..=57).contains(&first_byte) {
                 // First character is non zero number so we can assume that

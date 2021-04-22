@@ -1,5 +1,5 @@
 use bytes::{Bytes, BytesMut};
-use codec::{BytesDelimitedCodec,SyslogDecoder};
+use codec::{BytesDelimitedCodec, SyslogDecoder};
 use std::io;
 use tokio_util::codec::Decoder;
 

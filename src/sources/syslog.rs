@@ -1,26 +1,33 @@
 use crate::sources::{
-    socket::{Mode,SocketConfig},
+    socket::{Mode, SocketConfig},
     util::StreamDecoder,
 };
+use crate::Value;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
-    Pipeline,
-    transforms::remap::{Remap, RemapConfig},
+    transforms::{
+        add_fields::AddFields,
+        remap::{Remap, RemapConfig},
+    },
 };
-use bytes::Bytes;
 use indoc::indoc;
-use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SyslogConfig {
-    // Config settings we may need access to
-    // host_key: Option<String>,
     #[serde(flatten)]
     original_config: SocketConfig,
+}
+
+impl From<SocketConfig> for SyslogConfig {
+    fn from(config: SocketConfig) -> Self {
+        SyslogConfig {
+            original_config: config,
+        }
+    }
 }
 
 inventory::submit! {
@@ -48,29 +55,34 @@ impl SourceConfig for SyslogConfig {
         };
 
         let tf = Remap::new(conf).unwrap();
-        let (to_transform, rx) = Pipeline::new_with_buffer(100, vec![Box::new(tf)]);
-        let out = cx.out;
-        cx.out = to_transform;
-        tokio::spawn(async move {
-            rx.map(|mut event| {
-                event
-                    .as_mut_log()
-                    .insert(log_schema().source_type_key(), Bytes::from("syslog"));
-                Ok(event)
-            })
-            .forward(out)
-            .await
-        });
+        cx.out.register_transform(Box::new(tf));
 
+        let src_field = AddFields::new(
+            indexmap::indexmap! {
+                log_schema().source_type_key().to_string() => Value::from("syslog".to_string()),
+            },
+            true,
+        )
+        .unwrap();
+        cx.out.register_transform(Box::new(src_field));
+
+        // Enforce the syslog required decoding per socket type
         match self.original_config.mode.clone() {
             Mode::Tcp(mut config) => {
-                config.set_decoder(
-                    Some(StreamDecoder::SyslogDecoder(codec::SyslogDecoder::new(config.max_length())))
-                );
+                config.set_decoder(Some(StreamDecoder::SyslogDecoder(
+                    codec::SyslogDecoder::new(config.max_length()),
+                )));
                 SocketConfig::new_tcp(config).build(cx).await
-            },
-            //Mode::UnixStream() => {
-                // do something
+            }
+            //Mode::Udp(config) => {
+            //    run a udp source producing an event per datagram
+            //},
+            //Mode::UnixStream(config) => {
+            //    run a unix stream source with the correct decoder
+            //},
+            //Mode::UnixDatagram(config) => {
+            //    note: the original syslog source did not support that
+            //    run an af_unix source producing an event per datagram
             //},
             _ => self.original_config.build(cx).await,
         }

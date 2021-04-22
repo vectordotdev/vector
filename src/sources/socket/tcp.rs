@@ -1,12 +1,12 @@
 use crate::{
     event::Event,
     internal_events::{SocketEventReceived, SocketMode},
-    sources::util::{SocketListenAddr, TcpSource, StreamDecoder},
+    sources::util::{SocketListenAddr, StreamDecoder, TcpSource},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
 use bytes::{Bytes, BytesMut};
-use codec::{BytesDelimitedCodec,SyslogDecoder};
+use codec::{BytesDelimitedCodec, SyslogDecoder};
 use getset::{CopyGetters, Getters, Setters};
 use serde::{Deserialize, Serialize};
 use std::io;
@@ -115,9 +115,12 @@ impl TcpSource for RawTcpSource {
     type Decoder = StreamDecoder;
 
     fn decoder(&self) -> StreamDecoder {
-        self.config.decoder.clone().unwrap_or(
-            StreamDecoder::BytesDecoder(BytesDelimitedCodec::new_with_max_length(b'\n', self.config.max_length))
-        )
+        self.config.decoder.clone().unwrap_or_else(|| {
+            StreamDecoder::BytesDecoder(BytesDelimitedCodec::new_with_max_length(
+                b'\n',
+                self.config.max_length,
+            ))
+        })
     }
 
     fn build_event(&self, frame: Bytes, host: Bytes) -> Option<Event> {

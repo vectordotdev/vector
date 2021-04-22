@@ -3,27 +3,23 @@ use crate::{
     internal_events::{SocketEventReceived, SocketMode},
     shutdown::ShutdownSignal,
     sources::{
-        util::{build_unix_datagram_source, build_unix_stream_source, StreamDecoder},
+        util::{build_unix_datagram_source, build_unix_stream_source},
         Source,
     },
     Pipeline,
 };
 use bytes::Bytes;
-use codec::BytesDelimitedCodec;
-use getset::Setters;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use tokio_util::codec::LinesCodec;
 
-#[derive(Deserialize, Serialize, Debug, Clone, Setters)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct UnixConfig {
     pub path: PathBuf,
     #[serde(default = "default_max_length")]
     pub max_length: usize,
     pub host_key: Option<String>,
-    #[serde(skip)]
-    #[set = "pub"]
-    decoder: Option<StreamDecoder>,
 }
 
 fn default_max_length() -> usize {
@@ -36,7 +32,6 @@ impl UnixConfig {
             path,
             max_length: default_max_length(),
             host_key: None,
-            decoder: None,
         }
     }
 }
@@ -45,7 +40,7 @@ impl UnixConfig {
 * Function to pass to build_unix_*_source, specific to the basic unix source.
 * Takes a single line of a received message and builds an Event object.
 **/
-fn build_event(host_key: &str, received_from: Option<Bytes>, line: Bytes) -> Event {
+fn build_event(host_key: &str, received_from: Option<Bytes>, line: &str) -> Event {
     let byte_size = line.len();
     let mut event = Event::from(line);
     event.as_mut_log().insert(
@@ -73,7 +68,7 @@ pub(super) fn unix_datagram(
         path,
         max_length,
         host_key,
-        BytesDelimitedCodec::new_with_max_length(b'\n',max_length),
+        LinesCodec::new_with_max_length(max_length),
         shutdown,
         out,
         |host_key, received_from, line| Some(build_event(host_key, received_from, line)),
@@ -89,7 +84,7 @@ pub(super) fn unix_stream(
 ) -> Source {
     build_unix_stream_source(
         path,
-        BytesDelimitedCodec::new_with_max_length(b'\n',max_length),
+        LinesCodec::new_with_max_length(max_length),
         host_key,
         shutdown,
         out,
