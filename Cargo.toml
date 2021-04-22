@@ -173,7 +173,7 @@ bollard = { version = "0.10.1", default-features = false, features = ["ssl"], op
 bytes = { version = "1.0.1", default-features = false, features = ["serde"] }
 bytesize = { version = "1.0.1", default-features = false, optional = true }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-cidr-utils = { version = "0.5.1", default-features = false }
+cidr-utils = { version = "0.5.3", default-features = false }
 colored = { version = "2.0.0", default-features = false }
 dashmap = { version = "4.0.2", default-features = false }
 db-key = { version = "0.0.5", default-features = false }

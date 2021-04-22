@@ -963,12 +963,12 @@ dependencies = [
 
 [[package]]
 name = "cidr-utils"
-version = "0.5.1"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b926222810dca24b177606653e09ebf34310c23c60931d630d408486e341335c"
+checksum = "8b2b344c64cf961a8f49c371acef86abf758bc292f645bd61779e1bb1edc9d87"
 dependencies = [
  "debug-helper",
- "num-bigint 0.3.2",
+ "num-bigint 0.4.0",
  "num-traits",
  "once_cell",
  "regex",
@@ -4176,9 +4176,9 @@ dependencies = [
 
 [[package]]
 name = "num-bigint"
-version = "0.3.2"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d0a3d5e207573f948a9e5376662aa743a2ea13f7c50a554d7af443a73fbfeba"
+checksum = "4e0d047c1062aa51e256408c560894e5251f08925980e53cf1aa5bd00eec6512"
 dependencies = [
  "autocfg 1.0.1",
  "num-integer",
