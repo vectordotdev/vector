@@ -5,6 +5,8 @@
 {{ $devOpts      := (dict "targetPath" $cssOutput "includePaths" $includePaths "enableSourceMap" true) }}
 {{ $prodOpts     := (dict "targetPath" $cssOutput "includePaths" $includePaths "outputStyle" "compressed") }}
 {{ $cssOpts      := cond $serverMode $devOpts $prodOpts }}
-{{ $css          := resources.Get $sass | resources.ExecuteAsTemplate $sass . | toCSS $cssOpts | fingerprint}}
-
+{{ $css          := resources.Get $sass | resources.ExecuteAsTemplate $sass . | toCSS $cssOpts | postCSS | fingerprint }}
+{{ if not $serverMode }}
+{{ $css = $css | resources.PostProcess }}
+{{ end }}
 <link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
