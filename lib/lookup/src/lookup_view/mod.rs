@@ -5,7 +5,7 @@ use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
-use std::{collections::VecDeque, str};
+use std::{collections::VecDeque, iter::IntoIterator, str};
 
 #[cfg(test)]
 mod test;
@@ -112,15 +112,6 @@ impl<'a> Display for Lookup<'a> {
 impl<'a> Lookup<'a> {
     pub fn iter(&self) -> std::collections::vec_deque::Iter<'_, Segment<'a>> {
         self.segments.iter()
-    }
-
-    pub fn into_iter(self) -> std::collections::vec_deque::IntoIter<Segment<'a>> {
-        self.segments.into_iter()
-    }
-
-    /// Dump the value to a `String`.
-    pub fn to_string(&self) -> String {
-        format!("{}", self)
     }
 
     /// Become a `LookupBuf` (by allocating).

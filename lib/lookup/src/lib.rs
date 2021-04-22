@@ -35,6 +35,10 @@ pub trait Look<'a>:
 
     fn len(&self) -> usize;
 
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     fn from_str(input: &'a str) -> Result<Self, LookupError>;
 
     fn extend(&mut self, other: Self);

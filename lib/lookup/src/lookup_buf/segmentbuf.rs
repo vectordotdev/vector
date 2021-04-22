@@ -66,7 +66,7 @@ pub enum SegmentBuf {
 }
 
 impl SegmentBuf {
-    pub fn as_segment<'a>(&'a self) -> Segment<'a> {
+    pub fn as_segment(&self) -> Segment {
         match self {
             SegmentBuf::Field(field) => Segment::field(field.into()),
             SegmentBuf::Index(i) => Segment::index(*i),
