@@ -4,6 +4,10 @@ module.exports = {
   darkMode: 'class',
   theme: {
     extend: {
+      colors: {
+        'primary': '#28d9f2',
+        'twitter-blue': '#1DA1F2'
+      },
       fontFamily: {
         sans: ['Segoe UI', ...defaultTheme.fontFamily.sans],
       }
@@ -12,5 +16,7 @@ module.exports = {
   variants: {
     extend: {},
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/forms')
+  ],
 }
