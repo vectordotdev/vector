@@ -7799,6 +7799,7 @@ dependencies = [
  "uuid 0.8.2",
  "vector-api-client",
  "vector-wasm",
+ "vector_core",
  "vrl",
  "vrl-cli",
  "vrl-stdlib",

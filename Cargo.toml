@@ -93,6 +93,7 @@ prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 shared = { path = "lib/shared" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
+vector_core = { path = "lib/vector-core" }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures

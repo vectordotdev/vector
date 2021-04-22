@@ -86,9 +86,7 @@ pub mod vector_windows;
 pub use event::{Event, Value};
 pub use pipeline::Pipeline;
 
-pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-
-pub type Result<T> = std::result::Result<T, Error>;
+pub use vector_core::{Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
