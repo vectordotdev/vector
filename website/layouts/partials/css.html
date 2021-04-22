@@ -1,14 +1,17 @@
 {{ $prodMode     := hugo.IsProduction }}
-{{ $includePaths := (slice "node_modules") }}
+{{ $includePaths := slice "node_modules" }}
 {{ $sass         := "sass/style.sass" }}
 {{ $cssOutput    := "css/style.css" }}
-{{ $devOpts      := (dict "targetPath" $cssOutput "includePaths" $includePaths "enableSourceMap" true) }}
-{{ $prodOpts     := (dict "targetPath" $cssOutput "includePaths" $includePaths "outputStyle" "compressed") }}
+{{ $devOpts      := dict "targetPath" $cssOutput "includePaths" $includePaths "enableSourceMap" true }}
+{{ $prodOpts     := dict "targetPath" $cssOutput "includePaths" $includePaths "outputStyle" "compressed" }}
 {{ $cssOpts      := cond $prodMode $prodOpts $devOpts }}
-{{ $css          := resources.Get $sass | resources.ExecuteAsTemplate $sass . | toCSS $cssOpts | postCSS | fingerprint }}
+{{ $postCssOpts  := dict "config" "postcss.config.js" }}
+{{ $css          := resources.Get $sass | resources.ExecuteAsTemplate $sass . | toCSS $cssOpts | postCSS $postCssOpts }}
 
 {{/* Run CSS post-processing for production and preview builds */}}
 {{ if $prodMode }}
-{{ $css = $css | minify | resources.PostProcess }}
+{{ $prodCss := $css | minify | fingerprint | resources.PostProcess }}
+<link rel="stylesheet" href="{{ $prodCss.RelPermalink }}" integrity="{{ $prodCss.Data.Integrity }}">
+{{ else }}
+<link rel="stylesheet" href="{{ $css.RelPermalink }}">
 {{ end }}
-<link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
