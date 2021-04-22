@@ -2,21 +2,42 @@ use crate::*;
 use std::{fs, io::Read, path::Path};
 use tracing::trace;
 
-const SUFFICIENTLY_COMPLEX: &str =
-    r#"regular."quoted"."quoted but spaces"."quoted.but.periods".lookup[0].nested_lookup[0][0]"#;
+const SUFFICIENTLY_COMPLEX: &str = r#"regular."quoted"."quoted but spaces"."quoted.but.periods".lookup[0].00numericstart.nested_lookup[0][0]"#;
 
 lazy_static::lazy_static! {
-    static ref SUFFICIENTLY_DECOMPOSED: [Segment<'static>; 9] = [
+    static ref SUFFICIENTLY_DECOMPOSED: [Segment<'static>; 10] = [
         Segment::from(r#"regular"#),
         Segment::from(r#""quoted""#),
         Segment::from(r#""quoted but spaces""#),
         Segment::from(r#""quoted.but.periods""#),
         Segment::from(r#"lookup"#),
         Segment::from(0),
+        Segment::from("00numericstart"),
         Segment::from(r#"nested_lookup"#),
         Segment::from(0),
         Segment::from(0),
     ];
+}
+
+#[test]
+fn field_is_quoted() {
+    let field: Field = "zork2".into();
+    assert_eq!(
+        Field {
+            name: "zork2",
+            requires_quoting: false,
+        },
+        field
+    );
+
+    let field: Field = "zork2-zoog".into();
+    assert_eq!(
+        Field {
+            name: "zork2-zoog",
+            requires_quoting: true,
+        },
+        field
+    );
 }
 
 #[test]
@@ -27,11 +48,20 @@ fn zero_len_not_allowed() {
 }
 
 #[test]
+fn unquoted_numeric_not_allowed() {
+    let input = "23";
+    let maybe_lookup = Lookup::from_str(input);
+    assert!(maybe_lookup.is_err());
+}
+
+#[test]
 fn we_dont_parse_plain_strings_in_from() {
     let input = "some_key.still_the_same_key.this.is.going.in.via.from.and.should.not.get.parsed";
+    let output =
+        r#""some_key.still_the_same_key.this.is.going.in.via.from.and.should.not.get.parsed""#;
     let lookup = Lookup::from(input);
     assert_eq!(lookup[0], Segment::from(input));
-    assert_eq!(lookup.to_string(), input);
+    assert_eq!(lookup.to_string(), output);
 }
 
 #[test]

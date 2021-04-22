@@ -1,16 +1,14 @@
+use crate::{Look, Lookup, LookupError};
+use inherent::inherent;
+use serde::de::{self, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::VecDeque,
-    convert::TryFrom,
     fmt::{self, Display, Formatter},
     ops::{Index, IndexMut},
     str,
     str::FromStr,
 };
-
-use crate::*;
-use serde::de::{self, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use tracing::instrument;
 
 #[cfg(test)]
 mod test;
@@ -82,16 +80,6 @@ pub struct LookupBuf {
     pub segments: VecDeque<SegmentBuf>,
 }
 
-impl<'a> TryFrom<VecDeque<SegmentBuf>> for LookupBuf {
-    type Error = LookupError;
-
-    fn try_from(segments: VecDeque<SegmentBuf>) -> Result<Self, Self::Error> {
-        let retval = LookupBuf { segments };
-        retval.is_valid()?;
-        Ok(retval)
-    }
-}
-
 impl Display for LookupBuf {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let mut peeker = self.segments.iter().peekable();
@@ -133,67 +121,16 @@ impl LookupBuf {
         }
     }
 
-    /// Get from the internal list of segments.
-    #[instrument(level = "trace")]
-    pub fn get(&mut self, index: usize) -> Option<&SegmentBuf> {
-        self.segments.get(index)
-    }
-
-    /// Push onto the internal list of segments.
-    #[instrument(level = "trace", skip(segment))]
-    pub fn push_back(&mut self, segment: impl Into<SegmentBuf>) {
-        self.segments.push_back(segment.into());
-    }
-
-    #[instrument(level = "trace")]
-    pub fn pop_back(&mut self) -> Option<SegmentBuf> {
-        self.segments.pop_back()
-    }
-
-    #[instrument(level = "trace", skip(segment))]
-    pub fn push_front(&mut self, segment: impl Into<SegmentBuf>) {
-        self.segments.push_front(segment.into())
-    }
-
-    #[instrument(level = "trace")]
-    pub fn pop_front(&mut self) -> Option<SegmentBuf> {
-        self.segments.pop_front()
-    }
-
-    #[instrument(level = "trace")]
     pub fn iter(&self) -> std::collections::vec_deque::Iter<'_, SegmentBuf> {
         self.segments.iter()
     }
 
-    #[instrument(level = "trace")]
-    pub fn len(&self) -> usize {
-        self.segments.len()
-    }
-
-    #[instrument(level = "trace")]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    #[instrument(level = "trace")]
-    pub fn is_root(&self) -> bool {
-        self.is_empty()
-    }
-
-    /// Raise any errors that might stem from the lookup being invalid.
-    #[instrument(level = "trace")]
-    pub fn is_valid(&self) -> Result<(), LookupError> {
-        Ok(())
-    }
-
-    #[instrument(level = "trace")]
     pub fn clone_lookup(&self) -> Lookup {
         Lookup::from(self)
     }
 
-    #[instrument(level = "trace")]
-    pub fn from_str(value: &str) -> Result<LookupBuf, LookupError> {
-        Lookup::from_str(value).map(|l| l.into_buf())
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     pub fn from_segments(segments: Vec<SegmentBuf>) -> Self {
@@ -203,34 +140,19 @@ impl LookupBuf {
     }
 
     /// Return a borrow of the SegmentBuf set.
-    #[instrument(level = "trace")]
     pub fn as_segments(&self) -> &VecDeque<SegmentBuf> {
         &self.segments
     }
 
     /// Return the SegmentBuf set.
-    #[instrument(level = "trace")]
     pub fn into_segments(self) -> VecDeque<SegmentBuf> {
         self.segments
-    }
-
-    /// Merge a lookup.
-    #[instrument(level = "trace")]
-    pub fn extend(&mut self, other: Self) {
-        self.segments.extend(other.segments)
-    }
-
-    /// Returns `true` if `needle` is a prefix of the lookup.
-    #[instrument(level = "trace")]
-    pub fn starts_with(&self, needle: &LookupBuf) -> bool {
-        needle.iter().zip(&self.segments).all(|(n, s)| n == s)
     }
 
     /// Create the possible fields that can be followed by this lookup.
     /// Because of coalesced paths there can be a number of different combinations.
     /// There is the potential for this function to create a vast number of different
     /// combinations if there are multiple coalesced segments in a path.
-    #[instrument(level = "trace")]
     pub fn to_alternative_components(&self) -> Vec<Vec<&str>> {
         let mut components = vec![vec![]];
         for segment in &self.segments {
@@ -264,6 +186,55 @@ impl LookupBuf {
     }
 }
 
+#[inherent(pub)]
+impl Look<'static> for LookupBuf {
+    type Segment = SegmentBuf;
+
+    /// Get from the internal list of segments.
+    fn get(&mut self, index: usize) -> Option<&SegmentBuf> {
+        self.segments.get(index)
+    }
+
+    /// Push onto the internal list of segments.
+    fn push_back(&mut self, segment: impl Into<SegmentBuf>) {
+        self.segments.push_back(segment.into());
+    }
+
+    fn pop_back(&mut self) -> Option<SegmentBuf> {
+        self.segments.pop_back()
+    }
+
+    fn push_front(&mut self, segment: impl Into<SegmentBuf>) {
+        self.segments.push_front(segment.into())
+    }
+
+    fn pop_front(&mut self) -> Option<SegmentBuf> {
+        self.segments.pop_front()
+    }
+
+    fn len(&self) -> usize {
+        self.segments.len()
+    }
+
+    fn is_root(&self) -> bool {
+        self.is_empty()
+    }
+
+    fn from_str(value: &'static str) -> Result<LookupBuf, LookupError> {
+        Lookup::from_str(value).map(|l| l.into_buf())
+    }
+
+    /// Merge a lookup.
+    fn extend(&mut self, other: Self) {
+        self.segments.extend(other.segments)
+    }
+
+    /// Returns `true` if `needle` is a prefix of the lookup.
+    fn starts_with(&self, needle: &LookupBuf) -> bool {
+        needle.iter().zip(&self.segments).all(|(n, s)| n == s)
+    }
+}
+
 impl FromStr for LookupBuf {
     type Err = LookupError;
 
@@ -283,12 +254,17 @@ impl IntoIterator for LookupBuf {
     }
 }
 
+impl From<VecDeque<SegmentBuf>> for LookupBuf {
+    fn from(segments: VecDeque<SegmentBuf>) -> Self {
+        LookupBuf { segments }
+    }
+}
+
 impl From<String> for LookupBuf {
     fn from(input: String) -> Self {
         let mut segments = VecDeque::with_capacity(1);
         segments.push_back(SegmentBuf::from(input));
         LookupBuf { segments }
-        // We know this must be at least one segment.
     }
 }
 
@@ -297,7 +273,6 @@ impl From<SegmentBuf> for LookupBuf {
         let mut segments = VecDeque::with_capacity(1);
         segments.push_back(input);
         LookupBuf { segments }
-        // We know this must be at least one segment.
     }
 }
 
@@ -306,7 +281,6 @@ impl From<isize> for LookupBuf {
         let mut segments = VecDeque::with_capacity(1);
         segments.push_back(SegmentBuf::index(input));
         LookupBuf { segments }
-        // We know this must be at least one segment.
     }
 }
 
@@ -315,7 +289,6 @@ impl From<&str> for LookupBuf {
         let mut segments = VecDeque::with_capacity(1);
         segments.push_back(SegmentBuf::from(input.to_owned()));
         LookupBuf { segments }
-        // We know this must be at least one segment.
     }
 }
 
@@ -372,14 +345,14 @@ impl<'de> Visitor<'de> for LookupBufVisitor {
     where
         E: de::Error,
     {
-        LookupBuf::from_str(value).map_err(de::Error::custom)
+        FromStr::from_str(value).map_err(de::Error::custom)
     }
 
     fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
     where
         E: de::Error,
     {
-        LookupBuf::from_str(&value).map_err(de::Error::custom)
+        FromStr::from_str(&value).map_err(de::Error::custom)
     }
 }
 
@@ -390,10 +363,6 @@ impl<'a> From<Lookup<'a>> for LookupBuf {
             .into_iter()
             .map(|f| f.as_segment_buf())
             .collect::<VecDeque<_>>();
-        let retval: Result<LookupBuf, LookupError> = LookupBuf::try_from(segments);
-        retval.expect(
-            "A LookupBuf with 0 length was turned into a Lookup. Since a LookupBuf with 0 \
-                  length is an invariant, any action on it is too.",
-        )
+        LookupBuf::from(segments)
     }
 }

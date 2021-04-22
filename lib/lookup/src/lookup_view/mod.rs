@@ -1,13 +1,13 @@
 #![allow(clippy::len_without_is_empty)] // It's invalid to have a lookupbuf that is empty.
 
-use crate::*;
+use crate::{Look, LookupBuf, LookupError, SegmentBuf};
 use core::fmt;
+use inherent::inherent;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
-use std::{collections::VecDeque, convert::TryFrom, str};
-use tracing::instrument;
+use std::{collections::VecDeque, str};
 
 #[cfg(test)]
 mod test;
@@ -23,8 +23,8 @@ pub use segment::{Field, Segment};
 ///
 /// # Building
 ///
-/// You build `Lookup`s from `str`s and other str-like objects with a `from()` or `try_from()`
-/// call. **These do not parse the buffer.**
+/// You build `Lookup`s from `str`s and other str-like objects with a `from()` call.
+/// **These do not parse the buffer.**
 ///
 /// ```rust
 /// use lookup::Lookup;
@@ -118,90 +118,79 @@ impl<'a> Display for Lookup<'a> {
 }
 
 impl<'a> Lookup<'a> {
-    #[instrument(level = "trace")]
-    pub fn get(&mut self, index: usize) -> Option<&Segment<'a>> {
-        self.segments.get(index)
-    }
-
-    #[instrument(level = "trace", skip(segment))]
-    pub fn push_back(&mut self, segment: impl Into<Segment<'a>>) {
-        self.segments.push_back(segment.into())
-    }
-
-    #[instrument(level = "trace")]
-    pub fn pop_back(&mut self) -> Option<Segment<'a>> {
-        self.segments.pop_back()
-    }
-
-    #[instrument(level = "trace", skip(segment))]
-    pub fn push_front(&mut self, segment: impl Into<Segment<'a>>) {
-        self.segments.push_front(segment.into())
-    }
-
-    #[instrument(level = "trace")]
-    pub fn pop_front(&mut self) -> Option<Segment<'a>> {
-        self.segments.pop_front()
-    }
-
-    #[instrument(level = "trace")]
-    pub fn len(&self) -> usize {
-        self.segments.len()
-    }
-
-    #[instrument(level = "trace")]
     pub fn iter(&self) -> std::collections::vec_deque::Iter<'_, Segment<'a>> {
         self.segments.iter()
     }
 
-    #[instrument(level = "trace")]
     pub fn into_iter(self) -> std::collections::vec_deque::IntoIter<Segment<'a>> {
         self.segments.into_iter()
     }
 
-    /// Raise any errors that might stem from the lookup being invalid.
-    #[instrument(level = "trace")]
-    pub fn is_valid(&self) -> Result<(), LookupError> {
-        Ok(())
-    }
-
-    /// Parse the lookup from a str.
-    #[instrument(level = "trace")]
-    pub fn from_str(input: &'a str) -> Result<Self, LookupError> {
-        crate::parser::parse_lookup(input).map_err(|err| LookupError::Invalid { message: err })
-    }
-
     /// Dump the value to a `String`.
-    #[instrument(level = "trace")]
     pub fn to_string(&self) -> String {
         format!("{}", self)
     }
 
     /// Become a `LookupBuf` (by allocating).
-    #[instrument(level = "trace")]
     pub fn into_buf(self) -> LookupBuf {
         LookupBuf::from(self)
     }
 
     /// Return a borrow of the Segment set.
-    #[instrument(level = "trace")]
     pub fn as_segments(&self) -> &VecDeque<Segment<'_>> {
         &self.segments
     }
 
     /// Return the Segment set.
-    #[instrument(level = "trace")]
     pub fn into_segments(self) -> VecDeque<Segment<'a>> {
         self.segments
     }
+}
+
+#[inherent(pub)]
+impl<'a> Look<'a> for Lookup<'a> {
+    type Segment = Segment<'a>;
+
+    fn is_root(&self) -> bool {
+        self.segments.is_empty()
+    }
+
+    fn get(&mut self, index: usize) -> Option<&Segment<'a>> {
+        self.segments.get(index)
+    }
+
+    fn push_back(&mut self, segment: impl Into<Segment<'a>>) {
+        self.segments.push_back(segment.into())
+    }
+
+    fn pop_back(&mut self) -> Option<Segment<'a>> {
+        self.segments.pop_back()
+    }
+
+    fn push_front(&mut self, segment: impl Into<Segment<'a>>) {
+        self.segments.push_front(segment.into())
+    }
+
+    fn pop_front(&mut self) -> Option<Segment<'a>> {
+        self.segments.pop_front()
+    }
+
+    fn len(&self) -> usize {
+        self.segments.len()
+    }
+
+    /// Parse the lookup from a str.
+    fn from_str(input: &'a str) -> Result<Self, LookupError> {
+        crate::parser::parse_lookup(input).map_err(|err| LookupError::Invalid { message: err })
+    }
 
     /// Merge a lookup.
-    #[instrument(level = "trace")]
-    pub fn extend(&mut self, other: Self) {
+    fn extend(&mut self, other: Self) {
         self.segments.extend(other.segments)
     }
 
     /// Returns `true` if `needle` is a prefix of the lookup.
-    pub fn starts_with<'b>(&self, needle: &Lookup<'b>) -> bool {
+    fn starts_with(&self, needle: &Lookup<'a>) -> bool {
         needle.iter().zip(&self.segments).all(|(n, s)| n == s)
     }
 }
@@ -250,37 +239,25 @@ impl<'a> From<Segment<'a>> for Lookup<'a> {
     }
 }
 
-impl<'a> TryFrom<VecDeque<Segment<'a>>> for Lookup<'a> {
-    type Error = LookupError;
-
-    fn try_from(segments: VecDeque<Segment<'a>>) -> Result<Self, Self::Error> {
-        let retval = Self { segments };
-        retval.is_valid()?;
-        Ok(retval)
+impl<'a> From<VecDeque<Segment<'a>>> for Lookup<'a> {
+    fn from(segments: VecDeque<Segment<'a>>) -> Self {
+        Self { segments }
     }
 }
 
-impl<'collection: 'item, 'item> TryFrom<&'collection [SegmentBuf]> for Lookup<'item> {
-    type Error = LookupError;
-
-    fn try_from(segments: &'collection [SegmentBuf]) -> Result<Self, Self::Error> {
-        let retval = Self {
+impl<'collection: 'item, 'item> From<&'collection [SegmentBuf]> for Lookup<'item> {
+    fn from(segments: &'collection [SegmentBuf]) -> Self {
+        Self {
             segments: segments.iter().map(Segment::from).collect(),
-        };
-        retval.is_valid()?;
-        Ok(retval)
+        }
     }
 }
 
-impl<'collection: 'item, 'item> TryFrom<&'collection VecDeque<SegmentBuf>> for Lookup<'item> {
-    type Error = LookupError;
-
-    fn try_from(segments: &'collection VecDeque<SegmentBuf>) -> Result<Self, Self::Error> {
-        let retval = Self {
+impl<'collection: 'item, 'item> From<&'collection VecDeque<SegmentBuf>> for Lookup<'item> {
+    fn from(segments: &'collection VecDeque<SegmentBuf>) -> Self {
+        Self {
             segments: segments.iter().map(Segment::from).collect(),
-        };
-        retval.is_valid()?;
-        Ok(retval)
+        }
     }
 }
 
@@ -294,10 +271,7 @@ impl<'a> From<Field<'a>> for Lookup<'a> {
 
 impl<'a> From<&'a LookupBuf> for Lookup<'a> {
     fn from(lookup_buf: &'a LookupBuf) -> Self {
-        Self::try_from(&lookup_buf.segments).expect(
-            "It is an invariant to have a 0 segment LookupBuf, so it is also an \
-                     invariant to have a 0 segment Lookup.",
-        )
+        Self::from(&lookup_buf.segments)
     }
 }
 

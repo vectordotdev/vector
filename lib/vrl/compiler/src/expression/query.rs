@@ -75,7 +75,7 @@ impl Expression for Query {
                 // `.` path must be an object
                 //
                 // TODO: make sure to enforce this
-                if self.path.is_empty() {
+                if self.path.is_root() {
                     return TypeDef::new()
                         .object::<String, TypeDef>(BTreeMap::default())
                         .infallible();

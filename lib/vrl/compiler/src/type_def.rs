@@ -971,14 +971,10 @@ impl From<Kind> for TypeDef {
     }
 }
 
-/*
-TODO Make these work.
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use path::{self, Segment};
-    use std::str::FromStr;
+    use lookup::{FieldBuf, SegmentBuf};
 
     #[test]
     fn collect_subtypes() {
@@ -1016,7 +1012,7 @@ mod tests {
         fn for_path() {
             struct TestCase {
                 info: KindInfo,
-                path: Vec<Segment>,
+                path: Vec<SegmentBuf>,
                 want: KindInfo,
             }
 
@@ -1024,7 +1020,7 @@ mod tests {
                 // overwrite unknown
                 TestCase {
                     info: KindInfo::Unknown,
-                    path: vec![Segment::Index(0)],
+                    path: vec![SegmentBuf::Index(0)],
                     want: KindInfo::Known({
                         let mut map = BTreeMap::new();
                         map.insert(Index::Index(0), KindInfo::Unknown);
@@ -1055,7 +1051,7 @@ mod tests {
                         set.insert(TypeKind::Integer);
                         set
                     }),
-                    path: vec![Segment::Field(path::Field::from_str("foo").unwrap())],
+                    path: vec![SegmentBuf::Field(FieldBuf::from("foo"))],
                     want: KindInfo::Known({
                         let map = {
                             let mut set = BTreeSet::new();
@@ -1078,8 +1074,8 @@ mod tests {
                         set.insert(TypeKind::Integer);
                         set
                     }),
-                    path: vec![Segment::Index(1)],
-
+                    path: vec![SegmentBuf::Index(1)],
+                    want: KindInfo::Known({
                         let map = {
                             let mut set = BTreeSet::new();
                             set.insert(TypeKind::Integer);
@@ -1101,7 +1097,7 @@ mod tests {
                         set.insert(TypeKind::Integer);
                         set
                     }),
-                    path: vec![Segment::Index(-1)],
+                    path: vec![SegmentBuf::Index(-1)],
                     want: KindInfo::Known({
                         let mut set = BTreeSet::new();
                         set.insert(TypeKind::Array({
@@ -1115,11 +1111,10 @@ mod tests {
             ];
 
             for TestCase { info, path, want } in cases {
-                let path = LookupBuf::new_unchecked(path);
+                let path = LookupBuf::from_segments(path);
 
                 assert_eq!(info.for_path(path), want);
             }
         }
     }
 }
-*/

@@ -17,14 +17,14 @@ PathSegment: Segment<'input> = {
   "."? <Field> => Segment::field(<>),
   "[" <Index> "]" => Segment::index(<>),
   "."? "(" <v:(<Field> "|")+> <e:Field> ")" => {
-        let mut v = v;
-        v.push(e);
-        Segment::coalesce(v)
+    let mut v = v;
+    v.push(e);
+    Segment::coalesce(v)
   }
 }
 
 Field: Field<'input> = {
-   <s:r"[a-zA-Z_][0-9a-zA-Z_]*"> => Field::from(s),
+   <s:r"[0-9]*[a-zA-Z_][0-9a-zA-Z_]*"> => Field::from(s),
    <s:r#""(\\"|[^"])+""#> => Field::from(s),
 }
 

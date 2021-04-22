@@ -1,5 +1,3 @@
-#[cfg(test)]
-use lookup::LookupBuf;
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -66,10 +64,12 @@ pub struct DelFn {
 impl DelFn {
     #[cfg(test)]
     fn new(path: &str) -> Self {
+        use std::str::FromStr;
+
         Self {
             query: expression::Query::new(
                 expression::Target::External,
-                LookupBuf::from_str(path).unwrap(),
+                FromStr::from_str(path).unwrap(),
             ),
         }
     }

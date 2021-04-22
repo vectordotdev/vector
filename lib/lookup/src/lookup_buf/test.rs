@@ -1,5 +1,5 @@
 use crate::*;
-use std::{fs, io::Read, path::Path};
+use std::{fs, io::Read, path::Path, str::FromStr};
 use tracing::trace;
 
 const SUFFICIENTLY_COMPLEX: &str =
@@ -20,6 +20,27 @@ lazy_static::lazy_static! {
 }
 
 #[test]
+fn field_is_quoted() {
+    let field: FieldBuf = "zork2".into();
+    assert_eq!(
+        FieldBuf {
+            name: "zork2".into(),
+            requires_quoting: false,
+        },
+        field
+    );
+
+    let field: FieldBuf = "zork2-zoog".into();
+    assert_eq!(
+        FieldBuf {
+            name: "zork2-zoog".into(),
+            requires_quoting: true,
+        },
+        field
+    );
+}
+
+#[test]
 fn zero_len_not_allowed() {
     let input = "";
     let maybe_lookup = LookupBuf::from_str(input);
@@ -29,9 +50,12 @@ fn zero_len_not_allowed() {
 #[test]
 fn we_dont_parse_plain_strings_in_from() {
     let input = "some_key.still_the_same_key.this.is.going.in.via.from.and.should.not.get.parsed";
+    // Because the field contains non-path characters it will need to be quoted.
+    let output =
+        r#""some_key.still_the_same_key.this.is.going.in.via.from.and.should.not.get.parsed""#;
     let lookup = LookupBuf::from(input);
     assert_eq!(lookup[0], SegmentBuf::from(String::from(input)));
-    assert_eq!(lookup.to_string(), input);
+    assert_eq!(lookup.to_string(), output);
 }
 
 #[test]
@@ -186,7 +210,7 @@ fn lookup_to_string_and_serialize() {
                 let buf = parse_artifact(&path).unwrap();
                 let buf_serialized =
                     serde_json::to_string(&serde_json::to_value(&buf).unwrap()).unwrap();
-                let lookup = LookupBuf::from_str(&buf).unwrap();
+                let lookup: LookupBuf = FromStr::from_str(&buf).unwrap();
                 tracing::trace!(?path, ?lookup, ?buf, "Asserting equal.");
                 assert_eq!(lookup.to_string(), buf);
                 // Ensure serialization doesn't clobber.

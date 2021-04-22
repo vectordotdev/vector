@@ -1,6 +1,6 @@
-use crate::*;
+use crate::{field, LookSegment, Segment};
+use inherent::inherent;
 use std::fmt::{Display, Formatter};
-use tracing::instrument;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct FieldBuf {
@@ -27,13 +27,18 @@ impl Display for FieldBuf {
 
 impl From<String> for FieldBuf {
     fn from(mut name: String) -> Self {
-        let requires_quoting = name.starts_with('\"');
-        if requires_quoting {
-            // There is unfortunately not way to make an owned substring of a string.
+        let mut requires_quoting = false;
+
+        if name.starts_with('\"') {
+            // There is unfortunately no way to make an owned substring of a string.
             // So we have to take a slice and clone it.
             let len = name.len();
             name = name[1..len - 1].to_string();
+            requires_quoting = true;
+        } else if !field::is_valid_fieldname(&name) {
+            requires_quoting = true
         }
+
         Self {
             name,
             requires_quoting,
@@ -61,31 +66,6 @@ pub enum SegmentBuf {
 }
 
 impl SegmentBuf {
-    pub const fn field(field: FieldBuf) -> SegmentBuf {
-        SegmentBuf::Field(field)
-    }
-
-    pub fn is_field(&self) -> bool {
-        matches!(self, SegmentBuf::Field(_))
-    }
-
-    pub const fn index(v: isize) -> SegmentBuf {
-        SegmentBuf::Index(v)
-    }
-
-    pub fn is_index(&self) -> bool {
-        matches!(self, SegmentBuf::Index(_))
-    }
-
-    pub const fn coalesce(v: Vec<FieldBuf>) -> SegmentBuf {
-        SegmentBuf::Coalesce(v)
-    }
-
-    pub fn is_coalesce(&self) -> bool {
-        matches!(self, SegmentBuf::Coalesce(_))
-    }
-
-    #[instrument]
     pub fn as_segment<'a>(&'a self) -> Segment<'a> {
         match self {
             SegmentBuf::Field(field) => Segment::field(field.into()),
@@ -94,6 +74,35 @@ impl SegmentBuf {
                 Segment::coalesce(v.iter().map(|field| field.into()).collect())
             }
         }
+    }
+}
+
+#[inherent(pub)]
+impl<'a> LookSegment<'a> for SegmentBuf {
+    type Field = FieldBuf;
+
+    fn field(field: FieldBuf) -> SegmentBuf {
+        SegmentBuf::Field(field)
+    }
+
+    fn is_field(&self) -> bool {
+        matches!(self, SegmentBuf::Field(_))
+    }
+
+    fn index(v: isize) -> SegmentBuf {
+        SegmentBuf::Index(v)
+    }
+
+    fn is_index(&self) -> bool {
+        matches!(self, SegmentBuf::Index(_))
+    }
+
+    fn coalesce(v: Vec<FieldBuf>) -> SegmentBuf {
+        SegmentBuf::Coalesce(v)
+    }
+
+    fn is_coalesce(&self) -> bool {
+        matches!(self, SegmentBuf::Coalesce(_))
     }
 }
 

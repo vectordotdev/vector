@@ -1,6 +1,6 @@
-use crate::*;
+use crate::{field, FieldBuf, LookSegment, SegmentBuf};
+use inherent::inherent;
 use std::fmt::{Display, Formatter};
-use tracing::instrument;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct Field<'a> {
@@ -30,11 +30,16 @@ impl<'a> Display for Field<'a> {
 
 impl<'a> From<&'a str> for Field<'a> {
     fn from(mut name: &'a str) -> Self {
-        let requires_quoting = name.starts_with('\"');
-        if requires_quoting {
+        let mut requires_quoting = false;
+
+        if name.starts_with('\"') {
             let len = name.len();
             name = &name[1..len - 1];
+            requires_quoting = true;
+        } else if !field::is_valid_fieldname(name) {
+            requires_quoting = true;
         }
+
         Self {
             name,
             requires_quoting,
@@ -64,31 +69,6 @@ pub enum Segment<'a> {
 }
 
 impl<'a> Segment<'a> {
-    pub const fn field(field: Field<'a>) -> Segment<'a> {
-        Segment::Field(field)
-    }
-
-    pub fn is_field(&self) -> bool {
-        matches!(self, Segment::Field(_))
-    }
-
-    pub const fn index(v: isize) -> Segment<'a> {
-        Segment::Index(v)
-    }
-
-    pub fn is_index(&self) -> bool {
-        matches!(self, Segment::Index(_))
-    }
-
-    pub const fn coalesce(v: Vec<Field<'a>>) -> Segment<'a> {
-        Segment::Coalesce(v)
-    }
-
-    pub fn is_coalesce(&self) -> bool {
-        matches!(self, Segment::Coalesce(_))
-    }
-
-    #[instrument]
     pub fn as_segment_buf(&self) -> SegmentBuf {
         match self {
             Segment::Field(field) => SegmentBuf::field(field.as_field_buf()),
@@ -100,9 +80,37 @@ impl<'a> Segment<'a> {
     }
 
     /// Become a `SegmentBuf` (by allocating).
-    #[instrument(level = "trace")]
     pub fn into_buf(self) -> SegmentBuf {
         SegmentBuf::from(self)
+    }
+}
+
+#[inherent(pub)]
+impl<'a> LookSegment<'a> for Segment<'a> {
+    type Field = Field<'a>;
+
+    fn field(field: Field<'a>) -> Segment<'a> {
+        Segment::Field(field)
+    }
+
+    fn is_field(&self) -> bool {
+        matches!(self, Segment::Field(_))
+    }
+
+    fn index(v: isize) -> Segment<'a> {
+        Segment::Index(v)
+    }
+
+    fn is_index(&self) -> bool {
+        matches!(self, Segment::Index(_))
+    }
+
+    fn coalesce(v: Vec<Field<'a>>) -> Segment<'a> {
+        Segment::Coalesce(v)
+    }
+
+    fn is_coalesce(&self) -> bool {
+        matches!(self, Segment::Coalesce(_))
     }
 }
 
