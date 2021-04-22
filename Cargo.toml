@@ -245,7 +245,7 @@ zstd = { version = "0.6", default-features = false }
 cfg-if = { version = "1.0.0", default-features = false }
 
 # For WASM
-async-stream = "0.3.0"
+async-stream = "0.3.1"
 lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
