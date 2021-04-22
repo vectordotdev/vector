@@ -18,9 +18,7 @@ use syslog_loose::{Message, ProcId, Protocol, StructuredElement, SyslogFacility,
 pub struct SyslogSinkConfig {
     #[serde(flatten)]
     mode: Mode,
-    #[serde(default = "crate::serde::default_true")]
-    rfc5424: bool,
-    #[serde(default = "crate::serde::default_false")]
+    rfc3164: bool,
     include_extra_fields: bool,
     #[serde(default = "appname_key")]
     appname_key: String,
@@ -103,7 +101,7 @@ impl SinkConfig for SyslogSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let rfc5424 = self.rfc5424.clone();
+        let rfc3164 = self.rfc3164.clone();
         let include_extra_fields = self.include_extra_fields.clone();
         let appname_key = self.appname_key.to_owned();
         let facility_key = self.facility_key.to_owned();
@@ -118,7 +116,7 @@ impl SinkConfig for SyslogSinkConfig {
             build_syslog_message(
                 event,
                 include_len,
-                rfc5424,
+                rfc3164,
                 include_extra_fields,
                 appname_key.as_str(),
                 facility_key.as_str(),
@@ -151,7 +149,7 @@ impl SinkConfig for SyslogSinkConfig {
 fn build_syslog_message(
     event: Event,
     include_len: bool,
-    rfc5424: bool,
+    rfc3164: bool,
     include_extra_fields: bool,
     appname_key: &str,
     facility_key: &str,
@@ -179,10 +177,10 @@ fn build_syslog_message(
         .or(Some(ProcId::Name("vector".to_string())));
 
     let msg = Message {
-        protocol: if rfc5424 {
-            Protocol::RFC5424(1)
-        } else {
+        protocol: if rfc3164 {
             Protocol::RFC3164
+        } else {
+            Protocol::RFC5424(1)
         },
         timestamp: ts,
         procid: procid,
@@ -380,11 +378,11 @@ mod tests {
         crate::test_util::test_generate_config::<SyslogSinkConfig>();
     }
 
-    fn build_message(event: Event, rfc5434: bool) -> Option<Bytes> {
+    fn build_message(event: Event, rfc3164: bool) -> Option<Bytes> {
         build_syslog_message(
             event,
             false,
-            rfc5434,
+            rfc3164,
             true,
             "appname",
             "facility",
@@ -407,7 +405,7 @@ mod tests {
         event.as_mut_log().insert("hostname", "foohost");
         event.as_mut_log().insert("appname", "myapp");
 
-        let bytes = build_message(event, true).unwrap();
+        let bytes = build_message(event, false).unwrap();
 
         let msg =
             Bytes::from("<14>1 2021-04-12T21:00:01+00:00 foohost myapp vector - - A message\n");
@@ -427,7 +425,7 @@ mod tests {
         event.as_mut_log().insert("severity", "warning");
         event.as_mut_log().insert("facility", "kern");
 
-        let bytes = build_message(event, false).unwrap();
+        let bytes = build_message(event, true).unwrap();
 
         let msg = Bytes::from("<4> 2021-04-12T21:00:01+00:00 foo bar[vector]: A message\n");
 
