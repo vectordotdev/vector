@@ -197,7 +197,6 @@ hyper-openssl = { version = "0.9.1", default-features = false }
 indexmap = { version = "1.6.2", default-features = false, features = ["serde"] }
 indoc = { version = "1.0.3", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
-jemallocator = { version = "0.3.2", default-features = false, optional = true }
 k8s-openapi = { version = "0.11.0", default-features = true, features = ["api", "v1_16"], optional = true }
 lazy_static = { version = "1.4.0", default-features = false }
 leveldb = { version = "0.8.6", default-features = false, optional = true }
@@ -321,7 +320,7 @@ rdkafka-plain = ["rdkafka"]
 rusoto = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
 sasl = ["rdkafka/gssapi"]
 # Enables features that work only on systems providing `cfg(unix)`
-unix = ["jemallocator"]
+unix = []
 # These are **very** useful on Cross compilations!
 vendor-all = ["vendor-libz", "vendor-openssl", "vendor-sasl"]
 vendor-sasl = ["rdkafka/gssapi-vendored"]

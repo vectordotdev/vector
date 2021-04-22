@@ -20,10 +20,6 @@ extern crate pest_derive;
 #[cfg(feature = "vrl-cli")]
 extern crate vrl_cli;
 
-#[cfg(feature = "jemallocator")]
-#[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
-
 #[macro_use]
 pub mod config;
 pub mod cli;
