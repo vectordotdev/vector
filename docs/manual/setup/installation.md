@@ -8,6 +8,8 @@ hide_pagination: true
 Vector compiles to a single `musl` static binary with no dependencies, making it
 simple to install.
 
+Test.
+
 ## Install script
 
 This light-weight script will perform platform detection and determine the best
