@@ -382,7 +382,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		kafka_consumed_messages_total: {
-			description:       "Total number of messages consumed, not including ignored messages (due to offset, etc), from Kafka brokers.."
+			description:       "Total number of messages consumed, not including ignored messages (due to offset, etc), from Kafka brokers."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
