@@ -3,6 +3,7 @@
 name: cargo_hack
 
 on:
+  pull_request: {}
   workflow_dispatch:
   schedule:
     - cron: "0 0 * * *"
@@ -15,7 +16,7 @@ env:
 
 jobs:
   hack:
-    runs-on: ubuntu-20.04
+    runs-on: self-hosted
     name: Cargo Hack Check - Powerset
     steps:
       - uses: actions/checkout@v2
