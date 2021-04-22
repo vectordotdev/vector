@@ -4,7 +4,6 @@
 name: cargo_hack
 
 on:
-  pull_request: {}
   workflow_dispatch:
   schedule:
     - cron: "0 0 * * *"
