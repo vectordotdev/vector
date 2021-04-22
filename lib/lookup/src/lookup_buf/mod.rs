@@ -62,13 +62,13 @@ pub use segmentbuf::{FieldBuf, SegmentBuf};
 /// There exists an unowned variant of this type appropriate for static contexts or where you only
 /// have a view into a long lived string. (Say, deserialization of configs).
 ///
-/// To shed ownership use `lookup_buf.clone_lookup()`. To gain ownership of a `lookup`, use
+/// To shed ownership use `lookup_buf.to_lookup()`. To gain ownership of a `lookup`, use
 /// `lookup.into()`.
 ///
 /// ```rust
 /// use lookup::LookupBuf;
 /// let mut lookup = LookupBuf::from_str("foo.bar").unwrap();
-/// let mut unowned_view = lookup.clone_lookup();
+/// let mut unowned_view = lookup.to_lookup();
 /// unowned_view.push_back(1);
 /// unowned_view.push_back("bar");
 /// lookup.push_back("baz"); // Does not impact the view!
@@ -119,7 +119,7 @@ impl LookupBuf {
         self.segments.iter()
     }
 
-    pub fn clone_lookup(&self) -> Lookup {
+    pub fn to_lookup(&self) -> Lookup {
         Lookup::from(self)
     }
 
