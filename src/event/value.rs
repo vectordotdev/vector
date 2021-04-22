@@ -369,7 +369,6 @@ impl Value {
     /// val.insert("bar", 2);
     /// assert_eq!(val.is_leaf(), false);
     /// ```
-    #[instrument(level = "trace")]
     pub fn is_leaf<'a>(&'a self) -> bool {
         match &self {
             Value::Boolean(_)
@@ -406,7 +405,6 @@ impl Value {
     /// val.insert("bar", 2);
     /// assert_eq!(val.is_empty(), false);
     /// ```
-    #[instrument(level = "trace")]
     pub fn is_empty(&self) -> bool {
         match &self {
             Value::Boolean(_)
@@ -443,7 +441,6 @@ impl Value {
     /// val.insert("bar", 2);
     /// assert_eq!(val.len(), Some(2));
     /// ```
-    #[instrument(level = "trace")]
     pub fn len(&self) -> Option<usize> {
         match &self {
             Value::Boolean(_)
@@ -637,7 +634,7 @@ impl Value {
         }
     }
 
-    /// This situation is surprisingly common due to how nulls full sparse vectors.
+    /// This situation is surprisingly common due to how nulls fill sparse vectors.
     fn insert_null(
         segment: &SegmentBuf,
         mut working_lookup: LookupBuf,

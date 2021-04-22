@@ -1,7 +1,6 @@
 use crate::event::Value;
 use lookup::LookupBuf;
 use snafu::Snafu;
-pub use EventError::*;
 
 #[derive(Debug, Snafu)]
 pub enum EventError {

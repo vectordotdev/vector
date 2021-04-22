@@ -5,19 +5,21 @@ use chrono::Utc;
 use derivative::Derivative;
 use getset::Getters;
 use lookup::LookupBuf;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{
+    de::{MapAccess, Visitor},
+    Deserialize, Serialize, Serializer,
+};
 use shared::EventDataEq;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
-    fmt::{Debug, Display},
+    fmt::{self, Debug, Display},
     iter::FromIterator,
 };
 
-#[derive(Clone, Debug, Getters, PartialEq, Derivative, Deserialize)]
+#[derive(Clone, Debug, Getters, PartialEq, Derivative)]
 pub struct LogEvent {
     // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
-    #[serde(flatten)]
     #[derivative(Default(value = "Value::from(BTreeMap::default())"))]
     fields: Value,
 
@@ -51,34 +53,22 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        match &self.fields {
-            Value::Map(map) => util::log::get(&map, key.as_ref()),
-            _ => unreachable!(),
-        }
+        util::log::get(self.as_map(), key.as_ref())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
-        match &self.fields {
-            Value::Map(map) => map.get(key.as_ref()),
-            _ => unreachable!(),
-        }
+        self.as_map().get(key.as_ref())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
-        match self.fields {
-            Value::Map(ref mut map) => util::log::get_mut(map, key.as_ref()),
-            _ => unreachable!(),
-        }
+        util::log::get_mut(self.as_map_mut(), key.as_ref())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn contains(&self, key: impl AsRef<str>) -> bool {
-        match &self.fields {
-            Value::Map(map) => util::log::contains(&map, key.as_ref()),
-            _ => unreachable!(),
-        }
+        util::log::contains(self.as_map(), key.as_ref())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
@@ -87,10 +77,7 @@ impl LogEvent {
         key: impl AsRef<str>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        match self.fields {
-            Value::Map(ref mut map) => util::log::insert(map, key.as_ref(), value.into()),
-            _ => unreachable!(),
-        }
+        util::log::insert(self.as_map_mut(), key.as_ref(), value.into())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = ?key))]
@@ -98,10 +85,7 @@ impl LogEvent {
     where
         V: Into<Value> + Debug,
     {
-        match self.fields {
-            Value::Map(ref mut map) => util::log::insert_path(map, key, value.into()),
-            _ => unreachable!(),
-        }
+        util::log::insert_path(self.as_map_mut(), key, value.into())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key))]
@@ -110,12 +94,7 @@ impl LogEvent {
         K: Into<String> + Display,
         V: Into<Value> + Debug,
     {
-        match self.fields {
-            Value::Map(ref mut map) => {
-                map.insert(key.into(), value.into());
-            }
-            _ => unreachable!(),
-        }
+        self.as_map_mut().insert(key.into(), value.into());
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
@@ -128,18 +107,12 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn remove(&mut self, key: impl AsRef<str>) -> Option<Value> {
-        match self.fields {
-            Value::Map(ref mut map) => util::log::remove(map, key.as_ref(), false),
-            _ => unreachable!(),
-        }
+        util::log::remove(self.as_map_mut(), key.as_ref(), false)
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn remove_prune(&mut self, key: impl AsRef<str>, prune: bool) -> Option<Value> {
-        match self.fields {
-            Value::Map(ref mut map) => util::log::remove(map, key.as_ref(), prune),
-            _ => unreachable!(),
-        }
+        util::log::remove(self.as_map_mut(), key.as_ref(), prune)
     }
 
     #[instrument(level = "trace", skip(self))]
@@ -152,18 +125,12 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self))]
     pub fn all_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
-        match &self.fields {
-            Value::Map(map) => util::log::all_fields(&map),
-            _ => unreachable!(),
-        }
+        util::log::all_fields(self.as_map())
     }
 
     #[instrument(level = "trace", skip(self))]
     pub fn is_empty(&self) -> bool {
-        match &self.fields {
-            Value::Map(map) => map.is_empty(),
-            _ => unreachable!(),
-        }
+        self.as_map().is_empty()
     }
 
     #[instrument(level = "trace", skip(self))]
@@ -380,6 +347,37 @@ impl Serialize for LogEvent {
     }
 }
 
+struct LogEventVisitor;
+
+impl<'de> Visitor<'de> for LogEventVisitor {
+    type Value = LogEvent;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("A map")
+    }
+
+    fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
+    where
+        M: MapAccess<'de>,
+    {
+        let mut event = LogEvent::default();
+        while let Some((key, value)) = access.next_entry::<String, String>()? {
+            event.insert(key, Value::from(value));
+        }
+
+        Ok(event)
+    }
+}
+
+impl<'de> Deserialize<'de> for LogEvent {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_map(LogEventVisitor)
+    }
+}
+
 impl vrl::Target for LogEvent {
     fn get(&self, path: &LookupBuf) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
@@ -414,7 +412,6 @@ impl vrl::Target for LogEvent {
         if path.is_root() {
             if let Value::Map(_) = value {
                 std::mem::swap(&mut self.fields, &mut value);
-                // TODO: Why does this not return value?
                 Ok(())
             } else {
                 Err("Cannot insert as root of Event unless it is a map.".into())
@@ -468,6 +465,18 @@ mod test {
                 }
                 _ => panic!("This test should never read Err'ing test fixtures."),
             });
+    }
+
+    #[test]
+    fn serialize_metadata_field() {
+        let mut event = LogEvent::default();
+        event.insert("message", "spork");
+        event.insert("metadata", "zork");
+
+        let serialized = serde_json::to_string(&event).unwrap();
+        let deserialized: LogEvent = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(event, deserialized);
     }
 
     // We use `serde_json` pointers in this test to ensure we're validating that Vector correctly inputs and outputs things as expected.
@@ -588,7 +597,7 @@ mod test {
         use shared::btreemap;
 
         let cases = vec![
-            /*(
+            (
                 btreemap! { "foo" => "bar" },
                 vec![],
                 btreemap! { "baz" => "qux" }.into(),
@@ -601,7 +610,7 @@ mod test {
                 "baz".into(),
                 btreemap! { "foo" => "baz" },
                 Ok(()),
-            ),*/
+            ),
             (
                 btreemap! { "foo" => "bar" },
                 vec![

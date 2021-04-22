@@ -1,5 +1,3 @@
-#![allow(clippy::len_without_is_empty)] // It's invalid to have a lookupbuf that is empty.
-
 use crate::{Look, LookupBuf, LookupError, SegmentBuf};
 use core::fmt;
 use inherent::inherent;
@@ -90,25 +88,19 @@ impl<'a> Display for Lookup<'a> {
         let mut next = peeker.next();
         let mut maybe_next = peeker.peek();
         while let Some(segment) = next {
-            match segment {
-                Segment::Field(_) => match maybe_next {
-                    Some(next) if next.is_field() || next.is_coalesce() => {
-                        write!(f, r#"{}."#, segment)?
-                    }
-                    None | Some(_) => write!(f, "{}", segment)?,
-                },
-                Segment::Index(_) => match maybe_next {
-                    Some(next) if next.is_field() || next.is_coalesce() => {
-                        write!(f, r#"[{}]."#, segment)?
-                    }
-                    None | Some(_) => write!(f, "[{}]", segment)?,
-                },
-                Segment::Coalesce(_) => match maybe_next {
-                    Some(next) if next.is_field() || next.is_coalesce() => {
-                        write!(f, r#"{}."#, segment)?
-                    }
-                    None | Some(_) => write!(f, "{}", segment)?,
-                },
+            match (segment, maybe_next) {
+                (Segment::Field(_), Some(next)) if next.is_field() || next.is_coalesce() => {
+                    write!(f, r#"{}."#, segment)?
+                }
+                (Segment::Field(_), _) => write!(f, "{}", segment)?,
+                (Segment::Index(_), Some(next)) if next.is_field() || next.is_coalesce() => {
+                    write!(f, r#"[{}]."#, segment)?
+                }
+                (Segment::Index(_), _) => write!(f, "[{}]", segment)?,
+                (Segment::Coalesce(_), Some(next)) if next.is_field() || next.is_coalesce() => {
+                    write!(f, r#"{}."#, segment)?
+                }
+                (Segment::Coalesce(_), _) => write!(f, "{}", segment)?,
             }
             next = peeker.next();
             maybe_next = peeker.peek();
@@ -209,7 +201,6 @@ impl<'a> From<&'a str> for Lookup<'a> {
         let mut segments = VecDeque::with_capacity(1);
         segments.push_back(Segment::from(input));
         Self { segments }
-        // We know this must be at least one segment.
     }
 }
 
@@ -218,7 +209,6 @@ impl<'a> From<isize> for Lookup<'a> {
         let mut segments = VecDeque::with_capacity(1);
         segments.push_back(Segment::from(input));
         Self { segments }
-        // We know this must be at least one segment.
     }
 }
 
@@ -227,7 +217,6 @@ impl<'a> From<&'a String> for Lookup<'a> {
         let mut segments = VecDeque::with_capacity(1);
         segments.push_back(Segment::from(input.as_str()));
         Self { segments }
-        // We know this must be at least one segment.
     }
 }
 

@@ -86,25 +86,19 @@ impl Display for LookupBuf {
         let mut next = peeker.next();
         let mut maybe_next = peeker.peek();
         while let Some(segment) = next {
-            match segment {
-                SegmentBuf::Field(_) => match maybe_next {
-                    Some(next) if next.is_field() || next.is_coalesce() => {
-                        write!(f, r#"{}."#, segment)?
-                    }
-                    None | Some(_) => write!(f, "{}", segment)?,
-                },
-                SegmentBuf::Index(_) => match maybe_next {
-                    Some(next) if next.is_field() || next.is_coalesce() => {
-                        write!(f, r#"[{}]."#, segment)?
-                    }
-                    None | Some(_) => write!(f, "[{}]", segment)?,
-                },
-                SegmentBuf::Coalesce(_) => match maybe_next {
-                    Some(next) if next.is_field() || next.is_coalesce() => {
-                        write!(f, r#"{}."#, segment)?
-                    }
-                    None | Some(_) => write!(f, "{}", segment)?,
-                },
+            match (segment, maybe_next) {
+                (SegmentBuf::Field(_), Some(next)) if next.is_field() || next.is_coalesce() => {
+                    write!(f, r#"{}."#, segment)?
+                }
+                (SegmentBuf::Field(_), _) => write!(f, "{}", segment)?,
+                (SegmentBuf::Index(_), Some(next)) if next.is_field() || next.is_coalesce() => {
+                    write!(f, r#"[{}]."#, segment)?
+                }
+                (SegmentBuf::Index(_), _) => write!(f, "[{}]", segment)?,
+                (SegmentBuf::Coalesce(_), Some(next)) if next.is_field() || next.is_coalesce() => {
+                    write!(f, r#"{}."#, segment)?
+                }
+                (SegmentBuf::Coalesce(_), _) => write!(f, "{}", segment)?,
             }
             next = peeker.next();
             maybe_next = peeker.peek();
@@ -130,7 +124,7 @@ impl LookupBuf {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.segments.is_empty()
     }
 
     pub fn from_segments(segments: Vec<SegmentBuf>) -> Self {
