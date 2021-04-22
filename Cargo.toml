@@ -339,6 +339,8 @@ api = [
   "async-graphql-warp",
   "base64",
   "itertools",
+  "sources-host_metrics",
+  "uuid",
   "warp",
 ]
 
