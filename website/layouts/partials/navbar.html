@@ -1,11 +1,12 @@
 {{ $menu := site.Menus.navbar }}
-<nav class="bg-gray-800 dark:bg-white">
+<nav class="dark:bg-gray-800" x-data="{ open: false }">
   <div class="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
     <div class="relative flex items-center justify-between h-16">
       <div class="flex items-center px-2 lg:px-0">
         <div class="flex-shrink-0">
-          <img class="block lg:hidden h-8 w-auto" src="https://tailwindui.com/img/logos/workflow-mark-indigo-500.svg" alt="Workflow">
-          <img class="hidden lg:block h-8 w-auto" src="https://tailwindui.com/img/logos/workflow-logo-indigo-500-mark-white-text.svg" alt="Workflow">
+          <a href="{{ site.BaseURL }}" class="dark:text-gray-100">
+            {{ site.Title }}
+          </a>
         </div>
         <div class="hidden lg:block lg:ml-6">
           <div class="flex space-x-4">
@@ -17,7 +18,13 @@
           </div>
         </div>
       </div>
-      <div class="flex-1 flex justify-center px-2 lg:ml-6 lg:justify-end">
+      <div class="flex-1 flex items-center justify-center px-2 lg:ml-6 lg:justify-end">
+        {{/* Dark mode toggler */}}
+        <div class="mr-3">
+          {{ partial "toggler.html" . }}
+        </div>
+
+
         <div class="max-w-lg w-full lg:max-w-xs">
           <label for="search" class="sr-only">Search</label>
           <div class="relative">

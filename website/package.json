@@ -10,6 +10,7 @@
   },
   "devDependencies": {
     "@fullhuman/postcss-purgecss": "^4.0.3",
+    "@ryangjchandler/spruce": "^2.6.3",
     "postcss-cli": "^8.3.1"
   }
 }

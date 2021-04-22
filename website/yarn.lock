@@ -58,6 +58,13 @@
     "@nodelib/fs.scandir" "2.1.4"
     fastq "^1.6.0"
 
+"@ryangjchandler/spruce@^2.6.3":
+  version "2.6.3"
+  resolved "https://registry.yarnpkg.com/@ryangjchandler/spruce/-/spruce-2.6.3.tgz#c9a42c6009385af279ba229a8950f63a45feeadb"
+  integrity sha512-sWeh9y+N4O86hq96PMjqhH6Bj215f903q9+SV8ofucjtH17/gYJ9AmaFJhA0TvkPAxGrRHVrYaO+KaCrNL8PJQ==
+  dependencies:
+    alpinejs "^2.5"
+
 "@tailwindcss/forms@^0.3.2":
   version "0.3.2"
   resolved "https://registry.yarnpkg.com/@tailwindcss/forms/-/forms-0.3.2.tgz#e28c4514a53e69f725416a5a2a6d0f221683f069"
@@ -89,7 +96,7 @@ acorn@^7.0.0:
   resolved "https://registry.yarnpkg.com/acorn/-/acorn-7.4.1.tgz#feaed255973d2e77555b83dbc08851a6c63520fa"
   integrity sha512-nQyp0o1/mNdbTO1PO6kHkwSrmgZ0MT/jCCpNiwbUjGoRN4dlBhqJtoQuCnEOKzgTVwg0ZWiCoQy6SxMebQVh8A==
 
-alpinejs@^2.8.2:
+alpinejs@^2.5, alpinejs@^2.8.2:
   version "2.8.2"
   resolved "https://registry.yarnpkg.com/alpinejs/-/alpinejs-2.8.2.tgz#b14ec21ae3cd78dcee4aed0a78ed0f01b676dac4"
   integrity sha512-5yOUtckn4CBp0qsHpo2qgjZyZit84uXvHbB7NJ27sn4FA6UlFl2i9PGUAdTXkcbFvvxDJBM+zpOD8RuNYFvQAw==
