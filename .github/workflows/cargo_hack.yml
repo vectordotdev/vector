@@ -26,7 +26,7 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: cargo install cargo-hack
-      - run: cargo hack check --each-feature --clean-per-run
+      - run: cargo hack check --each-feature
 
   cargo-hack-failure:
     name: cargo-hack-failure
