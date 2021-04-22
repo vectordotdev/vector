@@ -16,7 +16,7 @@ env:
 
 jobs:
   hack:
-    runs-on: self-hosted
+    runs-on: [self-hosted, linux, x64, general]
     name: Cargo Hack Check - Powerset
     steps:
       - uses: actions/checkout@v2
