@@ -23,7 +23,6 @@ ci-production-build: setup build-cue production-build
 # Preview site
 preview-build:
 	hugo \
-	--environment "production" \
 	--baseURL $(DEPLOY_PRIME_URL) \
 	--buildDrafts \
 	--buildFuture \
