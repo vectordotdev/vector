@@ -27,16 +27,19 @@ jobs:
       - run: cargo install cargo-hack
       - run: cargo hack check --each-feature
 
-  cargo-hack-failure:
-    name: cargo-hack-failure
-    if: failure() && github.ref == 'refs/heads/master'
-    needs:
-      - hack
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Discord notification
-      env:
-        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.0
-      with:
-        args: "Master cargo-hack failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+  # Temporarily disabled until we achieve a clean nightly run of cargo-hack,
+  # which is blocked behind known failures.
+
+  # cargo-hack-failure:
+  #   name: cargo-hack-failure
+  #   if: failure() && github.ref == 'refs/heads/master'
+  #   needs:
+  #     - hack
+  #   runs-on: ubuntu-20.04
+  #   steps:
+  #   - name: Discord notification
+  #     env:
+  #       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+  #     uses: Ilshidur/action-discord@0.3.0
+  #     with:
+  #       args: "Master cargo-hack failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
