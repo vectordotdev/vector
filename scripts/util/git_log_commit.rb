@@ -96,9 +96,9 @@ module Vector
     def initialize(hash)
       @author = hash.fetch("author")
       @date = hash.fetch("date")
-      @deletions_count = hash.fetch("deletions_count")
-      @files_count = hash.fetch("files_count")
-      @insertions_count = hash.fetch("insertions_count")
+      @deletions_count = hash.fetch("deletions_count", 0)
+      @files_count = hash.fetch("files_count", 0)
+      @insertions_count = hash.fetch("insertions_count", 0)
       @message = hash.fetch("message")
       @sha = hash.fetch("sha")
     end

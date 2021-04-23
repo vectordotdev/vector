@@ -86,6 +86,7 @@ criterion_group!(
               to_bool,
               to_float,
               to_int,
+              to_regex,
               to_string,
               to_syslog_facility,
               to_syslog_level,
@@ -1394,6 +1395,15 @@ bench_function! {
     null {
         args: func_args![value: value!(null)],
         want: Ok(0)
+    }
+}
+
+bench_function! {
+    to_regex => vrl_stdlib::ToRegex;
+
+    regex {
+        args: func_args![value: "^foo.*bar.*baz"],
+        want: Ok(Regex::new("^foo.*bar.*baz").expect("regex is valid"))
     }
 }
 

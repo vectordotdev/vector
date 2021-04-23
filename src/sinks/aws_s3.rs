@@ -1,5 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
     internal_events::TemplateRenderingFailed,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     serde::to_string,
@@ -11,7 +12,6 @@ use crate::{
         PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
     },
     template::Template,
-    Event,
 };
 use bytes::Bytes;
 use chrono::Utc;
