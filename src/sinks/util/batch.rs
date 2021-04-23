@@ -1,3 +1,4 @@
+use crate::event::EventMetadata;
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -190,13 +191,90 @@ pub trait Batch: Sized {
     fn num_items(&self) -> usize;
 }
 
+/// This is a batch construct that stores an vector of metadata alongside the batch itself.
+#[derive(Clone, Debug)]
+pub struct MetadataBatch<B> {
+    inner: B,
+    metadata: Vec<EventMetadata>,
+}
+
+#[derive(Debug)]
+pub struct MetadataBatchInput<B: Batch> {
+    pub item: B::Input,
+    pub metadata: Option<EventMetadata>,
+}
+
+#[derive(Debug)]
+pub struct MetadataBatchOutput<B: Batch> {
+    pub body: B::Output,
+    pub metadata: Vec<EventMetadata>,
+}
+
+impl<B: Batch> From<B> for MetadataBatch<B> {
+    fn from(inner: B) -> Self {
+        Self {
+            inner,
+            metadata: Vec::new(),
+        }
+    }
+}
+
+impl<B: Batch> Batch for MetadataBatch<B> {
+    type Input = MetadataBatchInput<B>;
+    type Output = MetadataBatchOutput<B>;
+
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(B::get_settings_defaults(config, defaults.into())?.into())
+    }
+
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        let MetadataBatchInput { item, metadata } = item;
+        match self.inner.push(item) {
+            PushResult::Ok(full) => {
+                if let Some(metadata) = metadata {
+                    self.metadata.push(metadata);
+                }
+                PushResult::Ok(full)
+            }
+            PushResult::Overflow(item) => {
+                PushResult::Overflow(MetadataBatchInput { item, metadata })
+            }
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    fn fresh(&self) -> Self {
+        Self {
+            inner: self.inner.fresh(),
+            metadata: Vec::new(),
+        }
+    }
+
+    fn finish(self) -> Self::Output {
+        MetadataBatchOutput {
+            body: self.inner.finish(),
+            metadata: self.metadata,
+        }
+    }
+
+    fn num_items(&self) -> usize {
+        self.inner.num_items()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct StatefulBatch<B> {
     inner: B,
     was_full: bool,
 }
 
-impl<B> From<B> for StatefulBatch<B> {
+impl<B: Batch> From<B> for StatefulBatch<B> {
     fn from(inner: B) -> Self {
         Self {
             inner,
@@ -215,10 +293,7 @@ impl<B> StatefulBatch<B> {
     }
 }
 
-impl<B> Batch for StatefulBatch<B>
-where
-    B: Batch,
-{
+impl<B: Batch> Batch for StatefulBatch<B> {
     type Input = B::Input;
     type Output = B::Output;
 
