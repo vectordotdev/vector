@@ -112,8 +112,7 @@ mod tests {
     use super::LogfmtConfig;
     use crate::{
         config::{GlobalOptions, TransformConfig},
-        event::{LogEvent, Value},
-        Event,
+        event::{Event, LogEvent, Value},
     };
 
     #[test]

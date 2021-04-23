@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.13.0"
+version = "0.14.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -60,7 +60,7 @@ depends = ""
 members = [
   ".",
   "lib/codec",
-  "lib/core",
+  "lib/vector-core",
   "lib/derive_is_enum_variant",
   "lib/fakedata",
   "lib/file-source",
@@ -93,6 +93,7 @@ prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 shared = { path = "lib/shared" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
+vector_core = { path = "lib/vector-core" }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures
@@ -173,7 +174,7 @@ bollard = { version = "0.10.1", default-features = false, features = ["ssl"], op
 bytes = { version = "1.0.1", default-features = false, features = ["serde"] }
 bytesize = { version = "1.0.1", default-features = false, optional = true }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-cidr-utils = { version = "0.5.1", default-features = false }
+cidr-utils = { version = "0.5.3", default-features = false }
 colored = { version = "2.0.0", default-features = false }
 dashmap = { version = "4.0.2", default-features = false }
 db-key = { version = "0.0.5", default-features = false }
@@ -191,12 +192,11 @@ headers = { version = "0.3.4", default-features = false }
 heim = { version = "0.1.0-rc.1", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.4", default-features = false }
-hyper = { version = "0.14.5", default-features = false, features = ["stream"] }
+hyper = { version = "0.14.6", default-features = false, features = ["stream"] }
 hyper-openssl = { version = "0.9.1", default-features = false }
 indexmap = { version = "1.6.2", default-features = false, features = ["serde"] }
 indoc = { version = "1.0.3", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
-jemallocator = { version = "0.3.2", default-features = false, optional = true }
 k8s-openapi = { version = "0.11.0", default-features = true, features = ["api", "v1_16"], optional = true }
 lazy_static = { version = "1.4.0", default-features = false }
 leveldb = { version = "0.8.6", default-features = false, optional = true }
@@ -245,7 +245,7 @@ zstd = { version = "0.6", default-features = false }
 cfg-if = { version = "1.0.0", default-features = false }
 
 # For WASM
-async-stream = "0.3.0"
+async-stream = "0.3.1"
 lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
@@ -271,7 +271,7 @@ approx = "0.4.0"
 assert_cmd = "1.0.3"
 base64 = "0.13.0"
 criterion = { version = "0.3.4", features = ["html_reports"] }
-httpmock = { version = "0.5.7", default-features = false }
+httpmock = { version = "0.5.8", default-features = false }
 libc = "0.2.93"
 libz-sys = "1.1.2"
 matches = "0.1.8"
@@ -320,7 +320,7 @@ rdkafka-plain = ["rdkafka"]
 rusoto = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
 sasl = ["rdkafka/gssapi"]
 # Enables features that work only on systems providing `cfg(unix)`
-unix = ["jemallocator"]
+unix = []
 # These are **very** useful on Cross compilations!
 vendor-all = ["vendor-libz", "vendor-openssl", "vendor-sasl"]
 vendor-sasl = ["rdkafka/gssapi-vendored"]

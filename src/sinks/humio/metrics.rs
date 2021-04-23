@@ -107,10 +107,10 @@ mod tests {
     use crate::{
         event::{
             metric::{MetricKind, MetricValue, StatisticKind},
-            Metric,
+            Event, Metric,
         },
         sinks::util::test::{build_test_server, load_sink},
-        test_util, Event,
+        test_util,
     };
     use chrono::{offset::TimeZone, Utc};
     use indoc::indoc;

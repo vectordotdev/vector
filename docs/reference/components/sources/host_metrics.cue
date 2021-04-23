@@ -39,7 +39,17 @@ components: sources: host_metrics: {
 		}
 		notices: []
 		requirements: []
-		warnings: []
+		warnings: [
+			"""
+				When vector is run under kubernetes, you may experience an error when loading the partition usage data:
+				```Failed to load partition usage data. mount_point="/host/proc/sys/fs/binfmt_misc" error=FFI function "statvfs" call failed: Too many levels of symbolic links (os error 40)```
+				To work around this configuration issue, add one of the following lines to the
+				`host_metrics` configuration section:
+				```filesystem.devices.excludes = ["binfmt_misc"]```,
+				```filesystem.filesystems.excludes = ["binfmt_misc"]```, or
+				```filesystem.mountpoints.excludes = ["*/proc/sys/fs/binfmt_misc"]```.
+				""",
+		]
 	}
 
 	installation: {

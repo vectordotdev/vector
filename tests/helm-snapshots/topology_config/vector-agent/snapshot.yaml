@@ -55,6 +55,9 @@ data:
     # Capture the metrics from the host.
     [sources.host_metrics]
       type = "host_metrics"
+      [sources.host_metrics.filesystem]
+        [sources.host_metrics.filesystem.filesystems]
+          excludes = ["binfmt_misc"]
     
     
     # Emit internal Vector metrics.

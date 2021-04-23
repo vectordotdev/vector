@@ -2,13 +2,13 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
+    event::Event,
     internal_events::{NatsEventSendFail, NatsEventSendSuccess, TemplateRenderingFailed},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
     },
     template::{Template, TemplateParseError},
-    Event,
 };
 use async_trait::async_trait;
 use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};

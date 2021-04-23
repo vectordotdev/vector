@@ -1,9 +1,9 @@
 use crate::{
     config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
-    event::Value,
+    event::{Event, Value},
     internal_events::{AnsiStripperFailed, AnsiStripperFieldInvalid, AnsiStripperFieldMissing},
     transforms::{FunctionTransform, Transform},
-    Event, Result,
+    Result,
 };
 use serde::{Deserialize, Serialize};
 

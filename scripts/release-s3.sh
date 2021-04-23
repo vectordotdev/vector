@@ -102,10 +102,12 @@ elif [[ "$CHANNEL" == "latest" ]]; then
       aws s3 cp "$td" "s3://packages.timber.io/vector/$i/" --recursive --sse --acl public-read
     fi
 
-    # Delete anything that isn't the current version
-    echo "Deleting old artifacts from s3://packages.timber.io/vector/$i/"
-    aws s3 rm "s3://packages.timber.io/vector/$i/" --recursive --exclude "*$VERSION_EXACT*"
-    echo "Deleted old versioned artifacts"
+    if [[ "$i" == "${VERSION_MAJOR_X}" || "$i" == "${VERSION_MINOR_X}"  ]] ; then
+      # Delete anything that isn't the current version
+      echo "Deleting old artifacts from s3://packages.timber.io/vector/$i/"
+      aws s3 rm "s3://packages.timber.io/vector/$i/" --recursive --exclude "*$VERSION_EXACT*"
+      echo "Deleted old versioned artifacts"
+    fi
 
     echo "Redirecting old artifact names in s3://packages.timber.io/vector/$i/"
     for file in $(aws s3api list-objects-v2 --bucket packages.timber.io --prefix "vector/$i/" --query 'Contents[*].Key' --output text  | tr "\t" "\n" | grep "\-$VERSION_EXACT"); do

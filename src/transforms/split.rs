@@ -141,8 +141,8 @@ pub fn split(input: &str, separator: Option<String>) -> Vec<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{LogEvent, Value};
-    use crate::{config::TransformConfig, Event};
+    use crate::config::TransformConfig;
+    use crate::event::{Event, LogEvent, Value};
 
     #[test]
     fn generate_config() {

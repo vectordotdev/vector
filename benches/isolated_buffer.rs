@@ -13,9 +13,9 @@ use vector::{
         disk::{leveldb_buffer, DiskBuffer},
         Acker,
     },
+    event::Event,
     sinks::util::StreamSink,
     test_util::{random_lines, runtime},
-    Event,
 };
 
 struct NullSink {

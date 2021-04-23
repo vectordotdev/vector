@@ -1,4 +1,4 @@
-use crate::Event;
+use crate::event::Event;
 use futures::{future::BoxFuture, Sink, Stream, StreamExt};
 use snafu::Snafu;
 use std::fmt;

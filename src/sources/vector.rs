@@ -1,11 +1,10 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
     config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
-    event::proto,
+    event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
-    Event,
 };
 use bytes::{Bytes, BytesMut};
 use getset::Setters;
@@ -117,6 +116,7 @@ mod test {
     use crate::shutdown::ShutdownSignal;
     use crate::{
         config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext},
+        event::Event,
         event::{
             metric::{MetricKind, MetricValue},
             Metric,
@@ -124,7 +124,7 @@ mod test {
         sinks::vector::VectorSinkConfig,
         test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
         tls::{TlsConfig, TlsOptions},
-        Event, Pipeline,
+        Pipeline,
     };
     use futures::stream;
     use shared::assert_event_data_eq;

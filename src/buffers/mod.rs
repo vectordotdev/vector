@@ -1,4 +1,4 @@
-use crate::{config::Resource, internal_events::EventOut, Event};
+use crate::{config::Resource, event::Event, internal_events::EventOut};
 #[cfg(feature = "leveldb")]
 use futures::compat::{Sink01CompatExt, Stream01CompatExt};
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
