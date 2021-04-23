@@ -216,9 +216,15 @@ weight = 2
 
 [[menu.comms]]
 name = "Chat"
-params = { icon = "discord-purple", icon = "discord" }
+params = { color = "discord-purple", icon = "discord" }
 url = "https://chat.vector.dev"
 weight = 3
+
+[[menu.comms]]
+name = "RSS"
+params = { color = "rss-orange", icon = "rss" }
+url = "/blog/index.xml"
+weight = 4
 
 # Links in subfooter
 [[menu.subfooter]]
