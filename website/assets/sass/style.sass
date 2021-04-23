@@ -4,3 +4,11 @@
 
 [x-cloak]
   display: none
+
+.prose
+  // Remove annoying border around clicked-on headings
+  h1:focus, h2:focus, h3:focus, h4:focus, h5:focus, h6:focus
+    outline: none !important
+    box-shadow: none !important
+
+@import "syntax"

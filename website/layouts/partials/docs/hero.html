@@ -1,13 +1,17 @@
-<section class="hero">
-  <div class="hero-body">
-    <p class="title is-size-1 is-size-2-mobile has-text-weight-light{{ if .description }} is-spaced{{ end }}">
-      {{ .title }}
-    </p>
-  
-    {{ with .description }}
-    <p class="subtitle is-size-4 is-size-5-mobile has-text-weight-light">
-      {{ . | markdownify }}
+<div class="pt-6 pb-16 sm:pb-24">
+  <div class="max-w-xl">
+    <div class="mb-4">
+      {{ partial "docs/breadcrumb.html" . }}
+    </div>
+
+    <h2 class="dark:text-gray-50 font-secondary font-extrabold text-4xl md:text-5xl tracking-tight sm:tracking-tighter">
+      {{ .Title }}
+    </h2>
+
+    {{ with .Description }}
+    <p class="dark:text-gray-200 mt-5 text-xl text-gray-500">
+      {{ . }}
     </p>
     {{ end }}
   </div>
-</section>
+</div>

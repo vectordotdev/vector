@@ -18,7 +18,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
 
 Or you can [choose your preferred installation method][install].
 
-Once Vector is install, let's check to make sure that it's working correctly:
+Once Vector is installed, let's check to make sure that it's working correctly:
 
 ```shell
 vector --version

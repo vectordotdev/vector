@@ -15,14 +15,40 @@ module.exports = {
         'rss-orange': '#f26522'
       },
       fontFamily: {
-        sans: ['Segoe UI', ...defaultTheme.fontFamily.sans],
-      }
+        sans: ['Segoe UI', ...defaultTheme.fontFamily.sans]
+      },
+      gridTemplateColumns: {
+        '16': 'repeat(16, minmax(0, 1fr))',
+      },
+      typography: (theme) => ({
+        dark: {
+          css: {
+            color: theme('colors.gray.100'),
+            'p, h1, h2, h3, h4, h5, h6': {
+              color: theme('colors.gray.100')
+            },
+            'a, a code, p code': {
+              color: theme('colors.primary'),
+              'text-decoration': 'none',
+              '&:hover, &:active': {
+                color: 'secondary',
+              },
+            },
+            strong: {
+              color: theme('colors.gray.100'),
+            },
+          }
+        }
+      }),
     },
   },
   variants: {
-    extend: {},
+    extend: {
+      typography: ['dark']
+    },
   },
   plugins: [
-    require('@tailwindcss/forms')
+    require('@tailwindcss/forms'),
+    require('@tailwindcss/typography'),
   ],
 }

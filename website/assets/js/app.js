@@ -3,14 +3,15 @@ import 'alpinejs';
 import 'tocbot/dist/tocbot';
 
 // Table of contents for documentation pages
-
-tocbot.init({
-  tocSelector: '#docs-toc',
-  contentSelector: '#docs-content',
-  headingSelector: 'h1, h2, h3, h4',
-  ignoreSelector: 'no-toc',
-  scrollSmoothDuration: 400
-});
+const tableOfContents = () => {
+  tocbot.init({
+    tocSelector: '#docs-toc',
+    contentSelector: '#docs-content',
+    headingSelector: 'h1, h2, h3, h4',
+    ignoreSelector: 'no-toc',
+    scrollSmoothDuration: 400
+  });
+}
 
 /* Global state management */
 
@@ -40,6 +41,7 @@ const sayHello = () => {
 const main = () => {
   sayHello();
   manageState();
+  tableOfContents();
 }
 
 document.addEventListener("DOMContentLoaded", main());
