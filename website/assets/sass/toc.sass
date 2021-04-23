@@ -9,10 +9,13 @@ $h3-font-size: 0.75rem
 $h4-font-size: 0.7rem
 $h3-toc-spacing: 0.25rem
 $h4-toc-spacing: 0.2rem
+$y-padding: 0.25rem
 
 #docs-toc
-  border-left: 2px solid $grey-lighter
+  border-left: 2px solid grey
   overflow-y: scroll
+  padding-top: $y-padding
+  padding-bottom: $y-padding
 
   .toc-list // h2
     margin: 0
@@ -23,7 +26,7 @@ $h4-toc-spacing: 0.2rem
       font-size: $h3-font-size
       padding-top: $h3-toc-spacing
       padding-bottom: $h3-toc-spacing
-      color: $grey
+      color: grey
       padding-left: $toc-indent-sm
 
       .toc-list // h4
@@ -44,8 +47,15 @@ a.toc-link
   height: 100%
 
 .is-active-link
-  font-weight: $weight-bold
+  font-weight: 700
 
 // Get rid of the annoying border on Chrome when a link is selected
 *:focus
   outline: none
+
+.dark
+  .toc-list
+    color: white
+
+    .toc-list
+      color: light-grey
