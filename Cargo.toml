@@ -192,7 +192,7 @@ headers = { version = "0.3.4", default-features = false }
 heim = { version = "0.1.0-rc.1", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.4", default-features = false }
-hyper = { version = "0.14.6", default-features = false, features = ["stream"] }
+hyper = { version = "0.14.7", default-features = false, features = ["stream"] }
 hyper-openssl = { version = "0.9.1", default-features = false }
 indexmap = { version = "1.6.2", default-features = false, features = ["serde"] }
 indoc = { version = "1.0.3", default-features = false }
