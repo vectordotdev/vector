@@ -172,7 +172,9 @@ impl SplunkSource {
                       host: Option<String>,
                       gzip: bool,
                       body: Bytes| {
-                    let out = out.clone();
+                    let mut out = out
+                        .clone()
+                        .sink_map_err(|_| Rejection::from(ApiError::ServerShutdown));
                     async move {
                         let reader: Box<dyn Read + Send> = if gzip {
                             Box::new(MultiGzDecoder::new(body.reader()))
@@ -180,11 +182,15 @@ impl SplunkSource {
                             Box::new(body.reader())
                         };
 
-                        let mut events = stream::iter(EventIterator::new(reader, channel, host));
+                        let events = stream::iter(EventIterator::new(reader, channel, host));
 
-                        out.sink_map_err(|_| Rejection::from(ApiError::ServerShutdown))
-                            .send_all(&mut events)
-                            .await
+                        // `fn send_all` can be used once https://github.com/rust-lang/futures-rs/issues/2402
+                        // is resolved.
+                        let res = events.forward(&mut out).await;
+
+                        out.flush().await?;
+
+                        res
                     }
                 },
             )
