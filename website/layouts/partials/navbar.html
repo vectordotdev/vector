@@ -1,7 +1,7 @@
 {{ $here := .RelPermalink }}
 {{ $menu := site.Menus.navbar }}
-<nav class="dark:bg-black shadow-md" x-data="{ open: false }">
-  <div class="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
+<nav class="sticky top-0 bg-white dark:bg-black dark:border-b-2 dark:border-gray-200 shadow-md" x-data="{ open: false }">
+  <div class="max-w-8xl mx-auto px-2 sm:px-4 lg:px-8">
     <div class="relative flex items-center justify-between h-16">
       <div class="flex items-center px-2 lg:px-0">
         <div class="flex-shrink-0">
@@ -13,7 +13,7 @@
           <div class="flex space-x-4">
             {{ range $menu }}
             {{ $isActive := hasPrefix $here .URL }}
-            <a href="{{ .URL }}" class="dark:text-gray-300 dark:hover:text-secondary tracking-wide hover:text-primary px-2.5 py-1.5 rounded-sm text-normal font-normal{{ if $isActive }} dark:text-primary text-secondary{{ end }}">
+            <a href="{{ .URL }}" class="dark:text-gray-300 dark:hover:text-secondary tracking-tight hover:text-primary px-2.5 py-1.5 rounded-sm text-normal font-normal{{ if $isActive }} dark:text-primary text-secondary{{ end }}">
               {{ .Name }}
             </a>
             {{ end }}
@@ -22,7 +22,7 @@
       </div>
       <div class="flex-1 flex items-center justify-center px-2 lg:ml-6 lg:justify-end">
         {{/* Dark mode toggler */}}
-        <div class="lg:mr-4 md:mr-3 mr-2 pt-0.5">
+        <div class="lg:mr-5 md:mr-4 mr-2.5 pt-0.5">
           {{ partial "toggler.html" . }}
         </div>
 
@@ -39,6 +39,11 @@
             <input id="search" name="search" class="dark:bg-gray-700 dark:text-gray-400 bg-gray-200 text-gray-800 block w-full pl-10 pr-3 py-2 border border-transparent rounded-md leading-5 placeholder-gray-400 focus:outline-none focus:bg-white focus:border-white focus:ring-white focus:text-gray-900 sm:text-sm" placeholder="Search" type="search">
           </div>
         </div>
+      </div>
+
+      {{/* Social icons */}}
+      <div class="flex space-x-3.5 md:order-2 text-lg pt-1.5 ml-2 lg:ml-4 md:ml-3 hidden lg:block">
+        {{ partial "social-buttons.html" (dict "color" true) }}
       </div>
 
       {{/* Mobile dropdown toggle */}}
@@ -63,7 +68,7 @@
   </div>
 
   {{/* Mobile menu */}}
-  <div x-show="open" class="dark:bg-gray-900 bg-white lg:hidden absolute w-full z-20" id="mobile-menu">
+  <div x-show="open" @click.away="open = false" class="dark:shadow-none dark:bg-gray-900 bg-white lg:hidden absolute w-full shadow" id="mobile-menu">
     <div class="px-2 pt-2 pb-3 space-y-1">
       {{ range $menu }}
       {{ $isActive := hasPrefix $here .URL }}
@@ -71,6 +76,10 @@
         {{ .Name }}
       </a>
       {{ end }}
+    </div>
+
+    <div class="flex space-x-4 text-lg lg:hidden px-5 mb-2 mt-3.5">
+      {{ partial "social-buttons.html" (dict "color" true) }}
     </div>
   </div>
 </nav>

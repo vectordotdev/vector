@@ -16,12 +16,18 @@ tocbot.init({
 
 // Dark mode state
 const manageState = () => {
-  window.Spruce.store('dark', {
-    enabled: true,
-    toggle() {
-      this.enabled = !this.enabled;
+  const useLocalStorage = true;
+
+  window.Spruce.store('global', {
+    dark: false,
+    banner: true,
+    toggleDarkMode() {
+      this.dark = !this.dark;
+    },
+    toggleBanner() {
+      this.banner = !this.banner;
     }
-  }, true);
+  }, useLocalStorage);
 }
 
 const sayHello = () => {

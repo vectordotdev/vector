@@ -2,6 +2,7 @@ title = "Vector"
 baseURL = "/"
 disableKinds = ["taxonomy", "term"]
 copyright = "Datadog, Inc."
+languageCode = "en-us"
 
 [build]
 writeStats = true

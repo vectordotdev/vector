@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html
+  lang="{{ site.LanguageCode }}"
   x-cloak
-  x-data="{ dark: $store.dark.enabled }"
-  x-on:dark-toggle="dark = !dark"
+  x-data="{ dark: $store.global.dark }"
+  x-on:toggle-dark="dark = !dark"
   :class="{ 'dark': dark }"
-  class="h-full">
+  class="h-screen">
 
   <head>
     {{ partial "meta.html" . }}
@@ -20,12 +21,13 @@
     {{ partial "css.html" . }}
   </head>
   <body class="dark:bg-black font-sans antialiased flex flex-col min-h-full">
-    <main class="flex-1">
-      {{ partial "navbar.html" . }}
+    {{ partial "banner.html" . }}
+    {{ partial "navbar.html" . }}
 
+    <div class="flex-1 overflow-y-auto">
       {{ block "main" . }}
       {{ end }}
-    </main>
+    </div>
 
     {{ partial "footer.html" . }}
 
