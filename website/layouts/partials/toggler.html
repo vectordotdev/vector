@@ -1,4 +1,4 @@
-<button @click="$store.dark.toggle(); $dispatch('dark-toggle')" :class="{ 'bg-gray-500': $store.dark.enabled }" type="button" class="bg-gray-200 relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" role="switch" aria-checked="false">
+<button x-cloak @click="$store.dark.toggle(); $dispatch('dark-toggle')" :class="{ 'bg-gray-500': $store.dark.enabled }" type="button" class="bg-gray-200 relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" role="switch" aria-checked="false">
   <span class="sr-only">
     Toggle dark mode
   </span>
