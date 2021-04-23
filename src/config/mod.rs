@@ -27,7 +27,6 @@ mod diff;
 pub mod format;
 mod loading;
 mod log_schema;
-#[cfg(feature = "providers")]
 pub mod provider;
 mod unit_test;
 mod validation;
@@ -54,7 +53,6 @@ pub struct Config {
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
-    #[cfg(feature = "providers")]
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<String, Vec<String>>,

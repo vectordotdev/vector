@@ -13,10 +13,7 @@ use tokio::{
     runtime::{self, Runtime},
     sync::mpsc,
 };
-use tokio_stream::wrappers::UnboundedReceiverStream;
-
-#[cfg(feature = "providers")]
-use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::wrappers::{ReceiverStream, UnboundedReceiverStream};
 
 #[cfg(feature = "sources-host_metrics")]
 use crate::sources::host_metrics;
@@ -41,7 +38,6 @@ pub struct ApplicationConfig {
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
-    #[cfg(feature = "providers")]
     pub provider: Option<Box<dyn config::provider::ProviderConfig>>,
 }
 
@@ -172,7 +168,6 @@ impl Application {
                 #[cfg(feature = "api")]
                 let api = config.api;
 
-                #[cfg(feature = "providers")]
                 let provider = config.provider.take();
 
                 let result = topology::start_validated(config, diff, pieces).await;
@@ -184,7 +179,6 @@ impl Application {
                     graceful_crash,
                     #[cfg(feature = "api")]
                     api,
-                    #[cfg(feature = "providers")]
                     provider,
                 })
             })
@@ -210,7 +204,6 @@ impl Application {
         #[cfg(feature = "api")]
         let api_config = self.config.api;
 
-        #[cfg(feature = "providers")]
         let provider = self.config.provider;
 
         // Any internal_logs sources will have grabbed a copy of the
@@ -247,7 +240,6 @@ impl Application {
             controller.handler(signals);
 
             // Configure the provider, if applicable.
-            #[cfg(feature = "providers")]
             let mut _provider = config::provider::init_provider(provider)
                 .await
                 .map(|provider| controller.with_shutdown(ReceiverStream::new(provider)));
@@ -299,7 +291,6 @@ impl Application {
                                 let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
 
                                 if let Some(mut new_config) = new_config {
-                                    #[cfg(feature = "providers")]
                                     // If there's a new provider, (re)instantiate it.
                                     if new_config.provider.is_some() {
                                         _provider = config::provider::init_provider(new_config.provider.take())

@@ -1,10 +1,8 @@
 #[cfg(feature = "api")]
 use super::api;
-#[cfg(feature = "providers")]
-use super::provider;
 use super::{
-    compiler, default_data_dir, Config, GlobalOptions, HealthcheckOptions, SinkConfig, SinkOuter,
-    SourceConfig, TestDefinition, TransformConfig, TransformOuter,
+    compiler, default_data_dir, provider, Config, GlobalOptions, HealthcheckOptions, SinkConfig,
+    SinkOuter, SourceConfig, TestDefinition, TransformConfig, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -27,7 +25,6 @@ pub struct ConfigBuilder {
     pub transforms: IndexMap<String, TransformOuter>,
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
-    #[cfg(feature = "providers")]
     pub provider: Option<Box<dyn provider::ProviderConfig>>,
 }
 
@@ -53,7 +50,6 @@ impl From<Config> for ConfigBuilder {
             sources: c.sources,
             sinks: c.sinks,
             transforms: c.transforms,
-            #[cfg(feature = "providers")]
             provider: c.provider,
             tests: c.tests,
         }
@@ -114,11 +110,7 @@ impl ConfigBuilder {
             errors.push(error);
         }
 
-        cfg_if::cfg_if!(
-            if #[cfg(feature = "providers")] {
-                self.provider = with.provider;
-            }
-        );
+        self.provider = with.provider;
 
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
             self.global.data_dir = with.global.data_dir;

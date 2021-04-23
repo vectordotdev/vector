@@ -49,7 +49,6 @@ pub mod list;
 pub mod mapping;
 pub mod metrics;
 pub(crate) mod pipeline;
-#[cfg(feature = "providers")]
 pub mod providers;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;

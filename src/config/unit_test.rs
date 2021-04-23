@@ -33,7 +33,6 @@ async fn build_unit_tests(mut builder: ConfigBuilder) -> Result<Vec<UnitTest>, V
         sources: builder.sources,
         sinks: builder.sinks,
         transforms: builder.transforms,
-        #[cfg(feature = "providers")]
         provider: builder.provider,
         tests: builder.tests,
         expansions,

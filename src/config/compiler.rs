@@ -3,7 +3,6 @@ use indexmap::IndexMap;
 
 /// Compile defers to either building a "stub" config, deferring the rest to a provider...
 /// or configuring components directly.
-#[cfg(feature = "providers")]
 pub fn compile(builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     if builder.provider.is_some() {
         compile_provider(builder)
@@ -12,13 +11,7 @@ pub fn compile(builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<Stri
     }
 }
 
-#[cfg(not(feature = "providers"))]
-pub fn compile(builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
-    compile_components(builder)
-}
-
 /// Validates provider configuration, and returns a "stub" config with empty topology.
-#[cfg(feature = "providers")]
 fn compile_provider(builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     validation::check_provider(&builder)?;
 
@@ -31,7 +24,6 @@ fn compile_provider(builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
             transforms: IndexMap::new(),
-            #[cfg(feature = "providers")]
             provider: builder.provider,
             tests: builder.tests,
             expansions: IndexMap::new(),
@@ -73,7 +65,6 @@ fn compile_components(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>
                 sources: builder.sources,
                 sinks: builder.sinks,
                 transforms: builder.transforms,
-                #[cfg(feature = "providers")]
                 provider: builder.provider,
                 tests: builder.tests,
                 expansions,
