@@ -28,20 +28,37 @@ pub fn build_test_server(
     Trigger,
     impl std::future::Future<Output = Result<(), ()>>,
 ) {
+    build_test_server2(addr, || Response::new(Body::empty()))
+}
+
+pub fn build_test_server2(
+    addr: std::net::SocketAddr,
+    responder: impl Fn() -> Response<Body> + Clone + Send + Sync + 'static,
+) -> (
+    mpsc::Receiver<(http::request::Parts, Bytes)>,
+    Trigger,
+    impl std::future::Future<Output = Result<(), ()>>,
+) {
     let (tx, rx) = mpsc::channel(100);
     let service = make_service_fn(move |_| {
+        let responder = responder.clone();
         let tx = tx.clone();
-        async {
+        async move {
+            let responder = responder.clone();
             Ok::<_, Error>(service_fn(move |req: Request<Body>| {
+                let responder = responder.clone();
                 let mut tx = tx.clone();
-                async {
+                async move {
                     let (parts, body) = req.into_parts();
-                    tokio::spawn(async move {
-                        let bytes = hyper::body::to_bytes(body).await.unwrap();
-                        tx.send((parts, bytes)).await.unwrap();
-                    });
+                    let response = responder();
+                    if response.status().is_success() {
+                        tokio::spawn(async move {
+                            let bytes = hyper::body::to_bytes(body).await.unwrap();
+                            tx.send((parts, bytes)).await.unwrap();
+                        });
+                    }
 
-                    Ok::<_, Error>(Response::new(Body::empty()))
+                    Ok::<_, Error>(response)
                 }
             }))
         }

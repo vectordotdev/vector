@@ -311,7 +311,10 @@ mod tests {
         config::SinkContext,
         sinks::{
             http::HttpSinkConfig,
-            util::{http::HttpSink, test::build_test_server},
+            util::{
+                http::HttpSink,
+                test::{build_test_server, build_test_server2},
+            },
         },
         test_util::{next_addr, random_lines_with_stream},
     };
@@ -320,9 +323,10 @@ mod tests {
     use futures::{channel::mpsc, stream, StreamExt};
     use headers::{Authorization, HeaderMapExt};
     use http::request::Parts;
-    use hyper::Method;
+    use hyper::{Method, Response, StatusCode};
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};
+    use std::sync::{atomic, Arc};
 
     #[test]
     fn generate_config() {
@@ -511,6 +515,74 @@ mod tests {
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
+    }
+
+    #[tokio::test]
+    async fn retries_on_temporary_error() {
+        const NUM_LINES: usize = 1000;
+        const NUM_FAILURES: usize = 2;
+
+        let (in_addr, sink) = build_sink("").await;
+
+        let counter = Arc::new(atomic::AtomicUsize::new(0));
+        let in_counter = Arc::clone(&counter);
+        let (rx, trigger, server) = build_test_server2(in_addr, move || {
+            let count = in_counter.fetch_add(1, atomic::Ordering::Relaxed);
+            if count < NUM_FAILURES {
+                // Send a temporary error for the first two responses
+                Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(Body::empty())
+                    .unwrap_or_else(|_| unreachable!())
+            } else {
+                Response::new(Body::empty())
+            }
+        });
+
+        let (input_lines, events) = random_lines_with_stream(100, NUM_LINES);
+        let pump = sink.run(events);
+
+        tokio::spawn(server);
+
+        pump.await.unwrap();
+        drop(trigger);
+
+        let output_lines = get_received(rx, |parts| {
+            assert_eq!(Method::POST, parts.method);
+            assert_eq!("/frames", parts.uri.path());
+        })
+        .await;
+
+        let tries = counter.load(atomic::Ordering::Relaxed);
+        assert!(tries > NUM_FAILURES);
+        assert_eq!(NUM_LINES, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    }
+
+    #[tokio::test]
+    async fn fails_on_permanent_error() {
+        let num_lines = 1000;
+
+        let (in_addr, sink) = build_sink("").await;
+
+        let (rx, trigger, server) = build_test_server2(in_addr, move || {
+            Response::builder()
+                .status(StatusCode::FORBIDDEN)
+                .body(Body::empty())
+                .unwrap_or_else(|_| unreachable!())
+        });
+
+        let (_input_lines, events) = random_lines_with_stream(100, num_lines);
+        let pump = sink.run(events);
+
+        tokio::spawn(server);
+
+        pump.await.unwrap();
+        drop(trigger);
+
+        let output_lines = get_received(rx, |_| unreachable!("There should be no lines")).await;
+
+        assert!(output_lines.is_empty());
     }
 
     #[tokio::test]
