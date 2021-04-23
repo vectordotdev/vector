@@ -4,7 +4,6 @@ import 'tocbot/dist/tocbot';
 
 // Table of contents for documentation pages
 
-/*
 tocbot.init({
   tocSelector: '#docs-toc',
   contentSelector: '#docs-content',
@@ -12,16 +11,26 @@ tocbot.init({
   ignoreSelector: 'no-toc',
   scrollSmoothDuration: 400
 });
-*/
 
 /* Global state management */
 
 // Dark mode state
-window.Spruce.store('dark', {
-  enabled: null,
-  toggle() {
-    this.enabled = !this.enabled;
-  }
-}, true);
+const manageState = () => {
+  window.Spruce.store('dark', {
+    enabled: true,
+    toggle() {
+      this.enabled = !this.enabled;
+    }
+  }, true);
+}
 
-console.log('Welcome to the Vector website and documentation!');
+const sayHello = () => {
+  console.log('Welcome to the Vector website and documentation!');
+}
+
+const main = () => {
+  sayHello();
+  manageState();
+}
+
+document.addEventListener("DOMContentLoaded", main());
