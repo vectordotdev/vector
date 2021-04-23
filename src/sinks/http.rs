@@ -417,167 +417,77 @@ mod tests {
 
     #[tokio::test]
     async fn http_happy_path_post() {
-        let num_lines = 1000;
-
-        let in_addr = next_addr();
-
-        let config = r#"
-        uri = "http://$IN_ADDR/frames"
-        compression = "gzip"
-        encoding = "ndjson"
-
+        run_sink(
+            r#"
         [auth]
         strategy = "basic"
         user = "waldo"
         password = "hunter2"
-    "#
-        .replace("$IN_ADDR", &format!("{}", in_addr));
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
-
-        let cx = SinkContext::new_test();
-
-        let (sink, _) = config.build(cx).await.unwrap();
-        let (rx, trigger, server) = build_test_server(in_addr);
-
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.run(events);
-
-        tokio::spawn(server);
-
-        pump.await.unwrap();
-        drop(trigger);
-
-        let output_lines = get_received(rx, |parts| {
-            assert_eq!(Method::POST, parts.method);
-            assert_eq!("/frames", parts.uri.path());
-            assert_eq!(
-                Some(Authorization::basic("waldo", "hunter2")),
-                parts.headers.typed_get()
-            );
-        })
+    "#,
+            |parts| {
+                assert_eq!(Method::POST, parts.method);
+                assert_eq!("/frames", parts.uri.path());
+                assert_eq!(
+                    Some(Authorization::basic("waldo", "hunter2")),
+                    parts.headers.typed_get()
+                );
+            },
+        )
         .await;
-
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
     }
 
     #[tokio::test]
     async fn http_happy_path_put() {
-        let num_lines = 1000;
-
-        let in_addr = next_addr();
-
-        let config = r#"
-        uri = "http://$IN_ADDR/frames"
+        run_sink(
+            r#"
         method = "put"
-        compression = "gzip"
-        encoding = "ndjson"
 
         [auth]
         strategy = "basic"
         user = "waldo"
         password = "hunter2"
-    "#
-        .replace("$IN_ADDR", &format!("{}", in_addr));
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
-
-        let cx = SinkContext::new_test();
-
-        let (sink, _) = config.build(cx).await.unwrap();
-        let (rx, trigger, server) = build_test_server(in_addr);
-
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.run(events);
-
-        tokio::spawn(server);
-
-        pump.await.unwrap();
-        drop(trigger);
-
-        let output_lines = get_received(rx, |parts| {
-            assert_eq!(Method::PUT, parts.method);
-            assert_eq!("/frames", parts.uri.path());
-            assert_eq!(
-                Some(Authorization::basic("waldo", "hunter2")),
-                parts.headers.typed_get()
-            );
-        })
+    "#,
+            |parts| {
+                assert_eq!(Method::PUT, parts.method);
+                assert_eq!("/frames", parts.uri.path());
+                assert_eq!(
+                    Some(Authorization::basic("waldo", "hunter2")),
+                    parts.headers.typed_get()
+                );
+            },
+        )
         .await;
-
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
     }
 
     #[tokio::test]
     async fn http_passes_custom_headers() {
-        let num_lines = 1000;
-
-        let in_addr = next_addr();
-
-        let config = r#"
-        uri = "http://$IN_ADDR/frames"
-        encoding = "ndjson"
-        compression = "gzip"
+        run_sink(
+            r#"
         [request.headers]
         foo = "bar"
         baz = "quux"
-    "#
-        .replace("$IN_ADDR", &format!("{}", in_addr));
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
-
-        let cx = SinkContext::new_test();
-
-        let (sink, _) = config.build(cx).await.unwrap();
-        let (rx, trigger, server) = build_test_server(in_addr);
-
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.run(events);
-
-        tokio::spawn(server);
-
-        pump.await.unwrap();
-        drop(trigger);
-
-        let output_lines = get_received(rx, |parts| {
-            assert_eq!(Method::POST, parts.method);
-            assert_eq!("/frames", parts.uri.path());
-            assert_eq!(
-                Some("bar"),
-                parts.headers.get("foo").map(|v| v.to_str().unwrap())
-            );
-            assert_eq!(
-                Some("quux"),
-                parts.headers.get("baz").map(|v| v.to_str().unwrap())
-            );
-        })
+    "#,
+            |parts| {
+                assert_eq!(Method::POST, parts.method);
+                assert_eq!("/frames", parts.uri.path());
+                assert_eq!(
+                    Some("bar"),
+                    parts.headers.get("foo").map(|v| v.to_str().unwrap())
+                );
+                assert_eq!(
+                    Some("quux"),
+                    parts.headers.get("baz").map(|v| v.to_str().unwrap())
+                );
+            },
+        )
         .await;
-
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
     }
 
     #[tokio::test]
     async fn retries_on_no_connection() {
         let num_lines = 10;
 
-        let in_addr = next_addr();
-
-        let config = r#"
-        uri = "http://$IN_ADDR/frames"
-        compression = "gzip"
-        encoding = "ndjson"
-
-        [auth]
-        strategy = "basic"
-        user = "waldo"
-        password = "hunter2"
-    "#
-        .replace("$IN_ADDR", &format!("{}", in_addr));
-        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
-
-        let cx = SinkContext::new_test();
-
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (in_addr, sink) = build_sink("").await;
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = tokio::spawn(sink.run(events));
@@ -596,10 +506,6 @@ mod tests {
         let output_lines = get_received(rx, |parts| {
             assert_eq!(Method::POST, parts.method);
             assert_eq!("/frames", parts.uri.path());
-            assert_eq!(
-                Some(Authorization::basic("waldo", "hunter2")),
-                parts.headers.typed_get()
-            );
         })
         .await;
 
@@ -675,5 +581,45 @@ mod tests {
         })
         .collect::<Vec<_>>()
         .await
+    }
+
+    async fn run_sink(extra_config: &str, assert_parts: impl Fn(http::request::Parts)) {
+        let num_lines = 1000;
+
+        let (in_addr, sink) = build_sink(extra_config).await;
+
+        let (rx, trigger, server) = build_test_server(in_addr);
+
+        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let pump = sink.run(events);
+
+        tokio::spawn(server);
+        pump.await.unwrap();
+        drop(trigger);
+
+        let output_lines = get_received(rx, assert_parts).await;
+
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
+    }
+
+    async fn build_sink(extra_config: &str) -> (std::net::SocketAddr, crate::sinks::VectorSink) {
+        let in_addr = next_addr();
+        let config = format!(
+            r#"
+                uri = "http://{addr}/frames"
+                compression = "gzip"
+                encoding = "ndjson"
+                {extras}
+            "#,
+            addr = in_addr,
+            extras = extra_config
+        );
+        let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+        let cx = SinkContext::new_test();
+
+        let (sink, _) = config.build(cx).await.unwrap();
+        (in_addr, sink)
     }
 }
