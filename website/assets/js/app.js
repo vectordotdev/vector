@@ -18,8 +18,11 @@ tocbot.init({
 const manageState = () => {
   const useLocalStorage = true;
 
+  // Detect the user's dark mode preference and set that to the default
+  const darkModeDefault = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
   window.Spruce.store('global', {
-    dark: false,
+    dark: darkModeDefault,
     banner: true,
     toggleDarkMode() {
       this.dark = !this.dark;

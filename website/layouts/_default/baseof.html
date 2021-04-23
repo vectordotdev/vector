@@ -20,11 +20,11 @@
 
     {{ partial "css.html" . }}
   </head>
-  <body class="dark:bg-black font-sans antialiased flex flex-col min-h-full">
+  <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-full">
     {{ partial "banner.html" . }}
     {{ partial "navbar.html" . }}
 
-    <div class="flex-1 overflow-y-auto">
+    <div class="flex-1 overflow-y-auto z-20">
       {{ block "main" . }}
       {{ end }}
     </div>
