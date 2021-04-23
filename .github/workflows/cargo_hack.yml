@@ -1,5 +1,6 @@
 # A workflow that runs [cargo-hack](https://github.com/taiki-e/cargo-hack)
-# across the powerset of our features.
+# across our feature flags. We do not run a powerset as there's too many
+# features to fit all that in memory.
 name: cargo_hack
 
 on:
@@ -15,8 +16,8 @@ env:
 
 jobs:
   hack:
-    runs-on: ubuntu-20.04
-    name: Cargo Hack Check - Powerset
+    runs-on: [self-hosted, linux, x64, general]
+    name: Cargo Hack Check
     steps:
       - uses: actions/checkout@v2
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
@@ -24,18 +25,21 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: cargo install cargo-hack
-      - run: cargo hack check --feature-powerset --clean-per-run
+      - run: cargo hack check --each-feature
 
-  cargo-hack-failure:
-    name: cargo-hack-failure
-    if: failure() && github.ref == 'refs/heads/master'
-    needs:
-      - hack
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Discord notification
-      env:
-        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      uses: Ilshidur/action-discord@0.3.0
-      with:
-        args: "Master cargo-hack failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+  # Temporarily disabled until we achieve a clean nightly run of cargo-hack,
+  # which is blocked behind known failures.
+
+  # cargo-hack-failure:
+  #   name: cargo-hack-failure
+  #   if: failure() && github.ref == 'refs/heads/master'
+  #   needs:
+  #     - hack
+  #   runs-on: ubuntu-20.04
+  #   steps:
+  #   - name: Discord notification
+  #     env:
+  #       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+  #     uses: Ilshidur/action-discord@0.3.0
+  #     with:
+  #       args: "Master cargo-hack failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
