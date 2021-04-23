@@ -1,17 +1,19 @@
 {{ $here := .RelPermalink }}
-<div class="max-w-3xl mx-auto sm:px-6 lg:max-w-7xl lg:px-8 lg:grid lg:grid-cols-16 lg:gap-6 mt-6">
-  <div class="hidden lg:block lg:col-span-5 xl:col-span-4">
-    <nav aria-label="sidebar" class="sticky top-6 divide-y divide-gray-300">
-      {{ partial "docs/sidebar.html" (dict "ctx" . "here" .) }}
+<div class="relative max-w-3xl mx-auto sm:px-6 lg:max-w-7xl lg:px-8 lg:grid lg:grid-cols-16 lg:gap-8 mt-8">
+  <div class="hidden lg:block lg:col-span-5 xl:col-span-4 pr-0 lg:pr-6 md:pr-2">
+    <nav aria-label="Sidebar" class="sticky top-6 pr-0 lg:pr-4" x-cloak>
+      {{ partial "docs/sidebar.html" . }}
     </nav>
   </div>
-  <main class="lg:col-span-11 xl:col-span-9 px-4 px-6 md:px-0">
+  <main aria-label="Main documentation content" class="lg:col-span-11 xl:col-span-9 px-4 px-6 md:px-0">
     {{ partial "docs/hero.html" . }}
     <div class="pb-32">
       {{ partial "docs/content.html" . }}
     </div>
   </main>
-  <aside class="sticky top-6 hidden xl:block xl:col-span-3">
-    {{ partial "docs/toc.html" . }}
-  </aside>
+  <div class="hidden lg:block xl:col-span-3">
+    <aside aria-label="Table of contents" class="sticky top-6">
+      {{ partial "docs/toc.html" . }}
+    </aside>
+  </div>
 </div>

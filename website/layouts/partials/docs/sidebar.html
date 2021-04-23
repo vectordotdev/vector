@@ -1,117 +1,123 @@
 {{ $sections := where site.Sections "Section" "docs" }}
-{{ $page := .ctx }}
+{{ $page := . }}
 {{ $metaLinks := site.Menus.meta }}
-<section class="section is-sticky">
-  <!-- x-cloak hides the sidebar until it's loaded, which provides a smoother UX -->
-  <aside class="sidebar" x-cloak>
-    {{ range $sections }}
-    {{ $isHere := eq $page.RelPermalink .RelPermalink }}
-    {{ $title := .Params.short | default .Title }}
-    <div class="sidebar-section">
-      <a class="sidebar-section-title{{ if $isHere }} is-active{{ end }}" href="{{ .RelPermalink }}">
-        {{ $title }}
-      </a>
-    </div>
 
-    {{ with .Sections }}
-    {{ range . }}
-    {{ template "section" (dict "ctx" . "page" $page) }}
-    {{ end }}
-    {{ end }}
-    {{ end }}
+{{ range $sections }}
+{{ $isActive := eq $page.RelPermalink .RelPermalink }}
+{{ $title := .Params.short | default .Title }}
+<div class="flex flex-col space-y-4">
+  <a class="uppercase font-semibold dark:text-gray-200 text-gray-600{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}" href="{{ .RelPermalink }}">
+    {{ $title }}
+  </a>
 
-    {{/* Extra links */}}
-    <div class="sidebar-section">
-      <p class="sidebar-section-title">
-        Meta
-      </p>
+  {{ with .Sections }}
+  {{ range . }}
+  {{ template "section" (dict "ctx" . "page" $page) }}
+  {{ end }}
+  {{ end }}
+  {{ end }}
 
+  <div>
+    <p class="uppercase font-semibold dark:text-gray-200 text-gray-600">
+      Meta
+    </p>
+
+    <div class="flex flex-col space-y-0.5 mt-1.5">
       {{ range $metaLinks  }}
-      <a class="sidebar-section-link" href="{{ .URL }}" target="_blank">
-        {{ .Name }}
-      </a>
+      <p class="flex items-start">
+        <a class="block dark:text-gray-400 text-gray-600" href="{{ .URL }}" target="_blank">
+          <span class="flex justify-between items-start">
+            <span>
+              {{ .Name }}
+            </span>
+
+            <svg xmlns="http://www.w3.org/2000/svg" class="pl-0.5 dark:text-gray-400 text-gray-400 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </span>
+        </a>
+      </p>
       {{ end }}
     </div>
-  </aside>
-</section>
+  </div>
+</div>
 
 {{ define "section" }}
 {{ $page := .page }}
-{{ $isHere := eq $page.RelPermalink .ctx.RelPermalink }}
+{{ $isActive := eq $page.RelPermalink .ctx.RelPermalink }}
 {{ $title := .ctx.Params.short | default .ctx.Title }}
-<div class="sidebar-section">
-  <a class="sidebar-section-title{{ if $isHere }} is-active{{ end }}" href="{{ .ctx.RelPermalink }}">
+<div>
+  <a class="uppercase font-semibold dark:text-gray-200 text-gray-600{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}" href="{{ .ctx.RelPermalink }}">
     {{ $title }}
   </a>
 
-  {{ with .ctx.Sections }}
-  <div class="sidebar-subsection">
+  <div class="flex flex-col space-y-0.5 mt-1.5">
+    {{ with .ctx.Sections }}
     {{ range . }}
     {{ $title := .Params.short | default .Title }}
-    {{ $isHere := eq $page.RelPermalink .RelPermalink }}
+    {{ $isActive := eq $page.RelPermalink .RelPermalink }}
     {{ $open := .IsAncestor $page.CurrentSection }}
-    <div class="sidebar-subsection-accordion" x-data="{ open: {{ $open }} }">
-      <p class="sidebar-subsection-title">
-        <a href="{{ .RelPermalink }}"{{ if $isHere }} class="is-active"{{ end }}>
+    <div x-data="{ open: {{ $open }} }">
+      <p class="flex justify-between items-center">
+        <a href="{{ .RelPermalink }}" class="dark:text-gray-400 text-gray-600{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}">
           {{ $title }}
         </a>
 
-        <a class="icon is-small has-text-primary" @click="open = !open">
-          <i :class="{ 'rotate-90': open }" class="fas fa-sm fa-chevron-right"></i>
-        </a>
+        {{ template "chevron" }}
       </p>
 
-      <div class="sidebar-subsection-group" x-show.transition.duration.300ms="open">
-        {{ with .Sections }}
-        {{ range . }}
-        {{ template "subsection-group" (dict "ctx" . "page" $page) }}
-        {{ end }}
-        {{ end }}
+      {{ with .Pages }}
+      <div x-show.transition.duration.300ms="open">
+        <div class="flex flex-col space-y-0.5 pl-3 border-l-2 border-gray-200 dark:border-gray-600 py-0.5 my-0.5">
+          {{ range . }}
+          {{ $isActive := eq $page.RelPermalink .RelPermalink }}
 
-        {{ with .RegularPages }}
-        {{ range . }}
-        {{ $isHere := eq $page.RelPermalink .RelPermalink }}
-        {{ $title := .Params.short | default .Title }}
-        <a class="sidebar-subsection-group-link{{ if $isHere }} is-active{{ end }}" href="{{ .RelPermalink }}">
-          {{ $title }}
-        </a>
-        {{ end }}
-        {{ end }}
+          {{ if .IsSection }}
+          {{ template "subsection-group" (dict "ctx" . "page" $page) }}
+          {{ end }}
+
+          {{ if .IsPage }}
+          {{ $title := .Params.short | default .Title }}
+          <a class="block dark:text-gray-400 text-gray-600{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}" href="{{ .RelPermalink }}">
+            {{ $title }}
+          </a>
+          {{ end }}
+          {{ end }}
+        </div>
       </div>
+      {{ end }}
     </div>
     {{ end }}
-  </div>
-  {{ end }}
+    {{ end }}
 
-  {{ with .ctx.RegularPages }}
-  {{ range . }}
-  {{ $isHere := eq $page.RelPermalink .RelPermalink }}
-  {{ $title := .Params.short | default .Title }}
-  <a class="sidebar-section-link{{ if $isHere }} is-active{{ end }}" href="{{ .RelPermalink }}">
-    {{ $title }}
-  </a>
-  {{ end }}
-  {{ end }}
+    {{ with .ctx.RegularPages }}
+    {{ range . }}
+    {{ $isActive := eq $page.RelPermalink .RelPermalink }}
+    {{ $title := .Params.short | default .Title }}
+    <a class="block text-gray-700 dark:text-gray-400{{ if $isActive }} font-semibold text-secondary dark:text-secondary{{ end }}" href="{{ .RelPermalink }}">
+      {{ $title }}
+    </a>
+    {{ end }}
+    {{ end }}
+  </div>
 </div>
 {{ end }}
 
 {{ define "subsection-group" }}
 {{ $page := .page }}
-{{ $isHere := eq .page.RelPermalink .ctx.RelPermalink }}
+{{ $isActive := eq .page.RelPermalink .ctx.RelPermalink }}
 {{ $open := .ctx.IsAncestor $page.CurrentSection }}
 {{ $title := .ctx.Params.short | default .ctx.Title }}
-<div class="sidebar-subsection-subgroup" x-data="{ open: {{ $open }} }">
-  <p class="sidebar-subsection-subgroup-title">
-    <a href="{{ .ctx.RelPermalink }}"{{ if $isHere }} class="is-active"{{ end }}>
+<div x-data="{ open: {{ $open }} }">
+  <p class="flex justify-between items-center">
+    <a href="{{ .ctx.RelPermalink }}" class="text-gray-500 dark:text-gray-400{{ if $isActive }} font-bold text-purple dark:text-primary{{ end }}">
       {{ $title }}
     </a>
 
-    <a class="icon is-small has-text-primary" @click="open = !open">
-      <i :class="{ 'fa-chevron-down': open, 'fa-chevron-right': !open }" class="fas fa-sm"></i>
-    </a>
+    {{ template "chevron" }}
   </p>
 
-  <div x-show.transition.duration.300ms="open">
+  <div x-show.transition.duration.300ms="open" class="flex flex-col space-y-0.5 pl-3 my-0.5">
     {{ with .ctx.Sections }}
     {{ range . }}
     {{ template "subsection-group" (dict "ctx" . "page" $page) }}
@@ -120,13 +126,21 @@
 
     {{ with .ctx.RegularPages }}
     {{ range . }}
-    {{ $isHere := eq $page.RelPermalink .RelPermalink }}
+    {{ $isActive := eq $page.RelPermalink .RelPermalink }}
     {{ $title := .Params.short | default .Title }}
-    <a class="sidebar-subsection-subgroup-link{{ if $isHere }} is-active{{ end }}" href="{{ .RelPermalink }}">
+    <a class="block text-gray-500 dark:text-gray-400{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}" href="{{ .RelPermalink }}">
       {{ $title }}
     </a>
     {{ end }}
     {{ end }}
   </div>
 </div>
+{{ end }}
+
+{{ define "chevron" }}
+<a @click="open = !open" class="cursor-pointer">
+  <svg :class="{ 'transform rotate-90 text-secondary dark:text-primary': open }" class="dark:text-gray-300 text-gray-500 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+  </svg>
+</a>
 {{ end }}

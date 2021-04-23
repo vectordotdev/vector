@@ -1,4 +1,4 @@
-<div class="pt-6 pb-16 sm:pb-24">
+<div class="pb-16 sm:pb-24">
   <div class="max-w-xl">
     <div class="mb-4">
       {{ partial "docs/breadcrumb.html" . }}
@@ -9,8 +9,8 @@
     </h2>
 
     {{ with .Description }}
-    <p class="dark:text-gray-200 mt-5 text-xl text-gray-500">
-      {{ . }}
+    <p class="dark:text-gray-200 mt-5 text-xl text-gray-500 prose dark:prose-dark">
+      {{ . | markdownify }}
     </p>
     {{ end }}
   </div>

@@ -1,19 +1,9 @@
 {{/* A hack to check for the presence of a TOC */}}
 {{ if gt (len .TableOfContents) 32 }}
 {{ $scrollableToc := .Params.scrollable_toc }}
-<section class="section is-sticky">
-  <aside>
-    <p class="title is-size-5 is-size-6-mobile mb-4">
-      <span class="icon is-small has-text-primary mr-2">
-        <i class="fas fa-sm fa-align-left"></i>
-      </span>
+<p class="text-lg dark:text-gray-300 text-gray-400 mb-3">
+  On this page
+</p>
 
-      <span class="has-text-weight-light">
-        Contents
-      </span>
-    </p>
-
-    <div id="docs-toc" class="mb-6"></div>
-  </aside>
-</section>
+<div id="docs-toc"></div>
 {{ end }}
