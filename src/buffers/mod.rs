@@ -1,4 +1,4 @@
-use crate::{config::Resource, internal_events::EventOut, event::Event};
+use crate::{config::Resource, event::Event, internal_events::EventOut};
 
 use futures::{channel::mpsc, task::AtomicWaker, Sink, SinkExt, Stream};
 use pin_project::pin_project;
