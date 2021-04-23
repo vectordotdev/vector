@@ -17,6 +17,7 @@
   {{ end }}
   {{ end }}
 
+  {{/* Extra "meta" links specified in config.toml (external links outside our doc tree) */}}
   <div>
     <p class="uppercase font-semibold dark:text-gray-200 text-gray-600">
       Meta
@@ -31,6 +32,7 @@
               {{ .Name }}
             </span>
 
+            {{/* Heroicon: outline/external-link */}}
             <svg xmlns="http://www.w3.org/2000/svg" class="pl-0.5 dark:text-gray-400 text-gray-400 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
@@ -68,15 +70,14 @@
 
       {{ with .Pages }}
       <div x-show.transition.duration.300ms="open">
-        <div class="flex flex-col space-y-0.5 pl-3 border-l-2 border-gray-200 dark:border-gray-600 py-0.5 my-0.5">
+        <div class="flex flex-col space-y-0.5 pl-3 border-l-2 border-gray-300 dark:border-gray-600 py-0.5 my-1">
           {{ range . }}
-          {{ $isActive := eq $page.RelPermalink .RelPermalink }}
-
           {{ if .IsSection }}
           {{ template "subsection-group" (dict "ctx" . "page" $page) }}
           {{ end }}
 
           {{ if .IsPage }}
+          {{ $isActive := eq $page.RelPermalink .RelPermalink }}
           {{ $title := .Params.short | default .Title }}
           <a class="block dark:text-gray-400 text-gray-600{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}" href="{{ .RelPermalink }}">
             {{ $title }}
@@ -94,7 +95,7 @@
     {{ range . }}
     {{ $isActive := eq $page.RelPermalink .RelPermalink }}
     {{ $title := .Params.short | default .Title }}
-    <a class="block text-gray-700 dark:text-gray-400{{ if $isActive }} font-semibold text-secondary dark:text-secondary{{ end }}" href="{{ .RelPermalink }}">
+    <a class="block dark:text-gray-400 text-gray-600{{ if $isActive }} font-semibold text-secondary dark:text-primary{{ end }}" href="{{ .RelPermalink }}">
       {{ $title }}
     </a>
     {{ end }}
@@ -110,7 +111,7 @@
 {{ $title := .ctx.Params.short | default .ctx.Title }}
 <div x-data="{ open: {{ $open }} }">
   <p class="flex justify-between items-center">
-    <a href="{{ .ctx.RelPermalink }}" class="text-gray-500 dark:text-gray-400{{ if $isActive }} font-bold text-purple dark:text-primary{{ end }}">
+    <a href="{{ .ctx.RelPermalink }}" class="dark:text-gray-400 text-gray-600{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}">
       {{ $title }}
     </a>
 
@@ -139,6 +140,7 @@
 
 {{ define "chevron" }}
 <a @click="open = !open" class="cursor-pointer">
+  {{/* Heroicon: outline/chevron-right */}}
   <svg :class="{ 'transform rotate-90 text-secondary dark:text-primary': open }" class="dark:text-gray-300 text-gray-500 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
   </svg>

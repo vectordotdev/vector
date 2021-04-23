@@ -1,6 +1,6 @@
 ---
 title: Template syntax
-weight: 3
+weight: 6
 ---
 
 Vector supports a template syntax for some configuration options. This allows for dynamic values derived from event data. Options that support this syntax will be clearly documented as such in the option description.

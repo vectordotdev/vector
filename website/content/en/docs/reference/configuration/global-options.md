@@ -1,7 +1,7 @@
 ---
 title: Global options reference
 short: Global options
-weight: 1
+weight: 4
 ---
 
 ## Global configuration parameters

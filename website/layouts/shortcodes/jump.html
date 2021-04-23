@@ -7,20 +7,15 @@
 {{ if not $page }}
 {{ errorf "Error in link shortcode at content/%s. No page found at %s." $.Page.File $link }}
 {{ end }}
-
-<div class="jump">
-  <a href="{{ $link }}">
-    <span class="link">
-      <span class="icon">
-        <i class="fas fa-file-alt"></i>
-      </span>
-      <span class="text">
-        {{ $page.Title }}
-      </span>
+<div class="jump shadow px-3.5 py-2 bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 hover:bg-gray-200">
+  <a href="{{ $link }}" class="flex justify-between items-center">
+    <span class="dark:text-gray-200 text-gray-700 tracking-tight">
+      {{ $page.Title }}
     </span>
 
-    <span class="icon right-icon">
-      <i class="fas fa-chevron-right"></i>
-    </span>
+    {{/* Heroicon: outline/chevron-right */}}
+    <svg xmlns="http://www.w3.org/2000/svg" class="transform hover:translate-x-1 dark:hover:text-primary dark:text-gray-100 text-dark hover:text-secondary h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+    </svg>
   </a>
 </div>

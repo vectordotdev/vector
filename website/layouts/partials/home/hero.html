@@ -10,22 +10,22 @@
         <div class="lg:grid lg:grid-cols-12 lg:gap-8">
           <div class="px-4 sm:px-6 sm:text-center md:max-w-2xl md:mx-auto lg:col-span-6 lg:text-left lg:flex lg:items-center">
             <div>
-              <a href="{{ $link }}" class="dark:bg-gray-800 bg-gradient-to-l from-primary to-purple inline-flex items-center text-white rounded-full p-1 pr-2 sm:text-base lg:text-sm xl:text-base hover:text-gray-200">
-                <span class="dark:text-white dark:bg-dark bg-black px-3 py-0.5 text-xs font-bold leading-5 uppercase tracking-tight rounded-full">
+              <a href="{{ $link }}" class="dark:bg-gray-800 bg-gradient-to-l from-secondary to-purple inline-flex items-center text-white rounded-full py-1 px-1.5 sm:text-base lg:text-sm xl:text-base hover:text-gray-100">
+                <span class="dark:text-white dark:bg-dark bg-black px-2.5 py-0 lg:py-0.5 text-xs font-semibold leading-5 uppercase tracking-tight rounded-full">
                   New
                 </span>
-                <span class="text-dark ml-3.5 text-sm">
-                  Vector version <strong>{{ $latest }}</strong>
+                <span class="dark:text-dark ml-2.5 lg:ml-3 text-xs md:text-sm font-light tracking-tight">
+                  Vector version <span class="font-semibold">{{ $latest }}</span>
                 </span>
                 {{/* Heroicon name: solid/chevron-right */}}
-                <svg class="text-dark ml-2 w-5 h-5 transition transform hover:translate-x-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <svg class="text-dark ml-2 w-5 h-5 transition transform hover:translate-x-1.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                   <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
                 </svg>
               </a>
-              <h1 class="dark:text-gray-100 text-gray-800 my-6 text-6xl tracking-tight font-extrabold sm:mt-5 sm:leading-none lg:mt-6 xl:text-7xl">
+              <h1 class="dark:text-gray-100 text-gray-800 my-6 text-6xl lg:text-7xl tracking-tight font-extrabold sm:mt-5 sm:leading-none lg:mt-6">
                 {{ site.Title }}
               </h1>
-              <p class="dark:text-gray-300 text-gray-600 sm:mt-5 sm:text-xl lg:text-lg xl:text-xl">
+              <p class="dark:text-gray-300 text-gray-600 sm:mt-5 sm:text-xl lg:text-2xl xl:text-xl">
                 {{ site.Params.description }}
               </p>
 

@@ -1,7 +1,7 @@
 ---
 title: Unit tests reference
 short: Unit tests
-weight: 2
+weight: 5
 ---
 
 You can define unit tests in your Vector configuration file to cover a network of transforms within the topology. The intention of these tests is to improve the maintainability of configurations containing larger and more complex combinations of transforms.

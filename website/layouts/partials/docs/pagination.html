@@ -1,33 +1,39 @@
 {{ if or (ne nil .NextInSection) (ne nil .PrevInSection) }}
-<section class="section has-background-white-bis">
-  <div class="container">
-    <nav class="pagination is-centered is-small is-rounded" role="navigation" aria-label="pagination">
-      <div class="pagination-list"></div>
-
-      {{ with .NextInSection }}
-      {{ $title := .Params.short | default .Title }}
-      <a class="pagination-previous has-background-dark" href="{{ .RelPermalink }}">
-        <span class="has-text-light">
-          <span class="icon has-text-primary">
-            <i class="fas fa-chevron-left"></i>
-          </span>
-          Previous:<span class="ml-2 has-text-weight-bold">{{ $title }}</span>
-        </span>
-      </a>
-      {{ end }}
-
-      {{ with .PrevInSection }}
-      {{ $title := .Params.short | default .Title }}
-      <a class="pagination-next has-background-dark" href="{{ .RelPermalink }}">
-        <span class="has-text-light">
-          Next:<span class="ml-2 has-text-weight-bold">{{ $title }}</span>
-          <span class="icon has-text-primary">
-            <i class="fas fa-chevron-right"></i>
-          </span>
-        </span>
-      </a>
-      {{ end }}
-    </nav>
+<nav class="border-t border-gray-200 dark:border-gray-400 px-4 flex items-center justify-between sm:px-0 mb-8">
+  {{ with .NextInSection }}
+  {{ $title := .Params.short | default .Title }}
+  <div class="-mt-px w-0 flex-1 flex">
+    <a href="{{ .RelPermalink }}" class="dark:text-gray-300 border-t-2 border-transparent pt-4 pr-1 inline-flex items-center text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
+      {{/* Heroicon: solid/arrow-narrow-left */}}
+      <svg class="text-dark dark:text-gray-200 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+      </svg>
+      <span>
+        Previous:&nbsp;
+      </span>
+      <span class="font-bold dark:hover:text-primary hover:text-secondary">
+        {{ $title }}
+      </span>
+    </a>
   </div>
-</section>
+  {{ end }}
+
+  {{ with .PrevInSection }}
+  {{ $title := .Params.short | default .Title }}
+  <div class="-mt-px w-0 flex-1 flex justify-end">
+    <a href="{{ .RelPermalink }}" class="dark:text-gray-300 border-t-2 border-transparent pt-4 pl-1 inline-flex items-center text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
+      <span>
+        Next:&nbsp;
+      </span>
+      <span class="font-bold dark:hover:text-primary hover:text-secondary">
+        {{ $title }}
+      </span>
+      {{/* Heroicon: solid/arrow-narrow-right */}}
+      <svg class="text-dark dark:text-gray-200 ml-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd" />
+      </svg>
+    </a>
+  </div>
+  {{ end }}
+</nav>
 {{ end }}

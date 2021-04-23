@@ -15,19 +15,48 @@ module.exports = {
         'rss-orange': '#f26522'
       },
       fontFamily: {
-        sans: ['Segoe UI', ...defaultTheme.fontFamily.sans]
+        sans: ['Segoe UI', ...defaultTheme.fontFamily.sans],
       },
       gridTemplateColumns: {
         '16': 'repeat(16, minmax(0, 1fr))',
       },
       typography: (theme) => ({
+        DEFAULT: {
+          css: {
+            a: {
+              color: theme('colors.primary-dark'),
+              '&:hover': {
+                color: theme('colors.secondary'),
+              },
+              'text-decoration': 'none'
+            },
+            code: {
+              color: theme('colors.primary-dark'),
+            },
+            '.no-prose': {
+              a: {
+                color: theme('colors.black'),
+                '&:hover': {
+                  color: theme('colors.black'),
+                },
+              },
+              p: {
+                margin: 0,
+                padding: 0,
+              }
+            }
+          }
+        },
         dark: {
           css: {
             color: theme('colors.gray.100'),
             'p, h1, h2, h3, h4, h5, h6': {
               color: theme('colors.gray.100')
             },
-            'a, a code, p code': {
+            'a code, p code, td code': {
+              color: theme('colors.primary'),
+            },
+            'a': {
               color: theme('colors.primary'),
               'text-decoration': 'none',
               '&:hover, &:active': {

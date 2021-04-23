@@ -7,20 +7,20 @@
 {{ $isHere := eq .p1 .p2 }}
 {{ $title := .p1.Params.breadcrumb | default .p1.Params.short | default .p1.Title }}
 <li>
-  <div class="flex flex-grow-1 items-center">
+  <div class="flex items-center">
     {{ if not .p1.IsHome }}
     <svg class="flex-shrink-0{{ if $isHere }} h-6 w-6 dark:text-primary text-secondary{{ else }} h-5 w-5 dark:text-gray-200 text-dark{{ end }}" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
       <path d="M5.555 17.776l8-16 .894.448-8 16-.894-.448z" />
     </svg>
     {{ end }}
-    <a href="{{ .p1.RelPermalink }}" class="dark:text-gray-300 tracking-thin text-sm md:text-normal font-medium hover:text-gray-700{{ if not .p1.IsHome }} ml-4{{ end }}{{ if $isHere }} dark:text-gray-100 text-gray-700 font-semibold{{ else }} text-gray-600{{ end }}">
+    <a href="{{ .p1.RelPermalink }}" class="dark:text-gray-300 tracking-thin text-sm md:text-normal font-medium hover:text-gray-700{{ if not .p1.IsHome }} ml-4{{ end }}{{ if $isHere }} dark:text-gray-100 text-gray-700 font-extrabold{{ else }} text-gray-600{{ end }}">
       {{ $title }}
     </a>
   </div>
 </li>
 {{ end }}
 
-<nav class="flex" aria-label="Breadcrumb">
+<nav class="flex" aria-label="Documentation breadcrumb">
   <ol class="flex items-center space-x-4">
     {{ template "breadcrumb" (dict "p1" . "p2" .) }}
   </ol>

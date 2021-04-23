@@ -13,3 +13,11 @@
 
 @import "syntax"
 @import "toc"
+
+// Some rules that Tailwind can't really cover
+.jump + .jump
+  margin-top: 0.5rem
+
+.svg svg
+  max-width: 100%
+  height: auto

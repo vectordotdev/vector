@@ -1,3 +1,4 @@
-<div class="dark:prose-dark tracking-normal prose prose-normal" id="docs-content">
+{{ $hasToc := not .Params.no_toc }}
+<div class="dark:prose-dark tracking-normal prose{{ if $hasToc }} prose-normal{{ end }}" id="docs-content">
   {{ .Content }}
 </div>
