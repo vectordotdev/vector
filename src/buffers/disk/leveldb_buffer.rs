@@ -84,6 +84,8 @@ impl Sink<Event> for Writer {
         if self.slot.is_none() {
             Poll::Ready(Ok(()))
         } else {
+            // Assumes that flush will only succeed if it has also emptied the slot,
+            // hence we don't need to recheck if the slot is empty.
             self.poll_flush(cx)
         }
     }
