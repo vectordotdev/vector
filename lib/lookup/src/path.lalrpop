@@ -29,5 +29,5 @@ Field: Field<'input> = {
 }
 
 Index: isize = {
-  r"[0-9]+" => isize::from_str(<>).unwrap()
+  r"-?[0-9]+" => isize::from_str(<>).unwrap()
 }

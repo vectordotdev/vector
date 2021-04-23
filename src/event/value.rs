@@ -535,101 +535,128 @@ impl Value {
             })
     }
 
-    /// Note this will blow up with negative indexes which it wasn't designed to cope with,
-    /// but since Remap handles it, we should handle it here too..
     fn insert_array(
         i: isize,
         mut working_lookup: LookupBuf,
         array: &mut Vec<Value>,
         value: Value,
     ) -> std::result::Result<Option<Value>, EventError> {
-        {
-            match array.get_mut(i as usize) {
-                Some(inner) => inner.insert(working_lookup, value).map_err(|mut e| {
-                    if let EventError::PrimitiveDescent {
-                        original_target,
-                        primitive_at,
-                        original_value: _,
-                    } = &mut e
-                    {
-                        let segment = SegmentBuf::Index(i);
-                        original_target.push_front(segment.clone());
-                        primitive_at.push_front(segment);
-                    };
-                    e
-                }),
-                None => {
+        let index = if i.is_positive() {
+            i
+        } else {
+            array.len() as isize + i
+        };
+
+        let item = if index.is_negative() {
+            // A negative index is greater than the length of the array, so we are trying to
+            // set an index that doesn't yet exist.
+            None
+        } else {
+            array.get_mut(index as usize)
+        };
+
+        match item {
+            Some(inner) => inner.insert(working_lookup, value).map_err(|mut e| {
+                if let EventError::PrimitiveDescent {
+                    original_target,
+                    primitive_at,
+                    original_value: _,
+                } = &mut e
+                {
+                    let segment = SegmentBuf::Index(i);
+                    original_target.push_front(segment.clone());
+                    primitive_at.push_front(segment);
+                };
+                e
+            }),
+            None => {
+                if i.is_negative() {
+                    // Resizing for a negative index must resize to the left.
+                    // Setting x[-4] to true for an array [0,1] must end up with
+                    // [true, null, 0, 1]
+                    let abs = i.abs() as usize - 1;
+                    let len = array.len();
+
+                    array.resize(abs, Value::Null);
+                    array.rotate_right(abs - len);
+                } else {
                     // Fill the vector to the index.
                     array.resize(i as usize, Value::Null);
-                    let mut retval = Ok(None);
-                    let next_val = match working_lookup.get(0) {
-                        Some(SegmentBuf::Index(next_len)) => {
-                            let mut inner = Value::Array(Vec::with_capacity(*next_len as usize));
-                            retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                                if let EventError::PrimitiveDescent {
-                                    original_target,
-                                    primitive_at,
-                                    original_value: _,
-                                } = &mut e
-                                {
-                                    let segment = SegmentBuf::Index(i);
-                                    original_target.push_front(segment.clone());
-                                    primitive_at.push_front(segment);
-                                };
-                                e
-                            });
-                            inner
-                        }
-                        Some(SegmentBuf::Field(FieldBuf {
-                            name,
-                            requires_quoting,
-                        })) => {
-                            let mut inner = Value::Map(Default::default());
-                            let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
-                            let requires_quoting = *requires_quoting; // This is for navigating an ownership issue in the error stack reporting.
-                            retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                                if let EventError::PrimitiveDescent {
-                                    original_target,
-                                    primitive_at,
-                                    original_value: _,
-                                } = &mut e
-                                {
-                                    let segment = SegmentBuf::Field(FieldBuf {
-                                        name,
-                                        requires_quoting,
-                                    });
-                                    original_target.push_front(segment.clone());
-                                    primitive_at.push_front(segment);
-                                };
-                                e
-                            });
-                            inner
-                        }
-                        Some(SegmentBuf::Coalesce(set)) => match set.get(0) {
-                            None => return Err(EventError::EmptyCoalesceSubSegment),
-                            Some(_) => {
-                                let mut inner = Value::Map(Default::default());
-                                let set = SegmentBuf::Coalesce(set.clone());
-                                retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                                    if let EventError::PrimitiveDescent {
-                                        original_target,
-                                        primitive_at,
-                                        original_value: _,
-                                    } = &mut e
-                                    {
-                                        original_target.push_front(set.clone());
-                                        primitive_at.push_front(set.clone());
-                                    };
-                                    e
-                                });
-                                inner
-                            }
-                        },
-                        None => value,
-                    };
-                    array.push(next_val);
-                    retval
                 }
+                let mut retval = Ok(None);
+                let next_val = match working_lookup.get(0) {
+                    Some(SegmentBuf::Index(next_len)) => {
+                        let mut inner = Value::Array(Vec::with_capacity(*next_len as usize));
+                        retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                            if let EventError::PrimitiveDescent {
+                                original_target,
+                                primitive_at,
+                                original_value: _,
+                            } = &mut e
+                            {
+                                let segment = SegmentBuf::Index(i);
+                                original_target.push_front(segment.clone());
+                                primitive_at.push_front(segment);
+                            };
+                            e
+                        });
+                        inner
+                    }
+                    Some(SegmentBuf::Field(FieldBuf {
+                        name,
+                        requires_quoting,
+                    })) => {
+                        let mut inner = Value::Map(Default::default());
+                        let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
+                        let requires_quoting = *requires_quoting; // This is for navigating an ownership issue in the error stack reporting.
+                        retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                            if let EventError::PrimitiveDescent {
+                                original_target,
+                                primitive_at,
+                                original_value: _,
+                            } = &mut e
+                            {
+                                let segment = SegmentBuf::Field(FieldBuf {
+                                    name,
+                                    requires_quoting,
+                                });
+                                original_target.push_front(segment.clone());
+                                primitive_at.push_front(segment);
+                            };
+                            e
+                        });
+                        inner
+                    }
+                    Some(SegmentBuf::Coalesce(set)) => match set.get(0) {
+                        None => return Err(EventError::EmptyCoalesceSubSegment),
+                        Some(_) => {
+                            let mut inner = Value::Map(Default::default());
+                            let set = SegmentBuf::Coalesce(set.clone());
+                            retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                                if let EventError::PrimitiveDescent {
+                                    original_target,
+                                    primitive_at,
+                                    original_value: _,
+                                } = &mut e
+                                {
+                                    original_target.push_front(set.clone());
+                                    primitive_at.push_front(set.clone());
+                                };
+                                e
+                            });
+                            inner
+                        }
+                    },
+                    None => value,
+                };
+                if i.is_negative() {
+                    // We need to push to the front of the array.
+                    array.push(next_val);
+                    array.rotate_right(1);
+                } else {
+                    array.push(next_val);
+                }
+                retval
             }
         }
     }
@@ -888,16 +915,26 @@ impl Value {
             (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
             // Descend into an array
             (Some(Segment::Index(i)), Value::Array(array)) => {
+                let index = if i.is_negative() {
+                    if i.abs() > array.len() as isize {
+                        // The index is before the start of the array.
+                        return Ok(None);
+                    }
+                    (array.len() as isize + i) as usize
+                } else {
+                    i as usize
+                };
+
                 if working_lookup.len() == 0 {
                     // We don't **actually** want to remove the index, we just want to swap it with a null.
-                    if array.len() > i as usize {
-                        Ok(Some(array.remove(i as usize)))
+                    if array.len() > index {
+                        Ok(Some(array.remove(index)))
                     } else {
                         Ok(None)
                     }
                 } else {
                     let mut inner_is_empty = false;
-                    let retval = match array.get_mut(i as usize) {
+                    let retval = match array.get_mut(index) {
                         Some(inner) => {
                             let ret = inner.remove(working_lookup.clone(), prune);
                             if inner.is_empty() {
@@ -976,10 +1013,22 @@ impl Value {
             }
             (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
             // Descend into an array
-            (Some(Segment::Index(i)), Value::Array(array)) => match array.get(i as usize) {
-                Some(inner) => inner.get(working_lookup.clone()),
-                None => Ok(None),
-            },
+            (Some(Segment::Index(i)), Value::Array(array)) => {
+                let index = if i.is_negative() {
+                    if i.abs() > array.len() as isize {
+                        // The index is before the start of the array.
+                        return Ok(None);
+                    }
+                    (array.len() as isize + i) as usize
+                } else {
+                    i as usize
+                };
+
+                match array.get(index) {
+                    Some(inner) => inner.get(working_lookup.clone()),
+                    None => Ok(None),
+                }
+            }
             (Some(Segment::Field(Field { .. })), Value::Array(_)) => {
                 trace!("Mismatched field trying to access array.");
                 Ok(None)
@@ -1378,6 +1427,45 @@ mod test {
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
+        }
+
+        #[test]
+        fn negative_index() {
+            let mut value = Value::from(vec![Value::from(1), Value::from(2), Value::from(3)]);
+            let key = "[-2]";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let marker = Value::from(true);
+
+            assert_eq!(
+                value.insert(lookup.clone(), marker.clone()).unwrap(),
+                Some(Value::from(2))
+            );
+            assert_eq!(value.as_array().len(), 3);
+            assert_eq!(value.as_array()[0], Value::from(1));
+            assert_eq!(value.as_array()[1], marker);
+            assert_eq!(value.as_array()[2], Value::from(3));
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+
+            let lookup = Lookup::from_str(key).unwrap();
+            assert_eq!(value.remove(lookup, true).unwrap(), Some(marker));
+            assert_eq!(value.as_array().len(), 2);
+            assert_eq!(value.as_array()[0], Value::from(1));
+            assert_eq!(value.as_array()[1], Value::from(3));
+        }
+
+        #[test]
+        fn negative_index_resize() {
+            let mut value = Value::from(Vec::<Value>::default());
+            let key = "[-3]";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let marker = Value::from(true);
+
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_array().len(), 3);
+            assert_eq!(value.as_array()[0], marker);
+            assert_eq!(value.as_array()[1], Value::Null);
+            assert_eq!(value.as_array()[2], Value::Null);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
         }
 
         #[test]
