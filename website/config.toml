@@ -204,19 +204,19 @@ weight = 3
 # Mini icons in footer
 [[menu.comms]]
 name = "Twitter"
-params = { icon = "fab fa-twitter" }
+params = { color = "twitter-blue", icon = "twitter" }
 url = "https://twitter.com/vectordotdev"
 weight = 1
 
 [[menu.comms]]
 name = "GitHub"
-params = { icon = "fab fa-github" }
+params = { color = "black", dark = "white", icon = "github" }
 url = "https://github.com/timberio/vector"
 weight = 2
 
 [[menu.comms]]
 name = "Chat"
-params = { icon = "fab fa-discord" }
+params = { icon = "discord-purple", icon = "discord" }
 url = "https://chat.vector.dev"
 weight = 3
 

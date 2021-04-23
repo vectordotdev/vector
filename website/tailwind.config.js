@@ -7,7 +7,8 @@ module.exports = {
       colors: {
         'primary': '#28d9f2',
         'secondary': '#f44af5',
-        'twitter-blue': '#1DA1F2'
+        'twitter-blue': '#1DA1F2',
+        'discord-purple': '#7289DA'
       },
       fontFamily: {
         sans: ['Segoe UI', ...defaultTheme.fontFamily.sans],

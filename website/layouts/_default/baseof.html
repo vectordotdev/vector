@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html
+  x-cloak
   x-data="{ dark: $store.dark.enabled }"
   x-on:dark-toggle="dark = !dark"
   :class="{ 'dark': dark }"
@@ -14,33 +15,16 @@
       {{ end }}
     </title>
 
+    <script src="https://unpkg.com/ionicons@5.4.0/dist/ionicons.js"></script>
+
     {{ partial "css.html" . }}
   </head>
   <body class="dark:bg-black font-sans antialiased flex flex-col min-h-full">
     <main class="flex-1">
       {{ partial "navbar.html" . }}
 
-      <p class="dark:text-gray-50">
-        Cillum est sunt laborum eiusmod ut cupidatat nisi nisi ut do excepteur. Est sunt eiusmod mollit proident voluptate nulla eiusmod cillum nisi culpa. Tempor fugiat culpa anim qui culpa exercitation fugiat Lorem ullamco commodo cillum exercitation. Ipsum et nulla sint elit do proident eiusmod consectetur quis ea cupidatat velit irure.
-
-Ex dolore non ex deserunt cillum non. Ipsum ut voluptate cillum do minim aliquip laboris elit dolore amet adipisicing reprehenderit magna magna. Consectetur qui irure consectetur dolor elit non proident id aliquip occaecat deserunt culpa ipsum.
-
-Culpa laborum amet sit proident cillum mollit cillum in Lorem ipsum cillum pariatur aliqua consectetur. Sint ea minim laboris commodo irure anim proident quis velit minim et id. Cillum proident magna reprehenderit proident commodo elit minim voluptate elit labore consequat id. Id reprehenderit anim ad sit. Ipsum mollit ex deserunt id consequat veniam minim laboris.
-
-Commodo commodo eu non voluptate pariatur enim sit dolor. Ullamco velit sit ut eiusmod nostrud est dolore consequat elit quis irure labore est fugiat. Exercitation enim exercitation voluptate nisi amet ullamco excepteur pariatur labore labore qui ipsum. Laborum duis magna aute nisi labore id anim eiusmod in Lorem cillum. Occaecat est do duis in esse et fugiat irure tempor exercitation consequat Lorem do nisi. Exercitation eiusmod dolore id quis aliqua proident ullamco et Lorem velit. Sit consequat anim laborum officia.
-
-Consequat ea do adipisicing magna cillum proident amet sunt mollit et. Proident nostrud ipsum culpa eu eiusmod ex sit et. In laborum officia sit ullamco laborum aliqua ad. Deserunt minim irure commodo ex ad officia magna pariatur incididunt sit quis aliquip esse.
-
-Laboris velit ipsum elit commodo veniam non nisi anim eiusmod. Labore dolor incididunt aliquip incididunt. Adipisicing velit nostrud nostrud mollit magna dolor minim cupidatat consectetur qui minim deserunt reprehenderit sit. Fugiat eiusmod consequat deserunt exercitation Lorem culpa laboris ipsum tempor ullamco. Mollit eiusmod deserunt ullamco non sit. Non sit ut cillum laborum enim et qui labore nostrud mollit. Ullamco anim nulla quis ipsum incididunt fugiat enim pariatur qui sint.
-
-Tempor do sint id sint minim consectetur consectetur. Eiusmod sunt veniam ea est anim consectetur occaecat nisi non. Ut commodo amet commodo velit cupidatat eu deserunt voluptate ut ipsum dolore ipsum.
-
-Magna elit laborum adipisicing sint nulla magna. Aliquip do ullamco ea veniam in id esse consectetur voluptate. In duis tempor occaecat incididunt.
-
-Labore dolore culpa aliqua commodo nulla reprehenderit voluptate laborum. Cillum ea reprehenderit Lorem laboris sit cupidatat. Pariatur aute eiusmod ad adipisicing cupidatat ad non incididunt dolore culpa. Pariatur ut occaecat irure nulla elit sunt do.
-
-Aliqua mollit qui consequat deserunt velit occaecat. Ullamco do fugiat mollit anim adipisicing. Nisi ut amet exercitation officia cupidatat exercitation officia excepteur dolor. Sit elit ut elit exercitation. Voluptate officia proident labore fugiat labore consequat aliqua irure laboris do. Quis nisi exercitation eu reprehenderit consequat sunt anim sunt fugiat eiusmod quis pariatur aliquip pariatur. Laborum ipsum deserunt deserunt officia minim laborum.
-      </p>
+      {{ block "main" . }}
+      {{ end }}
     </main>
 
     {{ partial "footer.html" . }}

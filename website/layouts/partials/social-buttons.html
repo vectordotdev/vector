@@ -1,17 +1,10 @@
-{{ $social := site.Params.social }}
-{{ $twitter := printf "https://twitter.com/%s" $social.twitter_handle }}
-{{ $github := printf "https://github.com/%s" $social.github_repo }}
-{{ $discord := $social.discord }}
-<div class="buttons">
-  {{ template "button" (dict "color" "twitter-blue" "url" $twitter "icon" "fa-twitter") }}
-  {{ template "button" (dict "color" "white" "url" $github "icon" "fa-github") }}
-  {{ template "button" (dict "color" "discord-purple" "url" $discord "icon" "fa-discord") }}
-</div>
-
-{{ define "button" }}
-<a class="button is-small is-{{ .color }}" href="{{ .url }}" target="_blank">
-  <span class="icon">
-    <i class="fab {{ .icon }}"></i>
-  </span>
-</a>
-{{ end }}
+{{ range site.Menus.comms }}
+  <a href="{{ .URL }}" class="text-gray-400 hover:text-gray-300" target="_blank">
+    <span class="sr-only">
+      {{ .Name }} icon and link
+    </span>
+    <span class="hover:text-{{ .Params.color }}{{ with .Params.dark }} dark:hover:text-{{ . }}{{ end }}">
+      <ion-icon name="logo-{{ .Params.icon }}"></ion-icon>
+    </span>
+  </a>
+  {{ end }}
