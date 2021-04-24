@@ -7,3 +7,7 @@
 {{ $prodApp := $app | fingerprint }}
 <script type="text/javascript" src="{{ $prodApp.RelPermalink }}" integrity="{{ $prodApp.Data.Integrity }}" defer></script>
 {{ end }}
+
+{{/* We have a few Ionicons icons scattered throughout */}}
+{{ $version := site.Params.ionicons_version }}
+<script src="https://unpkg.com/ionicons@{{ $version }}/dist/ionicons.js"></script>

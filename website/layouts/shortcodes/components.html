@@ -3,25 +3,7 @@
 <div class="no-prose mt-3">
   <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
     {{ range $componentsOfType }}
-    {{ $title := .Params.short | default .Title }}
-    {{ $componentTag := .File.BaseFileName }}
-    <div class="dark:bg-gray-700 dark:hover:bg-gray-800 bg-white shadow-md px-5 py-4 hover:bg-gray-50 rounded-md">
-      <a href="{{ .RelPermalink }}" class="block text-2xl leading-tight">
-        <span class="dark:text-gray-200 hover:text-purple dark:hover:text-primary">
-          {{ $title }}
-        </span>
-      </a>
-
-      <span class="mt-3 dark:text-gray-200 dark:bg-gray-800 text-dark tracking-wider bg-gray-100 inline-block text-xs font-semibold font-mono py-1 px-2 rounded">
-        {{ $componentTag }}
-      </span>
-
-      {{ with .Description }}
-      <div class="mt-5 text-md dark:text-gray-300 text-gray-700 leading-snug">
-        {{ . | markdownify | plainify }}
-      </div>
-      {{ end }}
-    </div>
+    {{ .Render "component-card" }}
     {{ end }}
   </div>
 </div>

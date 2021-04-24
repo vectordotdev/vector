@@ -5,61 +5,65 @@ Components - Sources, Transforms, and Sinks | {{ site.Title }}
 {{ define "main" }}
 {{ $criteria := .Params.criteria }}
 {{ $types := slice "Sources" "Transforms" "Sinks" }}
-{{ partial "hero.html" . }}
+<div class="relative max-w-3xl mx-auto sm:px-6 lg:max-w-7xl lg:px-8 mt-8 pb-24">
+  <div class="pb-16 sm:pb-24 px-6 md:px-0">
+    <div class="mb-4 md:mb-6">
+      {{ partial "docs/breadcrumb.html" . }}
+    </div>
 
-<section class="section my-4" x-data="{ tags: ['source', 'sink', 'transform', 'logs', 'metrics'] }">
-  <div class="container">
-    <div class="columns is-variable is-6">
-      <div class="column is-one-quarter">
-        <section class="is-sticky">
-          <p class="title is-size-4 is-size-5-mobile has-text-weight-light">
-            Criteria
-          </p>
+    <h2 class="dark:text-gray-50 font-secondary font-extrabold text-4xl md:text-5xl tracking-tight sm:tracking-tighter leading-tight">
+      {{ .Title }}
+    </h2>
 
-          {{ range $map := $criteria }}
-          {{ range $k, $v := $map }}
-          <p class="has-text-weight-semibold">
-            {{ $k }}
-          </p>
+    {{ with .Description }}
+    <p class="dark:text-gray-200 mt-5 text-xl text-gray-500 prose dark:prose-dark">
+      {{ . | markdownify }}
+    </p>
+    {{ end }}
+  </div>
 
-          <div class="mt-2 mb-3">
-            {{ range $v }}
-            <label class="checkbox">
-              <input type="checkbox">
-              {{ . }}
-            </label>
-            <br />
-            {{ end }}
-          </div>
-          {{ end }}
-          {{ end }}
-        </section>
-      </div>
+  <div class="lg:grid lg:grid-cols-16 px-6 md:px-0">
+    <div class="flex flex-col space-y-3 lg:col-span-4 pb-12 lg:pb-0">
+      {{ range .Params.criteria }}
+      {{ range $k, $v := . }}
+      {{ $id := $k | urlize }}
+      <p class="lg:text-md font-semibold uppercase dark:text-gray-200 text-base">
+        {{ $k }}
+      </p>
 
-      <div class="column">
-        {{ range $types }}
-        {{ $components := where site.RegularPages ".CurrentSection.Params.short" . }}
-        {{ template "components" (dict "type" . "components" $components) }}
+      <div class="flex flex-col space-y-1">
+        {{ range $v }}
+        <p>
+          <input type="checkbox" class="h-5 w-5 dark:bg-gray-300 bg-gray-100 border-1 dark:border-gray-300 border-gray-200 rounded text-gray-500" unchecked>
+          <span class="ml-2.5 dark:text-gray-300 text-gray-700">
+            {{ . }}
+          </span>
+        </p>
         {{ end }}
       </div>
+      {{ end }}
+      {{ end }}
+    </div>
+
+    <div class="lg:col-span-12 flex flex-col space-y-10">
+      {{ range $types }}
+      {{ $components := where site.RegularPages ".CurrentSection.Params.short" . }}
+      {{ $num := len $components }}
+
+      <div>
+        <p class="text-2xl md:text-3xl font-light mb-4 dark:text-gray-200">
+          {{ $num }} {{ . }}
+        </p>
+
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {{ range $components }}
+          {{ .Render "component-card" }}
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
     </div>
   </div>
-</section>
-{{ end }}
-
-{{ define "components" }}
-{{ $type := .type }}
-<p class="title is-size-3 is-size-4-mobile">
-  <span class="has-text-weight-light">
-    {{ len .components }} {{ $type | lower }}
-  </span>
-</p>
-
-<div class="columns is-variable is-multiline mb-6">
-  {{ range .components }}
-  <div class="column is-one-third">
-    {{ .Render "component-card-selectable" }}
-  </div>
-  {{ end }}
 </div>
 {{ end }}
+
