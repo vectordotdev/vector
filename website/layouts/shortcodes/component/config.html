@@ -1,43 +1,4 @@
 {{ $tag := $.Page.File.BaseFileName }}
 {{ $type := $.Page.CurrentSection.Params.component_type }}
-{{ $configs := (index (index site.Data.docs.components $type) $tag).configuration }}
-<div class="configs">
-  {{ range $k, $v := $configs }}
-  {{ $req := $v.required }}
-  <div class="config">
-    <span class="config-title">
-      <h3 class="name" id="{{ $k }}">
-        {{ $k }}
-      </h3>
-
-      <div class="config-buttons">
-        <div class="config-button is-grey">
-          {{ range $k, $v := $v.type }}{{ $k }}{{ end }}
-        </div>
-
-        <div class="config-button{{ if $req }} is-bold{{ else }} is-light{{ end }}">
-          {{ if $req }}
-          required
-          {{ else }}
-          optional
-          {{ end }}
-        </div>
-      </div>
-    </span>
-
-    <p class="config-description">
-      {{ $v.description | markdownify }}
-    </p>
-
-    {{ range $k, $v := $v.type }}
-    {{ with $v.default }}
-    <p class="config-default">
-      Default: <code>
-        {{ . }}
-      </code>
-    </p>
-    {{ end }}
-    {{ end }}
-  </div>
-  {{ end }}
-</div>
+{{ $config := (index (index site.Data.docs.components $type) $tag).configuration }}
+{{ partial "config.html" (dict "config" $config) }}

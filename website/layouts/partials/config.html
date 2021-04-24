@@ -1,0 +1,93 @@
+{{/* Used by several shortcodes to display config-style info (CLI, API, VRL functions, etc.) */}}
+<div class="no-prose w-full border dark:border-gray-700 rounded-md">
+  {{/* Source/transform/sink config */}}
+  {{ with .config }}
+  <div class="flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
+    {{ range $k, $v := . }}
+    <div class="py-3.5 px-5">
+      <span class="flex justify-between items-center">
+        <span class="font-mono font-bold text-primary-dark dark:text-primary">
+          {{ $k }}
+        </span>
+        <span class="flex justify-between space-x-1">
+          {{ if $v.common }}
+          {{ template "badge" (dict "word" "common" "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
+          {{ end }}
+
+          {{ if $v.required }}
+          {{ template "badge" (dict "word" "required" "text" "red-800" "bg" "red-100" "bg_dark" "red-600") }}
+          {{ else }}
+          {{ template "badge" (dict "word" "optional" "text" "gray-800" "bg" "gray-200" "bg_dark" "gray-500") }}
+          {{ end }}
+
+          {{ range $k, $v := $v.type }}
+          {{ $isArray := eq $k "array" }}
+          {{ if $isArray }}
+          {{ range $k, $v := $v.items.type }}
+          {{ $name := printf "[%s]" $k }}
+          {{ template "badge" (dict "word" $name "text" "gray-800" "bg" "gray-200" "bg_dark" "gray-500") }}
+          {{ end }}
+          {{ else }}
+          {{ template "badge" (dict "word" $k "text" "gray-800" "bg" "gray-200" "bg_dark" "gray-500") }}
+          {{ end }}
+
+          {{ if $v.enum }}
+          {{ template "badge" (dict "word" "enum" "text" "yellow-800" "bg" "yellow-200" "bg_dark" "yellow-600") }}
+          {{ end }}
+          {{ end }}
+        </span>
+      </span>
+
+      <div class="mt-2 leading-normal text-sm text-gray-600 dark:text-gray-300">
+        {{ $v.description | markdownify }}
+      </div>
+
+      {{ range $k, $v := $v.type }}
+      {{ with $v.enum }}
+      <div>
+        <p>
+          Enum options
+        </p>
+        {{ range $k, $v := . }}
+        <p>
+          <span>
+            <code>
+              {{- $k -}}
+            </code>
+          </span>
+
+          <span>
+            {{ $v }}
+          </span>
+        </p>
+        {{ end }}
+      </div>
+      {{ end }}
+
+      {{ with $v.examples }}
+      <div class="mt-2">
+        <p>
+          Example values
+        </p>
+
+        {{ range . }}
+        <span class="block">
+          <code>
+            {{- . -}}
+          </code>
+        </span>
+        {{ end }}
+      </div>
+      {{ end }}
+      {{ end }}
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+</div>
+
+{{ define "badge" }}
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-{{ .bg }} text-{{ .text }} dark:bg-{{ .bg_dark }} dark:text-gray-100">
+  {{ .word }}
+</span>
+{{ end }}

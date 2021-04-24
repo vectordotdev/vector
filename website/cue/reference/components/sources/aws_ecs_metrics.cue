@@ -95,8 +95,8 @@ components: sources: aws_ecs_metrics: {
 		}
 		version: {
 			description: """
-					The version of the metadata endpoint.
-					If empty, the version will be automatically discovered based on envirionment variables.
+				The version of the metadata endpoint. If empty, the version is automatically discovered based on
+				environment variables.
 				"""
 			common:   false
 			required: false
