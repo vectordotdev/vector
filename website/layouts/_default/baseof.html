@@ -4,7 +4,7 @@
   x-cloak
   x-data="{ dark: $store.global.dark }"
   x-on:toggle-dark="dark = !dark"
-  :class="{ 'dark': dark }"
+  :class="{ 'dark': dark, 'light': !dark }"
   class="h-screen">
 
   <head>

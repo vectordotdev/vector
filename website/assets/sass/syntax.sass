@@ -1,351 +1,713 @@
-$sx-1: black
-$sx-2: teal
-$sx-3: green
-$sx-4: grey
-$sx-5: red
-$sx-6: orange
-$sx-7: yellow
-$sx-8: magenta
-$sx-9: purple
-$sx-10: pink
-$sx-11: olive
-$sx-12: teal
 
-$bg-color: black
-$default-text-color: white
+// Code block highlighting
+
+// Global variables
 $padding: 0.8rem
+
+// Light theme variables
+$light-1: black
+$light-2: teal
+$light-3: green
+$light-4: grey
+$light-5: red
+$light-6: orange
+$light-7: yellow
+$light-8: magenta
+$light-9: purple
+$light-10: pink
+$light-11: olive
+$light-12: teal
+
+$light-bg-color: black
+$light-default-text-color: white
+
+// Dark theme variables
+$dark-1: black
+$dark-2: teal
+$dark-3: green
+$dark-4: grey
+$dark-5: red
+$dark-6: orange
+$dark-7: yellow
+$dark-8: magenta
+$dark-9: purple
+$dark-10: pink
+$dark-11: olive
+$dark-12: teal
+
+$dark-bg-color: black
+$dark-default-text-color: grey
 
 // Code blocks with no language specified
 .content pre, .chroma
-  background-color: $bg-color
-  color: $default-text-color
   padding: $padding
 
-.chroma
-  // Background
-  background-color: black
-
-  // Base text color
-  color: $default-text-color
-
-  // Other
-  .x
-
-  // Error
-  .err
-    color: $sx-8
-    //background-color: $sx-1
-
-  // LineTable TD
-  .lntd
-    vertical-align: top
-    padding: 0
-    margin: 0
-    border: 0
-
-  // LineTable
-  .lntable
-    border-spacing: 0
-    padding: 0
-    margin: 0
-    border: 0
-    width: auto
-    overflow: auto
-    display: block
-
-  // LineHighlight
-  .hl
-    display: block
-    width: 100%
-    background-color: $sx-5
-
-  // LineNumbersTable
-  .lnt
-    margin-right: 0.4em
-    padding: 0 0.4em 0 0.4em
-    color: $sx-4
-
-  // LineNumbers
-  .ln
-    margin-right: 0.4em
-    padding: 0 0.4em 0 0.4em
-    color: $sx-4
-
-  // Keyword
-  .k
-    font-weight: 600
-    color: $sx-2
-
-  // KeywordConstant
-  .kc
-    color: $sx-2
-
-  // KeywordDeclaration
-  .kd
-    color: $sx-2
-
-  // KeywordNamespace
-  .kn
-    color: $sx-7
-
-  // KeywordPseudo
-  .kp
-    color: $sx-2
-
-  // KeywordReserved
-  .kr
-    color: $sx-2
-
-  // KeywordType
-  .kt
-    color: $sx-2
-
-  // Name
-  .n
-
-  // NameAttribute
-  .na
-    color: $sx-3
-
-  // NameBuiltin
-  .nb
-
-  // NameBuiltinPseudo
-  .bp
-
-  // NameClass
-  .nc
-    color: $sx-3
-
-  // NameConstant
-  .no
-    color: $sx-2
-
-  // NameDecorator
-  .nd
-    color: $sx-3
+// Light theme code blocks
+.light
+  .content pre, .chroma
+    background-color: $light-bg-color
+    color: $light-default-text-color
+
+  .chroma
+    // Background
+    background-color: $light-bg-color
+
+    // Base text color
+    color: $light-default-text-color
+
+    // Other
+    .x
+
+    // Error
+    .err
+      color: $light-8
+      //background-color: $sx-1
+
+    // LineTable TD
+    .lntd
+      vertical-align: top
+      padding: 0
+      margin: 0
+      border: 0
+
+    // LineTable
+    .lntable
+      border-spacing: 0
+      padding: 0
+      margin: 0
+      border: 0
+      width: auto
+      overflow: auto
+      display: block
+
+    // LineHighlight
+    .hl
+      display: block
+      width: 100%
+      background-color: $light-5
+
+    // LineNumbersTable
+    .lnt
+      margin-right: 0.4em
+      padding: 0 0.4em 0 0.4em
+      color: $light-4
+
+    // LineNumbers
+    .ln
+      margin-right: 0.4em
+      padding: 0 0.4em 0 0.4em
+      color: $light-4
+
+    // Keyword
+    .k
+      font-weight: 600
+      color: $light-2
+
+    // KeywordConstant
+    .kc
+      color: $light-2
+
+    // KeywordDeclaration
+    .kd
+      color: $light-2
+
+    // KeywordNamespace
+    .kn
+      color: $light-7
+
+    // KeywordPseudo
+    .kp
+      color: $light-2
+
+    // KeywordReserved
+    .kr
+      color: $light-2
+
+    // KeywordType
+    .kt
+      color: $light-2
+
+    // Name
+    .n
+
+    // NameAttribute
+    .na
+      color: $light-3
+
+    // NameBuiltin
+    .nb
+
+    // NameBuiltinPseudo
+    .bp
+
+    // NameClass
+    .nc
+      color: $light-3
 
-  // NameEntity
-  .ni
+    // NameConstant
+    .no
+      color: $light-2
 
-  // NameException
-  .ne
-    color: $sx-3
+    // NameDecorator
+    .nd
+      color: $light-3
 
-  // NameFunction
-  .nf
-    color: $sx-3
+    // NameEntity
+    .ni
 
-  // NameFunctionMagic
-  .fm
+    // NameException
+    .ne
+      color: $light-3
 
-  // NameLabel
-  .nl
+    // NameFunction
+    .nf
+      color: $light-3
 
-  // NameNamespace
-  .nn
+    // NameFunctionMagic
+    .fm
 
-  // NameOther
-  .nx
-    color: $sx-3
+    // NameLabel
+    .nl
 
-  // NameProperty
-  .py
+    // NameNamespace
+    .nn
 
-  // NameTag
-  .nt
-    color: $sx-7
+    // NameOther
+    .nx
+      color: $light-3
 
-  // NameVariable
-  .nv
+    // NameProperty
+    .py
 
-  // NameVariableClass
-  .vc
+    // NameTag
+    .nt
+      color: $light-7
 
-  // NameVariableGlobal
-  .vg
+    // NameVariable
+    .nv
 
-  // NameVariableInstance
-  .vi
+    // NameVariableClass
+    .vc
 
-  // NameVariableMagic
-  .vm
+    // NameVariableGlobal
+    .vg
 
-  // Literal
-  .l
-    color: $sx-10
+    // NameVariableInstance
+    .vi
 
-  // LiteralDate
-  .ld
-    color: $sx-12
+    // NameVariableMagic
+    .vm
 
-  // LiteralString
-  .s
-    color: $sx-12
+    // Literal
+    .l
+      color: $light-10
 
-  // LiteralStringAffix
-  .sa
-    color: $sx-12
+    // LiteralDate
+    .ld
+      color: $light-12
 
-  // LiteralStringBacktick
-  .sb
-    color: $sx-12
+    // LiteralString
+    .s
+      color: $light-12
 
-  // LiteralStringChar
-  .sc
-    color: $sx-12
+    // LiteralStringAffix
+    .sa
+      color: $light-12
 
-  // LiteralStringDelimiter
-  .dl
-    color: $sx-12
+    // LiteralStringBacktick
+    .sb
+      color: $light-12
 
-  // LiteralStringDoc
-  .sd
-    color: $sx-12
+    // LiteralStringChar
+    .sc
+      color: $light-12
 
-  // LiteralStringDouble
-  .s2
-    color: $sx-12
+    // LiteralStringDelimiter
+    .dl
+      color: $light-12
 
-  // LiteralStringEscape
-  .se
-    color: $sx-10
+    // LiteralStringDoc
+    .sd
+      color: $light-12
 
-  // LiteralStringHeredoc
-  .sh
-    color: $sx-12
+    // LiteralStringDouble
+    .s2
+      color: $light-12
 
-  // LiteralStringInterpol
-  .si
-    color: $sx-12
+    // LiteralStringEscape
+    .se
+      color: $light-10
 
-  // LiteralStringOther
-  .sx
-    color: $sx-12
+    // LiteralStringHeredoc
+    .sh
+      color: $light-12
 
-  // LiteralStringRegex
-  .sr
-    color: $sx-12
+    // LiteralStringInterpol
+    .si
+      color: $light-12
 
-  // LiteralStringSingle
-  .s1
-    color: $sx-12
+    // LiteralStringOther
+    .sx
+      color: $light-12
 
-  // LiteralStringSymbol
-  .ss
-    color: $sx-12
+    // LiteralStringRegex
+    .sr
+      color: $light-12
 
-  // LiteralNumber
-  .m
-    color: $sx-10
+    // LiteralStringSingle
+    .s1
+      color: $light-12
 
-  // LiteralNumberBin
-  .mb
-    color: $sx-10
+    // LiteralStringSymbol
+    .ss
+      color: $light-12
 
-  // LiteralNumberFloat
-  .mf
-    color: $sx-10
+    // LiteralNumber
+    .m
+      color: $light-10
 
-  // LiteralNumberHex
-  .mh
-    color: $sx-10
+    // LiteralNumberBin
+    .mb
+      color: $light-10
 
-  // LiteralNumberInteger
-  .mi
-    color: $sx-10
+    // LiteralNumberFloat
+    .mf
+      color: $light-10
 
-  // LiteralNumberIntegerLong
-  .il
-    color: $sx-10
+    // LiteralNumberHex
+    .mh
+      color: $light-10
 
-  // LiteralNumberOct
-  .mo
-    color: $sx-10
+    // LiteralNumberInteger
+    .mi
+      color: $light-10
 
-  // Operator
-  .o
-    color: $sx-7
+    // LiteralNumberIntegerLong
+    .il
+      color: $light-10
 
-  // OperatorWord
-  .ow
-    color: $sx-7
+    // LiteralNumberOct
+    .mo
+      color: $light-10
 
-  // Punctuation
-  .p
-    color: $sx-2
+    // Operator
+    .o
+      color: $light-7
 
-  // Comment
-  .c
-    color: $sx-6
+    // OperatorWord
+    .ow
+      color: $light-7
 
-  // CommentHashbang
-  .ch
-    color: $sx-6
+    // Punctuation
+    .p
+      color: $light-2
 
-  // CommentMultiline
-  .cm
-    color: $sx-6
+    // Comment
+    .c
+      color: $light-6
 
-  // CommentSingle
-  .c1
-    color: $sx-6
+    // CommentHashbang
+    .ch
+      color: $light-6
 
-  // CommentSpecial
-  .cs
-    color: $sx-6
+    // CommentMultiline
+    .cm
+      color: $light-6
 
-  // CommentPreproc
-  .cp
-    color: $sx-6
+    // CommentSingle
+    .c1
+      color: $light-6
 
-  // CommentPreprocFile
-  .cpf
-    color: $sx-6
+    // CommentSpecial
+    .cs
+      color: $light-6
 
-  // Generic
-  .g
+    // CommentPreproc
+    .cp
+      color: $light-6
 
-  // GenericDeleted
-  .gd
-    color: $sx-7
+    // CommentPreprocFile
+    .cpf
+      color: $light-6
 
-  // GenericEmph
-  .ge
-    font-style: italic
+    // Generic
+    .g
 
-  // GenericError
-  .gr
+    // GenericDeleted
+    .gd
+      color: $light-7
 
-  // GenericHeading
-  .gh
+    // GenericEmph
+    .ge
+      font-style: italic
 
-  // GenericInserted
-  .gi
-    color: $sx-3
+    // GenericError
+    .gr
 
-  // GenericOutput
-  .go
+    // GenericHeading
+    .gh
 
-  // GenericPrompt
-  .gp
+    // GenericInserted
+    .gi
+      color: $light-3
 
-  // GenericStrong
-  .gs
-    font-weight: 700
+    // GenericOutput
+    .go
 
-  // GenericSubheading
-  .gu
+    // GenericPrompt
+    .gp
 
-  // GenericSubheading
-  .gu
-    color: $sx-9
+    // GenericStrong
+    .gs
+      font-weight: 700
 
-  // GenericTraceback
-  .gt
+    // GenericSubheading
+    .gu
 
-  // GenericUnderline
-  .gl
+    // GenericSubheading
+    .gu
+      color: $light-9
 
-  // TextWhitespace
-  .w
+    // GenericTraceback
+    .gt
+
+    // GenericUnderline
+    .gl
+
+    // TextWhitespace
+    .w
+
+// Dark theme code blocks
+.dark
+  .content pre, .chroma
+    background-color: $dark-bg-color
+    color: $dark-default-text-color
+
+  .chroma
+    // Background
+    background-color: $dark-bg-color
+
+    // Base text color
+    color: $dark-default-text-color
+
+    // Other
+    .x
+
+    // Error
+    .err
+      color: $dark-8
+      //background-color: $sx-1
+
+    // LineTable TD
+    .lntd
+      vertical-align: top
+      padding: 0
+      margin: 0
+      border: 0
+
+    // LineTable
+    .lntable
+      border-spacing: 0
+      padding: 0
+      margin: 0
+      border: 0
+      width: auto
+      overflow: auto
+      display: block
+
+    // LineHighlight
+    .hl
+      display: block
+      width: 100%
+      background-color: $dark-5
+
+    // LineNumbersTable
+    .lnt
+      margin-right: 0.4em
+      padding: 0 0.4em 0 0.4em
+      color: $dark-4
+
+    // LineNumbers
+    .ln
+      margin-right: 0.4em
+      padding: 0 0.4em 0 0.4em
+      color: $dark-4
+
+    // Keyword
+    .k
+      font-weight: 600
+      color: $dark-2
+
+    // KeywordConstant
+    .kc
+      color: $dark-2
+
+    // KeywordDeclaration
+    .kd
+      color: $dark-2
+
+    // KeywordNamespace
+    .kn
+      color: $dark-7
+
+    // KeywordPseudo
+    .kp
+      color: $dark-2
+
+    // KeywordReserved
+    .kr
+      color: $dark-2
+
+    // KeywordType
+    .kt
+      color: $dark-2
+
+    // Name
+    .n
+
+    // NameAttribute
+    .na
+      color: $dark-3
+
+    // NameBuiltin
+    .nb
+
+    // NameBuiltinPseudo
+    .bp
+
+    // NameClass
+    .nc
+      color: $dark-3
+
+    // NameConstant
+    .no
+      color: $dark-2
+
+    // NameDecorator
+    .nd
+      color: $dark-3
+
+    // NameEntity
+    .ni
+
+    // NameException
+    .ne
+      color: $dark-3
+
+    // NameFunction
+    .nf
+      color: $dark-3
+
+    // NameFunctionMagic
+    .fm
+
+    // NameLabel
+    .nl
+
+    // NameNamespace
+    .nn
+
+    // NameOther
+    .nx
+      color: $dark-3
+
+    // NameProperty
+    .py
+
+    // NameTag
+    .nt
+      color: $dark-7
+
+    // NameVariable
+    .nv
+
+    // NameVariableClass
+    .vc
+
+    // NameVariableGlobal
+    .vg
+
+    // NameVariableInstance
+    .vi
+
+    // NameVariableMagic
+    .vm
+
+    // Literal
+    .l
+      color: $dark-10
+
+    // LiteralDate
+    .ld
+      color: $dark-12
+
+    // LiteralString
+    .s
+      color: $dark-12
+
+    // LiteralStringAffix
+    .sa
+      color: $dark-12
+
+    // LiteralStringBacktick
+    .sb
+      color: $dark-12
+
+    // LiteralStringChar
+    .sc
+      color: $dark-12
+
+    // LiteralStringDelimiter
+    .dl
+      color: $dark-12
+
+    // LiteralStringDoc
+    .sd
+      color: $dark-12
+
+    // LiteralStringDouble
+    .s2
+      color: $dark-12
+
+    // LiteralStringEscape
+    .se
+      color: $dark-10
+
+    // LiteralStringHeredoc
+    .sh
+      color: $dark-12
+
+    // LiteralStringInterpol
+    .si
+      color: $dark-12
+
+    // LiteralStringOther
+    .sx
+      color: $dark-12
+
+    // LiteralStringRegex
+    .sr
+      color: $dark-12
+
+    // LiteralStringSingle
+    .s1
+      color: $dark-12
+
+    // LiteralStringSymbol
+    .ss
+      color: $dark-12
+
+    // LiteralNumber
+    .m
+      color: $dark-10
+
+    // LiteralNumberBin
+    .mb
+      color: $dark-10
+
+    // LiteralNumberFloat
+    .mf
+      color: $dark-10
+
+    // LiteralNumberHex
+    .mh
+      color: $dark-10
+
+    // LiteralNumberInteger
+    .mi
+      color: $dark-10
+
+    // LiteralNumberIntegerLong
+    .il
+      color: $dark-10
+
+    // LiteralNumberOct
+    .mo
+      color: $dark-10
+
+    // Operator
+    .o
+      color: $dark-7
+
+    // OperatorWord
+    .ow
+      color: $dark-7
+
+    // Punctuation
+    .p
+      color: $dark-2
+
+    // Comment
+    .c
+      color: $dark-6
+
+    // CommentHashbang
+    .ch
+      color: $dark-6
+
+    // CommentMultiline
+    .cm
+      color: $dark-6
+
+    // CommentSingle
+    .c1
+      color: $dark-6
+
+    // CommentSpecial
+    .cs
+      color: $dark-6
+
+    // CommentPreproc
+    .cp
+      color: $dark-6
+
+    // CommentPreprocFile
+    .cpf
+      color: $dark-6
+
+    // Generic
+    .g
+
+    // GenericDeleted
+    .gd
+      color: $dark-7
+
+    // GenericEmph
+    .ge
+      font-style: italic
+
+    // GenericError
+    .gr
+
+    // GenericHeading
+    .gh
+
+    // GenericInserted
+    .gi
+      color: $dark-3
+
+    // GenericOutput
+    .go
+
+    // GenericPrompt
+    .gp
+
+    // GenericStrong
+    .gs
+      font-weight: 700
+
+    // GenericSubheading
+    .gu
+
+    // GenericSubheading
+    .gu
+      color: $dark-9
+
+    // GenericTraceback
+    .gt
+
+    // GenericUnderline
+    .gl
+
+    // TextWhitespace
+    .w
