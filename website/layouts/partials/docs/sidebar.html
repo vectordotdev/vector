@@ -1,71 +1,45 @@
 {{ $sections := where site.Sections "Section" "docs" }}
-{{ $page := . }}
+{{ $here := .RelPermalink }}
+{{ $section := .CurrentSection }}
 {{ $metaLinks := site.Menus.meta }}
 
+{{/* Iterate through all docs sections, including the root */}}
 {{ range $sections }}
-{{ $isActive := eq $page.RelPermalink .RelPermalink }}
-{{ $title := .Params.short | default .Title }}
 <div class="flex flex-col space-y-4">
-  <a class="uppercase font-semibold dark:text-gray-200 text-gray-600{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}" href="{{ .RelPermalink }}">
-    {{ $title }}
-  </a>
+  {{ template "heading" (dict "here" $here "url" .RelPermalink "title" (.Params.short | default .Title )) }}
 
   {{ with .Sections }}
   {{ range . }}
-  {{ template "section" (dict "ctx" . "page" $page) }}
+  {{ template "section" (dict "ctx" . "here" $here "section" $section) }}
   {{ end }}
   {{ end }}
   {{ end }}
 
   {{/* Extra "meta" links specified in config.toml (external links outside our doc tree) */}}
   <div>
-    <p class="uppercase font-semibold dark:text-gray-200 text-gray-600">
-      Meta
-    </p>
+    {{ template "heading" (dict "title" "Meta") }}
 
     <div class="flex flex-col space-y-0.5 mt-1.5">
-      {{ range $metaLinks  }}
-      <p class="flex items-start">
-        <a class="block dark:text-gray-400 text-gray-600" href="{{ .URL }}" target="_blank">
-          <span class="flex justify-between items-start">
-            <span>
-              {{ .Name }}
-            </span>
-
-            {{/* Heroicon: outline/external-link */}}
-            <svg xmlns="http://www.w3.org/2000/svg" class="pl-0.5 dark:text-gray-400 text-gray-400 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-          </span>
-        </a>
-      </p>
-      {{ end }}
+      {{ template "meta-menu" $metaLinks }}
     </div>
   </div>
 </div>
 
 {{ define "section" }}
-{{ $page := .page }}
-{{ $isActive := eq $page.RelPermalink .ctx.RelPermalink }}
-{{ $title := .ctx.Params.short | default .ctx.Title }}
+{{ $here := .here }}
+{{ $section := .section }}
 <div>
-  <a class="uppercase font-semibold dark:text-gray-200 text-gray-600{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}" href="{{ .ctx.RelPermalink }}">
-    {{ $title }}
-  </a>
+  {{ template "heading" (dict "here" $here "url" .ctx.RelPermalink "title" (.ctx.Params.short | default .ctx.Title )) }}
 
   <div class="flex flex-col space-y-0.5 mt-1.5">
     {{ with .ctx.Sections }}
     {{ range . }}
-    {{ $title := .Params.short | default .Title }}
-    {{ $isActive := eq $page.RelPermalink .RelPermalink }}
-    {{ $open := .IsAncestor $page.CurrentSection }}
+    {{ $open := .IsAncestor $section }}
     <div x-data="{ open: {{ $open }} }">
       <p class="flex justify-between items-center">
-        <a href="{{ .RelPermalink }}" class="dark:text-gray-400 text-gray-600{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}">
-          {{ $title }}
-        </a>
+        {{ template "link" (dict "here" $here "url" .RelPermalink "title" (.Params.short | default .Title )) }}
 
-        {{ template "chevron" }}
+        {{ template "chevron-icon" }}
       </p>
 
       {{ with .Pages }}
@@ -73,15 +47,11 @@
         <div class="flex flex-col space-y-0.5 pl-3 border-l-2 border-gray-300 dark:border-gray-600 py-0.5 my-1">
           {{ range . }}
           {{ if .IsSection }}
-          {{ template "subsection-group" (dict "ctx" . "page" $page) }}
+          {{ template "subsection-group" (dict "ctx" . "here" $here "section" $section) }}
           {{ end }}
 
           {{ if .IsPage }}
-          {{ $isActive := eq $page.RelPermalink .RelPermalink }}
-          {{ $title := .Params.short | default .Title }}
-          <a class="block dark:text-gray-400 text-gray-600{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}" href="{{ .RelPermalink }}">
-            {{ $title }}
-          </a>
+          {{ template "link" (dict "here" $here "url" .RelPermalink "title" (.Params.short | default .Title)) }}
           {{ end }}
           {{ end }}
         </div>
@@ -93,11 +63,7 @@
 
     {{ with .ctx.RegularPages }}
     {{ range . }}
-    {{ $isActive := eq $page.RelPermalink .RelPermalink }}
-    {{ $title := .Params.short | default .Title }}
-    <a class="block dark:text-gray-400 text-gray-600{{ if $isActive }} font-semibold text-secondary dark:text-primary{{ end }}" href="{{ .RelPermalink }}">
-      {{ $title }}
-    </a>
+    {{ template "link" (dict "here" $here "url" .RelPermalink "title" (.Params.short | default .Title )) }}
     {{ end }}
     {{ end }}
   </div>
@@ -105,44 +71,80 @@
 {{ end }}
 
 {{ define "subsection-group" }}
-{{ $page := .page }}
-{{ $isActive := eq .page.RelPermalink .ctx.RelPermalink }}
-{{ $open := .ctx.IsAncestor $page.CurrentSection }}
-{{ $title := .ctx.Params.short | default .ctx.Title }}
+{{ $here := .here }}
+{{ $section := .section }}
+{{ $open := .ctx.IsAncestor $section }}
 <div x-data="{ open: {{ $open }} }">
   <p class="flex justify-between items-center">
-    <a href="{{ .ctx.RelPermalink }}" class="dark:text-gray-400 text-gray-600{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}">
-      {{ $title }}
-    </a>
+    {{ template "link" (dict "here" $here "url" .RelPermalink "title" (.ctx.Params.short | default .ctx.Title)) }}
 
-    {{ template "chevron" }}
+    {{ template "chevron-icon" }}
   </p>
 
   <div x-show.transition.duration.300ms="open" class="flex flex-col space-y-0.5 pl-3 my-0.5">
     {{ with .ctx.Sections }}
     {{ range . }}
-    {{ template "subsection-group" (dict "ctx" . "page" $page) }}
+    {{ template "subsection-group" (dict "ctx" . "here" $here "section" $section) }}
     {{ end }}
     {{ end }}
 
     {{ with .ctx.RegularPages }}
     {{ range . }}
-    {{ $isActive := eq $page.RelPermalink .RelPermalink }}
-    {{ $title := .Params.short | default .Title }}
-    <a class="block text-gray-500 dark:text-gray-400{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}" href="{{ .RelPermalink }}">
-      {{ $title }}
-    </a>
+    {{ template "link" (dict "here" $here "url" .RelPermalink "title" (.Params.short | default .Title )) }}
     {{ end }}
     {{ end }}
   </div>
 </div>
 {{ end }}
 
-{{ define "chevron" }}
+{{ define "heading" }}
+{{ $isActive := eq .here .url }}
+{{ if .url }}
+<a class="uppercase font-semibold dark:text-gray-200 text-gray-600 dark:hover:text-purple hover:text-purple{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}" href="{{ .url }}">
+  {{ .title }}
+</a>
+{{ else }}
+<p class="uppercase font-semibold dark:text-gray-200 text-gray-600 dark:hover:text-purple hover:text-purple">
+  {{ .title }}
+</p>
+{{ end }}
+{{ end }}
+
+{{ define "link" }}
+{{ $isActive := eq .here .url }}
+<a href="{{ .url }}" class="block dark:text-gray-400 text-gray-600 dark:hover:text-purple hover:text-purple{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}">
+  {{ .title }}
+</a>
+{{ end }}
+
+{{ define "chevron-icon" }}
 <a @click="open = !open" class="cursor-pointer">
   {{/* Heroicon: outline/chevron-right */}}
   <svg :class="{ 'transform rotate-90 text-secondary dark:text-primary': open }" class="dark:text-gray-300 text-gray-500 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
   </svg>
 </a>
+{{ end }}
+
+{{ define "external-link-icon" }}
+{{/* Heroicon: outline/external-link */}}
+<svg xmlns="http://www.w3.org/2000/svg" class="pl-0.5 dark:text-gray-400 text-gray-400 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+</svg>
+{{ end }}
+
+{{ define "meta-menu" }}
+{{ range .  }}
+<p class="flex items-start">
+  <a class="block dark:text-gray-400 text-gray-600 dark:hover:text-purple hover:text-purple" href="{{ .URL }}" target="_blank">
+    <span class="flex justify-between items-start">
+      <span>
+        {{ .Name }}
+      </span>
+
+      {{ template "external-link-icon" }}
+    </span>
+  </a>
+</p>
+{{ end }}
 {{ end }}
