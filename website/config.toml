@@ -65,6 +65,7 @@ discord = "https://chat.vector.dev"
 [[menu.navbar]]
 name = "Docs"
 url = "/docs"
+params = { flyout = true }
 weight = 1
 
 [[menu.navbar]]
@@ -237,3 +238,68 @@ weight = 1
 name = "Privacy policy"
 url = "https://github.com/timberio/vector/blob/master/PRIVACY.md"
 weight = 2
+
+[[menu.flyout]]
+name = "Documentation"
+identifier = "docs"
+url = "/docs"
+weight = 1
+
+[[menu.flyout]]
+name = "Quickstart"
+parent = "docs"
+url = "/docs/setup/quickstart"
+weight = 1
+
+[[menu.flyout]]
+name = "Components"
+identifier = "components"
+url = "/components"
+weight = 2
+
+[[menu.flyout]]
+name = "Sources"
+parent = "components"
+url = "/docs/reference/configuration/sources"
+weight = 1
+
+[[menu.flyout]]
+name = "Transforms"
+parent = "components"
+url = "/docs/reference/configuration/transforms"
+weight = 2
+
+[[menu.flyout]]
+name = "Sinks"
+parent = "components"
+url = "/docs/reference/configuration/sinks"
+weight = 3
+
+[[menu.flyout]]
+name = "Vector Remap Language"
+identifier = "vrl"
+url = "/docs/reference/vrl"
+weight = 3
+
+[[menu.flyout]]
+name = "Functions"
+parent = "vrl"
+url = "/docs/reference/vrl/functions"
+weight = 1
+
+[[menu.flyout]]
+name = "Errors"
+parent = "vrl"
+url = "/docs/reference/vrl/errors"
+weight = 2
+
+[[menu.flyout]]
+name = "Examples"
+parent = "vrl"
+url = "/docs/reference/vrl/examples"
+weight = 3
+
+[[menu.flyout]]
+name = "Other"
+identifier = "other"
+weight = 4

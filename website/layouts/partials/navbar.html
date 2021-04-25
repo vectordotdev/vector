@@ -1,6 +1,6 @@
 {{ $here := .RelPermalink }}
 {{ $menu := site.Menus.navbar }}
-<nav class="z-50 dark:bg-dark dark:border-gray-800 border-b" x-data="{ open: false }">
+<nav class="z-50 dark:bg-dark dark:border-gray-800 border-b" x-data="{ open: false, flyout: false }">
   <div class="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
     <div class="relative flex items-center justify-between h-16">
       <div class="flex items-center px-2 lg:px-0">
@@ -13,8 +13,21 @@
           <div class="flex space-x-4">
             {{ range $menu }}
             {{ $isActive := hasPrefix $here .URL }}
-            <a href="{{ .URL }}" class="dark:text-gray-300 dark:hover:text-secondary tracking-tight hover:text-primary px-2.5 py-1.5 rounded-sm text-normal font-normal{{ if $isActive }} dark:text-primary text-secondary{{ end }}">
-              {{ .Name }}
+            <a href="{{ .URL }}" class="flex items-center tracking-tight px-2.5 py-1.5 rounded-sm text-normal font-normal">
+              <span class="dark:text-gray-300 hover:text-primary dark:hover:text-secondary{{ if $isActive }} dark:text-primary text-secondary{{ end }}">
+                {{ .Name }}
+              </span>
+              {{ if .Params.flyout }}
+              <span :class="{ 'transform rotate-180': flyout }" class="cursor-pointer ml-1 dark:text-gray-300 text-black" @mouseover="flyout = true">
+                <svg x-show="!flyout" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+
+                <svg x-show="flyout" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
+                </svg>
+              </span>
+              {{ end }}
             </a>
             {{ end }}
           </div>
@@ -68,7 +81,7 @@
   </div>
 
   {{/* Mobile menu */}}
-  <div x-show="open" @click.away="open = false" class="dark:shadow-none dark:bg-gray-900 bg-white lg:hidden absolute w-full shadow" id="mobile-menu">
+  <div x-show="open" @click.away="open = false" class="z-10 dark:shadow-none dark:bg-gray-900 bg-white lg:hidden absolute w-full shadow" id="mobile-menu">
     <div class="px-2 pt-2 pb-3 space-y-1">
       {{ range $menu }}
       {{ $isActive := hasPrefix $here .URL }}
@@ -82,4 +95,7 @@
       {{ partial "social-buttons.html" (dict "color" true) }}
     </div>
   </div>
+
+  {{/* Docs flyout menu */}}
+  {{ partial "flyout-menu.html" . }}
 </nav>
