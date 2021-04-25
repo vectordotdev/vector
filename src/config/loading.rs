@@ -87,6 +87,18 @@ pub fn load_from_paths(config_paths: &[(PathBuf, FormatHint)]) -> Result<Config,
     Ok(config)
 }
 
+pub async fn load_with_provider_from_paths() -> Result<Config, Vec<String>> {
+    let (builder, load_warnings) = load_builder_from_paths(config_paths)?;
+
+    // If a provider is present, initialize and attempt to retrieve config.
+    match builder.provider {
+        Some(provider) => {
+
+        },
+        _ => 
+    }
+}
+
 pub fn load_builder_from_paths(
     config_paths: &[(PathBuf, FormatHint)],
 ) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {

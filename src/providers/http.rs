@@ -51,7 +51,7 @@ impl Default for HttpConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl ProviderConfig for HttpConfig {
-    async fn build(&mut self) -> Result<ProviderRx, &'static str> {
+    async fn build(&mut self) -> Result<String, &'static str> {
         let url = self
             .url
             .take()

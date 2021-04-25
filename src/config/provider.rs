@@ -1,12 +1,14 @@
 use super::{component::ExampleError, GenerateConfig};
-use crate::providers::ProviderRx;
+use crate::signal::SignalTx;
 use async_trait::async_trait;
 use toml::Value;
 
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait ProviderConfig: core::fmt::Debug + Send + Sync + dyn_clone::DynClone {
-    async fn build(&mut self) -> Result<ProviderRx, &'static str>;
+    /// Builds a provider, returning a string containing the config. It's passed a signals
+    /// channel to control reloading and shutdown, as applicable.
+    async fn build(&mut self, signal_tx: SignalTx) -> Result<String, &'static str>;
     fn provider_type(&self) -> &'static str;
 }
 
@@ -46,14 +48,14 @@ where
 
 inventory::collect!(ProviderDescription);
 
-/// Takes an optional provider. If the provider builds successfully, it returns a `ProviderRx`
-/// channel for receiving control messages from the provider.
-pub async fn init_provider(provider: Option<Box<dyn ProviderConfig>>) -> Option<ProviderRx> {
+/// Takes an optional provider. If the provider builds successfully, it returns a string
+/// containing the initial configuration.
+pub async fn init_provider(provider: Option<Box<dyn ProviderConfig>>) -> Option<String> {
     match provider {
         Some(mut provider) => match provider.build().await {
-            Ok(provider_rx) => {
+            Ok(config) => {
                 debug!(message = "Provider configured.", provider = ?provider.provider_type());
-                Some(provider_rx)
+                Some(config)
             }
             Err(err) => {
                 error!(message = "Provider error.", error = ?err);

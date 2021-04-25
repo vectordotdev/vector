@@ -53,7 +53,6 @@ pub struct Config {
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
-    pub provider: Option<Box<dyn provider::ProviderConfig>>,
     tests: Vec<TestDefinition>,
     expansions: IndexMap<String, Vec<String>>,
 }

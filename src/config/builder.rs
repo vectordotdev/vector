@@ -161,4 +161,6 @@ impl ConfigBuilder {
 
         Ok(())
     }
+
+    pub async fn try_provider() -> Result(Option<String>, Vec<String>) {}
 }

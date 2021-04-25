@@ -1,8 +1,6 @@
 use crate::{
     cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubCommand},
-    config,
-    control::{Control, Controller},
-    generate, heartbeat, list, metrics, signal,
+    config, generate, heartbeat, list, metrics, signal,
     topology::{self, RunningTopology},
     trace, unit_test, validate,
 };
@@ -145,6 +143,10 @@ impl Application {
                         })?;
                 }
 
+                // Signal handler for OS and provider messages.
+                let mut signal_handler = signal::SignalHandler::new();
+                signal_handler.add(signal::os_signals());
+
                 info!(
                     message = "Loading configs.",
                     path = ?config_paths
@@ -232,12 +234,7 @@ impl Application {
                 }
             );
 
-            // Controller for handling control messages.
-            let mut controller = Controller::new();
 
-            // Handle OS signals.
-            let signals = signal::signals();
-            controller.handler(signals);
 
             // Configure the provider, if applicable.
             let mut _provider = config::provider::init_provider(provider)
