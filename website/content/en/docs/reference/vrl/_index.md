@@ -18,7 +18,7 @@ VRL programs act on a single observability event and can be used to:
 
 Those programs are specified as part of your Vector [configuration]. Here's an example `remap` transform that contains a VRL program in the `source` field:
 
-```toml
+```toml {title="vector.toml"}
 [transforms.modify]
 type = "remap"
 inputs = ["logs"]
@@ -68,7 +68,7 @@ Finally, the resulting event:
 
 The JSON parsing program in the example above modifies the contents of each event. But you can also use VRL to specify conditions, which convert events into a single Boolean expression. Here's an example [`filter`][filter] transform that filters out all messages for which the `severity` field equals `"info"`:
 
-```toml
+```toml {title="vector.toml"}
 [transforms.filter_out_info]
 type = "filter"
 inputs = ["logs"]

@@ -50,8 +50,8 @@ module.exports = {
               }
             },
             '.highlight, .highlight pre.chroma': {
-              'margin-top': '0.75rem',
-              'margin-bottom': '0.75rem',
+              'margin-top': '0.5rem',
+              'margin-bottom': '0.5rem',
             }
           }
         },
