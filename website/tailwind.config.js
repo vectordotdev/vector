@@ -90,9 +90,6 @@ module.exports = {
                 padding: 0,
               }
             },
-            '.highlight': {
-              width: '100%',
-            }
           }
         }
       }),

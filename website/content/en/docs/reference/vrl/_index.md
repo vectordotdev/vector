@@ -47,7 +47,7 @@ You want to apply these changes to each event:
 
 This VRL program would accomplish all of that:
 
-```vrl
+```ruby
 . = parse_json!(string!(.message))
 .timestamp = to_unix_timestamp(to_timestamp!(.timestamp))
 del(.username)
@@ -181,13 +181,13 @@ Like Vector, VRL is built with [Rust] and compiles to native Rust code. Therefor
 
 VRL strives to provide high-quality, helpful error messages, streamling the development and iteration workflow around VRL programs. This VRL program, for example...
 
-```vrl
+```ruby
 .foo, err = upcase(.foo)
 ```
 
 ...would result in this error:
 
-```vrl
+```ruby
 error: program aborted
   ┌─ :2:1
   │
@@ -213,7 +213,7 @@ VRL implements *progressive* [type safety](#type-safety), erroring at [compile t
 
   VRL's type safety is *progressive*, meaning that it implements type safety for any value for which it knows the type. Because observability data can be quite unpredictable, it's not always known which type a field might be, hence the progressive nature of VRL's type-safety. As VRL scripts are evaluated, type information is built up and used at compile-time to enforce type-safety. Let's look at an example:
 
-  ```vrl
+  ```ruby
   .foo # any
   .foo = downcase!(.foo) # string
   .foo = upcase(.foo) # string
@@ -228,7 +228,7 @@ VRL implements *progressive* [type safety](#type-safety), erroring at [compile t
 
   To avoid error handling for argument errors, you can specify the types of your fields at the top of your VRL script:
 
-  ```vrl
+  ```ruby
   .foo = string!(.foo) # string
 
   .foo = downcase(.foo) # string

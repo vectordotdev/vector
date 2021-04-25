@@ -1,14 +1,15 @@
 {{/* Used by several shortcodes to display config-style info (CLI, API, VRL functions, etc.) */}}
 {{ $componentType := .type }}
 {{ $tag := .tag }}
-<div class="w-full border dark:border-gray-700 rounded-md">
+<div class="relative no-prose w-full border dark:border-gray-700 rounded-md">
   {{/* Source/transform/sink config */}}
   {{ with .config }}
   <div class="flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
     {{ range $k, $v := . }}
+    {{ if ne $k "type" }}
     <div class="py-3.5 px-5">
       <span class="flex justify-between items-center">
-        <span class="font-mono font-bold text-primary-dark dark:text-primary">
+        <span class="font-mono font-bold text-lg text-primary-dark dark:text-primary">
           {{ $k }}
         </span>
         <span class="flex justify-between space-x-1">
@@ -40,49 +41,84 @@
         </span>
       </span>
 
-      <div class="mt-2 leading-normal text-sm text-gray-600 dark:text-gray-300">
+      <div class="my-3 leading-normal text-gray-600 dark:text-gray-300">
         {{ $v.description | markdownify }}
       </div>
 
       {{ range $k, $v := $v.type }}
-      {{ with $v.enum }}
-      <div>
-        <p>
-          Enum options
-        </p>
-        {{ range $k, $v := . }}
-        <p>
-          <span>
-            <code>
-              {{- $k -}}
-            </code>
-          </span>
-
-          <span>
-            {{ $v | markdownify }}
-          </span>
-        </p>
-        {{ end }}
-      </div>
+      {{ if .default }}
+      <p>
+        Default: <code>{{ .default }}</code>{{ with .unit }} ({{ . }}){{ end }}
+      </p>
       {{ end }}
 
-      {{ with $v.examples }}
-      <div class="mt-2">
-        <p>
-          Example values
-        </p>
+      {{ with .items.type }}
+      {{ range $k, $v := . }}
+      <div class="mt-3 border dark:border-gray-700 rounded">
+        <div class="py-2.5 px-4">
+          <div class="flex justify-between">
+            <span>
+              Array
+            </span>
 
-        {{ range . }}
-        <span class="block">
-          <code>
-            {{- . -}}
-          </code>
-        </span>
-        {{ end }}
+            <span class="flex space-x-1">
+              <span>
+                {{ template "badge" (dict "word" $k "text" "gray-800" "bg" "gray-200" "bg_dark" "gray-500") }}
+              </span>
+
+              <span>
+                {{ template "badge" (dict "word" $v.syntax "text" "gray-800" "bg" "gray-200" "bg_dark" "gray-500") }}
+              </span>
+            </span>
+          </div>
+
+          <p>
+            Examples:
+          </p>
+
+          {{ range $v.examples }}
+          <p class="block">
+            <span>
+              &rarr;
+            </span>
+            <code>
+              {{- . -}}
+            </code>
+          </p>
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+      {{ end }}
+
+      {{ with $v.enum }}
+      <div class="mt-3 border dark:border-gray-700 rounded">
+        <div class="py-2.5 px-4">
+          <div>
+            <span>
+              Enum options
+            </span>
+          </div>
+
+          <div>
+            {{ range $k, $v := . }}
+            <p class="flex justify-between">
+              <span>
+                <code>{{ $k }}</code>
+              </span>
+
+              <span>
+                {{ $v | markdownify }}
+              </span>
+            </p>
+            {{ end }}
+          </div>
+        </div>
       </div>
       {{ end }}
       {{ end }}
     </div>
+    {{ end }}
     {{ end }}
   </div>
   {{ end }}
