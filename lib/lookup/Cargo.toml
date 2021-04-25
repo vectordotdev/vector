@@ -14,9 +14,14 @@ regex = { version = "1.4.5", default-features = false, features = ["std", "perf"
 inherent = "0.1"
 lalrpop-util = "0.19.5"
 lazy_static = "1.3.0"
+quickcheck = { version = "1.0.3", optional = true }
 
 [dev-dependencies]
 serde_json = { version = "1.0.64", features = ["raw_value"] }
+quickcheck = { version = "1.0.3" }
 
 [build-dependencies]
 lalrpop = "0.19"
+
+[features]
+arbitrary = ["quickcheck"]

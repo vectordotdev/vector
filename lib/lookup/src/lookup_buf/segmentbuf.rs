@@ -1,5 +1,7 @@
 use crate::{field, LookSegment, Segment};
 use inherent::inherent;
+#[cfg(any(test, feature = "arbitrary"))]
+use quickcheck::{Arbitrary, Gen};
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
@@ -52,6 +54,32 @@ impl From<&str> for FieldBuf {
     }
 }
 
+#[cfg(any(test, feature = "arbitrary"))]
+impl Arbitrary for FieldBuf {
+    fn arbitrary(g: &mut Gen) -> Self {
+        let chars = (32u8..90).map(|c| c as char).collect::<Vec<_>>();
+        let len = u32::arbitrary(g) % 100 + 1;
+        let name = (0..len)
+            .map(|_| chars[usize::arbitrary(g) % chars.len()].clone())
+            .collect::<String>()
+            .replace(r#"""#, r#"\""#);
+        //let name = String::arbitrary(g).replace(r#"""#, r#"/""#);
+        FieldBuf::from(name)
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        Box::new(
+            self.name
+                .shrink()
+                .filter(|name| !name.is_empty())
+                .map(|name| {
+                    let name = name.replace(r#"""#, r#"/""#);
+                    FieldBuf::from(name)
+                }),
+        )
+    }
+}
+
 /// `SegmentBuf`s are chunks of a `LookupBuf`.
 ///
 /// They represent either a field or an index. A sequence of `SegmentBuf`s can become a `LookupBuf`.
@@ -73,6 +101,40 @@ impl SegmentBuf {
             SegmentBuf::Coalesce(v) => {
                 Segment::coalesce(v.iter().map(|field| field.into()).collect())
             }
+        }
+    }
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl Arbitrary for SegmentBuf {
+    fn arbitrary(g: &mut Gen) -> Self {
+        match u8::arbitrary(g) % 3 {
+            0 => SegmentBuf::Field(FieldBuf::arbitrary(g)),
+            1 => SegmentBuf::Index(isize::arbitrary(g) % 100),
+            _ => SegmentBuf::Coalesce({
+                let mut fields = Vec::arbitrary(g);
+                // A coalesce always has at least two fields.
+                fields.push(FieldBuf::arbitrary(g));
+                fields.push(FieldBuf::arbitrary(g));
+                fields
+            }),
+        }
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        match self {
+            SegmentBuf::Field(field) => {
+                Box::new(field.shrink().map(|field| SegmentBuf::Field(field)))
+            }
+            SegmentBuf::Index(index) => {
+                Box::new(index.shrink().map(|index| SegmentBuf::Index(index)))
+            }
+            SegmentBuf::Coalesce(fields) => Box::new(
+                fields
+                    .shrink()
+                    .filter(|fields| fields.len() > 2)
+                    .map(|fields| SegmentBuf::Coalesce(fields)),
+            ),
         }
     }
 }

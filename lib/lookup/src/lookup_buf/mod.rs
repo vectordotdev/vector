@@ -1,5 +1,7 @@
 use crate::{Look, Lookup, LookupError};
 use inherent::inherent;
+#[cfg(any(test, feature = "arbitrary"))]
+use quickcheck::{Arbitrary, Gen};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -78,6 +80,29 @@ pub use segmentbuf::{FieldBuf, SegmentBuf};
 #[derive(Debug, PartialEq, Default, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct LookupBuf {
     pub segments: VecDeque<SegmentBuf>,
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl Arbitrary for LookupBuf {
+    fn arbitrary(g: &mut Gen) -> Self {
+        LookupBuf {
+            segments: {
+                // Limit the number of segments generated to a fairly realistic number,
+                // otherwise thet tests take ages to run and don't add any extra value.
+                let size = usize::arbitrary(g) % 20 + 1;
+                (0..size).map(|_| SegmentBuf::arbitrary(g)).collect()
+            },
+        }
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        Box::new(
+            self.segments
+                .shrink()
+                .filter(|segments| !segments.is_empty())
+                .map(|segments| Self { segments }),
+        )
+    }
 }
 
 impl Display for LookupBuf {

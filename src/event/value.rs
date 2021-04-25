@@ -495,7 +495,7 @@ impl Value {
         map.entry(name.to_string())
             .and_modify(|entry| match next_segment {
                 SegmentBuf::Index(next_len) if !matches!(entry, Value::Array(_)) => {
-                    *entry = Value::Array(Vec::with_capacity(*next_len as usize));
+                    *entry = Value::Array(Vec::with_capacity(next_len.abs() as usize));
                 }
                 SegmentBuf::Field(_) if !matches!(entry, Value::Map(_)) => {
                     *entry = Value::Map(Default::default());
@@ -510,7 +510,7 @@ impl Value {
                 // into the value.
                 match next_segment {
                     SegmentBuf::Index(next_len) => {
-                        Value::Array(Vec::with_capacity(*next_len as usize))
+                        Value::Array(Vec::with_capacity(next_len.abs() as usize))
                     }
                     SegmentBuf::Field(_) => Value::Map(Default::default()),
                     SegmentBuf::Coalesce(_) => Value::Map(Default::default()),
@@ -586,7 +586,7 @@ impl Value {
                 let mut retval = Ok(None);
                 let next_val = match working_lookup.get(0) {
                     Some(SegmentBuf::Index(next_len)) => {
-                        let mut inner = Value::Array(Vec::with_capacity(*next_len as usize));
+                        let mut inner = Value::Array(Vec::with_capacity(next_len.abs() as usize));
                         retval = inner.insert(working_lookup, value).map_err(|mut e| {
                             if let EventError::PrimitiveDescent {
                                 original_target,
@@ -945,7 +945,7 @@ impl Value {
                         None => Ok(None),
                     };
                     if inner_is_empty && prune {
-                        array.remove(i as usize);
+                        array.remove(index);
                     }
                     retval
                 }
@@ -1110,10 +1110,22 @@ impl Value {
             }
             (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
             // Descend into an array
-            (Some(Segment::Index(i)), Value::Array(array)) => match array.get_mut(i as usize) {
-                Some(inner) => inner.get_mut(working_lookup.clone()),
-                None => Ok(None),
-            },
+            (Some(Segment::Index(i)), Value::Array(array)) => {
+                let index = if i.is_negative() {
+                    if i.abs() > array.len() as isize {
+                        // The index is before the start of the array.
+                        return Ok(None);
+                    }
+                    (array.len() as isize + i) as usize
+                } else {
+                    i as usize
+                };
+
+                match array.get_mut(index) {
+                    Some(inner) => inner.get_mut(working_lookup.clone()),
+                    None => Ok(None),
+                }
+            }
             (Some(Segment::Field(_)), Value::Array(_)) => Ok(None),
         }
     }
@@ -1351,6 +1363,7 @@ impl Value {
 #[cfg(test)]
 mod test {
     use super::*;
+    use quickcheck::{QuickCheck, TestResult};
     use std::{fs, io::Read, path::Path};
 
     fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<Vec<u8>> {
@@ -1400,7 +1413,6 @@ mod test {
         #[test]
         fn double_nested_field() {
             let mut value = Value::from(BTreeMap::default());
-            println!("NORK");
             let key = "root.doot.toot";
             let lookup = LookupBuf::from_str(key).unwrap();
             let mut marker = Value::from(true);
@@ -1469,6 +1481,19 @@ mod test {
         }
 
         #[test]
+        fn zero_index() {
+            let mut value = Value::from(BTreeMap::default());
+            let key = "[0]";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let marker = Value::from(true);
+
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.as_array().len(), 1);
+            assert_eq!(value.as_array()[0], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+        }
+
+        #[test]
         fn nested_index() {
             let mut value = Value::from(Vec::<Value>::default());
             let key = "[0][0]";
@@ -1492,6 +1517,20 @@ mod test {
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
+        }
+
+        #[test]
+        fn field_negative_index() {
+            let mut value = Value::from(BTreeMap::default());
+            let key = "root[-1]";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let marker = Value::from(true);
+
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None,);
+            assert_eq!(value.as_map().unwrap()["root"].as_array()[0], marker);
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
+            assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker),);
+            assert_eq!(value, Value::from(BTreeMap::default()),);
         }
 
         #[test]
@@ -1521,6 +1560,22 @@ mod test {
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
+        }
+
+        #[test]
+        fn nested_index_negative() {
+            let mut value = Value::from(BTreeMap::default());
+            let key = "field[0][-1]";
+            let lookup = LookupBuf::from_str(key).unwrap();
+            let mut marker = Value::from(true);
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(
+                value.as_map().unwrap()["field"].as_array()[0].as_array()[0],
+                marker
+            );
+            assert_eq!(value.get(&lookup).unwrap(), Some(&marker),);
+            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker),);
+            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker),);
         }
 
         #[test]
@@ -1625,6 +1680,70 @@ mod test {
             assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker));
             assert!(!value.contains(0));
         }
+    }
+
+    #[test]
+    fn test_thing() {
+        let mut value = Value::from(BTreeMap::default());
+        let marker = Value::from(true);
+        let path = LookupBuf::from_segments(vec![SegmentBuf::from("field"), SegmentBuf::Index(-1)]);
+
+        assert_eq!(
+            value.insert(path.clone(), marker.clone()).unwrap(),
+            None,
+            "inserting value"
+        );
+        assert_eq!(value.get(&path).unwrap(), Some(&marker), "retrieving value");
+
+        let lookup = Lookup::from(&path);
+        assert_eq!(
+            value.remove(lookup, true).unwrap(),
+            Some(marker),
+            "removing value"
+        );
+        assert_eq!(
+            value,
+            Value::from(BTreeMap::default()),
+            "should have empty value again"
+        );
+    }
+
+    #[test]
+    fn quickcheck_value() {
+        fn inner(mut path: LookupBuf) -> TestResult {
+            let mut value = Value::from(BTreeMap::default());
+            let mut marker = Value::from(true);
+
+            if matches!(path.get(0), Some(SegmentBuf::Index(_))) {
+                // Push a field at the start of the path since the top level is always a map.
+                path.push_front(SegmentBuf::from("field"));
+            }
+
+            assert_eq!(
+                value.insert(path.clone(), marker.clone()).unwrap(),
+                None,
+                "inserting value"
+            );
+            assert_eq!(value.get(&path).unwrap(), Some(&marker), "retrieving value");
+            assert_eq!(
+                value.get_mut(&path).unwrap(),
+                Some(&mut marker),
+                "retrieving mutable value"
+            );
+
+            assert_eq!(
+                value.remove(&path, true).unwrap(),
+                Some(marker),
+                "removing value"
+            );
+
+            TestResult::passed()
+        }
+
+        QuickCheck::new()
+            .tests(100)
+            .max_tests(200)
+            .quickcheck(inner as fn(LookupBuf) -> TestResult);
     }
 
     // This test iterates over the `tests/data/fixtures/value` folder and:

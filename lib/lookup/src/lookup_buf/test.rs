@@ -1,4 +1,5 @@
 use crate::*;
+use quickcheck::{QuickCheck, TestResult};
 use std::{fs, io::Read, path::Path, str::FromStr};
 use tracing::trace;
 
@@ -228,4 +229,27 @@ fn lookup_to_string_and_serialize() {
 fn test_indexed_coalesce_from_string() {
     let parsed = LookupBuf::from_str("(a | b)[2]");
     assert_eq!("(a | b)[2]", parsed.unwrap().to_string());
+}
+
+#[test]
+fn test_index_parses() {
+    let parsed = LookupBuf::from_str("[30]").unwrap();
+    assert_eq!(LookupBuf::from(SegmentBuf::Index(30)), parsed.clone());
+    assert_eq!("[30]", parsed.to_string());
+}
+
+#[test]
+fn parses() {
+    fn inner(path: LookupBuf) -> TestResult {
+        let s = path.to_string();
+        let path2: LookupBuf = FromStr::from_str(&s).unwrap();
+        assert_eq!(path, path2);
+
+        TestResult::passed()
+    }
+
+    QuickCheck::new()
+        .tests(1_000)
+        .max_tests(2_000)
+        .quickcheck(inner as fn(LookupBuf) -> TestResult);
 }
