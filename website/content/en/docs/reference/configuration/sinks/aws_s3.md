@@ -1,7 +1,6 @@
 ---
 title: AWS S3
 kind: sink
-layout: component
 ---
 
 ## Configuration

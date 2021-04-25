@@ -148,20 +148,13 @@ components: transforms: log_to_metric: {
 		{
 			title: "Counter"
 			notes: "This example demonstrates counting HTTP status codes."
-			configuration: {
-				metrics: [
-					{
-						type:      "counter"
-						field:     "status"
-						name:      "response_total"
-						namespace: "service"
-						tags: {
-							status: "{{status}}"
-							host:   "{{host}}"
-						}
-					},
+			configuration: #"""
+				[transforms.log_to_metric]
+				type = "log_to_metric"
+				metrics = [
+				  { type = "counter", field = "status", name = "response_total", namespace = "service", tags = {status = "{{status}}", host = "{{host}}"} }
 				]
-			}
+				"""#
 			input: log: {
 				host:    "10.22.11.222"
 				message: "Sent 200 in 54.2ms"
@@ -183,19 +176,13 @@ components: transforms: log_to_metric: {
 		{
 			title: "Sum"
 			notes: "In this example we'll demonstrate computing a sum by computing the total of orders placed."
-			configuration: {
-				metrics: [
-					{
-						type:               "counter"
-						field:              "total"
-						name:               "order_total"
-						increment_by_value: true
-						tags: {
-							host: "{{host}}"
-						}
-					},
+			configuration: #"""
+				[transforms.log_to_metric]
+				type = "log_to_metric"
+				metrics = [
+				  { type = "counter", field = "total", name = "order_total", increment_by_value = true, tags = {host = "{{host}}"} }
 				]
-			}
+				"""#
 			input: log: {
 				host:    "10.22.11.222"
 				message: "Order placed for $122.20"
@@ -215,25 +202,15 @@ components: transforms: log_to_metric: {
 		{
 			title: "Gauges"
 			notes: "In this example we'll demonstrate creating a gauge that represents the current CPU load averages."
-			configuration: {
-				metrics: [
-					{
-						type:  "gauge"
-						field: "1m_load_avg"
-						tags: host: "{{host}}"
-					},
-					{
-						type:  "gauge"
-						field: "5m_load_avg"
-						tags: host: "{{host}}"
-					},
-					{
-						type:  "gauge"
-						field: "15m_load_avg"
-						tags: host: "{{host}}"
-					},
+			configuration: #"""
+				[transforms.log_to_metric]
+				type = "log_to_metric"
+				metrics = [
+				  { type = "gauge", field = "1m_load_avg", tags = {host = "{{host}}"} },
+				  { type = "gauge", field = "5m_load_avg", tags = {host = "{{host}}"} },
+				  { type = "gauge", field = "15m_load_avg", tags = {host = "{{host}}"} }
 				]
-			}
+				"""#
 			input: log: {
 				host:           "10.22.11.222"
 				message:        "CPU activity sample"
@@ -277,19 +254,13 @@ components: transforms: log_to_metric: {
 		{
 			title: "Histogram distribution"
 			notes: "This example demonstrates capturing timings in your logs to compute histogram."
-			configuration: {
-				metrics: [
-					{
-						type:  "histogram"
-						field: "time"
-						name:  "time_ms"
-						tags: {
-							status: "{{status}}"
-							host:   "{{host}}"
-						}
-					},
+			configuration: #"""
+				[transforms.log_to_metric]
+				type = "log_to_metric"
+				metrics = [
+				  { type = "histogram", field = "time", name = "time_ms", tags = {status = "{{status}}", host = "{{host}}"} }
 				]
-			}
+				"""#
 			input: log: {
 				host:    "10.22.11.222"
 				message: "Sent 200 in 54.2ms"
@@ -312,19 +283,13 @@ components: transforms: log_to_metric: {
 		{
 			title: "Summary distribution"
 			notes: "This example demonstrates capturing timings in your logs to compute summary."
-			configuration: {
-				metrics: [
-					{
-						type:  "summary"
-						field: "time"
-						name:  "time_ms"
-						tags: {
-							status: "{{status}}"
-							host:   "{{host}}"
-						}
-					},
+			configuration: #"""
+				[transforms.log_to_metric]
+				type = "log_to_metric"
+				metrics = [
+				  { type = "summary", field = "time", name = "time_ms", tags = {status = "{{status}}", host = "{{host}}"} }
 				]
-			}
+				"""#
 			input: log: {
 				host:    "10.22.11.222"
 				message: "Sent 200 in 54.2ms"
@@ -352,18 +317,13 @@ components: transforms: log_to_metric: {
 				The idea is that you pass the unique/high-cardinality value as the metric value
 				and the metric store will count the number of unique values seen.
 				"""
-			configuration: {
-				metrics: [
-					{
-						type:      "set"
-						field:     "remote_addr"
-						namespace: "{{branch}}"
-						tags: {
-							host: "{{host}}"
-						}
-					},
+			configuration: #"""
+				[transforms.log_to_metric]
+				type = "log_to_metric"
+				metrics = [
+				  { type = "set", field = "remote_addr", namespace = "{{branch}}", tags = {host = "{{host}}"} }
 				]
-			}
+				"""#
 			input: log: {
 				host:        "10.22.11.222"
 				message:     "Sent 200 in 54.2ms"

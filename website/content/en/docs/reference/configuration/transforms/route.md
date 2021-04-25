@@ -1,7 +1,6 @@
 ---
 title: Route
 kind: transforms
-layout: component
 ---
 
 ## Configuration

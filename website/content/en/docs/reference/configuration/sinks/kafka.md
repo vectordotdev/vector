@@ -1,7 +1,6 @@
 ---
 title: Kafka
 kind: sink
-layout: component
 ---
 
 ## Requirements

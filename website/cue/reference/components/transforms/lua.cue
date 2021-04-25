@@ -233,26 +233,28 @@ components: transforms: lua: {
 	examples: [
 		{
 			title: "Add, rename, & remove log fields"
-			configuration: {
-				hooks: process: """
-					function (event, emit)
-						-- Add root level field
-						event.log.field = "new value"
+			configuration: #"""
+				[transforms.lua]
+				type = "lua"
+				hooks.process = '''
+				function (event, emit)
+					-- Add root level field
+					event.log.field = "new value"
 
-						-- Add nested field
-						event.log.nested.field = "nested value"
+					-- Add nested field
+					event.log.nested.field = "nested value"
 
-						-- Rename field
-						event.log.renamed_field = event.log.field_to_rename
-						event.log.field_to_rename = nil
+					-- Rename field
+					event.log.renamed_field = event.log.field_to_rename
+					event.log.field_to_rename = nil
 
-						-- Remove fields
-						event.log.field_to_remove = nil
+					-- Remove fields
+					event.log.field_to_remove = nil
 
-						emit(event)
-					end
-					"""
-			}
+					emit(event)
+				end
+				'''
+				"""#
 			input: log: {
 				field_to_rename: "old value"
 				field_to_remove: "remove me"
@@ -265,23 +267,25 @@ components: transforms: lua: {
 		},
 		{
 			title: "Add, rename, remove metric tags"
-			configuration: {
-				hooks: process: """
-					function (event, emit)
-						-- Add tag
-						event.metric.tags.tag = "new value"
+			configuration: #"""
+				[transforms.lua]
+				type = "lua"
+				hooks.process = '''
+				function (event, emit)
+					-- Add tag
+					event.metric.tags.tag = "new value"
 
-						-- Rename tag
-						event.metric.tags.renamed_tag = event.log.tag_to_rename
-						event.metric.tags.tag_to_rename = nil
+					-- Rename tag
+					event.metric.tags.renamed_tag = event.log.tag_to_rename
+					event.metric.tags.tag_to_rename = nil
 
-						-- Remove tag
-						event.metric.tags.tag_to_remove = nil
+					-- Remove tag
+					event.metric.tags.tag_to_remove = nil
 
-						emit(event)
-					end
-					"""
-			}
+					emit(event)
+				end
+				'''
+				"""#
 			input: metric: {
 				kind: "incremental"
 				name: "logins"
@@ -307,13 +311,15 @@ components: transforms: lua: {
 		},
 		{
 			title: "Drop an event"
-			configuration: {
-				hooks: process: """
-					function (event, emit)
-						-- Drop event entirely by not calling the `emit` function
-					end
-					"""
-			}
+			configuration: #"""
+				[transforms.lua]
+				type = "lua"
+				hooks.process = """
+				function (event, emit)
+					-- Drop event entirely by not calling the `emit` function
+				end
+				"""
+				"""#
 			input: log: {
 				field_to_rename: "old value"
 				field_to_remove: "remove me"
@@ -322,20 +328,22 @@ components: transforms: lua: {
 		},
 		{
 			title: "Iterate over log fields"
-			configuration: {
-				hooks: process: """
-					function (event, emit)
-						-- Remove all fields where the value is "-"
-						for f, v in pairs(event) do
-							if v == "-" then
-								event[f] = nil
-							end
+			configuration: #"""
+				[transforms.lua]
+				type = "lua"
+				hooks.process = '''
+				function (event, emit)
+					-- Remove all fields where the value is "-"
+					for f, v in pairs(event) do
+						if v == "-" then
+							event[f] = nil
 						end
-
-						emit(event)
 					end
-					"""
-			}
+
+					emit(event)
+				end
+				'''
+				"""#
 			input: log: {
 				value_to_remove: "-"
 				value_to_keep:   "keep"
@@ -346,37 +354,37 @@ components: transforms: lua: {
 		},
 		{
 			title: "Parse timestamps"
-			configuration: {
-				hooks: {
-					init: """
-						-- Parse timestamps like `2020-04-07 06:26:02.643`
-						timestamp_pattern = "(%d%d%d%d)[-](%d%d)[-](%d%d) (%d%d):(%d%d):(%d%d).?(%d*)"
+			configuration: #"""
+				[transforms.lua]
+				type = "lua"
+				hooks.init = '''
+				-- Parse timestamps like `2020-04-07 06:26:02.643`
+				timestamp_pattern = "(%d%d%d%d)[-](%d%d)[-](%d%d) (%d%d):(%d%d):(%d%d).?(%d*)"
 
-						function parse_timestamp(str)
-							local year, month, day, hour, min, sec, millis = string.match(str, timestamp_pattern)
-							local ms = 0
-							if millis and millis ~= "" then
-								ms = tonumber(millis)
-							end
-							return {
-								year    = tonumber(year),
-								month   = tonumber(month),
-								day     = tonumber(day),
-								hour    = tonumber(hour),
-								min     = tonumber(min),
-								sec     = tonumber(sec),
-								nanosec = ms * 1000000
-							}
-						end
-						"""
-					process: """
-						function (event, emit)
-							event.log.timestamp = parse_timestamp(event.log.timestamp_string)
-							emit(event)
-						end
-						"""
-				}
-			}
+				function parse_timestamp(str)
+					local year, month, day, hour, min, sec, millis = string.match(str, timestamp_pattern)
+					local ms = 0
+					if millis and millis ~= "" then
+						ms = tonumber(millis)
+					end
+					return {
+						year    = tonumber(year),
+						month   = tonumber(month),
+						day     = tonumber(day),
+						hour    = tonumber(hour),
+						min     = tonumber(min),
+						sec     = tonumber(sec),
+						nanosec = ms * 1000000
+					}
+				end
+				'''
+				hooks.process = """
+				function (event, emit)
+					event.log.timestamp = parse_timestamp(event.log.timestamp_string)
+					emit(event)
+				end
+				"""
+				"""#
 			input: log: {
 				timestamp_string: "2020-04-07 06:26:02.643"
 			}
@@ -387,45 +395,45 @@ components: transforms: lua: {
 		},
 		{
 			title: "Count the number of logs"
-			configuration: {
-				hooks: {
-					init:     "init"
-					process:  "process"
-					shutdown: "shutdown"
-				}
-				timers: [
-					{interval_seconds: 5, handler: "timer_handler"},
+			configuration: #"""
+				[transforms.lua]
+				type = "lua"
+				hooks.init = "init"
+				hooks.process = "process"
+				hooks.shutdown = "shutdown"
+				timers = [
+				{interval_seconds = 5, handler = "timer_handler"}
 				]
-				source: """
-					function init()
-						count = 0
-					end
+				source = '''
+				function init()
+					count = 0
+				end
 
-					function process()
-						count = count + 1
-					end
+				function process()
+					count = count + 1
+				end
 
-					function timer_handler(emit)
-						emit(make_counter(count))
-						count = 0
-					end
+				function timer_handler(emit)
+					emit(make_counter(count))
+					count = 0
+				end
 
-					function shutdown(emit)
-						emit(make_counter(count))
-					end
+				function shutdown(emit)
+					emit(make_counter(count))
+				end
 
-					function make_counter(value)
-						return metric = {
-							name = "event_counter",
-							kind = "incremental",
-							timestamp = os.date("!*t"),
-							counter = {
-								value = value
-							}
+				function make_counter(value)
+					return metric = {
+						name = "event_counter",
+						kind = "incremental",
+						timestamp = os.date("!*t"),
+						counter = {
+							value = value
 						}
-					end
-					"""
-			}
+					}
+				end
+				'''
+				"""#
 			input: log: {}
 			output: metric: {
 				kind: "incremental"

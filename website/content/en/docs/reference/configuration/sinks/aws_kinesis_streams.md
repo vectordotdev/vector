@@ -1,7 +1,6 @@
 ---
 title: AWS Kinesis Streams logs
 kind: sink
-layout: component
 ---
 
 ## Requirements

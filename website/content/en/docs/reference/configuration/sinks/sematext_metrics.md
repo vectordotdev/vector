@@ -1,7 +1,6 @@
 ---
 title: Sematext metrics
 kind: sink
-layout: component
 ---
 
 ## Warnings

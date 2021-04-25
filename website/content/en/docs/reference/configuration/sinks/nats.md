@@ -1,7 +1,6 @@
 ---
 title: NATS
 kind: sink
-layout: component
 ---
 
 ## Configuration

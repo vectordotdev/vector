@@ -1,7 +1,6 @@
 ---
 title: Humio metrics
 kind: sink
-layout: component
 ---
 
 ## Configuration

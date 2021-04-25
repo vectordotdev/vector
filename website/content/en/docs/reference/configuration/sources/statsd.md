@@ -1,7 +1,6 @@
 ---
 title: StatsD
 kind: source
-layout: component
 ---
 
 ## Configuration

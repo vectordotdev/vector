@@ -1,7 +1,6 @@
 ---
 title: Splunk HEC
 kind: sink
-layout: component
 ---
 
 ## Configuration

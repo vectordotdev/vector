@@ -1,7 +1,6 @@
 ---
 title: InfluxDB metrics
 kind: sink
-layout: component
 ---
 
 ## Configuration

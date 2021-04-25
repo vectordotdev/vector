@@ -1,7 +1,6 @@
 ---
 title: Reduce
 kind: transform
-layout: component
 ---
 
 ## Configuration

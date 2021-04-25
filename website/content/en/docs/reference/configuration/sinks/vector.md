@@ -1,7 +1,6 @@
 ---
 title: Vector
 kind: sink
-layout: component
 ---
 
 ## Configuration

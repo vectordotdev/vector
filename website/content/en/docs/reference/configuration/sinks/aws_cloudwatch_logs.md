@@ -1,7 +1,6 @@
 ---
 title: AWS Cloudwatch logs
 kind: sink
-layout: component
 ---
 
 ## Requirements

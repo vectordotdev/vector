@@ -1,7 +1,6 @@
 ---
 title: GeoIP
 kind: transform
-layout: component
 ---
 
 ## Requirements

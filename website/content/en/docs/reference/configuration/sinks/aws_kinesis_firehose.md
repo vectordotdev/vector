@@ -1,7 +1,6 @@
 ---
 title: AWS Kinesis Firehose logs
 kind: sink
-layout: component
 ---
 
 ## Configuration

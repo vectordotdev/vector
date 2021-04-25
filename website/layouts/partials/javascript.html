@@ -1,12 +1,6 @@
-{{ $serverMode   := site.IsServer }}
 {{ $opts         := dict "targetPath" "js/app.js" }}
 {{ $app          := resources.Get "js/app.js" | js.Build $opts }}
-{{ if $serverMode }}
-<script type="text/javascript" src="{{ $app.RelPermalink }}" defer></script>
-{{ else }}
-{{ $prodApp := $app | fingerprint }}
-<script type="text/javascript" src="{{ $prodApp.RelPermalink }}" integrity="{{ $prodApp.Data.Integrity }}" defer></script>
-{{ end }}
+<script type="text/javascript" src="{{ $app.RelPermalink }}" integrity="{{ $app.Data.Integrity }}"  defer></script>
 
 {{/* We have a few Ionicons icons scattered throughout */}}
 {{ $version := site.Params.ionicons_version }}

@@ -1,7 +1,6 @@
 ---
 title: Loki
 kind: sink
-layout: component
 ---
 
 ## Configuration

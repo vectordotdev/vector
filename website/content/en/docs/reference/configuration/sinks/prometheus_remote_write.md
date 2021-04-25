@@ -1,7 +1,6 @@
 ---
 title: Prometheus remote write
 kind: sink
-layout: component
 ---
 
 ## Warnings

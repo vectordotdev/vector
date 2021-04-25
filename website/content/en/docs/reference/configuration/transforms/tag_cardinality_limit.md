@@ -1,7 +1,6 @@
 ---
 title: Tag cardinality limit
 kind: transform
-layout: component
 ---
 
 ## Configuration

@@ -2,7 +2,6 @@
 title: Kubernetes logs
 description: Collect logs from [Kubernetes](https://kubernetes.io) Nodes
 kind: source
-layout: component
 ---
 
 The `kubernetes_logs` source enriches log data with Kubernetes metadata via the Kubernetes API.

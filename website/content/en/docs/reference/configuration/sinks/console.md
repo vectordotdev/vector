@@ -1,7 +1,6 @@
 ---
 title: Console
 kind: sink
-layout: component
 ---
 
 ## Configuration

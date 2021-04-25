@@ -1,7 +1,6 @@
 ---
 title: GCP PubSub
 kind: sink
-layout: component
 ---
 
 ## Configuration

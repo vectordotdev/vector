@@ -2,7 +2,6 @@
 title: GCP Operations (formerly Stackdriver) logs
 short: GCP Stackdriver
 kind: sink
-layout: component
 ---
 
 ## Configuration

@@ -1,7 +1,6 @@
 ---
 title: Metric to log
 kind: transform
-layout: component
 ---
 
 ## Configuration

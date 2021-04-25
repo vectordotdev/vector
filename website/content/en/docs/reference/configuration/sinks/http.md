@@ -1,7 +1,6 @@
 ---
 title: HTTP
 kind: sink
-layout: component
 ---
 
 ## Configuration

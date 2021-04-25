@@ -1,7 +1,6 @@
 ---
 title: Syslog
 kind: source
-layout: component
 ---
 
 ## Configuration

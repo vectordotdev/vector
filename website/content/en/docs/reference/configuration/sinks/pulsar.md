@@ -1,7 +1,6 @@
 ---
 title: Apache Pulsar
 kind: sink
-layout: component
 ---
 
 ## Warnings

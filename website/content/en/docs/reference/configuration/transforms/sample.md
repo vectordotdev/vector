@@ -1,7 +1,6 @@
 ---
 title: Sample
 kind: transform
-layout: component
 ---
 
 ## Configuration

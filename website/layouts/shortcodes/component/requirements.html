@@ -1,17 +1,4 @@
 {{ $tag := $.Page.File.BaseFileName }}
 {{ $type := $.Page.CurrentSection.Params.component_type }}
-{{ $docs := index (index site.Data.docs.components $type) $tag }}
-
-<div class="requirements">
-  {{ range $docs.support.requirements }}
-  <div class="requirement">
-    <span class="icon mr-3 has-text-danger">
-      <i class="fas fa-exclamation-triangle"></i>
-    </span>
-
-    <span class="text">
-      {{ . | markdownify }}
-    </span>
-  </div>
-  {{ end }}
-</div>
+{{ $requirements := (index (index site.Data.docs.components $type) $tag).support.requirements }}
+{{ partial "config.html" (dict "requirements" $requirements) }}

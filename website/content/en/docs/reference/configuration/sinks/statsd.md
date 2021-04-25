@@ -1,7 +1,6 @@
 ---
 title: Statsd
 kind: sink
-layout: component
 ---
 
 ## Configuration

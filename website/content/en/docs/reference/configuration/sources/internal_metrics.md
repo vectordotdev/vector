@@ -1,7 +1,6 @@
 ---
 title: Internal metrics
 kind: source
-layout: component
 ---
 
 ## Requirements

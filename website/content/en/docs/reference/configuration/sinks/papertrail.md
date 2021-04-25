@@ -1,7 +1,6 @@
 ---
 title: Papertrail
 kind: sink
-layout: component
 ---
 
 ## Configuration

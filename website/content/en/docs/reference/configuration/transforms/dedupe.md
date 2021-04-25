@@ -2,7 +2,6 @@
 title: Dedupe events
 short: Dedupe
 kind: transform
-layout: component
 ---
 
 ## Configuration

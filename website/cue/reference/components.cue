@@ -75,7 +75,7 @@ components: {
 				for k, v in configuration {
 					"\( k )"?: _ | *null
 				}
-			}
+			} | string
 
 			if Kind == "source" {
 				input: string

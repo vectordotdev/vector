@@ -1,5 +1,7 @@
 {{/* Used by several shortcodes to display config-style info (CLI, API, VRL functions, etc.) */}}
-<div class="no-prose w-full border dark:border-gray-700 rounded-md">
+{{ $componentType := .type }}
+{{ $tag := .tag }}
+<div class="w-full border dark:border-gray-700 rounded-md">
   {{/* Source/transform/sink config */}}
   {{ with .config }}
   <div class="flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
@@ -57,7 +59,7 @@
           </span>
 
           <span>
-            {{ $v }}
+            {{ $v | markdownify }}
           </span>
         </p>
         {{ end }}
@@ -84,10 +86,173 @@
     {{ end }}
   </div>
   {{ end }}
+
+  {{/* Source/transform/sink requirements */}}
+  {{ with .requirements }}
+  <div class="py-3.5 px-5 flex items-center">
+    <div class="mr-5 flex-shrink-0">
+      <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+    </div>
+    <div class="flex flex-col divide-gray-100">
+      {{ range . }}
+      <p class="leading-normal">
+        {{ . | markdownify }}
+      </p>
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+
+  {{/* Source/transform/sink output */}}
+  {{ with .output }}
+  <div class="no-prose py-3.5 px-5">
+    {{ with .metrics }}
+    <h3 class="hover:text-secondary">
+      <a href="/docs/about/under-the-hood/architecture/data-model/metric">
+        Metrics
+      </a>
+    </h3>
+    {{ end }}
+
+    {{ with .logs }}
+    <h3 class="hover:text-secondary">
+      <a href="/docs/about/under-the-hood/architecture/data-model/log">
+        Logs
+      </a>
+    </h3>
+    {{ end }}
+  </div>
+  {{ end }}
+
+  {{/* Source/transform/sink examples */}}
+  {{ with .examples }}
+  {{ warnf "Used in %s/%s" $componentType $tag }}
+
+  {{ $multiple := gt (len . ) 1 }}
+  <div class="no-prose py-3.5 px-5">
+    {{ if $multiple }}
+    {{ $first := index . 0 }}
+    <div x-data="{ selected: '{{ $first.title }}' }">
+      <nav class="flex items-start space-between" aria-label="Component examples tabs">
+        {{ range . }}
+        <a @click="selected = '{{ .title }}'" :class="{ 'bg-gray-200 dark:bg-gray-500': selected === '{{ .title }}' }" class="cursor-pointer dark:text-gray-100 dark:hover:text-white text-gray-600 hover:text-dark px-3 py-2 font-medium text-sm rounded-md">
+          {{ .title }}
+        </a>
+        {{ end }}
+      </nav>
+
+      {{ range . }}
+      <div x-show="selected === '{{ .title }}'" class="mt-2">
+        {{ template "example" . }}
+      </div>
+      {{ end }}
+    </div>
+    {{ else }}
+    {{ $example := index . 0 }}
+    {{ template "example" $example }}
+    {{ end }}
+  </div>
+  {{ end }}
+
+  {{/* Source/transform/sink telemetry */}}
+  {{ with .telemetry }}
+  <div class="py-3.5 px-5">
+    {{ . }}
+  </div>
+  {{ end }}
 </div>
 
 {{ define "badge" }}
 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-{{ .bg }} text-{{ .text }} dark:bg-{{ .bg_dark }} dark:text-gray-100">
   {{ .word }}
 </span>
+{{ end }}
+
+{{ define "example" }}
+{{ $event := .input | jsonify (dict "indent" "  ") }}
+<p>
+  Given this event...
+</p>
+
+{{ highlight $event "json" "" }}
+
+<p>
+  ...and this Vector configuration...
+</p>
+
+{{ highlight .configuration "toml" "" }}
+
+{{ if reflect.IsSlice .output }}
+{{ $multiple := gt (len .output) 1 }}
+{{ if $multiple }}
+{{ $kind := "" }}
+{{ $event := slice }}
+{{ range .output }}
+{{ if .log }}
+{{ $kind = "log" }}
+{{ $event = $event | append .log }}
+{{ end }}
+{{ if .metric }}
+{{ $kind = "metric" }}
+{{ $event = $event | append .metric }}
+{{ end }}
+{{ end }}
+
+{{ if eq $kind "log" }}
+<p>
+  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/log">log</a> event is produced:
+</p>
+{{ end }}
+
+{{ if eq $kind "metric" }}
+<p>
+  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/metric">metric</a> event is produced:
+</p>
+{{ end }}
+
+{{ $json := $event | jsonify (dict "indent" "  ") }}
+{{ highlight $json "json" "" }}
+{{ else }}
+{{ $out := index .output 0 }}
+{{ with $out.metric }}
+{{ $json := . | jsonify (dict "indent" "  ") }}
+<p>
+  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/metric">metric</a> event is produced:
+</p>
+
+{{ highlight $json "json" "" }}
+{{ end }}
+
+{{ with $out.log }}
+{{ $json := . | jsonify (dict "indent" "  ") }}
+<p>
+  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/log">log</a> event is produced:
+</p>
+
+{{ highlight $json "json" "" }}
+{{ end }}
+{{ end }}
+{{ end }}
+
+{{ if reflect.IsMap .output }}
+{{ with .output.log }}
+{{ $json := . | jsonify (dict "indent" "  ") }}
+<p>
+  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/log">log</a> event is produced:
+</p>
+
+{{ highlight $json "json" "" }}
+{{ end }}
+
+{{ with .output.metric }}
+{{ $json := . | jsonify (dict "indent" "  ") }}
+<p>
+  ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/metric">metric</a> event is produced:
+</p>
+
+{{ highlight $json "json" "" }}
+{{ end }}
+{{ end }}
 {{ end }}

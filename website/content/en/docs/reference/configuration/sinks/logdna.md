@@ -1,7 +1,6 @@
 ---
 title: LogDNA
 kind: sink
-layout: component
 ---
 
 ## Configuration

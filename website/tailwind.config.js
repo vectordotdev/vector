@@ -43,7 +43,15 @@ module.exports = {
               p: {
                 margin: 0,
                 padding: 0,
+              },
+              'h1, h2, h3, h4, h5, h6': {
+                margin: 0,
+                padding: 0,
               }
+            },
+            '.highlight, .highlight pre.chroma': {
+              'margin-top': '0.75rem',
+              'margin-bottom': '0.75rem',
             }
           }
         },
@@ -66,6 +74,25 @@ module.exports = {
             strong: {
               color: theme('colors.gray.100'),
             },
+            '.no-prose': {
+              a: {
+                color: theme('colors.black'),
+                '&:hover': {
+                  color: theme('colors.black'),
+                },
+              },
+              p: {
+                margin: 0,
+                padding: 0,
+              },
+              'h1, h2, h3, h4, h5, h6': {
+                margin: 0,
+                padding: 0,
+              }
+            },
+            '.highlight': {
+              width: '100%',
+            }
           }
         }
       }),

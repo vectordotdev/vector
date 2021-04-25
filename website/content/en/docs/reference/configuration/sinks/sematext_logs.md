@@ -1,7 +1,6 @@
 ---
 title: Sematext logs
 kind: sink
-layout: component
 ---
 
 ## Configuration

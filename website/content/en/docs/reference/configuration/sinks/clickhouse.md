@@ -2,7 +2,6 @@
 title: Clickhouse
 description: Deliver log data to the [Clickhouse](https://clickhouse.tech) database
 kind: sink
-layout: component
 ---
 
 ## Requirements

@@ -1,7 +1,6 @@
 ---
 title: File
 kind: sink
-layout: component
 ---
 
 ## Configuration

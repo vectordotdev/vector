@@ -1,7 +1,6 @@
 ---
 title: Humio logs
 kind: sink
-layout: component
 ---
 
 ## Configuration

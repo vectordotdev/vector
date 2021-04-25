@@ -1,7 +1,6 @@
 ---
 title: New Relic logs
 kind: sink
-layout: component
 ---
 
 ## Configuration

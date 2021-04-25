@@ -1,7 +1,6 @@
 ---
 title: Prometheus Exporter
 kind: sink
-layout: component
 ---
 
 ## Warnings

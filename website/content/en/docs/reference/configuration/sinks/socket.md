@@ -1,7 +1,6 @@
 ---
 title: Socket
 kind: sink
-layout: component
 ---
 
 ## Warnings

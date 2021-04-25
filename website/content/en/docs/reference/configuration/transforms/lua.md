@@ -1,7 +1,6 @@
 ---
 title: Lua
 kind: transform
-layout: component
 ---
 
 ## Warnings

@@ -1,7 +1,6 @@
 ---
 title: Heroku Logplex
 kind: source
-layout: component
 ---
 
 ## Configuration

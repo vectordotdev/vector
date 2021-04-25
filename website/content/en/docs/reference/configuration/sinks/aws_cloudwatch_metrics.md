@@ -1,7 +1,6 @@
 ---
 title: AWS Cloudwatch metrics
 kind: sink
-layout: component
 ---
 
 ## Warnings

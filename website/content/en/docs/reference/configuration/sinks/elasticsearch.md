@@ -1,7 +1,6 @@
 ---
 title: Elasticsearch
 kind: sink
-layout: component
 ---
 
 ## Requirements

@@ -1,7 +1,6 @@
 ---
 title: Datadog metrics
 kind: sink
-layout: component
 ---
 
 ## Configuration
