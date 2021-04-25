@@ -6,69 +6,77 @@
 {{ end }}
 {{ end }}
 
-<div class="configs">
+<div class="no-prose flex flex-col divide-y divide-gray-200 dark:divide-gray-700 dark:border-gray-700 border rounded-md">
   {{ range $funcs }}
-  {{ $name := .name }}
-  {{ $func := index site.Data.docs.remap.functions .name }}
-  {{ $infallible := not $func.internal_failure_reasons }}
-  {{ $args := $func.arguments }}
-  {{ $lastArg := sub (len $args) 1 }}
-  {{ $return := $func.return }}
-  <div class="config">
-    <span class="config-title">
-      <h3 class="name" id="{{ $name }}">
+  <div class="py-3.5 px-5">
+    {{ $name := .name }}
+    {{ $func := index site.Data.docs.remap.functions .name }}
+    {{ $infallible := not $func.internal_failure_reasons }}
+    {{ $args := $func.arguments }}
+    {{ $lastArg := sub (len $args) 1 }}
+    {{ $return := $func.return }}
+
+    {{/* Function title */}}
+    <span class="flex justify-between items-center">
+      <h3 id="{{ $name }}" class="font-mono">
         {{ $name }}
       </h3>
 
-      <div class="config-buttons">
-        {{ $color := cond $infallible "grey" "bold" }}
-        <span class="config-button is-{{ $color }}">
-          {{ cond $infallible "infallible" "fallible" }}
-        </span>
-      </div>
+      <span>
+        {{ if $infallible }}
+        {{ template "badge" (dict "word" "infallible" "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
+        {{ else }}
+        {{ template "badge" (dict "word" "fallible" "text" "red-800" "bg" "red-100" "bg_dark" "red-600") }}
+        {{ end }}
+      </span>
     </span>
 
-    <p class="config-description">
+    {{/* Function description */}}
+    <div class="mt-4">
       {{ $func.description | markdownify }}
-    </p>
+    </div>
 
-    <div class="config-spec">
-      <p class="has-text-weight-bold">
-        Function spec
+    {{/* Function spec */}}
+    <div class="mt-3 border rounded px-3 py-2 dark:border-gray-700">
+      <p class="font-semibold">
+        Spec
       </p>
 
-      <div class="function-spec">
-        <span class="name">{{ $name }}</span>(
+      <div class="my-2 font-mono text-sm bg-dark p-2 rounded text-gray-100">
+        <span class="text-primary dark:text-primary font-semibold">{{ $name }}</span>(
           {{- range $idx, $arg := $args -}}
           {{ $isLast := eq $idx $lastArg -}}
-          <span class="arg{{ if .required }} is-required{{ end }}">{{ .name -}}</span>:
-          <span class="types"><{{ delimit .type `<span class="bar"> | </span>` }}></span>{{ if not $isLast }}, {{ end -}}
+          <span class="{{ if .required }} text-blue-400 dark:text-purple{{ else }} text-purple dark:text-secondary{{ end }}">{{ .name -}}</span>:
+          <span class="text-gray-300 dark:text-gray-200"><{{ delimit .type `<span class="text-white"> | </span>` }}></span>{{ if not $isLast }}, {{ end -}}
           {{ end -}}
-        ){{- if $return }} <span class="icon"><i class="fas fa-sm fa-arrow-right"></i></i></span> <span class="types"><{{ delimit $return.types " | " }}</span>{{- end -}}>
+        ){{- if $return }} <span class="font-extrabold">::</span> <span class="text-gray-300"><{{ delimit $return.types " | " }}</span>{{- end -}}>
       </div>
 
-      {{ template "key" }}
-
-      <p class="mt-3 has-text-weight-bold">
-        Arguments
-      </p>
+      {{ range $args }}
+      {{ template "arg" . }}
+      {{ end }}
     </div>
   </div>
   {{ end }}
 </div>
 
-{{ define "key" }}
-<div class="has-text-right">
-  <span class="has-background-black">
-    <span>
-      required
-    </span>
-    <span>
-      optional
-    </span>
-    <span>
-      &lt;type(s)&gt;
-    </span>
+{{ define "arg" }}
+<span class="flex">
+  <span>
+    <code>
+      {{- .name -}}
+    </code>
   </span>
-</div>
+  <span>
+    {{ .description | markdownify }}
+  </span>
+</span>
+
+
+{{ end }}
+
+{{ define "badge" }}
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-{{ .bg }} text-{{ .text }} dark:bg-{{ .bg_dark }} dark:text-gray-100">
+  {{ .word }}
+</span>
 {{ end }}

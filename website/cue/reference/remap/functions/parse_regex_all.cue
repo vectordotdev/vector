@@ -25,8 +25,8 @@ remap: functions: parse_regex_all: {
 		{
 			name: "numeric_groups"
 			description: """
-					If true, the index of each group in the regular expression is also captured. The 0th index
-					will contain the whole match.
+				If `true`, the index of each group in the regular expression is also captured. The 0th index
+				contains the whole match.
 				"""
 			required: false
 			default:  false

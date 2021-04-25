@@ -1,7 +1,6 @@
 ---
 title: VRL function reference
 short: Functions
-layout: vrl/functions
 scrollable_toc: true
 weight: 4
 ---
