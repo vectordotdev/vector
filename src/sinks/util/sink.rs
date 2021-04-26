@@ -32,7 +32,7 @@
 //! it to notify the consumer that the request has succeeded.
 
 use super::{
-    batch::{Batch, PushResult, StatefulBatch},
+    batch::{Batch, MetadataBatch, MetadataBatchInput, PushResult, StatefulBatch},
     buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
     service::{Map, ServiceBuilderExt},
 };
@@ -179,9 +179,9 @@ where
     B: Batch,
 {
     service: ServiceSink<S, B::Output>,
-    buffer: Option<(K, B::Input)>,
-    batch: StatefulBatch<B>,
-    partitions: HashMap<K, StatefulBatch<B>>,
+    buffer: Option<(K, MetadataBatchInput<B>)>,
+    batch: StatefulBatch<MetadataBatch<B>>,
+    partitions: HashMap<K, StatefulBatch<MetadataBatch<B>>>,
     timeout: Duration,
     lingers: HashMap<K, Pin<Box<Sleep>>>,
     closing: bool,
@@ -203,7 +203,7 @@ where
         Self {
             service,
             buffer: None,
-            batch: batch.into(),
+            batch: StatefulBatch::from(MetadataBatch::from(batch)),
             partitions: HashMap::new(),
             timeout,
             lingers: HashMap::new(),
@@ -255,7 +255,10 @@ where
             self.lingers.insert(partition.clone(), Box::pin(delay));
         };
 
-        if let PushResult::Overflow(item) = batch.push(item) {
+        if let PushResult::Overflow(item) = batch.push(MetadataBatchInput {
+            item,
+            metadata: None,
+        }) {
             self.buffer = Some((partition, item));
         }
 
@@ -301,8 +304,8 @@ where
                     self.lingers.remove(&partition);
 
                     let batch_size = batch.num_items();
-                    let request = batch.finish();
-                    tokio::spawn(self.service.call(request, batch_size));
+                    let output = batch.finish();
+                    tokio::spawn(self.service.call(output.body, batch_size));
 
                     batch_consumed = true;
                 } else {
@@ -318,7 +321,7 @@ where
                 if self.partitions.contains_key(&partition) {
                     self.buffer = Some((partition, item));
                 } else {
-                    self.as_mut().start_send(item)?;
+                    self.as_mut().start_send(item.item)?;
 
                     if self.buffer.is_some() {
                         unreachable!("Empty buffer overflowed.");
