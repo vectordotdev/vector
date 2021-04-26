@@ -7,11 +7,11 @@
   <div class="flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
     {{ range $k, $v := . }}
     {{ if ne $k "type" }}
-    <div class="py-3.5 px-5">
+    <div class="py-4 px-6" id="{{ $k }}">
       <span class="flex justify-between items-center">
-        <span class="font-mono font-bold text-lg text-primary-dark dark:text-primary">
+        <a href="#{{ $k }}" class="font-mono font-bold text-lg text-primary-dark dark:text-primary">
           {{ $k }}
-        </span>
+        </a>
         <span class="flex justify-between space-x-1">
           {{ if $v.common }}
           {{ template "badge" (dict "word" "common" "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
@@ -125,7 +125,7 @@
 
   {{/* Source/transform/sink requirements */}}
   {{ with .requirements }}
-  <div class="no-prose py-3.5 px-5 flex items-center">
+  <div class="no-prose py-4 px-6 flex items-center">
     <div class="mr-5 flex-shrink-0">
       <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -171,7 +171,7 @@
     <div x-data="{ selected: '{{ $first.title }}' }">
       <nav class="flex items-start space-between" aria-label="Component examples tabs">
         {{ range . }}
-        <a @click="selected = '{{ .title }}'" :class="{ 'bg-gray-200 dark:bg-gray-500': selected === '{{ .title }}' }" class="cursor-pointer dark:text-gray-100 dark:hover:text-white text-gray-600 hover:text-dark px-3 py-2 font-medium text-sm rounded-md">
+        <a @click="selected = '{{ .title }}'" :class="{ 'bg-gray-100 dark:bg-gray-700': selected === '{{ .title }}' }" class="cursor-pointer dark:text-gray-100 text-gray-600 hover:text-dark px-3 py-2 font-medium text-sm rounded-md">
           {{ .title }}
         </a>
         {{ end }}
@@ -192,8 +192,133 @@
 
   {{/* Source/transform/sink telemetry */}}
   {{ with .telemetry }}
-  <div class="py-3.5 px-5">
-    {{ . }}
+  <div class="py-4 px-6">
+    {{ with .metrics }}
+    <h3 id="metrics">
+      Metrics
+    </h3>
+
+    <p class="mt-2 leading-normal">
+      This component provides the following metrics that can be retrieved through the <a href="/docs/reference/configuration/source/internal_metrics"><code>internal_metrics</code> source</a>. See the <a href="/docs/administration/monitoring/#metrics">metrics section</a> on the <a href="/docs/administration/monitoring#metrics">monitoring page</a> for more info.
+    </p>
+
+    <div class="mt-2 border rounded flex flex-col divide-y divide-gray-100 dark:divide-gray-600">
+      {{ range $k, $v := . }}
+      {{ $type := $v.type }}
+      <div class="py-2 px-4" id="{{ $k }}">
+        <span class="flex justify-between items-center">
+          <a href="#{{ $k }}" class="font-mono">
+            {{ $k }}
+          </a>
+
+          <span>
+            {{/* Metric type */}}
+            {{ $url := printf "/docs/about/under-the-hood/architecture/data-model/metric/#%s" $type }}
+            <a href="{{ $url }}">
+              {{ template "badge" (dict "word" $v.type "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
+            </a>
+          </span>
+        </span>
+
+        <div class="mt-2 border rounded py-2 px-3">
+          <p>
+            Tags
+          </p>
+
+          <div class="flex flex-col space-y-2">
+            {{ range $v.tags }}
+            <span class="flex justify-between items-center">
+              <span>
+                {{ .name }}
+              </span>
+
+              {{ if .required }}
+              <span>
+                {{ template "badge" (dict "word" "required" "text" "red-800" "bg" "red-100" "bg_dark" "red-700") }}
+              </span>
+              {{ end }}
+            </span>
+
+            <div>
+              {{ .description | markdownify }}
+            </div>
+            {{ end }}
+          </div>
+        </div>
+      </div>
+      {{ end }}
+    </div>
+    {{ end }}
+
+    {{ with .logs }}
+    {{/* No components use this yet */}}
+    {{ end }}
+  </div>
+  {{ end }}
+
+  {{/* Source/transform/sink warnings */}}
+  {{ with .warnings }}
+  <div class="no-prose py-4 px-6 flex items-center">
+    <div class="mr-5 flex-shrink-0">
+      <svg xmlns="http://www.w3.org/2000/svg" class="text-red-400 h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+    </div>
+    <div class="flex flex-col divide-gray-100">
+      {{ range . }}
+      <p class="leading-normal">
+        {{ . | markdownify }}
+      </p>
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+
+  {{/* Source/transform/sink environment variables */}}
+  {{ with .env_vars }}
+  <div class="no-prose flex flex-col divide-y divide-gray-100 dark:divide-gray-600">
+    {{ range $k, $v := . }}
+    <div class="py-4 px-6">
+      <span class="flex justify-between">
+        <span>
+          <code>
+            {{- $k -}}
+          </code>
+        </span>
+
+        <span>
+          {{ if $v.common }}
+          {{ template "badge" (dict "word" "common" "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
+          {{ end }}
+
+          {{ if not $v.required }}
+          {{ template "badge" (dict "word" "optional" "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
+          {{ end }}
+
+          {{ if $v.required }}
+          {{ template "badge" (dict "word" "required" "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
+          {{ end }}
+
+          {{ range $k, $v := $v.type }}
+          {{ template "badge" (dict "word" $k "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
+          {{ template "badge" (dict "word" $v.syntax "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
+          {{ end }}
+        </span>
+      </span>
+
+      {{ range $k, $v := $v.type }}
+      {{ with $v.default }}
+      <p>
+        Default: {{ . }}
+      </p>
+      {{ end }}
+      {{ end }}
+
+      <div>
+        {{ $v.description | markdownify }}
+      </div>
+    </div>
+    {{ end }}
   </div>
   {{ end }}
 </div>

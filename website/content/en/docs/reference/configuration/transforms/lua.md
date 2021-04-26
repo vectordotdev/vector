@@ -11,6 +11,10 @@ kind: transform
 
 {{< component/config >}}
 
+## Telemetry
+
+{{< component/telemetry >}}
+
 ## Examples
 
 {{< component/examples >}}

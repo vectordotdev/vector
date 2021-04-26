@@ -3,17 +3,13 @@ title: AWS Cloudwatch logs
 kind: sink
 ---
 
-## Requirements
-
-{{< component/requirements >}}
-
 ## Configuration
 
 {{< component/config >}}
 
-## Output
+## Environment variables
 
-{{< component/output >}}
+{{< component/env-vars >}}
 
 ## Telemetry
 
