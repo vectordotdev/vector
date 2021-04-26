@@ -234,7 +234,7 @@ strip-ansi-escapes = { version = "0.1.0", default-features = false }
 structopt = { version = "0.3.21", default-features = false }
 syslog = { version = "5.0.0", default-features = false, optional = true }
 syslog_loose = { version = "0.10.0", default-features = false, optional = true }
-tokio-postgres = { version = "0.7.1", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
+tokio-postgres = { version = "0.7.2", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.7", default-features = false }
 twox-hash = { version = "1.6.0", default-features = false }
