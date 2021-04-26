@@ -244,13 +244,6 @@ Or using a [globbing syntax][glob]:
 vector --config /etc/vector/*.toml
 ```
 
-[cue]: https://cuelang.org
-[glob]: https://en.wikipedia.org/wiki/Glob_(programming)
-[json]: https://json.org
-[jsonnet]: https://jsonnet.org
-[toml]: https://github.com/toml-lang/toml
-[yaml]: https://yaml.org
-
 #### Wilcards in identifiers
 
 Vector supports wildcards (`*`) in component identifiers when building your topology, but only supports them as the last character. For example:
@@ -276,3 +269,18 @@ inputs = ["app*"]
 type = "aws_s3"
 inputs = ["app*", "system_logs"]
 ```
+
+## Sections
+
+{{< sections >}}
+
+## Pages
+
+{{< pages >}}
+
+[cue]: https://cuelang.org
+[glob]: https://en.wikipedia.org/wiki/Glob_(programming)
+[json]: https://json.org
+[jsonnet]: https://jsonnet.org
+[toml]: https://github.com/toml-lang/toml
+[yaml]: https://yaml.org

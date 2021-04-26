@@ -246,6 +246,10 @@ VRL is a safe language in several senses: VRL scripts have access only to the ev
 
 VRL is implemented in the very fast and efficient [Rust] language and VRL scripts are compiled into Rust code when Vector is started. This means that you can use VRL to transform observability data with a minimal per-event performance penalty vis-à-vis pure Rust. In addition, ergonomic features such as compile-time correctness checks and the lack of language constructs like loops make it difficult to write scripts that are slow or buggy or require optimization.
 
+## Pages in this section
+
+{{< pages >}}
+
 [affine_types]: https://en.wikipedia.org/wiki/Substructural_type_system#Affine_type_systems
 [blog_post]: /blog/vector-remap-language
 [configuration]: /docs/reference/configuration
