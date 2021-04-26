@@ -1,5 +1,5 @@
 ---
-last_modified_on: "2021-04-20"
+last_modified_on: "2021-04-21"
 $schema: ".schema.json"
 title: "Introducing `vector tap`"
 description: "Observing events flowing through your Vector topologies"
