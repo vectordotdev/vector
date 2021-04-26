@@ -5,47 +5,117 @@
 {{ define "main" }}
 {{ $rss := .OutputFormats.Get "rss" }}
 {{ $posts := .RegularPages }}
-<section class="section has-background-light">
-  <div class="columns is-variable is-8">
-    <div class="column is-one-third">
-      <section class="hero is-medium is-bold is-sticky">
-        <div class="hero-body">
-          <div class="container">
-            <p class="title is-size-1 is-size-2-mobile has-text-weight-bold is-spaced">
-              {{ .Title }}
-            </p>
-
-            <p class="subtitle has-text-grey">
-              {{ .Description }}
-            </p>
-
-            <div class="buttons are-small">
-              <a class="button is-orange" href="{{ $rss.RelPermalink }}">
-                <span class="icon">
-                  <i class="fas fa-rss"></i>
-                </span>
-                <span>
-                  RSS
-                </span>
-              </a>
-            </div>
-          </div>
+<div class="relative max-w-3xl mx-auto sm:px-6 lg:max-w-7xl lg:px-8 lg:grid lg:grid-cols-16 lg:gap-x-8 xl:gap-x-10 mt-8 mb-12">
+  <div class="lg:col-span-6 xl:col-span-4 pr-0 lg:pr-6 md:pr-2">
+    <div class="px-6 lg:p-0">
+      <div class="max-w-xl">
+        <div class="mb-4 md:mb-6">
+          {{ partial "docs/breadcrumb.html" . }}
         </div>
-      </section>
-    </div>
 
-    <div class="column">
-      <section class="section">
-        <div class="container">
-          <div class="columns is-multiline is-variable is-4">
-            {{ range $posts }}
-            <div class="column is-one-third">
-              {{ .Render "blog-post-card" }}
-            </div>
-            {{ end }}
-          </div>
-      </section>
+        <h2 class="dark:text-gray-50 font-secondary font-extrabold text-4xl md:text-5xl tracking-tight sm:tracking-tighter leading-tight">
+          {{ .Title }}
+        </h2>
+
+        {{ with .Description }}
+        <p class="dark:text-gray-200 mt-5 text-xl text-gray-500 prose dark:prose-dark">
+          {{ . | markdownify }}
+        </p>
+        {{ end }}
+
+        <div class="mt-5">
+          <a type="button" href="{{ $rss.RelPermalink }}" class="inline-flex items-center px-3 py-2 space-x-1.5 border border-transparent shadow-sm text-sm leading-4 font-medium rounded text-white bg-rss-orange focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-rss-orange" target="_blank">
+            <ion-icon name="logo-rss"></ion-icon>
+            <span>
+              RSS
+            </span>
+          </a>
+        </div>
+      </div>
     </div>
   </div>
-</section>
+
+  <div class="lg:col-span-10 xl:col-span-12 mt-10 lg:mt-0">
+    <div class="px-6 lg:p-0">
+      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        {{ range $posts }}
+        {{ $date := .Date | dateFormat "January 2, 2006" }}
+        <div class="flex flex-col border rounded-lg p-6 dark:border-gray-800">
+          <div class="flex-1">
+            <a href="{{ .RelPermalink }}" class="text-2xl block font-bold tracking-tight dark:text-gray-200 hover:text-secondary dark:hover:text-primary">
+              {{ .Title }}
+            </a>
+
+            <div class="mt-2.5 flex space-x-1 text-sm text-gray-500 dark:text-gray-400">
+              <time datetime="2020-03-16">
+                {{ $date }}
+              </time>
+              <span aria-hidden="true">
+                &middot;
+              </span>
+              <span>
+                {{ .ReadingTime }} min read
+              </span>
+            </div>
+
+            {{ with .Description }}
+            <p class="my-5 text-base text-gray-500 dark:text-gray-300">
+              {{ . }}
+            </p>
+            {{ end }}
+          </div>
+
+          {{/* Author(s) info */}}
+          <div class="flex flex-col space-y-1.5 mt-3 mb-6">
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <div class="flex -space-x-1 relative z-0 overflow-hidden">
+                  {{ range .Params.authors }}
+                  {{ $img := printf "https://github.com/%s.png" . }}
+                  {{ $name := (index (where site.Data.docs.authors ".handle" "eq" .) 0).name }}
+                  <img class="relative z-30 inline-block h-12 w-12 rounded-full ring-1 ring-white dark:ring-dark" src="{{ $img }}" alt="Author photo for {{ $name }}">
+                  {{ end }}
+                </div>
+              </div>
+
+
+              <div class="ml-4 flex flex-col space-y-1">
+                {{ range .Params.authors }}
+                {{ $name := (index (where site.Data.docs.authors ".handle" "eq" .) 0).name }}
+                {{ $link := printf "https://github.com/%s" . }}
+                <a href="{{ $link }}" class="text-gray-700 hover:text-secondary dark:text-gray-200">
+                  {{ $name }}
+                </a>
+                {{ end }}
+              </div>
+            </div>
+          </div>
+
+          {{ with .Params.tags }}
+          <div class="block space-y-1.5">
+            {{ template "badge" (dict "type" .type "bg" "indigo-100" "text" "indigo-800" "bg_dark" "indigo-700" "text_dark" "indigo-100") }}
+
+            {{ range .domains }}
+            {{ template "badge" (dict "domain" . "bg" "green-200" "text" "green-800" "bg_dark" "green-700" "text_dark" "green-100") }}
+            {{ end }}
+          </div>
+          {{ end }}
+        </div>
+        {{ end }}
+      </div>
+    </div>
+  </div>
+</div>
+{{ end }}
+
+{{ define "badge" }}
+<span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-{{ .bg }} text-{{ .text }} dark:bg-{{ .bg_dark }} dark:text-{{ .text_dark }}">
+  {{ with .type }}
+  type:&nbsp;<strong>{{ . }}</strong>
+  {{ end }}
+
+  {{ with .domain }}
+  domain:&nbsp;<strong>{{ . }}</strong>
+  {{ end }}
+</span>
 {{ end }}
