@@ -94,7 +94,6 @@ where
         Map<S, PartitionInnerBuffer<B::Output, ()>, B::Output>,
         PartitionBuffer<B, ()>,
         (),
-        PartitionInnerBuffer<B::Output, ()>,
     >,
 }
 
@@ -175,11 +174,11 @@ where
 /// and r3 are dispatched and r2 and r3 complete, all events contained
 /// in all requests will not be acked until r1 has completed.
 #[pin_project]
-pub struct PartitionBatchSink<S, B, K, Request>
+pub struct PartitionBatchSink<S, B, K>
 where
-    B: Batch<Output = Request>,
+    B: Batch,
 {
-    service: ServiceSink<S, Request>,
+    service: ServiceSink<S, B::Output>,
     buffer: Option<(K, B::Input)>,
     batch: StatefulBatch<B>,
     partitions: HashMap<K, StatefulBatch<B>>,
@@ -188,12 +187,12 @@ where
     closing: bool,
 }
 
-impl<S, B, K, Request> PartitionBatchSink<S, B, K, Request>
+impl<S, B, K> PartitionBatchSink<S, B, K>
 where
-    B: Batch<Output = Request>,
+    B: Batch,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
-    S: Service<Request>,
+    S: Service<B::Output>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response,
@@ -213,12 +212,12 @@ where
     }
 }
 
-impl<S, B, K, Request> Sink<B::Input> for PartitionBatchSink<S, B, K, Request>
+impl<S, B, K> Sink<B::Input> for PartitionBatchSink<S, B, K>
 where
-    B: Batch<Output = Request>,
+    B: Batch,
     B::Input: Partition<K>,
     K: Hash + Eq + Clone + Send + 'static,
-    S: Service<Request>,
+    S: Service<B::Output>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response,
@@ -342,10 +341,10 @@ where
     }
 }
 
-impl<S, B, K, Request> fmt::Debug for PartitionBatchSink<S, B, K, Request>
+impl<S, B, K> fmt::Debug for PartitionBatchSink<S, B, K>
 where
     S: fmt::Debug,
-    B: Batch<Output = Request> + fmt::Debug,
+    B: Batch + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PartitionBatchSink")

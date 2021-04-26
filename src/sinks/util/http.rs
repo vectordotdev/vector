@@ -196,7 +196,6 @@ where
         B,
         L,
         K,
-        B::Output,
     >,
     slot: Option<B::Input>,
 }
