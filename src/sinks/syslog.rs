@@ -2,17 +2,14 @@
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::LogEvent,
-    event::Value,
+    event::{Event,LogEvent,Value},
     sinks::util::{tcp::TcpSinkConfig, udp::UdpSinkConfig},
-    Event,
 };
 use bytes::Bytes;
 use chrono::{FixedOffset, TimeZone};
 use serde::{Deserialize, Serialize};
 use syslog_loose::{Message, ProcId, Protocol, StructuredElement, SyslogFacility, SyslogSeverity};
 
-//#[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[derive(Derivative, Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Format {
@@ -340,7 +337,7 @@ fn get_severity(value: Value) -> Option<SyslogSeverity> {
     }
 }
 
-/// Syslog Severities from RFC 5424.
+// Syslog Severities from RFC 5424.
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "SyslogSeverity")]
 #[allow(non_camel_case_types)]
@@ -355,7 +352,7 @@ pub enum SyslogSeverityDef {
     SEV_DEBUG = 7,
 }
 
-/// Names are from Linux.
+// Names are from Linux.
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "SyslogFacility")]
 #[allow(non_camel_case_types)]
@@ -389,7 +386,7 @@ pub enum SyslogFacilityDef {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Event;
+    use crate::event::Event;
     use chrono::Utc;
 
     #[test]
@@ -397,11 +394,11 @@ mod tests {
         crate::test_util::test_generate_config::<SyslogSinkConfig>();
     }
 
-    fn build_message(event: Event, rfc3164: bool) -> Option<Bytes> {
+    fn build_message(event: Event, format: Format) -> Option<Bytes> {
         build_syslog_message(
             event,
             false,
-            rfc3164,
+            format,
             true,
             "appname",
             "facility",
@@ -424,7 +421,7 @@ mod tests {
         event.as_mut_log().insert("hostname", "foohost");
         event.as_mut_log().insert("appname", "myapp");
 
-        let bytes = build_message(event, false).unwrap();
+        let bytes = build_message(event, Format::RFC5424).unwrap();
 
         let msg =
             Bytes::from("<14>1 2021-04-12T21:00:01+00:00 foohost myapp vector - - A message\n");
@@ -444,7 +441,7 @@ mod tests {
         event.as_mut_log().insert("severity", "warning");
         event.as_mut_log().insert("facility", "kern");
 
-        let bytes = build_message(event, true).unwrap();
+        let bytes = build_message(event, Format::RFC3164).unwrap();
 
         let msg = Bytes::from("<4> 2021-04-12T21:00:01+00:00 foo bar[vector]: A message\n");
 
