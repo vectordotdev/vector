@@ -67,12 +67,19 @@ components: sinks: syslog: {
 
 	configuration:  sinks.socket.configuration & {
 	    "type": "type": string: enum: syslog: "The type of this component."
-		rfc3164: {
-			common: true
-			description: "If this is set to `true` the message will be formatted according to the RFC3164 else the RFC5424 will be used."
-			required: false
+		format: {
+			common:      true
+			description: "The Syslog format used to send message, RFC3164 and RFC5424 are supported."
+			required:    false
 			warnings: []
-            type: bool: default: false
+			type: string: {
+				default: "rfc5424"
+				enum: {
+					rfc3164: "Format message according to [RFC3164](https://tools.ietf.org/html/rfc3164."
+					rfc5424: "Format message according to [RFC5424](https://tools.ietf.org/html/rfc5424."
+				}
+			syntax: "literal"
+			}
 		}
 		include_extra_fields: {
 			common: false

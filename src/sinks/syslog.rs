@@ -12,13 +12,32 @@ use chrono::{FixedOffset, TimeZone};
 use serde::{Deserialize, Serialize};
 use syslog_loose::{Message, ProcId, Protocol, StructuredElement, SyslogFacility, SyslogSeverity};
 
+//#[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Derivative, Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Format {
+    RFC3164,
+    RFC5424,
+}
+
+impl From<Format> for Protocol {
+    fn from(f: Format) -> Protocol {
+        match f {
+            Format::RFC3164 => Protocol::RFC3164,
+            Format::RFC5424 => Protocol::RFC5424(1),
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 // TODO: add back when serde-rs/serde#1358 is addressed
 // #[serde(deny_unknown_fields)]
 pub struct SyslogSinkConfig {
     #[serde(flatten)]
     mode: Mode,
-    rfc3164: bool,
+    #[serde(default = "format")]
+    format: Format,
+    #[serde(default = "crate::serde::default_false")]
     include_extra_fields: bool,
     #[serde(default = "appname_key")]
     appname_key: String,
@@ -36,6 +55,10 @@ pub struct SyslogSinkConfig {
     default_facility: SyslogFacility,
     #[serde(with = "SyslogSeverityDef", default = "severity")]
     default_severity: SyslogSeverity,
+}
+
+fn format() -> Format {
+    Format::RFC5424
 }
 
 fn appname_key() -> String {
@@ -101,7 +124,7 @@ impl SinkConfig for SyslogSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let rfc3164 = self.rfc3164.clone();
+        let format = self.format.clone();
         let include_extra_fields = self.include_extra_fields.clone();
         let appname_key = self.appname_key.to_owned();
         let facility_key = self.facility_key.to_owned();
@@ -116,7 +139,7 @@ impl SinkConfig for SyslogSinkConfig {
             build_syslog_message(
                 event,
                 include_len,
-                rfc3164,
+                format,
                 include_extra_fields,
                 appname_key.as_str(),
                 facility_key.as_str(),
@@ -149,7 +172,7 @@ impl SinkConfig for SyslogSinkConfig {
 fn build_syslog_message(
     event: Event,
     include_len: bool,
-    rfc3164: bool,
+    format: Format,
     include_extra_fields: bool,
     appname_key: &str,
     facility_key: &str,
@@ -177,11 +200,7 @@ fn build_syslog_message(
         .or(Some(ProcId::Name("vector".to_string())));
 
     let msg = Message {
-        protocol: if rfc3164 {
-            Protocol::RFC3164
-        } else {
-            Protocol::RFC5424(1)
-        },
+        protocol: format.into(),
         timestamp: ts,
         procid: procid,
         facility: log
