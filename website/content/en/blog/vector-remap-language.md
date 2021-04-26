@@ -1,5 +1,6 @@
 ---
 title: Vector Remap Language
+short: VRL
 description: A fast and safe way to transform observability data
 authors: ["binarylogic"]
 date: "2021-02-15"

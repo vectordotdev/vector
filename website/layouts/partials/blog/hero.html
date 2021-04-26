@@ -1,0 +1,40 @@
+{{ $date := .Date | dateFormat "January 2, 2006" }}
+<div class="pb-16 sm:pb-24">
+  <div class="max-w-xl">
+    <div class="mb-4 md:mb-6">
+      {{ partial "breadcrumb.html" . }}
+    </div>
+
+    <h2 class="dark:text-gray-50 font-secondary font-extrabold text-4xl md:text-5xl tracking-tight sm:tracking-tighter leading-tight">
+      {{ .Title }}
+    </h2>
+
+    {{ with .Description }}
+    <p class="dark:text-gray-200 mt-5 text-xl text-gray-500 prose dark:prose-dark">
+      {{ . | markdownify }}
+    </p>
+    {{ end }}
+
+    <div class="mt-3 flex items-center space-x-1 text-gray-500 dark:text-gray-300">
+      <time datetime="{{ $date }}">
+        {{ $date }}
+      </time>
+      <span aria-hidden="true">
+        &middot;
+      </span>
+      <span>
+        <strong>{{ .ReadingTime }}</strong> min read
+      </span>
+    </div>
+
+    <div class="mt-5">
+      {{ partial "blog/authors.html" . }}
+    </div>
+  </div>
+</div>
+
+{{ define "blog-hero-badge" }}
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-{{ .bg }} text-{{ .text }} dark:bg-{{ .bg_dark }} dark:text-gray-100">
+  {{ .word }}
+</span>
+{{ end }}

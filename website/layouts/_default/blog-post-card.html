@@ -1,79 +1,53 @@
-{{ $title := .Params.short | default .Title }}
-{{ $allAuthors := site.Data.docs.authors }}
 {{ $date := .Date | dateFormat "January 2, 2006" }}
-{{ $type := .Params.tags.type | default "announcement" }}
-{{ $domains := .Params.tags.domains }}
-<div class="card is-hoverable has-medium-padding" x-data="{ type: '{{ $type }}' }">
-  <div class="card-content">
-    <div class="media">
-      <div class="media-content">
-        <p class="title is-size-4 is-size-5-mobile has-text-weight-semibold is-spaced">
-          <a href="{{ .RelPermalink }}">
-            {{ $title }}
-          </a>
-        </p>
+<div class="flex flex-col border rounded-lg p-6 dark:border-gray-700 shadow-lg">
+  <div class="flex-1">
+    <a href="{{ .RelPermalink }}" class="text-2xl font-bold tracking-tight dark:text-gray-200 hover:text-secondary dark:hover:text-primary">
+      {{ .Title }}
+    </a>
 
-        <p class="has-text-weight-light">
-          <span>
-            {{ $date }}
-          </span>
-
-          /
-
-          <span>
-            {{ .ReadingTime }} min read
-          </span>
-        </p>
-      </div>
+    <div class="mt-2.5 flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
+      <time datetime="{{ $date }}">
+        {{ $date }}
+      </time>
+      <span aria-hidden="true">
+        &middot;
+      </span>
+      <span>
+        <strong>{{ .ReadingTime }}</strong> min read
+      </span>
     </div>
-
-    {{ with .Params.authors }}
-    {{ range . }}
-    {{ $author := index (where $allAuthors "handle" "==" .) 0 }}
-    {{ $authorImg := printf "https://github.com/%s.png" $author.handle }}
-    {{ $authorUrl := printf "https://github.com/%s" $author.handle }}
-    <div class="media">
-      <div class="media-left">
-        <figure class="image is-48x48">
-          <img class="is-rounded" src="{{ $authorImg }}" alt="GitHub avatar for author {{ $author.name }}">
-        </figure>
-      </div>
-      <div class="media-content">
-        <a href="{{ $authorUrl }}" target="_blank">
-          {{ $author.name }}
-        </a>
-      </div>
-    </div>
-    {{ end }}
-    {{ end }}
 
     {{ with .Description }}
-    <div class="content has-text-grey">
+    <p class="my-5 text-semibold text-gray-500 dark:text-gray-300">
       {{ . }}
-    </div>
+    </p>
     {{ end }}
-
-    <div class="buttons are-small">
-      <div class="button is-rounded is-secondary is-outlined no-hover">
-        <span>
-          type:&nbsp;
-        </span>
-        <span class="has-text-weight-bold">
-          {{ $type }}
-        </span>
-      </div>
-      {{ with $domains }}
-      {{ range . }}
-      <div class="button is-rounded is-purple is-outlined no-hover">
-        <span>
-          domain:&nbsp;
-        </span>
-        <span class="has-text-weight-bold">
-          {{ . }}
-        </span>
-      </div>
-      {{ end }}
-      {{ end }}
-    </div>
   </div>
+
+  {{/* Author(s) info */}}
+  <div class="mb-5">
+    {{ partial "blog/authors.html" . }}
+  </div>
+
+  {{ with .Params.tags }}
+  <div class="block space-y-1.5">
+    {{ template "blog-post-badge" (dict "type" .type "bg" "indigo-100" "text" "indigo-800" "bg_dark" "indigo-700" "text_dark" "indigo-100") }}
+
+    {{ range .domains }}
+    {{ template "blog-post-badge" (dict "domain" . "bg" "green-200" "text" "green-800" "bg_dark" "green-700" "text_dark" "green-100") }}
+    {{ end }}
+  </div>
+  {{ end }}
 </div>
+
+{{ define "blog-post-badge" }}
+<span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-{{ .bg }} text-{{ .text }} dark:bg-{{ .bg_dark }} dark:text-{{ .text_dark }}">
+  {{ with .type }}
+  type:&nbsp;<strong>{{ . }}</strong>
+  {{ end }}
+
+  {{ with .domain }}
+  domain:&nbsp;<strong>{{ . }}</strong>
+  {{ end }}
+</span>
+{{ end }}
