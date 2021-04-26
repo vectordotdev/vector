@@ -7,9 +7,9 @@ kind: sink
 
 {{< component/config >}}
 
-## Output
+## Environment variables
 
-{{< component/output >}}
+{{< component/env-vars >}}
 
 ## Telemetry
 

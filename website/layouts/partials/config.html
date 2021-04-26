@@ -309,7 +309,7 @@
       {{ range $k, $v := $v.type }}
       {{ with $v.default }}
       <p>
-        Default: {{ . }}
+        Default: <code>{{ . }}</code>
       </p>
       {{ end }}
       {{ end }}
@@ -317,6 +317,38 @@
       <div>
         {{ $v.description | markdownify }}
       </div>
+
+      {{ range $k, $v := $v.type }}
+      {{ with $v.examples }}
+      <div x-data="{ open: true }" class="mt-2 border rounded py-2 px-3">
+        <span class="flex justify-between items-center">
+          <span>
+            Examples
+          </span>
+
+          <a @click="open = !open">
+            <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+
+            <svg x-show="open" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+            </svg>
+          </a>
+        </span>
+
+        <div x-show="open">
+          {{ range . }}
+          <div class="overflow-x-scroll">
+            <span class="font-mono">
+              {{ . }}
+            </span>
+          </div>
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+      {{ end }}
     </div>
     {{ end }}
   </div>
