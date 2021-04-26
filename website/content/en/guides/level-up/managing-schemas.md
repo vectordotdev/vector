@@ -1,5 +1,6 @@
 ---
 title: Encoding, Decoding, and Managing Schemas
+short: Schemas
 description: Learn how to manage log schemas with Vector.
 author_github: https://github.com/hoverbear
 domain: schemas
@@ -256,6 +257,9 @@ and a `last_name` field coming from a source, and we'd like to output a `name` f
 {{< info >}}
 What if you had to do this in reverse? Try using the [`regex_parser`][docs.transforms.regex_parser] or
 [`split`][docs.transforms.split] transforms.
+
+[docs.transforms.regex_parser]: /docs/reference/configuration/transforms/regex_parser
+[docs.transforms.split]: /docs/reference/configuration/transforms/split
 {{< /info >}}
 
 ## Coercing Data Types
@@ -335,6 +339,5 @@ Where are you deploying Vector? Let us know, maybe we can help optimize it!
 [docs.sources]: /docs/reference/configuration/sources/
 [docs.transforms.grok_parser]: /docs/reference/configuration/transforms/grok_parser/
 [docs.transforms.json_parser]: /docs/reference/configuration/transforms/json_parser/
-[docs.transforms.regex_parser]: /docs/reference/configuration/transforms/regex_parser/
 [docs.transforms.remap]: /docs/reference/configuration/transforms/remap/
-[docs.transforms.split]: /docs/reference/configuration/transforms/split/
+

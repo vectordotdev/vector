@@ -13,7 +13,7 @@
 
   {{ with .Description }}
   <div class="mt-5 text-md dark:text-gray-300 text-gray-700 leading-snug">
-    {{ . | markdownify | plainify }}
+    {{ . | markdownify }}
   </div>
   {{ end }}
 </div>

@@ -3,90 +3,22 @@
 {{ end }}
 
 {{ define "main" }}
-{{ $desc := .Description }}
+{{ $here := .RelPermalink }}
+<div class="relative max-w-3xl lg:max-w-5xl mx-auto px-6 lg:px-8 lg:grid lg:grid-cols-5 lg:gap-8 mt-16">
+  <main aria-label="Main guide content" class="lg:col-span-4 md:px-0">
+    {{ partial "docs/hero.html" . }}
 
-<section class="section">
-  <div class="container">
-    <div class="columns is-variable is-8">
-      <div class="column is-one-third">
-        <section class="is-sticky with-larger-margin">
-          <p class="is-uppercase has-text-primary has-text-weight-semibold mb-2">
-            <a href="{{ .CurrentSection.RelPermalink }}">
-              {{ .CurrentSection.Title }}
-            </a>
-          </p>
-
-          <p class="title is-size-2 is-size-3-mobile has-text-weight-light{{ if $desc }} is-spaced{{ end }}">
-            {{ with .Weight }}{{ . }}. {{ end }}{{ .Title }}
-          </p>
-
-          {{ with $desc }}
-          <p class="subtitle has-text-grey">
-            {{ . }}
-          </p>
-          {{ end }}
-
-          <div class="mb-3">
-            <p class="is-size-4 is-size-5-mobile mb-3">
-              Stats
-            </p>
-
-            <p>
-              <span class="icon">
-                <i class="fas fa-clock has-text-purple"></i>
-              </span>
-              <span>
-                {{ .ReadingTime }}-minute read
-              </span>
-            </p>
-          </div>
-
-          {{ if gt (len .TableOfContents) 32 }}
-          <p class="is-size-4 is-size-5-mobile has-text-grey-dark mb-3">
-            Contents
-          </p>
-
-          <div id="docs-toc" class="is-hidden-mobile"></div>
-          {{ end }}
-
-          {{ if or .NextInSection .PrevInSection }}
-          <p class="is-size-5 is-size-6-mobile has-text-grey-dark mt-5 mb-2">
-            Navigation
-          </p>
-
-          {{ with .NextInSection }}
-          <p>
-            <span class="icon has-text-purple">
-              <i class="fas fa-arrow-left"></i>
-            </span>
-            <a href="{{ .RelPermalink }}" class="has-text-black">
-              {{ .Weight }}. {{ .Title }}
-            </a>
-          </p>
-          {{ end }}
-
-          {{ with .PrevInSection }}
-          <p>
-            <span class="icon has-text-purple">
-              <i class="fas fa-arrow-right"></i>
-            </span>
-            <a href="{{ .RelPermalink }}" class="has-text-black">
-              {{ .Weight }}. {{ .Title }}
-            </a>
-          </p>
-          {{ end }}
-          {{ end }}
-        </section>
-      </div>
-
-      <div class="column is-two-thirds">
-        <section class="section">
-          <div class="content with-limited-chars pb-6" id="docs-content">
-            {{ .Content }}
-          </div>
-        </section>
-      </div>
+    <div class="pb-32">
+      {{ partial "docs/content.html" . }}
     </div>
+
+    {{ partial "docs/pagination.html" . }}
+  </main>
+
+  <div class="hidden lg:block xl:col-span-1">
+    <aside aria-label="Table of contents" class="sticky top-6">
+      {{ partial "docs/toc.html" . }}
+    </aside>
   </div>
-</section>
+</div>
 {{ end }}

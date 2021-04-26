@@ -19,7 +19,7 @@
             {{ range $menu }}
             {{ $isActive := hasPrefix $here .URL }}
             <a href="{{ .URL }}" class="flex items-center tracking-tight px-2.5 py-1.5 rounded-sm text-normal font-normal">
-              <span class="dark:text-gray-300 hover:text-primary dark:hover:text-secondary{{ if $isActive }} dark:text-primary text-secondary{{ end }}">
+              <span class="dark:text-gray-300 hover:text-primary-dark dark:hover:text-secondary{{ if $isActive }} dark:text-primary text-secondary{{ end }}">
                 {{ .Name }}
               </span>
               {{ if .Params.flyout }}

@@ -5,14 +5,14 @@
 {{ define "main" }}
 {{ $rss := .OutputFormats.Get "rss" }}
 {{ $posts := .RegularPages }}
-<div class="relative max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-6 lg:px-8 my-16 xl:grid xl:grid-cols-3 gap-8">
-  <div class="col-span-1">
+<div class="relative max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-6 lg:px-8 my-16 xl:grid xl:grid-cols-7 xl:gap-12">
+  <div class="col-span-2">
     <div class="max-w-xl">
       <div class="mb-4 md:mb-6">
         {{ partial "breadcrumb.html" . }}
       </div>
 
-      <h2 class="dark:text-gray-50 font-secondary font-extrabold text-4xl md:text-5xl tracking-tight sm:tracking-tighter leading-tight">
+      <h2 class="dark:text-gray-50 font-secondary font-extrabold text-4xl md:text-5xl tracking-tight leading-tight">
         {{ .Title }}
       </h2>
 
@@ -22,8 +22,8 @@
       </p>
       {{ end }}
 
-      <div class="mt-5">
-        <a type="button" href="{{ $rss.RelPermalink }}" class="inline-flex items-center px-3 py-2 space-x-1.5 border border-transparent shadow-sm text-sm leading-4 font-medium rounded text-white bg-rss-orange focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-rss-orange" target="_blank">
+      <div class="mt-8">
+        <a type="button" href="{{ $rss.RelPermalink }}" class="inline-flex items-center px-3 py-1.5 space-x-1.5 border border-transparent shadow-sm text-xs md:text-sm leading-4 font-medium rounded text-white bg-rss-orange focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-rss-orange hover:bg-yellow-400 dark:hover:bg-yellow-600" target="_blank">
           <ion-icon name="logo-rss"></ion-icon>
           <span>
             RSS
@@ -33,7 +33,7 @@
     </div>
   </div>
 
-  <div class="col-span-2 sm:mt-8">
+  <div class="col-span-5 sm:mt-8 mt-10 xl:mt-0">
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
       {{ range $posts }}
       {{ $date := .Date | dateFormat "January 2, 2006" }}
@@ -90,10 +90,10 @@
 
         {{ with .Params.tags }}
         <div class="block space-y-1.5">
-          {{ template "badge" (dict "type" .type "bg" "indigo-100" "text" "indigo-800" "bg_dark" "indigo-700" "text_dark" "indigo-100") }}
+          {{ template "blog-post-badge" (dict "type" .type "bg" "indigo-100" "text" "indigo-800" "bg_dark" "indigo-700" "text_dark" "indigo-100") }}
 
           {{ range .domains }}
-          {{ template "badge" (dict "domain" . "bg" "green-200" "text" "green-800" "bg_dark" "green-700" "text_dark" "green-100") }}
+          {{ template "blog-post-badge" (dict "domain" . "bg" "green-200" "text" "green-800" "bg_dark" "green-700" "text_dark" "green-100") }}
           {{ end }}
         </div>
         {{ end }}
@@ -104,7 +104,7 @@
 </div>
 {{ end }}
 
-{{ define "badge" }}
+{{ define "blog-post-badge" }}
 <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-{{ .bg }} text-{{ .text }} dark:bg-{{ .bg_dark }} dark:text-{{ .text_dark }}">
   {{ with .type }}
   type:&nbsp;<strong>{{ . }}</strong>
