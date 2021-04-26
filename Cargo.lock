@@ -6946,9 +6946,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-postgres"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98779a950cb6ef76f8ad71c411176115c5c1200a83eeeca4dd9f61e3fc4836c8"
+checksum = "2d2b1383c7e4fb9a09e292c7c6afb7da54418d53b045f1c1fac7a911411a2b8b"
 dependencies = [
  "async-trait",
  "byteorder",
