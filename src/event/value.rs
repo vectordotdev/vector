@@ -1646,6 +1646,15 @@ mod test {
             assert_eq!(value.as_map().unwrap()["a"].as_array()[0], marker);
             assert_eq!(value.as_map().unwrap()["a"].as_array()[1], Value::Null);
             assert_eq!(value.as_map().unwrap()["a"].as_array()[2], marker);
+
+            // Replace the value at 0.
+            let lookup = LookupBuf::from_str("a[0]").unwrap();
+            let marker = Value::from(false);
+            assert_eq!(
+                value.insert(lookup.clone(), marker.clone()).unwrap(),
+                Some(Value::from(true))
+            );
+            assert_eq!(value.as_map().unwrap()["a"].as_array()[0], marker);
         }
     }
 
@@ -1699,32 +1708,6 @@ mod test {
             assert_eq!(value.remove(&lookup, true).unwrap(), Some(marker));
             assert!(!value.contains(0));
         }
-    }
-
-    #[test]
-    fn test_thing() {
-        let mut value = Value::from(BTreeMap::default());
-        let marker = Value::from(true);
-        let path = LookupBuf::from_segments(vec![SegmentBuf::from("field"), SegmentBuf::Index(-1)]);
-
-        assert_eq!(
-            value.insert(path.clone(), marker.clone()).unwrap(),
-            None,
-            "inserting value"
-        );
-        assert_eq!(value.get(&path).unwrap(), Some(&marker), "retrieving value");
-
-        let lookup = Lookup::from(&path);
-        assert_eq!(
-            value.remove(lookup, true).unwrap(),
-            Some(marker),
-            "removing value"
-        );
-        assert_eq!(
-            value,
-            Value::from(BTreeMap::default()),
-            "should have empty value again"
-        );
     }
 
     #[test]

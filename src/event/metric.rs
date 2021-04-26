@@ -757,7 +757,7 @@ impl Target for Metric {
             return Err(MetricPathError::SetPathError.to_string());
         }
 
-        if let Some(paths) = path.to_alternative_components().get(0) {
+        if let Some(paths) = path.to_alternative_components(3).get(0) {
             match paths.as_slice() {
                 ["tags"] => {
                     let value = value.try_object().map_err(|e| e.to_string())?;
@@ -841,7 +841,7 @@ impl Target for Metric {
             return Ok(Some(map.into()));
         }
 
-        for paths in path.to_alternative_components() {
+        for paths in path.to_alternative_components(3) {
             match paths.as_slice() {
                 ["name"] => return Ok(Some(self.name().to_string().into())),
                 ["namespace"] => match &self.series.name.namespace {
@@ -884,7 +884,7 @@ impl Target for Metric {
             return Err(MetricPathError::SetPathError.to_string());
         }
 
-        if let Some(paths) = path.to_alternative_components().get(0) {
+        if let Some(paths) = path.to_alternative_components(3).get(0) {
             match paths.as_slice() {
                 ["namespace"] => return Ok(self.series.name.namespace.take().map(Into::into)),
                 ["timestamp"] => return Ok(self.data.timestamp.take().map(Into::into)),
