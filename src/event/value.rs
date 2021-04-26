@@ -1481,19 +1481,6 @@ mod test {
         }
 
         #[test]
-        fn zero_index() {
-            let mut value = Value::from(BTreeMap::default());
-            let key = "[0]";
-            let lookup = LookupBuf::from_str(key).unwrap();
-            let marker = Value::from(true);
-
-            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
-            assert_eq!(value.as_array().len(), 1);
-            assert_eq!(value.as_array()[0], marker);
-            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
-        }
-
-        #[test]
         fn nested_index() {
             let mut value = Value::from(Vec::<Value>::default());
             let key = "[0][0]";
@@ -1594,39 +1581,6 @@ mod test {
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
-        }
-
-        #[test]
-        fn coalesced_index() {
-            let mut value = Value::from(Vec::<Value>::default());
-            let key = "([0] | [1])";
-            let lookup = LookupBuf::from_str(key).unwrap();
-            let mut marker = Value::from(true);
-            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
-            assert_eq!(value.as_array()[0], marker);
-            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
-            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
-            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker));
-        }
-
-        #[test]
-        fn coalesced_index_with_tail() {
-            let mut value = Value::from(Vec::<Value>::default());
-            let key = "([0] | [1]).bloop";
-            let lookup = LookupBuf::from_str(key).unwrap();
-            let mut marker = Value::from(true);
-            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
-            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None); // Duplicated on purpose.
-            assert_eq!(value.as_array()[0].as_map().unwrap()["bloop"], marker);
-            assert_eq!(value.as_array()[1].as_map().unwrap()["bloop"], marker);
-            assert_eq!(value.get(&lookup).unwrap(), Some(&marker));
-            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker));
-            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker.clone()));
-
-            assert_eq!(value.as_array()[1].as_map().unwrap()["bloop"], marker);
-            assert_eq!(value.get(&lookup).unwrap(), Some(&marker)); // Duplicated on purpose.
-            assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker)); // Duplicated on purpose.
-            assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker)); // Duplicated on purpose.
         }
 
         #[test]
