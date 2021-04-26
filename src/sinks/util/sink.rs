@@ -32,11 +32,16 @@
 //! it to notify the consumer that the request has succeeded.
 
 use super::{
-    batch::{Batch, MetadataBatch, MetadataBatchInput, PushResult, StatefulBatch},
+    batch::{
+        Batch, MetadataBatch, MetadataBatchInput, MetadataBatchOutput, PushResult, StatefulBatch,
+    },
     buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
     service::{Map, ServiceBuilderExt},
 };
-use crate::{buffers::Acker, event::Event};
+use crate::{
+    buffers::Acker,
+    event::{Event, EventMetadata, EventStatus},
+};
 use async_trait::async_trait;
 use futures::{
     future::BoxFuture,
@@ -306,7 +311,7 @@ where
 
                     let batch_size = batch.num_items();
                     let output = batch.finish();
-                    tokio::spawn(self.service.call(output.body, batch_size));
+                    tokio::spawn(self.service.call_batch(output, batch_size));
 
                     batch_consumed = true;
                 } else {
@@ -396,7 +401,20 @@ where
         self.service.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, req: Request, batch_size: usize) -> BoxFuture<'static, ()> {
+    fn call_batch<B: Batch<Output = Request>>(
+        &mut self,
+        batch: MetadataBatchOutput<B>,
+        batch_size: usize,
+    ) -> BoxFuture<'static, ()> {
+        self.call(batch.body, batch_size, batch.metadata)
+    }
+
+    fn call(
+        &mut self,
+        req: Request,
+        batch_size: usize,
+        metadata: Vec<EventMetadata>,
+    ) -> BoxFuture<'static, ()> {
         let seqno = self.seq_head;
         self.seq_head += 1;
 
@@ -415,16 +433,22 @@ where
             .call(req)
             .err_into()
             .map(move |result| {
-                match result {
+                let status = match result {
                     Ok(response) if response.is_successful() => {
                         trace!(message = "Response successful.", ?response);
+                        EventStatus::Delivered
                     }
                     Ok(response) => {
                         error!(message = "Response wasn't successful.", ?response);
+                        EventStatus::Failed
                     }
                     Err(error) => {
                         error!(message = "Request failed.", %error);
+                        EventStatus::Failed
                     }
+                };
+                for metadata in metadata {
+                    metadata.update_status(status);
                 }
 
                 // If the rx end is dropped we still completed
@@ -895,8 +919,8 @@ mod tests {
         let mut sink = ServiceSink::new(svc, acker);
 
         // send some initial requests
-        let mut fut1 = sink.call(1, 1);
-        let mut fut2 = sink.call(2, 2);
+        let mut fut1 = sink.call(1, 1, vec![]);
+        let mut fut2 = sink.call(2, 2, vec![]);
 
         assert_eq!(ack_counter.load(Relaxed), 0);
 
@@ -908,8 +932,8 @@ mod tests {
         assert_eq!(ack_counter.load(Relaxed), 3);
 
         // send one request that will error and one normal
-        let mut fut3 = sink.call(3, 3); // i will error
-        let mut fut4 = sink.call(4, 4);
+        let mut fut3 = sink.call(3, 3, vec![]); // i will error
+        let mut fut4 = sink.call(4, 4, vec![]);
 
         // make sure they all "worked"
         assert!(matches!(fut3.poll_unpin(&mut cx), Poll::Ready(())));
