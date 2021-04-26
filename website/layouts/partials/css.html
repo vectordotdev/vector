@@ -8,10 +8,17 @@
 {{ $postCssOpts  := dict "inlineImports" true }}
 {{ $css          := resources.Get $sass | resources.ExecuteAsTemplate $sass . | toCSS $cssOpts | postCSS $postCssOpts }}
 
+{{/* The Sass for the TOC needs to be handled separately, as PurgeCSS will eliminate all of these
+  classes since they're created at page load time by JavaScript */}}
+{{ $tocCss := resources.Get "sass/toc.sass" | toCSS $cssOpts }}
+
 {{/* Run CSS post-processing for production and preview builds */}}
 {{ if $serverMode }}
 <link rel="stylesheet" href="{{ $css.RelPermalink }}">
+<link rel="stylesheet" href="{{ $tocCss.RelPermalink }}">
 {{ else }}
-{{ $css := $css | minify | fingerprint | resources.PostProcess }}
+{{ $css := $css | fingerprint | resources.PostProcess }}
+{{ $tocCss := $tocCss | minify | fingerprint }}
 <link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
+<link rel="stylesheet" href="{{ $tocCss.RelPermalink }}" integrity="{{ $tocCss.Data.Integrity }}">
 {{ end }}
