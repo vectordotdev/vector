@@ -85,30 +85,30 @@ pub trait StreamSink {
 /// in all requests will not be acked until r1 has completed.
 #[pin_project]
 #[derive(Debug)]
-pub struct BatchSink<S, B, Request>
+pub struct BatchSink<S, B>
 where
-    B: Batch<Output = Request>,
+    B: Batch,
 {
     #[pin]
     inner: PartitionBatchSink<
-        Map<S, PartitionInnerBuffer<Request, ()>, Request>,
+        Map<S, PartitionInnerBuffer<B::Output, ()>, B::Output>,
         PartitionBuffer<B, ()>,
         (),
-        PartitionInnerBuffer<Request, ()>,
+        PartitionInnerBuffer<B::Output, ()>,
     >,
 }
 
-impl<S, B, Request> BatchSink<S, B, Request>
+impl<S, B> BatchSink<S, B>
 where
-    S: Service<Request>,
+    S: Service<B::Output>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response,
-    B: Batch<Output = Request>,
+    B: Batch,
 {
     pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
         let service = ServiceBuilder::new()
-            .map(|req: PartitionInnerBuffer<Request, ()>| req.into_parts().0)
+            .map(|req: PartitionInnerBuffer<B::Output, ()>| req.into_parts().0)
             .service(service);
         let batch = PartitionBuffer::new(batch);
         let inner = PartitionBatchSink::new(service, batch, timeout, acker);
@@ -117,22 +117,22 @@ where
 }
 
 #[cfg(test)]
-impl<S, B, Request> BatchSink<S, B, Request>
+impl<S, B> BatchSink<S, B>
 where
-    B: Batch<Output = Request>,
+    B: Batch,
 {
     pub fn get_ref(&self) -> &S {
         &self.inner.service.service.inner
     }
 }
 
-impl<S, B, Request> Sink<B::Input> for BatchSink<S, B, Request>
+impl<S, B> Sink<B::Input> for BatchSink<S, B>
 where
-    S: Service<Request>,
+    S: Service<B::Output>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response,
-    B: Batch<Output = Request>,
+    B: Batch,
 {
     type Error = crate::Error;
 

@@ -22,7 +22,7 @@ use tower::{
 };
 
 pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AdaptiveConcurrencyLimit<Timeout<S>, L>>>;
-pub type TowerBatchedSink<S, B, L, Request> = BatchSink<Svc<S, L>, B, Request>;
+pub type TowerBatchedSink<S, B, L> = BatchSink<Svc<S, L>, B>;
 pub type TowerPartitionSink<S, B, L, K, Request> = PartitionBatchSink<Svc<S, L>, B, K, Request>;
 
 pub trait ServiceBuilderExt<L> {
@@ -275,22 +275,22 @@ impl TowerRequestSettings {
         )
     }
 
-    pub fn batch_sink<B, L, S, Request>(
+    pub fn batch_sink<B, L, S>(
         &self,
         retry_logic: L,
         service: S,
         batch: B,
         batch_timeout: Duration,
         acker: Acker,
-    ) -> TowerBatchedSink<S, B, L, Request>
+    ) -> TowerBatchedSink<S, B, L>
     where
         L: RetryLogic<Response = S::Response>,
-        S: Service<Request> + Clone + Send + 'static,
+        S: Service<B::Output> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
         S::Future: Send + 'static,
-        B: Batch<Output = Request>,
-        Request: Send + Clone + 'static,
+        B: Batch,
+        B::Output: Send + Clone + 'static,
     {
         BatchSink::new(
             self.service(retry_logic, service),

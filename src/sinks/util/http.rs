@@ -61,7 +61,6 @@ where
         HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>, B::Output>,
         B,
         L,
-        B::Output,
     >,
     // An empty slot is needed to buffer an item where we encoded it but
     // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
