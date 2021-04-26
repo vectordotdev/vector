@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-use super::{EventFinalizer, EventFinalizers};
+use super::{EventFinalizer, EventFinalizers, EventStatus};
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
 
@@ -23,6 +23,11 @@ impl EventMetadata {
     /// Merge the other `EventMetadata` into this.
     pub fn merge(&mut self, other: Self) {
         self.finalizers.merge(other.finalizers);
+    }
+
+    /// Update the finalizer(s) status.
+    pub fn update_status(&self, status: EventStatus) {
+        self.finalizers.update_status(status);
     }
 }
 
