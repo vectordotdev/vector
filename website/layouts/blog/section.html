@@ -5,8 +5,8 @@
 {{ define "main" }}
 {{ $rss := .OutputFormats.Get "rss" }}
 {{ $posts := .RegularPages }}
-<div class="relative max-w-3xl mx-auto sm:px-6 lg:max-w-7xl lg:px-8 lg:grid lg:grid-cols-16 lg:gap-x-8 xl:gap-x-10 mt-8 mb-12">
-  <div class="lg:col-span-6 xl:col-span-4 pr-0 lg:pr-6 md:pr-2">
+<div class="relative max-w-3xl mx-auto sm:px-6 lg:max-w-7xl lg:px-8 xl:grid lg:grid-cols-3 xl:gap-x-6 space-y-8 xl:space-y-0 mt-8 mb-12">
+  <div class="xl:col-span-1 pr-0 lg:pr-6 md:pr-2">
     <div class="px-6 lg:p-0">
       <div class="max-w-xl">
         <div class="mb-4 md:mb-6">
@@ -35,31 +35,31 @@
     </div>
   </div>
 
-  <div class="lg:col-span-10 xl:col-span-12 mt-10 lg:mt-0">
+  <div class="xl:col-span-2">
     <div class="px-6 lg:p-0">
       <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
         {{ range $posts }}
         {{ $date := .Date | dateFormat "January 2, 2006" }}
-        <div class="flex flex-col border rounded-lg p-6 dark:border-gray-800">
+        <div class="flex flex-col border rounded-lg p-6 dark:border-gray-800 shadow-lg">
           <div class="flex-1">
-            <a href="{{ .RelPermalink }}" class="text-2xl block font-bold tracking-tight dark:text-gray-200 hover:text-secondary dark:hover:text-primary">
+            <a href="{{ .RelPermalink }}" class="text-2xl font-bold tracking-tight dark:text-gray-200 hover:text-secondary dark:hover:text-primary">
               {{ .Title }}
             </a>
 
-            <div class="mt-2.5 flex space-x-1 text-sm text-gray-500 dark:text-gray-400">
-              <time datetime="2020-03-16">
+            <div class="mt-2.5 flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
+              <time datetime="{{ $date }}">
                 {{ $date }}
               </time>
               <span aria-hidden="true">
                 &middot;
               </span>
               <span>
-                {{ .ReadingTime }} min read
+                <strong>{{ .ReadingTime }}</strong> min read
               </span>
             </div>
 
             {{ with .Description }}
-            <p class="my-5 text-base text-gray-500 dark:text-gray-300">
+            <p class="my-5 text-semibold text-gray-500 dark:text-gray-300">
               {{ . }}
             </p>
             {{ end }}
@@ -83,7 +83,7 @@
                 {{ range .Params.authors }}
                 {{ $name := (index (where site.Data.docs.authors ".handle" "eq" .) 0).name }}
                 {{ $link := printf "https://github.com/%s" . }}
-                <a href="{{ $link }}" class="text-gray-700 hover:text-secondary dark:text-gray-200">
+                <a href="{{ $link }}" class="text-md font-bold tracking-tight text-gray-700 hover:text-secondary dark:text-gray-200">
                   {{ $name }}
                 </a>
                 {{ end }}
