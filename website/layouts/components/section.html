@@ -8,7 +8,7 @@ Components - Sources, Transforms, and Sinks | {{ site.Title }}
 <div class="relative max-w-3xl mx-auto sm:px-6 lg:max-w-7xl lg:px-8 mt-8 pb-24">
   <div class="pb-16 sm:pb-24 px-6 md:px-0">
     <div class="mb-4 md:mb-6">
-      {{ partial "docs/breadcrumb.html" . }}
+      {{ partial "breadcrumb.html" . }}
     </div>
 
     <h2 class="dark:text-gray-50 font-secondary font-extrabold text-4xl md:text-5xl tracking-tight sm:tracking-tighter leading-tight">
@@ -22,40 +22,25 @@ Components - Sources, Transforms, and Sinks | {{ site.Title }}
     {{ end }}
   </div>
 
-  <div class="lg:grid lg:grid-cols-16 px-6 md:px-0">
-    <div class="flex flex-col space-y-3 lg:col-span-4 pb-12 lg:pb-0">
-      {{ range .Params.criteria }}
-      {{ range $k, $v := . }}
-      {{ $id := $k | urlize }}
-      <p class="lg:text-md font-semibold uppercase dark:text-gray-200 text-base">
-        {{ $k }}
-      </p>
-
-      <div class="flex flex-col space-y-1">
-        {{ range $v }}
-        <p>
-          <input type="checkbox" class="h-5 w-5 dark:bg-gray-300 bg-gray-100 border-1 dark:border-gray-300 border-gray-200 rounded text-gray-500" unchecked>
-          <span class="ml-2.5 dark:text-gray-300 text-gray-700">
-            {{ . }}
-          </span>
-        </p>
-        {{ end }}
-      </div>
-      {{ end }}
-      {{ end }}
-    </div>
-
-    <div class="lg:col-span-12 flex flex-col space-y-10">
+  <div class="px-6 md:px-0">
+    <div class="flex flex-col space-y-12">
       {{ range $types }}
       {{ $components := where site.RegularPages ".CurrentSection.Params.short" . }}
       {{ $num := len $components }}
+      {{ $link := printf "docs/reference/configuration/%s" (. | lower) | relURL }}
 
       <div>
-        <p class="text-2xl md:text-3xl font-light mb-4 dark:text-gray-200">
-          {{ $num }} {{ . }}
+        <p class="text-2xl md:text-3xl mb-4 dark:text-gray-200">
+          <span>
+            {{ $num }}
+          </span>
+
+          <a href="{{ $link }}" class="font-bold hover:text-secondary dark:hover:text-primary">
+            {{ . }}
+          </a>
         </p>
 
-        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {{ range $components }}
           {{ .Render "component-card" }}
           {{ end }}

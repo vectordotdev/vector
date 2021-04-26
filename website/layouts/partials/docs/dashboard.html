@@ -1,6 +1,6 @@
 {{ $here := .RelPermalink }}
 {{ $hasToc := not .Params.no_toc }}
-<div class="relative max-w-3xl mx-auto sm:px-6 lg:max-w-7xl lg:px-8 lg:grid lg:grid-cols-16 lg:gap-8 mt-8">
+<div class="relative max-w-3xl mx-auto px-6 lg:px-8 lg:max-w-7xl lg:grid lg:grid-cols-16 lg:gap-8 mt-8">
   <div class="hidden lg:block lg:col-span-5 xl:col-span-4 pr-0 lg:pr-6 md:pr-2">
     <nav aria-label="Sidebar" class="sticky top-6 pr-0 lg:pr-4 pb-16" x-cloak>
       {{ partial "docs/sidebar.html" . }}

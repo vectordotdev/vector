@@ -1,66 +1,52 @@
-<div class="card">
-  <div class="card-content is-fullheight">
-    <article class="media">
-      <figure class="media-left">
-        <p class="title has-text-dark is-size-5 is-size-6-mobile">
-          {{ .Weight }}.
-        </p>
-      </figure>
-      <div class="media-content">
-        <p class="title is-size-5 is-size-6-mobile has-text-weight-bold mb-3">
-          <a href="{{ .RelPermalink }}">
-            {{ .Title }}
-          </a>
-        </p>
+<div class="py-5 px-6">
+  <p class="text-xl md:text-2xl text-black dark:text-gray-200">
+    <span class="font-extrabold">{{ .Weight }}</span>.
+    <a href="{{ .RelPermalink }}" class="ml-1 font-semibold tracking-tight hover:text-secondary dark:hover:text-primary">
+      {{ .Title }}
+    </a>
+  </p>
 
-        {{ with .Description }}
-        <div class="content">
-          {{ . | markdownify }}
-        </div>
-        {{ end }}
-      </div>
-    </article>
+  {{ with .Description }}
+  <div class="my-3 tracking-tight text-md lg:text-lg dark:text-gray-300 text-gray-500">
+    {{- . | markdownify -}}
+  </div>
+  {{ end }}
 
-    <nav class="level mt-2">
-      <div class="level-left"></div>
-      <div class="level-right">
-        <div class="level-item">
-          <div class="buttons are-small">
-            {{ with .Params.domain }}
-            <span class="button is-rounded is-primary is-outlined">
-              domain:&nbsp;<strong>{{ . }}</strong>
-            </span>
-            {{ end }}
+  <div class="block space-y-1.5">
+    {{ with .Params.domain }}
+    {{ template "guide-card-badge" (dict "domain" . "bg" "green-200" "text" "green-800" "bg_dark" "green-700" "text_dark" "green-100") }}
+    {{ end }}
 
-            {{ with .Params.transforms }}
-            {{ range . }}
-            {{ $url := printf "/docs/reference/configuration/transforms/%s" . | relURL }}
-            <a class="button is-rounded is-black is-outlined" href="{{ $url }}">
-              transform:&nbsp;<strong>{{ . }}</strong>
-            </a>
-            {{ end }}
-            {{ end }}
+    {{ range .Params.transforms }}
+    {{ template "guide-card-badge" (dict "transform" . "bg" "blue-200" "text" "blue-800" "bg_dark" "blue-700" "text_dark" "blue-100") }}
+    {{ end }}
 
-            {{ with .Params.sources }}
-            {{ range . }}
-            {{ $url := printf "/docs/reference/configuration/sources/%s" . | relURL }}
-            <a class="button is-rounded is-black is-light" href="{{ $url }}">
-              source:&nbsp;<strong>{{ . }}</strong>
-            </a>
-            {{ end }}
-            {{ end }}
+    {{ range .Params.sources }}
+    {{ template "guide-card-badge" (dict "source" . "bg" "blue-200" "text" "blue-800" "bg_dark" "blue-700" "text_dark" "blue-100") }}
+    {{ end }}
 
-            {{ with .Params.sinks }}
-            {{ range . }}
-            {{ $url := printf "/docs/reference/configuration/sinks/%s" . | relURL }}
-            <a class="button is-rounded is-black is-light" href="{{ $url }}">
-              sink:&nbsp;<strong>{{ . }}</strong>
-            </a>
-            {{ end }}
-            {{ end }}
-          </div>
-        </div>
-      </div>
-    </nav>
+    {{ range .Params.sinks }}
+    {{ template "guide-card-badge" (dict "sink" . "bg" "blue-200" "text" "blue-800" "bg_dark" "blue-700" "text_dark" "blue-100") }}
+    {{ end }}
   </div>
 </div>
+
+{{ define "guide-card-badge" }}
+<span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium bg-{{ .bg }} text-{{ .text }} dark:bg-{{ .bg_dark }} dark:text-{{ .text_dark }}">
+  {{ with .source }}
+  source:&nbsp;<strong>{{ . }}</strong>
+  {{ end }}
+
+  {{ with .transform }}
+  transform:&nbsp;<strong>{{ . }}</strong>
+  {{ end }}
+
+  {{ with .sink }}
+  sink:&nbsp;<strong>{{ . }}</strong>
+  {{ end }}
+
+  {{ with .domain }}
+  domain:&nbsp;<strong>{{ . }}</strong>
+  {{ end }}
+</span>
+{{ end }}
