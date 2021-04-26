@@ -5,11 +5,11 @@ use crate::{
     http::HttpClient,
     sinks::{
         util::{
+            batch::{BatchConfig, BatchSettings, MetadataBatchInput},
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
-            BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-            TowerRequestConfig,
+            PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
         },
         Healthcheck, HealthcheckError, UriParseError, VectorSink,
     },
@@ -195,7 +195,9 @@ impl SinkConfig for DatadogConfig {
             .with_flat_map(move |event: Event| {
                 stream::iter(normalizer.apply(event).map(|event| {
                     let endpoint = DatadogEndpoint::from_metric(&event);
-                    Ok(PartitionInnerBuffer::new(event, endpoint))
+                    Ok(MetadataBatchInput::new(PartitionInnerBuffer::new(
+                        event, endpoint,
+                    )))
                 }))
             });
 

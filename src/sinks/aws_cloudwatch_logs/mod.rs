@@ -6,10 +6,11 @@ use crate::{
     internal_events::TemplateRenderingFailed,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
+        batch::{BatchConfig, BatchSettings, MetadataBatchInput},
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchConfig, BatchSettings, Compression, EncodedLength, PartitionBatchSink,
-        PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
+        Compression, EncodedLength, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+        TowerRequestConfig, TowerRequestSettings, VecBuffer,
     },
     template::Template,
 };
@@ -440,7 +441,7 @@ fn partition_encode(
     encoding: &EncodingConfig<Encoding>,
     group: &Template,
     stream: &Template,
-) -> Option<PartitionInnerBuffer<InputLogEvent, CloudwatchKey>> {
+) -> Option<MetadataBatchInput<PartitionBuffer<VecBuffer<InputLogEvent>, CloudwatchKey>>> {
     let group = match group.render_string(&event) {
         Ok(b) => b,
         Err(error) => {
@@ -474,7 +475,9 @@ fn partition_encode(
         )
         .ok()?;
 
-    Some(PartitionInnerBuffer::new(event, key))
+    Some(MetadataBatchInput::new(PartitionInnerBuffer::new(
+        event, key,
+    )))
 }
 
 #[derive(Debug, Snafu)]
@@ -693,9 +696,8 @@ mod tests {
         let group = "group".try_into().unwrap();
         let encoding = Encoding::Text.into();
 
-        let (_event, key) = partition_encode(event, &encoding, &group, &stream)
-            .unwrap()
-            .into_parts();
+        let encoded = partition_encode(event, &encoding, &group, &stream).unwrap();
+        let (_event, key) = encoded.item.into_parts();
 
         let expected = CloudwatchKey {
             stream: "stream".into(),
@@ -715,9 +717,8 @@ mod tests {
         let group = "group".try_into().unwrap();
         let encoding = Encoding::Text.into();
 
-        let (_event, key) = partition_encode(event, &encoding, &group, &stream)
-            .unwrap()
-            .into_parts();
+        let encoded = partition_encode(event, &encoding, &group, &stream).unwrap();
+        let (_event, key) = encoded.item.into_parts();
 
         let expected = CloudwatchKey {
             stream: "stream".into(),
@@ -737,9 +738,8 @@ mod tests {
         let group = "group".try_into().unwrap();
         let encoding = Encoding::Text.into();
 
-        let (_event, key) = partition_encode(event, &encoding, &group, &stream)
-            .unwrap()
-            .into_parts();
+        let encoded = partition_encode(event, &encoding, &group, &stream).unwrap();
+        let (_event, key) = encoded.item.into_parts();
 
         let expected = CloudwatchKey {
             stream: "abcd-stream".into(),
@@ -759,9 +759,8 @@ mod tests {
         let group = "group".try_into().unwrap();
         let encoding = Encoding::Text.into();
 
-        let (_event, key) = partition_encode(event, &encoding, &group, &stream)
-            .unwrap()
-            .into_parts();
+        let encoded = partition_encode(event, &encoding, &group, &stream).unwrap();
+        let (_event, key) = encoded.item.into_parts();
 
         let expected = CloudwatchKey {
             stream: "stream-abcd".into(),

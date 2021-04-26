@@ -1,6 +1,7 @@
 use super::{
+    batch::{Batch, MetadataBatchInput},
     retries::{RetryAction, RetryLogic},
-    sink, Batch, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
+    sink, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestSettings,
 };
 use crate::{
@@ -305,7 +306,8 @@ where
         let mut this = self.project();
         if this.slot.is_some() {
             ready!(this.inner.as_mut().poll_ready(cx))?;
-            this.inner.as_mut().start_send(this.slot.take().unwrap())?;
+            let item = MetadataBatchInput::new(this.slot.take().unwrap());
+            this.inner.as_mut().start_send(item)?;
         }
 
         this.inner.poll_flush(cx)

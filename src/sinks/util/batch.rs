@@ -204,6 +204,17 @@ pub struct MetadataBatchInput<B: Batch> {
     pub metadata: Option<EventMetadata>,
 }
 
+impl<B: Batch> MetadataBatchInput<B> {
+    /// Create a trivial input with no metadata. This method will be
+    /// removed when all sinks are converted.
+    pub fn new(item: B::Input) -> Self {
+        Self {
+            item,
+            metadata: None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct MetadataBatchOutput<B: Batch> {
     pub body: B::Output,

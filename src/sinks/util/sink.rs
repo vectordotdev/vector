@@ -140,8 +140,9 @@ where
     }
 
     fn start_send(self: Pin<&mut Self>, item: B::Input) -> Result<(), Self::Error> {
-        let item = PartitionInnerBuffer::new(item, ());
-        self.project().inner.start_send(item)
+        self.project()
+            .inner
+            .start_send(MetadataBatchInput::new(PartitionInnerBuffer::new(item, ())))
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -212,7 +213,7 @@ where
     }
 }
 
-impl<S, B, K> Sink<B::Input> for PartitionBatchSink<S, B, K>
+impl<S, B, K> Sink<MetadataBatchInput<B>> for PartitionBatchSink<S, B, K>
 where
     B: Batch,
     B::Input: Partition<K>,
@@ -240,8 +241,11 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: B::Input) -> Result<(), Self::Error> {
-        let partition = item.partition();
+    fn start_send(
+        mut self: Pin<&mut Self>,
+        item: MetadataBatchInput<B>,
+    ) -> Result<(), Self::Error> {
+        let partition = item.item.partition();
 
         let batch = loop {
             if let Some(batch) = self.partitions.get_mut(&partition) {
@@ -255,10 +259,7 @@ where
             self.lingers.insert(partition.clone(), Box::pin(delay));
         };
 
-        if let PushResult::Overflow(item) = batch.push(MetadataBatchInput {
-            item,
-            metadata: None,
-        }) {
+        if let PushResult::Overflow(item) = batch.push(item) {
             self.buffer = Some((partition, item));
         }
 
@@ -321,7 +322,7 @@ where
                 if self.partitions.contains_key(&partition) {
                     self.buffer = Some((partition, item));
                 } else {
-                    self.as_mut().start_send(item.item)?;
+                    self.as_mut().start_send(item)?;
 
                     if self.buffer.is_some() {
                         unreachable!("Empty buffer overflowed.");
@@ -769,7 +770,7 @@ mod tests {
         let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(Ok))
+            .send_all(&mut stream::iter(0..22).map(|item| Ok(MetadataBatchInput::new(item))))
             .await
             .unwrap();
 
@@ -800,7 +801,7 @@ mod tests {
 
         let input = vec![Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(Ok))
+            .send_all(&mut stream::iter(input).map(|item| Ok(MetadataBatchInput::new(item))))
             .await
             .unwrap();
 
@@ -825,7 +826,7 @@ mod tests {
 
         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(Ok))
+            .send_all(&mut stream::iter(input).map(|item| Ok(MetadataBatchInput::new(item))))
             .await
             .unwrap();
 
@@ -859,7 +860,10 @@ mod tests {
             sink.poll_ready_unpin(&mut cx),
             Poll::Ready(Ok(()))
         ));
-        assert!(matches!(sink.start_send_unpin(1), Ok(())));
+        assert!(matches!(
+            sink.start_send_unpin(MetadataBatchInput::new(1)),
+            Ok(())
+        ));
         assert!(matches!(sink.poll_flush_unpin(&mut cx), Poll::Pending));
 
         advance_time(TIMEOUT + Duration::from_secs(1)).await;

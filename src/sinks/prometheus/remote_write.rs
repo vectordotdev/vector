@@ -7,10 +7,10 @@ use crate::{
     sinks::{
         self,
         util::{
+            batch::{BatchConfig, BatchSettings, MetadataBatchInput},
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
-            BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-            TowerRequestConfig,
+            PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
         },
     },
     template::Template,
@@ -119,7 +119,9 @@ impl SinkConfig for RemoteWriteConfig {
                                 .ok()
                         });
                         let key = PartitionKey { tenant_id };
-                        Ok(PartitionInnerBuffer::new(event, key))
+                        Ok(MetadataBatchInput::new(PartitionInnerBuffer::new(
+                            event, key,
+                        )))
                     }))
                 })
                 .sink_map_err(
