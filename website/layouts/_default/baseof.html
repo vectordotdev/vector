@@ -1,8 +1,10 @@
+{{/* Root template for all pages */}}
+{{ $hasBottomNav := eq .Section "docs" }}
 <!DOCTYPE html>
 <html
   lang="{{ site.LanguageCode }}"
   x-cloak
-  x-data="{ dark: $store.global.dark }"
+  x-data="{ dark: $store.global.dark{{ if $hasBottomNav }}, sidebar: false, toc: false{{ end }} }"
   x-on:toggle-dark="dark = !dark"
   :class="{ 'dark': dark, 'light': !dark }"
   class="h-screen">
@@ -18,7 +20,7 @@
 
     {{ partial "css.html" . }}
   </head>
-  <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-full">
+  <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}">
     <div class="flex-1 z-1">
       {{ partial "banner.html" . }}
       {{ partial "navbar.html" . }}
@@ -28,6 +30,9 @@
     </div>
 
     {{ partial "footer.html" . }}
+
+    {{ block "subfooter" . }}
+    {{ end }}
 
     {{ partial "javascript.html" . }}
   </body>

@@ -1,16 +1,44 @@
-<nav class="navbar is-fixed-bottom is-padded has-shadow is-hidden-desktop">
-  <div class="container">
-    <div class="navbar-brand">
-      <div class="navbar-item">
-        <a class="button is-black" @click="drawer = !drawer">
-          <span class="icon">
-            <i class="fas fa-ellipsis-v"></i>
-          </span>
-          <span class="has-text-weight-bold">
-            Docs nav
-          </span>
-        </a>
+<!-- This example requires Tailwind CSS v2.0+ -->
+<!--
+  Make sure you add some bottom padding to pages that include a sticky banner like this to prevent
+  your content from being obscured when the user scrolls to the bottom of the page.
+-->
+<div class="fixed inset-x-0 bottom-0 dark:border-gray-800 lg:hidden">
+  <div class="bg-gray-100 dark:bg-gray-700">
+    <div class="max-w-7xl mx-auto py-4 px-3 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center">
+        <span>
+          <a @click="sidebar = !sidebar" class="flex items-center cursor-pointer">
+            <svg x-show="!sidebar" xmlns="http://www.w3.org/2000/svg" class="dark:text-gray-300 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+            </svg>
+
+            <svg x-show="sidebar" xmlns="http://www.w3.org/2000/svg" class="dark:text-gray-300 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+            </svg>
+
+            <span class="ml-2 uppercase text-sm text-gray-600 dark:text-gray-100">
+              Sidebar
+            </span>
+          </a>
+        </span>
+
+        <span>
+          <a @click="toc = !toc" class="flex items-center cursor-pointer">
+            <span class="mr-2 uppercase text-sm text-gray-600 dark:text-gray-100">
+              Table of contents
+            </span>
+
+            <svg x-show="!toc" xmlns="http://www.w3.org/2000/svg" class="dark:text-gray-300 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
+            </svg>
+
+            <svg x-show="toc" xmlns="http://www.w3.org/2000/svg" class="dark:text-gray-300 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </a>
+        </span>
       </div>
     </div>
   </div>
-</nav>
+</div>
