@@ -541,10 +541,10 @@ impl Value {
         array: &mut Vec<Value>,
         value: Value,
     ) -> std::result::Result<Option<Value>, EventError> {
-        let index = if i.is_positive() {
-            i
-        } else {
+        let index = if i.is_negative() {
             array.len() as isize + i
+        } else {
+            i
         };
 
         let item = if index.is_negative() {
@@ -1627,6 +1627,25 @@ mod test {
             assert_eq!(value.get(&lookup).unwrap(), Some(&marker)); // Duplicated on purpose.
             assert_eq!(value.get_mut(&lookup).unwrap(), Some(&mut marker)); // Duplicated on purpose.
             assert_eq!(value.remove(&lookup, false).unwrap(), Some(marker)); // Duplicated on purpose.
+        }
+
+        #[test]
+        fn populated_field() {
+            let mut value = Value::from(BTreeMap::default());
+            let marker = Value::from(true);
+            let lookup = LookupBuf::from_str("a[2]").unwrap();
+            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+
+            let lookup = LookupBuf::from_str("a[0]").unwrap();
+            assert_eq!(
+                value.insert(lookup.clone(), marker.clone()).unwrap(),
+                Some(Value::Null)
+            );
+
+            assert_eq!(value.as_map().unwrap()["a"].as_array().len(), 3);
+            assert_eq!(value.as_map().unwrap()["a"].as_array()[0], marker);
+            assert_eq!(value.as_map().unwrap()["a"].as_array()[1], Value::Null);
+            assert_eq!(value.as_map().unwrap()["a"].as_array()[2], marker);
         }
     }
 
