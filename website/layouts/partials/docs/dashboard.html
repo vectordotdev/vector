@@ -10,6 +10,8 @@
   {{ if $hasToc }}
   <main aria-label="Main documentation content" class="lg:col-span-11 xl:col-span-9 px-4 px-6 md:px-0">
     {{ partial "docs/hero.html" . }}
+    <p x-text="slideover"></p>
+
     <div class="pb-32">
       {{ partial "docs/content.html" . }}
     </div>
@@ -31,4 +33,6 @@
     {{ partial "docs/pagination.html" . }}
   </main>
   {{ end }}
+
+  {{ partial "docs/slideover.html" . }}
 </div>

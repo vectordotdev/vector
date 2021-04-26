@@ -11,6 +11,14 @@ const tableOfContents = () => {
     ignoreSelector: 'no-toc',
     scrollSmoothDuration: 400
   });
+
+  tocbot.init({
+    tocSelector: '#docs-toc-slideover',
+    contentSelector: '#docs-content',
+    headingSelector: 'h1, h2, h3, h4',
+    ignoreSelector: 'no-toc',
+    scrollSmoothDuration: 400
+  });
 }
 
 /* Global state management */

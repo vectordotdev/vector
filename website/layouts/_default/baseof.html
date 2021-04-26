@@ -4,7 +4,7 @@
 <html
   lang="{{ site.LanguageCode }}"
   x-cloak
-  x-data="{ dark: $store.global.dark{{ if $hasBottomNav }}, sidebar: false, toc: false{{ end }} }"
+  x-data="{ dark: $store.global.dark{{ if $hasBottomNav }}, slideover: false {{ end }} }"
   x-on:toggle-dark="dark = !dark"
   :class="{ 'dark': dark, 'light': !dark }"
   class="h-screen">
