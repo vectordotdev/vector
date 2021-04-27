@@ -11,10 +11,10 @@ Download | {{ site.Title }}
     {{ partial "hero.html" . }}
 
     <div class="mt-6 flex items-center justify-between">
-      {{ partial "releases/release-selector.html" . }}
+      {{ partial "download/release-selector.html" . }}
 
       <div x-show="$store.global.release != 'nightly'">
-        {{ partial "releases/version-selector.html" . }}
+        {{ partial "download/version-selector.html" . }}
       </div>
     </div>
 
@@ -75,8 +75,6 @@ Download | {{ site.Title }}
 </div>
 {{ end }}
 
-{{/* codename commits date whats_next description */}}
-
 {{ define "warning" }}
 <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
   <div class="flex">
@@ -94,3 +92,6 @@ Download | {{ site.Title }}
   </div>
 </div>
 {{ end }}
+
+
+{{/* codename commits date whats_next description */}}
