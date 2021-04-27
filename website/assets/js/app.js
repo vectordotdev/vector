@@ -68,6 +68,9 @@ const manageState = () => {
     isNightly() {
       return this.release === 'nightly';
     },
+    isStable() {
+      return this.release === 'stable';
+    },
     isCurrent(version) {
       return this.version === version;
     },
