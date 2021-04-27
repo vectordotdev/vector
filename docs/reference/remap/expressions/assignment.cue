@@ -40,6 +40,21 @@ remap: expressions: assignment: {
 						.field = "value"
 						```
 						"""
+					"|=": """
+						Object merge assignment operator. Assigns the result of the right-hand side, merged with the left-hand side, to the left-hand side:
+
+						```vrl
+						.field |= {"foo": "bar"}
+						```
+
+						This is equivalent to using the `merge` function:
+
+						```vrl
+						.field = merge(.field, {"foo": "bar"})
+						```
+
+						This can only be used if both the left-hand side and right-hand side are objects.
+						"""
 					"??=": """
 						Assigns _only_ if the right-hand side doesn't error. This is useful when invoking fallible
 						functions on the right-hand side:
@@ -99,6 +114,14 @@ remap: expressions: assignment: {
 				my_variable = "Hello, World!"
 				"""#
 			return: "Hello, World!"
+		},
+		{
+			title: "Object merge assignment"
+			source: #"""
+				my_variable = {"message": "Hello, World!"}
+				my_variable |= {"level": "info"}
+				"""#
+			return: {"level": "info", "message": "Hello, World!"}
 		},
 		{
 			title: "Fallible assignment (success)"
