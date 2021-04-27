@@ -3,6 +3,13 @@ package metadata
 components: sinks: syslog: {
 	title: "Syslog"
 
+	description: """
+		Sends data to a Syslog collector. Both [RFC3164](https://tools.ietf.org/html/rfc3164)
+		and [RFC5424](https://tools.ietf.org/html/rfc5424) are supported. If TCP or a stream Unix
+		domain socket is used then the message will be encoded according to the
+		[RFC6587](https://tools.ietf.org/html/rfc6587).
+		"""
+
 	classes: {
 		commonly_used: true
 		delivery:      "best_effort"
