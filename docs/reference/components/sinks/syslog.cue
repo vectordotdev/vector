@@ -75,8 +75,8 @@ components: sinks: syslog: {
 			type: string: {
 				default: "rfc5424"
 				enum: {
-					rfc3164: "Format message according to [RFC3164](https://tools.ietf.org/html/rfc3164."
-					rfc5424: "Format message according to [RFC5424](https://tools.ietf.org/html/rfc5424."
+					rfc3164: "Format message according to [RFC3164](https://tools.ietf.org/html/rfc3164)."
+					rfc5424: "Format message according to [RFC5424](https://tools.ietf.org/html/rfc5424)."
 				}
 				syntax: "literal"
 			}
@@ -169,16 +169,38 @@ components: sinks: syslog: {
 			common: false
 			description: """
 				The default facility when there is no facility in the message or when it cannot be matched to a known
-				facility. Supported value are: `LOG_KERN`, `LOG_USER`, `LOG_MAIL`, `LOG_DAEMON`, `LOG_AUTH`, `LOG_SYSLOG`,
-				`LOG_LPR`, `LOG_NEWS`, `LOG_UUCP`, `LOG_CRON`, `LOG_AUTHPRIV`, `LOG_FTP`, `LOG_NTP`, `LOG_AUDIT`, `LOG_ALERT`,
-				`LOG_CLOCKD`, `LOG_LOCAL0`, `LOG_LOCAL1`, `LOG_LOCAL2`, `LOG_LOCAL3`, `LOG_LOCAL4`, `LOG_LOCAL5`, `LOG_LOCAL6`
-				and `LOG_LOCAL7` *(TODO reword as enum and probably harmonise with the value accepted in log even)*
+				facility. Possible values and their descriptions comes from the [RFC5424](https://tools.ietf.org/html/rfc5424.
 				"""
 			required: false
 			warnings: []
 			type: string: {
-				default: "LOG_SYSLOG"
-				examples: ["LOG_UUCP"]
+				default: "syslog"
+				enum: {
+					kern:     "kernel messages (numerical code 0)"
+					user:     "user-level messages (numerical code 1)"
+					mail:     "mail system (numerical code 2)"
+					daemon:   "system daemons (numerical code 3)"
+					auth:     "security/authorization messages (numerical code 4)"
+					syslog:   "messages generated internally by syslogd (numerical code 5)"
+					lpr:      "line printer subsystem (numerical code 6)"
+					news:     "network news subsystem (numerical code 7)"
+					uucp:     "UUCP subsystem (numerical code 8)"
+					cron:     "clock daemon (numerical code 9)"
+					authpriv: "security/authorization messages (numerical code 10)"
+					ftp:      "FTP daemon (numerical code 11)"
+					ntp:      "NTP subsystem messages (numerical code 12)"
+					audit:    "log audit (numerical code 13)"
+					alert:    "log alert (numerical code 14)"
+					clockd:   "clock daemon (numerical code 15)"
+					local0:   "local use 0 (numerical code 16)"
+					local1:   "local use 0 (numerical code 17)"
+					local2:   "local use 0 (numerical code 18)"
+					local3:   "local use 0 (numerical code 19)"
+					local4:   "local use 0 (numerical code 20)"
+					local5:   "local use 0 (numerical code 21)"
+					local6:   "local use 0 (numerical code 22)"
+					local7:   "local use 0 (numerical code 23)"
+				}
 				syntax: "literal"
 			}
 		}
@@ -186,14 +208,22 @@ components: sinks: syslog: {
 			common: false
 			description: """
 				The default severity when there is no severity in the message or when it cannot be matched to a known
-				severity. Supported value are: `SEV_EMERG`, `SEV_ALERT`, `SEV_CRIT`, `SEV_ERR`, `SEV_WARNING`, `SEV_NOTICE`,
-				`SEV_INFO` and `SEV_DEBUG` *(TODO: reword as enum and probably harmonise with the value accepted in log even)*
+				severity. Possible values and their descriptions comes from the [RFC5424](https://tools.ietf.org/html/rfc5424).
 				"""
 			required: false
 			warnings: []
 			type: string: {
-				default: "SEV_DEBUG"
-				examples: ["SEV_ALERT"]
+				default: "debug"
+				enum: {
+					emerg:   "Emergency: system is unusable (numerical code 0)"
+					alert:   "Alert: action must be taken immediately (numerical code 1)"
+					crit:    "Critical: critical conditions (numerical code 2)"
+					err:     "Error: error conditions (numerical code 3)"
+					warning: "Warning: warning conditions (numerical code 4)"
+					notice:  "Notice: normal but significant condition (numerical code 5)"
+					info:    "Informational: informational messages (numerical code 6)"
+					debug:   "Debug: debug-level messages (numerical code 7)"
+				}
 				syntax: "literal"
 			}
 		}
