@@ -1,3 +1,5 @@
+{{/* TODO: find a way to generate less HTML for displaying the download info */}}
+
 {{ define "title" }}
 Download | {{ site.Title }}
 {{ end }}
@@ -10,7 +12,7 @@ Download | {{ site.Title }}
   <div class="my-16">
     {{ partial "hero.html" . }}
 
-    <div class="my-8 flex items-center flex-wrap justify-between">
+    <div class="mt-10 mb-8 flex items-center flex-wrap justify-between">
       <span class="flex space-x-4">
         {{ partial "download/version-selector.html" . }}
         {{ partial "download/release-toggle.html" . }}
@@ -21,38 +23,75 @@ Download | {{ site.Title }}
     {{ range $k, $v := $releases }}
     <div x-show="$store.global.version === '{{ $k }}'">
       <div class="flex items-center space-x-8">
-        <span class="text-md lg:text-lg font-light">
-          Date <strong class="ml-1.5">{{ $v.date }}</strong>
+        <span class="text-md lg:text-lg font-light text-dark dark:text-gray-300">
+          Date <span class="ml-1.5 font-bold">{{ $v.date }}</span>
         </span>
 
-        <span class="text-md lg:text-lg font-light">
-          License <a href="https://github.com/timberio/vector/blob/master/LICENSE" class="ml-1.5 hover:text-secondary font-semibold" target="_blank">MPL 2.0</a>
+        <span class="text-md lg:text-lg font-light text-dark dark:text-gray-300">
+          License <a href="https://github.com/timberio/vector/blob/master/LICENSE" class="ml-1.5 hover:text-secondary dark:hover:text-primary font-bold" target="_blank">MPL 2.0</a>
         </span>
       </div>
 
-      <div class="mt-6">
-        {{ partial "download/download-matrix.html" (dict "version" $k) }}
+      <div class="mt-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div class="col-span-2">
+            {{ template "download-heading" (dict "text" "Downloads") }}
+
+            <div class="border px-4 py-3 lg:px-6 lg:py-4 rounded-md dark:border-gray-700">
+              {{ partial "download/download-matrix.html" (dict "version" $k) }}
+            </div>
+          </div>
+
+          <div class="col-span-1">
+            {{ template "download-heading" (dict "text" "Other methods") }}
+
+            <div class="flex flex-col divide-y divide-gray-200 border rounded-md dark:border-gray-700">
+              {{ partial "download/links.html" . }}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     {{ end }}
 
     {{/* Nightly release */}}
-
-    <div x-show="$store.global.isNightly()">
+    <div x-show="$store.global.isNightly()" x-data="{ date: new Date().toISOString().slice(0, 10) }">
       <div class="flex items-center space-x-8">
-        <span class="text-md lg:text-lg font-light">
-          Date <strong class="ml-1.5" x-text="new Date().toISOString().slice(0, 10)"></strong>
+        <span class="text-md lg:text-lg font-light text-dark dark:text-gray-300">
+          Date <strong class="ml-1.5 font-bold" x-text="date"></strong>
         </span>
 
-        <span class="text-md lg:text-lg font-light">
-          License <a href="https://github.com/timberio/vector/blob/master/LICENSE" class="ml-1.5 hover:text-secondary font-semibold" target="_blank">MPL 2.0</a>
+        <span class="text-md lg:text-lg font-light text-dark dark:text-gray-300">
+          License <a href="https://github.com/timberio/vector/blob/master/LICENSE" class="ml-1.5 hover:text-secondary dark:hover:text-primary font-bold" target="_blank">MPL 2.0</a>
         </span>
       </div>
 
-      <div class="mt-6">
-        {{ partial "download/download-matrix.html" (dict "version" "nightly") }}
+      <div class="mt-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div class="col-span-2">
+            {{ template "download-heading" (dict "text" "Download") }}
+
+            <div class="border px-4 py-3 lg:px-6 lg:py-4 rounded-md dark:border-gray-700">
+              {{ partial "download/download-matrix.html" (dict "version" "nightly") }}
+            </div>
+          </div>
+
+          <div class="col-span-1">
+            {{ template "download-heading" (dict "text" "Other methods") }}
+
+            <div class="flex flex-col divide-y divide-gray-200 border rounded-md dark:border-gray-700">
+              {{ partial "download/links.html" . }}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </div>
+{{ end }}
+
+{{ define "download-heading" }}
+<p class="text-2xl lg:text-2.5xl tracking-tight text-dark dark:text-gray-300 font-semibold mb-3">
+  {{ .text }}
+</p>
 {{ end }}

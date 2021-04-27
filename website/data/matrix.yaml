@@ -1,5 +1,5 @@
 # Download matrix for the /downloads page
-host: https://packages.timber.io/vector
+host: https://packages.timber.io
 releases:
 - name: Linux
   file: tar.gz
