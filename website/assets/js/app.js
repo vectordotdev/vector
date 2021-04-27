@@ -46,11 +46,14 @@ const manageState = () => {
     },
     // Toggle between stable and nightly
     toggleRelease() {
-      if (this.release == 'stable') {
+      if (this.release === 'stable') {
         this.release = 'nightly';
-      } else if (this.release == 'nightly') {
+      } else if (this.release === 'nightly') {
         this.release = 'stable';
       }
+    },
+    isNightly() {
+      return this.release === 'nightly';
     },
     isCurrent(version) {
       return this.version === version;
