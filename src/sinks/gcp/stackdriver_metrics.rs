@@ -3,7 +3,7 @@ use crate::event::{Event, Metric, MetricValue};
 use crate::http::HttpClient;
 use crate::sinks::gcp;
 use crate::sinks::util::buffer::metrics::MetricsBuffer;
-use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
+use crate::sinks::util::http::{BatchedHttpSink, EncodedEvent, HttpSink};
 use crate::sinks::util::{BatchConfig, BatchSettings, TowerRequestConfig};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::tls::{TlsOptions, TlsSettings};
@@ -104,12 +104,12 @@ impl HttpSink for HttpEventSink {
     type Input = Metric;
     type Output = Vec<Metric>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
         let metric = event.into_metric();
 
         match &metric.data.value {
-            &MetricValue::Counter { .. } => Some(metric),
-            &MetricValue::Gauge { .. } => Some(metric),
+            &MetricValue::Counter { .. } => Some(metric.into()),
+            &MetricValue::Gauge { .. } => Some(metric.into()),
             not_supported => {
                 warn!("Unsupported metric type: {:?}.", not_supported);
                 None

@@ -6,7 +6,7 @@ use crate::{
     sinks::util::{
         buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink, RequestConfig},
+        http::{BatchedHttpSink, EncodedEvent, HttpSink, RequestConfig},
         BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
@@ -178,7 +178,7 @@ impl HttpSink for HttpSinkConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         self.encoding.apply_rules(&mut event);
         let event = event.into_log();
 
@@ -215,7 +215,7 @@ impl HttpSink for HttpSinkConfig {
             byte_size: body.len(),
         });
 
-        Some(body)
+        Some(body.into())
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -340,7 +340,7 @@ mod tests {
 
         let mut config = default_config(Encoding::Text);
         config.encoding = encoding;
-        let bytes = config.encode_event(event).unwrap();
+        let bytes = config.encode_event(event).unwrap().item;
 
         assert_eq!(bytes, Vec::from("hello world\n"));
     }
@@ -352,7 +352,7 @@ mod tests {
 
         let mut config = default_config(Encoding::Json);
         config.encoding = encoding;
-        let bytes = config.encode_event(event).unwrap();
+        let bytes = config.encode_event(event).unwrap().item;
 
         #[derive(Deserialize, Debug)]
         #[serde(deny_unknown_fields)]

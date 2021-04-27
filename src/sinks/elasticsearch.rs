@@ -7,7 +7,7 @@ use crate::{
     rusoto::{self, region_from_endpoint, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink, RequestConfig},
+        http::{BatchedHttpSink, EncodedEvent, HttpSink, RequestConfig},
         retries::{RetryAction, RetryLogic},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
@@ -195,7 +195,7 @@ impl HttpSink for ElasticSearchCommon {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         let index = self
             .index
             .render_string(&event)
@@ -235,7 +235,7 @@ impl HttpSink for ElasticSearchCommon {
             index
         });
 
-        Some(body)
+        Some(body.into())
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -612,7 +612,7 @@ mod tests {
             log_schema().timestamp_key(),
             Utc.ymd(2020, 12, 1).and_hms(1, 2, 3),
         );
-        let encoded = es.encode_event(event).unwrap();
+        let encoded = es.encode_event(event).unwrap().item;
         let expected = r#"{"create":{"_index":"vector","_type":"_doc"}}
 {"message":"hello there","timestamp":"2020-12-01T01:02:03Z"}
 "#;
@@ -664,7 +664,7 @@ mod tests {
         event.as_mut_log().insert("foo", "bar");
         event.as_mut_log().insert("idx", "purple");
 
-        let encoded = es.encode_event(event).unwrap();
+        let encoded = es.encode_event(event).unwrap().item;
         let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
 {"foo":"bar","message":"hello there"}
 "#;

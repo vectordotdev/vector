@@ -5,7 +5,7 @@ use crate::{
     internal_events::{SplunkEventEncodeError, SplunkEventSent, TemplateRenderingFailed},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink},
+        http::{BatchedHttpSink, EncodedEvent, HttpSink},
         BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig,
     },
     template::Template,
@@ -139,7 +139,7 @@ impl HttpSink for HecSinkConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
         let sourcetype = self.sourcetype.as_ref().and_then(|sourcetype| {
             sourcetype
                 .render_string(&event)
@@ -235,7 +235,7 @@ impl HttpSink for HecSinkConfig {
                 emit!(SplunkEventSent {
                     byte_size: value.len()
                 });
-                Some(value)
+                Some(value.into())
             }
             Err(error) => {
                 emit!(SplunkEventEncodeError { error });
@@ -349,7 +349,7 @@ mod tests {
         )
         .unwrap();
 
-        let bytes = config.encode_event(event).unwrap();
+        let bytes = config.encode_event(event).unwrap().item;
 
         let hec_event = serde_json::from_slice::<HecEventJson>(&bytes[..]).unwrap();
 
@@ -401,7 +401,7 @@ mod tests {
         )
         .unwrap();
 
-        let bytes = config.encode_event(event).unwrap();
+        let bytes = config.encode_event(event).unwrap().item;
 
         let hec_event = serde_json::from_slice::<HecEventText>(&bytes[..]).unwrap();
 

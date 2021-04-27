@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     buffers::Acker,
-    event::Event,
+    event::{Event, EventMetadata},
     http::{HttpClient, HttpError},
 };
 use bytes::{Buf, Bytes};
@@ -27,12 +27,27 @@ use std::{
 };
 use tower::Service;
 
+pub struct EncodedEvent<I> {
+    pub item: I,
+    pub metadata: Option<EventMetadata>,
+}
+
+// TODO: Drop this conversion once all sinks have been converted
+impl<I> From<I> for EncodedEvent<I> {
+    fn from(item: I) -> Self {
+        Self {
+            item,
+            metadata: None,
+        }
+    }
+}
+
 #[async_trait::async_trait]
 pub trait HttpSink: Send + Sync + 'static {
     type Input;
     type Output;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input>;
+    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>>;
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>>;
 }
 
@@ -66,7 +81,7 @@ where
     // An empty slot is needed to buffer an item where we encoded it but
     // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
     // sink combinator. https://docs.rs/futures/0.1.29/src/futures/sink/with_flat_map.rs.html#20
-    slot: Option<B::Input>,
+    slot: Option<MetadataBatchInput<B>>,
 }
 
 impl<T, B> BatchedHttpSink<T, B, HttpRetryLogic>
@@ -157,8 +172,8 @@ where
     }
 
     fn start_send(self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        if let Some(item) = self.sink.encode_event(item) {
-            *self.project().slot = Some(item);
+        if let Some(EncodedEvent { item, metadata }) = self.sink.encode_event(item) {
+            *self.project().slot = Some(MetadataBatchInput { item, metadata });
         }
 
         Ok(())
@@ -168,7 +183,9 @@ where
         let mut this = self.project();
         if this.slot.is_some() {
             ready!(this.inner.as_mut().poll_ready(cx))?;
-            this.inner.as_mut().start_send(this.slot.take().unwrap())?;
+            this.inner
+                .as_mut()
+                .start_send(this.slot.take().unwrap().item)?; // FIXME throws away metadata
         }
 
         this.inner.poll_flush(cx)
@@ -198,7 +215,7 @@ where
         L,
         K,
     >,
-    slot: Option<B::Input>,
+    slot: Option<MetadataBatchInput<B>>,
 }
 
 impl<T, B, K> PartitionHttpSink<T, B, K, HttpRetryLogic>
@@ -295,8 +312,8 @@ where
     }
 
     fn start_send(self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        if let Some(item) = self.sink.encode_event(item) {
-            *self.project().slot = Some(item);
+        if let Some(EncodedEvent { item, metadata }) = self.sink.encode_event(item) {
+            *self.project().slot = Some(MetadataBatchInput { item, metadata });
         }
 
         Ok(())
@@ -306,7 +323,7 @@ where
         let mut this = self.project();
         if this.slot.is_some() {
             ready!(this.inner.as_mut().poll_ready(cx))?;
-            let item = MetadataBatchInput::new(this.slot.take().unwrap());
+            let item = MetadataBatchInput::new(this.slot.take().unwrap().item); // FIXME discards metadata
             this.inner.as_mut().start_send(item)?;
         }
 

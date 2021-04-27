@@ -8,7 +8,7 @@ use crate::{
             batch::{Batch, BatchError},
             encode_event,
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
+            http::{BatchedHttpSink, EncodedEvent, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, Compression, Encoding, JsonArrayBuffer,
             TowerRequestConfig, VecBuffer,
         },
@@ -210,7 +210,7 @@ impl HttpSink for DatadogLogsJsonService {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         let log = event.as_mut_log();
 
         if let Some(message) = log.remove(log_schema().message_key()) {
@@ -227,7 +227,7 @@ impl HttpSink for DatadogLogsJsonService {
 
         self.config.encoding.apply_rules(&mut event);
 
-        Some(json!(event.into_log()))
+        Some(json!(event.into_log()).into())
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -248,13 +248,13 @@ impl HttpSink for DatadogLogsTextService {
     type Input = Bytes;
     type Output = Vec<Bytes>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
         encode_event(event, &self.config.encoding).map(|e| {
             emit!(DatadogLogEventProcessed {
                 byte_size: e.len(),
                 count: 1,
             });
-            e
+            e.into()
         })
     }
 
