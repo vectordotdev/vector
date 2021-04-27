@@ -60,10 +60,9 @@ impl Arbitrary for FieldBuf {
         let chars = (32u8..90).map(|c| c as char).collect::<Vec<_>>();
         let len = u32::arbitrary(g) % 100 + 1;
         let name = (0..len)
-            .map(|_| chars[usize::arbitrary(g) % chars.len()].clone())
+            .map(|_| chars[usize::arbitrary(g) % chars.len()])
             .collect::<String>()
             .replace(r#"""#, r#"\""#);
-        //let name = String::arbitrary(g).replace(r#"""#, r#"/""#);
         FieldBuf::from(name)
     }
 
@@ -123,17 +122,13 @@ impl Arbitrary for SegmentBuf {
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         match self {
-            SegmentBuf::Field(field) => {
-                Box::new(field.shrink().map(|field| SegmentBuf::Field(field)))
-            }
-            SegmentBuf::Index(index) => {
-                Box::new(index.shrink().map(|index| SegmentBuf::Index(index)))
-            }
+            SegmentBuf::Field(field) => Box::new(field.shrink().map(SegmentBuf::Field)),
+            SegmentBuf::Index(index) => Box::new(index.shrink().map(SegmentBuf::Index)),
             SegmentBuf::Coalesce(fields) => Box::new(
                 fields
                     .shrink()
                     .filter(|fields| fields.len() > 2)
-                    .map(|fields| SegmentBuf::Coalesce(fields)),
+                    .map(SegmentBuf::Coalesce),
             ),
         }
     }

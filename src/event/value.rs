@@ -1588,11 +1588,11 @@ mod test {
             let mut value = Value::from(BTreeMap::default());
             let marker = Value::from(true);
             let lookup = LookupBuf::from_str("a[2]").unwrap();
-            assert_eq!(value.insert(lookup.clone(), marker.clone()).unwrap(), None);
+            assert_eq!(value.insert(lookup, marker.clone()).unwrap(), None);
 
             let lookup = LookupBuf::from_str("a[0]").unwrap();
             assert_eq!(
-                value.insert(lookup.clone(), marker.clone()).unwrap(),
+                value.insert(lookup, marker.clone()).unwrap(),
                 Some(Value::Null)
             );
 
@@ -1605,7 +1605,7 @@ mod test {
             let lookup = LookupBuf::from_str("a[0]").unwrap();
             let marker = Value::from(false);
             assert_eq!(
-                value.insert(lookup.clone(), marker.clone()).unwrap(),
+                value.insert(lookup, marker.clone()).unwrap(),
                 Some(Value::from(true))
             );
             assert_eq!(value.as_map().unwrap()["a"].as_array()[0], marker);

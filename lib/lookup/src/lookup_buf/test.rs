@@ -234,7 +234,7 @@ fn test_indexed_coalesce_from_string() {
 #[test]
 fn test_index_parses() {
     let parsed = LookupBuf::from_str("[30]").unwrap();
-    assert_eq!(LookupBuf::from(SegmentBuf::Index(30)), parsed.clone());
+    assert_eq!(LookupBuf::from(SegmentBuf::Index(30)), parsed);
     assert_eq!("[30]", parsed.to_string());
 }
 
