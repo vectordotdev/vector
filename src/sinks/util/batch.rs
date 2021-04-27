@@ -1,4 +1,4 @@
-use super::{EncodedEvent, MetadataOutput};
+use super::EncodedEvent;
 use crate::event::EventMetadata;
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
@@ -210,7 +210,7 @@ impl<B: Batch> From<B> for MetadataBatch<B> {
 
 impl<B: Batch> Batch for MetadataBatch<B> {
     type Input = EncodedEvent<B::Input>;
-    type Output = MetadataOutput<B::Output>;
+    type Output = (B::Output, Vec<EventMetadata>);
 
     fn get_settings_defaults(
         config: BatchConfig,
@@ -244,10 +244,7 @@ impl<B: Batch> Batch for MetadataBatch<B> {
     }
 
     fn finish(self) -> Self::Output {
-        MetadataOutput {
-            body: self.inner.finish(),
-            metadata: self.metadata,
-        }
+        (self.inner.finish(), self.metadata)
     }
 
     fn num_items(&self) -> usize {

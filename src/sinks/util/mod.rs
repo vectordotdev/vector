@@ -76,12 +76,6 @@ impl<I> EncodedEvent<I> {
     }
 }
 
-#[derive(Debug)]
-pub struct MetadataOutput<O> {
-    pub body: O,
-    pub metadata: Vec<EventMetadata>,
-}
-
 /**
  * Enum representing different ways to encode events as they are sent into a Sink.
  */

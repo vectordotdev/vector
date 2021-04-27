@@ -35,7 +35,7 @@ use super::{
     batch::{Batch, MetadataBatch, PushResult, StatefulBatch},
     buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
     service::{Map, ServiceBuilderExt},
-    EncodedEvent, MetadataOutput,
+    EncodedEvent,
 };
 use crate::{
     buffers::Acker,
@@ -311,8 +311,8 @@ where
                     self.lingers.remove(&partition);
 
                     let batch_size = batch.num_items();
-                    let output = batch.finish();
-                    tokio::spawn(self.service.call_batch(output, batch_size));
+                    let (batch, metadata) = batch.finish();
+                    tokio::spawn(self.service.call(batch, batch_size, metadata));
 
                     batch_consumed = true;
                 } else {
@@ -400,14 +400,6 @@ where
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<crate::Result<()>> {
         self.service.poll_ready(cx).map_err(Into::into)
-    }
-
-    fn call_batch(
-        &mut self,
-        batch: MetadataOutput<Request>,
-        batch_size: usize,
-    ) -> BoxFuture<'static, ()> {
-        self.call(batch.body, batch_size, batch.metadata)
     }
 
     fn call(
