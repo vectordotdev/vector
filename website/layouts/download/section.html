@@ -10,15 +10,16 @@ Download | {{ site.Title }}
   <div class="my-16">
     {{ partial "hero.html" . }}
 
-    <div class="mt-8 flex items-center justify-between flex-wrap">
-      {{ partial "download/release-toggle.html" . }}
+    <div class="my-8 flex items-center flex-wrap">
       {{ partial "download/version-selector.html" . }}
+
+      <div class="ml-4">
+        {{ partial "download/release-toggle.html" . }}
+      </div>
     </div>
 
-    <div>
-      <p x-text="$store.global.version"></p>
-      <p x-text="$store.global.release"></p>
-      <p x-text="$store.global.versionBackup"></p>
+    <div class="border">
+
     </div>
   </div>
 </div>
