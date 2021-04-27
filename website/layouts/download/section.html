@@ -10,16 +10,48 @@ Download | {{ site.Title }}
   <div class="my-16">
     {{ partial "hero.html" . }}
 
-    <div class="my-8 flex items-center flex-wrap">
-      {{ partial "download/version-selector.html" . }}
-
-      <div class="ml-4">
+    <div class="my-8 flex items-center flex-wrap justify-between">
+      <span class="flex space-x-4">
+        {{ partial "download/version-selector.html" . }}
         {{ partial "download/release-toggle.html" . }}
-      </div>
+      </span>
     </div>
 
-    <div class="border">
+    {{/* Stable releases */}}
+    {{ range $k, $v := $releases }}
+    <div x-show="$store.global.version === '{{ $k }}'">
+      <div class="flex items-center space-x-8">
+        <span class="text-md lg:text-lg font-light">
+          Date <strong class="ml-1.5">{{ $v.date }}</strong>
+        </span>
 
+        <span class="text-md lg:text-lg font-light">
+          License <a href="https://github.com/timberio/vector/blob/master/LICENSE" class="ml-1.5 hover:text-secondary font-semibold" target="_blank">MPL 2.0</a>
+        </span>
+      </div>
+
+      <div class="mt-6">
+        {{ partial "download/download-matrix.html" (dict "version" $k) }}
+      </div>
+    </div>
+    {{ end }}
+
+    {{/* Nightly release */}}
+
+    <div x-show="$store.global.isNightly()">
+      <div class="flex items-center space-x-8">
+        <span class="text-md lg:text-lg font-light">
+          Date <strong class="ml-1.5" x-text="new Date().toISOString().slice(0, 10)"></strong>
+        </span>
+
+        <span class="text-md lg:text-lg font-light">
+          License <a href="https://github.com/timberio/vector/blob/master/LICENSE" class="ml-1.5 hover:text-secondary font-semibold" target="_blank">MPL 2.0</a>
+        </span>
+      </div>
+
+      <div class="mt-6">
+        {{ partial "download/download-matrix.html" (dict "version" "nightly") }}
+      </div>
     </div>
   </div>
 </div>

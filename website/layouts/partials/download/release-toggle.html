@@ -1,4 +1,4 @@
-<div class="flex items-center">
+<div class="flex items-center space-x-3">
   <button @click="$store.global.toggleRelease()" type="button" class="flex-shrink-0 group relative rounded-full inline-flex items-center justify-center h-5 w-12 cursor-pointer focus:outline-none dark:bg-dark" role="switch" aria-checked="false">
     <span class="sr-only">
       Toggle release (stable vs. nightly)
@@ -11,7 +11,7 @@
     <span :class="{ 'translate-x-6': $store.global.isNightly() }" class="translate-x-0 pointer-events-none absolute left-0 inline-block h-6 w-6 border border-gray-200 dark:border-gray-700 rounded-full bg-white dark:bg-dark shadow transform ring-0 transition-transform ease-in-out duration-300" aria-hidden="true" ></span>
   </button>
 
-  <span x-text="$store.global.isNightly() ? 'Nightly' : 'Stable'" class="ml-3.5 dark:text-gray-300"></span>
+  <span x-text="$store.global.isNightly() ? 'Nightly' : 'Stable'" class="dark:text-gray-300"></span>
 
   <svg x-show="$store.global.isNightly()" xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 ml-2 h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
     <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />

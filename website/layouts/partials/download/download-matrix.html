@@ -1,0 +1,37 @@
+{{ $version := .version }}
+{{ $host := site.Data.matrix.host }}
+{{ $matrix := site.Data.matrix.releases }}
+
+<p class="text-xl lg:text-2xl">
+  Downloads
+</p>
+
+<div class="mt-3">
+  {{ range $matrix }}
+  {{ $file := .file }}
+  {{ $prefix := .prefix }}
+  <div class="grid grid-cols-4">
+    <div class="col-span-1">
+      <span>
+        {{ .name }}
+      </span>
+    </div>
+
+    <div class="col-span-1">
+      <code>
+        {{ $file }}
+      </code>
+    </div>
+
+    <div class="col-span-2">
+      <div class="flex space-x-2">
+        {{ range .releases }}
+        <a href="{{ $host }}/{{ $version }}/vector-{{ $version }}-{{ with $prefix }}{{ . }}.{{ end }}{{ .tag }}.{{ $file }}" download>
+          {{ .name }}
+        </a>
+        {{ end }}
+      </div>
+    </div>
+  </div>
+  {{ end }}
+</div>
