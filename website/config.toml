@@ -78,8 +78,8 @@ url = "/components"
 weight = 3
 
 [[menu.navbar]]
-name = "Releases"
-url = "/releases"
+name = "Download"
+url = "/download"
 weight = 4
 
 [[menu.navbar]]
