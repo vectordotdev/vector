@@ -42,8 +42,13 @@ const manageState = () => {
     setVersion(v) {
       this.version = v;
 
+      if (v === 'nightly') {
+        this.setRelease('nightly');
+      }
+
       if (v != 'nightly') {
         this.setRelease('stable');
+        this.versionBackup = v;
       }
     },
     // Switch dark mode on and off

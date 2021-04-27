@@ -8,7 +8,7 @@
 
     <span :class="{ 'bg-secondary': $store.global.isNightly() }" class="bg-gray-200 pointer-events-none absolute h-4 w-9 mx-auto rounded-full transition-colors ease-in-out duration-200" aria-hidden="true"></span>
 
-    <span :class="{ 'translate-x-6': $store.global.isNightly() }" class="translate-x-0 pointer-events-none absolute left-0 inline-block h-6 w-6 border border-gray-200 dark:border-gray-700 rounded-full bg-white dark:bg-dark shadow transform ring-0 transition-transform ease-in-out duration-200" aria-hidden="true" ></span>
+    <span :class="{ 'translate-x-6': $store.global.isNightly() }" class="translate-x-0 pointer-events-none absolute left-0 inline-block h-6 w-6 border border-gray-200 dark:border-gray-700 rounded-full bg-white dark:bg-dark shadow transform ring-0 transition-transform ease-in-out duration-300" aria-hidden="true" ></span>
   </button>
 
   <span x-text="$store.global.isNightly() ? 'Nightly' : 'Stable'" class="ml-3.5 dark:text-gray-300"></span>
