@@ -10,10 +10,12 @@ use chrono::{FixedOffset, TimeZone};
 use serde::{Deserialize, Serialize};
 use syslog_loose::{Message, ProcId, Protocol, StructuredElement, SyslogFacility, SyslogSeverity};
 
-#[derive(Derivative, Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Format {
     Rfc3164,
+    #[derivative(Default)]
     Rfc5424,
 }
 
@@ -32,7 +34,7 @@ impl From<Format> for Protocol {
 pub struct SyslogSinkConfig {
     #[serde(flatten)]
     mode: Mode,
-    #[serde(default = "format")]
+    #[serde(default)]
     format: Format,
     #[serde(default = "crate::serde::default_false")]
     include_extra_fields: bool,
@@ -52,10 +54,6 @@ pub struct SyslogSinkConfig {
     default_facility: SyslogFacility,
     #[serde(with = "SyslogSeverityDef", default = "severity")]
     default_severity: SyslogSeverity,
-}
-
-fn format() -> Format {
-    Format::Rfc5424
 }
 
 fn appname_key() -> String {
