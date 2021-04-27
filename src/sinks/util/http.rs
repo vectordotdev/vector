@@ -81,7 +81,7 @@ where
     // An empty slot is needed to buffer an item where we encoded it but
     // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
     // sink combinator. https://docs.rs/futures/0.1.29/src/futures/sink/with_flat_map.rs.html#20
-    slot: Option<MetadataBatchInput<B>>,
+    slot: Option<MetadataBatchInput<B::Input>>,
 }
 
 impl<T, B> BatchedHttpSink<T, B, HttpRetryLogic>
@@ -215,7 +215,7 @@ where
         L,
         K,
     >,
-    slot: Option<MetadataBatchInput<B>>,
+    slot: Option<MetadataBatchInput<B::Input>>,
 }
 
 impl<T, B, K> PartitionHttpSink<T, B, K, HttpRetryLogic>
@@ -323,8 +323,7 @@ where
         let mut this = self.project();
         if this.slot.is_some() {
             ready!(this.inner.as_mut().poll_ready(cx))?;
-            let item = MetadataBatchInput::new(this.slot.take().unwrap().item); // FIXME discards metadata
-            this.inner.as_mut().start_send(item)?;
+            this.inner.as_mut().start_send(this.slot.take().unwrap())?;
         }
 
         this.inner.poll_flush(cx)

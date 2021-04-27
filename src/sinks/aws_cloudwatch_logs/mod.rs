@@ -441,7 +441,7 @@ fn partition_encode(
     encoding: &EncodingConfig<Encoding>,
     group: &Template,
     stream: &Template,
-) -> Option<MetadataBatchInput<PartitionBuffer<VecBuffer<InputLogEvent>, CloudwatchKey>>> {
+) -> Option<MetadataBatchInput<PartitionInnerBuffer<InputLogEvent, CloudwatchKey>>> {
     let group = match group.render_string(&event) {
         Ok(b) => b,
         Err(error) => {

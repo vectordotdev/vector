@@ -199,15 +199,15 @@ pub struct MetadataBatch<B> {
 }
 
 #[derive(Debug)]
-pub struct MetadataBatchInput<B: Batch> {
-    pub item: B::Input,
+pub struct MetadataBatchInput<I> {
+    pub item: I,
     pub metadata: Option<EventMetadata>,
 }
 
-impl<B: Batch> MetadataBatchInput<B> {
+impl<I> MetadataBatchInput<I> {
     /// Create a trivial input with no metadata. This method will be
     /// removed when all sinks are converted.
-    pub fn new(item: B::Input) -> Self {
+    pub fn new(item: I) -> Self {
         Self {
             item,
             metadata: None,
@@ -216,8 +216,8 @@ impl<B: Batch> MetadataBatchInput<B> {
 }
 
 #[derive(Debug)]
-pub struct MetadataBatchOutput<B: Batch> {
-    pub body: B::Output,
+pub struct MetadataBatchOutput<O> {
+    pub body: O,
     pub metadata: Vec<EventMetadata>,
 }
 
@@ -231,8 +231,8 @@ impl<B: Batch> From<B> for MetadataBatch<B> {
 }
 
 impl<B: Batch> Batch for MetadataBatch<B> {
-    type Input = MetadataBatchInput<B>;
-    type Output = MetadataBatchOutput<B>;
+    type Input = MetadataBatchInput<B::Input>;
+    type Output = MetadataBatchOutput<B::Output>;
 
     fn get_settings_defaults(
         config: BatchConfig,

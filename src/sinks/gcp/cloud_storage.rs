@@ -405,7 +405,7 @@ fn encode_event(
     mut event: Event,
     key_prefix: &Template,
     encoding: &EncodingConfig<Encoding>,
-) -> Option<MetadataBatchInput<PartitionBuffer<Buffer, Bytes>>> {
+) -> Option<MetadataBatchInput<PartitionInnerBuffer<Vec<u8>, Bytes>>> {
     let key = key_prefix
         .render_string(&event)
         .map_err(|error| {

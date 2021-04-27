@@ -185,7 +185,7 @@ where
     B: Batch,
 {
     service: ServiceSink<S, B::Output>,
-    buffer: Option<(K, MetadataBatchInput<B>)>,
+    buffer: Option<(K, MetadataBatchInput<B::Input>)>,
     batch: StatefulBatch<MetadataBatch<B>>,
     partitions: HashMap<K, StatefulBatch<MetadataBatch<B>>>,
     timeout: Duration,
@@ -218,7 +218,7 @@ where
     }
 }
 
-impl<S, B, K> Sink<MetadataBatchInput<B>> for PartitionBatchSink<S, B, K>
+impl<S, B, K> Sink<MetadataBatchInput<B::Input>> for PartitionBatchSink<S, B, K>
 where
     B: Batch,
     B::Input: Partition<K>,
@@ -248,7 +248,7 @@ where
 
     fn start_send(
         mut self: Pin<&mut Self>,
-        item: MetadataBatchInput<B>,
+        item: MetadataBatchInput<B::Input>,
     ) -> Result<(), Self::Error> {
         let partition = item.item.partition();
 
@@ -401,9 +401,9 @@ where
         self.service.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call_batch<B: Batch<Output = Request>>(
+    fn call_batch(
         &mut self,
-        batch: MetadataBatchOutput<B>,
+        batch: MetadataBatchOutput<Request>,
         batch_size: usize,
     ) -> BoxFuture<'static, ()> {
         self.call(batch.body, batch_size, batch.metadata)
