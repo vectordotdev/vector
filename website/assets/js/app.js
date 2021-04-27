@@ -52,6 +52,9 @@ const manageState = () => {
         this.release = 'stable';
       }
     },
+    isCurrent(version) {
+      return this.version === version;
+    },
     // Set release directly
     setRelease(release) {
       this.release = release;
