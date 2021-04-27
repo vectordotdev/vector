@@ -16,7 +16,7 @@ pub mod udp;
 pub mod unix;
 pub mod uri;
 
-use crate::event::Event;
+use crate::event::{Event, EventMetadata};
 use bytes::Bytes;
 use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};
@@ -42,6 +42,29 @@ enum SinkBuildError {
     MissingHost,
     #[snafu(display("Missing port in address field"))]
     MissingPort,
+}
+
+#[derive(Debug)]
+pub struct MetadataInput<I> {
+    pub item: I,
+    pub metadata: Option<EventMetadata>,
+}
+
+impl<I> MetadataInput<I> {
+    /// Create a trivial input with no metadata. This method will be
+    /// removed when all sinks are converted.
+    pub fn new(item: I) -> Self {
+        Self {
+            item,
+            metadata: None,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct MetadataOutput<O> {
+    pub body: O,
+    pub metadata: Vec<EventMetadata>,
 }
 
 /**

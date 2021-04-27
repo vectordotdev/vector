@@ -1,3 +1,4 @@
+use super::{MetadataInput, MetadataOutput};
 use crate::event::EventMetadata;
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
@@ -198,29 +199,6 @@ pub struct MetadataBatch<B> {
     metadata: Vec<EventMetadata>,
 }
 
-#[derive(Debug)]
-pub struct MetadataBatchInput<I> {
-    pub item: I,
-    pub metadata: Option<EventMetadata>,
-}
-
-impl<I> MetadataBatchInput<I> {
-    /// Create a trivial input with no metadata. This method will be
-    /// removed when all sinks are converted.
-    pub fn new(item: I) -> Self {
-        Self {
-            item,
-            metadata: None,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct MetadataBatchOutput<O> {
-    pub body: O,
-    pub metadata: Vec<EventMetadata>,
-}
-
 impl<B: Batch> From<B> for MetadataBatch<B> {
     fn from(inner: B) -> Self {
         Self {
@@ -231,8 +209,8 @@ impl<B: Batch> From<B> for MetadataBatch<B> {
 }
 
 impl<B: Batch> Batch for MetadataBatch<B> {
-    type Input = MetadataBatchInput<B::Input>;
-    type Output = MetadataBatchOutput<B::Output>;
+    type Input = MetadataInput<B::Input>;
+    type Output = MetadataOutput<B::Output>;
 
     fn get_settings_defaults(
         config: BatchConfig,
@@ -242,7 +220,7 @@ impl<B: Batch> Batch for MetadataBatch<B> {
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
-        let MetadataBatchInput { item, metadata } = item;
+        let MetadataInput { item, metadata } = item;
         match self.inner.push(item) {
             PushResult::Ok(full) => {
                 if let Some(metadata) = metadata {
@@ -250,9 +228,7 @@ impl<B: Batch> Batch for MetadataBatch<B> {
                 }
                 PushResult::Ok(full)
             }
-            PushResult::Overflow(item) => {
-                PushResult::Overflow(MetadataBatchInput { item, metadata })
-            }
+            PushResult::Overflow(item) => PushResult::Overflow(MetadataInput { item, metadata }),
         }
     }
 
@@ -268,7 +244,7 @@ impl<B: Batch> Batch for MetadataBatch<B> {
     }
 
     fn finish(self) -> Self::Output {
-        MetadataBatchOutput {
+        MetadataOutput {
             body: self.inner.finish(),
             metadata: self.metadata,
         }

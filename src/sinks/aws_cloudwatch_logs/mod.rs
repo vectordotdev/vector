@@ -6,11 +6,11 @@ use crate::{
     internal_events::TemplateRenderingFailed,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
-        batch::{BatchConfig, BatchSettings, MetadataBatchInput},
+        batch::{BatchConfig, BatchSettings},
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
-        Compression, EncodedLength, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-        TowerRequestConfig, TowerRequestSettings, VecBuffer,
+        Compression, EncodedLength, MetadataInput, PartitionBatchSink, PartitionBuffer,
+        PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
     },
     template::Template,
 };
@@ -441,7 +441,7 @@ fn partition_encode(
     encoding: &EncodingConfig<Encoding>,
     group: &Template,
     stream: &Template,
-) -> Option<MetadataBatchInput<PartitionInnerBuffer<InputLogEvent, CloudwatchKey>>> {
+) -> Option<MetadataInput<PartitionInnerBuffer<InputLogEvent, CloudwatchKey>>> {
     let group = match group.render_string(&event) {
         Ok(b) => b,
         Err(error) => {
@@ -475,9 +475,7 @@ fn partition_encode(
         )
         .ok()?;
 
-    Some(MetadataBatchInput::new(PartitionInnerBuffer::new(
-        event, key,
-    )))
+    Some(MetadataInput::new(PartitionInnerBuffer::new(event, key)))
 }
 
 #[derive(Debug, Snafu)]

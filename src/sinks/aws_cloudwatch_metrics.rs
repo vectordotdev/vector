@@ -6,10 +6,11 @@ use crate::{
     },
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
-        batch::{BatchConfig, BatchSettings, MetadataBatchInput},
+        batch::{BatchConfig, BatchSettings},
         buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
         retries::RetryLogic,
-        Compression, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
+        Compression, MetadataInput, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+        TowerRequestConfig,
     },
 };
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -156,7 +157,7 @@ impl CloudWatchMetricsSvc {
                         .namespace
                         .take()
                         .unwrap_or_else(|| default_namespace.clone());
-                    Ok(MetadataBatchInput::new(PartitionInnerBuffer::new(
+                    Ok(MetadataInput::new(PartitionInnerBuffer::new(
                         metric, namespace,
                     )))
                 }))

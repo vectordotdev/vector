@@ -32,11 +32,10 @@
 //! it to notify the consumer that the request has succeeded.
 
 use super::{
-    batch::{
-        Batch, MetadataBatch, MetadataBatchInput, MetadataBatchOutput, PushResult, StatefulBatch,
-    },
+    batch::{Batch, MetadataBatch, PushResult, StatefulBatch},
     buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
     service::{Map, ServiceBuilderExt},
+    MetadataInput, MetadataOutput,
 };
 use crate::{
     buffers::Acker,
@@ -147,7 +146,7 @@ where
     fn start_send(self: Pin<&mut Self>, item: B::Input) -> Result<(), Self::Error> {
         self.project()
             .inner
-            .start_send(MetadataBatchInput::new(PartitionInnerBuffer::new(item, ())))
+            .start_send(MetadataInput::new(PartitionInnerBuffer::new(item, ())))
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -185,7 +184,7 @@ where
     B: Batch,
 {
     service: ServiceSink<S, B::Output>,
-    buffer: Option<(K, MetadataBatchInput<B::Input>)>,
+    buffer: Option<(K, MetadataInput<B::Input>)>,
     batch: StatefulBatch<MetadataBatch<B>>,
     partitions: HashMap<K, StatefulBatch<MetadataBatch<B>>>,
     timeout: Duration,
@@ -218,7 +217,7 @@ where
     }
 }
 
-impl<S, B, K> Sink<MetadataBatchInput<B::Input>> for PartitionBatchSink<S, B, K>
+impl<S, B, K> Sink<MetadataInput<B::Input>> for PartitionBatchSink<S, B, K>
 where
     B: Batch,
     B::Input: Partition<K>,
@@ -248,7 +247,7 @@ where
 
     fn start_send(
         mut self: Pin<&mut Self>,
-        item: MetadataBatchInput<B::Input>,
+        item: MetadataInput<B::Input>,
     ) -> Result<(), Self::Error> {
         let partition = item.item.partition();
 
@@ -403,7 +402,7 @@ where
 
     fn call_batch(
         &mut self,
-        batch: MetadataBatchOutput<Request>,
+        batch: MetadataOutput<Request>,
         batch_size: usize,
     ) -> BoxFuture<'static, ()> {
         self.call(batch.body, batch_size, batch.metadata)
@@ -794,7 +793,7 @@ mod tests {
         let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(|item| Ok(MetadataBatchInput::new(item))))
+            .send_all(&mut stream::iter(0..22).map(|item| Ok(MetadataInput::new(item))))
             .await
             .unwrap();
 
@@ -825,7 +824,7 @@ mod tests {
 
         let input = vec![Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(MetadataBatchInput::new(item))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(MetadataInput::new(item))))
             .await
             .unwrap();
 
@@ -850,7 +849,7 @@ mod tests {
 
         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(MetadataBatchInput::new(item))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(MetadataInput::new(item))))
             .await
             .unwrap();
 
@@ -885,7 +884,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(MetadataBatchInput::new(1)),
+            sink.start_send_unpin(MetadataInput::new(1)),
             Ok(())
         ));
         assert!(matches!(sink.poll_flush_unpin(&mut cx), Poll::Pending));
