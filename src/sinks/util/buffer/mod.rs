@@ -141,7 +141,7 @@ mod test {
     use super::{Buffer, Compression};
     use crate::{
         buffers::Acker,
-        sinks::util::{BatchSettings, BatchSink},
+        sinks::util::{BatchSettings, BatchSink, MetadataInput},
     };
     use futures::{future, stream, SinkExt, StreamExt};
     use std::{
@@ -179,7 +179,7 @@ mod test {
 
         let _ = buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(Ok))
+            .send_all(&mut stream::iter(input).map(|item| Ok(MetadataInput::new(item))))
             .await
             .unwrap();
 

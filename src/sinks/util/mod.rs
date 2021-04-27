@@ -59,6 +59,21 @@ impl<I> MetadataInput<I> {
             metadata: None,
         }
     }
+
+    // This should be:
+    // ```impl<F, I: From<F>> From<MetadataInput<F>> for MetadataInput<I>```
+    // however, the compiler rejects that due to conflicting
+    // implementations of `From` due to the generic
+    // ```impl<T> From<T> for T```
+    pub fn from<F>(that: MetadataInput<F>) -> Self
+    where
+        I: From<F>,
+    {
+        Self {
+            item: I::from(that.item),
+            metadata: that.metadata,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -82,7 +97,10 @@ pub enum Encoding {
 * the given encoding. If there are any errors encoding the event, logs a warning
 * and returns None.
 **/
-pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
+pub fn encode_event(
+    mut event: Event,
+    encoding: &EncodingConfig<Encoding>,
+) -> Option<MetadataInput<Bytes>> {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
 
@@ -99,7 +117,7 @@ pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Op
 
     b.map(|mut b| {
         b.push(b'\n');
-        Bytes::from(b)
+        MetadataInput::new(Bytes::from(b))
     })
     .map_err(|error| error!(message = "Unable to encode.", %error))
     .ok()

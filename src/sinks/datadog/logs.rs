@@ -251,10 +251,10 @@ impl HttpSink for DatadogLogsTextService {
     fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
         encode_event(event, &self.config.encoding).map(|e| {
             emit!(DatadogLogEventProcessed {
-                byte_size: e.len(),
+                byte_size: e.item.len(),
                 count: 1,
             });
-            e.into()
+            e.item.into()
         })
     }
 

@@ -7,8 +7,8 @@ use crate::{
     metrics::{self, capture_metrics, get_controller},
     sinks::{
         util::{
-            retries::RetryLogic, BatchSettings, Concurrency, EncodedLength, TowerRequestConfig,
-            VecBuffer,
+            retries::RetryLogic, BatchSettings, Concurrency, EncodedLength, MetadataInput,
+            TowerRequestConfig, VecBuffer,
         },
         Healthcheck, VectorSink,
     },
@@ -21,7 +21,7 @@ use crate::{
 use core::task::Context;
 use futures::{
     future::{self, BoxFuture},
-    FutureExt, SinkExt,
+    stream, FutureExt, SinkExt,
 };
 use rand::{thread_rng, Rng};
 use rand_distr::Exp1;
@@ -155,12 +155,14 @@ impl SinkConfig for TestConfig {
                 batch.timeout,
                 cx.acker(),
             )
+            .with_flat_map(|event| stream::iter(Some(Ok(MetadataInput::new(event)))))
             .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
         let healthcheck = future::ok(()).boxed();
 
         // Dig deep to get at the internal controller statistics
         let stats = Arc::clone(
             &sink
+                .get_ref()
                 .get_ref()
                 .get_ref()
                 .get_ref()

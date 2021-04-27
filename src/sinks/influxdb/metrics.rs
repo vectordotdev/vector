@@ -15,7 +15,7 @@ use crate::{
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
             statistic::{validate_quantiles, DistributionStatistic},
-            BatchConfig, BatchSettings, TowerRequestConfig,
+            BatchConfig, BatchSettings, MetadataInput, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -148,7 +148,13 @@ impl InfluxDbSvc {
                 batch.timeout,
                 cx.acker(),
             )
-            .with_flat_map(move |event: Event| stream::iter(normalizer.apply(event).map(Ok)))
+            .with_flat_map(move |event: Event| {
+                stream::iter(
+                    normalizer
+                        .apply(event)
+                        .map(|metric| Ok(MetadataInput::new(metric))),
+                )
+            })
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
         Ok(VectorSink::Sink(Box::new(sink)))

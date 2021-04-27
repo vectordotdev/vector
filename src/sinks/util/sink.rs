@@ -129,7 +129,7 @@ where
     }
 }
 
-impl<S, B> Sink<B::Input> for BatchSink<S, B>
+impl<S, B> Sink<MetadataInput<B::Input>> for BatchSink<S, B>
 where
     S: Service<B::Output>,
     S::Future: Send + 'static,
@@ -143,10 +143,12 @@ where
         self.project().inner.poll_ready(cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: B::Input) -> Result<(), Self::Error> {
-        self.project()
-            .inner
-            .start_send(MetadataInput::new(PartitionInnerBuffer::new(item, ())))
+    fn start_send(self: Pin<&mut Self>, item: MetadataInput<B::Input>) -> Result<(), Self::Error> {
+        let MetadataInput { item, metadata } = item;
+        self.project().inner.start_send(MetadataInput {
+            item: PartitionInnerBuffer::new(item, ()),
+            metadata,
+        })
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -548,7 +550,7 @@ mod tests {
 
         let _ = buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(Ok))
+            .send_all(&mut stream::iter(0..22).map(|item| Ok(MetadataInput::new(item))))
             .await
             .unwrap();
 
@@ -590,17 +592,26 @@ mod tests {
             sink.poll_ready_unpin(&mut cx),
             Poll::Ready(Ok(()))
         ));
-        assert!(matches!(sink.start_send_unpin(0), Ok(())));
+        assert!(matches!(
+            sink.start_send_unpin(MetadataInput::new(0)),
+            Ok(())
+        ));
         assert!(matches!(
             sink.poll_ready_unpin(&mut cx),
             Poll::Ready(Ok(()))
         ));
-        assert!(matches!(sink.start_send_unpin(1), Ok(())));
+        assert!(matches!(
+            sink.start_send_unpin(MetadataInput::new(1)),
+            Ok(())
+        ));
         assert!(matches!(
             sink.poll_ready_unpin(&mut cx),
             Poll::Ready(Ok(()))
         ));
-        assert!(matches!(sink.start_send_unpin(2), Ok(())));
+        assert!(matches!(
+            sink.start_send_unpin(MetadataInput::new(2)),
+            Ok(())
+        ));
 
         // Clear internal buffer
         assert!(matches!(sink.poll_flush_unpin(&mut cx), Poll::Pending));
@@ -629,17 +640,26 @@ mod tests {
             sink.poll_ready_unpin(&mut cx),
             Poll::Ready(Ok(()))
         ));
-        assert!(matches!(sink.start_send_unpin(3), Ok(())));
+        assert!(matches!(
+            sink.start_send_unpin(MetadataInput::new(3)),
+            Ok(())
+        ));
         assert!(matches!(
             sink.poll_ready_unpin(&mut cx),
             Poll::Ready(Ok(()))
         ));
-        assert!(matches!(sink.start_send_unpin(4), Ok(())));
+        assert!(matches!(
+            sink.start_send_unpin(MetadataInput::new(4)),
+            Ok(())
+        ));
         assert!(matches!(
             sink.poll_ready_unpin(&mut cx),
             Poll::Ready(Ok(()))
         ));
-        assert!(matches!(sink.start_send_unpin(5), Ok(())));
+        assert!(matches!(
+            sink.start_send_unpin(MetadataInput::new(5)),
+            Ok(())
+        ));
 
         // Clear internal buffer
         assert!(matches!(sink.poll_flush_unpin(&mut cx), Poll::Pending));
@@ -692,7 +712,7 @@ mod tests {
 
         let _ = buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(Ok))
+            .send_all(&mut stream::iter(0..22).map(|item| Ok(MetadataInput::new(item))))
             .await
             .unwrap();
 
@@ -726,12 +746,18 @@ mod tests {
             buffered.poll_ready_unpin(&mut cx),
             Poll::Ready(Ok(()))
         ));
-        assert!(matches!(buffered.start_send_unpin(0), Ok(())));
+        assert!(matches!(
+            buffered.start_send_unpin(MetadataInput::new(0)),
+            Ok(())
+        ));
         assert!(matches!(
             buffered.poll_ready_unpin(&mut cx),
             Poll::Ready(Ok(()))
         ));
-        assert!(matches!(buffered.start_send_unpin(1), Ok(())));
+        assert!(matches!(
+            buffered.start_send_unpin(MetadataInput::new(1)),
+            Ok(())
+        ));
 
         buffered.close().await.unwrap();
 
@@ -758,12 +784,18 @@ mod tests {
             buffered.poll_ready_unpin(&mut cx),
             Poll::Ready(Ok(()))
         ));
-        assert!(matches!(buffered.start_send_unpin(0), Ok(())));
+        assert!(matches!(
+            buffered.start_send_unpin(MetadataInput::new(0)),
+            Ok(())
+        ));
         assert!(matches!(
             buffered.poll_ready_unpin(&mut cx),
             Poll::Ready(Ok(()))
         ));
-        assert!(matches!(buffered.start_send_unpin(1), Ok(())));
+        assert!(matches!(
+            buffered.start_send_unpin(MetadataInput::new(1)),
+            Ok(())
+        ));
 
         // Move clock forward by linger timeout + 1 sec
         advance_time(TIMEOUT + Duration::from_secs(1)).await;

@@ -182,9 +182,7 @@ where
         let mut this = self.project();
         if this.slot.is_some() {
             ready!(this.inner.as_mut().poll_ready(cx))?;
-            this.inner
-                .as_mut()
-                .start_send(this.slot.take().unwrap().item)?; // FIXME throws away metadata
+            this.inner.as_mut().start_send(this.slot.take().unwrap())?;
         }
 
         this.inner.poll_flush(cx)
