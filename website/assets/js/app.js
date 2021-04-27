@@ -34,11 +34,17 @@ const manageState = () => {
     banner: true,
     // The Vector version selected (for the download and releases pages)
     version: '{{ $latest }}',
+    // A "backup" version for use in release toggling
+    versionBackup: '{{ $latest }}',
     // Release version
     release: 'stable',
     // Set a new version
     setVersion(v) {
       this.version = v;
+
+      if (v != 'nightly') {
+        this.setRelease('stable');
+      }
     },
     // Switch dark mode on and off
     toggleDarkMode() {
@@ -48,8 +54,10 @@ const manageState = () => {
     toggleRelease() {
       if (this.release === 'stable') {
         this.release = 'nightly';
+        this.setVersion('nightly');
       } else if (this.release === 'nightly') {
         this.release = 'stable';
+        this.setVersion(this.versionBackup);
       }
     },
     isNightly() {

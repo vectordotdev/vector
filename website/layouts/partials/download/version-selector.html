@@ -32,6 +32,18 @@
     tabindex="-1">
 
     <div class="py-3 px-4 flex-flex-col space-y-1.5" role="none">
+      <div class="flex justify-between items-center text-md">
+        <button @click="$store.global.setVersion('nightly'); open = false" class="text-gray-600" role="menuitem" tabindex="-1" id="version-nightly">
+          <span>
+            nightly
+          </span>
+        </button>
+
+        <span class="px-2 py-0.5 rounded-md text-sm bg-yellow-100 text-yellow-800">
+          unstable
+        </span>
+      </div>
+
       {{ range $versions }}
       {{ $isLatest := eq . $latest }}
       <div class="flex justify-between items-center text-md">
