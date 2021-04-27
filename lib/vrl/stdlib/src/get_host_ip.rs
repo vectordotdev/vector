@@ -102,12 +102,23 @@ mod tests {
     use super::*;
     use std::net::IpAddr;
 
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     test_function![
         get_host_ip => GetHostIp;
 
         loopback {
             args: func_args![interface: "lo", family: "IPv4"],
+            want: Ok("127.0.0.1"),
+            tdef: TypeDef::new().fallible().bytes(),
+        }
+    ];
+
+    #[cfg(target_os = "macos")]
+    test_function![
+        get_host_ip => GetHostIp;
+
+        loopback {
+            args: func_args![interface: "lo0", family: "IPv4"],
             want: Ok("127.0.0.1"),
             tdef: TypeDef::new().fallible().bytes(),
         }

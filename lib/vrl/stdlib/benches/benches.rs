@@ -27,8 +27,7 @@ criterion_group!(
               format_number,
               format_timestamp,
               get_env_var,
-              // TODO: dynamic value
-              //get_host_ip,,
+              get_host_ip,
               get_hostname,
               includes,
               ip_cidr_contains,
@@ -279,6 +278,31 @@ bench_function! {
         args: func_args![name: "CARGO"],
         want: Ok(env!("CARGO")),
     }
+}
+
+#[cfg(target_os = "linux")]
+bench_function! {
+    get_host_ip => vrl_stdlib::GetHostIp;
+
+    loopback {
+        args: func_args![interface: "lo", family: "IPv4"],
+        want: Ok("127.0.0.1"),
+    }
+}
+
+#[cfg(target_os = "macos")]
+bench_function! {
+    get_host_ip => vrl_stdlib::GetHostIp;
+
+    loopback {
+        args: func_args![interface: "lo0", family: "IPv4"],
+        want: Ok("127.0.0.1"),
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+bench_function! {
+    get_host_ip => vrl_stdlib::GetHostIp;
 }
 
 bench_function! {
