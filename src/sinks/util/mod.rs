@@ -45,12 +45,12 @@ enum SinkBuildError {
 }
 
 #[derive(Debug)]
-pub struct MetadataInput<I> {
+pub struct EncodedEvent<I> {
     pub item: I,
     pub metadata: Option<EventMetadata>,
 }
 
-impl<I> MetadataInput<I> {
+impl<I> EncodedEvent<I> {
     /// Create a trivial input with no metadata. This method will be
     /// removed when all sinks are converted.
     pub fn new(item: I) -> Self {
@@ -61,11 +61,11 @@ impl<I> MetadataInput<I> {
     }
 
     // This should be:
-    // ```impl<F, I: From<F>> From<MetadataInput<F>> for MetadataInput<I>```
+    // ```impl<F, I: From<F>> From<EncodedEvent<F>> for EncodedEvent<I>```
     // however, the compiler rejects that due to conflicting
     // implementations of `From` due to the generic
     // ```impl<T> From<T> for T```
-    pub fn from<F>(that: MetadataInput<F>) -> Self
+    pub fn from<F>(that: EncodedEvent<F>) -> Self
     where
         I: From<F>,
     {
@@ -100,7 +100,7 @@ pub enum Encoding {
 pub fn encode_event(
     mut event: Event,
     encoding: &EncodingConfig<Encoding>,
-) -> Option<MetadataInput<Bytes>> {
+) -> Option<EncodedEvent<Bytes>> {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
 
@@ -117,7 +117,7 @@ pub fn encode_event(
 
     b.map(|mut b| {
         b.push(b'\n');
-        MetadataInput::new(Bytes::from(b))
+        EncodedEvent::new(Bytes::from(b))
     })
     .map_err(|error| error!(message = "Unable to encode.", %error))
     .ok()

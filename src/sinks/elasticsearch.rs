@@ -7,9 +7,10 @@ use crate::{
     rusoto::{self, region_from_endpoint, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, EncodedEvent, HttpSink, RequestConfig},
+        http::{BatchedHttpSink, HttpSink, RequestConfig},
         retries::{RetryAction, RetryLogic},
-        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
+        BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
+        UriSerde,
     },
     template::{Template, TemplateParseError},
     tls::{TlsOptions, TlsSettings},
@@ -235,7 +236,7 @@ impl HttpSink for ElasticSearchCommon {
             index
         });
 
-        Some(body.into())
+        Some(EncodedEvent::new(body))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {

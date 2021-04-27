@@ -7,7 +7,7 @@ use crate::{
     metrics::{self, capture_metrics, get_controller},
     sinks::{
         util::{
-            retries::RetryLogic, BatchSettings, Concurrency, EncodedLength, MetadataInput,
+            retries::RetryLogic, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
             TowerRequestConfig, VecBuffer,
         },
         Healthcheck, VectorSink,
@@ -155,7 +155,7 @@ impl SinkConfig for TestConfig {
                 batch.timeout,
                 cx.acker(),
             )
-            .with_flat_map(|event| stream::iter(Some(Ok(MetadataInput::new(event)))))
+            .with_flat_map(|event| stream::iter(Some(Ok(EncodedEvent::new(event)))))
             .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
         let healthcheck = future::ok(()).boxed();
 

@@ -35,7 +35,7 @@ use super::{
     batch::{Batch, MetadataBatch, PushResult, StatefulBatch},
     buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
     service::{Map, ServiceBuilderExt},
-    MetadataInput, MetadataOutput,
+    EncodedEvent, MetadataOutput,
 };
 use crate::{
     buffers::Acker,
@@ -129,7 +129,7 @@ where
     }
 }
 
-impl<S, B> Sink<MetadataInput<B::Input>> for BatchSink<S, B>
+impl<S, B> Sink<EncodedEvent<B::Input>> for BatchSink<S, B>
 where
     S: Service<B::Output>,
     S::Future: Send + 'static,
@@ -143,9 +143,9 @@ where
         self.project().inner.poll_ready(cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: MetadataInput<B::Input>) -> Result<(), Self::Error> {
-        let MetadataInput { item, metadata } = item;
-        self.project().inner.start_send(MetadataInput {
+    fn start_send(self: Pin<&mut Self>, item: EncodedEvent<B::Input>) -> Result<(), Self::Error> {
+        let EncodedEvent { item, metadata } = item;
+        self.project().inner.start_send(EncodedEvent {
             item: PartitionInnerBuffer::new(item, ()),
             metadata,
         })
@@ -186,7 +186,7 @@ where
     B: Batch,
 {
     service: ServiceSink<S, B::Output>,
-    buffer: Option<(K, MetadataInput<B::Input>)>,
+    buffer: Option<(K, EncodedEvent<B::Input>)>,
     batch: StatefulBatch<MetadataBatch<B>>,
     partitions: HashMap<K, StatefulBatch<MetadataBatch<B>>>,
     timeout: Duration,
@@ -219,7 +219,7 @@ where
     }
 }
 
-impl<S, B, K> Sink<MetadataInput<B::Input>> for PartitionBatchSink<S, B, K>
+impl<S, B, K> Sink<EncodedEvent<B::Input>> for PartitionBatchSink<S, B, K>
 where
     B: Batch,
     B::Input: Partition<K>,
@@ -249,7 +249,7 @@ where
 
     fn start_send(
         mut self: Pin<&mut Self>,
-        item: MetadataInput<B::Input>,
+        item: EncodedEvent<B::Input>,
     ) -> Result<(), Self::Error> {
         let partition = item.item.partition();
 
@@ -550,7 +550,7 @@ mod tests {
 
         let _ = buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(|item| Ok(MetadataInput::new(item))))
+            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item))))
             .await
             .unwrap();
 
@@ -593,7 +593,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(MetadataInput::new(0)),
+            sink.start_send_unpin(EncodedEvent::new(0)),
             Ok(())
         ));
         assert!(matches!(
@@ -601,7 +601,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(MetadataInput::new(1)),
+            sink.start_send_unpin(EncodedEvent::new(1)),
             Ok(())
         ));
         assert!(matches!(
@@ -609,7 +609,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(MetadataInput::new(2)),
+            sink.start_send_unpin(EncodedEvent::new(2)),
             Ok(())
         ));
 
@@ -641,7 +641,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(MetadataInput::new(3)),
+            sink.start_send_unpin(EncodedEvent::new(3)),
             Ok(())
         ));
         assert!(matches!(
@@ -649,7 +649,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(MetadataInput::new(4)),
+            sink.start_send_unpin(EncodedEvent::new(4)),
             Ok(())
         ));
         assert!(matches!(
@@ -657,7 +657,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(MetadataInput::new(5)),
+            sink.start_send_unpin(EncodedEvent::new(5)),
             Ok(())
         ));
 
@@ -712,7 +712,7 @@ mod tests {
 
         let _ = buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(|item| Ok(MetadataInput::new(item))))
+            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item))))
             .await
             .unwrap();
 
@@ -747,7 +747,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(MetadataInput::new(0)),
+            buffered.start_send_unpin(EncodedEvent::new(0)),
             Ok(())
         ));
         assert!(matches!(
@@ -755,7 +755,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(MetadataInput::new(1)),
+            buffered.start_send_unpin(EncodedEvent::new(1)),
             Ok(())
         ));
 
@@ -785,7 +785,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(MetadataInput::new(0)),
+            buffered.start_send_unpin(EncodedEvent::new(0)),
             Ok(())
         ));
         assert!(matches!(
@@ -793,7 +793,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            buffered.start_send_unpin(MetadataInput::new(1)),
+            buffered.start_send_unpin(EncodedEvent::new(1)),
             Ok(())
         ));
 
@@ -825,7 +825,7 @@ mod tests {
         let sink = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(0..22).map(|item| Ok(MetadataInput::new(item))))
+            .send_all(&mut stream::iter(0..22).map(|item| Ok(EncodedEvent::new(item))))
             .await
             .unwrap();
 
@@ -856,7 +856,7 @@ mod tests {
 
         let input = vec![Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(MetadataInput::new(item))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item))))
             .await
             .unwrap();
 
@@ -881,7 +881,7 @@ mod tests {
 
         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
         sink.sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(|item| Ok(MetadataInput::new(item))))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item))))
             .await
             .unwrap();
 
@@ -916,7 +916,7 @@ mod tests {
             Poll::Ready(Ok(()))
         ));
         assert!(matches!(
-            sink.start_send_unpin(MetadataInput::new(1)),
+            sink.start_send_unpin(EncodedEvent::new(1)),
             Ok(())
         ));
         assert!(matches!(sink.poll_flush_unpin(&mut cx), Poll::Pending));

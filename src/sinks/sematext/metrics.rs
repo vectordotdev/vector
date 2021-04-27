@@ -11,7 +11,7 @@ use crate::{
     sinks::util::{
         buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
         http::{HttpBatchService, HttpRetryLogic},
-        BatchConfig, BatchSettings, MetadataInput, TowerRequestConfig,
+        BatchConfig, BatchSettings, EncodedEvent, TowerRequestConfig,
     },
     sinks::{Healthcheck, HealthcheckError, VectorSink},
     vector_version, Result,
@@ -160,7 +160,7 @@ impl SematextMetricsService {
                 stream::iter(
                     normalizer
                         .apply(event)
-                        .map(|item| Ok(MetadataInput::new(item))),
+                        .map(|item| Ok(EncodedEvent::new(item))),
                 )
             })
             .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error));
@@ -221,7 +221,7 @@ fn encode_events(
     token: &str,
     default_namespace: &str,
     events: Vec<Metric>,
-) -> MetadataInput<String> {
+) -> EncodedEvent<String> {
     let mut output = String::new();
     for event in events.into_iter() {
         let namespace = event
@@ -256,7 +256,7 @@ fn encode_events(
     }
 
     output.pop();
-    MetadataInput::new(output)
+    EncodedEvent::new(output)
 }
 
 fn to_fields(label: String, value: f64) -> HashMap<String, Field> {

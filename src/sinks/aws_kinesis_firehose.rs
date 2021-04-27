@@ -6,7 +6,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
-        BatchConfig, BatchSettings, Compression, EncodedLength, MetadataInput, TowerRequestConfig,
+        BatchConfig, BatchSettings, Compression, EncodedEvent, EncodedLength, TowerRequestConfig,
         VecBuffer,
     },
 };
@@ -241,7 +241,7 @@ enum HealthcheckError {
     StreamNamesMismatch { name: String, stream_name: String },
 }
 
-fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> MetadataInput<Record> {
+fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> EncodedEvent<Record> {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
     let data = match encoding.codec() {
@@ -255,7 +255,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Metada
 
     let data = Bytes::from(data);
 
-    MetadataInput::new(Record { data })
+    EncodedEvent::new(Record { data })
 }
 
 #[cfg(test)]

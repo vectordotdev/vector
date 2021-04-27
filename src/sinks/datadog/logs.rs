@@ -8,9 +8,9 @@ use crate::{
             batch::{Batch, BatchError},
             encode_event,
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{BatchedHttpSink, EncodedEvent, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, Compression, Encoding, JsonArrayBuffer,
-            TowerRequestConfig, VecBuffer,
+            http::{BatchedHttpSink, HttpSink},
+            BatchConfig, BatchSettings, BoxedRawValue, Compression, EncodedEvent, Encoding,
+            JsonArrayBuffer, TowerRequestConfig, VecBuffer,
         },
         Healthcheck, VectorSink,
     },
@@ -227,7 +227,7 @@ impl HttpSink for DatadogLogsJsonService {
 
         self.config.encoding.apply_rules(&mut event);
 
-        Some(json!(event.into_log()).into())
+        Some(EncodedEvent::new(json!(event.into_log())))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -254,7 +254,7 @@ impl HttpSink for DatadogLogsTextService {
                 byte_size: e.item.len(),
                 count: 1,
             });
-            e.item.into()
+            EncodedEvent::new(e.item)
         })
     }
 

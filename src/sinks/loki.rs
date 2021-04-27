@@ -19,10 +19,10 @@ use crate::{
     sinks::util::{
         buffer::loki::{GlobalTimestamps, LokiBuffer, LokiEvent, LokiRecord, PartitionKey},
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{EncodedEvent, HttpSink, PartitionHttpSink},
+        http::{HttpSink, PartitionHttpSink},
         service::ConcurrencyOption,
-        BatchConfig, BatchSettings, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
-        UriSerde,
+        BatchConfig, BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer,
+        TowerRequestConfig, UriSerde,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -242,17 +242,14 @@ impl HttpSink for LokiSink {
         }
 
         let event = LokiEvent { timestamp, event };
-        Some(
-            PartitionInnerBuffer::new(
-                LokiRecord {
-                    labels,
-                    event,
-                    partition: key.clone(),
-                },
-                key,
-            )
-            .into(),
-        )
+        Some(EncodedEvent::new(PartitionInnerBuffer::new(
+            LokiRecord {
+                labels,
+                event,
+                partition: key.clone(),
+            },
+            key,
+        )))
     }
 
     async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {

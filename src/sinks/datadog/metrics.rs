@@ -9,7 +9,7 @@ use crate::{
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
-            MetadataInput, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+            EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
             TowerRequestConfig,
         },
         Healthcheck, HealthcheckError, UriParseError, VectorSink,
@@ -196,7 +196,7 @@ impl SinkConfig for DatadogConfig {
             .with_flat_map(move |event: Event| {
                 stream::iter(normalizer.apply(event).map(|event| {
                     let endpoint = DatadogEndpoint::from_metric(&event);
-                    Ok(MetadataInput::new(PartitionInnerBuffer::new(
+                    Ok(EncodedEvent::new(PartitionInnerBuffer::new(
                         event, endpoint,
                     )))
                 }))

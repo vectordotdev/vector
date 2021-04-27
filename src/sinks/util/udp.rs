@@ -10,7 +10,7 @@ use crate::{
         UdpSocketConnectionFailed, UdpSocketError,
     },
     sinks::{
-        util::{retries::ExponentialBackoff, MetadataInput, StreamSink},
+        util::{retries::ExponentialBackoff, EncodedEvent, StreamSink},
         Healthcheck, VectorSink,
     },
 };
@@ -76,7 +76,7 @@ impl UdpSinkConfig {
     pub fn build(
         &self,
         cx: SinkContext,
-        encode_event: impl Fn(Event) -> Option<MetadataInput<Bytes>> + Send + Sync + 'static,
+        encode_event: impl Fn(Event) -> Option<EncodedEvent<Bytes>> + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector(cx.clone())?;
         let sink = UdpSink::new(connector.clone(), cx.acker(), encode_event);
@@ -228,14 +228,14 @@ impl tower::Service<Bytes> for UdpService {
 struct UdpSink {
     connector: UdpConnector,
     acker: Acker,
-    encode_event: Box<dyn Fn(Event) -> Option<MetadataInput<Bytes>> + Send + Sync>,
+    encode_event: Box<dyn Fn(Event) -> Option<EncodedEvent<Bytes>> + Send + Sync>,
 }
 
 impl UdpSink {
     fn new(
         connector: UdpConnector,
         acker: Acker,
-        encode_event: impl Fn(Event) -> Option<MetadataInput<Bytes>> + Send + Sync + 'static,
+        encode_event: impl Fn(Event) -> Option<EncodedEvent<Bytes>> + Send + Sync + 'static,
     ) -> Self {
         Self {
             connector,

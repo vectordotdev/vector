@@ -6,8 +6,9 @@ use crate::{
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, EncodedEvent, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            http::{BatchedHttpSink, HttpSink},
+            BatchConfig, BatchSettings, BoxedRawValue, EncodedEvent, JsonArrayBuffer,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -180,7 +181,7 @@ impl HttpSink for StackdriverSink {
             entry.insert("timestamp".into(), json!(timestamp));
         }
 
-        Some(json!(entry).into())
+        Some(EncodedEvent::new(json!(entry)))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {

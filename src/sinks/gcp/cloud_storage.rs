@@ -10,7 +10,7 @@ use crate::{
             batch::{BatchConfig, BatchSettings},
             encoding::{EncodingConfig, EncodingConfiguration},
             retries::{RetryAction, RetryLogic},
-            Buffer, Compression, Concurrency, MetadataInput, PartitionBatchSink, PartitionBuffer,
+            Buffer, Compression, Concurrency, EncodedEvent, PartitionBatchSink, PartitionBuffer,
             PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -405,7 +405,7 @@ fn encode_event(
     mut event: Event,
     key_prefix: &Template,
     encoding: &EncodingConfig<Encoding>,
-) -> Option<MetadataInput<PartitionInnerBuffer<Vec<u8>, Bytes>>> {
+) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8>, Bytes>>> {
     let key = key_prefix
         .render_string(&event)
         .map_err(|error| {
@@ -435,7 +435,7 @@ fn encode_event(
         }
     };
 
-    Some(MetadataInput::new(PartitionInnerBuffer::new(
+    Some(EncodedEvent::new(PartitionInnerBuffer::new(
         bytes,
         key.into(),
     )))

@@ -7,7 +7,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
-        BatchConfig, BatchSettings, Compression, EncodedLength, MetadataInput, TowerRequestConfig,
+        BatchConfig, BatchSettings, Compression, EncodedEvent, EncodedLength, TowerRequestConfig,
         VecBuffer,
     },
 };
@@ -270,7 +270,7 @@ fn encode_event(
     mut event: Event,
     partition_key_field: &Option<String>,
     encoding: &EncodingConfig<Encoding>,
-) -> Option<MetadataInput<PutRecordsRequestEntry>> {
+) -> Option<EncodedEvent<PutRecordsRequestEntry>> {
     let partition_key = if let Some(partition_key_field) = partition_key_field {
         if let Some(v) = event.as_log().get(&partition_key_field) {
             v.to_string_lossy()
@@ -303,7 +303,7 @@ fn encode_event(
             .unwrap_or_default(),
     };
 
-    Some(MetadataInput::new(PutRecordsRequestEntry {
+    Some(EncodedEvent::new(PutRecordsRequestEntry {
         data: Bytes::from(data),
         partition_key,
         ..Default::default()

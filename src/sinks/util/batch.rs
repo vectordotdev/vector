@@ -1,4 +1,4 @@
-use super::{MetadataInput, MetadataOutput};
+use super::{EncodedEvent, MetadataOutput};
 use crate::event::EventMetadata;
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
@@ -209,7 +209,7 @@ impl<B: Batch> From<B> for MetadataBatch<B> {
 }
 
 impl<B: Batch> Batch for MetadataBatch<B> {
-    type Input = MetadataInput<B::Input>;
+    type Input = EncodedEvent<B::Input>;
     type Output = MetadataOutput<B::Output>;
 
     fn get_settings_defaults(
@@ -220,7 +220,7 @@ impl<B: Batch> Batch for MetadataBatch<B> {
     }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
-        let MetadataInput { item, metadata } = item;
+        let EncodedEvent { item, metadata } = item;
         match self.inner.push(item) {
             PushResult::Ok(full) => {
                 if let Some(metadata) = metadata {
@@ -228,7 +228,7 @@ impl<B: Batch> Batch for MetadataBatch<B> {
                 }
                 PushResult::Ok(full)
             }
-            PushResult::Overflow(item) => PushResult::Overflow(MetadataInput { item, metadata }),
+            PushResult::Overflow(item) => PushResult::Overflow(EncodedEvent { item, metadata }),
         }
     }
 

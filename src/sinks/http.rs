@@ -6,8 +6,9 @@ use crate::{
     sinks::util::{
         buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{BatchedHttpSink, EncodedEvent, HttpSink, RequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig, UriSerde,
+        http::{BatchedHttpSink, HttpSink, RequestConfig},
+        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, EncodedEvent,
+        TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -215,7 +216,7 @@ impl HttpSink for HttpSinkConfig {
             byte_size: body.len(),
         });
 
-        Some(body.into())
+        Some(EncodedEvent::new(body))
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {

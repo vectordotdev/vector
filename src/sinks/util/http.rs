@@ -1,11 +1,11 @@
 use super::{
     retries::{RetryAction, RetryLogic},
-    sink, Batch, MetadataInput, Partition, TowerBatchedSink, TowerPartitionSink,
-    TowerRequestConfig, TowerRequestSettings,
+    sink, Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
+    TowerRequestSettings,
 };
 use crate::{
     buffers::Acker,
-    event::{Event, EventMetadata},
+    event::Event,
     http::{HttpClient, HttpError},
 };
 use bytes::{Buf, Bytes};
@@ -25,21 +25,6 @@ use std::{
     time::Duration,
 };
 use tower::Service;
-
-pub struct EncodedEvent<I> {
-    pub item: I,
-    pub metadata: Option<EventMetadata>,
-}
-
-// TODO: Drop this conversion once all sinks have been converted
-impl<I> From<I> for EncodedEvent<I> {
-    fn from(item: I) -> Self {
-        Self {
-            item,
-            metadata: None,
-        }
-    }
-}
 
 #[async_trait::async_trait]
 pub trait HttpSink: Send + Sync + 'static {
@@ -80,7 +65,7 @@ where
     // An empty slot is needed to buffer an item where we encoded it but
     // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
     // sink combinator. https://docs.rs/futures/0.1.29/src/futures/sink/with_flat_map.rs.html#20
-    slot: Option<MetadataInput<B::Input>>,
+    slot: Option<EncodedEvent<B::Input>>,
 }
 
 impl<T, B> BatchedHttpSink<T, B, HttpRetryLogic>
@@ -171,8 +156,8 @@ where
     }
 
     fn start_send(self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        if let Some(EncodedEvent { item, metadata }) = self.sink.encode_event(item) {
-            *self.project().slot = Some(MetadataInput { item, metadata });
+        if let Some(item) = self.sink.encode_event(item) {
+            *self.project().slot = Some(item);
         }
 
         Ok(())
@@ -212,7 +197,7 @@ where
         L,
         K,
     >,
-    slot: Option<MetadataInput<B::Input>>,
+    slot: Option<EncodedEvent<B::Input>>,
 }
 
 impl<T, B, K> PartitionHttpSink<T, B, K, HttpRetryLogic>
@@ -309,8 +294,8 @@ where
     }
 
     fn start_send(self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
-        if let Some(EncodedEvent { item, metadata }) = self.sink.encode_event(item) {
-            *self.project().slot = Some(MetadataInput { item, metadata });
+        if let Some(item) = self.sink.encode_event(item) {
+            *self.project().slot = Some(item);
         }
 
         Ok(())

@@ -10,8 +10,8 @@ use crate::{
         util::{
             encode_namespace,
             encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, EncodedEvent, HttpSink},
-            BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
+            http::{BatchedHttpSink, HttpSink},
+            BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -200,7 +200,7 @@ impl HttpSink for InfluxDbLogsSink {
             return None;
         };
 
-        Some(output.into_bytes().into())
+        Some(EncodedEvent::new(output.into_bytes()))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {

@@ -9,7 +9,7 @@ use crate::{
         encode_namespace,
         tcp::TcpSinkConfig,
         udp::{UdpService, UdpSinkConfig},
-        BatchConfig, BatchSettings, BatchSink, Buffer, Compression, MetadataInput,
+        BatchConfig, BatchSettings, BatchSink, Buffer, Compression, EncodedEvent,
     },
 };
 use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
@@ -85,7 +85,7 @@ impl SinkConfig for StatsdSinkConfig {
         match &self.mode {
             Mode::Tcp(config) => {
                 let encode_event = move |event| {
-                    encode_event(event, default_namespace.as_deref()).map(MetadataInput::from)
+                    encode_event(event, default_namespace.as_deref()).map(EncodedEvent::from)
                 };
                 config.build(cx, encode_event)
             }
@@ -118,7 +118,7 @@ impl SinkConfig for StatsdSinkConfig {
             #[cfg(unix)]
             Mode::Unix(config) => {
                 let encode_event = move |event| {
-                    encode_event(event, default_namespace.as_deref()).map(MetadataInput::from)
+                    encode_event(event, default_namespace.as_deref()).map(EncodedEvent::from)
                 };
                 config.build(cx, encode_event)
             }
@@ -169,7 +169,7 @@ fn push_event<V: Display>(
     };
 }
 
-fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<MetadataInput<Vec<u8>>> {
+fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<EncodedEvent<Vec<u8>>> {
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
@@ -220,7 +220,7 @@ fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Metadat
     let mut body: Vec<u8> = message.into_bytes();
     body.push(b'\n');
 
-    Some(MetadataInput::new(body))
+    Some(EncodedEvent::new(body))
 }
 
 impl Service<Vec<u8>> for StatsdSvc {

@@ -5,8 +5,9 @@ use crate::{
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, EncodedEvent, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            http::{BatchedHttpSink, HttpSink},
+            BatchConfig, BatchSettings, BoxedRawValue, EncodedEvent, JsonArrayBuffer,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -174,7 +175,7 @@ impl HttpSink for AzureMonitorLogsSink {
             JsonValue::String(timestamp.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)),
         );
 
-        Some(entry.into())
+        Some(EncodedEvent::new(entry))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {

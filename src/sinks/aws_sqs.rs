@@ -7,7 +7,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
-        BatchSettings, EncodedLength, MetadataInput, TowerRequestConfig, VecBuffer,
+        BatchSettings, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
     },
     template::{Template, TemplateParseError},
 };
@@ -252,7 +252,7 @@ fn encode_event(
     mut event: Event,
     encoding: &EncodingConfig<Encoding>,
     message_group_id: Option<&Template>,
-) -> Option<MetadataInput<SendMessageEntry>> {
+) -> Option<EncodedEvent<SendMessageEntry>> {
     encoding.apply_rules(&mut event);
 
     let message_group_id = match message_group_id {
@@ -279,7 +279,7 @@ fn encode_event(
         Encoding::Json => serde_json::to_string(&log).expect("Error encoding event as json."),
     };
 
-    Some(MetadataInput::new(SendMessageEntry {
+    Some(EncodedEvent::new(SendMessageEntry {
         message_body,
         message_group_id,
     }))

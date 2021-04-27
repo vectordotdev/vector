@@ -4,7 +4,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSinkConfig,
-        Encoding, MetadataInput, UriSerde,
+        EncodedEvent, Encoding, UriSerde,
     },
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
@@ -81,7 +81,7 @@ fn encode_event(
     mut event: Event,
     pid: u32,
     encoding: &EncodingConfig<Encoding>,
-) -> MetadataInput<Bytes> {
+) -> EncodedEvent<Bytes> {
     let host = event
         .as_mut_log()
         .remove(log_schema().host_key())
@@ -113,7 +113,7 @@ fn encode_event(
 
     s.push(b'\n');
 
-    MetadataInput::new(Bytes::from(s))
+    EncodedEvent::new(Bytes::from(s))
 }
 
 #[cfg(test)]

@@ -9,7 +9,7 @@ use crate::{
         batch::{BatchConfig, BatchSettings},
         buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
         retries::RetryLogic,
-        Compression, MetadataInput, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+        Compression, EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
         TowerRequestConfig,
     },
 };
@@ -157,7 +157,7 @@ impl CloudWatchMetricsSvc {
                         .namespace
                         .take()
                         .unwrap_or_else(|| default_namespace.clone());
-                    Ok(MetadataInput::new(PartitionInnerBuffer::new(
+                    Ok(EncodedEvent::new(PartitionInnerBuffer::new(
                         metric, namespace,
                     )))
                 }))

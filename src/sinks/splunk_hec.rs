@@ -5,8 +5,9 @@ use crate::{
     internal_events::{SplunkEventEncodeError, SplunkEventSent, TemplateRenderingFailed},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{BatchedHttpSink, EncodedEvent, HttpSink},
-        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig,
+        http::{BatchedHttpSink, HttpSink},
+        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, EncodedEvent,
+        TowerRequestConfig,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -235,7 +236,7 @@ impl HttpSink for HecSinkConfig {
                 emit!(SplunkEventSent {
                     byte_size: value.len()
                 });
-                Some(value.into())
+                Some(EncodedEvent::new(value))
             }
             Err(error) => {
                 emit!(SplunkEventEncodeError { error });

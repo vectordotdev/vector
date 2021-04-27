@@ -5,8 +5,8 @@ use crate::{
     internal_events::TemplateRenderingFailed,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{EncodedEvent, HttpSink, PartitionHttpSink},
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, PartitionBuffer,
+        http::{HttpSink, PartitionHttpSink},
+        BatchConfig, BatchSettings, BoxedRawValue, EncodedEvent, JsonArrayBuffer, PartitionBuffer,
         PartitionInnerBuffer, TowerRequestConfig, UriSerde,
     },
     template::{Template, TemplateRenderingError},
@@ -180,7 +180,10 @@ impl HttpSink for LogdnaConfig {
             map.insert("meta".into(), json!(&log));
         }
 
-        Some(PartitionInnerBuffer::new(map.into(), key).into())
+        Some(EncodedEvent::new(PartitionInnerBuffer::new(
+            map.into(),
+            key,
+        )))
     }
 
     async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {

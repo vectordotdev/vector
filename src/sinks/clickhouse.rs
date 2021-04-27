@@ -4,9 +4,10 @@ use crate::{
     http::{Auth, HttpClient, HttpError, MaybeAuth},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, EncodedEvent, HttpRetryLogic, HttpSink},
+        http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
         retries::{RetryAction, RetryLogic},
-        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
+        BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
+        UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -117,7 +118,7 @@ impl HttpSink for ClickhouseConfig {
         let mut body = serde_json::to_vec(&event.as_log()).expect("Events should be valid json!");
         body.push(b'\n');
 
-        Some(body.into())
+        Some(EncodedEvent::new(body))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {

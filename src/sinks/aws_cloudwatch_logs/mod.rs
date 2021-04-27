@@ -9,7 +9,7 @@ use crate::{
         batch::{BatchConfig, BatchSettings},
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
-        Compression, EncodedLength, MetadataInput, PartitionBatchSink, PartitionBuffer,
+        Compression, EncodedEvent, EncodedLength, PartitionBatchSink, PartitionBuffer,
         PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
     },
     template::Template,
@@ -441,7 +441,7 @@ fn partition_encode(
     encoding: &EncodingConfig<Encoding>,
     group: &Template,
     stream: &Template,
-) -> Option<MetadataInput<PartitionInnerBuffer<InputLogEvent, CloudwatchKey>>> {
+) -> Option<EncodedEvent<PartitionInnerBuffer<InputLogEvent, CloudwatchKey>>> {
     let group = match group.render_string(&event) {
         Ok(b) => b,
         Err(error) => {
@@ -475,7 +475,7 @@ fn partition_encode(
         )
         .ok()?;
 
-    Some(MetadataInput::new(PartitionInnerBuffer::new(event, key)))
+    Some(EncodedEvent::new(PartitionInnerBuffer::new(event, key)))
 }
 
 #[derive(Debug, Snafu)]
