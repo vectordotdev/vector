@@ -5,8 +5,8 @@
 {{ define "main" }}
 {{ $rss := .OutputFormats.Get "rss" }}
 {{ $posts := .RegularPages }}
-<div class="relative max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-6 lg:px-8 my-16 xl:grid xl:grid-cols-7 xl:gap-12">
-  <div class="col-span-2 max-w-xl">
+<div class="relative max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-6 lg:px-8 my-16 xl:grid xl:grid-cols-7 lg:gap-x-10">
+  <div class="col-span-2">
     <div class="mb-4 md:mb-6">
       {{ partial "breadcrumb.html" . }}
     </div>

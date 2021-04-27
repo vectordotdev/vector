@@ -1,20 +1,17 @@
+{{ $latest := index site.Params.vector_versions 0 }}
 import '@ryangjchandler/spruce';
 import 'alpinejs';
 import 'tocbot/dist/tocbot';
 
+const sayHello = () => {
+  console.log('Welcome to the Vector website and documentation!');
+}
+
 // Table of contents for documentation pages
 const tableOfContents = () => {
   tocbot.init({
-    tocSelector: '#docs-toc',
-    contentSelector: '#docs-content',
-    headingSelector: 'h1, h2, h3, h4',
-    ignoreSelector: 'no-toc',
-    scrollSmoothDuration: 400
-  });
-
-  tocbot.init({
-    tocSelector: '#docs-toc-slideover',
-    contentSelector: '#docs-content',
+    tocSelector: '#toc',
+    contentSelector: '#page-content',
     headingSelector: 'h1, h2, h3, h4',
     ignoreSelector: 'no-toc',
     scrollSmoothDuration: 400
@@ -23,34 +20,47 @@ const tableOfContents = () => {
 
 /* Global state management */
 
-// Dark mode state
 const manageState = () => {
+  // Persist global state in localStorage
   const useLocalStorage = true;
 
   // Detect the user's dark mode preference and set that to the default
   const darkModeDefault = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
   window.Spruce.store('global', {
+    // Dark mode state
     dark: darkModeDefault,
+    // Whether the top banner is showing (user can dismiss)
     banner: true,
+    // The Vector version selected (for the download and releases pages)
+    version: '{{ $latest }}',
+    // Release version
+    release: 'stable',
+    // Set a new version
+    setVersion(v) {
+      this.version = v;
+    },
+    // Switch dark mode on and off
     toggleDarkMode() {
       this.dark = !this.dark;
     },
+    // Toggle between stable and nightly
+    toggleRelease() {
+      if (this.release == 'stable') {
+        this.release = 'nightly';
+      } else if (this.release == 'nightly') {
+        this.release = 'stable';
+      }
+    },
+    // Set release directly
+    setRelease(release) {
+      this.release = release;
+    },
+    // Switch the banner on and off
     toggleBanner() {
       this.banner = !this.banner;
     }
   }, useLocalStorage);
-}
-
-const sayHello = () => {
-  console.log('Welcome to the Vector website and documentation!');
-}
-
-const main = () => {
-  sayHello();
-  manageState();
-  tableOfContents();
-  showCodeFilename();
 }
 
 const showCodeFilename = () => {
@@ -64,6 +74,13 @@ const showCodeFilename = () => {
       els[i].parentNode.insertBefore(newNode, els[i]);
     }
   }
+}
+
+const main = () => {
+  sayHello();
+  manageState();
+  tableOfContents();
+  showCodeFilename();
 }
 
 document.addEventListener("DOMContentLoaded", main());

@@ -7,11 +7,13 @@
   <div class="flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
     {{ range $k, $v := . }}
     {{ if ne $k "type" }}
-    <div class="py-4 px-6" id="{{ $k }}">
+    <div class="py-4 px-6">
       <span class="flex justify-between items-center">
-        <a href="#{{ $k }}" class="font-mono font-bold text-lg text-primary-dark dark:text-primary">
-          {{ $k }}
-        </a>
+        <h3 id="{{ $k }}">
+          <a href="#{{ $k }}" class="font-mono font-bold text-lg text-primary-dark dark:text-primary dark:hover:text-secondary">
+            {{ $k }}
+          </a>
+        </h3>
         <span class="flex justify-between space-x-1">
           {{ if $v.common }}
           {{ template "badge" (dict "word" "common" "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}

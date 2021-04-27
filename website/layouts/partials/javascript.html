@@ -1,7 +1,9 @@
-{{ $opts         := dict "targetPath" "js/app.js" }}
-{{ $app          := resources.Get "js/app.js" | js.Build $opts }}
-<script type="text/javascript" src="{{ $app.RelPermalink }}" integrity="{{ $app.Data.Integrity }}"  defer></script>
+{{ $js   := "js/app.js"}}
+{{ $opts := dict "targetPath" $js "minify" true }}
+{{ $app  := resources.Get $js | resources.ExecuteAsTemplate $js . | js.Build }}
+<script type="text/javascript" src="{{ $app.RelPermalink }}" integrity="{{ $app.Data.Integrity }}"></script>
 
 {{/* We have a few Ionicons icons scattered throughout */}}
 {{ $version := site.Params.ionicons_version }}
-<script src="https://unpkg.com/ionicons@{{ $version }}/dist/ionicons.js"></script>
+<script type="module" src="https://unpkg.com/ionicons@{{ $version }}/dist/ionicons/ionicons.esm.js"></script>
+<script nomodule="" src="https://unpkg.com/ionicons@{{ $version }}/dist/ionicons/ionicons.js"></script>

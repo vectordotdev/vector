@@ -35,8 +35,7 @@ site_logo = "img/vector-open-graph.png"
 favicon = "favicon.ico"
 
 # Versions
-current_version = "0.12.1"
-vector_versions = ["0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.1", "0.8.0", "0.7.0", "0.6.0"]
+vector_versions = ["0.13.0", "0.12.1", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.1", "0.8.0", "0.7.0", "0.6.0"]
 
 # Aesthetics
 [[params.fonts]]
@@ -298,8 +297,3 @@ name = "Examples"
 parent = "vrl"
 url = "/docs/reference/vrl/examples"
 weight = 3
-
-[[menu.flyout]]
-name = "Other"
-identifier = "other"
-weight = 4

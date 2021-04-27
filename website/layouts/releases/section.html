@@ -4,60 +4,33 @@ Download | {{ site.Title }}
 
 {{ define "main" }}
 {{ $releases := site.Data.docs.releases }}
+{{ $versions := site.Params.vector_versions }}
+<div class="relative max-w-3xl lg:max-w-7xl px-6 lg:px-8 mx-auto">
+  <div class="my-16">
+    {{ partial "hero.html" . }}
 
-<section class="hero is-black is-medium is-bold">
-  <div class="hero-body">
-    <div class="container">
-      <p class="title is-size-1 is-size-2-mobile has-text-weight-light has-text-light">
-        {{ .Title }}
+    <div class="mt-6 flex items-center space-x-6">
+      {{ partial "releases/version-selector.html" . }}
+      {{ partial "releases/release-selector.html" . }}
+    </div>
+
+    {{ range $k, $v := $releases }}
+    <div x-show="$store.global.version === '{{ $k }}'">
+      <p>
+        Codename: {{ $v.codename }}
       </p>
+
+      <p>
+        Commits
+      </p>
+
+      {{ range $v.commits }}
+      {{ . }}
+      {{ end }}
     </div>
+    {{ end }}
   </div>
-</section>
-
-<section class="section">
-  <div class="container">
-    {{/* Stable vs. nightly selection logic */}}
-    <div x-data="{ release: localStorage.getItem('release') || 'Stable' }">
-      <div class="buttons">
-        <button class="button" :class="{ 'is-primary': release === 'Stable', 'is-outlined': release != 'Stable' }" @click="release = 'Stable'">
-          <span class="icon">
-            <i class="fas fa-mountain"></i>
-          </span>
-          <span>
-            Stable
-          </span>
-        </button>
-        <button class="button" :class="{ 'is-primary': release === 'Nightly', 'is-outlined': release != 'Nightly' }" @click="release = 'Nightly'">
-          <span class="icon">
-            <i class="far fa-moon"></i>
-          </span>
-          <span>
-            Nightly
-          </span>
-        </button>
-      </div>
-
-      <div class="card">
-        <header class="card-header">
-          <p class="card-header-title is-size-4 is-size-4-mobile" x-text="[release]" />
-        </header>
-
-        <div class="card-content">
-          <div x-show="release === 'Stable'">
-
-          </div>
-
-          <div x-show="release === 'Nightly'">
-            <article class="message is-danger">
-              <div class="message-body">
-                Nightly versions contain bleeding edge changes that may contain bugs. Proceed with caution.
-              </div>
-            </article>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+</div>
 {{ end }}
+
+{{/* codename commits date whats_next description */}}

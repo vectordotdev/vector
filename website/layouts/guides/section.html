@@ -8,7 +8,7 @@
 {{ $numSections := len .Sections }}
 {{ $isRoot := eq .FirstSection .CurrentSection }}
 {{ $guides := cond $isRoot .Sections .RegularPages }}
-<div class="relative max-w-3xl mx-auto sm:px-6 lg:max-w-7xl lg:px-8 xl:grid xl:grid-cols-3 xl:gap-x-12 space-y-8 xl:space-y-0 my-16">
+<div class="relative max-w-3xl mx-auto lg:max-w-7xl px-6 lg:px-8 xl:grid xl:grid-cols-3 xl:gap-x-12 space-y-8 xl:space-y-0 my-16">
   <div class="xl:col-span-1 pr-0 lg:pr-6 md:pr-2">
     <div class="px-6 lg:p-0">
       <div class="max-w-xl">
