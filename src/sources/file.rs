@@ -1,6 +1,6 @@
 use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     encoding_transcode::{Decoder, Encoder},
     event::Event,
     internal_events::{FileEventReceived, FileOpen, FileSourceInternalEventsEmitter},
@@ -187,18 +187,14 @@ impl_generate_config_from_default!(FileConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
-    async fn build(
-        &self,
-        name: &str,
-        globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         // add the source name as a subdir, so that multiple sources can
         // operate within the same given data_dir (e.g. the global one)
         // without the file servers' checkpointers interfering with each
         // other
-        let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
+        let data_dir = cx
+            .globals
+            .resolve_and_make_data_subdir(self.data_dir.as_ref(), &cx.name)?;
 
         // Clippy rule, because async_trait?
         #[allow(clippy::suspicious_else_formatting)]
@@ -213,7 +209,7 @@ impl SourceConfig for FileConfig {
             }
         }
 
-        Ok(file_source(self, data_dir, shutdown, out))
+        Ok(file_source(self, data_dir, cx.shutdown, cx.out))
     }
 
     fn output_type(&self) -> DataType {

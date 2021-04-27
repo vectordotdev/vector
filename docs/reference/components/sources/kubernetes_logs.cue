@@ -211,6 +211,15 @@ components: sources: kubernetes_logs: {
 				syntax: "literal"
 			}
 		}
+		max_line_bytes: {
+			common:      false
+			description: "The maximum number of a bytes a line can contain before being discarded. This protects against malformed lines or tailing incorrect files."
+			required:    false
+			type: uint: {
+				default: 32_768
+				unit:    "bytes"
+			}
+		}
 		timezone: configuration._timezone
 	}
 

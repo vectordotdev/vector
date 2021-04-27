@@ -1,6 +1,6 @@
 use crate::{
-    shutdown::ShutdownSignal, sources::util::build_unix_stream_source, sources::Source, Event,
-    Pipeline,
+    event::Event, shutdown::ShutdownSignal, sources::util::build_unix_stream_source,
+    sources::Source, Pipeline,
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};

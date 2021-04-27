@@ -82,7 +82,11 @@ mod join;
 mod length;
 #[cfg(feature = "log")]
 mod log;
-#[cfg(any(feature = "parse_common_log", feature = "parse_apache_log"))]
+#[cfg(any(
+    feature = "parse_common_log",
+    feature = "parse_apache_log",
+    feature = "parse_nginx_log"
+))]
 mod log_util;
 #[cfg(feature = "match")]
 mod r#match;
@@ -122,6 +126,8 @@ mod parse_key_value;
 mod parse_linux_authorization;
 #[cfg(feature = "parse_logfmt")]
 mod parse_logfmt;
+#[cfg(feature = "parse_nginx_log")]
+mod parse_nginx_log;
 #[cfg(feature = "parse_regex")]
 mod parse_regex;
 #[cfg(feature = "parse_regex_all")]
@@ -172,6 +178,8 @@ mod to_bool;
 mod to_float;
 #[cfg(feature = "to_int")]
 mod to_int;
+#[cfg(feature = "to_regex")]
+mod to_regex;
 #[cfg(feature = "to_string")]
 mod to_string;
 #[cfg(feature = "to_syslog_facility")]
@@ -313,6 +321,8 @@ pub use parse_key_value::ParseKeyValue;
 pub use parse_linux_authorization::ParseLinuxAuthorization;
 #[cfg(feature = "parse_logfmt")]
 pub use parse_logfmt::ParseLogFmt;
+#[cfg(feature = "parse_nginx_log")]
+pub use parse_nginx_log::ParseNginxLog;
 #[cfg(feature = "parse_query_string")]
 pub use parse_query_string::ParseQueryString;
 #[cfg(feature = "parse_regex")]
@@ -363,6 +373,8 @@ pub use to_bool::ToBool;
 pub use to_float::ToFloat;
 #[cfg(feature = "to_int")]
 pub use to_int::ToInt;
+#[cfg(feature = "to_regex")]
+pub use to_regex::ToRegex;
 #[cfg(feature = "to_string")]
 pub use to_string::ToString;
 #[cfg(feature = "to_syslog_facility")]
@@ -506,6 +518,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseLinuxAuthorization),
         #[cfg(feature = "parse_logfmt")]
         Box::new(ParseLogFmt),
+        #[cfg(feature = "parse_nginx_log")]
+        Box::new(ParseNginxLog),
         #[cfg(feature = "parse_query_string")]
         Box::new(ParseQueryString),
         #[cfg(feature = "parse_regex")]
@@ -558,6 +572,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ToFloat),
         #[cfg(feature = "to_int")]
         Box::new(ToInt),
+        #[cfg(feature = "to_regex")]
+        Box::new(ToRegex),
         #[cfg(feature = "to_string")]
         Box::new(ToString),
         #[cfg(feature = "to_syslog_facility")]

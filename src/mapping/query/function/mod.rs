@@ -5,8 +5,8 @@ mod not;
 pub(in crate::mapping) use not::NotFn;
 
 use super::Function;
+use crate::event::Event;
 use crate::mapping::{query::query_value::QueryValue, Result};
-use crate::Event;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::str::FromStr;

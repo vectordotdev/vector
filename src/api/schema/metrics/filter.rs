@@ -1,4 +1,4 @@
-use super::{ProcessedBytesTotal, ProcessedEventsTotal};
+use super::{EventsInTotal, EventsOutTotal, ProcessedBytesTotal, ProcessedEventsTotal};
 use crate::{
     event::{Event, Metric, MetricValue},
     metrics::{capture_metrics, get_controller, Controller},
@@ -29,6 +29,8 @@ fn sum_metrics<'a, I: IntoIterator<Item = &'a Metric>>(metrics: I) -> Option<Met
 pub trait MetricsFilter<'a> {
     fn processed_events_total(&self) -> Option<ProcessedEventsTotal>;
     fn processed_bytes_total(&self) -> Option<ProcessedBytesTotal>;
+    fn events_in_total(&self) -> Option<EventsInTotal>;
+    fn events_out_total(&self) -> Option<EventsOutTotal>;
 }
 
 impl<'a> MetricsFilter<'a> for Vec<Metric> {
@@ -42,6 +44,18 @@ impl<'a> MetricsFilter<'a> for Vec<Metric> {
         let sum = sum_metrics(self.iter().filter(|m| m.name() == "processed_bytes_total"))?;
 
         Some(ProcessedBytesTotal::new(sum))
+    }
+
+    fn events_in_total(&self) -> Option<EventsInTotal> {
+        let sum = sum_metrics(self.iter().filter(|m| m.name() == "events_in_total"))?;
+
+        Some(EventsInTotal::new(sum))
+    }
+
+    fn events_out_total(&self) -> Option<EventsOutTotal> {
+        let sum = sum_metrics(self.iter().filter(|m| m.name() == "events_out_total"))?;
+
+        Some(EventsOutTotal::new(sum))
     }
 }
 
@@ -64,6 +78,26 @@ impl<'a> MetricsFilter<'a> for Vec<&'a Metric> {
         )?;
 
         Some(ProcessedBytesTotal::new(sum))
+    }
+
+    fn events_in_total(&self) -> Option<EventsInTotal> {
+        let sum = sum_metrics(
+            self.iter()
+                .filter(|m| m.name() == "events_in_total")
+                .copied(),
+        )?;
+
+        Some(EventsInTotal::new(sum))
+    }
+
+    fn events_out_total(&self) -> Option<EventsOutTotal> {
+        let sum = sum_metrics(
+            self.iter()
+                .filter(|m| m.name() == "events_out_total")
+                .copied(),
+        )?;
+
+        Some(EventsOutTotal::new(sum))
     }
 }
 

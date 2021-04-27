@@ -1,8 +1,8 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::merge_state::LogEventMergeState,
-    event::{self, Event, LogEvent, Value},
+    event::{self, Event, LogEvent, PathComponent, PathIter, Value},
     internal_events::{
         DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchFailed, DockerLogsContainerUnwatch,
@@ -52,6 +52,7 @@ const MIN_HOSTNAME_LENGTH: usize = 6;
 lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
     static ref STDOUT: Bytes = "stdout".into();
+    static ref CONSOLE: Bytes = "console".into();
 }
 
 #[derive(Debug, Snafu)]
@@ -152,17 +153,11 @@ impl_generate_config_from_default!(DockerLogsConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "docker_logs")]
 impl SourceConfig for DockerLogsConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let source = DockerLogsSource::new(
             self.clone().with_empty_partial_event_marker_field_as_none(),
-            out,
-            shutdown.clone(),
+            cx.out,
+            cx.shutdown.clone(),
         )?;
 
         // Capture currently running containers, and do main future(run)
@@ -178,6 +173,7 @@ impl SourceConfig for DockerLogsConfig {
             }
         };
 
+        let shutdown = cx.shutdown;
         // Once this ShutdownSignal resolves it will drop DockerLogsSource and by extension it's ShutdownSignal.
         Ok(Box::pin(async move {
             Ok(tokio::select! {
@@ -207,14 +203,8 @@ struct DockerCompatConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "docker")]
 impl SourceConfig for DockerCompatConfig {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        self.config.build(_name, _globals, shutdown, out).await
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        self.config.build(cx).await
     }
 
     fn output_type(&self) -> DataType {
@@ -801,7 +791,8 @@ impl ContainerLogInfo {
         let (stream, mut bytes_message) = match log_output {
             LogOutput::StdErr { message } => (STDERR.clone(), message),
             LogOutput::StdOut { message } => (STDOUT.clone(), message),
-            _ => return None,
+            LogOutput::Console { message } => (CONSOLE.clone(), message),
+            LogOutput::StdIn { message: _ } => return None,
         };
 
         let byte_size = bytes_message.len();
@@ -860,6 +851,13 @@ impl ContainerLogInfo {
             .unwrap_or(false)
         {
             bytes_message.truncate(bytes_message.len() - 1);
+            if bytes_message
+                .last()
+                .map(|&b| b as char == '\r')
+                .unwrap_or(false)
+            {
+                bytes_message.truncate(bytes_message.len() - 1);
+            }
             false
         } else {
             true
@@ -887,8 +885,13 @@ impl ContainerLogInfo {
             log_event.insert(CONTAINER, self.id.0.clone());
 
             // Labels.
-            for (key, value) in self.metadata.labels.iter() {
-                log_event.insert(key.clone(), value.clone());
+            if !self.metadata.labels.is_empty() {
+                let prefix_path = PathIter::new("label").collect::<Vec<_>>();
+                for (key, value) in self.metadata.labels.iter() {
+                    let mut path = prefix_path.clone();
+                    path.push(PathComponent::Key(key.clone()));
+                    log_event.insert_path(path, value.clone());
+                }
             }
 
             // Container name.
@@ -963,7 +966,7 @@ impl ContainerLogInfo {
 
 struct ContainerMetadata {
     /// label.key -> String
-    labels: Vec<(String, Value)>,
+    labels: HashMap<String, String>,
     /// name -> String
     name: Value,
     /// name
@@ -980,17 +983,7 @@ impl ContainerMetadata {
         let name = details.name.unwrap();
         let created = details.created.unwrap();
 
-        let labels = config
-            .labels
-            .as_ref()
-            .map(|map| {
-                map.iter()
-                    .map(|(key, value)| {
-                        (("label.".to_owned() + key), Value::from(value.to_owned()))
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
+        let labels = config.labels.unwrap_or_default();
 
         Ok(ContainerMetadata {
             labels,
@@ -1167,12 +1160,7 @@ mod integration_tests {
         let (sender, recv) = Pipeline::new_test();
         tokio::spawn(async move {
             config
-                .build(
-                    "default",
-                    &GlobalOptions::default(),
-                    ShutdownSignal::noop(),
-                    sender,
-                )
+                .build(SourceContext::new_test(sender))
                 .await
                 .unwrap()
                 .await
@@ -1182,8 +1170,14 @@ mod integration_tests {
     }
 
     /// Users should ensure to remove container before exiting.
-    async fn log_container(name: &str, label: Option<&str>, log: &str, docker: &Docker) -> String {
-        cmd_container(name, label, vec!["echo", log], docker).await
+    async fn log_container(
+        name: &str,
+        label: Option<&str>,
+        log: &str,
+        docker: &Docker,
+        tty: bool,
+    ) -> String {
+        cmd_container(name, label, vec!["echo", log], docker, tty).await
     }
 
     /// Users should ensure to remove container before exiting.
@@ -1203,6 +1197,7 @@ mod integration_tests {
                 format!("echo before; i=0; while [ $i -le 50 ]; do sleep 0.1; echo {}; i=$((i+1)); done", log).as_str(),
             ],
             docker,
+            false
         ).await
     }
 
@@ -1212,8 +1207,9 @@ mod integration_tests {
         label: Option<&str>,
         cmd: Vec<&str>,
         docker: &Docker,
+        tty: bool,
     ) -> String {
-        if let Some(id) = cmd_container_for_real(name, label, cmd, docker).await {
+        if let Some(id) = cmd_container_for_real(name, label, cmd, docker, tty).await {
             id
         } else {
             // Maybe a before created container is present
@@ -1231,6 +1227,7 @@ mod integration_tests {
         label: Option<&str>,
         cmd: Vec<&str>,
         docker: &Docker,
+        tty: bool,
     ) -> Option<String> {
         pull_busybox(docker).await;
 
@@ -1241,6 +1238,7 @@ mod integration_tests {
             image: Some("busybox"),
             cmd: Some(cmd),
             labels: label.map(|label| vec![(label, "")].into_iter().collect()),
+            tty: Some(tty),
             ..Default::default()
         };
 
@@ -1333,7 +1331,17 @@ mod integration_tests {
         log: &str,
         docker: &Docker,
     ) -> String {
-        let id = log_container(name, label, log, docker).await;
+        container_with_optional_tty_log_n(n, name, label, log, docker, false).await
+    }
+    async fn container_with_optional_tty_log_n(
+        n: usize,
+        name: &str,
+        label: Option<&str>,
+        log: &str,
+        docker: &Docker,
+        tty: bool,
+    ) -> String {
+        let id = log_container(name, label, log, docker, tty).await;
         for _ in 0..n {
             if let Err(error) = container_run(&id, docker).await {
                 container_remove(&id, docker).await;
@@ -1372,6 +1380,27 @@ mod integration_tests {
 
     fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> bool {
         rx.next().now_or_never().is_none()
+    }
+
+    #[tokio::test]
+    async fn container_with_tty() {
+        trace_init();
+
+        let message = "log container_with_tty";
+        let name = "container_with_tty";
+
+        let out = source_with(&[name], None);
+
+        let docker = docker(None, None).unwrap();
+
+        let id = container_with_optional_tty_log_n(1, name, None, message, &docker, true).await;
+        let events = collect_n(out, 1).await;
+        container_remove(&id, &docker).await;
+
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key()],
+            message.into()
+        );
     }
 
     #[tokio::test]
@@ -1623,6 +1652,41 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    async fn flat_labels() {
+        trace_init();
+
+        let message = "18";
+        let name = "vector_test_flat_labels";
+        let label = "vector.test.label.flat.labels";
+
+        let docker = docker(None, None).unwrap();
+        let id = running_container(name, Some(label), message, &docker).await;
+        let out = source_with(&[name], None);
+
+        let events = collect_n(out, 1).await;
+        let _ = container_kill(&id, &docker).await;
+        container_remove(&id, &docker).await;
+
+        let log = events[0].as_log();
+        assert_eq!(log[log_schema().message_key()], message.into());
+        assert_eq!(log[&*super::CONTAINER], id.into());
+        assert!(log.get(&*super::CREATED_AT).is_some());
+        assert_eq!(log[&*super::IMAGE], "busybox".into());
+        assert!(log
+            .get("label")
+            .unwrap()
+            .as_map()
+            .unwrap()
+            .get(label)
+            .is_some());
+        assert_eq!(events[0].as_log()[&super::NAME], name.into());
+        assert_eq!(
+            events[0].as_log()[log_schema().source_type_key()],
+            "docker".into()
+        );
+    }
+
+    #[tokio::test]
     async fn log_longer_than_16kb() {
         trace_init();
 
@@ -1681,7 +1745,7 @@ mod integration_tests {
             .collect::<Box<_>>()
             .join(" && ");
 
-        let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker).await;
+        let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker, false).await;
         if let Err(error) = container_run(&id, &docker).await {
             container_remove(&id, &docker).await;
             panic!("Container failed to start with error: {:?}", error);

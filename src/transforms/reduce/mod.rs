@@ -1,8 +1,7 @@
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
-    event::discriminant::Discriminant,
-    event::{Event, LogEvent},
+    event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
     internal_events::ReduceStaleEventFlushed,
     transforms::{TaskTransform, Transform},
 };
@@ -73,13 +72,15 @@ impl TransformConfig for ReduceConfig {
 struct ReduceState {
     fields: HashMap<String, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
+    metadata: EventMetadata,
 }
 
 impl ReduceState {
     fn new(e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) -> Self {
+        let (fields, metadata) = e.into_parts();
         Self {
             stale_since: Instant::now(),
-            fields: e
+            fields: fields
                 .into_iter()
                 .filter_map(|(k, v)| {
                     if let Some(strat) = strategies.get(&k) {
@@ -95,11 +96,15 @@ impl ReduceState {
                     }
                 })
                 .collect(),
+            metadata,
         }
     }
 
     fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) {
-        for (k, v) in e.into_iter() {
+        let (fields, metadata) = e.into_parts();
+        self.metadata.merge(&metadata);
+
+        for (k, v) in fields.into_iter() {
             let strategy = strategies.get(&k);
             match self.fields.entry(k) {
                 hash_map::Entry::Vacant(entry) => {
@@ -127,7 +132,7 @@ impl ReduceState {
     }
 
     fn flush(mut self) -> LogEvent {
-        let mut event = Event::new_empty_log().into_log();
+        let mut event = LogEvent::new_with_metadata(self.metadata);
         for (k, v) in self.fields.drain() {
             if let Err(error) = v.insert_into(k, &mut event) {
                 warn!(message = "Failed to merge values for field.", %error);
@@ -289,7 +294,10 @@ impl TaskTransform for Reduce {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::TransformConfig, event::Value, Event};
+    use crate::{
+        config::TransformConfig,
+        event::{LogEvent, Value},
+    };
     use serde_json::json;
 
     #[test]
@@ -314,41 +322,45 @@ group_by = [ "request_id" ]
         .unwrap();
         let reduce = reduce.into_task();
 
-        let mut e_1 = Event::from("test message 1");
-        e_1.as_mut_log().insert("counter", 1);
-        e_1.as_mut_log().insert("request_id", "1");
+        let mut e_1 = LogEvent::from("test message 1");
+        e_1.insert("counter", 1);
+        e_1.insert("request_id", "1");
+        let metadata_1 = e_1.metadata().clone();
 
-        let mut e_2 = Event::from("test message 2");
-        e_2.as_mut_log().insert("counter", 2);
-        e_2.as_mut_log().insert("request_id", "2");
+        let mut e_2 = LogEvent::from("test message 2");
+        e_2.insert("counter", 2);
+        e_2.insert("request_id", "2");
+        let metadata_2 = e_2.metadata().clone();
 
-        let mut e_3 = Event::from("test message 3");
-        e_3.as_mut_log().insert("counter", 3);
-        e_3.as_mut_log().insert("request_id", "1");
+        let mut e_3 = LogEvent::from("test message 3");
+        e_3.insert("counter", 3);
+        e_3.insert("request_id", "1");
 
-        let mut e_4 = Event::from("test message 4");
-        e_4.as_mut_log().insert("counter", 4);
-        e_4.as_mut_log().insert("request_id", "1");
-        e_4.as_mut_log().insert("test_end", "yep");
+        let mut e_4 = LogEvent::from("test message 4");
+        e_4.insert("counter", 4);
+        e_4.insert("request_id", "1");
+        e_4.insert("test_end", "yep");
 
-        let mut e_5 = Event::from("test message 5");
-        e_5.as_mut_log().insert("counter", 5);
-        e_5.as_mut_log().insert("request_id", "2");
-        e_5.as_mut_log().insert("extra_field", "value1");
-        e_5.as_mut_log().insert("test_end", "yep");
+        let mut e_5 = LogEvent::from("test message 5");
+        e_5.insert("counter", 5);
+        e_5.insert("request_id", "2");
+        e_5.insert("extra_field", "value1");
+        e_5.insert("test_end", "yep");
 
-        let inputs = vec![e_1, e_2, e_3, e_4, e_5];
+        let inputs = vec![e_1.into(), e_2.into(), e_3.into(), e_4.into(), e_5.into()];
         let in_stream = Box::pin(stream::iter(inputs));
         let mut out_stream = reduce.transform(in_stream);
 
-        let output_1 = out_stream.next().await.unwrap();
-        assert_eq!(output_1.as_log()["message"], "test message 1".into());
-        assert_eq!(output_1.as_log()["counter"], Value::from(8));
+        let output_1 = out_stream.next().await.unwrap().into_log();
+        assert_eq!(output_1["message"], "test message 1".into());
+        assert_eq!(output_1["counter"], Value::from(8));
+        assert_eq!(output_1.metadata(), &metadata_1);
 
-        let output_2 = out_stream.next().await.unwrap();
-        assert_eq!(output_2.as_log()["message"], "test message 2".into());
-        assert_eq!(output_2.as_log()["extra_field"], "value1".into());
-        assert_eq!(output_2.as_log()["counter"], Value::from(7));
+        let output_2 = out_stream.next().await.unwrap().into_log();
+        assert_eq!(output_2["message"], "test message 2".into());
+        assert_eq!(output_2["extra_field"], "value1".into());
+        assert_eq!(output_2["counter"], Value::from(7));
+        assert_eq!(output_2.metadata(), &metadata_2);
     }
 
     #[tokio::test]
@@ -372,37 +384,39 @@ merge_strategies.baz = "max"
         .unwrap();
         let reduce = reduce.into_task();
 
-        let mut e_1 = Event::from("test message 1");
-        e_1.as_mut_log().insert("foo", "first foo");
-        e_1.as_mut_log().insert("bar", "first bar");
-        e_1.as_mut_log().insert("baz", 2);
-        e_1.as_mut_log().insert("request_id", "1");
+        let mut e_1 = LogEvent::from("test message 1");
+        e_1.insert("foo", "first foo");
+        e_1.insert("bar", "first bar");
+        e_1.insert("baz", 2);
+        e_1.insert("request_id", "1");
+        let metadata = e_1.metadata().clone();
 
-        let mut e_2 = Event::from("test message 2");
-        e_2.as_mut_log().insert("foo", "second foo");
-        e_2.as_mut_log().insert("bar", 2);
-        e_2.as_mut_log().insert("baz", "not number");
-        e_2.as_mut_log().insert("request_id", "1");
+        let mut e_2 = LogEvent::from("test message 2");
+        e_2.insert("foo", "second foo");
+        e_2.insert("bar", 2);
+        e_2.insert("baz", "not number");
+        e_2.insert("request_id", "1");
 
-        let mut e_3 = Event::from("test message 3");
-        e_3.as_mut_log().insert("foo", 10);
-        e_3.as_mut_log().insert("bar", "third bar");
-        e_3.as_mut_log().insert("baz", 3);
-        e_3.as_mut_log().insert("request_id", "1");
-        e_3.as_mut_log().insert("test_end", "yep");
+        let mut e_3 = LogEvent::from("test message 3");
+        e_3.insert("foo", 10);
+        e_3.insert("bar", "third bar");
+        e_3.insert("baz", 3);
+        e_3.insert("request_id", "1");
+        e_3.insert("test_end", "yep");
 
-        let inputs = vec![e_1, e_2, e_3];
+        let inputs = vec![e_1.into(), e_2.into(), e_3.into()];
         let in_stream = Box::pin(stream::iter(inputs));
         let mut out_stream = reduce.transform(in_stream);
 
-        let output_1 = out_stream.next().await.unwrap();
-        assert_eq!(output_1.as_log()["message"], "test message 1".into());
-        assert_eq!(output_1.as_log()["foo"], "first foo second foo".into());
+        let output_1 = out_stream.next().await.unwrap().into_log();
+        assert_eq!(output_1["message"], "test message 1".into());
+        assert_eq!(output_1["foo"], "first foo second foo".into());
         assert_eq!(
-            output_1.as_log()["bar"],
+            output_1["bar"],
             Value::Array(vec!["first bar".into(), 2.into(), "third bar".into()]),
         );
-        assert_eq!(output_1.as_log()["baz"], 3.into(),);
+        assert_eq!(output_1["baz"], 3.into());
+        assert_eq!(output_1.metadata(), &metadata);
     }
 
     #[tokio::test]
@@ -422,41 +436,43 @@ group_by = [ "request_id" ]
         .unwrap();
         let reduce = reduce.into_task();
 
-        let mut e_1 = Event::from("test message 1");
-        e_1.as_mut_log().insert("counter", 1);
-        e_1.as_mut_log().insert("request_id", "1");
+        let mut e_1 = LogEvent::from("test message 1");
+        e_1.insert("counter", 1);
+        e_1.insert("request_id", "1");
+        let metadata_1 = e_1.metadata().clone();
 
-        let mut e_2 = Event::from("test message 2");
-        e_2.as_mut_log().insert("counter", 2);
+        let mut e_2 = LogEvent::from("test message 2");
+        e_2.insert("counter", 2);
+        let metadata_2 = e_2.metadata().clone();
 
-        let mut e_3 = Event::from("test message 3");
-        e_3.as_mut_log().insert("counter", 3);
-        e_3.as_mut_log().insert("request_id", "1");
+        let mut e_3 = LogEvent::from("test message 3");
+        e_3.insert("counter", 3);
+        e_3.insert("request_id", "1");
 
-        let mut e_4 = Event::from("test message 4");
-        e_4.as_mut_log().insert("counter", 4);
-        e_4.as_mut_log().insert("request_id", "1");
-        e_4.as_mut_log().insert("test_end", "yep");
+        let mut e_4 = LogEvent::from("test message 4");
+        e_4.insert("counter", 4);
+        e_4.insert("request_id", "1");
+        e_4.insert("test_end", "yep");
 
-        let mut e_5 = Event::from("test message 5");
-        e_5.as_mut_log().insert("counter", 5);
-        e_5.as_mut_log().insert("extra_field", "value1");
-        e_5.as_mut_log().insert("test_end", "yep");
+        let mut e_5 = LogEvent::from("test message 5");
+        e_5.insert("counter", 5);
+        e_5.insert("extra_field", "value1");
+        e_5.insert("test_end", "yep");
 
-        let inputs = vec![e_1, e_2, e_3, e_4, e_5];
+        let inputs = vec![e_1.into(), e_2.into(), e_3.into(), e_4.into(), e_5.into()];
         let in_stream = Box::pin(stream::iter(inputs));
         let mut out_stream = reduce.transform(in_stream);
 
-        let output_1 = out_stream.next().await.unwrap();
-        let output_1 = output_1.as_log();
+        let output_1 = out_stream.next().await.unwrap().into_log();
         assert_eq!(output_1["message"], "test message 1".into());
         assert_eq!(output_1["counter"], Value::from(8));
+        assert_eq!(output_1.metadata(), &metadata_1);
 
-        let output_2 = out_stream.next().await.unwrap();
-        let output_2 = output_2.as_log();
+        let output_2 = out_stream.next().await.unwrap().into_log();
         assert_eq!(output_2["message"], "test message 2".into());
         assert_eq!(output_2["extra_field"], "value1".into());
         assert_eq!(output_2["counter"], Value::from(7));
+        assert_eq!(output_2.metadata(), &metadata_2);
     }
 
     #[tokio::test]
@@ -479,51 +495,59 @@ merge_strategies.bar = "concat"
         .unwrap();
         let reduce = reduce.into_task();
 
-        let mut e_1 = Event::from("test message 1");
-        e_1.as_mut_log().insert("foo", json!([1, 3]));
-        e_1.as_mut_log().insert("bar", json!([1, 3]));
-        e_1.as_mut_log().insert("request_id", "1");
+        let mut e_1 = LogEvent::from("test message 1");
+        e_1.insert("foo", json!([1, 3]));
+        e_1.insert("bar", json!([1, 3]));
+        e_1.insert("request_id", "1");
+        let metadata_1 = e_1.metadata().clone();
 
-        let mut e_2 = Event::from("test message 2");
-        e_2.as_mut_log().insert("foo", json!([2, 4]));
-        e_2.as_mut_log().insert("bar", json!([2, 4]));
-        e_2.as_mut_log().insert("request_id", "2");
+        let mut e_2 = LogEvent::from("test message 2");
+        e_2.insert("foo", json!([2, 4]));
+        e_2.insert("bar", json!([2, 4]));
+        e_2.insert("request_id", "2");
+        let metadata_2 = e_2.metadata().clone();
 
-        let mut e_3 = Event::from("test message 3");
-        e_3.as_mut_log().insert("foo", json!([5, 7]));
-        e_3.as_mut_log().insert("bar", json!([5, 7]));
-        e_3.as_mut_log().insert("request_id", "1");
+        let mut e_3 = LogEvent::from("test message 3");
+        e_3.insert("foo", json!([5, 7]));
+        e_3.insert("bar", json!([5, 7]));
+        e_3.insert("request_id", "1");
 
-        let mut e_4 = Event::from("test message 4");
-        e_4.as_mut_log().insert("foo", json!("done"));
-        e_4.as_mut_log().insert("bar", json!("done"));
-        e_4.as_mut_log().insert("request_id", "1");
-        e_4.as_mut_log().insert("test_end", "yep");
+        let mut e_4 = LogEvent::from("test message 4");
+        e_4.insert("foo", json!("done"));
+        e_4.insert("bar", json!("done"));
+        e_4.insert("request_id", "1");
+        e_4.insert("test_end", "yep");
 
-        let mut e_5 = Event::from("test message 5");
-        e_5.as_mut_log().insert("foo", json!([6, 8]));
-        e_5.as_mut_log().insert("bar", json!([6, 8]));
-        e_5.as_mut_log().insert("request_id", "2");
+        let mut e_5 = LogEvent::from("test message 5");
+        e_5.insert("foo", json!([6, 8]));
+        e_5.insert("bar", json!([6, 8]));
+        e_5.insert("request_id", "2");
 
-        let mut e_6 = Event::from("test message 6");
-        e_6.as_mut_log().insert("foo", json!("done"));
-        e_6.as_mut_log().insert("bar", json!("done"));
-        e_6.as_mut_log().insert("request_id", "2");
-        e_6.as_mut_log().insert("test_end", "yep");
+        let mut e_6 = LogEvent::from("test message 6");
+        e_6.insert("foo", json!("done"));
+        e_6.insert("bar", json!("done"));
+        e_6.insert("request_id", "2");
+        e_6.insert("test_end", "yep");
 
-        let inputs = vec![e_1, e_2, e_3, e_4, e_5, e_6];
+        let inputs = vec![
+            e_1.into(),
+            e_2.into(),
+            e_3.into(),
+            e_4.into(),
+            e_5.into(),
+            e_6.into(),
+        ];
         let in_stream = Box::pin(stream::iter(inputs));
         let mut out_stream = reduce.transform(in_stream);
 
-        let output_1 = out_stream.next().await.unwrap();
-        let output_1 = output_1.as_log();
+        let output_1 = out_stream.next().await.unwrap().into_log();
         assert_eq!(output_1["foo"], json!([[1, 3], [5, 7], "done"]).into());
-
         assert_eq!(output_1["bar"], json!([1, 3, 5, 7, "done"]).into());
+        assert_eq!(output_1.metadata(), &metadata_1);
 
-        let output_1 = out_stream.next().await.unwrap();
-        let output_1 = output_1.as_log();
-        assert_eq!(output_1["foo"], json!([[2, 4], [6, 8], "done"]).into());
-        assert_eq!(output_1["bar"], json!([2, 4, 6, 8, "done"]).into());
+        let output_2 = out_stream.next().await.unwrap().into_log();
+        assert_eq!(output_2["foo"], json!([[2, 4], [6, 8], "done"]).into());
+        assert_eq!(output_2["bar"], json!([2, 4, 6, 8, "done"]).into());
+        assert_eq!(output_2.metadata(), &metadata_2);
     }
 }

@@ -20,6 +20,17 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
+    pub fn new_with_metadata(metadata: EventMetadata) -> Self {
+        Self {
+            fields: Default::default(),
+            metadata,
+        }
+    }
+
+    pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
+        (self.fields, self.metadata)
+    }
+
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
         util::log::get(&self.fields, key.as_ref())
@@ -194,7 +205,7 @@ impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
         LogEvent {
             fields: map,
-            metadata: EventMetadata,
+            metadata: EventMetadata::default(),
         }
     }
 }
@@ -209,7 +220,7 @@ impl From<HashMap<String, Value>> for LogEvent {
     fn from(map: HashMap<String, Value>) -> Self {
         LogEvent {
             fields: map.into_iter().collect(),
-            metadata: EventMetadata,
+            metadata: EventMetadata::default(),
         }
     }
 }
@@ -273,19 +284,9 @@ where
 // Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
 impl<K: AsRef<str>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let mut log_event = LogEvent::default();
+        let mut log_event = Self::default();
         log_event.extend(iter);
         log_event
-    }
-}
-
-/// Converts event into an iterator over top-level key/value pairs.
-impl IntoIterator for LogEvent {
-    type Item = (String, Value);
-    type IntoIter = std::collections::btree_map::IntoIter<String, Value>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.fields.into_iter()
     }
 }
 
@@ -631,7 +632,7 @@ mod test {
                 vrl::Target::insert(&mut event, &path, value.clone()),
                 result
             );
-            assert_eq!(event, expect);
+            shared::assert_event_data_eq!(event, expect);
             assert_eq!(vrl::Target::get(&event, &path), Ok(Some(value)));
         }
     }

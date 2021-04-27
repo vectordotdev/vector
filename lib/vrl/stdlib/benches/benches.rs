@@ -63,6 +63,7 @@ criterion_group!(
               parse_grok,
               parse_key_value,
               parse_json,
+              parse_nginx_log,
               parse_query_string,
               parse_regex,
               parse_regex_all,
@@ -86,6 +87,7 @@ criterion_group!(
               to_bool,
               to_float,
               to_int,
+              to_regex,
               to_string,
               to_syslog_facility,
               to_syslog_level,
@@ -926,6 +928,49 @@ bench_function! {
 }
 
 bench_function! {
+    parse_nginx_log => vrl_stdlib::ParseNginxLog;
+
+    combined {
+        args: func_args![
+            value: r#"172.17.0.1 alice - [01/Apr/2021:12:02:31 +0000] "POST /not-found HTTP/1.1" 404 153 "http://localhost/somewhere" "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36" "2.75""#,
+            format: "combined",
+        ],
+        want: Ok(value!({
+            "client": "172.17.0.1",
+            "user": "alice",
+            "timestamp": (DateTime::parse_from_rfc3339("2021-04-01T12:02:31Z").unwrap().with_timezone(&Utc)),
+            "request": "POST /not-found HTTP/1.1",
+            "method": "POST",
+            "path": "/not-found",
+            "protocol": "HTTP/1.1",
+            "status": 404,
+            "size": 153,
+            "referer": "http://localhost/somewhere",
+            "agent": "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.119 Safari/537.36",
+            "compression": "2.75",
+        })),
+    }
+
+    error {
+        args: func_args![value: r#"2021/04/01 13:02:31 [error] 31#31: *1 open() "/usr/share/nginx/html/not-found" failed (2: No such file or directory), client: 172.17.0.1, server: localhost, request: "POST /not-found HTTP/1.1", host: "localhost:8081""#,
+                         format: "error"
+        ],
+        want: Ok(value!({
+            "timestamp": (DateTime::parse_from_rfc3339("2021-04-01T13:02:31Z").unwrap().with_timezone(&Utc)),
+            "severity": "error",
+            "pid": 31,
+            "tid": 31,
+            "cid": 1,
+            "message": "open() \"/usr/share/nginx/html/not-found\" failed (2: No such file or directory)",
+            "client": "172.17.0.1",
+            "server": "localhost",
+            "request": "POST /not-found HTTP/1.1",
+            "host": "localhost:8081",
+        })),
+    }
+}
+
+bench_function! {
     parse_query_string => vrl_stdlib::ParseQueryString;
 
     literal {
@@ -944,7 +989,8 @@ bench_function! {
         args: func_args! [
             value: "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574",
             pattern: Regex::new(r#"^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$"#)
-                .unwrap()
+                .unwrap(),
+            numeric_groups: true
         ],
         want: Ok(value!({
             "bytes_in": "5667",
@@ -974,8 +1020,6 @@ bench_function! {
         ],
         want: Ok(value!({
             "number": "first",
-            "0": "first group",
-            "1": "first"
         }))
     }
 }
@@ -986,7 +1030,8 @@ bench_function! {
     matches {
         args: func_args![
             value: "apples and carrots, peaches and peas",
-            pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap()
+            pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap(),
+            numeric_groups: true
         ],
         want: Ok(value!([
                 {
@@ -1376,6 +1421,15 @@ bench_function! {
     null {
         args: func_args![value: value!(null)],
         want: Ok(0)
+    }
+}
+
+bench_function! {
+    to_regex => vrl_stdlib::ToRegex;
+
+    regex {
+        args: func_args![value: "^foo.*bar.*baz"],
+        want: Ok(Regex::new("^foo.*bar.*baz").expect("regex is valid"))
     }
 }
 

@@ -3,6 +3,7 @@ use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
+    event::Event,
     internal_events::StatsdInvalidMetricReceived,
     sinks::util::{
         encode_namespace,
@@ -10,7 +11,6 @@ use crate::{
         udp::{UdpService, UdpSinkConfig},
         BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
     },
-    Event,
 };
 use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
@@ -301,7 +301,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        assert_eq!(metric1, metric2);
+        shared::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -331,7 +331,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        assert_eq!(metric1, metric2);
+        shared::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -346,7 +346,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        assert_eq!(metric1, metric2);
+        shared::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -364,7 +364,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        assert_eq!(metric1, metric2);
+        shared::assert_event_data_eq!(metric1, metric2);
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -381,7 +381,7 @@ mod test {
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
-        assert_eq!(metric1, metric2);
+        shared::assert_event_data_eq!(metric1, metric2);
     }
 
     #[tokio::test]

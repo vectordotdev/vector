@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use structopt::{clap::AppSettings, StructOpt};
 
 #[cfg(feature = "api-client")]
+use crate::tap;
+#[cfg(feature = "api-client")]
 use crate::top;
 
 #[cfg(windows)]
@@ -140,12 +142,16 @@ pub enum SubCommand {
     List(list::Opts),
 
     /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
-    /// For guidance on how to write unit tests check out: https://vector.dev/docs/setup/guides/unit-testing/
+    /// For guidance on how to write unit tests check out: https://vector.dev/guides/level-up/unit-testing/
     Test(unit_test::Opts),
 
     /// Display topology and metrics in the console, for a local or remote Vector instance
     #[cfg(feature = "api-client")]
     Top(top::Opts),
+
+    /// Observe log events from topology components
+    #[cfg(feature = "api-client")]
+    Tap(tap::Opts),
 
     /// Manage the vector service.
     #[cfg(windows)]
