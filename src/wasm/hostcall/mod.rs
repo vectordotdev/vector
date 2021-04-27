@@ -1,8 +1,8 @@
 //! Hostcall endpoints exposed to guests.
 use super::context::EventBuffer;
+use crate::event::Event;
 use crate::wasm::context::RaisedError;
 use crate::wasm::WasmModuleConfig;
-use crate::Event;
 use lucet_runtime::vmctx::Vmctx;
 use std::convert::TryInto;
 use vector_wasm::Registration;

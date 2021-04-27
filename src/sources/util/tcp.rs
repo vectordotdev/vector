@@ -1,10 +1,11 @@
 use crate::{
     config::Resource,
+    event::Event,
     internal_events::{ConnectionOpen, OpenGauge, TcpSocketConnectionError},
     shutdown::ShutdownSignal,
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
-    Event, Pipeline,
+    Pipeline,
 };
 use bytes::Bytes;
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};

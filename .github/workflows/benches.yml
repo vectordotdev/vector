@@ -93,11 +93,10 @@ jobs:
           mkdir -p target/criterion
           setarch $(uname -m) -R taskset -c "$(cat /sys/devices/system/cpu/isolated)" make bench-all | tee target/criterion/out
 
-      - run: zip --recurse-paths target/criterion.zip target/criterion
       - uses: actions/upload-artifact@v2
         with:
           name: "criterion"
-          path: "./target/criterion.zip"
+          path: "./target/criterion"
       - name: Upload criterion data to S3
         run: scripts/upload-benchmarks-s3.sh
         if: github.ref == 'refs/heads/master'

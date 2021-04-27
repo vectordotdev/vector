@@ -5,7 +5,7 @@
 //!
 //! **Note:** This code is experimental.
 
-use crate::{internal_events, Event, Result};
+use crate::{event::Event, internal_events, Result};
 use lucet_runtime::{DlModule, InstanceHandle, Limits, MmapRegion, Region};
 use lucet_wasi::WasiCtxBuilder;
 use lucetc::{Bindings, Lucetc, LucetcOpts};

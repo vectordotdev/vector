@@ -55,7 +55,7 @@ pub extern "C" fn process(data: u32, length: u32) -> u32 {
     //. = parse_syslog!(string!(.message))
     //.timestamp = format_timestamp!(to_timestamp!(.timestamp), format: "%c")
     //del(.hostname)
-    //.message = downcase(string!(.message))
+    //.message = downcase(.message)
     let message = event
         .get("message")
         .map(|v| v.as_str().unwrap_or_default())

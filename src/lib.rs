@@ -20,10 +20,6 @@ extern crate pest_derive;
 #[cfg(feature = "vrl-cli")]
 extern crate vrl_cli;
 
-#[cfg(feature = "jemallocator")]
-#[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
-
 #[macro_use]
 pub mod config;
 pub mod cli;
@@ -83,12 +79,9 @@ pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
 
-pub use event::{Event, Value};
 pub use pipeline::Pipeline;
 
-pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-
-pub type Result<T> = std::result::Result<T, Error>;
+pub use vector_core::{Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]

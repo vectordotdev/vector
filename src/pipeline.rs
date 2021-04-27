@@ -1,4 +1,4 @@
-use crate::{internal_events::EventOut, transforms::FunctionTransform, Event};
+use crate::{event::Event, internal_events::EventOut, transforms::FunctionTransform};
 use futures::{channel::mpsc, task::Poll, Sink};
 use std::{collections::VecDeque, fmt, pin::Pin, task::Context};
 
@@ -42,7 +42,7 @@ impl Pipeline {
                 Poll::Ready(Err(_error)) => return Poll::Ready(Err(ClosedError)),
             }
 
-            match self.inner.try_send(event) {
+            match self.inner.start_send(event) {
                 Ok(()) => {
                     // we good, keep looping
                 }
@@ -130,9 +130,9 @@ impl Pipeline {
 mod test {
     use super::Pipeline;
     use crate::{
+        event::{Event, Value},
         test_util::collect_ready,
         transforms::{add_fields::AddFields, filter::Filter},
-        Event, Value,
     };
     use futures::SinkExt;
     use serde_json::json;

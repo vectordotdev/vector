@@ -5,8 +5,8 @@
     {
         "foo": [
             {
-                "bar": parse_json!("{ \"baz\": true }").baz,
+                "bar": parse_json!("{ \"baz\": {\"0tar\": true} }").baz,
             }
         ]
     }
-][1].foo[0].bar
+][1].foo[0].bar.0tar

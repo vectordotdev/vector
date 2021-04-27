@@ -450,9 +450,9 @@ mod integration_tests {
     use crate::{
         assert_downcast_matches,
         config::{SinkConfig, SinkContext},
+        event::Event,
         sinks,
         test_util::{random_lines_with_stream, random_string},
-        Event,
     };
     use futures::stream;
     use serde_json::Value as JsonValue;

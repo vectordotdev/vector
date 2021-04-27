@@ -1,11 +1,11 @@
 use crate::{
     config::{self, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
+    event::Event,
     internal_events::{
         MongoDbMetricsBsonParseError, MongoDbMetricsCollectCompleted, MongoDbMetricsEventsReceived,
         MongoDbMetricsRequestError,
     },
-    Event,
 };
 use chrono::Utc;
 use futures::{

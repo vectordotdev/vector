@@ -24,4 +24,14 @@ impl GenericTransformMetrics {
     pub async fn processed_bytes_total(&self) -> Option<metrics::ProcessedBytesTotal> {
         self.0.processed_bytes_total()
     }
+
+    /// Total incoming events for the current transform
+    pub async fn events_in_total(&self) -> Option<metrics::EventsInTotal> {
+        self.0.events_in_total()
+    }
+
+    /// Total outgoing events for the current transform
+    pub async fn events_out_total(&self) -> Option<metrics::EventsOutTotal> {
+        self.0.events_out_total()
+    }
 }

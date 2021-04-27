@@ -1,8 +1,8 @@
 use crate::{
     config::{DataType, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
+    event::Event,
     internal_events::{PostgresqlMetricsCollectCompleted, PostgresqlMetricsCollectFailed},
-    Event,
 };
 use chrono::{DateTime, Utc};
 use futures::{
