@@ -64,7 +64,7 @@ impl<'a> From<&'a FieldBuf> for Field<'a> {
 pub enum Segment<'a> {
     Field(Field<'a>),
     Index(isize),
-    // Coalesces hold multiple segment sets.
+    // Coalesces hold multiple possible fields.
     Coalesce(Vec<Field<'a>>),
 }
 

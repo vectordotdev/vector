@@ -88,7 +88,7 @@ impl Arbitrary for FieldBuf {
 pub enum SegmentBuf {
     Field(FieldBuf),
     Index(isize), // Indexes can be negative.
-    // Coalesces hold multiple segment sets.
+    // Coalesces hold multiple possible fields.
     Coalesce(Vec<FieldBuf>),
 }
 

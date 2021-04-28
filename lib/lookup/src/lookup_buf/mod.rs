@@ -88,7 +88,7 @@ impl Arbitrary for LookupBuf {
         LookupBuf {
             segments: {
                 // Limit the number of segments generated to a fairly realistic number,
-                // otherwise thet tests take ages to run and don't add any extra value.
+                // otherwise the tests take ages to run and don't add any extra value.
                 let size = usize::arbitrary(g) % 20 + 1;
                 (0..size).map(|_| SegmentBuf::arbitrary(g)).collect()
             },
@@ -133,7 +133,7 @@ impl Display for LookupBuf {
 }
 
 impl LookupBuf {
-    /// Creates an lookup to the root
+    /// Creates a lookup to the root
     pub fn root() -> Self {
         Self {
             segments: VecDeque::new(),
