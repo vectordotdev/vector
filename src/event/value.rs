@@ -478,6 +478,23 @@ impl Value {
         }
     }
 
+    /// Ensures the value is the correct type for the given segment.
+    /// An Index needs the value to be an Array, the others need it to be a Map.
+    fn correct_type(value: &mut Value, segment: &SegmentBuf) {
+        match segment {
+            SegmentBuf::Index(next_len) if !matches!(value, Value::Array(_)) => {
+                *value = Value::Array(Vec::with_capacity(next_len.abs() as usize));
+            }
+            SegmentBuf::Field(_) if !matches!(value, Value::Map(_)) => {
+                *value = Value::Map(Default::default());
+            }
+            SegmentBuf::Coalesce(_set) if !matches!(value, Value::Map(_)) => {
+                *value = Value::Map(Default::default());
+            }
+            _ => (),
+        }
+    }
+
     fn insert_map(
         name: &str,
         requires_quoting: bool,
@@ -493,18 +510,7 @@ impl Value {
         };
 
         map.entry(name.to_string())
-            .and_modify(|entry| match next_segment {
-                SegmentBuf::Index(next_len) if !matches!(entry, Value::Array(_)) => {
-                    *entry = Value::Array(Vec::with_capacity(next_len.abs() as usize));
-                }
-                SegmentBuf::Field(_) if !matches!(entry, Value::Map(_)) => {
-                    *entry = Value::Map(Default::default());
-                }
-                SegmentBuf::Coalesce(_set) if !matches!(entry, Value::Map(_)) => {
-                    *entry = Value::Map(Default::default());
-                }
-                _ => (),
-            })
+            .and_modify(|mut entry| Value::correct_type(&mut entry, &next_segment))
             .or_insert_with(|| {
                 // The entry this segment is referring to doesn't exist, so we must push the appropriate type
                 // into the value.
@@ -556,19 +562,26 @@ impl Value {
         };
 
         match item {
-            Some(inner) => inner.insert(working_lookup, value).map_err(|mut e| {
-                if let EventError::PrimitiveDescent {
-                    original_target,
-                    primitive_at,
-                    original_value: _,
-                } = &mut e
-                {
-                    let segment = SegmentBuf::Index(i);
-                    original_target.push_front(segment.clone());
-                    primitive_at.push_front(segment);
-                };
-                e
-            }),
+            Some(inner) => {
+                match working_lookup.get(0) {
+                    Some(next_segment) => Value::correct_type(inner, next_segment),
+                    None => (),
+                }
+
+                inner.insert(working_lookup, value).map_err(|mut e| {
+                    if let EventError::PrimitiveDescent {
+                        original_target,
+                        primitive_at,
+                        original_value: _,
+                    } = &mut e
+                    {
+                        let segment = SegmentBuf::Index(i);
+                        original_target.push_front(segment.clone());
+                        primitive_at.push_front(segment);
+                    };
+                    e
+                })
+            }
             None => {
                 if i.is_negative() {
                     // Resizing for a negative index must resize to the left.
