@@ -1,6 +1,7 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, Sample, StatisticKind},
+    event::Event,
     http::HttpClient,
     sinks::{
         util::{
@@ -12,7 +13,6 @@ use crate::{
         },
         Healthcheck, HealthcheckError, UriParseError, VectorSink,
     },
-    Event,
 };
 use chrono::{DateTime, Utc};
 use futures::{stream, FutureExt, SinkExt};

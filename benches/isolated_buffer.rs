@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
 use futures::{
-    compat::{Future01CompatExt, Stream01CompatExt},
-    stream::BoxStream,
-    SinkExt, StreamExt,
+    compat::{Future01CompatExt, Sink01CompatExt},
+    stream::{self, BoxStream},
+    Sink, SinkExt, Stream, StreamExt,
 };
-use futures01::{stream, Sink, Stream};
+use futures01::Stream as Stream01;
 use tempfile::tempdir;
 use tokio_stream::wrappers::ReceiverStream;
 use vector::{
@@ -13,9 +13,9 @@ use vector::{
         disk::{leveldb_buffer, DiskBuffer},
         Acker,
     },
+    event::Event,
     sinks::util::StreamSink,
     test_util::{random_lines, runtime},
-    Event,
 };
 
 struct NullSink {
@@ -50,21 +50,18 @@ fn benchmark_buffers(c: &mut Criterion) {
                 let rt = runtime();
 
                 let (writer, reader) = futures01::sync::mpsc::channel(100);
-                let writer = writer.sink_map_err(|e| panic!("{}", e));
+                let writer = writer.sink_compat().sink_map_err(|e| panic!("{}", e));
 
                 let read_loop = reader.for_each(move |_| Ok(()));
 
                 (rt, writer, read_loop)
             },
             |(rt, writer, read_loop)| {
-                let send = writer.send_all(random_events(line_size).take(num_lines as u64));
+                let write_handle = rt.spawn(send_random(line_size, num_lines, writer));
 
                 let read_handle = rt.spawn(read_loop.compat());
-                let write_handle = rt.spawn(send.compat());
 
-                let (writer, _stream) = rt.block_on(write_handle).unwrap().unwrap();
-                drop(writer);
-
+                rt.block_on(write_handle).unwrap();
                 rt.block_on(read_handle).unwrap().unwrap();
             },
             BatchSize::SmallInput,
@@ -82,13 +79,8 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                 (rt, writer, read_handle)
             },
-            |(rt, mut writer, read_handle)| {
-                let write_handle = rt.spawn(async move {
-                    let mut stream = random_events(line_size).take(num_lines as u64).compat();
-                    while let Some(e) = stream.next().await {
-                        writer.send(e).await.unwrap();
-                    }
-                });
+            |(rt, writer, read_handle)| {
+                let write_handle = rt.spawn(send_random(line_size, num_lines, writer));
 
                 rt.block_on(write_handle).unwrap();
                 rt.block_on(read_handle).unwrap();
@@ -111,7 +103,7 @@ fn benchmark_buffers(c: &mut Criterion) {
             },
             |(rt, writer, read_handle)| {
                 let write_handle = rt.spawn(async move {
-                    let mut stream = random_events(line_size).take(num_lines as u64).compat();
+                    let mut stream = random_events(line_size).take(num_lines);
                     while let Some(e) = stream.next().await {
                         writer.send(e).await.unwrap();
                     }
@@ -139,9 +131,8 @@ fn benchmark_buffers(c: &mut Criterion) {
                 (rt, writer)
             },
             |(rt, writer)| {
-                let send = writer.send_all(random_events(line_size).take(num_lines as u64));
-                let write_handle = rt.spawn(send.compat());
-                let _ = rt.block_on(write_handle).unwrap().unwrap();
+                let write_handle = rt.spawn(send_random(line_size, num_lines, writer));
+                let _ = rt.block_on(write_handle).unwrap();
             },
             BatchSize::LargeInput,
         );
@@ -159,16 +150,10 @@ fn benchmark_buffers(c: &mut Criterion) {
                     leveldb_buffer::Buffer::build(data_dir.path().to_path_buf(), plenty_of_room)
                         .unwrap();
 
-                let send = writer.send_all(random_events(line_size).take(num_lines as u64));
-                let write_handle = rt.spawn(send.compat());
-                let (writer, _stream) = rt.block_on(write_handle).unwrap().unwrap();
-                drop(writer);
+                let write_handle = rt.spawn(send_random(line_size, num_lines, writer));
+                rt.block_on(write_handle).unwrap();
 
-                let read_loop = async move {
-                    NullSink::new(acker)
-                        .run(Box::pin(reader.compat().map(Result::unwrap)))
-                        .await
-                };
+                let read_loop = async move { NullSink::new(acker).run(Box::pin(reader)).await };
 
                 (rt, read_loop)
             },
@@ -192,21 +177,15 @@ fn benchmark_buffers(c: &mut Criterion) {
                     leveldb_buffer::Buffer::build(data_dir.path().to_path_buf(), plenty_of_room)
                         .unwrap();
 
-                let read_loop = async move {
-                    NullSink::new(acker)
-                        .run(Box::pin(reader.compat().map(Result::unwrap)))
-                        .await
-                };
+                let read_loop = async move { NullSink::new(acker).run(Box::pin(reader)).await };
 
                 (rt, writer, read_loop)
             },
             |(rt, writer, read_loop)| {
-                let send = writer.send_all(random_events(line_size).take(num_lines as u64));
-
                 let read_handle = rt.spawn(read_loop);
-                let write_handle = rt.spawn(send.compat());
+                let write_handle = rt.spawn(send_random(line_size, num_lines, writer));
 
-                let _ = rt.block_on(write_handle).unwrap().unwrap();
+                let _ = rt.block_on(write_handle).unwrap();
                 rt.block_on(read_handle).unwrap().unwrap();
             },
             BatchSize::LargeInput,
@@ -216,8 +195,17 @@ fn benchmark_buffers(c: &mut Criterion) {
     group.finish();
 }
 
-fn random_events(size: usize) -> impl Stream<Item = Event, Error = ()> {
-    stream::iter_ok(random_lines(size)).map(Event::from)
+async fn send_random<E: std::fmt::Debug>(
+    line_size: usize,
+    num_lines: usize,
+    mut writer: impl Sink<Event, Error = E> + Unpin,
+) {
+    let mut stream = random_events(line_size).map(Ok).take(num_lines);
+    writer.send_all(&mut stream).await.unwrap();
+}
+
+fn random_events(size: usize) -> impl Stream<Item = Event> {
+    stream::iter(random_lines(size)).map(Event::from)
 }
 
 criterion_group!(

@@ -269,6 +269,54 @@ cli: {
 			}
 		}
 
+		"tap": {
+			description: """
+				Observe log events from topology components.
+				"""
+
+			flags: _default_flags
+
+			options: {
+				"interval": {
+					_short:      "i"
+					description: "Interval to sample metrics at, in milliseconds"
+					type:        "integer"
+					default:     500
+				}
+				"url": {
+					_short:      "u"
+					description: "Vector GraphQL API server endpoint"
+					type:        "string"
+				}
+				"limit": {
+					_short:      "l"
+					description: "Sample log events to the provided limit"
+					type:        "integer"
+					default:     100
+				}
+				"format": {
+					_short:      "f"
+					description: "Encoding format for logs printed to screen"
+					type:        "enum"
+					default:     "json"
+					enum: {
+						json: "Output events as JSON"
+						yaml: "Output events as YAML"
+					}
+				}
+			}
+
+			args: {
+				components: {
+					type: "list"
+					description: """
+						    Components to observe (comma-separated; accepts glob patterns).
+						"""
+					default: "*"
+				}
+			}
+		}
+
 		"top": {
 			description: """
 				Display topology and metrics in the console, for a local or remote Vector

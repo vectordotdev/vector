@@ -3,6 +3,7 @@ use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
+    event::Event,
     internal_events::StatsdInvalidMetricReceived,
     sinks::util::{
         encode_namespace,
@@ -10,7 +11,6 @@ use crate::{
         udp::{UdpService, UdpSinkConfig},
         BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
     },
-    Event,
 };
 use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};

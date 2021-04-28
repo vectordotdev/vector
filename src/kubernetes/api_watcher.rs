@@ -64,11 +64,20 @@ where
         emit!(internal_events::RequestPrepared { request: &request });
 
         // Send request, get response.
-        let response = self
-            .client
-            .send(request)
-            .await
-            .context(invocation::Request)?;
+        let response = match self.client.send(request).await {
+            Ok(response) => response,
+            Err(source @ crate::http::HttpError::CallRequest { .. }) => {
+                return Err(watcher::invocation::Error::recoverable(
+                    invocation::Error::Request { source },
+                ))
+            }
+            Err(source) => {
+                return Err(watcher::invocation::Error::other(
+                    invocation::Error::Request { source },
+                ))
+            }
+        };
+
         emit!(internal_events::ResponseReceived {
             response: &response
         });
@@ -273,10 +282,14 @@ mod tests {
                 watcher::invocation::Error::Desync {
                     source: invocation::Error::BadStatus { status },
                 } => (Some(status), true),
+                watcher::invocation::Error::Desync { .. } => (None, true),
+                watcher::invocation::Error::Recoverable {
+                    source: invocation::Error::BadStatus { status },
+                } => (Some(status), false),
+                watcher::invocation::Error::Recoverable { .. } => (None, false),
                 watcher::invocation::Error::Other {
                     source: invocation::Error::BadStatus { status },
                 } => (Some(status), false),
-                watcher::invocation::Error::Desync { .. } => (None, true),
                 watcher::invocation::Error::Other { .. } => (None, false),
             };
 
