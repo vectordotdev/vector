@@ -11,13 +11,8 @@ mod lookup_buf;
 mod lookup_view;
 mod parser;
 
-// This trait, while it is not necessarily imported and used, exists
-// to enforce parity among view/buf types.
-//
-// It is convention to implement these functions on the bare type itself,
-// then have the implementation proxy to this **without modification**.
-//
-// This is so the functions are always available to users, without needing an import.
+/// This trait, while it is not necessarily imported and used, exists
+/// to enforce parity among view/buf types.
 pub trait Look<'a>:
     Debug + Display + PartialEq + Eq + PartialOrd + Ord + Clone + Hash + Sized + ToString
 {
