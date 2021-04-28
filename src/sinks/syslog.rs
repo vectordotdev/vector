@@ -38,54 +38,54 @@ pub struct SyslogSinkConfig {
     format: Format,
     #[serde(default = "crate::serde::default_false")]
     include_extra_fields: bool,
-    #[serde(default = "appname_key")]
+    #[serde(default = "default_appname_key")]
     appname_key: String,
-    #[serde(default = "facility_key")]
+    #[serde(default = "default_facility_key")]
     facility_key: String,
-    #[serde(default = "host_key")]
+    #[serde(default = "default_host_key")]
     host_key: String,
-    #[serde(default = "msgid_key")]
+    #[serde(default = "default_msgid_key")]
     msgid_key: String,
-    #[serde(default = "procid_key")]
+    #[serde(default = "default_procid_key")]
     procid_key: String,
-    #[serde(default = "severity_key")]
+    #[serde(default = "default_severity_key")]
     severity_key: String,
-    #[serde(with = "SyslogFacilityDef", default = "facility")]
+    #[serde(with = "SyslogFacilityDef", default = "default_facility")]
     default_facility: SyslogFacility,
-    #[serde(with = "SyslogSeverityDef", default = "severity")]
+    #[serde(with = "SyslogSeverityDef", default = "default_severity")]
     default_severity: SyslogSeverity,
 }
 
-fn appname_key() -> String {
+fn default_appname_key() -> String {
     "appname".to_string()
 }
 
-fn facility_key() -> String {
+fn default_facility_key() -> String {
     "facility".to_string()
 }
 
-fn host_key() -> String {
+fn default_host_key() -> String {
     crate::config::log_schema().host_key().to_string()
 }
 
-fn msgid_key() -> String {
+fn default_msgid_key() -> String {
     "msgid".to_string()
 }
 
-fn procid_key() -> String {
+fn default_procid_key() -> String {
     "procid".to_string()
 }
 
-fn severity_key() -> String {
+fn default_severity_key() -> String {
     "severity".to_string()
 }
 
-fn facility() -> SyslogFacility {
-    SyslogFacility::LOG_SYSLOG
+fn default_facility() -> SyslogFacility {
+    SyslogFacility::LOG_USER
 }
 
-fn severity() -> SyslogSeverity {
-    SyslogSeverity::SEV_DEBUG
+fn default_severity() -> SyslogSeverity {
+    SyslogSeverity::SEV_INFO
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

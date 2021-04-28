@@ -181,7 +181,7 @@ components: sinks: syslog: {
 			required: false
 			warnings: []
 			type: string: {
-				default: "syslog"
+				default: "user"
 				enum: {
 					kern:     "kernel messages (numerical code 0)"
 					user:     "user-level messages (numerical code 1)"
@@ -220,7 +220,7 @@ components: sinks: syslog: {
 			required: false
 			warnings: []
 			type: string: {
-				default: "debug"
+				default: "info"
 				enum: {
 					emerg:   "Emergency: system is unusable (numerical code 0)"
 					alert:   "Alert: action must be taken immediately (numerical code 1)"
