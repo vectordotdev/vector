@@ -74,7 +74,7 @@ enum RedisSinkState {
 pub struct RedisSink {
     key: Template,
     data_type: Type,
-    method: Option<Method>,
+    method: Method,
     encoding: EncodingConfig<Encoding>,
     state: RedisSinkState,
     in_flight: FuturesUnordered<BoxFuture<'static, (usize, Result<i32, RedisError>)>>,
@@ -95,7 +95,7 @@ impl GenerateConfig for RedisSinkConfig {
             key: "vector".to_owned(),
             encoding: Encoding::Json.into(),
             data_type: Type::List,
-            method: Option::from(Method::Lpush),
+            method: Some(Method::Lpush),
         })
         .unwrap()
     }
@@ -110,10 +110,6 @@ impl SinkConfig for RedisSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         if self.key.is_empty() {
             return Err("`key` cannot be empty.".into());
-        } else if let Type::List = self.data_type {
-            if self.method.is_none() {
-                return Err("When `data_type` is `list`, `method` cannot be empty.".into());
-            }
         }
 
         let sink = RedisSink::new(self.clone(), cx.acker()).await?;
@@ -155,7 +151,7 @@ impl RedisSink {
         match res {
             Ok(conn) => Ok(RedisSink {
                 data_type: config.data_type,
-                method: config.method,
+                method: config.method.unwrap_or_default(),
                 key: key_tmpl,
                 encoding: config.encoding.into(),
                 acker,
@@ -214,7 +210,7 @@ impl Sink<Event> for RedisSink {
 
         match self.data_type {
             Type::List => match self.method {
-                Some(Method::Lpush) => {
+                Method::Lpush => {
                     self.state = RedisSinkState::Sending(Box::pin(async move {
                         let result = lpush(conn.clone(), key.clone(), encoded.clone()).await;
                         if result.is_ok() {
@@ -225,7 +221,7 @@ impl Sink<Event> for RedisSink {
                         (conn, result)
                     }));
                 }
-                Some(Method::Rpush) => {
+                Method::Rpush => {
                     self.state = RedisSinkState::Sending(Box::pin(async move {
                         let result = rpush(conn.clone(), key.clone(), encoded.clone()).await;
                         if result.is_ok() {
@@ -236,7 +232,6 @@ impl Sink<Event> for RedisSink {
                         (conn, result)
                     }));
                 }
-                _ => {}
             },
             Type::Channel => {
                 self.state = RedisSinkState::Sending(Box::pin(async move {
