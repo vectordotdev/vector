@@ -144,11 +144,6 @@ async fn kafka_source(
     let mut stream = consumer.stream().take_until(shutdown);
 
     while let Some(message) = stream.next().await {
-        let key_field = key_field.clone();
-        let topic_key = topic_key.clone();
-        let partition_key = partition_key.clone();
-        let offset_key = offset_key.clone();
-
         match message {
             Err(error) => {
                 emit!(KafkaEventFailed { error });
