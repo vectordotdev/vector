@@ -203,10 +203,10 @@ async fn kafka_source(
                 }
                 log.insert(&headers_key, Value::from(headers_map));
 
-                // TODO what should we do if we encounter an error here?
-                let _ = consumer.store_offset(&msg).map_err(|error| {
+                if let Err(error) = consumer.store_offset(&msg) {
                     emit!(KafkaOffsetUpdateFailed { error });
-                });
+                    continue;
+                }
 
                 let _ = out
                     .send(event)
