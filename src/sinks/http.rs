@@ -216,7 +216,11 @@ impl HttpSink for HttpSinkConfig {
             byte_size: body.len(),
         });
 
-        Some(EncodedEvent::new(body))
+        let (_, metadata) = event.into_parts();
+        Some(EncodedEvent {
+            item: body,
+            metadata: Some(metadata),
+        })
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
