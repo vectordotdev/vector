@@ -5,25 +5,23 @@ use chrono::Utc;
 use derivative::Derivative;
 use getset::Getters;
 use lookup::LookupBuf;
-use serde::{
-    de::{MapAccess, Visitor},
-    Deserialize, Serialize, Serializer,
-};
+use serde::{Deserialize, Serialize, Serializer};
 use shared::EventDataEq;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
-    fmt::{self, Debug, Display},
+    fmt::{Debug, Display},
     iter::FromIterator,
 };
 
-#[derive(Clone, Debug, Getters, PartialEq, Derivative)]
+#[derive(Clone, Debug, Getters, PartialEq, Derivative, Deserialize)]
 pub struct LogEvent {
     // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
     #[derivative(Default(value = "Value::from(BTreeMap::default())"))]
     fields: Value,
 
     #[getset(get = "pub")]
+    #[serde(skip)]
     metadata: EventMetadata,
 }
 
@@ -344,37 +342,6 @@ impl Serialize for LogEvent {
         S: Serializer,
     {
         serializer.collect_map(self.as_map().iter())
-    }
-}
-
-struct LogEventVisitor;
-
-impl<'de> Visitor<'de> for LogEventVisitor {
-    type Value = LogEvent;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("A map")
-    }
-
-    fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
-    where
-        M: MapAccess<'de>,
-    {
-        let mut event = LogEvent::default();
-        while let Some((key, value)) = access.next_entry::<String, String>()? {
-            event.insert(key, Value::from(value));
-        }
-
-        Ok(event)
-    }
-}
-
-impl<'de> Deserialize<'de> for LogEvent {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_map(LogEventVisitor)
     }
 }
 
