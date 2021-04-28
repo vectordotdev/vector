@@ -1,7 +1,7 @@
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
     emit,
-    event::Event,
+    event::{Event, VrlTarget},
     internal_events::RemapConditionExecutionError,
 };
 use serde::{Deserialize, Serialize};
@@ -73,10 +73,8 @@ impl Remap {
         // program wants to mutate its events.
         //
         // see: https://github.com/timberio/vector/issues/4744
-        match event {
-            Event::Log(event) => Runtime::default().resolve(&mut event.clone(), &self.program),
-            Event::Metric(event) => Runtime::default().resolve(&mut event.clone(), &self.program),
-        }
+        let mut target = VrlTarget::new(event.clone());
+        Runtime::default().resolve(&mut target, &self.program)
     }
 }
 

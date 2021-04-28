@@ -19,7 +19,7 @@ package metadata
 		source:  string
 		diff?:   string
 		return?: _
-		output?: #Event
+		output?: #Event | [#Event, ...#Event]
 		raises?: _
 
 		notes?: [string, ...string]
@@ -175,6 +175,20 @@ remap: #Remap & {
 					instance_id: "abcd1234"
 				}
 			}
+		},
+		{
+			title: "Emitting multiple logs from JSON"
+			input: log: message: #"[{"message": "first_log"}, {"message": "second_log"}]"#
+			source: """
+				. = parse_json!(.message) # sets `.` to an array of objects
+				"""
+			output: [
+				{log: {message: "first_log"}},
+				{log: {message: "second_log"}},
+			]
+			notes: [
+				"Setting `.` to an array will emit one event per element",
+			]
 		},
 		{
 			title: "Invalid argument type"
