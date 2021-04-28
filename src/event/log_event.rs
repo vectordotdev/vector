@@ -18,6 +18,7 @@ use std::{
 pub struct LogEvent {
     // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
     #[derivative(Default(value = "Value::from(BTreeMap::default())"))]
+    #[serde(flatten)]
     fields: Value,
 
     #[getset(get = "pub")]
@@ -432,18 +433,6 @@ mod test {
                 }
                 _ => panic!("This test should never read Err'ing test fixtures."),
             });
-    }
-
-    #[test]
-    fn serialize_metadata_field() {
-        let mut event = LogEvent::default();
-        event.insert("message", "spork");
-        event.insert("metadata", "zork");
-
-        let serialized = serde_json::to_string(&event).unwrap();
-        let deserialized: LogEvent = serde_json::from_str(&serialized).unwrap();
-
-        assert_eq!(event, deserialized);
     }
 
     // We use `serde_json` pointers in this test to ensure we're validating that Vector correctly inputs and outputs things as expected.
