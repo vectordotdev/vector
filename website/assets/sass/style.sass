@@ -19,3 +19,53 @@
 // For debugging purposes
 .x
   border: 1.5px solid red
+
+// SVG-specific variables
+$svg-gray: rgb(224, 235, 247)
+$svg-white: white
+$svg-primary: #28d9f2
+
+// SVG theme compatibility
+svg
+  [fill="#000000"],
+  [fill="black"]
+    fill: $svg-gray
+
+  [stroke="#000000"],
+  [stroke="black"]
+    stroke: $svg-gray
+
+  [stop-color="#000000"],
+  [stop-color="black"]
+    stop-color: $svg-gray
+
+  [fill="#FFFFFF"],
+  [fill="white"]
+    fill: $svg-white
+
+  [stroke="#FFFFFF"],
+  [stroke="white"]
+    stroke: $svg-white
+
+  [fill="#10E7FF"],
+  [fill="white"]
+    fill: $svg-primary
+
+  [stroke="#10E7FF"],
+  [stroke="white"]
+    stroke: $svg-primary
+
+// SVG dark mode compatibility
+html
+  &.dark
+    svg
+      [fill="#000000"]
+        fill: $svg-gray
+      [stroke="#000000"]
+        stroke: $svg-gray
+      [stop-color="#000000"]
+        stop-color: $svg-gray
+      [fill="#FFFFFF"]
+        fill: $svg-white
+      [stroke="$FFFFFF"]
+        stroke: $svg-white
