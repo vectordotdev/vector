@@ -7067,9 +7067,9 @@ dependencies = [
 
 [[package]]
 name = "tower"
-version = "0.4.6"
+version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f715efe02c0862926eb463e49368d38ddb119383475686178e32e26d15d06a66"
+checksum = "bf0aa6dfc29148c3826708dabbfa83c121eeb84df4d1468220825e3a33651687"
 dependencies = [
  "futures-core",
  "futures-util",
