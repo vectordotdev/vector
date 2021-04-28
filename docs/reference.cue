@@ -383,12 +383,16 @@ _values: {
 
 #TypeArray: {
 	_args: required: bool
+	_type: items: type: string
 	let Args = _args
+	let Type = _type
 
 	if !Args.required {
 		// `default` sets the default value.
 		default: [...] | null
 	}
+
+	examples?: [...[...Type.items.type]]
 
 	// Set `required` to `true` to force disable defaults. Defaults should
 	// be specified on the array level and not the type level.
