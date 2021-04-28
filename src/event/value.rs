@@ -674,72 +674,6 @@ impl Value {
         }
     }
 
-    /// This situation is surprisingly common due to how nulls fill sparse vectors.
-    fn insert_null(
-        segment: &SegmentBuf,
-        mut working_lookup: LookupBuf,
-        val: &mut Value,
-        value: Value,
-    ) -> std::result::Result<Option<Value>, EventError> {
-        let retval;
-        let this_val = match segment {
-            SegmentBuf::Index(_) => {
-                let mut inner = Value::Array(Vec::with_capacity(0));
-                working_lookup.push_front(segment.clone());
-                retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                    if let EventError::PrimitiveDescent {
-                        original_target,
-                        primitive_at,
-                        original_value: _,
-                    } = &mut e
-                    {
-                        original_target.push_front(segment.clone());
-                        primitive_at.push_front(segment.clone());
-                    };
-                    e
-                });
-                inner
-            }
-            SegmentBuf::Field(FieldBuf { .. }) => {
-                let mut inner = Value::Map(Default::default());
-                working_lookup.push_front(segment.clone());
-                retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                    if let EventError::PrimitiveDescent {
-                        original_target,
-                        primitive_at,
-                        original_value: _,
-                    } = &mut e
-                    {
-                        original_target.push_front(segment.clone());
-                        primitive_at.push_front(segment.clone());
-                    };
-                    e
-                });
-                inner
-            }
-            SegmentBuf::Coalesce(set) => {
-                let mut inner = Value::Map(Default::default());
-                let set = SegmentBuf::Coalesce(set.clone());
-                retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                    if let EventError::PrimitiveDescent {
-                        original_target,
-                        primitive_at,
-                        original_value: _,
-                    } = &mut e
-                    {
-                        original_target.push_front(set.clone());
-                        primitive_at.push_front(set.clone());
-                    };
-                    e
-                });
-                inner
-            }
-        };
-        trace!(val = ?this_val, "Setting previously existing null to value.");
-        *val = this_val;
-        retval
-    }
-
     /// Insert a value at a given lookup.
     ///
     /// ```rust
@@ -775,12 +709,16 @@ impl Value {
                 trace!("Swapped with existing value.");
                 Ok(Some(value))
             }
-            // This is just not allowed!
+            // This is just not allowed and should not occur.
+            // The top level insert will always be a map (or an array in tests).
+            // Then for further descents into the lookup, in the `insert_map` function
+            // if the type is one of the following, the field is modified to be a map.
             (Some(segment), Value::Boolean(_))
             | (Some(segment), Value::Bytes(_))
             | (Some(segment), Value::Timestamp(_))
             | (Some(segment), Value::Float(_))
-            | (Some(segment), Value::Integer(_)) => {
+            | (Some(segment), Value::Integer(_))
+            | (Some(segment), Value::Null) => {
                 trace!("Encountered descent into a primitive.");
                 Err(EventError::PrimitiveDescent {
                     primitive_at: LookupBuf::default(),
@@ -816,10 +754,6 @@ impl Value {
                 trace!("Mismatched field trying to access array.");
                 Ok(None)
             }
-            (Some(segment), val) if val == &mut Value::Null => {
-                Value::insert_null(&segment, working_lookup, val, value)
-            }
-            (Some(_), Value::Null) => unreachable!("This is covered by the above case."),
         }
     }
 
