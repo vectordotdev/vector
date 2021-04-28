@@ -510,7 +510,7 @@ impl Value {
         };
 
         map.entry(name.to_string())
-            .and_modify(|mut entry| Value::correct_type(&mut entry, &next_segment))
+            .and_modify(|entry| Value::correct_type(entry, &next_segment))
             .or_insert_with(|| {
                 // The entry this segment is referring to doesn't exist, so we must push the appropriate type
                 // into the value.
@@ -563,9 +563,8 @@ impl Value {
 
         match item {
             Some(inner) => {
-                match working_lookup.get(0) {
-                    Some(next_segment) => Value::correct_type(inner, next_segment),
-                    None => (),
+                if let Some(next_segment) = working_lookup.get(0) {
+                    Value::correct_type(inner, next_segment);
                 }
 
                 inner.insert(working_lookup, value).map_err(|mut e| {
@@ -706,7 +705,6 @@ impl Value {
             (None, item) => {
                 let mut value = value;
                 core::mem::swap(&mut value, item);
-                trace!("Swapped with existing value.");
                 Ok(Some(value))
             }
             // This is just not allowed and should not occur.
