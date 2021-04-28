@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::update_counter;
 use metrics::{counter, gauge};
 
 #[derive(Debug)]
@@ -71,29 +72,29 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
             "kafka_queue_messages_bytes",
             self.statistics.msg_size as f64
         );
-        counter!("kafka_requests_total", self.statistics.tx as u64);
-        counter!(
+        update_counter!("kafka_requests_total", self.statistics.tx as u64);
+        update_counter!(
             "kafka_requests_bytes_total",
             self.statistics.tx_bytes as u64
         );
-        counter!("kafka_responses_total", self.statistics.rx as u64);
-        counter!(
+        update_counter!("kafka_responses_total", self.statistics.rx as u64);
+        update_counter!(
             "kafka_responses_bytes_total",
             self.statistics.rx_bytes as u64
         );
-        counter!(
+        update_counter!(
             "kafka_produced_messages_total",
             self.statistics.txmsgs as u64
         );
-        counter!(
+        update_counter!(
             "kafka_produced_messages_bytes_total",
             self.statistics.txmsg_bytes as u64
         );
-        counter!(
+        update_counter!(
             "kafka_consumed_messages_total",
             self.statistics.rxmsgs as u64
         );
-        counter!(
+        update_counter!(
             "kafka_consumed_messages_bytes_total",
             self.statistics.rxmsg_bytes as u64
         );

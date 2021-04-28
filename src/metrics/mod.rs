@@ -12,8 +12,6 @@ use crate::metrics::registry::VectorRegistry;
 use crate::{event::Metric, Event};
 use metrics::{Key, KeyData, SharedString};
 use metrics_tracing_context::TracingContextLayer;
-#[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
-use metrics_util::layers::AbsoluteLayer;
 use metrics_util::layers::Layer;
 use metrics_util::{CompositeKey, MetricKind};
 use once_cell::sync::OnceCell;
@@ -80,22 +78,6 @@ pub fn init() -> crate::Result<()> {
     // case it doesn't _do_ much other than shepherd into the registry and
     // update the cardinality counter, see above, as needed.
     let recorder = VectorRecorder::new(registry);
-
-    #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
-    let recorder = {
-        let patterns = vec![
-            "kafka_requests_total",
-            "kafka_requests_bytes_total",
-            "kafka_responses_total",
-            "kafka_responses_bytes_total",
-            "kafka_produced_messages_total",
-            "kafka_produced_messages_bytes_total",
-            "kafka_consumed_messages_total",
-            "kafka_consumed_messages_bytes_total",
-        ];
-        AbsoluteLayer::from_patterns(patterns).layer(recorder)
-    };
-
     let recorder: Box<dyn metrics::Recorder> = if tracing_context_layer_enabled() {
         // Apply a layer to capture tracing span fields as labels.
         Box::new(TracingContextLayer::new(VectorLabelFilter).layer(recorder))
@@ -135,4 +117,32 @@ pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
     events.push(Metric::from_metric_kv(CARDINALITY_KEY.key(), &handle).into());
 
     events.into_iter()
+}
+
+#[macro_export]
+/// This macro is used to emit metrics as a `counter` while simultaneously converting from absolute
+/// values to incremental values.
+///
+/// # Panics
+///
+/// If a subsequent value is smaller than the previous one.
+macro_rules! update_counter {
+    ($label:literal, $value:expr) => {{
+        use ::std::sync::Mutex;
+
+        ::lazy_static::lazy_static! {
+            static ref PREVIOUS_VALUE: Mutex<u64> = Mutex::new(0);
+        }
+
+        let delta = {
+            let mut previous_value = PREVIOUS_VALUE.lock().unwrap();
+            let delta = $value
+                .checked_sub(*previous_value)
+                .expect("update_counter! must use monotonically increasing values.");
+            *previous_value = $value;
+            delta
+        };
+
+        counter!($label, delta);
+    }};
 }
