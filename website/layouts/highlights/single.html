@@ -3,9 +3,13 @@
 {{ end }}
 
 {{ define "main" }}
-<div class="relative max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-6 lg:px-8">
-  <div class="my-16">
-    {{ partial "hero.html" . }}
-  </div>
+<div class="relative max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-6 lg:px-8 my-16">
+  <main aria-label="Main guide content" class="lg:col-span-4 md:px-0">
+    {{ partial "blog/hero.html" . }}
+
+    <div class="pb-32">
+      {{ partial "content.html" . }}
+    </div>
+  </main>
 </div>
 {{ end }}

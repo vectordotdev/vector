@@ -1,6 +1,7 @@
 ---
 date: "2021-02-16"
 title: "Remap support for the `reduce` transform (multi-line logs)"
+short: "Reduce in Remap"
 description: "Use VRL to specify conditions for reducing multi-log lines into a single log event"
 authors: ["lucperkins"]
 pr_numbers: []

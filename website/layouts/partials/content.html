@@ -1,7 +1,4 @@
-<section class="section my-5">
-  <div class="container">
-    <div class="content pb-6">
-      {{ .content }}
-    </div>
-  </div>
-</section>
+{{ $hasToc := not .Params.no_toc }}
+<div class="dark:prose-dark tracking-tight prose{{ if $hasToc }} prose-normal{{ end }}" id="page-content">
+  {{ .Content }}
+</div>
