@@ -211,6 +211,7 @@ impl Drop for Writer {
 pub struct Reader {
     db: Arc<Database<Key>>,
     read_offset: usize,
+    uncompacted_offset: usize,
     delete_offset: usize,
     write_notifier: Arc<AtomicWaker>,
     blocked_write_tasks: Arc<Mutex<Vec<Waker>>>,
@@ -325,7 +326,10 @@ impl Reader {
             self.uncompacted_size = 0;
 
             debug!("Compacting disk buffer.");
-            self.db.compact(&Key(0), &Key(self.delete_offset));
+            self.db
+                .compact(&Key(self.uncompacted_offset), &Key(self.delete_offset));
+
+            self.uncompacted_offset = self.delete_offset;
         }
     }
 }
@@ -415,6 +419,7 @@ impl super::DiskBuffer for Buffer {
             write_notifier: Arc::clone(&write_notifier),
             blocked_write_tasks,
             read_offset: head,
+            uncompacted_offset: 0,
             delete_offset: head,
             current_size,
             ack_counter,
