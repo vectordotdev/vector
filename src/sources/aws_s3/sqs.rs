@@ -160,7 +160,7 @@ impl Ingestor {
         let mut stream =
             IntervalStream::new(time::interval(self.poll_interval)).take_until(shutdown);
 
-        while let Some(_) = stream.next().await {
+        while stream.next().await {
             self.run_once(&mut out).await
         }
 
