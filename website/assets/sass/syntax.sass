@@ -1,45 +1,47 @@
-
 // Code block highlighting
 
+@import variables
+
 // Global variables
-$padding: 0.8rem
+$padding: 2ren
 
 // Light theme variables
 $light-1: black
-$light-2: teal
-$light-3: green
+$light-2: $purple-300
+$light-3: $gray-200
 $light-4: grey
 $light-5: red
-$light-6: orange
-$light-7: yellow
+$light-6: $gray-500 // Comments
+$light-7: $pink-400
 $light-8: magenta
 $light-9: purple
-$light-10: pink
+$light-10: $emerald-300
 $light-11: olive
-$light-12: teal
+$light-12: $blue-300
 
 $light-bg-color: black
-$light-default-text-color: white
+$light-default-text-color: $gray-200
 
 // Dark theme variables
 $dark-1: black
-$dark-2: teal
-$dark-3: green
+$dark-2: $purple-300
+$dark-3: $gray-200
 $dark-4: grey
 $dark-5: red
-$dark-6: orange
-$dark-7: yellow
+$dark-6: $gray-500 // Comments
+$dark-7: $pink-400
 $dark-8: magenta
 $dark-9: purple
-$dark-10: pink
+$dark-10: $emerald-300
 $dark-11: olive
-$dark-12: teal
+$dark-12: $blue-300
 
-$dark-bg-color: white
-$dark-default-text-color: black
+$dark-bg-color: black
+$dark-default-text-color: $gray-200
 
 // Code blocks with no language specified
-pre, .chroma
+.chroma
+  letter-spacing: 1px
   padding: $padding
 
 // Light theme code blocks

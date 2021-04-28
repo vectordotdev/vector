@@ -98,7 +98,7 @@ common use case:
 
 ```json
 {
-  "time":"2021-02-03T21:13:54.713161211Z",
+  "time": "2021-02-03T21:13:54.713161211Z",
   "stream": "stdout",
   "log": "5.86.210.12 - zieme4647 [03/Feb/2021:21:13:55 -0200] \"GET /embrace/supply-chains/dynamic/vertical HTTP/1.0\" 201 20574"
 }
@@ -267,7 +267,7 @@ following log:
 
 ```json
 {
-  "time":"2021-02-03T21:13:54.713161211Z",
+  "time": "2021-02-03T21:13:54.713161211Z",
   "stream": "stdout",
   "log": "5.86.210.12 - zieme4647 [03/Feb/2021:21:13:55 -0200] \"GET /embrace/supply-chains/dynamic/vertical HTTP/1.0\" 201 20574"
 }
