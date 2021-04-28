@@ -26,9 +26,9 @@
 
       <span>
         {{ if $infallible }}
-        {{ partial "badge.html" (dict "word" "infallible" "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
+        {{ partial "badge.html" (dict "word" "infallible" "color" "blue") }}
         {{ else }}
-        {{ partial "badge.html" (dict "word" "fallible" "text" "red-800" "bg" "red-100" "bg_dark" "red-600") }}
+        {{ partial "badge.html" (dict "word" "fallible" "color" "red") }}
         {{ end }}
       </span>
     </span>

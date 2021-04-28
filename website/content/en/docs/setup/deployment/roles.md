@@ -18,7 +18,7 @@ The daemon role is designed to collect *all* data on a single host. This is the 
 
 {{< svg "img/sidecar-role.svg" >}}
 
-The sidecar role couples Vector with each service, focused on data collection for that individual service only. While the deamon role is recommended, the sidecar role is beneficial when you want to shift reponsibility of data collection to the service owner. And, in some cases, it can be simpler to manage.
+The sidecar role couples Vector with each service, focused on data collection for that individual service only. While the daemon role is recommended, the sidecar role is beneficial when you want to shift reponsibility of data collection to the service owner. And, in some cases, it can be simpler to manage.
 
 ## Aggregator
 

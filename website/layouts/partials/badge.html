@@ -1,6 +1,14 @@
-<span class="inline-flex items-center py-0.5 font-medium{{ if .large }} text-sm px-3{{ else }} text-xs px-2{{ end }} {{ if .rounded }} rounded-full{{ else }} rounded{{ end }} bg-{{ .bg }} text-{{ .text }} dark:bg-{{ .bg_dark }} dark:text-{{ .text_dark }}">
+{{ $red := "text-red-800 bg-red-100 dark:text-white dark:bg-red-600" }}
+{{ $blue := "text-blue-800 bg-blue-100 dark:text-blue-100 dark:bg-blue-600" }}
+{{ $gray := "text-gray-800 bg-gray-100 dark:text-dark dark:bg-gray-400" }}
+{{ $green := "text-green-800 bg-green-100 dark:text-green-100 dark:bg-green-800" }}
+{{ $indigo := "text-indigo-800 bg-indigo-100 dark:text-indigo-100 dark:bg-indigo-800" }}
+{{ $violet := "text-violet-800 bg-violet-100 dark:text-violet-100 dark:bg-violet-800" }}
+{{ $styles := dict "red" $red "blue" $blue "gray" $gray "green" $green "indigo" $indigo "violet" $violet }}
+{{ $color := index $styles .color }}
+<span class="inline-flex items-center py-0.5 font-medium{{ if .large }} text-sm px-3{{ else }} text-xs px-2{{ end }} {{ if .rounded }} rounded-full{{ else }} rounded{{ end }} {{ $color }}">
   {{ if .prefix }}
-  {{ .prefix }}:&nbsp;<strong>{{ .word }}</strong>
+  {{ .prefix }}:&nbsp;<span class="font-bold">{{- .word -}}</span>
   {{ else }}
   {{ .word }}
   {{ end }}

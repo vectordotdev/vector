@@ -44,23 +44,23 @@
 
     <div class="block space-y-1.5">
       {{ with $tags.type }}
-      {{ partial "badge.html" (dict "prefix" "type" "word" . "bg" "blue-200" "text" "blue-800" "bg_dark" "blue-700" "text_dark" "blue-100") }}
+      {{ partial "badge.html" (dict "prefix" "type" "word" . "color" "blue") }}
       {{ end }}
 
       {{ range $tags.domains }}
-      {{ partial "badge.html" (dict "prefix" "domain" "word" . "bg" "rose-200" "text" "rose-800" "bg_dark" "rose-700" "text_dark" "rose-100") }}
+      {{ partial "badge.html" (dict "prefix" "domain" "word" . "color" "rose") }}
       {{ end }}
 
       {{ range $tags.sources }}
-      {{ partial "badge.html" (dict "prefix" "source" "word" . "bg" "violet-200" "text" "violet-800" "bg_dark" "violet-700" "text_dark" "violet-100") }}
+      {{ partial "badge.html" (dict "prefix" "source" "word" . "color" "violet") }}
       {{ end }}
 
       {{ range $tags.transforms }}
-      {{ partial "badge.html" (dict "prefix" "transform" "word" . "bg" "violet-200" "text" "violet-800" "bg_dark" "violet-700" "text_dark" "violet-100") }}
+      {{ partial "badge.html" (dict "prefix" "transform" "word" . "color" "violet") }}
       {{ end }}
 
       {{ range $tags.sinks }}
-      {{ partial "badge.html" (dict "prefix" "sink" "word" . "bg" "violet-200" "text" "violet-800" "bg_dark" "violet-700" "text_dark" "violet-100") }}
+      {{ partial "badge.html" (dict "prefix" "sink" "word" . "color" "violet") }}
       {{ end }}
     </div>
   </div>

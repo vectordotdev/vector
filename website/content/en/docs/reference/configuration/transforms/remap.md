@@ -6,7 +6,11 @@ kind: transform
 featured: true
 ---
 
-Vector's `remap` transform is recommended for parsing, shaping, and transforming data in Vector. It implements [Vector Remap Language][vrl] (VRL), an expression-oriented language designed for processing observability data (logs and metrics) in a safe and performant manner. Refer to the [VRL reference][vrl] when writing scripts.
+The `remap` transform is designed for parsing, shaping, and transforming data in Vector. It implements [Vector Remap Language][vrl] (VRL), an expression-oriented language that processes observability data (logs and metrics) safely and at blazing speeds.
+
+{{< success >}}
+Refer to the [VRL reference][vrl] when writing scripts.
+{{< /success >}}
 
 ## Configuration
 

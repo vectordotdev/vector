@@ -99,11 +99,11 @@
 {{ define "heading" }}
 {{ $isActive := eq .here .url }}
 {{ if .url }}
-<a class="uppercase font-semibold dark:text-gray-200 text-gray-600 dark:hover:text-purple-v hover:text-purple-v{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}" href="{{ .url }}">
+<a class="uppercase tracking-tight font-semibold dark:text-gray-200 text-gray-600 dark:hover:text-purple-v hover:text-purple-v{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}" href="{{ .url }}">
   {{ .title }}
 </a>
 {{ else }}
-<p class="uppercase font-semibold dark:text-gray-200 text-gray-600 dark:hover:text-purple-v hover:text-purple-v">
+<p class="uppercase tracking-tight font-semibold dark:text-gray-200 text-gray-600 dark:hover:text-purple-v hover:text-purple-v">
   {{ .title }}
 </p>
 {{ end }}
@@ -111,7 +111,7 @@
 
 {{ define "link" }}
 {{ $isActive := eq .here .url }}
-<a href="{{ .url }}" class="block dark:text-gray-400 text-gray-600 dark:hover:text-purple-v hover:text-purple-v{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}">
+<a href="{{ .url }}" class="block tracking-tight dark:text-gray-400 text-gray-600 dark:hover:text-purple-v hover:text-purple-v{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}">
   {{ .title }}
 </a>
 {{ end }}

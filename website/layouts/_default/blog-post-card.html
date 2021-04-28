@@ -31,10 +31,10 @@
 
   {{ with .Params.tags }}
   <div class="block space-y-1.5">
-    {{ partial "badge.html" (dict "rounded" true "large" true "prefix" "type" "word" .type "bg" "indigo-100" "text" "indigo-800" "bg_dark" "indigo-700" "text_dark" "indigo-100") }}
+    {{ partial "badge.html" (dict "rounded" true "large" true "prefix" "type" "word" .type "color" "indigo") }}
 
     {{ range .domains }}
-    {{ partial "badge.html" (dict "rounded" true "large" true "prefix" "domain" "word" . "bg" "green-200" "text" "green-800" "bg_dark" "green-700" "text_dark" "green-100") }}
+    {{ partial "badge.html" (dict "rounded" true "large" true "prefix" "domain" "word" . "color" "green") }}
     {{ end }}
   </div>
   {{ end }}

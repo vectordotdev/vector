@@ -10,18 +10,18 @@
 
       <span class="flex space-x-1">
         {{ if $v.common }}
-        {{ partial "badge.html" (dict "word" "common" "bg" "indigo-100" "text" "indigo-800" "bg_dark" "indigo-700" "text_dark" "indigo-100") }}
+        {{ partial "badge.html" (dict "word" "common" "color" "indigo") }}
         {{ end }}
 
         {{ if $v.required }}
-        {{ partial "badge.html" (dict "word" "required" "bg" "red-100" "text" "red-800" "bg_dark" "red-700" "text_dark" "red-100") }}
+        {{ partial "badge.html" (dict "word" "required" "color" "red") }}
         {{ else }}
-        {{ partial "badge.html" (dict "word" "optional" "bg" "gray-100" "text" "gray-800" "bg_dark" "gray-700" "text_dark" "gray-100") }}
+        {{ partial "badge.html" (dict "word" "optional" "color" "gray") }}
         {{ end }}
 
         {{ range $k, $v := $v.type }}
         {{ $type := cond (eq $k "object") "table" $k }}
-        {{ partial "badge.html" (dict "word" $type "bg" "green-100" "text" "green-800" "bg_dark" "green-700" "text_dark" "green-100") }}
+        {{ partial "badge.html" (dict "word" $type "color" "green") }}
         {{ end }}
       </span>
     </span>

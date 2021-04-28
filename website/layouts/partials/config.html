@@ -16,13 +16,13 @@
         </h3>
         <span class="flex justify-between space-x-1">
           {{ if $v.common }}
-          {{ partial "badge.html" (dict "word" "common" "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
+          {{ partial "badge.html" (dict "word" "common" "color" "blue") }}
           {{ end }}
 
           {{ if $v.required }}
-          {{ partial "badge.html" (dict "word" "required" "text" "red-800" "bg" "red-100" "bg_dark" "red-600") }}
+          {{ partial "badge.html" (dict "word" "required" "color" "red") }}
           {{ else }}
-          {{ partial "badge.html" (dict "word" "optional" "text" "gray-800" "bg" "gray-200" "bg_dark" "gray-500") }}
+          {{ partial "badge.html" (dict "word" "optional" "color" "gray") }}
           {{ end }}
 
           {{ range $k, $v := $v.type }}
@@ -30,14 +30,14 @@
           {{ if $isArray }}
           {{ range $k, $v := $v.items.type }}
           {{ $name := printf "[%s]" $k }}
-          {{ partial "badge.html" (dict "word" $name "text" "gray-800" "bg" "gray-200" "bg_dark" "gray-500") }}
+          {{ partial "badge.html" (dict "word" $name "color" "gray") }}
           {{ end }}
           {{ else }}
-          {{ partial "badge.html" (dict "word" $k "text" "gray-800" "bg" "gray-200" "bg_dark" "gray-500") }}
+          {{ partial "badge.html" (dict "word" $k "color" "gray") }}
           {{ end }}
 
           {{ if $v.enum }}
-          {{ partial "badge.html" (dict "word" "enum" "text" "yellow-800" "bg" "yellow-200" "bg_dark" "yellow-600") }}
+          {{ partial "badge.html" (dict "word" "enum" "color" "yellow") }}
           {{ end }}
           {{ end }}
         </span>
@@ -65,11 +65,11 @@
 
             <span class="flex space-x-1">
               <span>
-                {{ partial "badge.html" (dict "word" $k "text" "gray-800" "bg" "gray-200" "bg_dark" "gray-500") }}
+                {{ partial "badge.html" (dict "word" $k "color" "gray") }}
               </span>
 
               <span>
-                {{ partial "badge.html" (dict "word" $v.syntax "text" "gray-800" "bg" "gray-200" "bg_dark" "gray-500") }}
+                {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
               </span>
             </span>
           </div>
@@ -217,7 +217,7 @@
             {{/* Metric type */}}
             {{ $url := printf "/docs/about/under-the-hood/architecture/data-model/metric/#%s" $type }}
             <a href="{{ $url }}">
-              {{ partial "badge.html" (dict "word" $v.type "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
+              {{ partial "badge.html" (dict "word" $v.type "color" "blue") }}
             </a>
           </span>
         </span>
@@ -236,7 +236,7 @@
 
               {{ if .required }}
               <span>
-                {{ partial "badge.html" (dict "word" "required" "text" "red-800" "bg" "red-100" "bg_dark" "red-700") }}
+                {{ partial "badge.html" (dict "word" "required" "color" "red") }}
               </span>
               {{ end }}
             </span>
@@ -290,20 +290,20 @@
 
         <span>
           {{ if $v.common }}
-          {{ partial "badge.html"  (dict "word" "common" "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
+          {{ partial "badge.html"  (dict "word" "common" "color" "blue") }}
           {{ end }}
 
           {{ if not $v.required }}
-          {{ partial "badge.html" (dict "word" "optional" "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
+          {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
           {{ end }}
 
           {{ if $v.required }}
-          {{ partial "badge.html" (dict "word" "required" "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
+          {{ partial "badge.html" (dict "word" "required" "color" "blue") }}
           {{ end }}
 
           {{ range $k, $v := $v.type }}
-          {{ partial "badge.html" (dict "word" $k "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
-          {{ partial "badge.html" (dict "word" $v.syntax "text" "blue-800" "bg" "blue-100" "bg_dark" "blue-700") }}
+          {{ partial "badge.html" (dict "word" $k "color" "blue") }}
+          {{ partial "badge.html" (dict "word" $v.syntax "color" "blue") }}
           {{ end }}
         </span>
       </span>

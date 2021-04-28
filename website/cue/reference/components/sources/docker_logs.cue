@@ -134,7 +134,7 @@ components: sources: docker_logs: {
 		tls: {
 			common: false
 			description: """
-				TLS options to connect to the Docker deamon. This has no effect unless `docker_host` is an HTTPS URL.
+				TLS options to connect to the Docker daemon. This has no effect unless `docker_host` is an HTTPS URL.
 				If absent, Vector will try to use environment variable `DOCKER_CERT_PATH` and then `DOCKER_CONFIG`.
 				If both environment variables are absent, Vector will try to read certificates in `~/.docker/`.
 				"""
