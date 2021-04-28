@@ -1,51 +1,130 @@
 {{ $errors := site.Data.docs.remap.errors }}
-{{ range $code, $error := $errors }}
-{{ $id := printf "%s %s" $code $error.title | urlize }}
-<h3 style="display: none;" id="{{ $id }}">
-  {{ $code }} {{ $error.title }}
-</h3>
+<div class="no-prose flex flex-col border rounded-md divide-y dark:border-gray-700">
+  {{ range $code, $error := $errors }}
+  {{ $id := printf "%s %s" $code $error.title | urlize }}
+  <div x-data="{ open: true }" class="dark:border-gray-700 py-4 px-6">
+    <span class="flex items-center justify-between">
+      <h3 id="{{ $code }}">
+        <span class="font-mono text-secondary">
+          {{ $code }}
+        </span>
 
-<div class="error" id="{{ $code }}" x-data="{ open: location.hash === '#{{ $code }}' }">
-  <header class="error-title">
-    <span class="is-size-5 is-size-6-mobile">
-      <span class="code">
-        {{ $code }}
-      </span>
+        <a href="#{{ $code }}" class="text-gray-700 dark:text-white">
+          {{ $error.title }}
+        </a>
+      </h3>
 
-      <span class="name">
-        {{ $error.title }}
-      </span>
+      {{ template "toggler" }}
     </span>
 
-    <a class="icon" @click="open = !open">
-      <i class="fas" :class="{ 'fa-minus': open, 'fa-plus': !open }"></i>
-    </a>
-  </header>
-
-  <div class="error-info" x-show="open">
-    <div class="error-description">
-      {{ $error.description | markdownify }}
-    </div>
-
-    {{ with $error.examples }}
-    <div class="error-examples" x-data="{ open: location.hash == '#{{ $code }}' }">
-      <header class="error-examples-title">
-        <span>
-          Examples
-        </span>
-
-        <span class="icon is-small" @click="open = !open">
-          <i class="fas fa-sm" :class="{ 'fa-minus': open, 'fa-plus': !open }"></i>
-        </span>
-      </header>
-
-      <div x-show="open">
-        <span class="has-text-secondary">
-          TODO
-        </span>
+    <div x-show="open">
+      {{ with $error.description }}
+      <div class="mt-4 leading-tight">
+        {{ . | markdownify }}
       </div>
+      {{ end }}
+
+      {{ with $error.rationale }}
+      <div class="mt-2">
+        <p class="font-semibold">
+          Rationale
+        </p>
+
+        <div class="mt-2 leading-tight">
+          {{ . | markdownify }}
+        </div>
+      </div>
+      {{ end }}
+
+      {{ with $error.resolution }}
+      <div class="mt-2">
+        <p class="font-semibold">
+          Resolution
+        </p>
+
+        <div class="mt-2 leading-tight">
+          {{ . | markdownify }}
+        </div>
+      </div>
+      {{ end }}
+
+      {{ with $error.examples }}
+      <div x-data="{ open: true }" class="mt-4 border rounded-md py-2 px-4 dark:border-gray-700">
+        <span class="flex justify-between items-center">
+          <span class="font-semibold">
+            Examples
+          </span>
+
+          {{ template "toggler" }}
+        </span>
+
+        <div x-show="open" class="mt-2 flex flex-col divide-y dark:divide-gray-700 border rounded-sm dark:border-gray-700">
+          {{ range . }}
+          <div class="py-2 px-3 rounded-sm dark:border-gray-700">
+            <p class="font-semibold">
+              {{ .title }}
+            </p>
+
+            {{/* Example event (log or metric) */}}
+            {{ with .input }}
+            {{ with .log }} {{/* Log event */}}
+            {{ $json := . | jsonify (dict "indent" "  ") }}
+            <p class="tracking-tighter font-semibold text-sm">
+              Log event
+            </p>
+
+            {{ highlight $json "json" "" }}
+            {{ end }}
+
+            {{ with .metric }} {{/* Metric event */}}
+            {{ $json := . | jsonify (dict "indent" "  ") }}
+            <p class="tracking-tighter font-semibold text-sm">
+              Metric event
+            </p>
+
+            {{ highlight $json "json" "" }}
+            {{ end }}
+            {{ end }}
+
+            {{ with .source }}
+            <p class="tracking-tighter font-semibold text-sm">
+              VRL program
+            </p>
+
+            {{ highlight . "ruby" "" }}
+            {{ end }}
+
+            {{/* Example diff */}}
+            {{ with .diff }}
+            <p class="tracking-tighter font-semibold text-sm">
+              How to fix it
+            </p>
+
+            {{ highlight . "diff" "" }}
+            {{ end }}
+          </div>
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
     </div>
-    {{ end }}
   </div>
+  {{ end }}
 </div>
+
+{{ define "toggler" }}
+
+<button @click="open = !open">
+  {{/* Heroicon: outline/plus */}}
+  <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class="text-gray-600 dark:text-gray-400 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+  </svg>
+
+  {{/* Heroicon: outline/minus-sm */}}
+  <svg x-show="open" xmlns="http://www.w3.org/2000/svg" class="text-gray-600 dark:text-gray-400 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
+  </svg>
+</button>
 {{ end }}
+
+{{/* title diff input */}}

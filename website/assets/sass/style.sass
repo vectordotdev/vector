@@ -8,12 +8,6 @@
 [x-cloak]
   display: none !important
 
-.prose
-  // Remove annoying border around clicked-on headings
-  h1:focus, h2:focus, h3:focus, h4:focus, h5:focus, h6:focus
-    outline: none !important
-    box-shadow: none !important
-
 // Some rules that Tailwind can't really cover
 .jump + .jump
   margin-top: 0.5rem
@@ -21,14 +15,6 @@
 .svg svg
   max-width: 100%
   height: auto
-
-.light
-  .code-title
-    color: black
-
-.dark
-  .code-title
-    color: white
 
 // For debugging purposes
 .x

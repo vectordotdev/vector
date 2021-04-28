@@ -13,7 +13,7 @@ module.exports = {
         'primary': '#28d9f2', // Vector greenish blue
         'primary-dark': '#00a9bc', // Vector darker greenish blue
         'secondary': '#f44af5', // Vector magenta
-        'purple': '#98f', // Vector purple
+        'purple-v': '#98f', // Vector purple
         // Brand colors
         'twitter-blue': '#1DA1F2',
         'discord-purple': '#7289DA',
@@ -23,7 +23,7 @@ module.exports = {
         DEFAULT: {
           css: {
             a: {
-              color: theme('colors.primary-dark'),
+              color: theme('colors.primary-dark', 'currentColor'),
               '&:hover': {
                 color: theme('colors.secondary'),
               },
@@ -31,6 +31,12 @@ module.exports = {
             },
             code: {
               color: theme('colors.primary-dark'),
+              '&::before': {
+                display: 'none',
+              },
+              '&::after': {
+                display: 'none',
+              },
             },
             '.no-prose': {
               a: {
@@ -39,19 +45,11 @@ module.exports = {
                   color: theme('colors.black'),
                 },
               },
-              p: {
-                margin: 0,
-                padding: 0,
-              },
-              'h1, h2, h3, h4, h5, h6': {
+              'p, h1, h2, h3, h4, h5, h6': {
                 margin: 0,
                 padding: 0,
               }
             },
-            '.highlight, .highlight pre.chroma': {
-              'margin-top': '0.5rem',
-              'margin-bottom': '0.5rem',
-            }
           }
         },
         dark: {
@@ -64,30 +62,16 @@ module.exports = {
               color: theme('colors.primary'),
             },
             'a': {
-              color: theme('colors.primary'),
+              color: theme('colors.primary', 'currentColor'),
               'text-decoration': 'none',
               '&:hover, &:active': {
-                color: 'secondary',
+                color: theme('colors.secondary'),
               },
             },
             strong: {
               color: theme('colors.gray.100'),
             },
             '.no-prose': {
-              a: {
-                color: theme('colors.black'),
-                '&:hover': {
-                  color: theme('colors.black'),
-                },
-              },
-              p: {
-                margin: 0,
-                padding: 0,
-              },
-              'h1, h2, h3, h4, h5, h6': {
-                margin: 0,
-                padding: 0,
-              }
             },
           }
         }

@@ -4,7 +4,7 @@ short: Errors
 weight: 3
 ---
 
-VRL is a [fail-safe](#fail-safety), which means that a VRL program doesn't compile unless every possible error is handled. This largely contributes to VRL's safety principle. Observability data is notoriously unpredictable and fail-safety ensures that your VRL programs elegantly handle malformed data, a problem that often plagues observability pipelines.
+VRL is a [fail-safe](#fail-safety) language, which means that a VRL program doesn't compile unless every potential error is handled. Observability data is notoriously unpredictable and fail safety ensures that your VRL programs elegantly handle malformed data.
 
 ## Compile-time errors
 
@@ -28,7 +28,7 @@ You have three options for handling errors in VRL:
 
 As documented in the [assignment expression reference], you can **assign** errors when invoking an expression that's fallible. When assigned, runtime errors are simple strings:
 
-```vrl
+```ruby
 structured, err = parse_json("not json")
 if err != null {
   log("Unable to parse JSON: " + err, level: "error")
@@ -39,7 +39,7 @@ if err != null {
 
 If the expression fails, the `ok` assignment target is assigned the "empty" value of its type:
 
-```vrl
+```ruby
 # `.foo` can be `100` or `"not an int"`
 foo, err = to_int(.foo)
 
@@ -72,7 +72,7 @@ Null | `null`
 
 As documented in the [coalesce expression reference][coalesce], you can **coalesce** errors to efficiently step through multiple expressions:
 
-```vrl
+```ruby
 structured = parse_json("not json") ?? parse_syslog("not syslog") ?? {}
 . = merge(., structured)
 ```
@@ -81,7 +81,7 @@ structured = parse_json("not json") ?? parse_syslog("not syslog") ?? {}
 
 As documented in the [function call reference][call], you can **raise** errors to immediately abort the program by adding a `!` to the end of the function name:
 
-```vrl
+```ruby
 structured = parse_json!("not json")
 . = merge(., structured)
 ```
