@@ -44,52 +44,24 @@
 
     <div class="block space-y-1.5">
       {{ with $tags.type }}
-      {{ template "highlight-badge" (dict "type" . "bg" "blue-200" "text" "blue-800" "bg_dark" "blue-700" "text_dark" "blue-100") }}
+      {{ partial "badge.html" (dict "prefix" "type" "word" . "bg" "blue-200" "text" "blue-800" "bg_dark" "blue-700" "text_dark" "blue-100") }}
       {{ end }}
 
       {{ range $tags.domains }}
-      {{ template "highlight-badge" (dict "domain" . "bg" "rose-200" "text" "rose-800" "bg_dark" "rose-700" "text_dark" "rose-100") }}
+      {{ partial "badge.html" (dict "prefix" "domain" "word" . "bg" "rose-200" "text" "rose-800" "bg_dark" "rose-700" "text_dark" "rose-100") }}
       {{ end }}
 
       {{ range $tags.sources }}
-      {{ template "highlight-badge" (dict "source" . "bg" "violet-200" "text" "violet-800" "bg_dark" "violet-700" "text_dark" "violet-100") }}
+      {{ partial "badge.html" (dict "prefix" "source" "word" . "bg" "violet-200" "text" "violet-800" "bg_dark" "violet-700" "text_dark" "violet-100") }}
       {{ end }}
 
       {{ range $tags.transforms }}
-      {{ template "highlight-badge" (dict "transform" . "bg" "violet-200" "text" "violet-800" "bg_dark" "violet-700" "text_dark" "violet-100") }}
+      {{ partial "badge.html" (dict "prefix" "transform" "word" . "bg" "violet-200" "text" "violet-800" "bg_dark" "violet-700" "text_dark" "violet-100") }}
       {{ end }}
 
       {{ range $tags.sinks }}
-      {{ template "highlight-badge" (dict "sink" . "bg" "violet-200" "text" "violet-800" "bg_dark" "violet-700" "text_dark" "violet-100") }}
+      {{ partial "badge.html" (dict "prefix" "sink" "word" . "bg" "violet-200" "text" "violet-800" "bg_dark" "violet-700" "text_dark" "violet-100") }}
       {{ end }}
     </div>
   </div>
 </div>
-
-{{ define "highlight-badge" }}
-<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-{{ .bg }} text-{{ .text }} dark:bg-{{ .bg_dark }} dark:text-{{ .text_dark }}">
-  {{ with .type }}
-  type:&nbsp;<strong>{{ . }}</strong>
-  {{ end }}
-
-  {{ with .domain }}
-  domain:&nbsp;<strong>{{ . }}</strong>
-  {{ end }}
-
-  {{ with .source }}
-  source:&nbsp;<strong>{{ . }}</strong>
-  {{ end }}
-
-  {{ with .transform }}
-  transform:&nbsp;<strong>{{ . }}</strong>
-  {{ end }}
-
-  {{ with .sink }}
-  sink:&nbsp;<strong>{{ . }}</strong>
-  {{ end }}
-
-  {{ with .word }}
-  {{ . }}
-  {{ end }}
-</span>
-{{ end }}

@@ -1,0 +1,7 @@
+<span class="inline-flex items-center py-0.5 font-medium{{ if .large }} text-sm px-3{{ else }} text-xs px-2{{ end }} {{ if .rounded }} rounded-full{{ else }} rounded{{ end }} bg-{{ .bg }} text-{{ .text }} dark:bg-{{ .bg_dark }} dark:text-{{ .text_dark }}">
+  {{ if .prefix }}
+  {{ .prefix }}:&nbsp;<strong>{{ .word }}</strong>
+  {{ else }}
+  {{ .word }}
+  {{ end }}
+</span>

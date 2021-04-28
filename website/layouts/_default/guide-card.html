@@ -14,39 +14,20 @@
 
   <div class="block space-y-1.5">
     {{ with .Params.domain }}
-    {{ template "guide-card-badge" (dict "domain" . "bg" "green-200" "text" "green-800" "bg_dark" "green-700" "text_dark" "green-100") }}
+    {{ partial "badge.html" (dict "prefix" "domain" "word" . "bg" "green-200" "text" "green-800" "bg_dark" "green-700" "text_dark" "green-100") }}
     {{ end }}
 
     {{ range .Params.transforms }}
-    {{ template "guide-card-badge" (dict "transform" . "bg" "blue-200" "text" "blue-800" "bg_dark" "blue-700" "text_dark" "blue-100") }}
+
+    {{ partial "badge.html" (dict "prefix" "transform" "word" . "bg" "blue-200" "text" "blue-800" "bg_dark" "blue-700" "text_dark" "blue-100") }}
     {{ end }}
 
     {{ range .Params.sources }}
-    {{ template "guide-card-badge" (dict "source" . "bg" "blue-200" "text" "blue-800" "bg_dark" "blue-700" "text_dark" "blue-100") }}
+    {{ partial "badge.html" (dict "prefix" "source" "word" . "bg" "blue-200" "text" "blue-800" "bg_dark" "blue-700" "text_dark" "blue-100") }}
     {{ end }}
 
     {{ range .Params.sinks }}
-    {{ template "guide-card-badge" (dict "sink" . "bg" "blue-200" "text" "blue-800" "bg_dark" "blue-700" "text_dark" "blue-100") }}
+    {{ partial "badge.html" (dict "prefix" "sink" "word"  . "bg" "blue-200" "text" "blue-800" "bg_dark" "blue-700" "text_dark" "blue-100") }}
     {{ end }}
   </div>
 </div>
-
-{{ define "guide-card-badge" }}
-<span class="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-medium bg-{{ .bg }} text-{{ .text }} dark:bg-{{ .bg_dark }} dark:text-{{ .text_dark }}">
-  {{ with .source }}
-  source:&nbsp;<strong>{{ . }}</strong>
-  {{ end }}
-
-  {{ with .transform }}
-  transform:&nbsp;<strong>{{ . }}</strong>
-  {{ end }}
-
-  {{ with .sink }}
-  sink:&nbsp;<strong>{{ . }}</strong>
-  {{ end }}
-
-  {{ with .domain }}
-  domain:&nbsp;<strong>{{ . }}</strong>
-  {{ end }}
-</span>
-{{ end }}

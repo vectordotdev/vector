@@ -7,4 +7,6 @@
 {{- with $url.Fragment -}}{{- $fragment = printf "#%s" . -}}{{ end -}}
 {{- if .Page.GetPage $url.Path -}}{{- $link = printf "%s%s" (.Page.GetPage $url.Path).RelPermalink $fragment -}}{{- end -}}{{- end -}}
 {{- end -}}
-<a {{ if $isRemote }}class="no-break" {{ end }}href="{{ $link | safeURL }}"{{ with .Title }} title="{{ . }}"{{ end }}{{ if $isRemote }} target="_blank" rel="noopener"{{- end -}}>{{- .Text | safeHTML -}}{{- if $isRemote -}}<sup class="ml-tiny"><i class="fas fa-xs fa-external-link-alt"></i></sup>{{- end -}}</a>
+<a href="{{ $link | safeURL }}"{{ with .Title }} title="{{ . }}"{{ end }}{{ if $isRemote }} target="_blank" class="inline-block"{{ end }}>
+  {{- .Text | safeHTML -}}
+</a>

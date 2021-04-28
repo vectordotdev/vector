@@ -31,23 +31,11 @@
 
   {{ with .Params.tags }}
   <div class="block space-y-1.5">
-    {{ template "blog-post-badge" (dict "type" .type "bg" "indigo-100" "text" "indigo-800" "bg_dark" "indigo-700" "text_dark" "indigo-100") }}
+    {{ partial "badge.html" (dict "rounded" true "large" true "prefix" "type" "word" .type "bg" "indigo-100" "text" "indigo-800" "bg_dark" "indigo-700" "text_dark" "indigo-100") }}
 
     {{ range .domains }}
-    {{ template "blog-post-badge" (dict "domain" . "bg" "green-200" "text" "green-800" "bg_dark" "green-700" "text_dark" "green-100") }}
+    {{ partial "badge.html" (dict "rounded" true "large" true "prefix" "domain" "word" . "bg" "green-200" "text" "green-800" "bg_dark" "green-700" "text_dark" "green-100") }}
     {{ end }}
   </div>
   {{ end }}
 </div>
-
-{{ define "blog-post-badge" }}
-<span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-{{ .bg }} text-{{ .text }} dark:bg-{{ .bg_dark }} dark:text-{{ .text_dark }}">
-  {{ with .type }}
-  type:&nbsp;<strong>{{ . }}</strong>
-  {{ end }}
-
-  {{ with .domain }}
-  domain:&nbsp;<strong>{{ . }}</strong>
-  {{ end }}
-</span>
-{{ end }}

@@ -8,20 +8,20 @@
         {{ $k }}
       </span>
 
-      <span>
+      <span class="flex space-x-1">
         {{ if $v.common }}
-        {{ template "schema-badge" (dict "word" "common" "bg" "indigo-100" "text" "indigo-800" "bg_dark" "indigo-700" "text_dark" "indigo-100") }}
+        {{ partial "badge.html" (dict "word" "common" "bg" "indigo-100" "text" "indigo-800" "bg_dark" "indigo-700" "text_dark" "indigo-100") }}
         {{ end }}
 
         {{ if $v.required }}
-        {{ template "schema-badge" (dict "word" "required" "bg" "red-100" "text" "red-800" "bg_dark" "red-700" "text_dark" "red-100") }}
+        {{ partial "badge.html" (dict "word" "required" "bg" "red-100" "text" "red-800" "bg_dark" "red-700" "text_dark" "red-100") }}
         {{ else }}
-        {{ template "schema-badge" (dict "word" "optional" "bg" "gray-100" "text" "gray-800" "bg_dark" "gray-700" "text_dark" "gray-100") }}
+        {{ partial "badge.html" (dict "word" "optional" "bg" "gray-100" "text" "gray-800" "bg_dark" "gray-700" "text_dark" "gray-100") }}
         {{ end }}
 
         {{ range $k, $v := $v.type }}
         {{ $type := cond (eq $k "object") "table" $k }}
-        {{ template "schema-badge" (dict "word" $type "bg" "green-100" "text" "green-800" "bg_dark" "green-700" "text_dark" "green-100") }}
+        {{ partial "badge.html" (dict "word" $type "bg" "green-100" "text" "green-800" "bg_dark" "green-700" "text_dark" "green-100") }}
         {{ end }}
       </span>
     </span>
@@ -40,9 +40,3 @@
   </div>
   {{ end }}
 </div>
-
-{{ define "schema-badge" }}
-<span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-{{ .bg }} text-{{ .text }} dark:bg-{{ .bg_dark }} dark:text-{{ .text_dark }}">
-  {{ .word }}
-</span>
-{{ end }}
