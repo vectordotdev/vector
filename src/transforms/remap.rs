@@ -1,13 +1,14 @@
 use crate::{
     config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
-    event::Event,
+    event::{self, Event, LogEvent},
     internal_events::{RemapMappingAbort, RemapMappingError},
     transforms::{FunctionTransform, Transform},
     Result,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use vrl::diagnostic::Formatter;
-use vrl::{Program, Runtime, Terminate};
+use vrl::{Program, Runtime, Terminate, Value};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -17,6 +18,7 @@ pub struct RemapConfig {
     pub drop_on_error: bool,
     #[serde(default = "crate::serde::default_true")]
     pub drop_on_abort: bool,
+    pub emit_multiple: bool,
 }
 
 inventory::submit! {
@@ -50,6 +52,7 @@ pub struct Remap {
     program: Program,
     drop_on_error: bool,
     drop_on_abort: bool,
+    emit_multiple: bool,
 }
 
 impl Remap {
@@ -64,6 +67,7 @@ impl Remap {
             program,
             drop_on_error: config.drop_on_error,
             drop_on_abort: config.drop_on_abort,
+            emit_multiple: config.emit_multiple,
         })
     }
 }
@@ -95,25 +99,79 @@ impl FunctionTransform for Remap {
         };
 
         match result {
-            Ok(_) => output.push(event),
-            Err(Terminate::Abort) => {
-                emit!(RemapMappingAbort {
-                    event_dropped: self.drop_on_abort,
-                });
+            Ok(value) => match (self.emit_multiple, value, &event) {
+                (false, _, _) => output.push(event),
+                (true, Value::Array(array), Event::Log(log)) => {
+                    let objects = array
+                        .into_iter()
+                        .map(|value| match value {
+                            Value::Object(object) => Ok(object
+                                .into_iter()
+                                .map(|(key, value)| (key, Into::<event::Value>::into(value)))
+                                .collect::<BTreeMap<_, _>>()),
+                            _ => Err(format!(
+                                "target must be a valid object, got {}: {}",
+                                value.kind(),
+                                value
+                            )),
+                        })
+                        .collect::<std::result::Result<Vec<_>, _>>();
 
+                    let objects = match objects {
+                        Ok(objects) => objects,
+                        Err(error) => {
+                            if !self.drop_on_error {
+                                output.push(original_event.unwrap_or(event))
+                            }
+
+                            return emit!(RemapMappingError {
+                                error,
+                                event_dropped: self.drop_on_error
+                            });
+                        }
+                    };
+
+                    let metadata = log.metadata();
+
+                    for object in objects {
+                        let event = LogEvent::new(object, metadata.clone());
+                        output.push(event.into());
+                    }
+                }
+                (true, Value::Array(_), Event::Metric(_)) => todo!(),
+                (true, value, _) => {
+                    if !self.drop_on_error {
+                        output.push(original_event.unwrap_or(event))
+                    }
+
+                    return emit!(RemapMappingError {
+                        error: format!(
+                            "target must be a valid array, got {}: {}",
+                            value.kind(),
+                            value
+                        ),
+                        event_dropped: self.drop_on_error
+                    });
+                }
+            },
+            Err(Terminate::Abort) => {
                 if !self.drop_on_abort {
                     output.push(original_event.unwrap_or(event))
                 }
+
+                emit!(RemapMappingAbort {
+                    event_dropped: self.drop_on_abort,
+                });
             }
             Err(Terminate::Error(error)) => {
+                if !self.drop_on_error {
+                    output.push(original_event.unwrap_or(event))
+                }
+
                 emit!(RemapMappingError {
                     error,
                     event_dropped: self.drop_on_error,
                 });
-
-                if !self.drop_on_error {
-                    output.push(original_event.unwrap_or(event))
-                }
             }
         }
     }
@@ -124,9 +182,10 @@ mod tests {
     use super::*;
     use crate::event::{
         metric::{MetricKind, MetricValue},
-        LogEvent, Metric, Value,
+        EventMetadata, LogEvent, Metric, Value,
     };
-    use indoc::formatdoc;
+    use indoc::indoc;
+    use shared::btreemap;
     use std::collections::BTreeMap;
 
     #[test]
@@ -148,13 +207,13 @@ mod tests {
         let metadata = event.metadata().clone();
 
         let conf = RemapConfig {
-            source: r#"  .foo = "bar"
-  .bar = "baz"
-  .copy = .copy_from
-"#
-            .to_string(),
-            drop_on_error: true,
-            drop_on_abort: false,
+            source: indoc! {r#"
+                .foo = "bar"
+                .bar = "baz"
+                .copy = .copy_from
+            "#}
+            .to_owned(),
+            ..Default::default()
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -176,13 +235,14 @@ mod tests {
         };
 
         let conf = RemapConfig {
-            source: formatdoc! {r#"
+            source: indoc! {r#"
                 .foo = "foo"
                 .not_an_int = int!(.bar)
                 .baz = 12
-            "#},
+            "#}
+            .to_owned(),
             drop_on_error: false,
-            drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -202,13 +262,14 @@ mod tests {
         };
 
         let conf = RemapConfig {
-            source: formatdoc! {r#"
+            source: indoc! {r#"
                 .foo = "foo"
                 .not_an_int = int!(.bar)
                 .baz = 12
-            "#},
+            "#}
+            .to_owned(),
             drop_on_error: true,
-            drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -224,12 +285,12 @@ mod tests {
         };
 
         let conf = RemapConfig {
-            source: formatdoc! {r#"
+            source: indoc! {r#"
                 .foo = "foo"
                 .baz = 12
-            "#},
-            drop_on_error: false,
-            drop_on_abort: false,
+            "#}
+            .to_owned(),
+            ..Default::default()
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -249,13 +310,14 @@ mod tests {
         };
 
         let conf = RemapConfig {
-            source: formatdoc! {r#"
+            source: indoc! {r#"
                 .foo = "foo"
                 abort
                 .baz = 12
-            "#},
-            drop_on_error: false,
+            "#}
+            .to_owned(),
             drop_on_abort: false,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -275,13 +337,14 @@ mod tests {
         };
 
         let conf = RemapConfig {
-            source: formatdoc! {r#"
+            source: indoc! {r#"
                 .foo = "foo"
                 abort
                 .baz = 12
-            "#},
-            drop_on_error: false,
+            "#}
+            .to_owned(),
             drop_on_abort: true,
+            ..Default::default()
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -298,13 +361,14 @@ mod tests {
         let metadata = metric.metadata().clone();
 
         let conf = RemapConfig {
-            source: r#".tags.host = "zoobub"
-                       .name = "zork"
-                       .namespace = "zerk"
-                       .kind = "incremental""#
-                .to_string(),
-            drop_on_error: true,
-            drop_on_abort: false,
+            source: indoc! {r#"
+                .tags.host = "zoobub"
+                .name = "zork"
+                .namespace = "zerk"
+                .kind = "incremental"
+            "# }
+            .to_owned(),
+            ..Default::default()
         };
         let mut tform = Remap::new(conf).unwrap();
 
@@ -326,5 +390,144 @@ mod tests {
                 }))
             )
         );
+    }
+
+    #[test]
+    fn check_remap_multiple_logs() {
+        let metadata: EventMetadata = Default::default();
+        let event: Event = LogEvent::new(
+            btreemap! {
+                "foo" => btreemap! {
+                    "source" => "foo",
+                },
+                "bar" => btreemap! {
+                    "source" => "bar",
+                },
+            },
+            metadata.clone(),
+        )
+        .into();
+
+        let conf = RemapConfig {
+            source: indoc! {"
+                . = [.foo, .bar]
+            "}
+            .to_owned(),
+            emit_multiple: true,
+            ..Default::default()
+        };
+
+        let mut transform = Remap::new(conf).unwrap();
+
+        let mut output = Vec::new();
+        transform.transform(&mut output, event);
+
+        assert_eq!(output.len(), 2);
+        assert_eq!(
+            output[0].as_log().as_map(),
+            &btreemap! {
+                "source" => "foo"
+            }
+        );
+        assert_eq!(output[0].metadata(), &metadata);
+        assert_eq!(
+            output[1].as_log().as_map(),
+            &btreemap! {
+                "source" => "bar"
+            }
+        );
+        assert_eq!(output[1].metadata(), &metadata);
+    }
+
+    #[test]
+    fn check_remap_multiple_logs_error_no_array() {
+        let metadata: EventMetadata = Default::default();
+        let event: Event = LogEvent::new(btreemap! {}, metadata.clone()).into();
+
+        let conf = RemapConfig {
+            source: indoc! {r#"
+                . = "not an array"
+            "#}
+            .to_owned(),
+            emit_multiple: true,
+            drop_on_error: false,
+            ..Default::default()
+        };
+
+        let mut transform = Remap::new(conf).unwrap();
+
+        let mut output = Vec::new();
+        transform.transform(&mut output, event.clone());
+
+        assert_eq!(output, [event.clone()]);
+    }
+
+    #[test]
+    fn check_remap_multiple_logs_error_no_object() {
+        let metadata: EventMetadata = Default::default();
+        let event: Event = LogEvent::new(btreemap! {}, metadata.clone()).into();
+
+        let conf = RemapConfig {
+            source: indoc! {r#"
+                . = ["not an object"]
+            "#}
+            .to_owned(),
+            emit_multiple: true,
+            drop_on_error: false,
+            ..Default::default()
+        };
+
+        let mut transform = Remap::new(conf).unwrap();
+
+        let mut output = Vec::new();
+        transform.transform(&mut output, event.clone());
+
+        assert_eq!(output, [event.clone()]);
+    }
+
+    #[test]
+    fn check_remap_multiple_logs_error_no_array_drop() {
+        let metadata: EventMetadata = Default::default();
+        let event: Event = LogEvent::new(btreemap! {}, metadata.clone()).into();
+
+        let conf = RemapConfig {
+            source: indoc! {r#"
+                . = "not an array"
+            "#}
+            .to_owned(),
+            emit_multiple: true,
+            drop_on_error: true,
+            ..Default::default()
+        };
+
+        let mut transform = Remap::new(conf).unwrap();
+
+        let mut output = Vec::new();
+        transform.transform(&mut output, event);
+
+        assert_eq!(output, []);
+    }
+
+    #[test]
+    fn check_remap_multiple_logs_error_no_object_drop() {
+        let metadata: EventMetadata = Default::default();
+        let event: Event = LogEvent::new(btreemap! {}, metadata.clone()).into();
+
+        let conf = RemapConfig {
+            source: indoc! {r#"
+                . = ["not an object"]
+            "#}
+            .to_owned(),
+            emit_multiple: true,
+            drop_on_error: true,
+            ..Default::default()
+        };
+
+        let mut transform = Remap::new(conf).unwrap();
+
+        let mut output = Vec::new();
+        transform.transform(&mut output, event);
+
+        assert_eq!(output, []);
     }
 }

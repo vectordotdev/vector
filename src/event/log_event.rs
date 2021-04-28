@@ -20,6 +20,10 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
+    pub fn new(fields: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
+        Self { fields, metadata }
+    }
+
     pub fn new_with_metadata(metadata: EventMetadata) -> Self {
         Self {
             fields: Default::default(),
