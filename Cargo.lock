@@ -343,6 +343,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-native-tls"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e9e7a929bd34c68a82d58a4de7f86fffdaf97fb2af850162a7bb19dd7269b33"
+dependencies = [
+ "async-std",
+ "native-tls",
+ "thiserror",
+ "url",
+]
+
+[[package]]
 name = "async-nats"
 version = "0.9.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5543,14 +5555,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eeb8f8d059ead7805e171fc22de8348a3d611c0f985aaa4f5cf6c0dfc7645407"
 dependencies = [
  "arc-swap",
+ "async-native-tls",
  "async-std",
  "async-trait",
  "bytes 1.0.1",
  "combine 4.5.2",
  "dtoa",
- "futures 0.3.13",
+ "futures 0.3.14",
  "futures-util",
  "itoa",
+ "native-tls",
  "percent-encoding",
  "pin-project-lite",
  "sha1",

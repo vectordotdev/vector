@@ -8,7 +8,6 @@ use crate::{
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
     template::{Template, TemplateParseError},
 };
-
 use futures::{future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream};
 use redis::{aio::ConnectionManager, AsyncCommands, RedisError, RedisResult};
 use serde::{Deserialize, Serialize};
@@ -118,8 +117,7 @@ impl SinkConfig for RedisSinkConfig {
         }
 
         let sink = RedisSink::new(self.clone(), cx.acker()).await?;
-
-        let conn = match &(sink.state) {
+        let conn = match &sink.state {
             RedisSinkState::Ready(conn) => conn.clone(),
             _ => unreachable!(),
         };
@@ -152,7 +150,6 @@ impl RedisSinkConfig {
 impl RedisSink {
     async fn new(config: RedisSinkConfig, acker: Acker) -> crate::Result<Self> {
         let res = config.build_client().await.context(RedisCreateFailed);
-
         let key_tmpl = Template::try_from(config.key).context(KeyTemplate)?;
 
         match res {
@@ -174,6 +171,7 @@ impl RedisSink {
             }
         }
     }
+
     fn poll_in_flight_prepare(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         if let RedisSinkState::Sending(fut) = &mut self.state {
             let (conn, result) = ready!(fut.as_mut().poll(cx));

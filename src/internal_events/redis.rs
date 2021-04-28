@@ -30,6 +30,7 @@ impl InternalEvent for RedisReceiveEventFailed {
             rate_limit_secs = 30,
         );
     }
+
     fn emit_metrics(&self) {
         counter!("receive_event_errors_total", 1);
     }
@@ -79,7 +80,7 @@ impl InternalEvent for RedisEncodeEventFailed {
     fn emit_logs(&self) {
         error!(
             message = "Error encoding Redis event to JSON.",
-            error = ?self.error,
+            error = %self.error,
             rate_limit_secs = 30,
         );
     }
