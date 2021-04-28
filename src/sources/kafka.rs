@@ -203,15 +203,14 @@ async fn kafka_source(
                 }
                 log.insert(&headers_key, Value::from(headers_map));
 
-                if let Err(error) = consumer.store_offset(&msg) {
-                    emit!(KafkaOffsetUpdateFailed { error });
-                    continue;
+                match out.send(event).await {
+                    Err(error) => error!(message = "Error sending to sink.", %error),
+                    Ok(_) => {
+                        if let Err(error) = consumer.store_offset(&msg) {
+                            emit!(KafkaOffsetUpdateFailed { error });
+                        }
+                    }
                 }
-
-                let _ = out
-                    .send(event)
-                    .await
-                    .map_err(|error| error!(message = "Error sending to sink.", %error));
             }
         }
     }
