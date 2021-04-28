@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{self, log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::{
         RedisEncodeEventFailed, RedisEventSent, RedisSendEventFailed, TemplateRenderingFailed,
@@ -27,29 +27,29 @@ enum BuildError {
     KeyTemplate { source: TemplateParseError },
 }
 
-#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
-pub enum Type {
+pub enum DataType {
     #[derivative(Default)]
     List,
     Channel,
 }
 
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Method {
     #[derivative(Default)]
-    Lpush,
-    Rpush,
+    LPush,
+    RPush,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSinkConfig {
     #[serde(default)]
-    pub data_type: Type,
+    pub data_type: DataType,
     pub method: Option<Method>,
     pub encoding: EncodingConfigWithDefault<Encoding>,
     pub url: String,
@@ -73,7 +73,7 @@ enum RedisSinkState {
 
 pub struct RedisSink {
     key: Template,
-    data_type: Type,
+    data_type: DataType,
     method: Method,
     encoding: EncodingConfig<Encoding>,
     state: RedisSinkState,
@@ -94,8 +94,8 @@ impl GenerateConfig for RedisSinkConfig {
             url: "redis://127.0.0.1:6379/0".to_owned(),
             key: "vector".to_owned(),
             encoding: Encoding::Json.into(),
-            data_type: Type::List,
-            method: Some(Method::Lpush),
+            data_type: DataType::List,
+            method: Some(Method::LPush),
         })
         .unwrap()
     }
@@ -122,8 +122,8 @@ impl SinkConfig for RedisSinkConfig {
         Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
-    fn input_type(&self) -> DataType {
-        DataType::Log
+    fn input_type(&self) -> config::DataType {
+        config::DataType::Log
     }
 
     fn sink_type(&self) -> &'static str {
@@ -192,7 +192,7 @@ impl Sink<Event> for RedisSink {
     }
 
     fn start_send(mut self: Pin<&mut Self>, event: Event) -> Result<(), Self::Error> {
-        let conn = match std::mem::replace(&mut self.state, RedisSinkState::None) {
+        let mut conn = match std::mem::replace(&mut self.state, RedisSinkState::None) {
             RedisSinkState::Ready(conn) => conn,
             _ => panic!("Expected `poll_ready` to be called first."),
         };
@@ -208,43 +208,26 @@ impl Sink<Event> for RedisSink {
         let encoded = encode_event(event, &self.encoding);
         let message_len = encoded.len();
 
-        match self.data_type {
-            Type::List => match self.method {
-                Method::Lpush => {
-                    self.state = RedisSinkState::Sending(Box::pin(async move {
-                        let result = lpush(conn.clone(), key.clone(), encoded.clone()).await;
-                        if result.is_ok() {
-                            emit!(RedisEventSent {
-                                byte_size: message_len,
-                            });
-                        }
-                        (conn, result)
-                    }));
-                }
-                Method::Rpush => {
-                    self.state = RedisSinkState::Sending(Box::pin(async move {
-                        let result = rpush(conn.clone(), key.clone(), encoded.clone()).await;
-                        if result.is_ok() {
-                            emit!(RedisEventSent {
-                                byte_size: message_len,
-                            });
-                        }
-                        (conn, result)
-                    }));
-                }
-            },
-            Type::Channel => {
-                self.state = RedisSinkState::Sending(Box::pin(async move {
-                    let result = publish(conn.clone(), key.clone(), encoded.clone()).await;
-                    if result.is_ok() {
-                        emit!(RedisEventSent {
-                            byte_size: message_len,
-                        });
-                    }
-                    (conn, result)
-                }));
+        let data_type = self.data_type;
+        let method = self.method;
+
+        self.state = RedisSinkState::Sending(Box::pin(async move {
+            let send = match (data_type, method) {
+                (DataType::List, Method::LPush) => ConnectionManager::lpush,
+                (DataType::List, Method::RPush) => ConnectionManager::rpush,
+                (DataType::Channel, _) => ConnectionManager::publish,
+            };
+
+            let result = send(&mut conn, key.clone(), encoded.clone()).await;
+            if result.is_ok() {
+                emit!(RedisEventSent {
+                    byte_size: message_len,
+                });
             }
-        }
+
+            (conn, result)
+        }));
+
         Ok(())
     }
 
@@ -281,22 +264,6 @@ impl Sink<Event> for RedisSink {
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.poll_flush(cx)
     }
-}
-
-async fn lpush(mut conn: ConnectionManager, key: String, value: String) -> Result<i32, RedisError> {
-    conn.lpush(key, value).await
-}
-
-async fn rpush(mut conn: ConnectionManager, key: String, value: String) -> Result<i32, RedisError> {
-    conn.rpush(key, value).await
-}
-
-async fn publish(
-    mut conn: ConnectionManager,
-    key: String,
-    value: String,
-) -> Result<i32, RedisError> {
-    conn.publish(key, value).await
 }
 
 async fn healthcheck(mut conn: ConnectionManager) -> crate::Result<()> {
@@ -394,8 +361,8 @@ mod integration_tests {
             url: REDIS_SERVER.to_owned(),
             key: key.clone(),
             encoding: Encoding::Json.into(),
-            data_type: Type::List,
-            method: Option::from(Method::Lpush),
+            data_type: DataType::List,
+            method: Some(Method::LPush),
         };
 
         // Publish events.
@@ -433,8 +400,8 @@ mod integration_tests {
             url: REDIS_SERVER.to_owned(),
             key: key.clone(),
             encoding: Encoding::Json.into(),
-            data_type: Type::List,
-            method: Option::from(Method::Rpush),
+            data_type: DataType::List,
+            method: Some(Method::RPush),
         };
 
         // Publish events.
@@ -488,7 +455,7 @@ mod integration_tests {
             url: REDIS_SERVER.to_owned(),
             key: key.clone(),
             encoding: Encoding::Json.into(),
-            data_type: Type::Channel,
+            data_type: DataType::Channel,
             method: None,
         };
 
