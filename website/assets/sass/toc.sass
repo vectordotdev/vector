@@ -1,15 +1,7 @@
 // Table of Contents provided by Tocbot (https://github.com/tscanlin/tocbot)
 // Our implementation uses the Tocbot JavaScript to build the HTML for the TOC but doesn't use Tocbot's CSS
 // Instead, we use the Sass/CSS here in this file
-
-$toc-indent-lg: 0.75rem
-$toc-indent-sm: 0.6rem
-$h2-font-size: 0.9rem
-$h3-font-size: 0.75rem
-$h4-font-size: 0.7rem
-$h3-toc-spacing: 0.25rem
-$h4-toc-spacing: 0.2rem
-$y-padding: 0.25rem
+@import variables
 
 .dark, .light
   #toc
@@ -42,30 +34,38 @@ $y-padding: 0.25rem
         list-style: none
 
 // Dark mode
-.dark #toc
-  border-left: 2px solid grey
+.dark
+  .is-active-link
+    color: $vector-blue
 
-  .toc-list
-    color: white
-
-    .toc-list
-      color: grey
-
-
-.light #toc
-  border-left: 2.5px solid grey
-
-  .toc-list
-    color: grey
+  #toc
+    border-left: 2px solid $gray-700
 
     .toc-list
-      color: grey
+      color: $gray-200
+
+      .toc-list
+        color: $gray-300
+
 
 // Light mode
+.light
+  .is-active-link
+    color: $vector-purple
+
+  #toc
+    border-left: 2px solid $gray-200
+
+    .toc-list
+      color: $gray-800
+
+      .toc-list
+        color: $gray-500
 
 a.toc-link
   color: currentColor
   height: 100%
+
 
 .is-active-link
   font-weight: 700
