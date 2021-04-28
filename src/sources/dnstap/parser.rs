@@ -1,5 +1,6 @@
 use crate::{
     event::{LogEvent, PathComponent, Value},
+    internal_events::DnstapParseDataError,
     Error, Result,
 };
 use bytes::Bytes;
@@ -149,7 +150,9 @@ impl<'a> DnstapParser<'a> {
             if dnstap_data_type == DnstapDataType::Message {
                 if let Some(message) = proto_msg.message {
                     if let Err(err) = self.parse_dnstap_message(message) {
-                        error!(target: "dnstap event", "failed to parse dnstap message: {}", err.to_string());
+                        emit!(DnstapParseDataError {
+                            error: err.to_string().as_str()
+                        });
                         need_raw_data = true;
                         self.insert(
                             self.event_schema.dnstap_root_data_schema().error(),
@@ -159,7 +162,9 @@ impl<'a> DnstapParser<'a> {
                 }
             }
         } else {
-            error!(target: "dnstap event", "Unknown dnstap data type: {}", dnstap_data_type_id);
+            emit!(DnstapParseDataError {
+                error: format!("Unknown dnstap data type: {}", dnstap_data_type_id).as_str()
+            });
             need_raw_data = true;
         }
 

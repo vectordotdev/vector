@@ -2,6 +2,7 @@ use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::Event,
+    internal_events::{DnstapEventReceived, DnstapParseDataError},
     Result,
 };
 use bytes::Bytes;
@@ -175,6 +176,8 @@ impl FrameHandler for DnstapFrameHandler {
 
         let log_event = event.as_mut_log();
 
+        let frame_size = frame.len();
+
         if let Some(host) = received_from {
             log_event.insert(self.host_key(), host);
         }
@@ -184,14 +187,24 @@ impl FrameHandler for DnstapFrameHandler {
                 &self.schema.dnstap_root_data_schema().raw_data(),
                 base64::encode(&frame),
             );
+            emit!(DnstapEventReceived {
+                byte_size: frame_size
+            });
             Some(event)
         } else {
             match DnstapParser::new(&self.schema, log_event).parse_dnstap_data(frame) {
-                Err(error) => {
-                    error!("Dnstap protobuf decode error {:?}.", error);
+                Err(err) => {
+                    emit!(DnstapParseDataError {
+                        error: format!("Dnstap protobuf decode error {:?}.", err).as_str()
+                    });
                     None
                 }
-                Ok(_) => Some(event),
+                Ok(_) => {
+                    emit!(DnstapEventReceived {
+                        byte_size: frame_size
+                    });
+                    Some(event)
+                }
             }
         }
     }
