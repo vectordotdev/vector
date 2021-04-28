@@ -8,57 +8,53 @@
 {{ $numSections := len .Sections }}
 {{ $isRoot := eq .FirstSection .CurrentSection }}
 {{ $guides := cond $isRoot .Sections .RegularPages }}
-<div class="relative max-w-3xl mx-auto lg:max-w-7xl px-6 lg:px-8 xl:grid xl:grid-cols-3 xl:gap-x-12 space-y-8 xl:space-y-0 my-16">
+<div class="relative max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-6 lg:px-8 xl:grid xl:grid-cols-3 xl:gap-x-12 space-y-8 xl:space-y-0 my-16">
   <div class="xl:col-span-1 pr-0 lg:pr-6 md:pr-2">
-    <div class="px-6 lg:p-0">
-      <div class="max-w-xl">
-        <div class="mb-4 md:mb-6">
-          {{ partial "breadcrumb.html" . }}
-        </div>
-
-        <h2 class="dark:text-gray-50 font-secondary font-extrabold text-4xl md:text-5xl tracking-tight sm:tracking-tighter leading-tight">
-          {{ .Title }}
-        </h2>
-
-        {{ with .Description }}
-        <p class="dark:text-gray-200 mt-5 text-xl text-gray-500 prose dark:prose-dark">
-          {{ . | markdownify }}
-        </p>
-        {{ end }}
+    <div class="max-w-xl">
+      <div class="mb-4 md:mb-6">
+        {{ partial "breadcrumb.html" . }}
       </div>
+
+      <h2 class="dark:text-gray-50 font-secondary font-extrabold text-4xl md:text-5xl tracking-tight sm:tracking-tighter leading-tight">
+        {{ .Title }}
+      </h2>
+
+      {{ with .Description }}
+      <p class="dark:text-gray-200 mt-5 text-xl text-gray-500 prose dark:prose-dark">
+        {{ . | markdownify }}
+      </p>
+      {{ end }}
     </div>
   </div>
 
-  <div class="xl:col-span-2">
-    <div class="px-6 lg:p-0 flex flex-col space-y-10">
-      {{/* Guide listing on main /guides page */}}
-      {{ if $isRoot }}
-      {{ range $guides }}
-      <div>
-        <h2 class="dark:text-gray-50 font-secondary font-extrabold text-2xl md:text-3xl tracking-tight sm:tracking-tighter leading-tight">
-          <a href="{{ .RelPermalink }}" class="hover:text-secondary">
-            {{ .Title }}
-          </a>
-        </h2>
+  <div class="xl:col-span-2 flex flex-col space-y-10">
+    {{/* Guide listing on main /guides page */}}
+    {{ if $isRoot }}
+    {{ range $guides }}
+    <div>
+      <h2 class="dark:text-gray-50 font-secondary font-extrabold text-2xl md:text-3xl tracking-tight sm:tracking-tighter leading-tight">
+        <a href="{{ .RelPermalink }}" class="hover:text-secondary">
+          {{ .Title }}
+        </a>
+      </h2>
 
-        <div class="mt-6 flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700 border shadow-md rounded-lg">
-          {{ range .RegularPages }}
-          {{ .Render "guide-card" }}
-          {{ end }}
-        </div>
-      </div>
-      {{ end }}
-      {{ end }}
-
-      {{/* Guide listing for non-main section, e.g. /level-up */}}
-      {{ if not $isRoot }}
-      <div class="flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700 border shadow-md rounded-lg">
-        {{ range $guides }}
+      <div class="mt-6 flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700 border shadow-md rounded-lg">
+        {{ range .RegularPages }}
         {{ .Render "guide-card" }}
         {{ end }}
       </div>
+    </div>
+    {{ end }}
+    {{ end }}
+
+    {{/* Guide listing for non-main section, e.g. /level-up */}}
+    {{ if not $isRoot }}
+    <div class="flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700 border shadow-md rounded-lg">
+      {{ range $guides }}
+      {{ .Render "guide-card" }}
       {{ end }}
     </div>
+    {{ end }}
   </div>
 </div>
 {{ end }}

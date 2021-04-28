@@ -7,7 +7,7 @@ weight: 2
 
 A **metric event** in Vector represents a numerical operation performed on a time series. In Vector, unlike in other tools, metrics are first-class citizens. They are *not* represented as [logs]. This makes them interoperable with various metrics services without the need for any transformation.
 
-Vector's metric data model favors accuracy and correctness over ideological purity. Vector's metric types are thus an agglomeration of various metric types found in the wild, such as [Prometheus] and [Statsd]. This ensures that metric is *correctly* interoperable between systems.
+Vector's metric data model favors accuracy and correctness over ideological purity. Vector's metric types are thus an agglomeration of various metric types found in the wild, such as [Prometheus] and [Statsd]. This ensures that metrics are *correctly* interoperable between systems.
 
 ## Schema
 

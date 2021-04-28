@@ -3,7 +3,6 @@
 {{ $systems := where site.RegularPages ".CurrentSection.Params.short" "eq" "Operating systems" }}
 {{ $manual := where site.RegularPages ".CurrentSection.Params.short" "eq" "Manual" }}
 {{ $links := dict "Platforms" $platforms "Package managers" $packageManagers "Operating systems" $systems "Manual" $manual }}
-
 <div class="flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
   {{ range $k, $v := $links }}
   <div class="px-4 py-3 lg:px-6 lg:py-4">

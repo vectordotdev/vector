@@ -5,7 +5,7 @@
 
 {{/* Iterate through all docs sections, including the root */}}
 {{ range $sections }}
-<div class="flex flex-col space-y-4">
+<div class="flex flex-col space-y-4 pb-10">
   {{ template "heading" (dict "here" $here "url" .RelPermalink "title" (.Params.short | default .Title )) }}
 
   {{ with .Sections }}

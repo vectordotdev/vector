@@ -30,6 +30,6 @@ Here's an example representation of a log event (as JSON):
 
 ### Types
 
-{{% snippet "how-it-works/types" %}}
+{{< snippet "how-it-works/types" >}}
 
 [components]: /components

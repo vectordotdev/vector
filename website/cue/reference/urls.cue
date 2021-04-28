@@ -498,7 +498,7 @@ urls: {
 	vrl_error_handling_assigning:                             "\(vrl_errors_reference)#assigning"
 	vrl_error_handling_coalescing:                            "\(vrl_errors_reference)#coalesing"
 	vrl_error_handling_raising:                               "\(vrl_errors_reference)#raising"
-	vrl_errors_reference:                                     "\(vrl_reference)errors/"
+	vrl_errors_reference:                                     "\(vrl_reference)/errors/"
 	vrl_expressions:                                          "\(vrl_reference)expressions/"
 	vrl_fail_safety:                                          "\(vrl_reference)#fail-safety"
 	vrl_features:                                             "\(vrl_reference)#features"
