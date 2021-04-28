@@ -44,7 +44,7 @@ pub struct ExecConfig {
 
 // TODO: Would be nice to combine the scheduled and streaming config with the mode enum once
 //       this serde ticket has been addressed (https://github.com/serde-rs/serde/issues/2013)
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Mode {
     Scheduled,
@@ -177,28 +177,28 @@ impl SourceConfig for ExecConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         self.validate()?;
         let hostname = get_hostname();
-        match self.mode.clone() {
+        match &self.mode {
             Mode::Scheduled => {
                 let exec_interval_secs = self.exec_interval_secs_or_default();
-                run_scheduled(
+                Ok(Box::pin(run_scheduled(
                     self.clone(),
                     hostname,
                     exec_interval_secs,
                     cx.shutdown,
                     cx.out,
-                )
+                )))
             }
             Mode::Streaming => {
                 let respawn_on_exit = self.respawn_on_exit_or_default();
                 let respawn_interval_secs = self.respawn_interval_secs_or_default();
-                run_streaming(
+                Ok(Box::pin(run_streaming(
                     self.clone(),
                     hostname,
                     respawn_on_exit,
                     respawn_interval_secs,
                     cx.shutdown,
                     cx.out,
-                )
+                )))
             }
         }
     }
@@ -212,40 +212,71 @@ impl SourceConfig for ExecConfig {
     }
 }
 
-pub fn run_scheduled(
+async fn run_scheduled(
     config: ExecConfig,
     hostname: Option<String>,
     exec_interval_secs: u64,
     shutdown: ShutdownSignal,
     out: Pipeline,
-) -> crate::Result<super::Source> {
-    Ok(Box::pin(async move {
-        debug!("Starting scheduled exec runs.");
-        let schedule = Duration::from_secs(exec_interval_secs);
+) -> Result<(), ()> {
+    debug!("Starting scheduled exec runs.");
+    let schedule = Duration::from_secs(exec_interval_secs);
 
-        let mut interval =
-            IntervalStream::new(time::interval(schedule)).take_until(shutdown.clone());
+    let mut interval = IntervalStream::new(time::interval(schedule)).take_until(shutdown.clone());
 
-        while interval.next().await.is_some() {
-            // Mark the start time just before spawning the process as
-            // this seems to be the best approximation of exec duration
-            let now = Instant::now();
+    while interval.next().await.is_some() {
+        // Wait for our task to finish, wrapping it in a timeout
+        let timeout = tokio::time::timeout(
+            schedule,
+            run_command(
+                config.clone(),
+                hostname.clone(),
+                shutdown.clone(),
+                out.clone(),
+            ),
+        );
 
-            // Wait for our task to finish, wrapping it in a timeout
-            let timeout = tokio::time::timeout(
-                schedule,
-                run_command(
-                    config.clone(),
-                    hostname.clone(),
-                    shutdown.clone(),
-                    out.clone(),
-                ),
-            );
+        let timeout_result = timeout.await;
 
-            let timeout_result = timeout.await;
+        match timeout_result {
+            Ok(output) => {
+                if let Err(command_error) = output {
+                    emit!(ExecFailed {
+                        command: config.command_line().as_str(),
+                        error: command_error,
+                    });
+                }
+            }
+            Err(_) => {
+                emit!(ExecTimeout {
+                    command: config.command_line().as_str(),
+                    elapsed_seconds: schedule.as_secs(),
+                });
+            }
+        }
+    }
 
-            match timeout_result {
-                Ok(output) => {
+    debug!("Finished scheduled exec runs.");
+    Ok(())
+}
+
+async fn run_streaming(
+    config: ExecConfig,
+    hostname: Option<String>,
+    respawn_on_exit: bool,
+    respawn_interval_secs: u64,
+    shutdown: ShutdownSignal,
+    out: Pipeline,
+) -> Result<(), ()> {
+    if respawn_on_exit {
+        let duration = Duration::from_secs(respawn_interval_secs);
+
+        // Continue to loop while not shutdown
+        loop {
+            tokio::select! {
+                _ = shutdown.clone() => break, // will break early if a shutdown is started
+                output = run_command(config.clone(), hostname.clone(), shutdown.clone(), out.clone()) => {
+                    // handle command finished
                     if let Err(command_error) = output {
                         emit!(ExecFailed {
                             command: config.command_line().as_str(),
@@ -253,70 +284,30 @@ pub fn run_scheduled(
                         });
                     }
                 }
-                Err(_) => {
-                    emit!(ExecTimeout {
-                        command: config.command_line().as_str(),
-                        elapsed_seconds: now.elapsed().as_secs(),
-                    });
-                }
+            }
+
+            let mut poll_shutdown = shutdown.clone();
+            if futures::poll!(&mut poll_shutdown).is_pending() {
+                warn!("Streaming process ended before shutdown.");
+            }
+
+            tokio::select! {
+                _ = &mut poll_shutdown => break, // will break early if a shutdown is started
+                _ = sleep(duration) => debug!("Restarting streaming process."),
             }
         }
+    } else {
+        let output = run_command(config.clone(), hostname, shutdown, out).await;
 
-        debug!("Finished scheduled exec runs.");
-        Ok(())
-    }))
-}
-
-pub fn run_streaming(
-    config: ExecConfig,
-    hostname: Option<String>,
-    respawn_on_exit: bool,
-    respawn_interval_secs: u64,
-    shutdown: ShutdownSignal,
-    out: Pipeline,
-) -> crate::Result<super::Source> {
-    Ok(Box::pin(async move {
-        if respawn_on_exit {
-            let duration = Duration::from_secs(respawn_interval_secs);
-
-            // Continue to loop while not shutdown
-            loop {
-                tokio::select! {
-                    _ = shutdown.clone() => break, // will break early if a shutdown is started
-                    output = run_command(config.clone(), hostname.clone(), shutdown.clone(), out.clone()) => {
-                        // handle command finished
-                        if let Err(command_error) = output {
-                            emit!(ExecFailed {
-                                command: config.command_line().as_str(),
-                                error: command_error,
-                            });
-                        }
-                    }
-                }
-
-                let mut poll_shutdown = shutdown.clone();
-                if futures::poll!(&mut poll_shutdown).is_pending() {
-                    warn!("Streaming process ended before shutdown.");
-                }
-
-                tokio::select! {
-                    _ = &mut poll_shutdown => break, // will break early if a shutdown is started
-                    _ = sleep(duration) => debug!("Restarting streaming process."),
-                }
-            }
-        } else {
-            let output = run_command(config.clone(), hostname, shutdown, out).await;
-
-            if let Err(command_error) = output {
-                emit!(ExecFailed {
-                    command: config.command_line().as_str(),
-                    error: command_error,
-                });
-            }
+        if let Err(command_error) = output {
+            emit!(ExecFailed {
+                command: config.command_line().as_str(),
+                error: command_error,
+            });
         }
+    }
 
-        Ok(())
-    }))
+    Ok(())
 }
 
 async fn run_command(
@@ -390,17 +381,17 @@ async fn run_command(
 
     let result = match child.try_wait() {
         Ok(Some(exit_status)) => {
-            handle_exit_status(&config, Some(exit_status), elapsed).await;
+            handle_exit_status(&config, exit_status.code(), elapsed);
             Ok(Some(exit_status))
         }
         Ok(None) => {
-            handle_exit_status(&config, None, elapsed).await;
+            handle_exit_status(&config, None, elapsed);
             Ok(None)
         }
         Err(error) => {
             error!(message = "Unable to obtain exit status.", %error);
 
-            handle_exit_status(&config, None, elapsed).await;
+            handle_exit_status(&config, None, elapsed);
             Ok(None)
         }
     };
@@ -411,16 +402,7 @@ async fn run_command(
     result
 }
 
-async fn handle_exit_status(
-    config: &ExecConfig,
-    exit_status: Option<ExitStatus>,
-    exec_duration: Duration,
-) {
-    let exit_status = match exit_status {
-        Some(exit_status) => exit_status.code(),
-        None => None,
-    };
-
+fn handle_exit_status(config: &ExecConfig, exit_status: Option<i32>, exec_duration: Duration) {
     emit!(ExecCommandExecuted {
         command: config.command_line().as_str(),
         exit_status,
@@ -444,9 +426,18 @@ fn build_command(config: &ExecConfig) -> Command {
         command.current_dir(current_dir);
     }
 
-    // Pipe our stdout/stderr to the process to we inherit it's output
+    // Pipe our stdout to the process
     command.stdout(std::process::Stdio::piped());
-    command.stderr(std::process::Stdio::piped());
+
+    // Pipe stderr to the process if needed
+    if config.include_stderr {
+        command.stderr(std::process::Stdio::piped());
+    } else {
+        command.stderr(std::process::Stdio::null());
+    }
+
+    // Stdin is not needed
+    command.stdin(std::process::Stdio::null());
 
     command
 }
