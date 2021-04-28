@@ -6,7 +6,10 @@ authors: ["binarylogic"]
 pr_numbers: [2126]
 release: "0.9.0"
 hide_on_release_notes: false
-tags: ["type: enhancement", "domain: sources", "source: vector"]
+tags:
+  type: enhancement
+  domains: ["sources"]
+  sources: ["vector"]
 ---
 
 v2 of our [`lua` transform][docs.transforms.lua] has been released! This is a

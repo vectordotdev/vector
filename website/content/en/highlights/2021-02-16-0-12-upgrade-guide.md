@@ -6,7 +6,8 @@ authors: ["binarylogic"]
 pr_numbers: [5281, 5978]
 release: "0.12.0"
 hide_on_release_notes: false
-tags: ["type: breaking change"]
+tags:
+  type: breaking change
 ---
 
 0.12 includes minimal breaking changes but significant deprecations. This guide will upgrade you quickly and

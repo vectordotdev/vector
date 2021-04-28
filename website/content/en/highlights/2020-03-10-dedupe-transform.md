@@ -6,7 +6,10 @@ authors: ["binarylogic"]
 pr_numbers: [1848]
 release: "0.9.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: sources", "source: vector"]
+tags:
+  type: new feature
+  domains: ["sources"]
+  sources: ["vector"]
 ---
 
 For certain use cases, log deduplication can be a useful tool. Not only does

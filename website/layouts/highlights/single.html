@@ -3,87 +3,9 @@
 {{ end }}
 
 {{ define "main" }}
-{{ $desc := .Description }}
-{{ $release := .Params.release }}
-{{ $allAuthors := site.Data.docs.authors }}
-<section class="section">
-  <div class="container">
-    <div class="columns is-variable is-8">
-      <div class="column is-one-quarter">
-        <section class="is-sticky with-larger-margin">
-          <p class="mb-3">
-            <span class="icon has-text-purple">
-              <i class="fas fa-arrow-left"></i>
-            </span>
-
-            <a href="{{ .CurrentSection.RelPermalink }}">
-              {{ .CurrentSection.Params.short }}
-            </a>
-          </p>
-
-          <p class="title is-size-2 is-size-3-mobile has-text-weight-light{{ if $desc }} is-spaced{{ end }}">
-            {{ .Title | markdownify }}
-          </p>
-
-          {{ with $desc }}
-          <p class="subtitle has-text-grey">
-            {{ . | markdownify }}
-          </p>
-          {{ end }}
-
-          {{ with .Params.authors }}
-          <div class="mt-5">
-            {{ range . }}
-            {{ $author := index (where $allAuthors "handle" "==" .) 0 }}
-            {{ $authorImg := printf "https://github.com/%s.png" $author.handle }}
-            {{ $authorUrl := printf "https://github.com/%s" $author.handle }}
-            <div class="media">
-              <div class="media-left">
-                <figure class="image is-48x48">
-                  <img class="is-rounded" src="{{ $authorImg }}" alt="GitHub avatar for author {{ $author.name }}">
-                </figure>
-              </div>
-              <div class="media-content">
-                <a href="{{ $authorUrl }}" target="_blank">
-                  {{ $author.name }}
-                </a>
-              </div>
-            </div>
-            {{ end }}
-          </div>
-          {{ end }}
-        </section>
-      </div>
-
-      <div class="column is-three-quarters my-6">
-        <div class="content with-limited-chars">
-          {{ .Content }}
-
-          <div class="card mt-6">
-            <div class="card-content">
-              <div class="columns">
-                <div class="column is-1">
-                  <span class="icon is-medium has-text-primary">
-                    <i class="fas fa-md fa-info-circle"></i>
-                  </span>
-                </div>
-
-                <div class="column is-11">
-                  <p>
-                    This change was made available in version <strong>{{ $release }}</strong>. You can get this change by <a href="https://vector.dev/releases/latest/download/">downloading the latest stable release</a>.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+<div class="relative max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-6 lg:px-8">
+  <div class="my-16">
+    {{ partial "hero.html" . }}
   </div>
-</section>
-{{ end }}
-
-{{ define "below" }}
-{{ partial "docs/pagination.html" . }}
-{{ partial "footer.html" . }}
+</div>
 {{ end }}

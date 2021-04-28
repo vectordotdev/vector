@@ -5,49 +5,35 @@ Components - Sources, Transforms, and Sinks | {{ site.Title }}
 {{ define "main" }}
 {{ $criteria := .Params.criteria }}
 {{ $types := slice "Sources" "Transforms" "Sinks" }}
-<div class="relative max-w-3xl mx-auto sm:px-6 lg:max-w-7xl lg:px-8 mt-8 pb-24">
-  <div class="pb-16 sm:pb-24 px-6 md:px-0">
-    <div class="mb-4 md:mb-6">
-      {{ partial "breadcrumb.html" . }}
-    </div>
-
-    <h2 class="dark:text-gray-50 font-secondary font-extrabold text-4xl md:text-5xl tracking-tight sm:tracking-tighter leading-tight">
-      {{ .Title }}
-    </h2>
-
-    {{ with .Description }}
-    <p class="dark:text-gray-200 mt-5 text-xl text-gray-500 prose dark:prose-dark">
-      {{ . | markdownify }}
-    </p>
-    {{ end }}
+<div class="relative max-w-3xl mx-auto px-6 lg:px-8 lg:max-w-7xl lg:px-8 mt-8 pb-24">
+  <div class="my-16">
+    {{ partial "hero.html" . }}
   </div>
 
-  <div class="px-6 md:px-0">
-    <div class="flex flex-col space-y-12">
-      {{ range $types }}
-      {{ $components := where site.RegularPages ".CurrentSection.Params.short" . }}
-      {{ $num := len $components }}
-      {{ $link := printf "docs/reference/configuration/%s" (. | lower) | relURL }}
+  <div class="flex flex-col space-y-12">
+    {{ range $types }}
+    {{ $components := where site.RegularPages ".CurrentSection.Params.short" . }}
+    {{ $num := len $components }}
+    {{ $link := printf "docs/reference/configuration/%s" (. | lower) | relURL }}
 
-      <div>
-        <p class="text-2xl md:text-3xl mb-4 dark:text-gray-200">
-          <span>
-            {{ $num }}
-          </span>
+    <div>
+      <p class="flex items-center justify-between space-x-2 text-2xl md:text-3xl mb-4 dark:text-gray-200">
+        <a href="{{ $link }}" class="font-bold hover:text-secondary dark:hover:text-primary">
+          {{ . }}
+        </a>
 
-          <a href="{{ $link }}" class="font-bold hover:text-secondary dark:hover:text-primary">
-            {{ . }}
-          </a>
-        </p>
+        <span class="text-sm text-gray-500">
+          count:&nbsp;{{ $num }}
+        </span>
+      </p>
 
-        <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {{ range $components }}
-          {{ .Render "component-card" }}
-          {{ end }}
-        </div>
+      <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {{ range $components }}
+        {{ .Render "component-card" }}
+        {{ end }}
       </div>
-      {{ end }}
     </div>
+    {{ end }}
   </div>
 </div>
 {{ end }}

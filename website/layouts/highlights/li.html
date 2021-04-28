@@ -1,0 +1,95 @@
+{{ $title := .Title | markdownify }}
+{{ $date := .Date | dateFormat "January 2, 2006" }}
+{{ $tags := .Params.tags }}
+<div class="flex flex-col justify-between border rounded-md p-6 shadow dark:border-gray-700">
+  <a href="{{ .RelPermalink }}" class="text-lg leading-tight font-semibold tracking-tight text-dark dark:text-gray-300 hover:text-secondary dark:hover:text-primary">
+    {{ $title }}
+  </a>
+
+  <p class="my-2 text-sm text-dark dark:text-gray-200 font-light">
+    <time datetime="{{ $date }}">
+      {{ $date }}
+    </time>
+  </p>
+
+  {{ with .Description }}
+  <p class="tracking-tight text-gray-500 dark:text-gray-400">
+    {{ . | markdownify }}
+  </p>
+  {{ end }}
+
+  <div>
+    <div class="my-4 flex items-center">
+      <div class="flex-shrink-0">
+        <div class="flex -space-x-1 relative z-0 overflow-hidden">
+          {{ range .Params.authors }}
+          {{ $img := printf "https://github.com/%s.png" . }}
+          {{ $name := (index (where site.Data.docs.authors ".handle" "eq" .) 0).name }}
+          <img class="relative z-30 inline-block h-8 w-8 rounded-full ring-1 ring-white dark:ring-dark" src="{{ $img }}" alt="Author photo for {{ $name }}">
+          {{ end }}
+        </div>
+      </div>
+
+
+      <div class="ml-4 flex flex-col space-y-1">
+        {{ range .Params.authors }}
+        {{ $name := (index (where site.Data.docs.authors ".handle" "eq" .) 0).name }}
+        {{ $link := printf "https://github.com/%s" . }}
+        <a href="{{ $link }}" class="text-md font-bold tracking-tight text-gray-700 hover:text-secondary dark:text-gray-200 dark:hover:text-primary">
+          {{ $name }}
+        </a>
+        {{ end }}
+      </div>
+    </div>
+
+    <div class="block space-y-1.5">
+      {{ with $tags.type }}
+      {{ template "highlight-badge" (dict "type" . "bg" "blue-200" "text" "blue-800" "bg_dark" "blue-700" "text_dark" "blue-100") }}
+      {{ end }}
+
+      {{ range $tags.domains }}
+      {{ template "highlight-badge" (dict "domain" . "bg" "rose-200" "text" "rose-800" "bg_dark" "rose-700" "text_dark" "rose-100") }}
+      {{ end }}
+
+      {{ range $tags.sources }}
+      {{ template "highlight-badge" (dict "source" . "bg" "violet-200" "text" "violet-800" "bg_dark" "violet-700" "text_dark" "violet-100") }}
+      {{ end }}
+
+      {{ range $tags.transforms }}
+      {{ template "highlight-badge" (dict "transform" . "bg" "violet-200" "text" "violet-800" "bg_dark" "violet-700" "text_dark" "violet-100") }}
+      {{ end }}
+
+      {{ range $tags.sinks }}
+      {{ template "highlight-badge" (dict "sink" . "bg" "violet-200" "text" "violet-800" "bg_dark" "violet-700" "text_dark" "violet-100") }}
+      {{ end }}
+    </div>
+  </div>
+</div>
+
+{{ define "highlight-badge" }}
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-{{ .bg }} text-{{ .text }} dark:bg-{{ .bg_dark }} dark:text-{{ .text_dark }}">
+  {{ with .type }}
+  type:&nbsp;<strong>{{ . }}</strong>
+  {{ end }}
+
+  {{ with .domain }}
+  domain:&nbsp;<strong>{{ . }}</strong>
+  {{ end }}
+
+  {{ with .source }}
+  source:&nbsp;<strong>{{ . }}</strong>
+  {{ end }}
+
+  {{ with .transform }}
+  transform:&nbsp;<strong>{{ . }}</strong>
+  {{ end }}
+
+  {{ with .sink }}
+  sink:&nbsp;<strong>{{ . }}</strong>
+  {{ end }}
+
+  {{ with .word }}
+  {{ . }}
+  {{ end }}
+</span>
+{{ end }}
