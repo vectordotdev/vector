@@ -168,9 +168,9 @@ mod tests {
     use super::*;
     use crate::{
         config::SinkConfig,
+        event::Event,
         sinks::util::{encoding::EncodingConfiguration, test::build_test_server, Concurrency},
         test_util::next_addr,
-        Event,
     };
     use bytes::Buf;
     use futures::{stream, StreamExt};

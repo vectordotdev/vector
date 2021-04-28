@@ -831,6 +831,7 @@ mod integration_tests {
     use crate::{
         config::{SinkConfig, SinkContext},
         event::metric::{Metric, MetricKind, MetricValue},
+        event::Event,
         http::HttpClient,
         sinks::influxdb::{
             metrics::{default_summary_quantiles, InfluxDbConfig, InfluxDbSvc},
@@ -841,7 +842,6 @@ mod integration_tests {
             InfluxDb1Settings, InfluxDb2Settings,
         },
         tls::{self, TlsOptions},
-        Event,
     };
     use chrono::{SecondsFormat, Utc};
     use futures::stream;

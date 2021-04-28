@@ -5,8 +5,8 @@ use super::{
 };
 use crate::{
     buffers::Acker,
+    event::Event,
     http::{HttpClient, HttpError},
-    Event,
 };
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};

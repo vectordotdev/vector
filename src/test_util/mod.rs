@@ -1,7 +1,8 @@
 use crate::{
     config::{Config, ConfigDiff, GenerateConfig},
+    event::Event,
     topology::{self, RunningTopology},
-    trace, Event,
+    trace,
 };
 use flate2::read::MultiGzDecoder;
 use futures::{

@@ -1,7 +1,6 @@
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
-    event::Value,
-    Event,
+    event::{Event, Value},
 };
 use cidr_utils::cidr::IpCidr;
 use indexmap::IndexMap;
@@ -583,7 +582,7 @@ impl Condition for CheckFields {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Event;
+    use crate::event::Event;
 
     #[test]
     fn generate_config() {

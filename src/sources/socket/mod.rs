@@ -162,13 +162,14 @@ mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
         config::{log_schema, GlobalOptions, SinkContext, SourceConfig, SourceContext},
+        event::Event,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSinkConfig,
         test_util::{
             collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
         tls::{self, TlsConfig, TlsOptions},
-        Event, Pipeline,
+        Pipeline,
     };
     use bytes::Bytes;
     use futures::{stream, StreamExt};

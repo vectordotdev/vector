@@ -1,4 +1,4 @@
-use crate::Value;
+use crate::event::Value;
 use async_graphql::scalar;
 
 // For raw JSON data.

@@ -2,7 +2,7 @@ use super::util::MultilineConfig;
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::merge_state::LogEventMergeState,
-    event::{self, Event, LogEvent, Value},
+    event::{self, Event, LogEvent, PathComponent, PathIter, Value},
     internal_events::{
         DockerLogsCommunicationError, DockerLogsContainerEventReceived,
         DockerLogsContainerMetadataFetchFailed, DockerLogsContainerUnwatch,
@@ -885,8 +885,13 @@ impl ContainerLogInfo {
             log_event.insert(CONTAINER, self.id.0.clone());
 
             // Labels.
-            for (key, value) in self.metadata.labels.iter() {
-                log_event.insert(key.clone(), value.clone());
+            if !self.metadata.labels.is_empty() {
+                let prefix_path = PathIter::new("label").collect::<Vec<_>>();
+                for (key, value) in self.metadata.labels.iter() {
+                    let mut path = prefix_path.clone();
+                    path.push(PathComponent::Key(key.clone()));
+                    log_event.insert_path(path, value.clone());
+                }
             }
 
             // Container name.
@@ -961,7 +966,7 @@ impl ContainerLogInfo {
 
 struct ContainerMetadata {
     /// label.key -> String
-    labels: Vec<(String, Value)>,
+    labels: HashMap<String, String>,
     /// name -> String
     name: Value,
     /// name
@@ -978,17 +983,7 @@ impl ContainerMetadata {
         let name = details.name.unwrap();
         let created = details.created.unwrap();
 
-        let labels = config
-            .labels
-            .as_ref()
-            .map(|map| {
-                map.iter()
-                    .map(|(key, value)| {
-                        (("label.".to_owned() + key), Value::from(value.to_owned()))
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
+        let labels = config.labels.unwrap_or_default();
 
         Ok(ContainerMetadata {
             labels,
@@ -1654,6 +1649,41 @@ mod integration_tests {
         container_remove(&id, &docker).await;
 
         assert!(is_empty(exclude_out));
+    }
+
+    #[tokio::test]
+    async fn flat_labels() {
+        trace_init();
+
+        let message = "18";
+        let name = "vector_test_flat_labels";
+        let label = "vector.test.label.flat.labels";
+
+        let docker = docker(None, None).unwrap();
+        let id = running_container(name, Some(label), message, &docker).await;
+        let out = source_with(&[name], None);
+
+        let events = collect_n(out, 1).await;
+        let _ = container_kill(&id, &docker).await;
+        container_remove(&id, &docker).await;
+
+        let log = events[0].as_log();
+        assert_eq!(log[log_schema().message_key()], message.into());
+        assert_eq!(log[&*super::CONTAINER], id.into());
+        assert!(log.get(&*super::CREATED_AT).is_some());
+        assert_eq!(log[&*super::IMAGE], "busybox".into());
+        assert!(log
+            .get("label")
+            .unwrap()
+            .as_map()
+            .unwrap()
+            .get(label)
+            .is_some());
+        assert_eq!(events[0].as_log()[&super::NAME], name.into());
+        assert_eq!(
+            events[0].as_log()[log_schema().source_type_key()],
+            "docker".into()
+        );
     }
 
     #[tokio::test]

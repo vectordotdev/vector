@@ -2,6 +2,7 @@ use crate::{
     buffers::Acker,
     config::SinkContext,
     dns,
+    event::Event,
     internal_events::{
         ConnectionOpen, OpenGauge, SocketMode, TcpSocketConnectionEstablished,
         TcpSocketConnectionFailed, TcpSocketConnectionShutdown, TcpSocketError,
@@ -17,7 +18,6 @@ use crate::{
     },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
-    Event,
 };
 use async_trait::async_trait;
 use bytes::Bytes;

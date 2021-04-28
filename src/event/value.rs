@@ -271,6 +271,13 @@ impl Value {
         self.as_bytes()
     }
 
+    pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
+        match &self {
+            Value::Map(map) => Some(map),
+            _ => None,
+        }
+    }
+
     pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
         match &self {
             Value::Timestamp(ts) => Some(ts),

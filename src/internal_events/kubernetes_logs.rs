@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::Event;
+use crate::event::Event;
 use metrics::counter;
 
 #[derive(Debug)]

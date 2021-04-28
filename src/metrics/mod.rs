@@ -5,11 +5,11 @@ mod registry;
 #[cfg(test)]
 mod tests;
 
+use crate::event::{Event, Metric};
 pub use crate::metrics::handle::{Counter, Handle};
 use crate::metrics::label_filter::VectorLabelFilter;
 use crate::metrics::recorder::VectorRecorder;
 use crate::metrics::registry::VectorRegistry;
-use crate::{event::Metric, Event};
 use metrics::{Key, KeyData, SharedString};
 use metrics_tracing_context::TracingContextLayer;
 use metrics_util::layers::Layer;

@@ -527,7 +527,7 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{sinks::util::retries::RetryAction, Event};
+    use crate::{event::Event, sinks::util::retries::RetryAction};
     use http::{Response, StatusCode};
     use pretty_assertions::assert_eq;
     use serde_json::json;
@@ -706,10 +706,10 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
+        event::Event,
         http::HttpClient,
         test_util::{random_events_with_stream, random_string, trace_init},
         tls::{self, TlsOptions},
-        Event,
     };
     use futures::{stream, StreamExt};
     use http::{Request, StatusCode};

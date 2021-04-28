@@ -1,7 +1,6 @@
 use crate::{
     config::log_schema,
-    event::{Metric, Value},
-    Event,
+    event::{Event, Metric, Value},
 };
 use bytes::Bytes;
 use chrono::{

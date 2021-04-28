@@ -1,7 +1,7 @@
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue, Sample},
+    event::Event,
     sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
-    Event,
 };
 use std::{
     cmp::Ordering,

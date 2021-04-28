@@ -12,6 +12,7 @@ parser = { package = "vrl-parser", path = "../parser" }
 bitflags = "1"
 bytes = "1.0.0"
 chrono = "0.4"
+dyn-clone = "1.0.4"
 lalrpop-util = "0.19"
 ordered-float = "2"
 paste = "1"
@@ -19,10 +20,11 @@ regex = "1"
 serde = "1"
 thiserror = "1"
 tracing = "0.1"
-dyn-clone = "1.0.4"
 
 [dev-dependencies]
 criterion = "0.3"
+indoc = "1"
+shared = { path = "../../shared", default-features = false, features = ["btreemap"] }
 
 [[bench]]
 name = "path"

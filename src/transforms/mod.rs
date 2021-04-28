@@ -1,4 +1,4 @@
-use crate::Event;
+use crate::event::Event;
 use futures::Stream;
 use snafu::Snafu;
 use std::pin::Pin;

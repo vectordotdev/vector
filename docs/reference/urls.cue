@@ -104,6 +104,7 @@ urls: {
 	cue:                                                      "https://cuelang.org/"
 	dag:                                                      "\(wikipedia)/wiki/Directed_acyclic_graph"
 	datadog:                                                  "https://www.datadoghq.com"
+	datadog_agent:                                            "https://github.com/DataDog/datadog-agent"
 	datadog_distribution:                                     "\(datadog_docs)/developers/metrics/types/?tab=distribution#definition"
 	datadog_docs:                                             "https://docs.datadoghq.com"
 	datadog_logs:                                             "\(datadog_docs)/logs/"

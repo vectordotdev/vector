@@ -297,10 +297,10 @@ async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::Event;
     use crate::sinks::util::http::HttpSink;
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
-    use crate::Event;
     use futures::StreamExt;
 
     #[test]
@@ -423,8 +423,8 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::SinkConfig, sinks::util::test::load_sink, template::Template,
-        test_util::random_lines, Event,
+        config::SinkConfig, event::Event, sinks::util::test::load_sink, template::Template,
+        test_util::random_lines,
     };
     use bytes::Bytes;
     use chrono::{DateTime, Duration, Utc};
