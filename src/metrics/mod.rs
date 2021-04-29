@@ -144,7 +144,7 @@ macro_rules! update_counter {
         let delta = match $value.checked_sub(*previous_value) {
             Some(delta) => delta,
             None => {
-                warn!(message = "update_counter! has been called with a series of non-monotonic values.", label = $label);
+                warn!(message = "Voilation of update_counter! invariant, called with a series of non-monotonic values.", label = $label);
                 0
             }
         };
