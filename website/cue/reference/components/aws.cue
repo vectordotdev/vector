@@ -134,20 +134,20 @@ components: _aws: {
 			}
 		}
 
-		AWS_SHARED_CREDENTIALS_FILE: {
-			description: "Specifies the location of the file that the AWS CLI uses to store access keys."
-			type: string: {
-				default: "~/.aws/credentials"
-				syntax:  "literal"
-			}
-		}
-
 		AWS_SESSION_TOKEN: {
 			description: "The AWS session token. Used for AWS authentication when communicating with AWS services."
 			type: string: {
 				default: null
 				examples: ["AQoEXAMPLEH4aoAH0gNCAPy...truncated...zrkuWJOgQs8IZZaIv2BXIa2R4Olgk"]
 				syntax: "literal"
+			}
+		}
+
+		AWS_SHARED_CREDENTIALS_FILE: {
+			description: "Specifies the location of the file that the AWS CLI uses to store access keys."
+			type: string: {
+				default: "~/.aws/credentials"
+				syntax:  "literal"
 			}
 		}
 	}

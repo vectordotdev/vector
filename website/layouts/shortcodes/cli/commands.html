@@ -1,7 +1,32 @@
-{{ $commands := site.Data.docs.cli.commands }}
+{{ $cli := site.Data.docs.cli }}
 
-<div class="no-prose flex flex-col border rounded-md divide-y">
-  {{ range $k, $v := $commands }}
+<div class="no-prose flex flex-col border dark:border-gray-700 rounded-md divide-y dark:divide-gray-700">
+  <div class="py-4 px-6">
+    <span class="flex justify-between items-center">
+      <h3 id="{{ $cli.name }}" class="font-mono">
+        {{ $cli.name }}
+      </h3>
+
+      {{ partial "badge.html" (dict "word" "root" "color" "blue") }}
+    </span>
+
+    <div class="mt-2">
+      <p>
+        The root command (no subcommand) starts Vector.
+      </p>
+
+      <div class="mt-3">
+        {{ template "table" (dict "title" "Flags" "items" $cli.flags) }}
+      </div>
+
+      <div class="mt-3">
+        {{ template "table" (dict "title" "Options" "items" $cli.options) }}
+      </div>
+    </div>
+  </div>
+
+
+  {{ range $k, $v := $cli.commands }}
   <div class="py-4 px-6">
     <span>
       <h3 id="{{ $k }}" class="font-mono">
@@ -14,111 +39,56 @@
       {{ . | markdownify }}
     </div>
     {{ end }}
-  </div>
-  {{ end }}
-</div>
-
-
-
-<div class="cli">
-  {{ range $k, $v := $commands }}
-  <div class="command">
-    <h3 class="is-family-monospace has-text-weight-bold has-text-grey" id="{{ $k }}">
-      {{ $k }}
-    </h3>
-
-    <p>
-      {{ $v.description | markdownify }}
-    </p>
 
     {{ with $v.flags }}
-    <h4 class="has-text-weight-light" id="{{ $k }}-flags">
-      Flags
-    </h4>
-
-    <table>
-      <thead>
-        <tr>
-          <th>
-            Flag (long)
-          </th>
-          <th>
-            Flag (short)
-          </th>
-          <th>
-            Description
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {{ range . }}
-        <tr>
-          <td>
-            <code class="no-break">{{ .flag }}</code>
-          </td>
-          <td>
-            {{ with .short }}
-            <code class="no-break">{{ . }}</code>
-            {{ end }}
-          </td>
-          <td>
-            {{ .description | markdownify }}
-          </td>
-        </tr>
-        {{ end }}
-      </tbody>
-    </table>
+    <div class="mt-2">
+      {{ template "table" (dict "title" "Flags" "items" .) }}
+    </div>
     {{ end }}
 
     {{ with $v.options }}
-    <h4 class="has-text-weight-light" id="{{ $k }}-options">
-      Options
-    </h4>
-
-    <table>
-      <thead>
-        <tr>
-          <th>
-            Option
-          </th>
-          <th>
-            Description
-          </th>
-          <th>
-            Required?
-          </th>
-          <th>
-            Default
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {{ range . }}
-        {{ . }}
-        <tr>
-          <td>
-            <code class="no-break">
-              {{ .option }} <{{ .type }}>
-            </code>
-          </td>
-          <td>
-            {{ .description | markdownify }}
-          </td>
-          <td>
-            {{ cond .required "yes" "no" }}
-          </td>
-          <td>
-            {{ with .default }}
-            <code>{{ . }}</code>
-            {{ else }}
-            none
-            {{ end }}
-          </td>
-        </tr>
-        {{ end }}
-      </tbody>
-    </table>
+    <div class="mt-2">
+      {{ template "table" (dict "title" "Options" "items" .) }}
+    </div>
     {{ end }}
   </div>
   {{ end }}
 </div>
+
+{{ define "table" }}
+<div class="grid grid-cols-5 border-b-2 dark:border-gray-700 pb-1 font-semibold">
+  <div class="col-span-2">
+    {{ .title }}
+  </div>
+  <div class="col-span-3">
+    Description
+  </div>
+</div>
+
+<div class="pt-2">
+  {{ range .items }}
+  <div class="grid grid-cols-5">
+    <div class="col-span-2">
+      <span>
+        {{ $comma := and .flag .short }}
+        {{ with .flag }}
+        <span class="text-xs font-mono font-semibold text-primary-dark dark:text-primary">
+          {{- . -}}
+        </span>
+        {{- end }}
+        {{ if $comma }}, {{ end }}
+        {{ with .short }}
+        <span class="text-xs font-mono font-semibold text-primary-dark dark:text-primary">
+          {{ . }}
+        </span>
+        {{ end }}
+      </span>
+    </div>
+
+    <div class="col-span-3 prose-sm dark:prose-dark">
+      {{ .description | markdownify }}
+    </div>
+  </div>
+  {{ end }}
+</div>
+{{ end }}

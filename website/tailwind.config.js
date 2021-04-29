@@ -67,7 +67,7 @@ module.exports = {
             'p, h1, h2, h3, h4, h5, h6': {
               color: theme('colors.gray.100')
             },
-            'a code, p code, td code': {
+            'code, a code, p code, td code': {
               color: theme('colors.primary'),
             },
             'a': {

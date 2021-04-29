@@ -100,7 +100,7 @@ cli: {
 		}
 		"watch-config": {
 			_short:      "w"
-			description: "Watch for changes in the configuration file, and reload accordingly"
+			description: "Watch for changes in the configuration file and reload accordingly"
 			env_var:     "VECTOR_WATCH_CONFIG"
 		}
 	}

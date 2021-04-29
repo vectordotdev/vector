@@ -278,14 +278,14 @@
 
   {{/* Source/transform/sink environment variables */}}
   {{ with .env_vars }}
-  <div class="no-prose flex flex-col divide-y divide-gray-100 dark:divide-gray-600">
+  <div class="no-prose flex flex-col divide-y dark:divide-gray-700">
     {{ range $k, $v := . }}
     <div class="py-4 px-6">
       <span class="flex justify-between">
         <span>
-          <code>
-            {{- $k -}}
-          </code>
+          <h3 id="{{ $k }}" class="font-mono">
+            {{ $k }}
+          </h3>
         </span>
 
         <span>
@@ -308,6 +308,10 @@
         </span>
       </span>
 
+      <div class="my-4 prose prose-sm dark:prose-dark">
+        {{ $v.description | markdownify }}
+      </div>
+
       {{ range $k, $v := $v.type }}
       {{ with $v.default }}
       <p>
@@ -316,15 +320,11 @@
       {{ end }}
       {{ end }}
 
-      <div>
-        {{ $v.description | markdownify }}
-      </div>
-
       {{ range $k, $v := $v.type }}
       {{ with $v.examples }}
-      <div x-data="{ open: true }" class="mt-2 border rounded py-2 px-3">
+      <div x-data="{ open: false }" class="border rounded py-2 px-3">
         <span class="flex justify-between items-center">
-          <span>
+          <span class="text-sm">
             Examples
           </span>
 
