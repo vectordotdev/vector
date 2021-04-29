@@ -210,24 +210,12 @@ impl From<BTreeMap<String, Value>> for LogEvent {
     }
 }
 
-impl From<LogEvent> for BTreeMap<String, Value> {
-    fn from(event: LogEvent) -> BTreeMap<String, Value> {
-        event.fields
-    }
-}
-
 impl From<HashMap<String, Value>> for LogEvent {
     fn from(map: HashMap<String, Value>) -> Self {
         LogEvent {
             fields: map.into_iter().collect(),
             metadata: EventMetadata::default(),
         }
-    }
-}
-
-impl From<LogEvent> for HashMap<String, Value> {
-    fn from(event: LogEvent) -> HashMap<String, Value> {
-        event.fields.into_iter().collect()
     }
 }
 
