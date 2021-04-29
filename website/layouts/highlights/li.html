@@ -6,7 +6,7 @@
     {{ $title }}
   </a>
 
-  <p class="my-2 text-sm text-dark dark:text-gray-200 font-light">
+  <p class="mt-3 mb-4 text-sm text-dark dark:text-gray-200 font-light">
     <time datetime="{{ $date }}">
       {{ $date }}
     </time>
@@ -21,7 +21,7 @@
   <div>
     <div class="my-4 flex items-center">
       <div class="flex-shrink-0">
-        <div class="flex -space-x-1 relative z-0 overflow-hidden">
+        <div class="flex space-x-1 relative z-0 overflow-hidden">
           {{ range .Params.authors }}
           {{ $img := printf "https://github.com/%s.png" . }}
           {{ $name := (index (where site.Data.docs.authors ".handle" "eq" .) 0).name }}
@@ -48,7 +48,7 @@
       {{ end }}
 
       {{ range $tags.domains }}
-      {{ partial "badge.html" (dict "prefix" "domain" "word" . "color" "rose") }}
+      {{ partial "badge.html" (dict "prefix" "domain" "word" . "color" "indigo") }}
       {{ end }}
 
       {{ range $tags.sources }}

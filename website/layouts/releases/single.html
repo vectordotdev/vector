@@ -6,7 +6,7 @@
 {{ $version := .File.BaseFileName }}
 {{ $release := index site.Data.docs.releases $version }}
 {{ $highlights := where (where site.RegularPages "Section" "highlights") ".Params.release" "eq" $version }}
-<div class="max-w-3xl md:max-w-4xl px-6 lg:px-8 mx-auto">
+<div class="max-w-3xl md:max-w-5xl px-6 lg:px-8 mx-auto">
   <div class="my-16">
     {{ partial "hero.html" . }}
 
@@ -26,6 +26,20 @@
       {{ with $release.description }}
       <div class="mt-8 prose dark:prose-dark">
         {{ . | markdownify }}
+      </div>
+      {{ end }}
+
+      {{ with $highlights }}
+      <div class="mt-8">
+        <h3 id="highlights" class="text-2xl font-semibold text-dark dark:text-gray-300">
+          Highlights
+        </h3>
+
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {{ range . }}
+          {{ .Render "li" }}
+          {{ end }}
+        </div>
       </div>
       {{ end }}
     </div>
