@@ -85,25 +85,20 @@ pub struct Lookup<'a> {
 impl<'a> Display for Lookup<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let mut peeker = self.segments.iter().peekable();
-        let mut next = peeker.next();
-        let mut maybe_next = peeker.peek();
-        while let Some(segment) = next {
+        while let Some(segment) = peeker.next() {
+            let maybe_next = peeker
+                .peek()
+                .map(|next| next.is_field() || next.is_coalesce())
+                .unwrap_or(false);
+
             match (segment, maybe_next) {
-                (Segment::Field(_), Some(next)) if next.is_field() || next.is_coalesce() => {
-                    write!(f, r#"{}."#, segment)?
-                }
-                (Segment::Field(_), _) => write!(f, "{}", segment)?,
-                (Segment::Index(_), Some(next)) if next.is_field() || next.is_coalesce() => {
-                    write!(f, r#"[{}]."#, segment)?
-                }
-                (Segment::Index(_), _) => write!(f, "[{}]", segment)?,
-                (Segment::Coalesce(_), Some(next)) if next.is_field() || next.is_coalesce() => {
-                    write!(f, r#"{}."#, segment)?
-                }
-                (Segment::Coalesce(_), _) => write!(f, "{}", segment)?,
+                (Segment::Field(_), true) => write!(f, r#"{}."#, segment)?,
+                (Segment::Field(_), false) => write!(f, "{}", segment)?,
+                (Segment::Index(_), true) => write!(f, r#"[{}]."#, segment)?,
+                (Segment::Index(_), false) => write!(f, "[{}]", segment)?,
+                (Segment::Coalesce(_), true) => write!(f, r#"{}."#, segment)?,
+                (Segment::Coalesce(_), false) => write!(f, "{}", segment)?,
             }
-            next = peeker.next();
-            maybe_next = peeker.peek();
         }
         Ok(())
     }

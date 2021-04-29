@@ -45,7 +45,9 @@ impl LogEvent {
 
     pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
         (
-            self.fields.into_map().expect("fields must be a map"),
+            self.fields
+                .into_map()
+                .unwrap_or_else(|| unreachable!("fields must be a map")),
             self.metadata,
         )
     }
@@ -326,17 +328,6 @@ impl<K: AsRef<str>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     }
 }
 
-/// Converts event into an iterator over top-level key/value pairs.
-impl IntoIterator for LogEvent {
-    type Item = (String, Value);
-    type IntoIter = std::collections::btree_map::IntoIter<String, Value>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        let fields: BTreeMap<_, _> = self.into();
-        fields.into_iter()
-    }
-}
-
 impl Serialize for LogEvent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -362,7 +353,8 @@ impl vrl::Target for LogEvent {
             Ok(Some({
                 let mut value = LogEvent::default();
                 std::mem::swap(self, &mut value);
-                value
+                let fields: BTreeMap<_, _> = value.into();
+                fields
                     .into_iter()
                     .map(|(key, value)| (key, value.into()))
                     .collect::<BTreeMap<_, _>>()

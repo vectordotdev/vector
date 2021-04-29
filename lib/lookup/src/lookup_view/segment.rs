@@ -32,7 +32,7 @@ impl<'a> From<&'a str> for Field<'a> {
     fn from(mut name: &'a str) -> Self {
         let mut requires_quoting = false;
 
-        if name.starts_with('\"') {
+        if name.starts_with('\"') && name.ends_with('\"') {
             let len = name.len();
             name = &name[1..len - 1];
             requires_quoting = true;

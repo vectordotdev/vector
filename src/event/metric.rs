@@ -751,13 +751,18 @@ enum MetricPathError<'a> {
     InvalidPath { path: &'a str, expected: &'a str },
 }
 
+/// Metrics aren't interested in paths that have a length longer than 3
+/// The longest path is 2, and we need to check that a third segment doesn't exist as we don't want
+/// fields such as `.tags.host.thing`.
+const MAX_METRIC_PATH_DEPTH: usize = 3;
+
 impl Target for Metric {
     fn insert(&mut self, path: &LookupBuf, value: vrl::Value) -> Result<(), String> {
         if path.is_root() {
             return Err(MetricPathError::SetPathError.to_string());
         }
 
-        if let Some(paths) = path.to_alternative_components(3).get(0) {
+        if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0) {
             match paths.as_slice() {
                 ["tags"] => {
                     let value = value.try_object().map_err(|e| e.to_string())?;
@@ -841,7 +846,7 @@ impl Target for Metric {
             return Ok(Some(map.into()));
         }
 
-        for paths in path.to_alternative_components(3) {
+        for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
             match paths.as_slice() {
                 ["name"] => return Ok(Some(self.name().to_string().into())),
                 ["namespace"] => match &self.series.name.namespace {
@@ -884,7 +889,7 @@ impl Target for Metric {
             return Err(MetricPathError::SetPathError.to_string());
         }
 
-        if let Some(paths) = path.to_alternative_components(3).get(0) {
+        if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0) {
             match paths.as_slice() {
                 ["namespace"] => return Ok(self.series.name.namespace.take().map(Into::into)),
                 ["timestamp"] => return Ok(self.data.timestamp.take().map(Into::into)),

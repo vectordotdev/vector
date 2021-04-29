@@ -31,7 +31,7 @@ impl From<String> for FieldBuf {
     fn from(mut name: String) -> Self {
         let mut requires_quoting = false;
 
-        if name.starts_with('\"') {
+        if name.starts_with('\"') && name.ends_with('\"') {
             // There is unfortunately no way to make an owned substring of a string.
             // So we have to take a slice and clone it.
             let len = name.len();

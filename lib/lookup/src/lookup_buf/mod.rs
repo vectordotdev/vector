@@ -108,25 +108,19 @@ impl Arbitrary for LookupBuf {
 impl Display for LookupBuf {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let mut peeker = self.segments.iter().peekable();
-        let mut next = peeker.next();
-        let mut maybe_next = peeker.peek();
-        while let Some(segment) = next {
+        while let Some(segment) = peeker.next() {
+            let maybe_next = peeker
+                .peek()
+                .map(|next| next.is_field() || next.is_coalesce())
+                .unwrap_or(false);
             match (segment, maybe_next) {
-                (SegmentBuf::Field(_), Some(next)) if next.is_field() || next.is_coalesce() => {
-                    write!(f, r#"{}."#, segment)?
-                }
-                (SegmentBuf::Field(_), _) => write!(f, "{}", segment)?,
-                (SegmentBuf::Index(_), Some(next)) if next.is_field() || next.is_coalesce() => {
-                    write!(f, r#"[{}]."#, segment)?
-                }
-                (SegmentBuf::Index(_), _) => write!(f, "[{}]", segment)?,
-                (SegmentBuf::Coalesce(_), Some(next)) if next.is_field() || next.is_coalesce() => {
-                    write!(f, r#"{}."#, segment)?
-                }
-                (SegmentBuf::Coalesce(_), _) => write!(f, "{}", segment)?,
+                (SegmentBuf::Field(_), true) => write!(f, r#"{}."#, segment)?,
+                (SegmentBuf::Field(_), false) => write!(f, "{}", segment)?,
+                (SegmentBuf::Index(_), true) => write!(f, r#"[{}]."#, segment)?,
+                (SegmentBuf::Index(_), false) => write!(f, "[{}]", segment)?,
+                (SegmentBuf::Coalesce(_), true) => write!(f, r#"{}."#, segment)?,
+                (SegmentBuf::Coalesce(_), false) => write!(f, "{}", segment)?,
             }
-            next = peeker.next();
-            maybe_next = peeker.peek();
         }
         Ok(())
     }
