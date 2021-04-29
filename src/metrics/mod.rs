@@ -131,18 +131,22 @@ macro_rules! update_counter {
         use ::std::sync::Mutex;
 
         ::lazy_static::lazy_static! {
+            // We use a `Mutex` here instead of an `Atomic` to guarantee that the incremental values
+            // are emitted in the same order as the absolute values arrive.
+            //
+            // If this requirement is not important and/or contention gets too high at this point,
+            // reconsider if a `Mutex` is necessary here.
             static ref PREVIOUS_VALUE: Mutex<u64> = Mutex::new(0);
         }
 
-        let delta = {
-            let mut previous_value = PREVIOUS_VALUE.lock().unwrap();
-            let delta = $value
-                .checked_sub(*previous_value)
-                .expect("update_counter! must use monotonically increasing values.");
-            *previous_value = $value;
-            delta
-        };
+        let mut previous_value = PREVIOUS_VALUE.lock().unwrap();
+
+        let delta = $value
+            .checked_sub(*previous_value)
+            .expect("update_counter! must use monotonically increasing values.");
 
         counter!($label, delta);
+
+        *previous_value = $value;
     }};
 }
