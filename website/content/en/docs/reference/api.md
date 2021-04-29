@@ -8,11 +8,11 @@ Vector ships with a [GraphQL] API that allows you to interact with a running Vec
 
 ## Configuration
 
-TODO
+{{< api/config >}}
 
 ## Endpoints
 
-{{< api-endpoints >}}
+{{< api/endpoints >}}
 
 ## How it works
 
