@@ -1,5 +1,25 @@
 {{ $commands := site.Data.docs.cli.commands }}
 
+<div class="no-prose flex flex-col border rounded-md divide-y">
+  {{ range $k, $v := $commands }}
+  <div class="py-4 px-6">
+    <span>
+      <h3 id="{{ $k }}" class="font-mono">
+        {{ $k }}
+      </h3>
+    </span>
+
+    {{ with $v.description }}
+    <div class="mt-2">
+      {{ . | markdownify }}
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+</div>
+
+
+
 <div class="cli">
   {{ range $k, $v := $commands }}
   <div class="command">
