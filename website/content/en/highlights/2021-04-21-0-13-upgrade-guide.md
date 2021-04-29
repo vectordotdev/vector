@@ -1,13 +1,13 @@
 ---
-last_modified_on: "2020-04-21"
-$schema: ".schema.json"
+date: "2020-04-21"
 title: "0.13 Upgrade Guide"
 description: "An upgrade guide that addresses breaking changes in 0.13.0"
-author_github: "https://github.com/jszwedko"
+authors: ["jszwedko"]
 pr_numbers: []
 release: "0.13.0"
 hide_on_release_notes: false
-tags: ["type: breaking change"]
+tags:
+  type: breaking change
 ---
 
 0.13 includes one minor breaking change:

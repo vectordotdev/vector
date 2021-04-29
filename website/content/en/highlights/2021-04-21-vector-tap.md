@@ -1,13 +1,14 @@
 ---
-last_modified_on: "2021-04-21"
-$schema: ".schema.json"
+date: "2021-04-21"
 title: "Introducing `vector tap`"
 description: "Observing events flowing through your Vector topologies"
-author_github: "https://github.com/jszwedko"
+authors: ["jszwedko"]
 pr_numbers: [6871]
 release: "0.13.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: graphql", "domain: cli", "domain: observability"]
+tags:
+  type: new feature
+  domains: ["graphql", "cli", "observability"]
 ---
 
 Vector 0.13 introduces a new [`vector tap`][tap] subcommand that allows for
