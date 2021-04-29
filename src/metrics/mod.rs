@@ -141,9 +141,13 @@ macro_rules! update_counter {
 
         let mut previous_value = PREVIOUS_VALUE.lock().unwrap();
 
-        let delta = $value
-            .checked_sub(*previous_value)
-            .expect("update_counter! must use monotonically increasing values.");
+        let delta = match $value.checked_sub(*previous_value) {
+            Some(delta) => delta,
+            None => {
+                warn!(message = "update_counter! has been called with a series of non-monotonic values.", label = $label);
+                0
+            }
+        };
 
         counter!($label, delta);
 
