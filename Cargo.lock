@@ -2949,6 +2949,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "inherent"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3974bf42c2050bbf0696471e4d91ecc9844845c2323b388aa7bf9d63f3b0693"
+dependencies = [
+ "proc-macro2 1.0.26",
+ "quote 1.0.9",
+ "syn 1.0.69",
+]
+
+[[package]]
 name = "inotify"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3424,6 +3435,23 @@ name = "logfmt"
 version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "879777f0cc6f3646a044de60e4ab98c75617e3f9580f7a2032e6ad7ea0cd3054"
+
+[[package]]
+name = "lookup"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "inherent",
+ "lalrpop",
+ "lalrpop-util",
+ "lazy_static",
+ "quickcheck",
+ "regex",
+ "serde",
+ "serde_json",
+ "snafu",
+ "tracing 0.1.25",
+]
 
 [[package]]
 name = "lru"
@@ -4890,6 +4918,7 @@ name = "proptests"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "lookup",
  "ordered-float",
  "proptest",
  "vrl-diagnostic",
@@ -7679,6 +7708,7 @@ dependencies = [
  "libz-sys",
  "listenfd",
  "logfmt",
+ "lookup",
  "lru",
  "lucet-runtime",
  "lucet-wasi",
@@ -7841,6 +7871,7 @@ version = "0.1.0"
 dependencies = [
  "bytes 1.0.1",
  "indoc",
+ "lookup",
  "ordered-float",
  "thiserror",
  "vrl-compiler",
@@ -7878,6 +7909,7 @@ dependencies = [
  "dyn-clone",
  "indoc",
  "lalrpop-util",
+ "lookup",
  "ordered-float",
  "paste",
  "regex",
@@ -7903,6 +7935,7 @@ version = "0.1.0"
 dependencies = [
  "lalrpop",
  "lalrpop-util",
+ "lookup",
  "ordered-float",
  "paste",
  "test-case",
@@ -7925,6 +7958,7 @@ dependencies = [
  "hex",
  "hostname",
  "lazy_static",
+ "lookup",
  "md-5",
  "nom 6.1.2",
  "regex",

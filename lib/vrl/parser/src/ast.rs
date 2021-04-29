@@ -1,5 +1,6 @@
 use crate::lex::Error;
 use diagnostic::Span;
+use lookup::LookupBuf;
 use ordered_float::NotNan;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -806,8 +807,8 @@ impl fmt::Debug for Assignment {
 pub enum AssignmentTarget {
     Noop,
     Query(Query),
-    Internal(Ident, Option<Path>),
-    External(Option<Path>),
+    Internal(Ident, Option<LookupBuf>),
+    External(Option<LookupBuf>),
 }
 
 impl AssignmentTarget {
@@ -829,7 +830,7 @@ impl AssignmentTarget {
                 span,
                 Query {
                     target: Node::new(span, QueryTarget::External),
-                    path: Node::new(span, path.clone().unwrap_or_else(|| Path(Vec::new()))),
+                    path: Node::new(span, path.clone().unwrap_or_else(LookupBuf::root)),
                 },
             )),
         }
@@ -845,7 +846,7 @@ impl fmt::Display for AssignmentTarget {
             Query(query) => query.fmt(f),
             Internal(ident, Some(path)) => write!(f, "{}{}", ident, path),
             Internal(ident, _) => ident.fmt(f),
-            External(Some(path)) => path.fmt(f),
+            External(Some(path)) => write!(f, ".{}", path),
             External(_) => f.write_str("."),
         }
     }
@@ -873,7 +874,7 @@ impl fmt::Debug for AssignmentTarget {
 #[derive(Clone, PartialEq)]
 pub struct Query {
     pub target: Node<QueryTarget>,
-    pub path: Node<Path>,
+    pub path: Node<LookupBuf>,
 }
 
 impl fmt::Display for Query {
@@ -902,7 +903,7 @@ impl fmt::Display for QueryTarget {
 
         match self {
             Internal(v) => v.fmt(f),
-            External => Ok(()),
+            External => write!(f, "."),
             FunctionCall(v) => v.fmt(f),
             Container(v) => v.fmt(f),
         }
@@ -919,92 +920,6 @@ impl fmt::Debug for QueryTarget {
             FunctionCall(v) => v.fmt(f),
             Container(v) => v.fmt(f),
         }
-    }
-}
-
-// -----------------------------------------------------------------------------
-// path
-// -----------------------------------------------------------------------------
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Path(pub Vec<PathSegment>);
-
-impl fmt::Display for Path {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for segment in &self.0 {
-            segment.fmt(f)?;
-        }
-
-        Ok(())
-    }
-}
-
-impl fmt::Debug for Path {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Path({})", self)
-    }
-}
-
-impl IntoIterator for Path {
-    type Item = PathSegment;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub enum PathSegment {
-    Field(Field),
-    Index(i64),
-    Coalesce(Vec<Field>),
-}
-
-impl fmt::Display for PathSegment {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use PathSegment::*;
-
-        match &self {
-            Field(field) => write!(f, ".{}", field),
-            Index(index) => write!(f, "[{}]", index),
-            Coalesce(fields) => write!(
-                f,
-                "({})",
-                fields
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join(" | ")
-            ),
-        }
-    }
-}
-
-impl fmt::Debug for PathSegment {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "PathSegment({})", self)
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub enum Field {
-    Regular(Ident),
-    Quoted(String),
-}
-
-impl fmt::Display for Field {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Field::Regular(ident) => ident.fmt(f),
-            Field::Quoted(string) => write!(f, r#""{}""#, string),
-        }
-    }
-}
-
-impl fmt::Debug for Field {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Field({})", self)
     }
 }
 
