@@ -198,6 +198,18 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
+		command_executed_total: {
+			description:       "The total number of times a command has been executed."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		command_execution_duration_ns: {
+			description:       "The command execution duration in nanoseconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		communication_errors_total: {
 			description:       "The total number of errors stemming from communication with the Docker daemon."
 			type:              "counter"

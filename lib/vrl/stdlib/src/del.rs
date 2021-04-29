@@ -69,7 +69,7 @@ impl DelFn {
         Self {
             query: expression::Query::new(
                 expression::Target::External,
-                Path::from_str(path).unwrap(),
+                FromStr::from_str(path).unwrap(),
             ),
         }
     }
