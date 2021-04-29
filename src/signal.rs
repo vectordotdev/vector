@@ -3,7 +3,7 @@ use tokio_stream::{Stream, StreamExt};
 
 pub type ShutdownTx = oneshot::Sender<()>;
 pub type SignalTx = mpsc::Sender<SignalTo>;
-type SignalRx = mpsc::Receiver<SignalTo>;
+pub type SignalRx = mpsc::Receiver<SignalTo>;
 
 #[derive(Debug)]
 /// Control messages used by Vector to drive topology and shutdown events.
@@ -23,6 +23,7 @@ pub enum SignalTo {
 pub struct SignalHandler {
     tx: SignalTx,
     rx: Option<SignalRx>,
+    shutdown: Option<ShutdownTx>,
 }
 
 impl SignalHandler {
@@ -31,7 +32,11 @@ impl SignalHandler {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::channel(2);
 
-        Self { tx, rx: Some(rx) }
+        Self {
+            tx,
+            rx: Some(rx),
+            shutdown: None,
+        }
     }
 
     /// Clones the transmitter.
@@ -53,48 +58,22 @@ impl SignalHandler {
 
             while let Some(value) = stream.next().await {
                 if tx.send(value.into()).await.is_err() {
-                    error!(message = "Couldn't send control message.");
+                    error!(message = "Couldn't send signal.");
                     break;
                 }
             }
         });
     }
 
-    /// Takes a stream who's elements are convertible to `SignalTo`, and spawns a task that can
-    /// be shut down by triggering the returned transmitter (typically, by falling out of scope.)
-    pub fn add_with_shutdown<T, S>(&mut self, stream: S) -> ShutdownTx
-    where
-        T: Into<SignalTo> + Send + Sync,
-        S: Stream<Item = T> + 'static + Send + Sync,
-    {
-        let tx = self.tx.clone();
-        let (shutdown_tx, mut shutdown_rx) = oneshot::channel();
-
-        tokio::spawn(async move {
-            tokio::pin!(stream);
-
-            loop {
-                tokio::select! {
-                    biased;
-
-                    _ = &mut shutdown_rx => break,
-                    Some(value) = stream.next() => {
-                        if tx.send(value.into()).await.is_err() {
-                            error!("Couldn't send control message.");
-                            break;
-                        }
-                    },
-                    else => unreachable!("controller doesn't end"),
-                }
-            }
-        });
-
-        shutdown_tx
+    /// Takes a shutdown to register with the instance. Registering a new one will
+    /// drop the old from scope, and trigger a shutdown in the producer.
+    pub fn register_shutdown(&mut self, shutdown_tx: ShutdownTx) {
+        self.shutdown = Some(shutdown_tx);
     }
 
     /// Takes the receiver, replacing it with `None`. A controller is intended to have only one
     /// consumer, typically at the root of the application.
-    pub fn take_rx(&mut self) -> Option<mpsc::Receiver<SignalTo>> {
+    pub fn take_rx(&mut self) -> Option<SignalRx> {
         self.rx.take()
     }
 }
@@ -115,7 +94,7 @@ pub fn os_signals() -> impl Stream<Item = SignalTo> {
                 _ = sigint.recv() => SignalTo::Shutdown,
                 _ = sigterm.recv() => SignalTo::Shutdown,
                 _ = sigquit.recv() => SignalTo::Quit,
-                _ = sighup.recv() => SignalTo::Reload,
+                _ = sighup.recv() => SignalTo::ReloadFromDisk,
             };
             yield signal;
         }

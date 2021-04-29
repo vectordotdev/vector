@@ -1,4 +1,5 @@
-use super::{builder::ConfigBuilder, format, vars, Config, Format, FormatHint};
+use super::{builder::ConfigBuilder, format, validation, vars, Config, Format, FormatHint};
+use crate::signal;
 use glob::glob;
 use lazy_static::lazy_static;
 use std::{
@@ -87,15 +88,30 @@ pub fn load_from_paths(config_paths: &[(PathBuf, FormatHint)]) -> Result<Config,
     Ok(config)
 }
 
-pub async fn load_with_provider_from_paths() -> Result<Config, Vec<String>> {
+pub async fn load_from_paths_with_provider(
+    config_paths: &[(PathBuf, FormatHint)],
+    signal_handler: &mut signal::SignalHandler,
+) -> Result<Config, Vec<String>> {
     let (builder, load_warnings) = load_builder_from_paths(config_paths)?;
+    validation::check_provider(&builder)?;
 
-    // If a provider is present, initialize and attempt to retrieve config.
     match builder.provider {
-        Some(provider) => {
-
+        Some(mut provider) => match provider.build(signal_handler).await {
+            Ok(config) => {
+                debug!(message = "Provider configured.", provider = ?provider.provider_type());
+                load_from_str(&config, None)
+            }
+            Err(err) => Err(vec![format!("provider error: {}", err)]),
         },
-        _ => 
+        _ => {
+            let (config, build_warnings) = builder.build_with_warnings()?;
+
+            for warning in load_warnings.into_iter().chain(build_warnings) {
+                warn!("{}", warning);
+            }
+
+            Ok(config)
+        }
     }
 }
 

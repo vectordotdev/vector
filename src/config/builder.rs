@@ -50,7 +50,7 @@ impl From<Config> for ConfigBuilder {
             sources: c.sources,
             sinks: c.sinks,
             transforms: c.transforms,
-            provider: c.provider,
+            provider: None,
             tests: c.tests,
         }
     }
@@ -161,6 +161,4 @@ impl ConfigBuilder {
 
         Ok(())
     }
-
-    pub async fn try_provider() -> Result(Option<String>, Vec<String>) {}
 }
