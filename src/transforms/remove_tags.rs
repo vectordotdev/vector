@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    event::Event,
     transforms::{FunctionTransform, Transform},
-    Event,
 };
 use serde::{Deserialize, Serialize};
 

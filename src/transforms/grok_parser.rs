@@ -151,9 +151,7 @@ mod tests {
     use super::GrokParserConfig;
     use crate::{
         config::{log_schema, GlobalOptions, TransformConfig},
-        event,
-        event::LogEvent,
-        Event,
+        event::{self, Event, LogEvent},
     };
     use pretty_assertions::assert_eq;
     use serde_json::json;

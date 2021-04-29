@@ -36,7 +36,7 @@ use super::{
     buffer::{Partition, PartitionBuffer, PartitionInnerBuffer},
     service::{Map, ServiceBuilderExt},
 };
-use crate::{buffers::Acker, Event};
+use crate::{buffers::Acker, event::Event};
 use async_trait::async_trait;
 use futures::{
     future::BoxFuture,

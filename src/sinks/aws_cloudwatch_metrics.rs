@@ -430,7 +430,11 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::{event::metric::StatisticKind, event::MetricKind, test_util::random_string, Event};
+    use crate::{
+        event::metric::StatisticKind,
+        event::{Event, MetricKind},
+        test_util::random_string,
+    };
     use chrono::offset::TimeZone;
     use rand::seq::SliceRandom;
 

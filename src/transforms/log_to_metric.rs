@@ -3,15 +3,13 @@ use crate::{
         log_schema, DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription,
     },
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-    event::LogEvent,
-    event::Value,
+    event::{Event, LogEvent, Value},
     internal_events::{
         LogToMetricFieldNotFound, LogToMetricParseFloatError, LogToMetricTemplateParseError,
         TemplateRenderingFailed,
     },
     template::{Template, TemplateParseError, TemplateRenderingError},
     transforms::{FunctionTransform, Transform},
-    Event,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};

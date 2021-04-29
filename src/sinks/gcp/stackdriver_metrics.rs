@@ -1,5 +1,5 @@
 use crate::config::{DataType, SinkConfig, SinkContext, SinkDescription};
-use crate::event::{Metric, MetricValue};
+use crate::event::{Event, Metric, MetricValue};
 use crate::http::HttpClient;
 use crate::sinks::gcp;
 use crate::sinks::util::buffer::metrics::MetricsBuffer;
@@ -7,7 +7,6 @@ use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
 use crate::sinks::util::{BatchConfig, BatchSettings, TowerRequestConfig};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::tls::{TlsOptions, TlsSettings};
-use crate::Event;
 use chrono::{DateTime, Utc};
 use futures::sink::SinkExt;
 use futures::FutureExt;

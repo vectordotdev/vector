@@ -1,5 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
     internal_events::{AwsSqsEventSent, TemplateRenderingFailed},
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
@@ -9,7 +10,6 @@ use crate::{
         BatchSettings, EncodedLength, TowerRequestConfig, VecBuffer,
     },
     template::{Template, TemplateParseError},
-    Event,
 };
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;

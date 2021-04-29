@@ -542,6 +542,55 @@ mod tests {
 
     #[test]
     #[allow(clippy::float_cmp)]
+    /// Tests componentEventsOutTotals returns increasing metrics, ordered by
+    /// source -> transform -> sink
+    fn api_graphql_component_events_out_totals() {
+        metrics_test("tests::api_graphql_component_events_out_totals", async {
+            let conf = r#"
+                    [api]
+                      enabled = true
+
+                    [sources.events_out_total_batch_source]
+                      type = "generator"
+                      format = "shuffle"
+                      lines = ["Random line", "And another"]
+                      interval = 0.01
+
+                    [sinks.events_out_total_batch_sink]
+                      # General
+                      type = "blackhole"
+                      inputs = ["events_out_total_batch_source"]
+                      print_amount = 100000
+                "#;
+
+            let topology = from_str_config(conf).await;
+
+            tokio::time::delay_for(tokio::time::Duration::from_millis(500)).await;
+
+            let server = api::Server::start(topology.config());
+            let client = new_subscription_client(server.addr()).await;
+            let subscription = client.component_events_out_totals_subscription(500);
+
+            let data = subscription
+                .stream()
+                .skip(1)
+                .take(1)
+                .map(|r| r.unwrap().data.unwrap().component_events_out_totals)
+                .next()
+                .await
+                .expect("Didn't return results");
+
+            for name in &[
+                "events_out_total_batch_source",
+                "events_out_total_batch_sink",
+            ] {
+                assert!(data.iter().any(|d| d.name == *name));
+            }
+        })
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)]
     /// Tests componentProcessedBytesTotals returns increasing metrics, ordered by
     /// source -> transform -> sink
     fn api_graphql_component_processed_bytes_totals() {
@@ -921,6 +970,7 @@ mod tests {
                     let node = &files.edges.iter().flatten().next().unwrap().as_ref().unwrap().node;
                     assert_eq!(node.name, path);
                     assert_eq!(node.processed_events_total.as_ref().unwrap().processed_events_total as usize, lines.len());
+                    assert_eq!(node.events_in_total.as_ref().unwrap().events_in_total as usize, lines.len());
                 }
                 _ => panic!("not a file source"),
             }

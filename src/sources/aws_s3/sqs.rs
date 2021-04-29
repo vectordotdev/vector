@@ -156,16 +156,18 @@ impl Ingestor {
         })
     }
 
-    pub(super) async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
-        IntervalStream::new(time::interval(self.poll_interval))
-            .take_until(shutdown)
-            .for_each(|_| self.run_once(&out))
-            .await;
+    pub(super) async fn run(self, mut out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
+        let mut stream =
+            IntervalStream::new(time::interval(self.poll_interval)).take_until(shutdown);
+
+        while stream.next().await.is_some() {
+            self.run_once(&mut out).await
+        }
 
         Ok(())
     }
 
-    async fn run_once(&self, out: &Pipeline) {
+    async fn run_once(&self, out: &mut Pipeline) {
         let messages = self
             .receive_messages()
             .inspect_ok(|messages| {
@@ -196,7 +198,7 @@ impl Ingestor {
                 .clone()
                 .unwrap_or_else(|| "<unknown>".to_owned());
 
-            match self.handle_sqs_message(message, out.clone()).await {
+            match self.handle_sqs_message(message, out).await {
                 Ok(()) => {
                     emit!(SqsMessageProcessingSucceeded {
                         message_id: &message_id
@@ -230,7 +232,7 @@ impl Ingestor {
     async fn handle_sqs_message(
         &self,
         message: Message,
-        out: Pipeline,
+        out: &mut Pipeline,
     ) -> Result<(), ProcessingError> {
         let s3_event: S3Event = serde_json::from_str(message.body.unwrap_or_default().as_ref())
             .context(InvalidSqsMessage {
@@ -243,10 +245,10 @@ impl Ingestor {
     async fn handle_s3_event(
         &self,
         s3_event: S3Event,
-        mut out: Pipeline,
+        out: &mut Pipeline,
     ) -> Result<(), ProcessingError> {
         for record in s3_event.records {
-            self.handle_s3_event_record(record, &mut out).await?
+            self.handle_s3_event_record(record, out).await?
         }
         Ok(())
     }

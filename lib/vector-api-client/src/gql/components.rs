@@ -113,6 +113,52 @@ impl components_query::ComponentsQueryComponentsEdgesNodeOn {
                 .unwrap_or(0),
         }
     }
+
+    pub fn events_in_total(&self) -> i64 {
+        match self {
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Source(s) => s
+                .metrics
+                .events_in_total
+                .as_ref()
+                .map(|p| p.events_in_total as i64)
+                .unwrap_or(0),
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Transform(t) => t
+                .metrics
+                .events_in_total
+                .as_ref()
+                .map(|p| p.events_in_total as i64)
+                .unwrap_or(0),
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Sink(s) => s
+                .metrics
+                .events_in_total
+                .as_ref()
+                .map(|p| p.events_in_total as i64)
+                .unwrap_or(0),
+        }
+    }
+
+    pub fn events_out_total(&self) -> i64 {
+        match self {
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Source(s) => s
+                .metrics
+                .events_out_total
+                .as_ref()
+                .map(|p| p.events_out_total as i64)
+                .unwrap_or(0),
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Transform(t) => t
+                .metrics
+                .events_out_total
+                .as_ref()
+                .map(|p| p.events_out_total as i64)
+                .unwrap_or(0),
+            components_query::ComponentsQueryComponentsEdgesNodeOn::Sink(s) => s
+                .metrics
+                .events_out_total
+                .as_ref()
+                .map(|p| p.events_out_total as i64)
+                .unwrap_or(0),
+        }
+    }
 }
 
 impl fmt::Display for components_query::ComponentsQueryComponentsEdgesNodeOn {

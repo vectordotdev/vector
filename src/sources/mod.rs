@@ -13,6 +13,8 @@ pub mod aws_s3;
 pub mod datadog;
 #[cfg(feature = "sources-docker_logs")]
 pub mod docker_logs;
+#[cfg(feature = "sources-exec")]
+pub mod exec;
 #[cfg(feature = "sources-file")]
 pub mod file;
 #[cfg(feature = "sources-generator")]

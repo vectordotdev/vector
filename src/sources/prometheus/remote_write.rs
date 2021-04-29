@@ -1,13 +1,13 @@
 use super::parser;
 use crate::{
     config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
+    event::Event,
     internal_events::{PrometheusRemoteWriteParseError, PrometheusRemoteWriteReceived},
     sources::{
         self,
         util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsConfig,
-    Event,
 };
 use bytes::Bytes;
 use prometheus_parser::proto;

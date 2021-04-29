@@ -1,6 +1,7 @@
 use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
     internal_events::TemplateRenderingFailed,
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
@@ -9,7 +10,6 @@ use crate::{
         BatchConfig,
     },
     template::{Template, TemplateParseError},
-    Event,
 };
 use futures::{
     channel::oneshot::Canceled, future::BoxFuture, ready, stream::FuturesUnordered, FutureExt,

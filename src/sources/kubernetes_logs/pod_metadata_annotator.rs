@@ -4,8 +4,8 @@
 
 use super::path_helpers::{parse_log_file_path, LogFileInfo};
 use crate::{
-    event::{LogEvent, PathComponent, PathIter},
-    kubernetes as k8s, Event,
+    event::{Event, LogEvent, PathComponent, PathIter},
+    kubernetes as k8s,
 };
 use evmap::ReadHandle;
 use k8s_openapi::{

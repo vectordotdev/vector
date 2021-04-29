@@ -1,12 +1,12 @@
 use crate::transforms::TaskTransform;
 use crate::{
     config::{DataType, GenerateConfig, GlobalOptions, TransformConfig, TransformDescription},
+    event::Event,
     internal_events::{
         TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
         TagCardinalityValueLimitReached,
     },
     transforms::Transform,
-    Event,
 };
 use bloom::{BloomFilter, ASMS};
 use futures::{Stream, StreamExt};

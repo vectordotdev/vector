@@ -2,9 +2,9 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
+    event::Event,
     internal_events::BlackholeEventReceived,
     sinks::util::StreamSink,
-    Event,
 };
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};

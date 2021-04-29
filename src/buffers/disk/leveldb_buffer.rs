@@ -1,9 +1,6 @@
 use crate::event::{proto, Event};
 use bytes::Bytes;
-use futures01::{
-    task::{self, AtomicTask, Task},
-    Async, AsyncSink, Poll, Sink, Stream,
-};
+use futures::{task::AtomicWaker, Sink, Stream};
 use leveldb::database::{
     batch::{Batch, Writebatch},
     compaction::Compaction,
@@ -18,10 +15,12 @@ use std::{
     convert::TryInto,
     mem::size_of,
     path::PathBuf,
+    pin::Pin,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
     },
+    task::{Context, Poll, Waker},
 };
 
 use super::{DataDirOpenError, Error};
@@ -48,14 +47,15 @@ impl db_key::Key for Key {
 }
 
 pub struct Writer {
-    db: Arc<Database<Key>>,
+    db: Option<Arc<Database<Key>>>,
     offset: Arc<AtomicUsize>,
-    write_notifier: Arc<AtomicTask>,
-    blocked_write_tasks: Arc<Mutex<Vec<Task>>>,
+    write_notifier: Arc<AtomicWaker>,
+    blocked_write_tasks: Arc<Mutex<Vec<Waker>>>,
     writebatch: Writebatch<Key>,
     batch_size: usize,
     max_size: usize,
     current_size: Arc<AtomicUsize>,
+    slot: Option<Event>,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to share across threads
@@ -64,7 +64,7 @@ unsafe impl Send for Writer {}
 impl Clone for Writer {
     fn clone(&self) -> Self {
         Self {
-            db: Arc::clone(&self.db),
+            db: self.db.as_ref().map(Arc::clone),
             offset: Arc::clone(&self.offset),
             write_notifier: Arc::clone(&self.write_notifier),
             blocked_write_tasks: Arc::clone(&self.blocked_write_tasks),
@@ -72,18 +72,68 @@ impl Clone for Writer {
             batch_size: 0,
             max_size: self.max_size,
             current_size: Arc::clone(&self.current_size),
+            slot: None,
         }
     }
 }
 
-impl Sink for Writer {
-    type SinkItem = Event;
-    type SinkError = ();
+impl Sink<Event> for Writer {
+    type Error = ();
 
-    fn start_send(
-        &mut self,
-        event: Self::SinkItem,
-    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if self.slot.is_none() {
+            Poll::Ready(Ok(()))
+        } else {
+            // Assumes that flush will only succeed if it has also emptied the slot,
+            // hence we don't need to recheck if the slot is empty.
+            self.poll_flush(cx)
+        }
+    }
+
+    fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
+        if let Some(event) = self.try_send(item) {
+            debug_assert!(self.slot.is_none());
+            self.slot = Some(event);
+        }
+        Ok(())
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if let Some(event) = self.slot.take() {
+            if let Some(event) = self.try_send(event) {
+                self.slot = Some(event);
+
+                self.blocked_write_tasks
+                    .lock()
+                    .unwrap()
+                    .push(cx.waker().clone());
+
+                if self.current_size.load(Ordering::Acquire) == 0 {
+                    // This is a rare case where the reader managed to consume
+                    // and delete all events in the buffer. In this case there
+                    // is a scenario where the reader won't be polled again hence
+                    // this sink will never be notified again so this will stall.
+                    //
+                    // To avoid this we notify the reader to notify this writer.
+                    self.write_notifier.wake();
+                }
+
+                return Poll::Pending;
+            }
+        }
+
+        self.flush();
+
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.poll_flush(cx)
+    }
+}
+
+impl Writer {
+    fn try_send(&mut self, event: Event) -> Option<Event> {
         let mut value = vec![];
         proto::EventWrapper::from(event).encode(&mut value).unwrap(); // This will not error when writing to a Vec
         let event_size = value.len();
@@ -91,18 +141,13 @@ impl Sink for Writer {
         if self.current_size.fetch_add(event_size, Ordering::Relaxed) + (event_size / 2)
             > self.max_size
         {
-            self.blocked_write_tasks
-                .lock()
-                .unwrap()
-                .push(task::current());
-
             self.current_size.fetch_sub(event_size, Ordering::Relaxed);
 
-            self.poll_complete()?;
+            self.flush();
 
             let buf = Bytes::from(value);
             let event = proto::EventWrapper::decode(buf).unwrap().into();
-            return Ok(AsyncSink::NotReady(event));
+            return Some(event);
         }
 
         let key = self.offset.fetch_add(1, Ordering::Relaxed);
@@ -111,43 +156,53 @@ impl Sink for Writer {
         self.batch_size += 1;
 
         if self.batch_size >= 100 {
-            self.poll_complete()?;
+            self.flush();
         }
 
-        Ok(AsyncSink::Ready)
+        None
     }
 
-    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
+    fn flush(&mut self) {
         // This doesn't write all the way through to disk and doesn't need to be wrapped
         // with `blocking`. (It does get written to a memory mapped table that will be
         // flushed even in the case of a process crash.)
         if self.batch_size > 0 {
             self.write_batch();
         }
-
-        Ok(Async::Ready(()))
     }
-}
 
-impl Writer {
     fn write_batch(&mut self) {
         self.db
+            .as_mut()
+            .unwrap()
             .write(WriteOptions::new(), &self.writebatch)
             .unwrap();
         self.writebatch = Writebatch::new();
         self.batch_size = 0;
-        self.write_notifier.notify();
+        self.write_notifier.wake();
     }
 }
 
 impl Drop for Writer {
     fn drop(&mut self) {
-        if self.batch_size > 0 {
-            self.write_batch();
+        if let Some(event) = self.slot.take() {
+            // This can happen if poll_close wasn't called which is a bug
+            // or we are unwinding the stack.
+            //
+            // We can't be picky at the moment so we will allow
+            // for the buffer to exceed configured limit.
+            self.max_size = usize::MAX;
+            assert!(self.try_send(event).is_none());
         }
 
+        self.flush();
+
+        // We drop the database Arc before notifying reader to avoid the case where we
+        // notify the reader, the reader reacts and checks Arc::strong_count to be > 1
+        // and then we drop the Arc which would cause a stall.
+        self.db.take();
         // We need to wake up the reader so it can return None if there are no more writers
-        self.write_notifier.notify();
+        self.write_notifier.wake();
     }
 }
 
@@ -155,8 +210,8 @@ pub struct Reader {
     db: Arc<Database<Key>>,
     read_offset: usize,
     delete_offset: usize,
-    write_notifier: Arc<AtomicTask>,
-    blocked_write_tasks: Arc<Mutex<Vec<Task>>>,
+    write_notifier: Arc<AtomicWaker>,
+    blocked_write_tasks: Arc<Mutex<Vec<Waker>>>,
     current_size: Arc<AtomicUsize>,
     ack_counter: Arc<AtomicUsize>,
     uncompacted_size: usize,
@@ -170,14 +225,13 @@ unsafe impl Send for Reader {}
 
 impl Stream for Reader {
     type Item = Event;
-    type Error = ();
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.delete_acked();
-
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // If there's no value at read_offset, we return NotReady and rely on Writer
         // using write_notifier to wake this task up after the next write.
-        self.write_notifier.register();
+        self.write_notifier.register(cx.waker());
+
+        self.delete_acked();
 
         if self.buffer.is_empty() {
             // This will usually complete instantly, but in the case of a large queue (or a fresh launch of
@@ -201,19 +255,19 @@ impl Stream for Reader {
             match proto::EventWrapper::decode(buf) {
                 Ok(event) => {
                     let event = Event::from(event);
-                    Ok(Async::Ready(Some(event)))
+                    Poll::Ready(Some(event))
                 }
                 Err(error) => {
                     error!(message = "Error deserializing proto.", %error);
                     debug_assert!(false);
-                    self.poll()
+                    self.poll_next(cx)
                 }
             }
         } else if Arc::strong_count(&self.db) == 1 {
             // There are no writers left
-            Ok(Async::Ready(None))
+            Poll::Ready(None)
         } else {
-            Ok(Async::NotReady)
+            Poll::Pending
         }
     }
 }
@@ -248,7 +302,7 @@ impl Reader {
             self.delete_offset = new_offset;
 
             let size_deleted = self.unacked_sizes.drain(..num_to_delete).sum();
-            self.current_size.fetch_sub(size_deleted, Ordering::Relaxed);
+            self.current_size.fetch_sub(size_deleted, Ordering::Release);
 
             self.uncompacted_size += size_deleted;
             if self.uncompacted_size > self.max_uncompacted_size {
@@ -257,7 +311,7 @@ impl Reader {
         }
 
         for task in self.blocked_write_tasks.lock().unwrap().drain(..) {
-            task.notify();
+            task.wake();
         }
     }
 
@@ -304,7 +358,7 @@ impl super::DiskBuffer for Buffer {
         let initial_size = db.value_iter(ReadOptions::new()).map(|v| v.len()).sum();
         let current_size = Arc::new(AtomicUsize::new(initial_size));
 
-        let write_notifier = Arc::new(AtomicTask::new());
+        let write_notifier = Arc::new(AtomicWaker::new());
 
         let blocked_write_tasks = Arc::new(Mutex::new(Vec::new()));
 
@@ -312,7 +366,7 @@ impl super::DiskBuffer for Buffer {
         let acker = Acker::Disk(Arc::clone(&ack_counter), Arc::clone(&write_notifier));
 
         let writer = Writer {
-            db: Arc::clone(&db),
+            db: Some(Arc::clone(&db)),
             write_notifier: Arc::clone(&write_notifier),
             blocked_write_tasks: Arc::clone(&blocked_write_tasks),
             offset: Arc::new(AtomicUsize::new(tail)),
@@ -320,6 +374,7 @@ impl super::DiskBuffer for Buffer {
             batch_size: 0,
             max_size,
             current_size: Arc::clone(&current_size),
+            slot: None,
         };
 
         let mut reader = Reader {
