@@ -1,0 +1,24 @@
+{{ $version := .File.BaseFileName }}
+{{ $latest := index site.Params.vector_versions 0 }}
+{{ $isLatest := eq $version $latest }}
+{{ $release := index site.Data.docs.releases $version }}
+{{ $date := $release.date | dateFormat "January 2, 2006" }}
+<a href="{{ .RelPermalink }}">
+  <div class="border shadow-sm rounded-md py-4 px-6 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700">
+    <span class="flex items-center justify-between">
+      <span class="flex items-center space-x-3">
+        <span class="font-bold dark:text-gray-300">
+          Version {{ .File.BaseFileName }}
+        </span>
+
+        {{ if $isLatest }}
+        {{ partial "badge.html" (dict "word" "latest" "color" "green") }}
+        {{ end }}
+      </span>
+
+      <time datetime="{{ $date }}" class="font-sm font-light tracking-tight">
+        {{ $date }}
+      </span>
+    </span>
+  </div>
+</a>

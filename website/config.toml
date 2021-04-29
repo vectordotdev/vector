@@ -297,3 +297,26 @@ name = "Examples"
 parent = "vrl"
 url = "/docs/reference/vrl/examples"
 weight = 3
+
+[[menu.flyout]]
+name = "Pages"
+identifier = "pages"
+weight = 4
+
+[[menu.flyout]]
+name = "Download"
+parent = "pages"
+url = "/download"
+weight = 1
+
+[[menu.flyout]]
+name = "Releases"
+parent = "pages"
+url = "/releases"
+weight = 2
+
+[[menu.flyout]]
+name = "Highlights"
+parent = "pages"
+url = "/highlights"
+weight = 3

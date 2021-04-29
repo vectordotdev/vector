@@ -18,7 +18,7 @@ releases: "0.13.0": {
 
 	whats_next: [
 		{
-			title: "End to end acknowledgements"
+			title: "End-to-end acknowledgements"
 			description: """
 				We've heard from a number of users that they'd like improved delivery guarantees for events flowing
 				through Vector. We are working on a feature to allow, for components that are able to support it, to

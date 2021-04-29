@@ -1,0 +1,17 @@
+{{ define "title" }}
+{{ .Title }} | {{ site.Title }}
+{{ end }}
+
+{{ define "main" }}
+{{ $version := .File.BaseFileName }}
+{{ $release := index site.Data.docs.releases $version }}
+<div class="max-w-3xl md:max-w-4xl px-6 lg:px-8 mx-auto">
+  <div class="my-16">
+    {{ partial "hero.html" . }}
+
+    <div class="mt-16">
+      {{ $release }}
+    </div>
+  </div>
+</div>
+{{ end }}

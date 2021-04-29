@@ -45,12 +45,16 @@ module.exports = {
                   color: theme('colors.black'),
                 },
               },
-              'p, h1, h2, h3, h4, h5, h6': {
+              'p, h1, h2, h3, h4, h5, h6, ul li': {
                 margin: 0,
                 padding: 0,
               },
               '.highlight': {
                 margin: 0,
+              },
+              '.admonition .highlight': {
+                border: '1px solid red',
+                width: '100%',
               },
             },
           }

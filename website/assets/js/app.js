@@ -38,6 +38,10 @@ const manageState = () => {
     versionBackup: '{{ $latest }}',
     // Release version
     release: 'stable',
+    // Set release directly
+    setRelease(release) {
+      this.release = release;
+    },
     // Set a new version
     setVersion(v) {
       this.version = v;
@@ -65,6 +69,11 @@ const manageState = () => {
         this.setVersion(this.versionBackup);
       }
     },
+    // Switch the banner on and off
+    toggleBanner() {
+      this.banner = !this.banner;
+    },
+    // Boolean helpers
     isNightly() {
       return this.release === 'nightly';
     },
@@ -74,14 +83,6 @@ const manageState = () => {
     isCurrent(version) {
       return this.version === version;
     },
-    // Set release directly
-    setRelease(release) {
-      this.release = release;
-    },
-    // Switch the banner on and off
-    toggleBanner() {
-      this.banner = !this.banner;
-    }
   }, useLocalStorage);
 }
 

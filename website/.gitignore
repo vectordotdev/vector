@@ -9,9 +9,5 @@ node_modules/
 # CUE-generated assets
 data/docs.json
 
-# Generated release pages
-content/en/releases
-!content/en/releases/_index.md
-
 # htmltest generated
 tmp/

@@ -5,8 +5,8 @@ releases: "0.12.2": {
 	codename: ""
 
 	description: """
-			This release includes a few critical bug fixes and a an update to
-			OpenSSL to 1.1.1k resolve CVE-2021-3450 and CVE-2021-3449.
+		This release includes a few critical bug fixes and a an update to OpenSSL to 1.1.1k resolve CVE-2021-3450 and
+		CVE-2021-3449.
 		"""
 
 	whats_next: []
