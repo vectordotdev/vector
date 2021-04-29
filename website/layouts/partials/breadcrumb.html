@@ -14,7 +14,7 @@
     </svg>
     {{ end }}
     <a href="{{ .p1.RelPermalink }}" class="leading-4 dark:text-gray-300 tracking-thin text-sm md:text-normal font-medium hover:text-gray-700{{ if not .p1.IsHome }} ml-4{{ end }}{{ if $isHere }} dark:text-gray-100 text-gray-700 font-extrabold{{ else }} text-gray-600{{ end }}">
-      {{ $title }}
+      {{ $title | markdownify }}
     </a>
   </div>
 </li>
