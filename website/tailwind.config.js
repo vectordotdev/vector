@@ -33,7 +33,7 @@ module.exports = {
               },
             },
             code: {
-              color: theme('colors.primary-dark'),
+              color: theme('colors.primary-dark', 'currentColor'),
               '&::before': {
                 display: 'none',
               },
@@ -48,7 +48,7 @@ module.exports = {
                   color: theme('colors.black'),
                 },
               },
-              'p, span, h1, h2, h3, h4, h5, h6, ul li': {
+              'h1, h2, h3, h4, h5, h6, ul li, span': {
                 margin: 0,
                 padding: 0,
               },

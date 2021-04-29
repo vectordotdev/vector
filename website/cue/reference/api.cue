@@ -88,7 +88,7 @@ api: {
 		"/playground": {
 			GET: {
 				description: """
-					A bundled GraphQL playground that allows you
+					A bundled GraphQL playground that enables you
 					to explore the available queries and manually
 					run queries.
 

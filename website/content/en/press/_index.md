@@ -22,6 +22,6 @@ Vector's capabilities continue to expand at a rapid pace, aspiring to integrate 
 
 ## Vector blue
 
-{{< press/color hex="10E7FF" r=16 g=231 b=255 >}}
+<!-- TODO: colors shortcode -->
 
 [timber]: https://timber.io

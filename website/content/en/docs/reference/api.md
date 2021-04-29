@@ -12,7 +12,7 @@ TODO
 
 ## Endpoints
 
-{{< endpoints >}}
+{{< api-endpoints >}}
 
 ## How it works
 
