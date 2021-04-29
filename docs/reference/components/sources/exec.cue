@@ -59,7 +59,7 @@ components: sources: exec: {
 			required:    true
 			description: "The command to be run, plus any arguments required."
 			type: array: {
-                examples: [["echo", "Hello World!"], ["ls", "-la"]]
+				examples: [["echo", "Hello World!"], ["ls", "-la"]]
 				items: type: string: {
 					syntax: "literal"
 				}
