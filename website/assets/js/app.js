@@ -104,6 +104,8 @@ const main = () => {
   manageState();
   tableOfContents();
   showCodeFilename();
+
+  document.getElementById('page').style.display = "block";
 }
 
 document.addEventListener("DOMContentLoaded", main());

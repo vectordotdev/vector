@@ -14,7 +14,7 @@
       {{ range $v }}
       {{ $title := .Params.short | default .Title }}
       <li>
-        <a href="{{ .RelPermalink }}" class="text-gray-500 tracking-tight dark:text-gray-400">
+        <a href="{{ .RelPermalink }}" class="text-gray-500 tracking-tight dark:text-gray-400 hover:text-secondary dark:hover:text-primary">
           {{ $title }}
         </a>
       </li>

@@ -17,13 +17,18 @@ Components - Sources, Transforms, and Sinks | {{ site.Title }}
     {{ $link := printf "docs/reference/configuration/%s" (. | lower) | relURL }}
 
     <div>
-      <p class="flex items-center justify-between space-x-2 text-2xl md:text-3xl mb-4 dark:text-gray-200">
+      <p class="flex items-end justify-between space-x-2 text-2xl md:text-3xl lg:text-4xl mb-4 dark:text-gray-200">
         <a href="{{ $link }}" class="font-bold hover:text-secondary dark:hover:text-primary">
           {{ . }}
         </a>
 
-        <span class="text-sm text-gray-500">
-          count:&nbsp;{{ $num }}
+        <span class="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-300">
+          <span>
+            count
+          </span>
+          <span class="font-bold">
+            {{ $num }}
+          </span>
         </span>
       </p>
 

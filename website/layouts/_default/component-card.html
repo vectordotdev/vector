@@ -1,18 +1,20 @@
 {{ $title := .Params.short | default .Title }}
 {{ $componentTag := .File.BaseFileName }}
-<div class="dark:bg-gray-700 dark:hover:bg-gray-800 bg-white shadow-md px-5 py-4 hover:bg-gray-50 rounded-md border dark:border-gray-700">
-  <a href="{{ .RelPermalink }}" class="block text-2xl leading-tight">
-    <span class="dark:text-gray-200 hover:text-purple-v dark:hover:text-primary">
-      {{ $title }}
-    </span>
-  </a>
+<div class="no-prose dark:bg-dark dark:hover:bg-gray-800 bg-white shadow-md px-5 py-4 hover:bg-gray-50 rounded-md border dark:border-gray-700">
+  <h3 id="{{ $componentTag }}">
+    <a href="{{ .RelPermalink }}" class="block text-2xl leading-tight">
+      <span class="dark:text-gray-200 dark:bg-gray-400 hover:text-secondary dark:hover:text-primary">
+        {{ $title }}
+      </span>
+    </a>
+  </h3>
 
-  <span class="mt-3 dark:text-gray-200 dark:bg-gray-800 text-dark tracking-wider bg-gray-100 inline-block text-xs font-semibold font-mono py-1 px-2 rounded">
+  <span class="my-3.5 dark:text-gray-200 dark:bg-gray-800 text-dark tracking-wider bg-gray-100 inline-block text-xs font-semibold font-mono py-1 px-2 rounded">
     {{ $componentTag }}
   </span>
 
   {{ with .Description }}
-  <div class="mt-5 text-md dark:text-gray-300 text-gray-700 leading-snug">
+  <div class="text-md dark:text-gray-300 text-gray-700 leading-snug">
     {{ . | markdownify }}
   </div>
   {{ end }}

@@ -27,7 +27,10 @@ module.exports = {
               '&:hover': {
                 color: theme('colors.secondary'),
               },
-              'text-decoration': 'none'
+              'text-decoration': 'none',
+              code: {
+                color: theme('colors.primary-dark'),
+              },
             },
             code: {
               color: theme('colors.primary-dark'),
@@ -45,23 +48,22 @@ module.exports = {
                   color: theme('colors.black'),
                 },
               },
-              'p, h1, h2, h3, h4, h5, h6, ul li': {
+              'p, span, h1, h2, h3, h4, h5, h6, ul li': {
                 margin: 0,
                 padding: 0,
               },
               '.highlight': {
                 margin: 0,
               },
-              '.admonition .highlight': {
-                border: '1px solid red',
-                width: '100%',
-              },
             },
           }
         },
         dark: {
           css: {
-            color: theme('colors.gray.100'),
+            'table th, table td': {
+              color: theme('colors.gray.200'),
+            },
+            color: theme('colors.gray.200'),
             'p, h1, h2, h3, h4, h5, h6': {
               color: theme('colors.gray.100')
             },
@@ -629,7 +631,7 @@ module.exports = {
       full: '100%',
       min: 'min-content',
       max: 'max-content',
-      prose: '65ch',
+      prose: '80ch',
       ...breakpoints(theme('screens')),
     }),
     minHeight: {

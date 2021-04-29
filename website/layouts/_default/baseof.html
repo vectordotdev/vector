@@ -7,7 +7,8 @@
   x-data="{ dark: $store.global.dark{{ if $hasBottomNav }}, slideover: false {{ end }} }"
   x-on:toggle-dark="dark = !dark"
   :class="{ 'dark': dark, 'light': !dark }"
-  class="h-screen">
+  class="h-screen"
+  id="page">
 
   <head>
     {{ partial "meta.html" . }}
@@ -19,6 +20,12 @@
     </title>
 
     {{ partial "css.html" . }}
+
+    <style>
+      #page {
+        display: none;
+      }
+    </style>
   </head>
   <body x-cloak class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}">
     <div class="flex-1 z-1">
