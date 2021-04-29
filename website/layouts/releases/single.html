@@ -6,6 +6,7 @@
 {{ $version := .File.BaseFileName }}
 {{ $release := index site.Data.docs.releases $version }}
 {{ $highlights := where (where site.RegularPages "Section" "highlights") ".Params.release" "eq" $version }}
+{{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes"}}
 <div class="max-w-3xl md:max-w-5xl px-6 lg:px-8 mx-auto">
   <div class="my-16">
     {{ partial "hero.html" . }}
@@ -31,9 +32,9 @@
 
       {{ with $highlights }}
       <div class="mt-8">
-        <h3 id="highlights" class="text-2xl font-semibold text-dark dark:text-gray-300">
+        <h2 id="highlights" class="text-2xl md:text-3xl font-semibold text-dark dark:text-gray-300">
           Highlights
-        </h3>
+        </h2>
 
         <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {{ range . }}
@@ -42,9 +43,64 @@
         </div>
       </div>
       {{ end }}
+
+      {{ if gt (len $release.commits) 0 }}
+      <div class="mt-8">
+        <h3 id="highlights" class="text-3xl font-semibold text-dark dark:text-gray-300 tracking-tight">
+          Changelog
+        </h3>
+
+        <div class="mt-6 flex flex-col space-y-8">
+          {{ range $k, $v := $groups }}
+          {{ $commits := where $release.commits ".type" "eq" $k }}
+          {{ if $commits }}
+          <div>
+            <h4 id="{{ $v | urlize }}" class="text-2xl tracking-tighter font-semibold text-dark dark:text-gray-300">
+              {{ len $commits }} {{ $v }}
+            </h4>
+
+            <div class="mt-4 flex flex-col space-y-2">
+              {{ range $commits }}
+              {{ template "commit" . }}
+              {{ end }}
+            </div>
+          </div>
+          {{ end }}
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
     </div>
   </div>
-
-  {{ partial "pagination.html" . }}
 </div>
+{{ end }}
+
+{{ define "commit" }}
+<span class="flex items-center justify-between space-x-3">
+  <span class="flex items-center space-x-3">
+    {{/* Scopes */}}
+    <span>
+      {{ range .scopes }}
+      {{ partial "badge.html" (dict "word" . "color" "blue") }}
+      {{ end }}
+    </span>
+
+    {{/* Description */}}
+    <span class="prose dark:prose-dark leading-snug flex-shrink prose-sm">
+      {{ .description | markdownify }}
+    </span>
+  </span>
+
+  {{/* Pull request chip */}}
+  {{ with .pr_number }}
+  {{ $link := printf "https://github.com/timberio/vector/pull/%v" . }}
+  <a href="{{ $link }}" class="font-mono flex items-center space-x-1 py-1 px-2 rounded-md bg-gray-100 dark:bg-gray-500 text-dark dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600" target="_blank">
+    <ion-icon class="h-3 w-3" name="git-pull-request-sharp"></ion-icon>
+
+    <span class="text-xs p-0">
+      {{ . }}
+    </span>
+  </a>
+  {{ end }}
+</span>
 {{ end }}
