@@ -351,11 +351,9 @@ impl vrl::Target for LogEvent {
     fn remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             Ok(Some({
-                let mut value = LogEvent::default();
-                std::mem::swap(self, &mut value);
-                let fields: BTreeMap<_, _> = value.into();
-                fields
-                    .into_iter()
+                let mut map = BTreeMap::new();
+                std::mem::swap(self.fields.as_map_mut(), &mut map);
+                map.into_iter()
                     .map(|(key, value)| (key, value.into()))
                     .collect::<BTreeMap<_, _>>()
                     .into()
