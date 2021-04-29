@@ -5,13 +5,32 @@
 {{ define "main" }}
 {{ $version := .File.BaseFileName }}
 {{ $release := index site.Data.docs.releases $version }}
+{{ $highlights := where (where site.RegularPages "Section" "highlights") ".Params.release" "eq" $version }}
 <div class="max-w-3xl md:max-w-4xl px-6 lg:px-8 mx-auto">
   <div class="my-16">
     {{ partial "hero.html" . }}
 
     <div class="mt-16">
-      {{ $release }}
+      {{ with $release.codename }}
+      <p class="inline-flex space-x-4 border dark:border-gray-700 rounded-md py-2 px-3.5">
+        <span class="tracking-tight text-gray-600 dark:text-gray-300">
+          Code name
+        </span>
+
+        <span class="font-bold text-dark dark:text-primary">
+          {{ . }}
+        </span>
+      </p>
+      {{ end }}
+
+      {{ with $release.description }}
+      <div class="mt-8 prose dark:prose-dark">
+        {{ . | markdownify }}
+      </div>
+      {{ end }}
     </div>
   </div>
+
+  {{ partial "pagination.html" . }}
 </div>
 {{ end }}

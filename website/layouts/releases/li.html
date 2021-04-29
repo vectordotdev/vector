@@ -6,8 +6,8 @@
 <a href="{{ .RelPermalink }}">
   <div class="border shadow-sm rounded-md py-4 px-6 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700">
     <span class="flex items-center justify-between">
-      <span class="flex items-center space-x-3">
-        <span class="font-bold dark:text-gray-300">
+      <span class="flex items-center space-x-4">
+        <span class="font-bold dark:text-gray-300 text-lg">
           Version {{ .File.BaseFileName }}
         </span>
 
@@ -16,7 +16,7 @@
         {{ end }}
       </span>
 
-      <time datetime="{{ $date }}" class="font-sm font-light tracking-tight">
+      <time datetime="{{ $date }}" class="font-sm font-light tracking-tight text-dark dark:text-gray-300">
         {{ $date }}
       </span>
     </span>

@@ -22,7 +22,7 @@ Download | {{ site.Title }}
     {{/* Stable releases */}}
     {{ range $k, $v := $releases }}
     <div x-show="$store.global.version === '{{ $k }}'">
-      <div class="flex items-center space-x-8">
+      <div class="flex items-center space-x-10">
         <span class="text-md lg:text-lg font-light text-dark dark:text-gray-300">
           Date <span class="ml-1.5 font-bold">{{ $v.date }}</span>
         </span>
@@ -30,6 +30,10 @@ Download | {{ site.Title }}
         <span class="text-md lg:text-lg font-light text-dark dark:text-gray-300">
           License <a href="https://github.com/timberio/vector/blob/master/LICENSE" class="ml-1.5 hover:text-secondary dark:hover:text-primary font-bold" target="_blank">MPL 2.0</a>
         </span>
+
+        <a class="text-md lg:text-lg text-dark dark:text-primary">
+          {{ $k }} release notes
+        </a>
       </div>
 
       <div class="mt-8">

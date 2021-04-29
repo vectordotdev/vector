@@ -1,40 +1,38 @@
 {{ $here := .RelPermalink }}
 {{ $hasToc := not .Params.no_toc }}
-<div class="relative max-w-3xl mx-auto px-6 lg:px-8 lg:max-w-7xl lg:grid lg:grid-cols-16 lg:gap-8 mt-8">
-  <div class="hidden lg:block lg:col-span-5 xl:col-span-4 pr-0 lg:pr-6 md:pr-2">
-    <nav aria-label="Sidebar" class="sticky top-6 pr-0 lg:pr-4 pb-16" x-cloak>
-      {{ partial "docs/sidebar.html" . }}
-    </nav>
+<div class="relative max-w-3xl mx-auto px-6 lg:px-8 lg:max-w-7xl mt-8">
+  <div class="lg:grid lg:grid-cols-16 lg:gap-8">
+    <div class="hidden lg:block lg:col-span-5 xl:col-span-4 pr-0 lg:pr-6 md:pr-2">
+      <nav aria-label="Sidebar" class="sticky top-8 pr-0 lg:pr-4 pb-16" x-cloak>
+        {{ partial "docs/sidebar.html" . }}
+      </nav>
+    </div>
+
+    {{ if $hasToc }}
+    <main aria-label="Main documentation content" class="lg:col-span-11 xl:col-span-9 md:px-0">
+      <div class="pb-16 sm:pb-24">
+        {{ partial "hero.html" . }}
+      </div>
+
+      <div class="pb-32">
+        {{ partial "content.html" . }}
+      </div>
+    </main>
+
+    <div class="hidden xl:block xl:col-span-3">
+      <aside aria-label="Table of contents" class="sticky top-8">
+        {{ partial "toc.html" . }}
+      </aside>
+    </div>
+    {{ else }}
+    <main aria-label="Main documentation content" class="lg:col-span-11 xl:col-span-12 md:px-0">
+      {{ partial "docs/hero.html" . }}
+      <div class="pb-32">
+        {{ partial "content.html" . }}
+      </div>
+    </main>
+    {{ end }}
   </div>
-
-  {{ if $hasToc }}
-  <main aria-label="Main documentation content" class="lg:col-span-11 xl:col-span-9 md:px-0">
-    <div class="pb-16 sm:pb-24">
-      {{ partial "hero.html" . }}
-    </div>
-
-    <div class="pb-32">
-      {{ partial "content.html" . }}
-    </div>
-
-    {{ partial "pagination.html" . }}
-  </main>
-
-  <div class="hidden xl:block xl:col-span-3">
-    <aside aria-label="Table of contents" class="sticky top-6">
-      {{ partial "toc.html" . }}
-    </aside>
-  </div>
-  {{ else }}
-  <main aria-label="Main documentation content" class="lg:col-span-11 xl:col-span-12 md:px-0">
-    {{ partial "docs/hero.html" . }}
-    <div class="pb-32">
-      {{ partial "content.html" . }}
-    </div>
-
-    {{ partial "pagination.html" . }}
-  </main>
-  {{ end }}
 
   {{ partial "docs/slideover.html" . }}
 </div>
