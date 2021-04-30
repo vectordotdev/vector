@@ -352,6 +352,13 @@ impl Reader {
             let unread_size = self.current_size.fetch_sub(size_deleted, Ordering::Release);
 
             self.uncompacted_size += size_deleted;
+            // Compaction can be triggered in two ways:
+            //  1. When size of uncompacted is a percentage of total allowed size.
+            //     Managed by MAX_UNCOMPACTED. This is to limit the size of disk buffer
+            //     under configured max size.
+            //  2. When the size of uncompacted buffer is larger than unread buffer.
+            //     Managed partially by MIN_UNCOMPACTED_SIZE. This is to keep the size
+            //     of the disk buffer to be proportional to the unread part of the buffer.
             if self.uncompacted_size > self.max_uncompacted_size
                 || (self.uncompacted_size > unread_size
                     && self.uncompacted_size >= MIN_UNCOMPACTED_SIZE)
