@@ -3,10 +3,12 @@ use crate::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::Event,
+    event::BatchNotifier,
     sources::{
         self,
-        util::{decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{
+            decode_body, BuiltEvents, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
+        },
     },
     tls::TlsConfig,
 };
@@ -79,25 +81,29 @@ impl SourceConfig for DatadogLogsConfig {
 struct DatadogLogsSource {}
 
 impl HttpSource for DatadogLogsSource {
-    fn build_event(
+    fn build_events(
         &self,
         body: Bytes,
         header_map: HeaderMap,
         _query_parameters: HashMap<String, String>,
         request_path: &str,
-    ) -> Result<Vec<Event>, ErrorMessage> {
+    ) -> Result<BuiltEvents, ErrorMessage> {
         if body.is_empty() {
             // The datadog agent may sent empty payload as keep alive
             debug!(
                 message = "Empty payload ignored.",
                 internal_log_rate_secs = 30
             );
-            return Ok(Vec::new());
+            return Ok(BuiltEvents {
+                events: Vec::new(),
+                receiver: None,
+            });
         }
 
         let api_key = extract_api_key(&header_map, request_path);
 
-        decode_body(body, Encoding::Json).map(|mut events| {
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        decode_body(body, Encoding::Json, batch).map(|mut events| {
             // Add source type & Datadog API key
             let key = log_schema().source_type_key();
             for event in events.iter_mut() {
@@ -107,7 +113,8 @@ impl HttpSource for DatadogLogsSource {
                     log.insert("dd_api_key", k.clone());
                 }
             }
-            events
+            let receiver = Some(receiver);
+            BuiltEvents { events, receiver }
         })
     }
 }
@@ -128,11 +135,11 @@ mod tests {
 
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
-        event::Event,
-        test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
+        event::{Event, EventStatus},
+        test_util::{next_addr, spawn_collect_n, stream_update_status, trace_init, wait_for_tcp},
         Pipeline,
     };
-    use futures::channel::mpsc;
+    use futures::Stream;
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
@@ -142,7 +149,7 @@ mod tests {
         crate::test_util::test_generate_config::<DatadogLogsConfig>();
     }
 
-    async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
+    async fn source() -> (impl Stream<Item = Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
         tokio::spawn(async move {
@@ -158,6 +165,7 @@ mod tests {
             .unwrap();
         });
         wait_for_tcp(address).await;
+        let recv = stream_update_status(recv, EventStatus::Delivered);
         (recv, address)
     }
 
@@ -183,18 +191,24 @@ mod tests {
         trace_init();
         let (rx, addr) = source().await;
 
-        assert_eq!(
-            200,
-            send_with_path(
-                addr,
-                r#"[{"message":"foo", "timestamp": 123}]"#,
-                HeaderMap::new(),
-                "/v1/input/"
-            )
-            .await
-        );
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        r#"[{"message":"foo", "timestamp": 123}]"#,
+                        HeaderMap::new(),
+                        "/v1/input/"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
 
-        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -210,18 +224,24 @@ mod tests {
         trace_init();
         let (rx, addr) = source().await;
 
-        assert_eq!(
-            200,
-            send_with_path(
-                addr,
-                r#"[{"message":"bar", "timestamp": 456}]"#,
-                HeaderMap::new(),
-                "/v1/input/12345678abcdefgh12345678abcdefgh"
-            )
-            .await
-        );
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        r#"[{"message":"bar", "timestamp": 456}]"#,
+                        HeaderMap::new(),
+                        "/v1/input/12345678abcdefgh12345678abcdefgh"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
 
-        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -243,18 +263,24 @@ mod tests {
             "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
         );
 
-        assert_eq!(
-            200,
-            send_with_path(
-                addr,
-                r#"[{"message":"baz", "timestamp": 789}]"#,
-                headers,
-                "/v1/input/"
-            )
-            .await
-        );
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        r#"[{"message":"baz", "timestamp": 789}]"#,
+                        headers,
+                        "/v1/input/"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
 
-        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();

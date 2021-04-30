@@ -39,7 +39,7 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
-use vector_core::event::{BatchNotifier, Event, LogEvent};
+use vector_core::event::{BatchNotifier, Event, EventStatus, LogEvent};
 
 const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
 const WAIT_FOR_MIN_MILLIS: u64 = 5; // The minimum time to pause before retrying
@@ -544,4 +544,32 @@ pub async fn start_topology(
     topology::start_validated(config, diff, pieces)
         .await
         .unwrap()
+}
+
+pub fn stream_update_status(
+    stream: impl Stream<Item = Event>,
+    status: EventStatus,
+) -> impl Stream<Item = Event> {
+    stream.map(move |mut event| {
+        let metadata = event.metadata_mut();
+        metadata.update_status(status);
+        metadata.update_sources();
+        event
+    })
+}
+
+/// Collect the first `n` events from a stream while a future is spawned
+/// in the background. This is used for tests where the collect has to
+/// happen concurrent with the sending process (ie the stream is
+/// handling finalization, which is required for the future to receive
+/// an acknowledgement).
+pub async fn spawn_collect_n<F, S>(future: F, stream: S, n: usize) -> Vec<Event>
+where
+    F: Future<Output = ()> + Send + 'static,
+    S: Stream<Item = Event> + Unpin,
+{
+    let sender = tokio::spawn(future);
+    let events = collect_n(stream, n).await;
+    sender.await.expect("Failed to send data");
+    events
 }

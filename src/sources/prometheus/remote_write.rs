@@ -5,7 +5,7 @@ use crate::{
     internal_events::{PrometheusRemoteWriteParseError, PrometheusRemoteWriteReceived},
     sources::{
         self,
-        util::{decode, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{decode, BuiltEvents, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsConfig,
 };
@@ -91,13 +91,13 @@ impl RemoteWriteSource {
 }
 
 impl HttpSource for RemoteWriteSource {
-    fn build_event(
+    fn build_events(
         &self,
         mut body: Bytes,
         header_map: HeaderMap,
         _query_parameters: HashMap<String, String>,
         _full_path: &str,
-    ) -> Result<Vec<Event>, ErrorMessage> {
+    ) -> Result<BuiltEvents, ErrorMessage> {
         // If `Content-Encoding` header isn't `snappy` HttpSource won't decode it for us
         // se we need to.
         if header_map
@@ -107,10 +107,13 @@ impl HttpSource for RemoteWriteSource {
         {
             body = decode(&Some("snappy".to_string()), body)?;
         }
-        let result = self.decode_body(body)?;
-        let count = result.len();
+        let events = self.decode_body(body)?;
+        let count = events.len();
         emit!(PrometheusRemoteWriteReceived { count });
-        Ok(result)
+        Ok(BuiltEvents {
+            events,
+            receiver: None,
+        })
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::{
-    event::Event,
+    event::{BatchStatus, BatchStatusReceiver, Event},
     internal_events::{HttpBadRequest, HttpDecompressError, HttpEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -173,15 +173,20 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
     )
 }
 
+pub struct BuiltEvents {
+    pub events: Vec<Event>,
+    pub receiver: Option<BatchStatusReceiver>,
+}
+
 #[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
-    fn build_event(
+    fn build_events(
         &self,
         body: Bytes,
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
         path: &str,
-    ) -> Result<Vec<Event>, ErrorMessage>;
+    ) -> Result<BuiltEvents, ErrorMessage>;
 
     fn run(
         self,
@@ -236,14 +241,15 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             .is_valid(&auth_header)
                             .and_then(|()| decode(&encoding_header, body))
                             .and_then(|body| {
-                                let body_len=body.len();
-                                self.build_event(body, headers, query_parameters, path.as_str())
-                                    .map(|events| (events, body_len))
+                                let body_len = body.len();
+                                self.build_events(body, headers, query_parameters, path.as_str())
+                                    .map(|built| (built, body_len))
                             });
 
                         async move {
                             match events {
-                                Ok((events,body_size)) => {
+                                Ok((built, body_size)) => {
+                                    let BuiltEvents { events, receiver } = built;
                                     emit!(HttpEventsReceived {
                                         events_count: events.len(),
                                         byte_size: body_size,
@@ -256,7 +262,27 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                             error!(message = "Tried to send the following event.", %error);
                                             warp::reject::custom(RejectShuttingDown)
                                         })
-                                        .map_ok(|_| warp::reply())
+                                        .and_then(|_| async move {
+                                            let status = match receiver {
+                                                None => BatchStatus::Delivered,
+                                                Some(receiver) => receiver.await.unwrap_or(BatchStatus::Delivered),
+                                            };
+                                            match status {
+                                                BatchStatus::Delivered => Ok(warp::reply()),
+                                                BatchStatus::Errored => Err(warp::reject::custom(
+                                                    ErrorMessage::new(
+                                                        StatusCode::INTERNAL_SERVER_ERROR,
+                                                        "Error delivering contents to sink".into(),
+                                                    ),
+                                                )),
+                                                BatchStatus::Failed => Err(warp::reject::custom(
+                                                    ErrorMessage::new(
+                                                        StatusCode::BAD_REQUEST,
+                                                        "Contents failed to deliver to sink".into(),
+                                                    ),
+                                                )),
+                                            }
+                                        })
                                         .await
                                 }
                                 Err(error) => {

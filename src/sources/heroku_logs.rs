@@ -5,7 +5,9 @@ use crate::{
     },
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
-    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+    sources::util::{
+        add_query_parameters, BuiltEvents, ErrorMessage, HttpSource, HttpSourceAuthConfig,
+    },
     tls::TlsConfig,
 };
 use bytes::{Buf, Bytes};
@@ -55,15 +57,17 @@ struct LogplexSource {
 }
 
 impl HttpSource for LogplexSource {
-    fn build_event(
+    fn build_events(
         &self,
         body: Bytes,
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
         _full_path: &str,
-    ) -> Result<Vec<Event>, ErrorMessage> {
-        decode_message(body, header_map)
-            .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
+    ) -> Result<BuiltEvents, ErrorMessage> {
+        decode_message(body, header_map).map(|events| BuiltEvents {
+            events: add_query_parameters(events, &self.query_parameters, query_parameters),
+            receiver: None,
+        })
     }
 }
 
