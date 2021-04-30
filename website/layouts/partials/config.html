@@ -1,4 +1,4 @@
-{{/* Used by several shortcodes to display config-style info (CLI, API, VRL functions, etc.) */}}
+{{/* Used by several shortcodes to display config-style info (CLI, API, component configs/output/telemetry, etc.) */}}
 {{ $componentType := .type }}
 {{ $tag := .tag }}
 {{ $here := .File }}
@@ -7,7 +7,6 @@
   {{ with .config }}
   <div class="flex flex-col divide-y dark:divide-gray-700">
     {{ range $k, $v := . }}
-    {{ if ne $k "type" }}
     <div class="py-4 px-6">
       <span class="flex justify-between items-center">
         {{/* Config name */}}
@@ -54,6 +53,43 @@
       </div>
 
       {{ range $k, $v := $v.type }}
+      {{/* Object */}}
+      {{ if eq $k "object" }}
+      <div class="mt-3 border dark:border-gray-700 rounded flex flex-col divide-y dark:divide-gray-700">
+        {{ range $k, $v := $v.options }}
+        <div class="py-2.5 px-4">
+          <span class="flex justify-between items-center">
+            <span class="font-mono font-semibold">
+              {{ $k }}
+            </span>
+
+            <span>
+              {{ if $v.required  }}
+              {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+              {{ else }}
+              {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
+              {{ end }}
+
+              {{ range $k, $v := $v.type }}
+              {{ partial "badge.html" (dict "word" $k "color" "gray") }}
+              {{ end }}
+            </span>
+          </span>
+
+          <div class="prose dark:prose-dark">
+            {{ $v.description | markdownify }}
+          </div>
+
+          {{ range $k, $v := $v.type }}
+          {{ if $v.default }}
+          {{/* TODO */}}
+          {{ end }}
+          {{ end }}
+        </div>
+        {{ end }}
+      </div>
+      {{ end }}
+
       {{/* Enum */}}
       {{ with $v.enum }}
       <div class="mt-3 border rounded py-2 px-3 dark:border-gray-700">
@@ -128,6 +164,8 @@
         {{ end }}
         {{ end }}
       </div>
+
+      {{ $k }}
       {{ end }}
       {{ end }}
       {{ end }}
@@ -141,7 +179,6 @@
       {{ end }}
       {{ end }}
     </div>
-    {{ end }}
     {{ end }}
   </div>
   {{ end }}
@@ -345,7 +382,7 @@
             Examples
           </span>
 
-          {{ template "toggler" (dict "size" 4) }}
+          {{ template "config-toggler" (dict "size" 4) }}
         </span>
 
         <div x-show="open">

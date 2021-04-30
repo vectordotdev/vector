@@ -12,7 +12,7 @@ tags:
   transforms: ["rename_fields"]
 ---
 
-Vector has a long overdue [`rename_fields` transform][docs.transforms.rename_fields].
+Vector has a long overdue [`rename_fields` transform][docs.transforms.remap].
 This does exactly what it says, rename fields :).
 
-[docs.transforms.rename_fields]: /docs/reference/transforms/rename_fields/
+[docs.transforms.remap]: /docs/reference/configuration/transforms/remap

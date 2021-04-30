@@ -106,12 +106,6 @@ parent = "about"
 weight = 2
 
 [[menu.footer]]
-name = "Press"
-url = "/press"
-parent = "about"
-weight = 3
-
-[[menu.footer]]
 name = "Components"
 identifier = "components"
 weight = 2
