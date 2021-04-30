@@ -337,8 +337,8 @@ impl Serialize for LogEvent {
     }
 }
 
-impl vrl::Target for LogEvent {
-    fn get(&self, path: &LookupBuf) -> Result<Option<vrl::Value>, String> {
+impl vrl_core::Target for LogEvent {
+    fn get(&self, path: &LookupBuf) -> Result<Option<vrl_core::Value>, String> {
         if path.is_root() {
             Ok(Some(self.fields.clone().into()))
         } else {
@@ -348,7 +348,11 @@ impl vrl::Target for LogEvent {
         }
     }
 
-    fn remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<vrl::Value>, String> {
+    fn remove(
+        &mut self,
+        path: &LookupBuf,
+        compact: bool,
+    ) -> Result<Option<vrl_core::Value>, String> {
         if path.is_root() {
             Ok(Some({
                 let mut map = BTreeMap::new();
@@ -365,7 +369,7 @@ impl vrl::Target for LogEvent {
         }
     }
 
-    fn insert(&mut self, path: &LookupBuf, value: vrl::Value) -> Result<(), String> {
+    fn insert(&mut self, path: &LookupBuf, value: vrl_core::Value) -> Result<(), String> {
         let mut value = Value::from(value);
         if path.is_root() {
             if let Value::Map(_) = value {
@@ -387,7 +391,6 @@ mod test {
     use crate::test_util::open_fixture;
     use serde_json::json;
     use std::str::FromStr;
-    use tracing::trace;
 
     // This test iterates over the `tests/data/fixtures/log_event` folder and:
     //   * Ensures the EventLog parsed from bytes and turned into a serde_json::Value are equal to the
@@ -396,10 +399,8 @@ mod test {
     // Basically: This test makes sure we aren't mutilating any content users might be sending.
     #[test]
     fn json_value_to_vector_log_event_to_json_value() {
-        crate::test_util::trace_init();
         const FIXTURE_ROOT: &str = "tests/data/fixtures/log_event";
 
-        trace!(?FIXTURE_ROOT, "Opening.");
         std::fs::read_dir(FIXTURE_ROOT)
             .unwrap()
             .for_each(|fixture_file| match fixture_file {
@@ -412,13 +413,6 @@ mod test {
                     let serde_value_again: serde_json::Value =
                         vector_value.clone().try_into().unwrap();
 
-                    tracing::trace!(
-                        ?path,
-                        ?serde_value,
-                        ?vector_value,
-                        ?serde_value_again,
-                        "Asserting equal."
-                    );
                     assert_eq!(serde_value, serde_value_again);
                 }
                 _ => panic!("This test should never read Err'ing test fixtures."),
@@ -428,7 +422,6 @@ mod test {
     // We use `serde_json` pointers in this test to ensure we're validating that Vector correctly inputs and outputs things as expected.
     #[test]
     fn entry() {
-        crate::test_util::trace_init();
         let fixture =
             open_fixture("tests/data/fixtures/log_event/motivatingly-complex.json").unwrap();
         let mut event = LogEvent::try_from(fixture).unwrap();
@@ -440,7 +433,6 @@ mod test {
         );
         entry.or_insert_with(|| fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
-        trace!(?json);
         assert_eq!(json.pointer("/non-existing"), Some(&fallback));
 
         let lookup = Lookup::from_str("nulled").unwrap();
@@ -533,7 +525,7 @@ mod test {
             let event = LogEvent::from(value);
             let path = LookupBuf::from_segments(segments);
 
-            assert_eq!(vrl::Target::get(&event, &path), expect)
+            assert_eq!(vrl_core::Target::get(&event, &path), expect)
         }
     }
 
@@ -635,15 +627,15 @@ mod test {
             let object: BTreeMap<String, Value> = object;
             let mut event = LogEvent::from(object);
             let expect = LogEvent::from(expect);
-            let value: vrl::Value = value;
+            let value: vrl_core::Value = value;
             let path = LookupBuf::from_segments(segments);
 
             assert_eq!(
-                vrl::Target::insert(&mut event, &path, value.clone()),
+                vrl_core::Target::insert(&mut event, &path, value.clone()),
                 result
             );
             shared::assert_event_data_eq!(event, expect);
-            assert_eq!(vrl::Target::get(&event, &path), Ok(Some(value)));
+            assert_eq!(vrl_core::Target::get(&event, &path), Ok(Some(value)));
         }
     }
 
@@ -729,10 +721,16 @@ mod test {
         for (object, segments, compact, expect) in cases {
             let mut event = LogEvent::from(object);
             let path = LookupBuf::from_segments(segments);
-            let removed = vrl::Target::get(&event, &path).unwrap();
+            let removed = vrl_core::Target::get(&event, &path).unwrap();
 
-            assert_eq!(vrl::Target::remove(&mut event, &path, compact), Ok(removed));
-            assert_eq!(vrl::Target::get(&event, &LookupBuf::root()), Ok(expect))
+            assert_eq!(
+                vrl_core::Target::remove(&mut event, &path, compact),
+                Ok(removed)
+            );
+            assert_eq!(
+                vrl_core::Target::get(&event, &LookupBuf::root()),
+                Ok(expect)
+            )
         }
     }
 

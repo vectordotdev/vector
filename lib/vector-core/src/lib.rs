@@ -8,9 +8,19 @@
 //! This library was extracted from the top-level project package, discussed in
 //! RFC 7027.
 
-#![deny(missing_docs)]
-#![deny(clippy::all)]
-#![deny(clippy::pedantic)]
+#[cfg(feature = "api")]
+pub mod api;
+pub mod config;
+pub mod event;
+pub mod mapping;
+pub mod metrics;
+#[cfg(test)]
+mod test_util;
+
+#[macro_use]
+extern crate tracing;
+#[macro_use]
+extern crate pest_derive;
 
 /// Vector's basic error type, dynamically dispatched and safe to send across
 /// threads.
@@ -19,11 +29,3 @@ pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 /// Vector's basic result type, defined in terms of [`Error`] and generic over
 /// `T`.
 pub type Result<T> = std::result::Result<T, Error>;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(4, 2 + 2)
-    }
-}

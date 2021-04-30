@@ -316,7 +316,7 @@ mod test {
             "example distribution",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 10, 1.0 => 20],
+                samples: vector_core::samples![1.0 => 10, 1.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
         );
@@ -338,7 +338,7 @@ mod test {
             "example histogram",
             MetricKind::Incremental,
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
+                buckets: vector_core::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
                 count: 87,
                 sum: 975.2,
             },
@@ -363,7 +363,7 @@ mod test {
             "example summary",
             MetricKind::Incremental,
             MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![
+                quantiles: vector_core::quantiles![
                     0.1 => 2.0, 0.25 => 3.0, 0.5 => 5.0, 0.75 => 8.0, 0.9 => 7.0, 0.99 => 9.0, 1.0 => 10.0
                 ],
                 count: 197,
@@ -492,7 +492,7 @@ mod test {
             "example distribution",
             MetricKind::Absolute,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 10, 1.0 => 20],
+                samples: vector_core::samples![1.0 => 10, 1.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
         );
@@ -515,7 +515,7 @@ mod test {
             "example histogram",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
+                buckets: vector_core::buckets![1.0 => 20, 2.0 => 10, 4.0 => 45, 8.0 => 12],
                 count: 87,
                 sum: 975.2,
             },
@@ -540,7 +540,7 @@ mod test {
             "example summary",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![
+                quantiles: vector_core::quantiles![
                     0.1 => 2.0, 0.25 => 3.0, 0.5 => 5.0, 0.75 => 8.0, 0.9 => 7.0, 0.99 => 9.0, 1.0 => 10.0
                 ],
                 count: 197,

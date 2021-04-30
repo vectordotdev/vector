@@ -13,7 +13,7 @@ use std::{
     fmt::{self, Display, Formatter},
     iter::FromIterator,
 };
-use vrl::Target;
+use vrl_core::Target;
 
 #[derive(Clone, Debug, Deserialize, Getters, PartialEq, Serialize)]
 pub struct Metric {
@@ -62,10 +62,10 @@ pub enum MetricKind {
     Absolute,
 }
 
-impl TryFrom<vrl::Value> for MetricKind {
+impl TryFrom<vrl_core::Value> for MetricKind {
     type Error = String;
 
-    fn try_from(value: vrl::Value) -> Result<Self, Self::Error> {
+    fn try_from(value: vrl_core::Value) -> Result<Self, Self::Error> {
         let value = value.try_bytes().map_err(|e| e.to_string())?;
         match std::str::from_utf8(&value).map_err(|e| e.to_string())? {
             "incremental" => Ok(Self::Incremental),
@@ -78,7 +78,7 @@ impl TryFrom<vrl::Value> for MetricKind {
     }
 }
 
-impl From<MetricKind> for vrl::Value {
+impl From<MetricKind> for vrl_core::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
             MetricKind::Incremental => "incremental".into(),
@@ -209,7 +209,7 @@ pub fn zip_quantiles(
 /// Convert the Metric value into a vrl value.
 /// Currently vrl can only read the type of the value and doesn't consider
 /// any actual metric values.
-impl From<MetricValue> for vrl::Value {
+impl From<MetricValue> for vrl_core::Value {
     fn from(value: MetricValue) -> Self {
         match value {
             MetricValue::Counter { .. } => "counter",
@@ -757,7 +757,7 @@ enum MetricPathError<'a> {
 const MAX_METRIC_PATH_DEPTH: usize = 3;
 
 impl Target for Metric {
-    fn insert(&mut self, path: &LookupBuf, value: vrl::Value) -> Result<(), String> {
+    fn insert(&mut self, path: &LookupBuf, value: vrl_core::Value) -> Result<(), String> {
         if path.is_root() {
             return Err(MetricPathError::SetPathError.to_string());
         }
@@ -821,9 +821,9 @@ impl Target for Metric {
         .to_string())
     }
 
-    fn get(&self, path: &LookupBuf) -> Result<Option<vrl::Value>, String> {
+    fn get(&self, path: &LookupBuf) -> Result<Option<vrl_core::Value>, String> {
         if path.is_root() {
-            let mut map = BTreeMap::<String, vrl::Value>::new();
+            let mut map = BTreeMap::<String, vrl_core::Value>::new();
             map.insert("name".to_string(), self.series.name.name.clone().into());
             if let Some(ref namespace) = self.series.name.namespace {
                 map.insert("namespace".to_string(), namespace.clone().into());
@@ -861,7 +861,7 @@ impl Target for Metric {
                 ["tags"] => {
                     return Ok(self.tags().map(|map| {
                         let iter = map.iter().map(|(k, v)| (k.to_owned(), v.to_owned().into()));
-                        vrl::Value::from_iter(iter)
+                        vrl_core::Value::from_iter(iter)
                     }))
                 }
                 ["tags", field] => match self.tag_value(field) {
@@ -884,7 +884,11 @@ impl Target for Metric {
         Ok(None)
     }
 
-    fn remove(&mut self, path: &LookupBuf, _compact: bool) -> Result<Option<vrl::Value>, String> {
+    fn remove(
+        &mut self,
+        path: &LookupBuf,
+        _compact: bool,
+    ) -> Result<Option<vrl_core::Value>, String> {
         if path.is_root() {
             return Err(MetricPathError::SetPathError.to_string());
         }
@@ -896,7 +900,7 @@ impl Target for Metric {
                 ["tags"] => {
                     return Ok(self.series.tags.take().map(|map| {
                         let iter = map.into_iter().map(|(k, v)| (k, v.into()));
-                        vrl::Value::from_iter(iter)
+                        vrl_core::Value::from_iter(iter)
                     }))
                 }
                 ["tags", field] => return Ok(self.delete_tag(field).map(Into::into)),
@@ -947,7 +951,7 @@ mod test {
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
     use shared::btreemap;
-    use vrl::Value;
+    use vrl_core::Value;
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)

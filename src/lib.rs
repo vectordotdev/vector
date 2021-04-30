@@ -25,7 +25,6 @@ pub mod config;
 pub mod cli;
 pub mod conditions;
 pub mod dns;
-pub mod event;
 pub mod expiring_hash_map;
 pub mod generate;
 #[cfg(feature = "wasm")]
@@ -45,8 +44,6 @@ pub mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
-pub mod mapping;
-pub mod metrics;
 pub(crate) mod pipeline;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
@@ -81,7 +78,7 @@ pub mod vector_windows;
 
 pub use pipeline::Pipeline;
 
-pub use vector_core::{Error, Result};
+pub use vector_core::{event, mapping, metrics, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]

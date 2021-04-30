@@ -94,7 +94,7 @@ prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 shared = { path = "lib/shared" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
-vector_core = { path = "lib/vector-core" }
+vector_core = { path = "lib/vector-core", default-features = false, features = [] }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures
@@ -267,7 +267,6 @@ atty = "0.2.14"
 nix = "0.20.0"
 
 [build-dependencies]
-prost-build = "0.7.0"
 built = { version = "0.5.0", features = ["chrono", "git2"] }
 
 [dev-dependencies]
@@ -344,6 +343,7 @@ api = [
   "async-graphql-warp",
   "base64",
   "itertools",
+  "vector_core/api",
   "warp",
   "uuid",
 ]
@@ -354,6 +354,7 @@ api-client = [
   "num-format",
   "number_prefix",
   "tui",
+  "vector_core/api",
   "vector-api-client",
 ]
 
@@ -484,7 +485,7 @@ transforms-json_parser = []
 transforms-key_value_parser = []
 transforms-log_to_metric = []
 transforms-logfmt_parser = ["logfmt"]
-transforms-lua = ["rlua"]
+transforms-lua = ["rlua", "vector_core/lua"]
 transforms-merge = []
 transforms-metric_to_log = []
 transforms-reduce = []

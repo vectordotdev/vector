@@ -83,10 +83,6 @@ impl TryFrom<TomlValue> for Value {
     }
 }
 
-// We only enable this in testing for convenience, since `"foo"` is a `&str`.
-// In normal operation, it's better to let the caller decide where to clone and when, rather than
-// hiding this from them.
-#[cfg(test)]
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
         Value::Bytes(Vec::from(s.as_bytes()).into())
@@ -204,9 +200,9 @@ impl TryInto<serde_json::Value> for Value {
     }
 }
 
-impl From<vrl::Value> for Value {
-    fn from(v: vrl::Value) -> Self {
-        use vrl::Value::*;
+impl From<vrl_core::Value> for Value {
+    fn from(v: vrl_core::Value) -> Self {
+        use vrl_core::Value::*;
 
         match v {
             Bytes(v) => Value::Bytes(v),
@@ -222,9 +218,9 @@ impl From<vrl::Value> for Value {
     }
 }
 
-impl From<Value> for vrl::Value {
+impl From<Value> for vrl_core::Value {
     fn from(v: Value) -> Self {
-        use vrl::Value::*;
+        use vrl_core::Value::*;
 
         match v {
             Value::Bytes(v) => v.into(),
@@ -349,7 +345,7 @@ impl Value {
     /// This is notably useful for things like influxdb logs where we list only leaves.
     ///
     /// ```rust
-    /// use vector::event::Value;
+    /// use vector_core::event::Value;
     /// use std::collections::BTreeMap;
     ///
     /// let val = Value::from(1);
@@ -385,7 +381,7 @@ impl Value {
     /// Return if the node is empty, that is, it is an array or map with no items.
     ///
     /// ```rust
-    /// use vector::event::Value;
+    /// use vector_core::event::Value;
     /// use std::collections::BTreeMap;
     ///
     /// let val = Value::from(1);
@@ -421,7 +417,7 @@ impl Value {
     /// Return the number of subvalues the value has.
     ///
     /// ```rust
-    /// use vector::event::Value;
+    /// use vector_core::event::Value;
     /// use std::collections::BTreeMap;
     ///
     /// let val = Value::from(1);
@@ -676,7 +672,7 @@ impl Value {
     /// Insert a value at a given lookup.
     ///
     /// ```rust
-    /// use vector::event::Value;
+    /// use vector_core::event::Value;
     /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
@@ -761,7 +757,7 @@ impl Value {
     /// Setting `prune` to true will also remove the entries of maps and arrays that are emptied.
     ///
     /// ```rust
-    /// use vector::event::Value;
+    /// use vector_core::event::Value;
     /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
@@ -906,7 +902,7 @@ impl Value {
     /// Get an immutable borrow of the value by lookup.
     ///
     /// ```rust
-    /// use vector::event::Value;
+    /// use vector_core::event::Value;
     /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
@@ -997,7 +993,7 @@ impl Value {
     /// Get a mutable borrow of the value by lookup.
     ///
     /// ```rust
-    /// use vector::event::Value;
+    /// use vector_core::event::Value;
     /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
@@ -1082,7 +1078,7 @@ impl Value {
     /// Determine if the lookup is contained within the value.
     ///
     /// ```rust
-    /// use vector::event::Value;
+    /// use vector_core::event::Value;
     /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
@@ -1110,7 +1106,7 @@ impl Value {
     /// will be prefixed with that lookup.
     ///
     /// ```rust
-    /// use vector::event::Value;
+    /// use vector_core::event::Value;
     /// use lookup::{Lookup, LookupBuf};
     /// let plain_key = "lick";
     /// let lookup_key = LookupBuf::from_str("vic.stick.slam").unwrap();
@@ -1204,7 +1200,7 @@ impl Value {
     /// will be prefixed with that lookup.
     ///
     /// ```rust
-    /// use vector::event::Value;
+    /// use vector_core::event::Value;
     /// use lookup::{Lookup, LookupBuf};
     /// let plain_key = "lick";
     /// let lookup_key = LookupBuf::from_str("vic.stick.slam").unwrap();
@@ -1661,14 +1657,11 @@ mod test {
     // Basically: This test makes sure we aren't mutilating any content users might be sending.
     #[test]
     fn json_value_to_vector_value_to_json_value() {
-        crate::test_util::trace_init();
         const FIXTURE_ROOT: &str = "tests/data/fixtures/value";
 
-        tracing::trace!(?FIXTURE_ROOT, "Opening");
         std::fs::read_dir(FIXTURE_ROOT).unwrap().for_each(|type_dir| match type_dir {
             Ok(type_name) => {
                 let path = type_name.path();
-                tracing::trace!(?path, "Opening");
                 std::fs::read_dir(path).unwrap().for_each(|fixture_file| match fixture_file {
                     Ok(fixture_file) => {
                         let path = fixture_file.path();
@@ -1689,13 +1682,7 @@ mod test {
                             _ => unreachable!("You need to add a new type handler here."),
                         }, "Typecheck failure. Wanted {}, got {:?}.", expected_type, vector_value);
 
-                        let serde_value_again: serde_json::Value = vector_value.clone().try_into().unwrap();
-
-                        tracing::trace!(?path, ?serde_value, ?vector_value, ?serde_value_again, "Asserting equal.");
-                        assert_eq!(
-                            serde_value,
-                            serde_value_again
-                        );
+                        let _serde_value_again: serde_json::Value = vector_value.clone().try_into().unwrap();
                     },
                     _ => panic!("This test should never read Err'ing test fixtures."),
                 });
