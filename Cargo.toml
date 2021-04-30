@@ -345,6 +345,7 @@ api = [
   "base64",
   "itertools",
   "warp",
+  "uuid",
 ]
 
 # API client
