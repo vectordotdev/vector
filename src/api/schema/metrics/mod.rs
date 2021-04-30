@@ -31,9 +31,6 @@ pub use source::{IntoSourceMetrics, SourceMetrics};
 pub use transform::{IntoTransformMetrics, TransformMetrics};
 pub use uptime::Uptime;
 
-#[cfg(feature = "sources-host_metrics")]
-pub use host::HostMetrics;
-
 #[derive(Interface)]
 #[graphql(field(name = "timestamp", type = "Option<DateTime<Utc>>"))]
 pub enum MetricType {
@@ -49,8 +46,8 @@ pub struct MetricsQuery;
 impl MetricsQuery {
     #[cfg(feature = "sources-host_metrics")]
     /// Vector host metrics
-    async fn host_metrics(&self) -> HostMetrics {
-        HostMetrics::new()
+    async fn host_metrics(&self) -> host::HostMetrics {
+        host::HostMetrics::new()
     }
 }
 
