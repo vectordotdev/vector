@@ -2956,7 +2956,7 @@ checksum = "f3974bf42c2050bbf0696471e4d91ecc9844845c2323b388aa7bf9d63f3b0693"
 dependencies = [
  "proc-macro2 1.0.26",
  "quote 1.0.9",
- "syn 1.0.69",
+ "syn 1.0.71",
 ]
 
 [[package]]
@@ -5760,9 +5760,9 @@ dependencies = [
 
 [[package]]
 name = "rust_decimal"
-version = "1.12.2"
+version = "1.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d64bd27418c091ebd539b00f50ad059fc41421c87d5033c217cd76c7506d0d71"
+checksum = "9f630aa659f2997db337f8be546c14e0c8f690eba3d7c59f7808b2900fa480f3"
 dependencies = [
  "arrayvec 0.5.2",
  "num-traits",
