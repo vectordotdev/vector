@@ -28,7 +28,6 @@ async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
                     events_out_throughput_sec: 0,
                     processed_bytes_total: 0,
                     processed_bytes_throughput_sec: 0,
-
                     errors: 0,
                 }))
                 .await;
