@@ -1,6 +1,69 @@
 {{ $key := .Get 0 }}
 {{ $examples := site.Data.docs.remap.examples }}
 {{ $first := index $examples 0 }}
+<div class="no-prose border rounded flex flex-col divide-y">
+  {{ range $examples }}
+  {{ $input := dict "message" .input.log.message | jsonify }}
+  {{ $vrlSourceCode := highlight .source "toml" "" }}
+  {{ $output := .output | jsonify (dict "indent" "  ") }}
+  {{ $outputCode := highlight $output "json" "" }}
+  {{ $id := .title | urlize }}
+  <div class="py-4 px-6">
+    <div id="{{ $id }}">
+      <a href="#{{ $id }}" class="text-lg font-semibold tracking-tight">
+        {{ .title }}
+      </a>
+    </div>
+
+    <div class="mt-2 flex flex-col space-y-2">
+      {{ with .input.log }}
+      {{ $json := . | jsonify (dict "indent" "  ") }}
+      {{ $code := highlight $json "json" "" }}
+      <span>
+        Given the following <a href="/docs/about/under-the-hood/architecture/data-model/log">Vector log event</a>...
+      </span>
+      {{ $code }}
+      {{ end }}
+
+      {{ with .input.metric }}
+      {{ $json := . | jsonify (dict "indent" "  ") }}
+      {{ $code := highlight $json "json" "" }}
+      <span>
+        Given the following <a href="/docs/about/under-the-hood/architecture/data-model/metric">Vector metric event</a>...
+      </span>
+      {{ $code }}
+      {{ end }}
+
+      <span>
+        ...and this VRL program...
+      </span>
+
+      {{ $vrlSourceCode }}
+
+      {{ if .raises }}
+      {{ $errorCode := highlight .raises.compiletime "ruby" "" }}
+      <span>
+        ...you should see this error:
+      </span>
+
+      {{ $errorCode }}
+      {{ else }}
+      {{ with .input.log }}
+      <span>...the following log event is output:</span>
+      {{ end }}
+
+      {{ with .input.metric }}
+      <span>...the following metric event is output:</span>
+      {{ end }}
+
+      {{ $outputCode }}
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+</div>
+
+
 <div class="vrl-examples" x-data="{ shown: localStorage.getItem('vrl-example') || '{{ $first.title }}', open: false }">
   <div class="dropdown" :class="{ 'is-active': open }">
     <div class="dropdown-trigger" @click="open = !open" @click.away="open = false">
@@ -29,28 +92,6 @@
     {{ $output := .output | jsonify (dict "indent" "  ") }}
     {{ $outputCode := highlight $output "json" "" }}
     <div x-show="shown == '{{ .title }}'">
-      {{ with .input.log }}
-      {{ $json := . | jsonify (dict "indent" "  ") }}
-      {{ $code := highlight $json "json" "" }}
-      <p>
-        Given the following <a href="/docs/about/under-the-hood/architecture/data-model/log">Vector log event</a>...
-      </p>
-
-      {{ $code }}
-
-      {{ end }}
-
-      {{ with .input.metric }}
-      {{ $json := . | jsonify (dict "indent" "  ") }}
-      {{ $code := highlight $json "json" "" }}
-      <p>
-        Given the following <a href="/docs/about/under-the-hood/architecture/data-model/metric">Vector metric event</a>...
-      </p>
-
-      {{ $code }}
-
-      {{ end }}
-
       <p>...and the following VRL program...</p>
 
       {{ $vrlSourceCode }}

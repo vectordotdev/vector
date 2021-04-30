@@ -17,9 +17,9 @@
       {{ template "errors-toggler" }}
     </span>
 
-    <div x-show="open">
+    <div x-show="open" class="mt-4">
       {{ with $error.description }}
-      <div class="mt-4 leading-tight">
+      <div class="leading-tight">
         {{ . | markdownify }}
       </div>
       {{ end }}
@@ -30,7 +30,7 @@
           Rationale
         </span>
 
-        <div class="mt-2 leading-tight">
+        <div class="mt-1 leading-tight">
           {{ . | markdownify }}
         </div>
       </div>
@@ -42,7 +42,7 @@
           Resolution
         </span>
 
-        <div class="mt-2 leading-tight">
+        <div class="mt-1 leading-tight">
           {{ . | markdownify }}
         </div>
       </div>

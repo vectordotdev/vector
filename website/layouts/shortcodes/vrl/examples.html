@@ -9,6 +9,11 @@
 {{ range $funcs }}
 {{ $example := index .examples 0 }}
 {{ $href := $example.title | urlize }}
+<div class="border rounded-md flex flex-col divide-y">
+  {{ $example.title }}
+</div>
+
+
 <div class="card">
   <div class="card-content">
     <h3 x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $href }}">
