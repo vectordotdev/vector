@@ -82,7 +82,15 @@ impl HumanFormatter for i64 {
     }
 }
 
-static HEADER: [&str; 7] = ["Name", "Kind", "Type", "Events In", "Events Out", "Bytes", "Errors"];
+static HEADER: [&str; 7] = [
+    "Name",
+    "Kind",
+    "Type",
+    "Events In",
+    "Events Out",
+    "Bytes",
+    "Errors",
+];
 
 struct Widgets<'a> {
     constraints: Vec<Constraint>,
@@ -193,12 +201,13 @@ impl<'a> Widgets<'a> {
             .block(Block::default().borders(Borders::ALL).title("Components"))
             .column_spacing(2)
             .widths(&[
-                Constraint::Percentage(20),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
-                Constraint::Percentage(10),
+                Constraint::Percentage(19),
+                Constraint::Percentage(8),
+                Constraint::Percentage(8),
+                Constraint::Percentage(19),
+                Constraint::Percentage(19),
+                Constraint::Percentage(19),
+                Constraint::Percentage(8),
             ]);
 
         f.render_widget(w, area);
