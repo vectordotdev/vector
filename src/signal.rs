@@ -1,8 +1,7 @@
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{broadcast, mpsc};
 use tokio_stream::{Stream, StreamExt};
 
-pub type ShutdownTx = oneshot::Sender<()>;
-type ShutdownRx = oneshot::Receiver<()>;
+pub type ShutdownTx = broadcast::Sender<()>;
 pub type SignalTx = mpsc::Sender<SignalTo>;
 pub type SignalRx = mpsc::Receiver<SignalTo>;
 
@@ -24,7 +23,7 @@ pub enum SignalTo {
 pub struct SignalHandler {
     tx: SignalTx,
     rx: Option<SignalRx>,
-    shutdown: Option<ShutdownTx>,
+    shutdown_txs: Vec<ShutdownTx>,
 }
 
 impl SignalHandler {
@@ -36,7 +35,7 @@ impl SignalHandler {
         Self {
             tx,
             rx: Some(rx),
-            shutdown: None,
+            shutdown_txs: vec![],
         }
     }
 
@@ -66,29 +65,62 @@ impl SignalHandler {
         });
     }
 
-    /// Add a stream with a shutdown. The receiver is returned to the caller, allowing the
-    /// caller to be informed when a stream replaces it or it's explictly cleared.
-    pub fn with_shutdown<T, S>(&mut self, stream: S) -> ShutdownRx
+    /// Takes a stream, sending to the underlying signal receiver. Returns a broadcast tx
+    /// channel which can be used by the caller to either subscribe to cancelation, or trigger
+    /// it. Useful for providers that may need to do both.
+    pub fn with_shutdown<T, S>(&mut self, stream: S) -> ShutdownTx
     where
         T: Into<SignalTo> + Send + Sync,
         S: Stream<Item = T> + 'static + Send + Sync,
     {
-        let (shutdown_tx, shutdown_rx) = oneshot::channel();
-        self.shutdown = Some(shutdown_tx);
-        self.add(stream);
+        let (shutdown_tx, mut shutdown_rx) = broadcast::channel::<()>(2);
+        let tx = self.tx.clone();
 
-        shutdown_rx
+        self.shutdown_txs.push(shutdown_tx.clone());
+
+        tokio::spawn(async move {
+            tokio::pin!(stream);
+
+            loop {
+                tokio::select! {
+                    biased;
+
+                    _ = shutdown_rx.recv() => break,
+                    Some(value) = stream.next() => {
+                        if tx.send(value.into()).await.is_err() {
+                            error!(message = "Couldn't send signal.");
+                            break;
+                        }
+                    }
+                    else => {
+                        error!(message = "Underlying stream is closed.");
+                        break;
+                    }
+                }
+            }
+        });
+
+        shutdown_tx
     }
 
-    /// Triggers a shutdown by letting it fall out of scope.
-    pub fn clear(&mut self) {
-        self.shutdown = None;
+    /// Triggers a shutdown on the underlying braodcast channel(s).
+    pub fn trigger_shutdown(&mut self) {
+        for shutdown_tx in self.shutdown_txs.drain(..) {
+            // An error just means the channel was already shut down; safe to ignore.
+            let _ = shutdown_tx.send(());
+        }
     }
 
     /// Takes the receiver, replacing it with `None`. A controller is intended to have only one
     /// consumer, typically at the root of the application.
     pub fn take_rx(&mut self) -> Option<SignalRx> {
         self.rx.take()
+    }
+}
+
+impl Default for SignalHandler {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
