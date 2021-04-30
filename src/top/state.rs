@@ -5,9 +5,6 @@ type NamedMetric = (String, i64);
 
 #[derive(Debug)]
 pub enum EventType {
-    ProcessedEventsTotals(Vec<NamedMetric>),
-    /// Interval in ms + named metric
-    ProcessedEventsThroughputs(i64, Vec<NamedMetric>),
     EventsInTotals(Vec<NamedMetric>),
     /// Interval in ms + named metric
     EventsInThroughputs(i64, Vec<NamedMetric>),
@@ -31,8 +28,6 @@ pub struct ComponentRow {
     pub name: String,
     pub kind: String,
     pub component_type: String,
-    pub processed_events_total: i64,
-    pub processed_events_throughput_sec: i64,
     pub processed_bytes_total: i64,
     pub processed_bytes_throughput_sec: i64,
     pub events_in_total: i64,
@@ -55,21 +50,6 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
         loop {
             if let Some(event_type) = event_rx.recv().await {
                 match event_type {
-                    EventType::ProcessedEventsTotals(rows) => {
-                        for (name, v) in rows {
-                            if let Some(r) = state.get_mut(&name) {
-                                r.processed_events_total = v;
-                            }
-                        }
-                    }
-                    EventType::ProcessedEventsThroughputs(interval, rows) => {
-                        for (name, v) in rows {
-                            if let Some(r) = state.get_mut(&name) {
-                                r.processed_events_throughput_sec =
-                                    (v as f64 * (1000.0 / interval as f64)) as i64;
-                            }
-                        }
-                    }
                     EventType::EventsInTotals(rows) => {
                         for (name, v) in rows {
                             if let Some(r) = state.get_mut(&name) {
