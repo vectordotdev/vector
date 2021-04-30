@@ -120,37 +120,47 @@ pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
 }
 
 #[macro_export]
-/// This macro is used to emit metrics as a `counter` while simultaneously converting from absolute
-/// values to incremental values.
+/// This macro is used to emit metrics as a `counter` while simultaneously
+/// converting from absolute values to incremental values.
 ///
-/// # Panics
-///
-/// If a subsequent value is smaller than the previous one.
+/// Values that do not arrive in strictly monotonically increasing order are
+/// ignored and will not be emitted.
 macro_rules! update_counter {
     ($label:literal, $value:expr) => {{
-        use ::std::sync::Mutex;
+        use ::std::sync::atomic::{AtomicU64, Ordering};
 
         ::lazy_static::lazy_static! {
-            // We use a `Mutex` here instead of an `Atomic` to guarantee that the incremental values
-            // are emitted in the same order as the absolute values arrive.
-            //
-            // If this requirement is not important and/or contention gets too high at this point,
-            // reconsider if a `Mutex` is necessary here.
-            static ref PREVIOUS_VALUE: Mutex<u64> = Mutex::new(0);
+            static ref PREVIOUS_VALUE: AtomicU64 = AtomicU64::new(0);
         }
 
-        let mut previous_value = PREVIOUS_VALUE.lock().unwrap();
+        let new_value = $value;
+        let mut previous_value = PREVIOUS_VALUE.load(Ordering::Relaxed);
 
-        let delta = match $value.checked_sub(*previous_value) {
-            Some(delta) => delta,
-            None => {
-                warn!(message = "Violation of update_counter! invariant, called with a series of non-monotonic values.", label = $label);
-                0
+        loop {
+            // Either a new greater value has been emitted before this thread updated the counter
+            // or values were provided that are not in strictly monotonically increasing order.
+            // Ignore.
+            if new_value <= previous_value {
+                break;
             }
-        };
 
-        counter!($label, delta);
-
-        *previous_value = $value;
+            match PREVIOUS_VALUE.compare_exchange_weak(
+                previous_value,
+                new_value,
+                Ordering::SeqCst,
+                Ordering::Relaxed,
+            ) {
+                // Another thread has written a new value before us. Re-enter loop.
+                Err(value) => previous_value = value,
+                // Calculate delta to last emitted value and emit it.
+                Ok(_) => {
+                    let delta = new_value - previous_value;
+                    // Albeit very unlikely, note that this sequence of deltas might be emitted in
+                    // a different order than they were calculated.
+                    counter!($label, delta);
+                    break;
+                }
+            }
+        }
     }};
 }
