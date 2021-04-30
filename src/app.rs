@@ -212,7 +212,7 @@ impl Application {
             .signal_handler
             .take()
             .expect("no signal handler");
-        let mut signal_rx = signal_handler.take_rx().expect("no signal receiver");
+        let mut signals = signal_handler.take_rx().expect("no signal receiver");
 
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
@@ -244,7 +244,7 @@ impl Application {
 
             let signal = loop {
                 tokio::select! {
-                    Some(signal) = signal_rx.recv() => {
+                    Some(signal) = signals.recv() => {
                         match signal {
                             SignalTo::ReloadFromString(new_config) => {
                                 match config::load_from_str(&new_config, None) {
@@ -278,8 +278,6 @@ impl Application {
                                     }
                                 }
                             }
-                            // Reload a configuration from the filesystem. If a new provider is
-                            // given, the previous drops out of scope and will be cleaned up.
                             SignalTo::ReloadFromDisk => {
                                 // Reload paths
                                 config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
@@ -322,7 +320,7 @@ impl Application {
                     // Trigger graceful shutdown if a component crashed, or all sources have ended.
                     _ = graceful_crash.next() => break SignalTo::Shutdown,
                     _ = &mut sources_finished => break SignalTo::Shutdown,
-                    else => unreachable!("signals signals never end"),
+                    else => unreachable!("Signal streams never end"),
                 }
             };
 
@@ -331,7 +329,7 @@ impl Application {
                     emit!(VectorStopped);
                     tokio::select! {
                         _ = topology.stop() => (), // Graceful shutdown finished
-                        _ = signal_rx.recv() => {
+                        _ = signals.recv() => {
                             // It is highly unlikely that this event will exit from topology.
                             emit!(VectorQuit);
                             // Dropping the shutdown future will immediately shut the server down
