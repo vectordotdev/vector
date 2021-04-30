@@ -1,15 +1,10 @@
-use crate::event::{Event, LogEvent, Value};
+use crate::event::Event;
 use metrics_tracing_context::MetricsLayer;
 use once_cell::sync::OnceCell;
-use std::{
-    convert::TryInto,
-    fmt::Debug,
-    sync::{Mutex, MutexGuard},
-};
+use std::sync::{Mutex, MutexGuard};
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::{
     dispatcher::{set_global_default, Dispatch},
-    field::{Field, Visit},
     span::Span,
     subscriber::Interest,
     Id, Metadata, Subscriber,

@@ -593,7 +593,7 @@ impl MetricValue {
                 *samples = samples
                     .iter()
                     .copied()
-                    .filter(|sample| samples2.iter().find(|sample2| sample == *sample2).is_none())
+                    .filter(|sample| !samples2.iter().any(|sample2| sample == sample2))
                     .collect();
             }
             (
@@ -857,7 +857,7 @@ impl Target for Metric {
                     Some(timestamp) => return Ok(Some(timestamp.into())),
                     None => continue,
                 },
-                ["kind"] => return Ok(Some(self.data.kind.clone().into())),
+                ["kind"] => return Ok(Some(self.data.kind.into())),
                 ["tags"] => {
                     return Ok(self.tags().map(|map| {
                         let iter = map.iter().map(|(k, v)| (k.to_owned(), v.to_owned().into()));

@@ -15,8 +15,6 @@
 extern crate tracing;
 #[macro_use]
 extern crate derivative;
-#[macro_use]
-extern crate pest_derive;
 #[cfg(feature = "vrl-cli")]
 extern crate vrl_cli;
 

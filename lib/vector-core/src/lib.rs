@@ -8,6 +8,8 @@
 //! This library was extracted from the top-level project package, discussed in
 //! RFC 7027.
 
+#![allow(clippy::float_cmp)]
+
 #[cfg(feature = "api")]
 pub mod api;
 pub mod config;

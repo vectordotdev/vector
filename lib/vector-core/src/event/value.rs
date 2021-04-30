@@ -657,12 +657,10 @@ impl Value {
                     },
                     None => value,
                 };
+                array.push(next_val);
                 if i.is_negative() {
                     // We need to push to the front of the array.
-                    array.push(next_val);
                     array.rotate_right(1);
-                } else {
-                    array.push(next_val);
                 }
                 retval
             }
