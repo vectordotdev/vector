@@ -48,15 +48,30 @@ impl db_key::Key for Key {
     }
 }
 
+/// The writer side of N to 1 channel through leveldb.
 pub struct Writer {
+    /// Leveldb database.
+    /// Shared with Reader.
     db: Option<Arc<Database<Key>>>,
+    /// First unused key/index.
+    /// Shared with other Writers.
     offset: Arc<AtomicUsize>,
+    /// Writers notify Reader through this Waker.
+    /// Shared with Reader.
     write_notifier: Arc<AtomicWaker>,
+    /// Waiting queue for when the disk is full.
+    /// Shared with Reader.
     blocked_write_tasks: Arc<Mutex<Vec<Waker>>>,
+    /// Batched writes.
     writebatch: Writebatch<Key>,
+    /// Events in batch.
     batch_size: usize,
+    /// Max size of unread events in bytes.
     max_size: usize,
+    /// Size of unread events in bytes.
+    /// Shared with Reader.
     current_size: Arc<AtomicUsize>,
+    /// Buffer for internal use.
     slot: Option<Event>,
 }
 
@@ -208,18 +223,47 @@ impl Drop for Writer {
     }
 }
 
+/// The reader side of N to 1 channel through leveldb.
+///
+/// Reader maintains/manages events thorugh several stages.
+/// Unread -> Read -> Deleted -> Compacted
+///
+/// So the disk buffer (indices/keys) is separated into following regions.
+/// |--Compacted--|--Deleted--|--Read--|--Unread--
+///  ^             ^           ^        ^
+///  |             |           |        |
+///  0  compacted_offset       |        |
+///                      delete_offset  |
+///                                 read_offset
 pub struct Reader {
+    /// Leveldb database.
+    /// Shared with Writers.
     db: Arc<Database<Key>>,
+    /// First unread key
     read_offset: usize,
-    uncompacted_offset: usize,
+    /// First uncompacted key
+    compacted_offset: usize,
+    /// First not deleted key
     delete_offset: usize,
+    /// Reader is notified by Writers through this Waker.
+    /// Shared with Writers.
     write_notifier: Arc<AtomicWaker>,
+    /// Writers blocked by disk being full.
+    /// Shared with Writers.
     blocked_write_tasks: Arc<Mutex<Vec<Waker>>>,
+    /// Size of unread events in bytes.
+    /// Shared with Writers.
     current_size: Arc<AtomicUsize>,
+    /// Number of oldest read, not deleted, events that have been acked by the consumer.
+    /// Shared with consumer.
     ack_counter: Arc<AtomicUsize>,
+    /// Size of deleted, not compacted, events in bytes.
     uncompacted_size: usize,
+    /// Sizes in bytes of read, not acked/deleted, events.
     unacked_sizes: VecDeque<usize>,
+    /// Buffer for internal use.
     buffer: Vec<Vec<u8>>,
+    /// Limit on uncompacted_size after which we trigger compaction.
     max_uncompacted_size: usize,
 }
 
@@ -327,9 +371,9 @@ impl Reader {
 
             debug!("Compacting disk buffer.");
             self.db
-                .compact(&Key(self.uncompacted_offset), &Key(self.delete_offset));
+                .compact(&Key(self.compacted_offset), &Key(self.delete_offset));
 
-            self.uncompacted_offset = self.delete_offset;
+            self.compacted_offset = self.delete_offset;
         }
     }
 }
@@ -419,7 +463,7 @@ impl super::DiskBuffer for Buffer {
             write_notifier: Arc::clone(&write_notifier),
             blocked_write_tasks,
             read_offset: head,
-            uncompacted_offset: 0,
+            compacted_offset: 0,
             delete_offset: head,
             current_size,
             ack_counter,
