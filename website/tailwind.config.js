@@ -108,7 +108,7 @@ module.exports = {
       orange: colors.orange,
       //amber: colors.amber,
       yellow: colors.yellow,
-      //lime: colors.lime,
+      lime: colors.lime,
       green: colors.green,
       //emerald: colors.emerald,
       //teal: colors.teal,

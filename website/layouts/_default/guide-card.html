@@ -12,7 +12,7 @@
   </div>
   {{ end }}
 
-  <div class="block space-y-1.5">
+  <div class="flex space-x-1.5">
     {{ with .Params.domain }}
     {{ partial "badge.html" (dict "prefix" "domain" "word" . "color" "green") }}
     {{ end }}

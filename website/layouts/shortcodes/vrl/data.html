@@ -18,9 +18,16 @@
 
 {{ with $v.grammar }}
 <div class="mt-2 no-prose">
-  <span class="font-semibold">
-    Grammar
-  </span>
+  <div>
+    <h4 x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $id }}-grammar" class="flex items-center">
+      Grammar
+      <a class="ml-2" x-cloak x-show="show" href="#{{ $id }}">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+        </svg>
+      </a>
+    </h4>
+  </div>
 
   <div class="mt-2">
     {{ highlight .source "ruby" "" }}
@@ -48,7 +55,7 @@
 
 {{ with $v.examples }}
 {{ $id := printf "%s-examples" $k }}
-<h4 x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $id }}" class="flex items-center">
+<h4 x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $id }}-examples" class="flex items-center">
   Examples
   <a class="ml-2" x-cloak x-show="show" href="#{{ $id }}">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -57,14 +64,14 @@
   </a>
 </h4>
 
-
-
-<div class="border rounded-md flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700">
-  {{ range . }}
-  <div class="py-4 px-6">
-    {{ . }}
+<div class="no-prose border rounded-md flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700">
+  <div>
+    <div class="flex flex-col space-y-2 divide-y dark:divide-gray-700">
+      {{ range . }}
+      {{ template "vrl-data-example" . }}
+      {{ end }}
+    </div>
   </div>
-  {{ end }}
 </div>
 {{ end }}
 {{ end }}
@@ -76,4 +83,46 @@
 {{ else }}
 {{ highlight . "ruby" "" }}
 {{ end }}
+{{ end }}
+
+{{ define "vrl-data-example" }}
+<div class="py-2 px-3">
+  {{ with .title }}
+  <span class="font-bold">
+    {{ . }}
+  </span>
+  {{ end }}
+
+  <div>
+    {{ with .input }}
+    <div>
+      <span class="text-base">
+        Vector event
+      </span>
+
+      {{ template "code" . }}
+    </div>
+    {{ end }}
+
+    {{ with .source }}
+    <div>
+      <span class="text-base">
+        VRL program
+      </span>
+
+      {{ template "code" . }}
+    </div>
+    {{ end }}
+
+    {{ with .return }}
+    <div>
+      <span class="text-base">
+        Resulting event
+      </span>
+
+      {{ template "code" . }}
+    </div>
+    {{ end }}
+  </div>
+</div>
 {{ end }}
