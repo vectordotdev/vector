@@ -1666,7 +1666,7 @@ mod test {
                         let buf = parse_artifact(&path).unwrap();
 
                         let serde_value: serde_json::Value = serde_json::from_slice(&*buf).unwrap();
-                        let vector_value = Value::from(serde_value.clone());
+                        let vector_value = Value::from(serde_value);
 
                         // Validate type
                         let expected_type = type_name.path().file_name().unwrap().to_string_lossy().to_string();
@@ -1680,7 +1680,7 @@ mod test {
                             _ => unreachable!("You need to add a new type handler here."),
                         }, "Typecheck failure. Wanted {}, got {:?}.", expected_type, vector_value);
 
-                        let _serde_value_again: serde_json::Value = vector_value.clone().try_into().unwrap();
+                        let _: serde_json::Value = vector_value.try_into().unwrap();
                     },
                     _ => panic!("This test should never read Err'ing test fixtures."),
                 });

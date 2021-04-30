@@ -9,6 +9,7 @@
 //! RFC 7027.
 
 #![allow(clippy::float_cmp)]
+#![allow(clippy::approx_constant)]
 
 #[cfg(feature = "api")]
 pub mod api;

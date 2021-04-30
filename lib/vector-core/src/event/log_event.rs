@@ -410,8 +410,7 @@ mod test {
                     let serde_value = open_fixture(&path).unwrap();
 
                     let vector_value = LogEvent::try_from(serde_value.clone()).unwrap();
-                    let serde_value_again: serde_json::Value =
-                        vector_value.clone().try_into().unwrap();
+                    let serde_value_again: serde_json::Value = vector_value.try_into().unwrap();
 
                     assert_eq!(serde_value, serde_value_again);
                 }
