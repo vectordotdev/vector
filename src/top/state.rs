@@ -8,6 +8,12 @@ pub enum EventType {
     ProcessedEventsTotals(Vec<NamedMetric>),
     /// Interval in ms + named metric
     ProcessedEventsThroughputs(i64, Vec<NamedMetric>),
+    EventsInTotals(Vec<NamedMetric>),
+    /// Interval in ms + named metric
+    EventsInThroughputs(i64, Vec<NamedMetric>),
+    EventsOutTotals(Vec<NamedMetric>),
+    /// Interval in ms + named metric
+    EventsOutThroughputs(i64, Vec<NamedMetric>),
     ProcessedBytesTotals(Vec<NamedMetric>),
     /// Interval + named metric
     ProcessedBytesThroughputs(i64, Vec<NamedMetric>),
@@ -29,6 +35,10 @@ pub struct ComponentRow {
     pub processed_events_throughput_sec: i64,
     pub processed_bytes_total: i64,
     pub processed_bytes_throughput_sec: i64,
+    pub events_in_total: i64,
+    pub events_in_throughput_sec: i64,
+    pub events_out_total: i64,
+    pub events_out_throughput_sec: i64,
     pub errors: i64,
 }
 
@@ -56,6 +66,36 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
                         for (name, v) in rows {
                             if let Some(r) = state.get_mut(&name) {
                                 r.processed_events_throughput_sec =
+                                    (v as f64 * (1000.0 / interval as f64)) as i64;
+                            }
+                        }
+                    }
+                    EventType::EventsInTotals(rows) => {
+                        for (name, v) in rows {
+                            if let Some(r) = state.get_mut(&name) {
+                                r.events_in_total = v;
+                            }
+                        }
+                    }
+                    EventType::EventsInThroughputs(interval, rows) => {
+                        for (name, v) in rows {
+                            if let Some(r) = state.get_mut(&name) {
+                                r.events_in_throughput_sec =
+                                    (v as f64 * (1000.0 / interval as f64)) as i64;
+                            }
+                        }
+                    }
+                    EventType::EventsOutTotals(rows) => {
+                        for (name, v) in rows {
+                            if let Some(r) = state.get_mut(&name) {
+                                r.events_out_total = v;
+                            }
+                        }
+                    }
+                    EventType::EventsOutThroughputs(interval, rows) => {
+                        for (name, v) in rows {
+                            if let Some(r) = state.get_mut(&name) {
+                                r.events_out_throughput_sec =
                                     (v as f64 * (1000.0 / interval as f64)) as i64;
                             }
                         }

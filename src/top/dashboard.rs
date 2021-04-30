@@ -82,7 +82,7 @@ impl HumanFormatter for i64 {
     }
 }
 
-static HEADER: [&str; 6] = ["Name", "Kind", "Type", "Events", "Bytes", "Errors"];
+static HEADER: [&str; 7] = ["Name", "Kind", "Type", "In", "Out", "Bytes", "Errors"];
 
 struct Widgets<'a> {
     constraints: Vec<Constraint>,
@@ -141,7 +141,7 @@ impl<'a> Widgets<'a> {
             let mut data = vec![r.name.clone(), r.kind.clone(), r.component_type.clone()];
 
             let formatted_metrics = [
-                match r.processed_events_total {
+                match r.events_in_total {
                     0 => "N/A".to_string(),
                     v => format!(
                         "{} ({}/s)",
@@ -150,7 +150,19 @@ impl<'a> Widgets<'a> {
                         } else {
                             v.thousands_format()
                         },
-                        r.processed_events_throughput_sec.human_format()
+                        r.events_in_throughput_sec.human_format()
+                    ),
+                },
+                match r.events_out_total {
+                    0 => "N/A".to_string(),
+                    v => format!(
+                        "{} ({}/s)",
+                        if self.opts.human_metrics {
+                            v.human_format()
+                        } else {
+                            v.thousands_format()
+                        },
+                        r.events_out_throughput_sec.human_format()
                     ),
                 },
                 match r.processed_bytes_total {
