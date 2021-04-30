@@ -52,7 +52,7 @@ module.exports = {
                   color: 'inherit',
                 },
               },
-              '.highlight': {
+              '.highlight, pre.chroma': {
                 margin: 0,
               },
             },

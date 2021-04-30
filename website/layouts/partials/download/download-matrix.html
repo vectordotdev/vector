@@ -1,4 +1,5 @@
 {{ $version := .version }}
+{{ $v1 := cond (eq $version "nightly") "latest" (printf "vector-%s" $version) }}
 {{ $host := site.Data.matrix.host }}
 {{ $matrix := site.Data.matrix.releases }}
 <div class="flex flex-col space-y-1.5">
@@ -23,7 +24,7 @@
         {{ range .releases }}
         <a
           type="button"
-          href="{{ $host }}/vector/{{ $version }}/vector-{{ $version }}-{{ with $prefix }}{{ . }}.{{ end }}{{ .tag }}.{{ $file }}"
+          href="{{ $host }}/vector/{{ $version }}/{{ $v1 }}-{{ with $prefix }}{{ . }}.{{ end }}{{ .tag }}.{{ $file }}"
           class="flex items-center space-x-1 py-1.5 px-2.5 border dark:border-gray-700 rounded-md dark:bg-dark hover:bg-gray-50 dark:hover:bg-black"
           download>
 

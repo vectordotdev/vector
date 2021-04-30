@@ -8,7 +8,7 @@
 {{ $color := index $types .type }}
 {{ $dimension := 6 }}
 {{ $viewBox := cond (eq .type "requirement") 24 20 }}
-<div class="no-prose rounded-lg px-6 py-4 border-3 border-{{ $color }}">
+<div class="admonition no-prose rounded-lg px-6 py-4 border-3 border-{{ $color }}">
   <div class="flex items-center">
     <div class="flex-shrink-0">
       <svg class="h-{{ $dimension }} w-{{ $dimension }} text-{{ $color }}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {{ $viewBox }} {{ $viewBox }}" fill="currentColor" aria-hidden="true"{{ if eq .type "requirement" }} stroke="currentColor"{{ end }}>

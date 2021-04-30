@@ -12,11 +12,13 @@ Download | {{ site.Title }}
   <div class="my-16">
     {{ partial "hero.html" . }}
 
-    <div class="mt-10 mb-8 flex items-center flex-wrap justify-between">
-      <span class="flex space-x-4">
-        {{ partial "download/version-selector.html" . }}
+    <div class="mt-10 mb-8">
+      <div>
         {{ partial "download/release-toggle.html" . }}
-      </span>
+      </div>
+      <div class="mt-6">
+        {{ partial "download/version-selector.html" . }}
+      </div>
     </div>
 
     {{/* Stable releases */}}

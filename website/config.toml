@@ -35,7 +35,7 @@ site_logo = "img/vector-open-graph.png"
 favicon = "favicon.ico"
 
 # Versions
-vector_versions = ["0.13.0", "0.12.1", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.1", "0.8.0", "0.7.0", "0.6.0"]
+vector_versions = ["0.13.1", "0.13.0", "0.12.1", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.1", "0.8.0", "0.7.0", "0.6.0"]
 
 # Aesthetics
 [[params.fonts]]
@@ -275,22 +275,28 @@ url = "/docs/reference/vrl"
 weight = 3
 
 [[menu.flyout]]
+name = "Expressions"
+parent = "vrl"
+url = "/docs/reference/vrl/expressions"
+weight = 1
+
+[[menu.flyout]]
 name = "Functions"
 parent = "vrl"
 url = "/docs/reference/vrl/functions"
-weight = 1
+weight = 2
 
 [[menu.flyout]]
 name = "Errors"
 parent = "vrl"
 url = "/docs/reference/vrl/errors"
-weight = 2
+weight = 3
 
 [[menu.flyout]]
 name = "Examples"
 parent = "vrl"
 url = "/docs/reference/vrl/examples"
-weight = 3
+weight = 4
 
 [[menu.flyout]]
 name = "Pages"

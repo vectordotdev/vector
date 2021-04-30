@@ -3,73 +3,69 @@
 
 {{ range $k, $v := $data }}
 {{ $id := $v.title | urlize }}
-
-<h3 x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $id }}">
+<h3 x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $id }}" class="flex items-center">
   {{ $v.title }}
-  <a class="ml-1" x-cloak x-show="show" href="#{{ $id }}">
-    <span class="icon is-small is-anchor">
-      <i class="fas fa-hashtag fa-xs"></i>
-    </span>
+  <a class="ml-2" x-cloak x-show="show" href="#{{ $id }}">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+    </svg>
   </a>
 </h3>
 
-<p>
+<div class="prose dark:prose-dark">
   {{ $v.description | markdownify }}
-</p>
+</div>
+
+{{ with $v.grammar }}
+<div class="mt-2 no-prose">
+  <span class="font-semibold">
+    Grammar
+  </span>
+
+  <div class="mt-2">
+    {{ highlight .source "ruby" "" }}
+  </div>
+
+  {{ with .definitions }}
+  <div class="mt-2 ml-4 flex flex-col space-y-1.5">
+    {{ range $k, $v := . }}
+    <div>
+      <span class="font-mono font-semibold text-base">
+        {{ $k }}
+      </span>
+
+      <div class="ml-4 prose dark:prose-dark leading-snug prose-sm">
+        {{ $v.description | markdownify }}
+      </div>
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+</div>
+{{ end }}
+
+
 
 {{ with $v.examples }}
 {{ $id := printf "%s-examples" $k }}
-
-<h4 x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $id }}">
+<h4 x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $id }}" class="flex items-center">
   Examples
-  <a class="ml-1" x-cloak x-show="show" href="#{{ $id }}">
-    <span class="icon is-small is-anchor">
-      <i class="fas fa-hashtag fa-xs"></i>
-    </span>
+  <a class="ml-2" x-cloak x-show="show" href="#{{ $id }}">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+    </svg>
   </a>
 </h4>
 
-{{ range . }}
-<div class="card" x-data="{ open: false }">
-  <header class="card-header">
-    <p class="card-header-title is-horizontally-spaced">
-      <span>
-        {{ .title }}
-      </span>
 
-      <a class="icon has-text-secondary" @click="open = !open">
-        <i :class="{ 'fa-plus': !open, 'fa-minus': open }" class="fas"></i>
-      </a>
-    </p>
-  </header>
 
-  <div class="card-content" x-show="open">
-    {{ with .source }}
-    <p class="has-text-weight-light mb-2">
-      Source
-    </p>
-
-    {{ template "code" . }}
-    {{ end }}
-
-    {{ with .return }}
-    <p class="has-text-weight-light mb-2">
-      Return
-    </p>
-
-    {{ template "code" . }}
-    {{ end }}
-
-    {{ with .output }}
-    <p class="has-text-weight-light mb-2">
-      Output
-    </p>
-
-    {{ template "code" . }}
-    {{ end }}
+<div class="border rounded-md flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700">
+  {{ range . }}
+  <div class="py-4 px-6">
+    {{ . }}
   </div>
+  {{ end }}
 </div>
-{{ end }}
 {{ end }}
 {{ end }}
 

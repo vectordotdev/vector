@@ -44,6 +44,7 @@
       </div>
       {{ end }}
 
+      {{ with $release.commits }}
       {{ if gt (len $release.commits) 0 }}
       <div class="mt-8">
         <h3 id="highlights" class="text-3xl font-semibold text-dark dark:text-gray-300 tracking-tight">
@@ -69,6 +70,7 @@
           {{ end }}
         </div>
       </div>
+      {{ end }}
       {{ end }}
     </div>
   </div>

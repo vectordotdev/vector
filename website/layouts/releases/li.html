@@ -2,7 +2,6 @@
 {{ $latest := index site.Params.vector_versions 0 }}
 {{ $isLatest := eq $version $latest }}
 {{ $release := index site.Data.docs.releases $version }}
-{{ $date := $release.date | dateFormat "January 2, 2006" }}
 <a href="{{ .RelPermalink }}">
   <div class="border shadow-sm rounded-md py-4 px-6 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700">
     <span class="flex items-center justify-between">
@@ -16,9 +15,12 @@
         {{ end }}
       </span>
 
+      {{ with $release.date }}
+      {{ $date := $release.date | dateFormat "January 2, 2006" }}
       <time datetime="{{ $date }}" class="font-sm font-light tracking-tight text-dark dark:text-gray-300">
         {{ $date }}
       </span>
+      {{ end }}
     </span>
   </div>
 </a>
