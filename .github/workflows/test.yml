@@ -196,7 +196,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
-      - run: make test-components
+      - run: make test
 
   test-vrl:
     name: VRL - Linux
