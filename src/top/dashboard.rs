@@ -82,7 +82,7 @@ impl HumanFormatter for i64 {
     }
 }
 
-static HEADER: [&str; 7] = ["Name", "Kind", "Type", "In", "Out", "Bytes", "Errors"];
+static HEADER: [&str; 7] = ["Name", "Kind", "Type", "Events In", "Events Out", "Bytes", "Errors"];
 
 struct Widgets<'a> {
     constraints: Vec<Constraint>,
