@@ -333,9 +333,9 @@ dependencies = [
 
 [[package]]
 name = "async-nats"
-version = "0.9.14"
+version = "0.9.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2147a9b6ff608c28974273f4b93ab05b4bf62bac7e8d8b8119e414e0d69a6298"
+checksum = "44a042e52858bf59b58b37ad2e32f9c956b2411a63e53063055bd18755598aac"
 dependencies = [
  "blocking",
  "nats",
@@ -2956,7 +2956,7 @@ checksum = "f3974bf42c2050bbf0696471e4d91ecc9844845c2323b388aa7bf9d63f3b0693"
 dependencies = [
  "proc-macro2 1.0.26",
  "quote 1.0.9",
- "syn 1.0.69",
+ "syn 1.0.71",
 ]
 
 [[package]]
@@ -3375,9 +3375,9 @@ dependencies = [
 
 [[package]]
 name = "libz-sys"
-version = "1.1.2"
+version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "602113192b08db8f38796c4e85c39e960c145965140e918018bcde1952429655"
+checksum = "de5435b8549c16d423ed0c03dbaafe57cf6c3344744f1242520d59c9d8ecec66"
 dependencies = [
  "cc",
  "libc",
@@ -3997,9 +3997,9 @@ dependencies = [
 
 [[package]]
 name = "nats"
-version = "0.9.14"
+version = "0.9.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6ffb2d2a086e3e5cdb2e0189e628128acaaf72d3a7a3ca76b25838a17d2412e"
+checksum = "a52d8392a8d3d010d503795cfe94e5ed7ca51ee6366d84640addc38b28c9fc5c"
 dependencies = [
  "base64 0.13.0",
  "base64-url",
@@ -5760,9 +5760,9 @@ dependencies = [
 
 [[package]]
 name = "rust_decimal"
-version = "1.12.2"
+version = "1.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d64bd27418c091ebd539b00f50ad059fc41421c87d5033c217cd76c7506d0d71"
+checksum = "9f630aa659f2997db337f8be546c14e0c8f690eba3d7c59f7808b2900fa480f3"
 dependencies = [
  "arrayvec 0.5.2",
  "num-traits",

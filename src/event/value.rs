@@ -349,7 +349,7 @@ impl Value {
     /// This is notably useful for things like influxdb logs where we list only leaves.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector::event::Value;
     /// use std::collections::BTreeMap;
     ///
     /// let val = Value::from(1);
@@ -385,7 +385,7 @@ impl Value {
     /// Return if the node is empty, that is, it is an array or map with no items.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector::event::Value;
     /// use std::collections::BTreeMap;
     ///
     /// let val = Value::from(1);
@@ -421,7 +421,7 @@ impl Value {
     /// Return the number of subvalues the value has.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector::event::Value;
     /// use std::collections::BTreeMap;
     ///
     /// let val = Value::from(1);
@@ -676,7 +676,8 @@ impl Value {
     /// Insert a value at a given lookup.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector::event::Value;
+    /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
     /// let mut inner_map = Value::from(BTreeMap::default());
@@ -760,7 +761,8 @@ impl Value {
     /// Setting `prune` to true will also remove the entries of maps and arrays that are emptied.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector::event::Value;
+    /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
     /// let mut inner_map = Value::from(BTreeMap::default());
@@ -904,7 +906,8 @@ impl Value {
     /// Get an immutable borrow of the value by lookup.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector::event::Value;
+    /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
     /// let mut inner_map = Value::from(BTreeMap::default());
@@ -994,7 +997,8 @@ impl Value {
     /// Get a mutable borrow of the value by lookup.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector::event::Value;
+    /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
     /// let mut inner_map = Value::from(BTreeMap::default());
@@ -1078,7 +1082,8 @@ impl Value {
     /// Determine if the lookup is contained within the value.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector::event::Value;
+    /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
     /// let mut inner_map = Value::from(BTreeMap::default());
@@ -1105,7 +1110,8 @@ impl Value {
     /// will be prefixed with that lookup.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector::event::Value;
+    /// use lookup::{Lookup, LookupBuf};
     /// let plain_key = "lick";
     /// let lookup_key = LookupBuf::from_str("vic.stick.slam").unwrap();
     /// let mut value = Value::from(std::collections::BTreeMap::default());
@@ -1113,7 +1119,7 @@ impl Value {
     /// value.insert(lookup_key, 2);
     ///
     /// let mut keys = value.lookups(None, false);
-    /// assert_eq!(keys.next(), Some(Lookup::from_str(".").unwrap()));
+    /// assert_eq!(keys.next(), Some(Lookup::root()));
     /// assert_eq!(keys.next(), Some(Lookup::from_str("lick").unwrap()));
     /// assert_eq!(keys.next(), Some(Lookup::from_str("vic").unwrap()));
     /// assert_eq!(keys.next(), Some(Lookup::from_str("vic.stick").unwrap()));
@@ -1198,7 +1204,8 @@ impl Value {
     /// will be prefixed with that lookup.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector::event::Value;
+    /// use lookup::{Lookup, LookupBuf};
     /// let plain_key = "lick";
     /// let lookup_key = LookupBuf::from_str("vic.stick.slam").unwrap();
     /// let mut value = Value::from(std::collections::BTreeMap::default());
@@ -1206,7 +1213,7 @@ impl Value {
     /// value.insert(lookup_key, 2);
     ///
     /// let mut keys = value.pairs(None, false);
-    /// assert_eq!(keys.next(), Some((Lookup::from_str(".").unwrap(), &Value::from({
+    /// assert_eq!(keys.next(), Some((Lookup::root(), &Value::from({
     ///     let mut inner_inner_map = std::collections::BTreeMap::default();
     ///     inner_inner_map.insert(String::from("slam"), Value::from(2));
     ///     let mut inner_map = std::collections::BTreeMap::default();

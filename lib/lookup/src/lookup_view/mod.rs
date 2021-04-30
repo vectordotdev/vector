@@ -105,6 +105,13 @@ impl<'a> Display for Lookup<'a> {
 }
 
 impl<'a> Lookup<'a> {
+    /// Creates a lookup to the root
+    pub fn root() -> Self {
+        Self {
+            segments: VecDeque::new(),
+        }
+    }
+
     pub fn iter(&self) -> std::collections::vec_deque::Iter<'_, Segment<'a>> {
         self.segments.iter()
     }
