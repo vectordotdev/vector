@@ -1,13 +1,12 @@
 ---
 title: Process management
+short: Management
 weight: 1
 ---
 
-This document covers how to manage the Vector process using various interfaces. How you manage the Vector process is largely dependent on how you installed Vector.
+This document shows you how to manage the Vector process using various platforms. *How* you manage the Vector process is largely dependent on how you installed it.
 
 ## Administrate
-
-OK
 
 ### Linux
 

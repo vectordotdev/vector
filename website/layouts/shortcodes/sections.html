@@ -1,18 +1,7 @@
 {{ with $.Page.Sections }}
-<div class="no-prose grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+<div class="no-prose grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
   {{ range . }}
-  {{ $title := .Params.short | default .Title }}
-  <div class="shadow-md dark:hover:bg-gray-600 hover:bg-gray-100 dark:bg-gray-700 px-3.5 py-2">
-    <a href="{{ .RelPermalink }}" class="flex items-center justify-between">
-      <span class="dark:text-gray-300 dark:hover:text-dark text-gray-600 hover:text-dark">
-        {{ $title }}
-      </span>
-
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 dark:hover:text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-      </svg>
-    </a>
-  </div>
+  {{ .Render "li" }}
   {{ end }}
 </div>
 {{ end }}
