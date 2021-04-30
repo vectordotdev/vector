@@ -12,6 +12,7 @@ impl InternalEvent for RedisEventReceived {
     }
 
     fn emit_metrics(&self) {
+        counter!("events_in_total", 1);
         counter!("processed_events_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
@@ -47,6 +48,7 @@ impl InternalEvent for RedisEventSent {
     }
 
     fn emit_metrics(&self) {
+        counter!("events_out_total", 1);
         counter!("processed_events_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
@@ -68,24 +70,5 @@ impl InternalEvent for RedisSendEventFailed {
 
     fn emit_metrics(&self) {
         counter!("send_event_errors_total", 1);
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct RedisEncodeEventFailed {
-    pub error: serde_json::Error,
-}
-
-impl InternalEvent for RedisEncodeEventFailed {
-    fn emit_logs(&self) {
-        error!(
-            message = "Error encoding Redis event to JSON.",
-            error = %self.error,
-            rate_limit_secs = 30,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("encode_event_errors_total", 1);
     }
 }

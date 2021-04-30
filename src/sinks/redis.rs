@@ -2,13 +2,11 @@ use crate::{
     buffers::Acker,
     config::{self, log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    internal_events::{
-        RedisEncodeEventFailed, RedisEventSent, RedisSendEventFailed, TemplateRenderingFailed,
-    },
-    sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
+    internal_events::{RedisEventSent, RedisSendEventFailed, TemplateRenderingFailed},
+    sinks::util::encoding::{EncodingConfig, EncodingConfiguration},
     template::{Template, TemplateParseError},
 };
-use futures::{future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream};
+use futures::{future::BoxFuture, ready, stream::FuturesOrdered, FutureExt, Sink, Stream};
 use redis::{aio::ConnectionManager, AsyncCommands, RedisError, RedisResult};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -45,24 +43,28 @@ pub enum Method {
     RPush,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub struct ListConfig {
+    method: Method,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RedisSinkConfig {
+    encoding: EncodingConfig<Encoding>,
     #[serde(default)]
-    pub data_type: DataType,
-    pub method: Option<Method>,
-    pub encoding: EncodingConfigWithDefault<Encoding>,
-    pub url: String,
-    pub key: String,
+    data_type: DataType,
+    list: Option<ListConfig>,
+    url: String,
+    key: String,
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
-#[derivative(Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
-    #[derivative(Default)]
-    Json,
     Text,
+    Json,
 }
 
 enum RedisSinkState {
@@ -77,7 +79,7 @@ pub struct RedisSink {
     method: Method,
     encoding: EncodingConfig<Encoding>,
     state: RedisSinkState,
-    in_flight: FuturesUnordered<BoxFuture<'static, (usize, Result<i32, RedisError>)>>,
+    in_flight: FuturesOrdered<BoxFuture<'static, (usize, Result<i32, RedisError>)>>,
     acker: Acker,
     seq_head: usize,
     seq_tail: usize,
@@ -95,9 +97,11 @@ impl GenerateConfig for RedisSinkConfig {
             key: "vector".to_owned(),
             encoding: Encoding::Json.into(),
             data_type: DataType::List,
-            method: Some(Method::LPush),
+            list: Some(ListConfig {
+                method: Method::LPush,
+            }),
         })
-        .unwrap()
+            .unwrap()
     }
 }
 
@@ -151,14 +155,14 @@ impl RedisSink {
         match res {
             Ok(conn) => Ok(RedisSink {
                 data_type: config.data_type,
-                method: config.method.unwrap_or_default(),
+                method: config.list.unwrap().method,
                 key: key_tmpl,
-                encoding: config.encoding.into(),
+                encoding: config.encoding,
                 acker,
                 seq_head: 0,
                 seq_tail: 0,
                 pending_acks: HashSet::new(),
-                in_flight: FuturesUnordered::new(),
+                in_flight: FuturesOrdered::new(),
                 state: RedisSinkState::Ready(conn),
             }),
             Err(error) => {
@@ -278,7 +282,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> String
 
     match encoding.codec() {
         Encoding::Json => serde_json::to_string(event.as_log())
-            .map_err(|error| emit!(RedisEncodeEventFailed { error }))
+            .map_err(|error| panic!("Unable to encode into JSON: {}", error))
             .unwrap_or_default(),
         Encoding::Text => event
             .as_log()
@@ -324,12 +328,13 @@ mod tests {
 
         let event = encode_event(
             evt,
-            &EncodingConfigWithDefault {
+            &EncodingConfig {
                 codec: Encoding::Json,
+                schema: None,
+                only_fields: None,
                 except_fields: Some(vec!["key".into()]),
-                ..Default::default()
-            }
-            .into(),
+                timestamp_format: None,
+            },
         );
 
         let map: HashMap<String, String> = serde_json::from_str(event.as_str()).unwrap();
@@ -342,7 +347,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
-    use futures::StreamExt;
+    use futures::{stream, StreamExt};
     use rand::Rng;
 
     const REDIS_SERVER: &str = "redis://127.0.0.1:6379/0";
@@ -354,7 +359,7 @@ mod integration_tests {
         let key = format!("test-{}", random_string(10));
         debug!("Test key name: {}.", key);
         let mut rng = rand::thread_rng();
-        let num_events = rng.gen_range(1000..2000);
+        let num_events = rng.gen_range(10000..20000);
         debug!("Test events num: {}.", num_events);
 
         let cnf = RedisSinkConfig {
@@ -362,14 +367,24 @@ mod integration_tests {
             key: key.clone(),
             encoding: Encoding::Json.into(),
             data_type: DataType::List,
-            method: Some(Method::LPush),
+            list: Some(ListConfig {
+                method: Method::LPush,
+            }),
         };
 
         // Publish events.
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = RedisSink::new(cnf.clone(), acker).await.unwrap();
-        let (_input, events) = random_lines_with_stream(1000, num_events);
-        events.map(Ok).forward(sink).await.unwrap();
+
+        let mut events: Vec<Event> = Vec::new();
+        for i in 0..num_events {
+            let s: String = i.to_string();
+            let e = Event::from(s);
+            events.push(e);
+        }
+
+        let stream = stream::iter(events.clone());
+        stream.map(Ok).forward(sink).await.unwrap();
 
         assert_eq!(
             ack_counter.load(std::sync::atomic::Ordering::Relaxed),
@@ -384,6 +399,16 @@ mod integration_tests {
         let llen: usize = conn.llen(key.clone()).await.unwrap();
         debug!("Test key: {} len: {}.", key, llen);
         assert_eq!(llen, num_events);
+
+        for i in 0..num_events {
+            let e = events.get(i).unwrap().as_log();
+            let s = serde_json::to_string(e).unwrap_or_default();
+            debug!("Raw event:{}", s);
+            let payload: (String, String) = conn.brpop(key.clone(), 2000).await.unwrap();
+            let val = payload.1;
+            debug!("Read val:{}", val);
+            assert_eq!(val, s);
+        }
     }
 
     #[tokio::test]
@@ -393,7 +418,7 @@ mod integration_tests {
         let key = format!("test-{}", random_string(10));
         debug!("Test key name: {}.", key);
         let mut rng = rand::thread_rng();
-        let num_events = rng.gen_range(1000..2000);
+        let num_events = rng.gen_range(10000..20000);
         debug!("Test events num: {}.", num_events);
 
         let cnf = RedisSinkConfig {
@@ -401,14 +426,23 @@ mod integration_tests {
             key: key.clone(),
             encoding: Encoding::Json.into(),
             data_type: DataType::List,
-            method: Some(Method::RPush),
+            list: Some(ListConfig {
+                method: Method::RPush,
+            }),
         };
 
         // Publish events.
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = RedisSink::new(cnf.clone(), acker).await.unwrap();
-        let (_input, events) = random_lines_with_stream(100, num_events);
-        events.map(Ok).forward(sink).await.unwrap();
+        let mut events: Vec<Event> = Vec::new();
+        for i in 0..num_events {
+            let s: String = i.to_string();
+            let e = Event::from(s);
+            events.push(e);
+        }
+
+        let stream = stream::iter(events.clone());
+        stream.map(Ok).forward(sink).await.unwrap();
 
         assert_eq!(
             ack_counter.load(std::sync::atomic::Ordering::Relaxed),
@@ -423,6 +457,16 @@ mod integration_tests {
         let llen: usize = conn.llen(key.clone()).await.unwrap();
         debug!("Test key: {} len: {}.", key, llen);
         assert_eq!(llen, num_events);
+
+        for i in 0..num_events {
+            let e = events.get(i).unwrap().as_log();
+            let s = serde_json::to_string(e).unwrap_or_default();
+            debug!("Raw event:{}", s);
+            let payload: (String, String) = conn.blpop(key.clone(), 2000).await.unwrap();
+            let val = payload.1;
+            debug!("Read val:{}", val);
+            assert_eq!(val, s);
+        }
     }
 
     #[tokio::test]
@@ -456,7 +500,7 @@ mod integration_tests {
             key: key.clone(),
             encoding: Encoding::Json.into(),
             data_type: DataType::Channel,
-            method: None,
+            list: None,
         };
 
         // Publish events.

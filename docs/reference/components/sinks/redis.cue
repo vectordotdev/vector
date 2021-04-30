@@ -11,7 +11,7 @@ components: sinks: redis: {
 		stateful: false
 	}
 	features: {
-		buffer: enabled:      false
+		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
@@ -19,7 +19,7 @@ components: sinks: redis: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: "json"
+					default: null
 					enum: ["json", "text"]
 				}
 			}

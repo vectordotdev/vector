@@ -5553,7 +5553,6 @@ dependencies = [
  "native-tls",
  "percent-encoding",
  "pin-project-lite",
- "sha1",
  "tokio",
  "tokio-native-tls",
  "tokio-util",
