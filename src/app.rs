@@ -37,7 +37,7 @@ pub struct ApplicationConfig {
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
     pub api: config::api::Options,
-    pub signal_handler: Option<signal::SignalHandler>,
+    pub signal_handler: signal::SignalHandler,
 }
 
 pub struct Application {
@@ -182,7 +182,7 @@ impl Application {
                     graceful_crash,
                     #[cfg(feature = "api")]
                     api,
-                    signal_handler: Some(signal_handler),
+                    signal_handler,
                 })
             })
         }?;
@@ -194,7 +194,7 @@ impl Application {
         })
     }
 
-    pub fn run(mut self) {
+    pub fn run(self) {
         let rt = self.runtime;
 
         let mut graceful_crash = UnboundedReceiverStream::new(self.config.graceful_crash);
@@ -207,11 +207,7 @@ impl Application {
         #[cfg(feature = "api")]
         let api_config = self.config.api;
 
-        let mut signal_handler = self
-            .config
-            .signal_handler
-            .take()
-            .expect("no signal handler");
+        let mut signal_handler = self.config.signal_handler;
         let mut signals = signal_handler.take_rx().expect("no signal receiver");
 
         // Any internal_logs sources will have grabbed a copy of the
