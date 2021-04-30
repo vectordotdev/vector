@@ -60,7 +60,7 @@ components: sources: apache_metrics: {
 
 	configuration: {
 		endpoints: {
-			description: "mod_status endpoints to scrape metrics from."
+			description: "`mod_status` endpoints to scrape metrics from."
 			required:    true
 			type: array: {
 				items: type: string: {

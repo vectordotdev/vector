@@ -1,7 +1,8 @@
 {{/* Used by several shortcodes to display config-style info (CLI, API, VRL functions, etc.) */}}
 {{ $componentType := .type }}
 {{ $tag := .tag }}
-<div class="relative no-prose w-full border dark:border-gray-700 rounded-md shadow-sm">
+{{ $here := .File }}
+<div class="relative no-prose w-full border dark:border-gray-700 rounded-md">
   {{/* Source/transform/sink config */}}
   {{ with .config }}
   <div class="flex flex-col divide-y dark:divide-gray-700">
@@ -48,7 +49,7 @@
         </span>
       </span>
 
-      <div class="mt-8 prose dark:prose-dark leading-snug text-gray-600 dark:text-gray-300">
+      <div class="mt-4 prose dark:prose-dark leading-snug text-gray-600 dark:text-gray-300">
         {{ $v.description | markdownify }}
       </div>
 
@@ -94,7 +95,7 @@
       {{/* Array */}}
       {{ if eq $k "array" }}
       {{ with $v.items }}
-      <div class="mt-3 border rounded py-2 px-3">
+      <div class="mt-3 border rounded py-2 px-3 dark:border-gray-700">
         {{ range $k, $v := . }}
         {{ range $k, $v := . }}
         <span class="flex justify-between items-center">
@@ -109,7 +110,8 @@
         </span>
 
         {{ with $v.examples }}
-        <div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3">
+        {{ $json := . | jsonify (dict "indent" "  ") }}
+        <div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3 dark:border-gray-700">
           <span class="flex justify-between items-center">
             <span class="text-sm">
               Examples
@@ -118,12 +120,8 @@
             {{ template "config-toggler" (dict "size" 4) }}
           </span>
 
-          <div x-show="open" class="flex flex-col ml-2 mt-1.5 space-y-2">
-            {{ range . }}
-            <span class="text-xs font-mono text-primary-dark dark:text-primary">
-              {{ . }}
-            </span>
-            {{ end }}
+          <div x-show="open" class="flex flex-col ml-2 space-y-2">
+            {{ highlight $json "json" "" }}
           </div>
         </div>
         {{ end }}
@@ -163,27 +161,47 @@
         {{ . | markdownify }}
       </span>
       {{ end }}
-    </div>
+    </div>`
   </div>
   {{ end }}
 
   {{/* Source/transform/sink output */}}
   {{ with .output }}
-  <div class="no-prose py-3.5 px-5">
+  <div class="py-3 px-5">
     {{ with .metrics }}
-    <h3 class="hover:text-secondary">
+    <span class="flex items-center justify-between">
+      <h3 class="hover:text-secondary" id="output-metrics">
+        <a href="#metrics">
+          Metrics
+        </a>
+      </h3>
+
       <a href="/docs/about/under-the-hood/architecture/data-model/metric">
-        Metrics
+        link
       </a>
-    </h3>
+    </span>
+
+    <div class="mt-3 border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
+      {{ template "telemetry" . }}
+    </div>
     {{ end }}
 
     {{ with .logs }}
-    <h3 class="hover:text-secondary">
+    <span class="flex items-center justify-between">
+      <h3 class="hover:text-secondary" id="output-logs">
+        <a href="#metrics">
+          Logs
+        </a>
+      </h3>
+
       <a href="/docs/about/under-the-hood/architecture/data-model/log">
-        Logs
+        link
       </a>
-    </h3>
+    </span>
+
+    <div class="mt-3 border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
+      {{ template "telemetry" . }}
+    </div>
     {{ end }}
   </div>
   {{ end }}
@@ -216,68 +234,43 @@
   </div>
   {{ end }}
 
-  {{/* Source/transform/sink telemetry */}}
+  {{/* Source/transform/sink output */}}
   {{ with .telemetry }}
-  <div class="py-4 px-6">
+  <div class="py-3 px-5">
     {{ with .metrics }}
-    <h3 id="metrics">
-      Metrics
-    </h3>
+    <span class="flex items-center justify-between">
+      <h3 class="hover:text-secondary" id="telemetry-metrics">
+        <a href="#metrics">
+          Metrics
+        </a>
+      </h3>
 
-    <p class="mt-2 leading-normal">
-      This component provides the following metrics that can be retrieved through the <a href="/docs/reference/configuration/source/internal_metrics"><code>internal_metrics</code> source</a>. See the <a href="/docs/administration/monitoring/#metrics">metrics section</a> on the <a href="/docs/administration/monitoring#metrics">monitoring page</a> for more info.
-    </p>
+      <a href="/docs/about/under-the-hood/architecture/data-model/metric">
+        link
+      </a>
+    </span>
 
-    <div class="mt-2 border rounded flex flex-col divide-y divide-gray-100 dark:divide-gray-600">
-      {{ range $k, $v := . }}
-      {{ $type := $v.type }}
-      <div class="py-2 px-4" id="{{ $k }}">
-        <span class="flex justify-between items-center">
-          <a href="#{{ $k }}" class="font-mono">
-            {{ $k }}
-          </a>
-
-          <span>
-            {{/* Metric type */}}
-            {{ $url := printf "/docs/about/under-the-hood/architecture/data-model/metric/#%s" $type }}
-            <a href="{{ $url }}">
-              {{ partial "badge.html" (dict "word" $v.type "color" "blue") }}
-            </a>
-          </span>
-        </span>
-
-        <div class="mt-2 border rounded py-2 px-3">
-          <p>
-            Tags
-          </p>
-
-          <div class="flex flex-col space-y-2">
-            {{ range $v.tags }}
-            <span class="flex justify-between items-center">
-              <span>
-                {{ .name }}
-              </span>
-
-              {{ if .required }}
-              <span>
-                {{ partial "badge.html" (dict "word" "required" "color" "red") }}
-              </span>
-              {{ end }}
-            </span>
-
-            <div>
-              {{ .description | markdownify }}
-            </div>
-            {{ end }}
-          </div>
-        </div>
-      </div>
-      {{ end }}
+    <div class="mt-3 border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
+      {{ template "telemetry" . }}
     </div>
     {{ end }}
 
     {{ with .logs }}
-    {{/* No components use this yet */}}
+    <span class="flex items-center justify-between">
+      <h3 class="hover:text-secondary" id="telemetry-logs">
+        <a href="#metrics">
+          Logs
+        </a>
+      </h3>
+
+      <a href="/docs/about/under-the-hood/architecture/data-model/log">
+        link
+      </a>
+    </span>
+
+    <div class="mt-3 border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
+      {{ template "telemetry" . }}
+    </div>
     {{ end }}
   </div>
   {{ end }}
@@ -482,4 +475,56 @@
     <code>{{ .default }}</code>{{ with .unit }} ({{ . }}){{ end }}
   </span>
 </div>
+{{ end }}
+
+{{ define "telemetry" }}
+{{ range $k, $v := . }}
+<div class="py-3 px-5">
+  <span class="flex justify-between items-center">
+    <span class="font-mono font-bold text-dark dark:text-gray-200">
+      <h4 id="{{ $k }}">
+        <a href="#{{ $k }}">
+          {{ $k }}
+        </a>
+      </h4>
+    </span>
+
+    {{ partial "badge.html" (dict "word" $v.type "color" "gray") }}
+  </span>
+
+  {{ with $v.description }}
+  <div class="my-3 prose dark:prose-dark">
+    {{ . | markdownify }}
+  </div>
+  {{ end }}
+
+  {{ with $v.tags }}
+  <div class="mt-3 border rounded dark:border-gray-700">
+    <div class="flex flex-col divide-y dark:divide-gray-700">
+      {{ range $k, $v := . }}
+      <div class="py-3 px-4">
+        <span class="flex justify-between items-center">
+          <span class="font-mono font-semibold">
+            {{ $k }}
+          </span>
+
+          <span>
+            {{ if $v.required }}
+            {{ partial "badge.html" (dict "word" "required" "color" "red") }}
+            {{ else }}
+            {{ partial "badge.html" (dict "word" "optional" "color" "blue") }}
+            {{ end }}
+          </span>
+        </span>
+
+        <div>
+          {{ $v.description }}
+        </div>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+</div>
+{{ end }}
 {{ end }}

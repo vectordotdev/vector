@@ -10,6 +10,8 @@ The `remap` transform is designed for parsing, shaping, and transforming data in
 
 {{< success >}}
 Refer to the [VRL reference][vrl] when writing scripts.
+
+[vrl]: /docs/reference/vrl
 {{< /success >}}
 
 ## Configuration
@@ -19,8 +21,6 @@ Refer to the [VRL reference][vrl] when writing scripts.
 ## Telemetry
 
 {{< component/telemetry >}}
-
-[vrl]: /docs/reference/vrl
 
 ## VRL examples
 

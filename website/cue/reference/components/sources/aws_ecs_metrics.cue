@@ -104,8 +104,8 @@ components: sources: aws_ecs_metrics: {
 				default: "v4"
 				enum: {
 					v4: "When the environment variable `ECS_CONTAINER_METADATA_URI_V4` is defined."
-					v3: "When fails the v4 check, but the environment variable `ECS_CONTAINER_METADATA_URI` is defined."
-					v2: "When fails the v4 and v3 checks."
+					v3: "When the v4 check fails but the environment variable `ECS_CONTAINER_METADATA_URI` is defined."
+					v2: "When the v4 and v3 checks fail."
 				}
 				syntax: "literal"
 			}

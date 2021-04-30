@@ -17,4 +17,8 @@ kind: source
 
 {{< component/output >}}
 
+## Telemetry
+
+{{< component/telemetry >}}
+
 [httpd]: https://httpd.apache.org
