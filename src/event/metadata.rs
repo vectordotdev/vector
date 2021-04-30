@@ -29,6 +29,11 @@ impl EventMetadata {
     pub fn update_status(&self, status: EventStatus) {
         self.finalizers.update_status(status);
     }
+
+    /// Update the finalizers' sources.
+    pub fn update_sources(&mut self) {
+        self.finalizers.update_sources();
+    }
 }
 
 impl EventDataEq for EventMetadata {
