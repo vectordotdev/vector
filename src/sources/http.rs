@@ -3,9 +3,10 @@ use crate::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{Event, Value},
+    event::{BatchNotifier, Event, Value},
     sources::util::{
-        add_query_parameters, decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
+        add_query_parameters, decode_body, BuiltEvents, Encoding, ErrorMessage, HttpSource,
+        HttpSourceAuthConfig,
     },
     tls::TlsConfig,
 };
@@ -72,14 +73,15 @@ struct SimpleHttpSource {
 }
 
 impl HttpSource for SimpleHttpSource {
-    fn build_event(
+    fn build_events(
         &self,
         body: Bytes,
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
         request_path: &str,
-    ) -> Result<Vec<Event>, ErrorMessage> {
-        decode_body(body, self.encoding)
+    ) -> Result<BuiltEvents, ErrorMessage> {
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        decode_body(body, self.encoding, batch)
             .map(|events| add_headers(events, &self.headers, header_map))
             .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
             .map(|events| add_path(events, self.path_key.as_str(), request_path))
@@ -89,7 +91,8 @@ impl HttpSource for SimpleHttpSource {
                 for event in events.iter_mut() {
                     event.as_mut_log().try_insert(key, Bytes::from("http"));
                 }
-                events
+                let receiver = Some(receiver);
+                BuiltEvents { events, receiver }
             })
     }
 }

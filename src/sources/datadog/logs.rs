@@ -3,10 +3,12 @@ use crate::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::Event,
+    event::BatchNotifier,
     sources::{
         self,
-        util::{decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig},
+        util::{
+            decode_body, BuiltEvents, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
+        },
     },
     tls::TlsConfig,
 };
@@ -79,25 +81,29 @@ impl SourceConfig for DatadogLogsConfig {
 struct DatadogLogsSource {}
 
 impl HttpSource for DatadogLogsSource {
-    fn build_event(
+    fn build_events(
         &self,
         body: Bytes,
         header_map: HeaderMap,
         _query_parameters: HashMap<String, String>,
         request_path: &str,
-    ) -> Result<Vec<Event>, ErrorMessage> {
+    ) -> Result<BuiltEvents, ErrorMessage> {
         if body.is_empty() {
             // The datadog agent may sent empty payload as keep alive
             debug!(
                 message = "Empty payload ignored.",
                 internal_log_rate_secs = 30
             );
-            return Ok(Vec::new());
+            return Ok(BuiltEvents {
+                events: Vec::new(),
+                receiver: None,
+            });
         }
 
         let api_key = extract_api_key(&header_map, request_path);
 
-        decode_body(body, Encoding::Json).map(|mut events| {
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        decode_body(body, Encoding::Json, batch).map(|mut events| {
             // Add source type & Datadog API key
             let key = log_schema().source_type_key();
             for event in events.iter_mut() {
@@ -107,7 +113,8 @@ impl HttpSource for DatadogLogsSource {
                     log.insert("dd_api_key", k.clone());
                 }
             }
-            events
+            let receiver = Some(receiver);
+            BuiltEvents { events, receiver }
         })
     }
 }
