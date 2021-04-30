@@ -278,7 +278,7 @@ cross-image-%:
 
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --workspace --no-fail-fast --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
 
 .PHONY: test-components
 test-components: ## Test with all components enabled
