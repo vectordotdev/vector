@@ -14,7 +14,7 @@
         </a>
       </h3>
 
-      {{ template "toggler" }}
+      {{ template "errors-toggler" }}
     </span>
 
     <div x-show="open">
@@ -26,9 +26,9 @@
 
       {{ with $error.rationale }}
       <div class="mt-2">
-        <p class="font-semibold">
+        <span class="font-semibold">
           Rationale
-        </p>
+        </span>
 
         <div class="mt-2 leading-tight">
           {{ . | markdownify }}
@@ -38,9 +38,9 @@
 
       {{ with $error.resolution }}
       <div class="mt-2">
-        <p class="font-semibold">
+        <span class="font-semibold">
           Resolution
-        </p>
+        </span>
 
         <div class="mt-2 leading-tight">
           {{ . | markdownify }}
@@ -55,50 +55,50 @@
             Examples
           </span>
 
-          {{ template "toggler" }}
+          {{ template "errors-toggler" }}
         </span>
 
         <div x-show="open" class="mt-2 flex flex-col divide-y dark:divide-gray-700 border rounded-sm dark:border-gray-700">
           {{ range . }}
           <div class="py-2 px-3 rounded-sm dark:border-gray-700">
-            <p class="font-semibold">
+            <span class="font-semibold">
               {{ .title }}
-            </p>
+            </span>
 
             {{/* Example event (log or metric) */}}
             {{ with .input }}
             {{ with .log }} {{/* Log event */}}
             {{ $json := . | jsonify (dict "indent" "  ") }}
-            <p class="tracking-tighter font-semibold text-sm">
+            <span class="tracking-tighter font-semibold text-sm">
               Log event
-            </p>
+            </span>
 
             {{ highlight $json "json" "" }}
             {{ end }}
 
             {{ with .metric }} {{/* Metric event */}}
             {{ $json := . | jsonify (dict "indent" "  ") }}
-            <p class="tracking-tighter font-semibold text-sm">
+            <span class="tracking-tighter font-semibold text-sm">
               Metric event
-            </p>
+            </span>
 
             {{ highlight $json "json" "" }}
             {{ end }}
             {{ end }}
 
             {{ with .source }}
-            <p class="tracking-tighter font-semibold text-sm">
+            <span class="tracking-tighter font-semibold text-sm">
               VRL program
-            </p>
+            </span>
 
             {{ highlight . "ruby" "" }}
             {{ end }}
 
             {{/* Example diff */}}
             {{ with .diff }}
-            <p class="tracking-tighter font-semibold text-sm">
+            <span class="tracking-tighter font-semibold text-sm">
               How to fix it
-            </p>
+            </span>
 
             {{ highlight . "diff" "" }}
             {{ end }}
@@ -112,8 +112,7 @@
   {{ end }}
 </div>
 
-{{ define "toggler" }}
-
+{{ define "errors-toggler" }}
 <button @click="open = !open">
   {{/* Heroicon: outline/plus */}}
   <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class="text-gray-600 dark:text-gray-400 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -126,5 +125,3 @@
   </svg>
 </button>
 {{ end }}
-
-{{/* title diff input */}}
