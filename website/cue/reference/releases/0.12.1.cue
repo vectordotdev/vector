@@ -2,7 +2,6 @@ package metadata
 
 releases: "0.12.1": {
 	date:        "2021-03-12"
-	codename:    ""
 	description: """
 		This release contains a few fast follow bug fixes from the 0.12.0
 		release, primarily centered around the recently released [**Vector Remap

@@ -44,23 +44,23 @@
 
     <div class="block space-y-1.5">
       {{ with $tags.type }}
-      {{ partial "badge.html" (dict "prefix" "type" "word" . "color" "blue") }}
+      {{ partial "badge.html" (dict "prefix" "type" "word" . "color" "blue" "inline" true) }}
       {{ end }}
 
       {{ range $tags.domains }}
-      {{ partial "badge.html" (dict "prefix" "domain" "word" . "color" "indigo") }}
+      {{ partial "badge.html" (dict "prefix" "domain" "word" . "color" "indigo" "inline" true) }}
       {{ end }}
 
       {{ range $tags.sources }}
-      {{ partial "badge.html" (dict "prefix" "source" "word" . "color" "violet") }}
+      {{ partial "badge.html" (dict "prefix" "source" "word" . "color" "violet" "inline" true) }}
       {{ end }}
 
       {{ range $tags.transforms }}
-      {{ partial "badge.html" (dict "prefix" "transform" "word" . "color" "violet") }}
+      {{ partial "badge.html" (dict "prefix" "transform" "word" . "color" "violet" "inline" true) }}
       {{ end }}
 
       {{ range $tags.sinks }}
-      {{ partial "badge.html" (dict "prefix" "sink" "word" . "color" "violet") }}
+      {{ partial "badge.html" (dict "prefix" "sink" "word" . "color" "violet" "inline" true) }}
       {{ end }}
     </div>
   </div>

@@ -2,7 +2,6 @@ package metadata
 
 releases: "0.12.2": {
 	date:     "2021-03-30"
-	codename: ""
 
 	description: """
 		This release includes a few critical bug fixes and a an update to OpenSSL to 1.1.1k resolve CVE-2021-3450 and
