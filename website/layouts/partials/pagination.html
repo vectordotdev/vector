@@ -1,5 +1,4 @@
-{{ if or (ne nil .NextInSection) (ne nil .PrevInSection) }}
-<nav class="border-t border-gray-200 dark:border-gray-400 px-4 flex items-center justify-between sm:px-0">
+<nav class="border-t border-gray-200 dark:border-gray-700 px-4 flex items-center justify-between sm:px-0">
   {{ with .NextInSection }}
   {{ $title := .Params.short | default .Title }}
   <div class="-mt-px w-0 flex-1 flex" x>
@@ -37,4 +36,3 @@
   </div>
   {{ end }}
 </nav>
-{{ end }}

@@ -11,8 +11,6 @@
     <div class="pb-32">
       {{ partial "content.html" . }}
     </div>
-
-    {{ partial "pagination.html" . }}
   </main>
 
   <div class="hidden lg:block xl:col-span-1">
@@ -21,4 +19,8 @@
     </aside>
   </div>
 </div>
+{{ end }}
+
+{{ define "below" }}
+{{ partial "blog/pagination.html" . }}
 {{ end }}

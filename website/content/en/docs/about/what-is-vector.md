@@ -11,6 +11,6 @@ Vector is downloaded millions of times per month and relied on by companies like
 
 {{< jump "/docs/setup/quickstart" >}}
 
-[collect]: /docs/components/sources
-[route]: /docs/components/sinks
-[transform]: /docs/components/transforms
+[collect]: /docs/reference/configuration/sources
+[route]: /docs/reference/configuration/sinks
+[transform]: /docs/reference/configuration/transforms

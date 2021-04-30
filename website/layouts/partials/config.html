@@ -53,8 +53,7 @@
       </div>
 
       {{ range $k, $v := $v.type }}
-      {{/* Object */}}
-      {{ if eq $k "object" }}
+      {{ if eq $k "object" }} {{/* Object (with sub-configs) */}}
       <div class="mt-3 border dark:border-gray-700 rounded flex flex-col divide-y dark:divide-gray-700">
         {{ range $k, $v := $v.options }}
         <div class="py-2.5 px-4">
@@ -72,17 +71,24 @@
 
               {{ range $k, $v := $v.type }}
               {{ partial "badge.html" (dict "word" $k "color" "gray") }}
+
+              {{ with $v.syntax }}
+              {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
+              {{ end }}
               {{ end }}
             </span>
           </span>
 
-          <div class="prose dark:prose-dark">
+          <div class="mt-2 prose dark:prose-dark">
             {{ $v.description | markdownify }}
           </div>
 
+          {{/* Default value */}}
           {{ range $k, $v := $v.type }}
-          {{ if $v.default }}
-          {{/* TODO */}}
+          {{ if or $v.default (eq $v.default false) }}
+          <div class="mt-4">
+            {{ template "default" . }}
+          </div>
           {{ end }}
           {{ end }}
         </div>
@@ -172,7 +178,7 @@
 
       {{/* Default value */}}
       {{ range $k, $v := $v.type }}
-      {{ if .default }}
+      {{ if or $v.default (eq $v.default false) }}
       <div class="mt-4">
         {{ template "default" . }}
       </div>
