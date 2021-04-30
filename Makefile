@@ -16,7 +16,7 @@ else
 endif
 
 # Override this with any scopes for testing/benching.
-export SCOPE ?= ""
+export SCOPE ?=
 # Override this with any extra flags for cargo bench
 export CARGO_BENCH_FLAGS ?= ""
 # override this to put criterion output elsewhere
