@@ -8,6 +8,7 @@
     overflow-y: scroll
     padding-top: $y-padding
     padding-bottom: $y-padding
+    line-height: 110%
 
     .toc-list // h2
       margin: 0
@@ -71,5 +72,6 @@ a.toc-link
   font-weight: 700
 
 // Get rid of the annoying border on Chrome when a link is selected
-*:focus
-  outline: none
+.prose
+  *:focus
+    outline: none

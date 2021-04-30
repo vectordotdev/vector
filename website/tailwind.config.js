@@ -43,14 +43,14 @@ module.exports = {
             },
             '.no-prose': {
               a: {
-                color: theme('colors.black'),
-                '&:hover': {
-                  color: theme('colors.black'),
-                },
+                color: 'inherit',
               },
-              'h1, h2, h3, h4, h5, h6, ul li': {
+              'h1, h2, h3, h4, h5, h6': {
                 margin: 0,
                 padding: 0,
+                a: {
+                  color: 'inherit',
+                },
               },
               '.highlight': {
                 margin: 0,
@@ -67,7 +67,7 @@ module.exports = {
             'p, h1, h2, h3, h4, h5, h6': {
               color: theme('colors.gray.100')
             },
-            'code, a code, p code, td code': {
+            'a code, p code, td code': {
               color: theme('colors.primary'),
             },
             'a': {
@@ -79,8 +79,6 @@ module.exports = {
             },
             strong: {
               color: theme('colors.gray.100'),
-            },
-            '.no-prose': {
             },
           }
         }

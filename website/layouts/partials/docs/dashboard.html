@@ -1,3 +1,5 @@
+{{/* The main documentation page content (three columns) */}}
+
 {{ $here := .RelPermalink }}
 {{ $hasToc := not .Params.no_toc }}
 <div class="relative max-w-3xl mx-auto px-6 lg:px-8 lg:max-w-7xl mt-8">
@@ -10,12 +12,14 @@
 
     {{ if $hasToc }}
     <main aria-label="Main documentation content" class="lg:col-span-11 xl:col-span-9 md:px-0">
-      <div class="pb-16 sm:pb-24">
-        {{ partial "hero.html" . }}
-      </div>
+      <div class="lg:pr-8">
+        <div class="pb-16 sm:pb-24">
+          {{ partial "hero.html" . }}
+        </div>
 
-      <div class="pb-32">
-        {{ partial "content.html" . }}
+        <div class="pb-32">
+          {{ partial "content.html" . }}
+        </div>
       </div>
     </main>
 

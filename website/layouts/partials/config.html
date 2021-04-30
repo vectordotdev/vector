@@ -1,19 +1,24 @@
 {{/* Used by several shortcodes to display config-style info (CLI, API, VRL functions, etc.) */}}
 {{ $componentType := .type }}
 {{ $tag := .tag }}
-<div class="relative no-prose w-full border dark:border-gray-700 rounded-md">
+<div class="relative no-prose w-full border dark:border-gray-700 rounded-md shadow-sm">
   {{/* Source/transform/sink config */}}
   {{ with .config }}
-  <div class="flex flex-col divide-y divide-gray-200 dark:divide-gray-700">
+  <div class="flex flex-col divide-y dark:divide-gray-700">
     {{ range $k, $v := . }}
     {{ if ne $k "type" }}
     <div class="py-4 px-6">
       <span class="flex justify-between items-center">
-        <h3 id="{{ $k }}">
-          <a href="#{{ $k }}" class="font-mono font-bold text-lg text-primary-dark dark:text-primary dark:hover:text-secondary">
-            {{ $k }}
-          </a>
-        </h3>
+        {{/* Config name */}}
+        <span class="text-black hover:text-secondary font-bold font-mono tracking-snug text-base">
+          <h3 id="{{ $k }}">
+            <a href="#{{ $k }}">
+              {{ $k }}
+            </a>
+          </h3>
+        </span>
+
+        {{/* Config labels */}}
         <span class="flex justify-between space-x-1">
           {{ if $v.common }}
           {{ partial "badge.html" (dict "word" "common" "color" "blue") }}
@@ -43,79 +48,97 @@
         </span>
       </span>
 
-      <div class="my-3 leading-normal text-gray-600 dark:text-gray-300">
+      <div class="mt-8 prose dark:prose-dark leading-snug text-gray-600 dark:text-gray-300">
         {{ $v.description | markdownify }}
       </div>
 
       {{ range $k, $v := $v.type }}
-      {{ if .default }}
-      <p>
-        Default: <code>{{ .default }}</code>{{ with .unit }} ({{ . }}){{ end }}
-      </p>
-      {{ end }}
-
-      {{ with .items.type }}
-      {{ range $k, $v := . }}
-      <div class="mt-3 border dark:border-gray-700 rounded">
-        <div class="py-2.5 px-4">
-          <div class="flex justify-between">
-            <span>
-              Array
-            </span>
-
-            <span class="flex space-x-1">
-              <span>
-                {{ partial "badge.html" (dict "word" $k "color" "gray") }}
-              </span>
-
-              <span>
-                {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
-              </span>
-            </span>
-          </div>
-
-          <p>
-            Examples:
-          </p>
-
-          {{ range $v.examples }}
-          <p class="block">
-            <span>
-              &rarr;
-            </span>
-            <code>
-              {{- . -}}
-            </code>
-          </p>
-          {{ end }}
-        </div>
-      </div>
-      {{ end }}
-      {{ end }}
-
+      {{/* Enum */}}
       {{ with $v.enum }}
-      <div class="mt-3 border dark:border-gray-700 rounded">
-        <div class="py-2.5 px-4">
-          <div>
-            <span>
-              Enum options
-            </span>
-          </div>
+      <div class="mt-3 border rounded py-2 px-3 dark:border-gray-700">
+        <span class="flex justify-between items-center">
+          <span class="font-semibold">
+            Enum
+          </span>
 
-          <div>
+          <span class="flex items-center space-x-1">
+            {{ partial "badge.html" (dict "word" $k "color" "gray") }}
+            {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
+          </span>
+        </span>
+
+        <div class="mt-2 border rounded py-2 px-3 dark:border-gray-700">
+          <span class="tracking-tight font-semibold">
+            Values
+          </span>
+
+          <div class="mt-1 flex flex-col space-y-1.5">
             {{ range $k, $v := . }}
-            <p class="flex justify-between">
-              <span>
-                <code>{{ $k }}</code>
-              </span>
+            <div class="grid grid-cols-5">
+              <div class="col-span-1">
+                <span class="font-mono text-primary-dark dark:text-primary text-sm">
+                  {{ $k }}
+                </span>
+              </div>
 
-              <span>
+              <div class="col-span-4 prose prose-sm dark:prose-dark leading-snug">
                 {{ $v | markdownify }}
-              </span>
-            </p>
+              </div>
+            </div>
             {{ end }}
           </div>
         </div>
+      </div>
+      {{ end }}
+
+      {{/* Array */}}
+      {{ if eq $k "array" }}
+      {{ with $v.items }}
+      <div class="mt-3 border rounded py-2 px-3">
+        {{ range $k, $v := . }}
+        {{ range $k, $v := . }}
+        <span class="flex justify-between items-center">
+          <span class="font-semibold">
+            Array
+          </span>
+
+          <span class="flex items-center space-x-1">
+            {{ partial "badge.html" (dict "word" $k "color" "gray") }}
+            {{ partial "badge.html" (dict "word" $v.syntax "color" "gray") }}
+          </span>
+        </span>
+
+        {{ with $v.examples }}
+        <div x-data="{ open: false }" class="mt-2.5 border rounded py-2 px-3">
+          <span class="flex justify-between items-center">
+            <span class="text-sm">
+              Examples
+            </span>
+
+            {{ template "config-toggler" (dict "size" 4) }}
+          </span>
+
+          <div x-show="open" class="flex flex-col ml-2 mt-1.5 space-y-2">
+            {{ range . }}
+            <span class="text-xs font-mono text-primary-dark dark:text-primary">
+              {{ . }}
+            </span>
+            {{ end }}
+          </div>
+        </div>
+        {{ end }}
+        {{ end }}
+        {{ end }}
+      </div>
+      {{ end }}
+      {{ end }}
+      {{ end }}
+
+      {{/* Default value */}}
+      {{ range $k, $v := $v.type }}
+      {{ if .default }}
+      <div class="mt-4">
+        {{ template "default" . }}
       </div>
       {{ end }}
       {{ end }}
@@ -129,15 +152,16 @@
   {{ with .requirements }}
   <div class="no-prose py-4 px-6 flex items-center">
     <div class="mr-5 flex-shrink-0">
-      <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      {{/* Heroicon: outline/exclamation */}}
+      <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
       </svg>
     </div>
     <div class="flex flex-col divide-gray-100">
       {{ range . }}
-      <p class="leading-normal">
+      <span class="leading-normal">
         {{ . | markdownify }}
-      </p>
+      </span>
       {{ end }}
     </div>
   </div>
@@ -328,15 +352,7 @@
             Examples
           </span>
 
-          <a @click="open = !open">
-            <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-
-            <svg x-show="open" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
-            </svg>
-          </a>
+          {{ template "toggler" (dict "size" 4) }}
         </span>
 
         <div x-show="open">
@@ -442,4 +458,28 @@
 {{ highlight $json "json" "" }}
 {{ end }}
 {{ end }}
+{{ end }}
+
+{{ define "config-toggler" }}
+{{ $size := .size | default 6 }}
+<a @click="open = !open">
+  {{/* Heroicon: outline/plus */}}
+  <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class="h-{{ $size }} w-{{ $size }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+  </svg>
+
+  {{/* Heroicon: outline/minus-sm */}}
+  <svg x-show="open" xmlns="http://www.w3.org/2000/svg" class="h-{{ $size }} w-{{ $size }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+  </svg>
+</a>
+{{ end }}
+
+{{ define "default" }}
+<div class="flex flex-row-reverse">
+  <span class="text-sm">
+    <span class="font-semibold">default:</span>
+    <code>{{ .default }}</code>{{ with .unit }} ({{ . }}){{ end }}
+  </span>
+</div>
 {{ end }}

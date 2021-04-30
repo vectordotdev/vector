@@ -6,9 +6,9 @@
 {{ $quote := "gray-400" }}
 {{ $types := dict "info" $info "success" $success "danger" $danger "warning" $warning "requirement" $requirement "quote" $quote }}
 {{ $color := index $types .type }}
-{{ $dimension := cond (eq .type "requirement") 6 5 }}
+{{ $dimension := 6 }}
 {{ $viewBox := cond (eq .type "requirement") 24 20 }}
-<div class="admonition no-prose rounded-lg px-4 py-3 border-3 border-{{ $color }}">
+<div class="no-prose rounded-lg px-6 py-4 border-3 border-{{ $color }}">
   <div class="flex items-center">
     <div class="flex-shrink-0">
       <svg class="h-{{ $dimension }} w-{{ $dimension }} text-{{ $color }}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {{ $viewBox }} {{ $viewBox }}" fill="currentColor" aria-hidden="true"{{ if eq .type "requirement" }} stroke="currentColor"{{ end }}>
@@ -42,14 +42,14 @@
         <path fill-rule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clip-rule="evenodd" />        {{ end }}
       </svg>
     </div>
-    <div class="ml-4 flex flex-col m-0 space-y-1.5">
+    <div class="ml-6 flex flex-col m-0 space-y-1.5">
       {{ with .title }}
-      <p class="font-semibold text-lg">
+      <span class="text-lg font-bold leading-tight tracking-tight">
         {{ . }}
-      </p>
+      </span>
       {{ end }}
 
-      <div class="text tracking-tight">
+      <div class="text tracking-tight leading-snug prose dark:prose-dark">
         {{ .content | markdownify }}
       </div>
     </div>

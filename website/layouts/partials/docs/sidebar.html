@@ -17,7 +17,7 @@
 
   {{/* Extra "meta" links specified in config.toml (external links outside our doc tree) */}}
   <div>
-    {{ template "heading" (dict "title" "Meta") }}
+    {{ template "heading" (dict "title" "Meta" "hover" false) }}
 
     <div class="flex flex-col space-y-0.5 mt-1.5">
       {{ template "meta-menu" $metaLinks }}
@@ -103,7 +103,7 @@
   {{ .title }}
 </a>
 {{ else }}
-<p class="uppercase tracking-tight font-semibold dark:text-gray-200 text-gray-600 dark:hover:text-purple-v hover:text-purple-v">
+<p class="uppercase tracking-tight font-semibold dark:text-gray-200 text-gray-600">
   {{ .title }}
 </p>
 {{ end }}

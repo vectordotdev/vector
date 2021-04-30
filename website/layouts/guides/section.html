@@ -10,21 +10,7 @@
 {{ $guides := cond $isRoot .Sections .RegularPages }}
 <div class="relative max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-6 lg:px-8 xl:grid xl:grid-cols-3 xl:gap-x-12 space-y-8 xl:space-y-0 my-16">
   <div class="xl:col-span-1 pr-0 lg:pr-6 md:pr-2">
-    <div class="max-w-xl">
-      <div class="mb-4 md:mb-6">
-        {{ partial "breadcrumb.html" . }}
-      </div>
-
-      <h2 class="dark:text-gray-50 font-secondary font-extrabold text-4xl md:text-5xl tracking-tight sm:tracking-tighter leading-tight">
-        {{ .Title }}
-      </h2>
-
-      {{ with .Description }}
-      <p class="dark:text-gray-200 mt-5 text-xl text-gray-500 prose dark:prose-dark">
-        {{ . | markdownify }}
-      </p>
-      {{ end }}
-    </div>
+    {{ partial "hero.html" . }}
   </div>
 
   <div class="xl:col-span-2 flex flex-col space-y-10">
