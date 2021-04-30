@@ -93,6 +93,13 @@ impl Event {
             Self::Metric(metric) => metric.metadata(),
         }
     }
+
+    pub fn metadata_mut(&mut self) -> &mut EventMetadata {
+        match self {
+            Self::Log(log) => log.metadata_mut(),
+            Self::Metric(metric) => metric.metadata_mut(),
+        }
+    }
 }
 
 impl EventDataEq for Event {

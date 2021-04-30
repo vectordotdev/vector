@@ -2,7 +2,7 @@ use super::EventMetadata;
 use crate::metrics::Handle;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use getset::Getters;
+use getset::{Getters, MutGetters};
 use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
@@ -15,13 +15,13 @@ use std::{
 };
 use vrl::Target;
 
-#[derive(Clone, Debug, Deserialize, Getters, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Getters, MutGetters, PartialEq, Serialize)]
 pub struct Metric {
     #[serde(flatten)]
     pub series: MetricSeries,
     #[serde(flatten)]
     pub data: MetricData,
-    #[getset(get = "pub")]
+    #[getset(get = "pub", get_mut = "pub")]
     #[serde(skip_serializing, default = "EventMetadata::default")]
     metadata: EventMetadata,
 }

@@ -3,7 +3,7 @@ use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
-use getset::Getters;
+use getset::{Getters, MutGetters};
 use lookup::LookupBuf;
 use serde::{Deserialize, Serialize, Serializer};
 use shared::EventDataEq;
@@ -14,14 +14,14 @@ use std::{
     iter::FromIterator,
 };
 
-#[derive(Clone, Debug, Getters, PartialEq, Derivative, Deserialize)]
+#[derive(Clone, Debug, Getters, MutGetters, PartialEq, Derivative, Deserialize)]
 pub struct LogEvent {
     // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
     #[derivative(Default(value = "Value::from(BTreeMap::default())"))]
     #[serde(flatten)]
     fields: Value,
 
-    #[getset(get = "pub")]
+    #[getset(get = "pub", get_mut = "pub")]
     #[serde(skip)]
     metadata: EventMetadata,
 }
