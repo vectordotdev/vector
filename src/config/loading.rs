@@ -105,6 +105,7 @@ pub async fn load_from_paths_with_provider(
         },
         _ => {
             let (config, build_warnings) = builder.build_with_warnings()?;
+            signal_handler.clear();
 
             for warning in load_warnings.into_iter().chain(build_warnings) {
                 warn!("{}", warning);

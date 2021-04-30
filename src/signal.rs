@@ -2,6 +2,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_stream::{Stream, StreamExt};
 
 pub type ShutdownTx = oneshot::Sender<()>;
+type ShutdownRx = oneshot::Receiver<()>;
 pub type SignalTx = mpsc::Sender<SignalTo>;
 pub type SignalRx = mpsc::Receiver<SignalTo>;
 
@@ -65,10 +66,23 @@ impl SignalHandler {
         });
     }
 
-    /// Takes a shutdown to register with the instance. Registering a new one will
-    /// drop the old from scope, and trigger a shutdown in the producer.
-    pub fn register_shutdown(&mut self, shutdown_tx: ShutdownTx) {
+    /// Add a stream with a shutdown. The receiver is returned to the caller, allowing the
+    /// caller to be informed when a stream replaces it or it's explictly cleared.
+    pub fn with_shutdown<T, S>(&mut self, stream: S) -> ShutdownRx
+    where
+        T: Into<SignalTo> + Send + Sync,
+        S: Stream<Item = T> + 'static + Send + Sync,
+    {
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
         self.shutdown = Some(shutdown_tx);
+        self.add(stream);
+
+        shutdown_rx
+    }
+
+    /// Triggers a shutdown by letting it fall out of scope.
+    pub fn clear(&mut self) {
+        self.shutdown = None;
     }
 
     /// Takes the receiver, replacing it with `None`. A controller is intended to have only one
