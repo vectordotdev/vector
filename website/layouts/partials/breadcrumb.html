@@ -13,7 +13,7 @@
       <path d="M5.555 17.776l8-16 .894.448-8 16-.894-.448z" />
     </svg>
     {{ end }}
-    <a href="{{ .p1.RelPermalink }}" class="leading-4 dark:text-gray-300 tracking-thin text-sm md:text-normal font-medium hover:text-gray-700{{ if not .p1.IsHome }} ml-4{{ end }}{{ if $isHere }} dark:text-gray-100 text-gray-700 font-extrabold{{ else }} text-gray-600{{ end }}">
+    <a href="{{ .p1.RelPermalink }}" class="leading-4 dark:text-gray-300 tracking-thin text-xs lg:text-sm md:text-normal font-medium hover:text-gray-700{{ if not .p1.IsHome }} ml-1 lg:ml-2{{ end }}{{ if $isHere }} dark:text-gray-100 text-gray-700 font-extrabold{{ else }} text-gray-600{{ end }}">
       {{ $title | markdownify }}
     </a>
   </div>
@@ -21,7 +21,7 @@
 {{ end }}
 
 <nav class="flex" aria-label="Documentation breadcrumb">
-  <ol class="flex items-center space-x-2.5 flex-wrap">
+  <ol class="flex items-center flex-wrap space-x-1 lg:space-x-2">
     {{ template "breadcrumb" (dict "p1" . "p2" .) }}
   </ol>
 </nav>

@@ -1,20 +1,30 @@
 {{ $title := .Params.short | default .Title }}
 {{ $componentTag := .File.BaseFileName }}
-<div class="no-prose dark:bg-dark dark:hover:bg-gray-800 bg-white shadow-md px-5 py-4 hover:bg-gray-50 rounded-md border dark:border-gray-700">
-  <h3 id="{{ $componentTag }}">
-    <a href="{{ .RelPermalink }}" class="block text-2xl leading-tight">
-      <span class="dark:text-gray-200 dark:bg-gray-400 hover:text-secondary dark:hover:text-primary">
+{{ $kind := .Params.kind }}
+{{ $kindLink := printf "/docs/reference/configuration/%ss" $kind | relURL }}
+<div class="no-prose border rounded-md py-3.5 px-5 flex flex-col hover:bg-gray-50 dark:border-gray-700 shadow-sm">
+  <span class="flex justify-between items-center">
+    <h3 id="{{ $componentTag }}" class="text-sm text-gray-600 tracking-snug dark:text-gray-300">
+      <a href="{{ .RelPermalink }}">
         {{ $title }}
-      </span>
-    </a>
-  </h3>
+      </a>
+    </h3>
 
-  <span class="my-3.5 dark:text-gray-200 dark:bg-gray-800 text-dark tracking-wider bg-gray-100 inline-block text-xs font-semibold font-mono py-1 px-2 rounded">
-    {{ $componentTag }}
+    <a href="{{ $kindLink }}">
+      {{ partial "badge.html" (dict "word" .Params.kind "color" "blue") }}
+    </a>
   </span>
 
+  <div class="my-4">
+    <span class="font-mono tracking-tight font-semibold dark:text-gray-300">
+      <a href="{{ .RelPermalink }}">
+        {{ $componentTag }}
+      </a>
+    </span>
+  </div>
+
   {{ with .Description }}
-  <div class="text-md dark:text-gray-300 text-gray-700 leading-snug">
+  <div class="prose prose-sm leading-snug text-gray-500 dark:prose-dark">
     {{ . | markdownify }}
   </div>
   {{ end }}

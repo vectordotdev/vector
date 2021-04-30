@@ -1,5 +1,6 @@
 ---
 title: AWS EC2 metadata
+kind: transform
 ---
 
 ## Requirements
