@@ -1,7 +1,6 @@
 use super::{builder::ConfigBuilder, validation, Config, TransformOuter};
 use indexmap::IndexMap;
 
-/// Compiles a "full" config, with topology components.
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
 

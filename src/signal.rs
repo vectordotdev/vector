@@ -103,7 +103,7 @@ impl SignalHandler {
         shutdown_tx
     }
 
-    /// Triggers a shutdown on the underlying braodcast channel(s).
+    /// Triggers a shutdown on the underlying broadcast channel(s).
     pub fn trigger_shutdown(&mut self) {
         for shutdown_tx in self.shutdown_txs.drain(..) {
             // An error just means the channel was already shut down; safe to ignore.

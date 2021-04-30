@@ -112,15 +112,13 @@ impl ProviderConfig for HttpConfig {
         let poll_interval_secs = self.poll_interval_secs;
         let request = self.request.clone();
 
-        // Configuration channel
         let (signal_tx, signal_rx) = mpsc::channel(2);
 
-        // Create a shutdown trigger.
         let mut shutdown_rx = signal_handler
             .with_shutdown(ReceiverStream::new(signal_rx))
             .subscribe();
 
-        // Attempt to retrieve the initial configuration, then poll for changes
+        // Attempt to retrieve the initial configuration, then poll for changes.
         http_request(&url, &tls_options, &request.headers).await.map(|config| {
             tokio::spawn(async move {
                 let mut interval =

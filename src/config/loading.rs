@@ -88,6 +88,8 @@ pub fn load_from_paths(config_paths: &[(PathBuf, FormatHint)]) -> Result<Config,
     Ok(config)
 }
 
+/// Loads a configuration from paths. If a provider is present in the builder, the config is
+/// used as bootstrapping for a remote source. Otherwise, provider instantiation is skipped.
 pub async fn load_from_paths_with_provider(
     config_paths: &[(PathBuf, FormatHint)],
     signal_handler: &mut signal::SignalHandler,
@@ -105,6 +107,10 @@ pub async fn load_from_paths_with_provider(
         },
         _ => {
             let (config, build_warnings) = builder.build_with_warnings()?;
+
+            // Trigger a shutdown in the signal handler, which will terminate any provider
+            // streams that may exist prior to loading this configuration to prevent any
+            // in-flight polling/retrieval.
             signal_handler.trigger_shutdown();
 
             for warning in load_warnings.into_iter().chain(build_warnings) {
