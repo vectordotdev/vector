@@ -278,7 +278,12 @@ cross-image-%:
 
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --workspace --no-fail-fast --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --quiet --workspace --no-fail-fast --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE}
+
+.PHONY: test-benches
+test-benches: ## Run benchmarks in debug mode to trigger debug_assertions
+test-benches: export DEFAULT_FEATURES:="benches metrics-benches remap-benches"
+test-benches: test
 
 .PHONY: test-components
 test-components: ## Test with all components enabled

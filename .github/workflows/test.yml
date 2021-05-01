@@ -101,7 +101,8 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make test-components
+      - run: make test
+      - run: make test-benches
 
   test-misc:
     name: Miscellaneous - Linux
@@ -183,7 +184,8 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make test-components
+      - run: make test
+      - run: make test-benches
       - run: make test-behavior
 
   test-windows:
