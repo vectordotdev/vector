@@ -242,17 +242,21 @@ fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 ) -> impl Fn(&'a str) -> IResult<&'a str, (String, Value), E> {
     move |input| {
         map(
-            tuple((
-                preceded(space0, parse_key(key_value_delimiter)),
-                preceded(space0, tag(key_value_delimiter)),
-                |input| {
-                    if whitespace_strict {
-                        parse_value(field_delimiter)(input)
-                    } else {
-                        preceded(space0, parse_value(field_delimiter))(input)
-                    }
-                },
-            )),
+            |input| {
+                if whitespace_strict {
+                    tuple((
+                        preceded(space0, parse_key(key_value_delimiter)),
+                        tag(key_value_delimiter),
+                        parse_value(field_delimiter),
+                    ))(input)
+                } else {
+                    tuple((
+                        preceded(space0, parse_key(key_value_delimiter)),
+                        preceded(space0, tag(key_value_delimiter)),
+                        preceded(space0, parse_value(field_delimiter)),
+                    ))(input)
+                }
+            },
             |(field, _, value): (&str, &str, Value)| (field.to_string(), value),
         )(input)
     }
