@@ -6,16 +6,15 @@
 {{ end }}
 {{ end }}
 
-<div class="no-prose flex flex-col divide-y divide-gray-200 dark:divide-gray-700 dark:border-gray-700 border rounded-md shadow">
+<div class="no-prose flex flex-col divide-y divide-gray-200 dark:divide-gray-700 dark:border-gray-700 border rounded-md shadow-sm">
   {{ range $funcs }}
+  {{ $name := .name }}
+  {{ $func := index site.Data.docs.remap.functions .name }}
+  {{ $infallible := not $func.internal_failure_reasons }}
+  {{ $args := $func.arguments }}
+  {{ $lastArg := sub (len $args) 1 }}
+  {{ $return := $func.return }}
   <div class="py-4 px-6">
-    {{ $name := .name }}
-    {{ $func := index site.Data.docs.remap.functions .name }}
-    {{ $infallible := not $func.internal_failure_reasons }}
-    {{ $args := $func.arguments }}
-    {{ $lastArg := sub (len $args) 1 }}
-    {{ $return := $func.return }}
-
     {{/* Function title */}}
     <span class="flex justify-between items-center">
       <h3 id="{{ $name }}" class="font-mono">
@@ -24,7 +23,8 @@
         </a>
       </h3>
 
-      <span>
+      {{/* Badges */}}
+      <span class="flex space-x-1">
         {{ if $infallible }}
         {{ partial "badge.html" (dict "word" "infallible" "color" "blue") }}
         {{ else }}
@@ -40,23 +40,23 @@
 
     {{/* Function spec */}}
     <div class="mt-2.5 border rounded-md py-3 px-4 dark:border-gray-700">
-      <p class="font-semibold text-md">
+      <span class="font-semibold text-md">
         Function spec
-      </p>
+      </span>
 
       <div class="my-2 font-mono text-sm bg-dark dark:bg-black px-3.5 py-2.5 rounded text-gray-100">
         <span class="text-primary dark:text-primary font-semibold">{{ $name }}</span>(
           {{- range $idx, $arg := $args -}}
           {{ $isLast := eq $idx $lastArg -}}
-          <span class="{{ if .required }} font-bold text-fuchsia-500 dark:text-orange-400{{ else }} text-purple-v dark:text-orange-500{{ end }}">
+          <span class="{{ if .required }} font-bold text-orange-400{{ else }} font-semibold text-purple-400{{ end }}">
             {{- .name -}}
           </span>:
-          <span class="text-gray-300 dark:text-gray-200"><{{ delimit .type `<span class="text-grey-100"> | </span>` }}></span>{{ if not $isLast }}, {{ end -}}
+          <span class="text-gray-200"><{{ delimit .type `<span class="text-grey-500"> | </span>` }}></span>{{ if not $isLast }}, {{ end -}}
           {{ end -}}
         )
         {{- with $return -}}
         <div class="ml-3">
-          <span class="font-extrabold">::</span> <span class="text-gray-300"><{{ delimit .types " | " }}></span>
+          <span class="font-extrabold">::</span> <span class="text-gray-200"><{{ delimit .types " | " }}></span>
         </div>
         {{- end -}}
       </div>
@@ -68,11 +68,10 @@
         {{ end }}
       </div>
 
-      <div class="mt-5 flex flex-row-reverse">
+      <div class="mt-6 flex flex-row-reverse">
         {{ template "legend" }}
       </div>
     </div>
-
   </div>
   {{ end }}
 </div>
@@ -84,15 +83,15 @@
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
   </svg>
 
-  <span class="font-mono text-xs text-fuchsia-500 dark:text-orange-400 font-semibold">
+  <span class="font-mono text-xs text-orange-400 font-semibold">
     required
   </span>
 
-  <span class="font-mono text-xs dark:text-purple-v font-semibold">
+  <span class="font-mono text-xs text-purple-400 font-semibold">
     optional
   </span>
 
-  <span class="font-mono text-xs text-grey-300 font-semibold">
+  <span class="font-mono text-xs text-gray-500 dark:text-gray-300 font-semibold">
     &lt;types | ...&gt;
   </span>
 </div>
@@ -101,11 +100,13 @@
 {{ define "arg" }}
 <div class="flex flex-col space-y-0.5">
   <span class="flex justify-between items-center">
-    <span class="font-mono tracking-tight{{ if .required }} font-extrabold text-fuchsia-500{{ else }} text-indigo-400{{ end }}">
+    <span class="font-mono tracking-tight{{ if .required }} font-extrabold text-orange-400{{ else }} font-semibold text-purple-400{{ end }}">
       {{ .name }}
     </span>
 
-    <span class="font-mono text-gray-400 dark:text-gray-300 text-sm">{{ delimit .type " | " }}</span>
+    <span class="font-mono text-gray-500 dark:text-gray-300 text-sm">
+      {{ delimit .type " | " }}
+    </span>
   </span>
 
   <div class="leading-snug ml-4">

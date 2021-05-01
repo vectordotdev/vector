@@ -9,13 +9,15 @@
   {{ $outputCode := highlight $output "json" "" }}
   {{ $id := .title | urlize }}
   <div class="py-4 px-6">
-    <div id="{{ $id }}">
-      <a href="#{{ $id }}" class="text-lg font-semibold tracking-tight">
-        {{ .title }}
-      </a>
-    </div>
+    <span>
+      <h3 id="{{ $id }}">
+        <a href="#{{ $id }}" class="text-lg font-semibold tracking-tight">
+          {{ .title }}
+        </a>
+      </h3>
+    </span>
 
-    <div class="mt-2 flex flex-col space-y-2">
+    <div class="mt-3 flex flex-col space-y-2">
       {{ with .input.log }}
       {{ $json := . | jsonify (dict "indent" "  ") }}
       {{ $code := highlight $json "json" "" }}
@@ -61,61 +63,4 @@
     </div>
   </div>
   {{ end }}
-</div>
-
-
-<div class="vrl-examples" x-data="{ shown: localStorage.getItem('vrl-example') || '{{ $first.title }}', open: false }">
-  <div class="dropdown" :class="{ 'is-active': open }">
-    <div class="dropdown-trigger" @click="open = !open" @click.away="open = false">
-      <button class="button" aria-haspopup="true" aria-controls="dropdown-menu">
-        <span x-text="shown" class="has-text-weight-bold"></span>
-        <span class="icon is-small has-text-primary">
-          <i class="fas" :class="{ 'fa-angle-down': !open, 'fa-angle-right': open }" aria-hidden="true"></i>
-        </span>
-      </button>
-    </div>
-    <div class="dropdown-menu" id="dropdown-menu" role="menu">
-      <div class="dropdown-content">
-        {{ range $examples }}
-        <a class="dropdown-item" @click="shown = '{{ .title }}'; localStorage.setItem('vrl-example', '{{ .title }}'); open = false">
-          {{ .title }}
-        </a>
-        {{ end }}
-      </div>
-    </div>
-  </div>
-
-  <div class="example mt-4">
-    {{ range $examples }}
-    {{ $input := dict "message" .input.log.message | jsonify }}
-    {{ $vrlSourceCode := highlight .source "toml" "" }}
-    {{ $output := .output | jsonify (dict "indent" "  ") }}
-    {{ $outputCode := highlight $output "json" "" }}
-    <div x-show="shown == '{{ .title }}'">
-      <p>...and the following VRL program...</p>
-
-      {{ $vrlSourceCode }}
-
-      {{ if .raises }}
-      {{ $errorCode := highlight .raises.compiletime "ruby" "" }}
-      <p>
-        ...you should see this error:
-      </p>
-
-      {{ $errorCode }}
-      {{ else }}
-
-      {{ with .input.log }}
-      <p>...the following log event is output:</p>
-      {{ end }}
-
-      {{ with .input.metric }}
-      <p>...the following metric event is output:</p>
-      {{ end }}
-
-      {{ $outputCode }}
-      {{ end }}
-    </div>
-    {{ end }}
-  </div>
 </div>
