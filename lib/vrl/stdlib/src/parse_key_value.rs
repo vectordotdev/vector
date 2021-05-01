@@ -1,9 +1,9 @@
 use nom::{
     self,
     branch::alt,
-    bytes::complete::{escaped, tag, take_until, take_while1},
+    bytes::complete::{escaped, tag, take_until, take_while, take_while1},
     character::complete::{char, satisfy, space0},
-    combinator::{eof, map, peek, rest},
+    combinator::{eof, map, opt, peek, rest},
     error::{ContextError, ParseError, VerboseError},
     multi::{many1, separated_list1},
     sequence::{delimited, preceded, terminated, tuple},
@@ -185,10 +185,13 @@ fn parse_delimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
         terminated(
             delimited(
                 char(delimiter),
-                escaped(
-                    take_while1(|c: char| c != '\\' && c != delimiter),
-                    '\\',
-                    satisfy(|c| c == '\\' || c == delimiter),
+                map(
+                    opt(escaped(
+                        take_while1(|c: char| c != '\\' && c != delimiter),
+                        '\\',
+                        satisfy(|c| c == '\\' || c == delimiter),
+                    )),
+                    |inner| inner.unwrap_or(""),
                 ),
                 char(delimiter),
             ),
@@ -313,6 +316,18 @@ mod test {
         assert_eq!(
             Ok(("", "noog".into())),
             parse_value::<VerboseError<&str>>(" ")("noog")
+        );
+
+        // empty delimited
+        assert_eq!(
+            Ok(("", "".into())),
+            parse_value::<VerboseError<&str>>(" ")(r#""""#)
+        );
+
+        // empty undelimited
+        assert_eq!(
+            Ok(("", "".into())),
+            parse_value::<VerboseError<&str>>(" ")("")
         );
     }
 
