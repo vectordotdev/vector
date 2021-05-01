@@ -183,7 +183,7 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make test
+      - run: make test-components
       - run: make test-behavior
 
   test-windows:
@@ -196,9 +196,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
-      - env:
-          RUSTFLAGS: "-D warnings"
-        run: cargo test --no-fail-fast --no-default-features --features default-msvc
+      - run: make test
 
   test-vrl:
     name: VRL - Linux

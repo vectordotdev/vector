@@ -658,40 +658,48 @@ wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-
 [[bench]]
 name = "default"
 harness = false
+test = true
 required-features = ["benches"]
 
 [[bench]]
 name = "wasm"
 path = "benches/wasm/mod.rs"
 harness = false
+test = true
 required-features = ["wasm-benches"]
 
 [[bench]]
 name = "remap"
 harness = false
+test = true
 required-features = ["remap-benches"]
 
 [[bench]]
 name = "languages"
 harness = false
+test = true
 required-features = ["language-benches"]
 
 [[bench]]
 name = "metrics_on"
 harness = false
+test = true
 required-features = ["metrics-benches"]
 
 [[bench]]
 name = "metrics_no_tracing_integration"
 harness = false
+test = true
 required-features = ["metrics-benches"]
 
 [[bench]]
 name = "metrics_off"
 harness = false
+test = true
 required-features = ["metrics-benches"]
 
 [[bench]]
 name = "distribution_statistic"
 harness = false
+test = true
 required-features = ["statistic-benches"]
