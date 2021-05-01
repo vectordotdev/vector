@@ -1,7 +1,7 @@
 use nom::{
     self,
     branch::alt,
-    bytes::complete::{escaped, tag, take_until, take_while, take_while1},
+    bytes::complete::{escaped, tag, take_until, take_while1},
     character::complete::{char, satisfy, space0},
     combinator::{eof, map, opt, peek, rest},
     error::{ContextError, ParseError, VerboseError},
@@ -9,7 +9,7 @@ use nom::{
     sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
-use std::iter::FromIterator;
+use std::{iter::FromIterator, str::FromStr};
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -37,6 +37,11 @@ impl Function for ParseKeyValue {
                 kind: kind::ANY,
                 required: false,
             },
+            Parameter {
+                keyword: "whitespace",
+                kind: kind::BYTES,
+                required: false,
+            },
         ]
     }
 
@@ -52,6 +57,13 @@ impl Function for ParseKeyValue {
                 source: r#"parse_key_value!(s'zork: zoog, nonk: "nink nork"', key_value_delimiter: ":", field_delimiter: ",")"#,
                 result: Ok(r#"{"zork": "zoog", "nonk": "nink nork"}"#),
             },
+            Example {
+                title: "strict whitespace",
+                source: r#"parse_key_value!(s'app=my-app ip=1.2.3.4 user= msg=hello-world', whitespace: "strict")"#,
+                result: Ok(
+                    r#"{"app": "my-app", "ip": "1.2.3.4", "user": "", "msg": "hello-world"}"#,
+                ),
+            },
         ]
     }
 
@@ -66,11 +78,66 @@ impl Function for ParseKeyValue {
             .optional("field_delimiter")
             .unwrap_or_else(|| expr!(" "));
 
+        let whitespace = arguments
+            .optional_enum("whitespace", &Whitespace::all_value())?
+            .map(|s| {
+                Whitespace::from_str(&s.try_bytes_utf8_lossy().expect("whitespace not bytes"))
+                    .expect("validated enum")
+            })
+            .unwrap_or_default();
+
         Ok(Box::new(ParseKeyValueFn {
             value,
             key_value_delimiter,
             field_delimiter,
+            whitespace,
         }))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Whitespace {
+    Strict,
+    Lenient,
+}
+
+impl Whitespace {
+    fn all_value() -> Vec<Value> {
+        use Whitespace::*;
+
+        vec![Strict, Lenient]
+            .into_iter()
+            .map(|u| u.as_str().into())
+            .collect::<Vec<_>>()
+    }
+
+    const fn as_str(self) -> &'static str {
+        use Whitespace::*;
+
+        match self {
+            Strict => "strict",
+            Lenient => "lenient",
+        }
+    }
+}
+
+impl Default for Whitespace {
+    fn default() -> Self {
+        Self::Lenient
+    }
+}
+
+impl FromStr for Whitespace {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        use Whitespace::*;
+
+        match s {
+            "strict" => Ok(Strict),
+            "lenient" => Ok(Lenient),
+            _ => Err("unknown whitespace variant"),
+        }
     }
 }
 
@@ -79,6 +146,7 @@ pub(crate) struct ParseKeyValueFn {
     pub(crate) value: Box<dyn Expression>,
     pub(crate) key_value_delimiter: Box<dyn Expression>,
     pub(crate) field_delimiter: Box<dyn Expression>,
+    pub(crate) whitespace: Whitespace,
 }
 
 impl Expression for ParseKeyValueFn {
@@ -92,7 +160,14 @@ impl Expression for ParseKeyValueFn {
         let value = self.field_delimiter.resolve(ctx)?;
         let field_delimiter = value.try_bytes_utf8_lossy()?;
 
-        let values = parse(&bytes, &key_value_delimiter, &field_delimiter)?;
+        let whitespace_strict = self.whitespace == Whitespace::Strict;
+
+        let values = parse(
+            &bytes,
+            &key_value_delimiter,
+            &field_delimiter,
+            whitespace_strict,
+        )?;
 
         Ok(Value::from_iter(values))
     }
@@ -108,15 +183,21 @@ fn parse<'a>(
     input: &'a str,
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
+    whitespace_strict: bool,
 ) -> Result<Vec<(String, Value)>> {
-    let (rest, result) =
-        parse_line(input, key_value_delimiter, field_delimiter).map_err(|e| match e {
-            nom::Err::Error(e) | nom::Err::Failure(e) => {
-                // Create a descriptive error message if possible.
-                nom::error::convert_error(input, e)
-            }
-            _ => format!("{}", e),
-        })?;
+    let (rest, result) = parse_line(
+        input,
+        key_value_delimiter,
+        field_delimiter,
+        whitespace_strict,
+    )
+    .map_err(|e| match e {
+        nom::Err::Error(e) | nom::Err::Failure(e) => {
+            // Create a descriptive error message if possible.
+            nom::error::convert_error(input, e)
+        }
+        _ => format!("{}", e),
+    })?;
 
     if rest.trim().is_empty() {
         Ok(result)
@@ -130,10 +211,11 @@ fn parse_line<'a>(
     input: &'a str,
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
+    whitespace_strict: bool,
 ) -> IResult<&'a str, Vec<(String, Value)>, VerboseError<&'a str>> {
     separated_list1(
         parse_field_delimiter(field_delimiter),
-        parse_key_value(key_value_delimiter, field_delimiter),
+        parse_key_value(key_value_delimiter, field_delimiter, whitespace_strict),
     )(input)
 }
 
@@ -156,13 +238,20 @@ fn parse_field_delimiter<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
+    whitespace_strict: bool,
 ) -> impl Fn(&'a str) -> IResult<&'a str, (String, Value), E> {
     move |input| {
         map(
             tuple((
                 preceded(space0, parse_key(key_value_delimiter)),
                 preceded(space0, tag(key_value_delimiter)),
-                preceded(space0, parse_value(field_delimiter)),
+                |input| {
+                    if whitespace_strict {
+                        parse_value(field_delimiter)(input)
+                    } else {
+                        preceded(space0, parse_value(field_delimiter))(input)
+                    }
+                },
             )),
             |(field, _, value): (&str, &str, Value)| (field.to_string(), value),
         )(input)
@@ -265,7 +354,8 @@ mod test {
             parse(
                 r#"ook=pook @timestamp=2020-12-31T12:43:22.2322232Z key#hash=value "key=with=special=characters"=value key="with special=characters""#,
                 "=",
-                " "
+                " ",
+                false
             )
         );
     }
@@ -274,7 +364,12 @@ mod test {
     fn test_parse_key_value() {
         assert_eq!(
             Ok(("", ("ook".to_string(), "pook".into()))),
-            parse_key_value::<VerboseError<&str>>("=", " ")("ook=pook")
+            parse_key_value::<VerboseError<&str>>("=", " ", false)("ook=pook")
+        );
+
+        assert_eq!(
+            Ok(("", ("key".to_string(), "".into()))),
+            parse_key_value::<VerboseError<&str>>("=", " ", true)("key=")
         );
     }
 
@@ -285,7 +380,18 @@ mod test {
                 ("ook".to_string(), "pook".into()),
                 ("onk".to_string(), "ponk".into())
             ]),
-            parse("ook=pook onk=ponk", "=", " ")
+            parse("ook=pook onk=ponk", "=", " ", false)
+        );
+    }
+
+    #[test]
+    fn test_parse_key_values_strict() {
+        assert_eq!(
+            Ok(vec![
+                ("ook".to_string(), "".into()),
+                ("onk".to_string(), "ponk".into())
+            ]),
+            parse("ook= onk=ponk", "=", " ", true)
         );
     }
 
@@ -406,6 +512,19 @@ mod test {
                              PolicyID: "3",
                              Action: "PERMIT",
                              Content: "Session Backout"})),
+            tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
+                (): Kind::all()
+            }),
+        }
+
+        strict {
+            args: func_args! [
+                value: r#"foo= bar= tar=data"#,
+                whitespace: "strict"
+            ],
+            want: Ok(value!({foo: "",
+                             bar: "",
+                             tar: "data"})),
             tdef: TypeDef::new().fallible().object::<(), Kind>(map! {
                 (): Kind::all()
             }),
