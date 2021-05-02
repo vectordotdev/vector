@@ -16,7 +16,7 @@ else
 endif
 
 # Override this with any scopes for testing/benching.
-export SCOPE ?= ""
+export SCOPE ?=
 # Override this with any extra flags for cargo bench
 export CARGO_BENCH_FLAGS ?= ""
 # override this to put criterion output elsewhere
@@ -278,7 +278,7 @@ cross-image-%:
 
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --workspace --features ${DEFAULT_FEATURES} ${SCOPE} --all-targets -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --workspace --no-fail-fast --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
 
 .PHONY: test-components
 test-components: ## Test with all components enabled
@@ -534,7 +534,7 @@ $(WASM_MODULE_OUTPUTS): ### Build a specific WASM module
 test-wasm: export TEST_THREADS=1
 test-wasm: export TEST_LOG=vector=trace
 test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-fail-fast --no-default-features --features "transforms-field_filter transforms-wasm transforms-lua transforms-add_fields" --lib --all-targets -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-fail-fast --no-default-features --features "transforms-field_filter transforms-wasm transforms-lua transforms-add_fields" -- --nocapture
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 

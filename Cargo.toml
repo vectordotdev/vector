@@ -72,6 +72,7 @@ members = [
   "lib/tracing-limit",
   "lib/vector-api-client",
   "lib/vector-wasm",
+  "lib/lookup",
   "lib/vrl/cli",
   "lib/vrl/compiler",
   "lib/vrl/core",
@@ -132,7 +133,7 @@ rusoto_sqs = { version = "0.46.0", optional = true }
 rusoto_sts = { version = "0.46.0", optional = true }
 
 # Tower
-tower = { version = "0.4.6", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
+tower = { version = "0.4.7", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
 tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
@@ -163,6 +164,9 @@ tui = { version = "0.14.0", optional = true, default-features = false, features 
 # VRL Lang
 vrl = { path = "lib/vrl/core" }
 vrl-stdlib = { path = "lib/vrl/stdlib" }
+
+# Lookup
+lookup = { path = "lib/lookup" }
 
 # External libs
 anyhow = { version = "1.0.40", default-features = false }
@@ -205,19 +209,19 @@ logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.6.5", default-features = false, optional = true }
 maxminddb = { version = "0.17.2", default-features = false, optional = true }
 mongodb = { version = "2.0.0-alpha.1", default-features = false, features = ["tokio-runtime"], optional = true }
-async-nats = { version = "0.9.14", default-features = false, optional = true }
+async-nats = { version = "0.9.16", default-features = false, optional = true }
 nom = { version = "6.1.2", default-features = false, optional = true }
 notify = { version = "4.0.16", default-features = false }
 num_cpus = { version = "1.13.0", default-features = false }
 once_cell = { version = "1.3", default-features = false }
-openssl = { version = "0.10.33", default-features = false }
+openssl = { version = "0.10.34", default-features = false }
 openssl-probe = { version = "0.1.2", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
 pest = { version = "2.1.3", default-features = false }
 pest_derive = { version = "2.1.0", default-features = false }
 pin-project = { version = "1.0.7", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
-pulsar = { version = "2.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
+pulsar = { version = "2.0.1", default-features = false, features = ["tokio-runtime"], optional = true }
 rand = { version = "0.8.3", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.0", default-features = false }
 rdkafka = { version = "0.26.0", default-features = false, features = ["libz", "ssl", "zstd"], optional = true }
@@ -273,7 +277,7 @@ base64 = "0.13.0"
 criterion = { version = "0.3.4", features = ["html_reports"] }
 httpmock = { version = "0.5.8", default-features = false }
 libc = "0.2.94"
-libz-sys = "1.1.2"
+libz-sys = "1.1.3"
 matches = "0.1.8"
 pretty_assertions = "0.7.2"
 reqwest = { version = "0.11.3", features = ["json"] }
@@ -284,6 +288,7 @@ tokio01-test = "0.1.1"
 tower-test = "0.4.0"
 walkdir = "2.3.2"
 quickcheck = "1.0.3"
+lookup = { path = "lib/lookup", features = ["arbitrary"] }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -340,6 +345,7 @@ api = [
   "base64",
   "itertools",
   "warp",
+  "uuid",
 ]
 
 # API client
@@ -652,40 +658,48 @@ wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-
 [[bench]]
 name = "default"
 harness = false
+test = true
 required-features = ["benches"]
 
 [[bench]]
 name = "wasm"
 path = "benches/wasm/mod.rs"
 harness = false
+test = true
 required-features = ["wasm-benches"]
 
 [[bench]]
 name = "remap"
 harness = false
+test = true
 required-features = ["remap-benches"]
 
 [[bench]]
 name = "languages"
 harness = false
+test = true
 required-features = ["language-benches"]
 
 [[bench]]
 name = "metrics_on"
 harness = false
+test = true
 required-features = ["metrics-benches"]
 
 [[bench]]
 name = "metrics_no_tracing_integration"
 harness = false
+test = true
 required-features = ["metrics-benches"]
 
 [[bench]]
 name = "metrics_off"
 harness = false
+test = true
 required-features = ["metrics-benches"]
 
 [[bench]]
 name = "distribution_statistic"
 harness = false
+test = true
 required-features = ["statistic-benches"]

@@ -3,6 +3,7 @@ use crate::metrics::Handle;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use getset::Getters;
+use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
 use snafu::Snafu;
@@ -12,7 +13,7 @@ use std::{
     fmt::{self, Display, Formatter},
     iter::FromIterator,
 };
-use vrl::{path::Segment, Target};
+use vrl::Target;
 
 #[derive(Clone, Debug, Deserialize, Getters, PartialEq, Serialize)]
 pub struct Metric {
@@ -750,62 +751,77 @@ enum MetricPathError<'a> {
     InvalidPath { path: &'a str, expected: &'a str },
 }
 
+/// Metrics aren't interested in paths that have a length longer than 3
+/// The longest path is 2, and we need to check that a third segment doesn't exist as we don't want
+/// fields such as `.tags.host.thing`.
+const MAX_METRIC_PATH_DEPTH: usize = 3;
+
 impl Target for Metric {
-    fn insert(&mut self, path: &vrl::Path, value: vrl::Value) -> Result<(), String> {
+    fn insert(&mut self, path: &LookupBuf, value: vrl::Value) -> Result<(), String> {
         if path.is_root() {
             return Err(MetricPathError::SetPathError.to_string());
         }
 
-        match path.segments() {
-            [Segment::Field(tags)] if tags.as_str() == "tags" => {
-                let value = value.try_object().map_err(|e| e.to_string())?;
-                for (field, value) in value.iter() {
-                    self.set_tag_value(
-                        field.as_str().to_owned(),
-                        value
-                            .try_bytes_utf8_lossy()
-                            .map_err(|e| e.to_string())?
-                            .into_owned(),
-                    );
+        if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0) {
+            match paths.as_slice() {
+                ["tags"] => {
+                    let value = value.try_object().map_err(|e| e.to_string())?;
+                    for (field, value) in value.iter() {
+                        self.set_tag_value(
+                            field.as_str().to_owned(),
+                            value
+                                .try_bytes_utf8_lossy()
+                                .map_err(|e| e.to_string())?
+                                .into_owned(),
+                        );
+                    }
+                    return Ok(());
                 }
-                Ok(())
+                ["tags", field] => {
+                    let value = value.try_bytes().map_err(|e| e.to_string())?;
+                    self.set_tag_value(
+                        field.to_string(),
+                        String::from_utf8_lossy(&value).into_owned(),
+                    );
+                    return Ok(());
+                }
+                ["name"] => {
+                    let value = value.try_bytes().map_err(|e| e.to_string())?;
+                    self.series.name.name = String::from_utf8_lossy(&value).into_owned();
+                    return Ok(());
+                }
+                ["namespace"] => {
+                    let value = value.try_bytes().map_err(|e| e.to_string())?;
+                    self.series.name.namespace = Some(String::from_utf8_lossy(&value).into_owned());
+                    return Ok(());
+                }
+                ["timestamp"] => {
+                    let value = value.try_timestamp().map_err(|e| e.to_string())?;
+                    self.data.timestamp = Some(value);
+                    return Ok(());
+                }
+                ["kind"] => {
+                    self.data.kind = MetricKind::try_from(value)?;
+                    return Ok(());
+                }
+                _ => {
+                    return Err(MetricPathError::InvalidPath {
+                        path: &path.to_string(),
+                        expected: VALID_METRIC_PATHS_SET,
+                    }
+                    .to_string())
+                }
             }
-            [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
-                let value = value.try_bytes().map_err(|e| e.to_string())?;
-                self.set_tag_value(
-                    field.as_str().to_owned(),
-                    String::from_utf8_lossy(&value).into_owned(),
-                );
-                Ok(())
-            }
-            [Segment::Field(name)] if name.as_str() == "name" => {
-                let value = value.try_bytes().map_err(|e| e.to_string())?;
-                self.series.name.name = String::from_utf8_lossy(&value).into_owned();
-                Ok(())
-            }
-            [Segment::Field(namespace)] if namespace.as_str() == "namespace" => {
-                let value = value.try_bytes().map_err(|e| e.to_string())?;
-                self.series.name.namespace = Some(String::from_utf8_lossy(&value).into_owned());
-                Ok(())
-            }
-            [Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {
-                let value = value.try_timestamp().map_err(|e| e.to_string())?;
-                self.data.timestamp = Some(value);
-                Ok(())
-            }
-            [Segment::Field(kind)] if kind.as_str() == "kind" => {
-                self.data.kind = MetricKind::try_from(value)?;
-                Ok(())
-            }
-            _ => Err(MetricPathError::InvalidPath {
-                path: &path.to_string(),
-                expected: VALID_METRIC_PATHS_SET,
-            }
-            .to_string()),
         }
+
+        Err(MetricPathError::InvalidPath {
+            path: &path.to_string(),
+            expected: VALID_METRIC_PATHS_SET,
+        }
+        .to_string())
     }
 
-    fn get(&self, path: &vrl::Path) -> Result<Option<vrl::Value>, String> {
+    fn get(&self, path: &LookupBuf) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             let mut map = BTreeMap::<String, vrl::Value>::new();
             map.insert("name".to_string(), self.series.name.name.clone().into());
@@ -830,64 +846,71 @@ impl Target for Metric {
             return Ok(Some(map.into()));
         }
 
-        match path.segments() {
-            [Segment::Field(name)] if name.as_str() == "name" => {
-                Ok(Some(self.name().to_string().into()))
+        for paths in path.to_alternative_components(MAX_METRIC_PATH_DEPTH) {
+            match paths.as_slice() {
+                ["name"] => return Ok(Some(self.name().to_string().into())),
+                ["namespace"] => match &self.series.name.namespace {
+                    Some(namespace) => return Ok(Some(namespace.clone().into())),
+                    None => continue,
+                },
+                ["timestamp"] => match self.data.timestamp {
+                    Some(timestamp) => return Ok(Some(timestamp.into())),
+                    None => continue,
+                },
+                ["kind"] => return Ok(Some(self.data.kind.clone().into())),
+                ["tags"] => {
+                    return Ok(self.tags().map(|map| {
+                        let iter = map.iter().map(|(k, v)| (k.to_owned(), v.to_owned().into()));
+                        vrl::Value::from_iter(iter)
+                    }))
+                }
+                ["tags", field] => match self.tag_value(field) {
+                    Some(value) => return Ok(Some(value.into())),
+                    None => continue,
+                },
+                ["type"] => return Ok(Some(self.data.value.clone().into())),
+                _ => {
+                    return Err(MetricPathError::InvalidPath {
+                        path: &path.to_string(),
+                        expected: VALID_METRIC_PATHS_GET,
+                    }
+                    .to_string())
+                }
             }
-            [Segment::Field(namespace)] if namespace.as_str() == "namespace" => {
-                Ok(self.series.name.namespace.clone().map(Into::into))
-            }
-            [Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {
-                Ok(self.data.timestamp.map(Into::into))
-            }
-            [Segment::Field(kind)] if kind.as_str() == "kind" => {
-                Ok(Some(self.data.kind.clone().into()))
-            }
-            [Segment::Field(tags)] if tags.as_str() == "tags" => Ok(self.tags().map(|map| {
-                let iter = map.iter().map(|(k, v)| (k.to_owned(), v.to_owned().into()));
-                vrl::Value::from_iter(iter)
-            })),
-            [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
-                Ok(self.tag_value(field.as_str()).map(|value| value.into()))
-            }
-            [Segment::Field(type_)] if type_.as_str() == "type" => {
-                Ok(Some(self.data.value.clone().into()))
-            }
-            _ => Err(MetricPathError::InvalidPath {
-                path: &path.to_string(),
-                expected: VALID_METRIC_PATHS_GET,
-            }
-            .to_string()),
         }
+
+        // We only reach this point if we have requested a tag that doesn't exist or an empty
+        // field.
+        Ok(None)
     }
 
-    fn remove(&mut self, path: &vrl::Path, _compact: bool) -> Result<Option<vrl::Value>, String> {
+    fn remove(&mut self, path: &LookupBuf, _compact: bool) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
             return Err(MetricPathError::SetPathError.to_string());
         }
 
-        match path.segments() {
-            [Segment::Field(namespace)] if namespace.as_str() == "namespace" => {
-                Ok(self.series.name.namespace.take().map(Into::into))
+        if let Some(paths) = path.to_alternative_components(MAX_METRIC_PATH_DEPTH).get(0) {
+            match paths.as_slice() {
+                ["namespace"] => return Ok(self.series.name.namespace.take().map(Into::into)),
+                ["timestamp"] => return Ok(self.data.timestamp.take().map(Into::into)),
+                ["tags"] => {
+                    return Ok(self.series.tags.take().map(|map| {
+                        let iter = map.into_iter().map(|(k, v)| (k, v.into()));
+                        vrl::Value::from_iter(iter)
+                    }))
+                }
+                ["tags", field] => return Ok(self.delete_tag(field).map(Into::into)),
+                _ => {
+                    return Err(MetricPathError::InvalidPath {
+                        path: &path.to_string(),
+                        expected: VALID_METRIC_PATHS_SET,
+                    }
+                    .to_string())
+                }
             }
-            [Segment::Field(timestamp)] if timestamp.as_str() == "timestamp" => {
-                Ok(self.data.timestamp.take().map(Into::into))
-            }
-            [Segment::Field(tags)] if tags.as_str() == "tags" => {
-                Ok(self.series.tags.take().map(|map| {
-                    let iter = map.into_iter().map(|(k, v)| (k, v.into()));
-                    vrl::Value::from_iter(iter)
-                }))
-            }
-            [Segment::Field(tags), Segment::Field(field)] if tags.as_str() == "tags" => {
-                Ok(self.delete_tag(field.as_str()).map(Into::into))
-            }
-            _ => Err(MetricPathError::InvalidPath {
-                path: &path.to_string(),
-                expected: VALID_METRIC_PATHS_SET,
-            }
-            .to_string()),
         }
+
+        Ok(None)
     }
 }
 
@@ -924,8 +947,7 @@ mod test {
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
     use shared::btreemap;
-    use std::str::FromStr;
-    use vrl::{Path, Value};
+    use vrl::Value;
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -1202,7 +1224,7 @@ mod test {
                 }
                 .into()
             )),
-            metric.get(&Path::from_str(".").unwrap())
+            metric.get(&LookupBuf::root())
         );
     }
 
@@ -1243,7 +1265,7 @@ mod test {
         ];
 
         for (path, current, new, delete) in cases {
-            let path = Path::from_str(path).unwrap();
+            let path = LookupBuf::from_str(path).unwrap();
 
             assert_eq!(Ok(current), metric.get(&path));
             assert_eq!(Ok(()), metric.insert(&path, new.clone()));
@@ -1277,34 +1299,34 @@ mod test {
 
         assert_eq!(
             Err(format!(
-                "invalid path .zork: expected one of {}",
+                "invalid path zork: expected one of {}",
                 validpaths_get.join(", ")
             )),
-            metric.get(&Path::from_str("zork").unwrap())
+            metric.get(&LookupBuf::from_str("zork").unwrap())
         );
 
         assert_eq!(
             Err(format!(
-                "invalid path .zork: expected one of {}",
+                "invalid path zork: expected one of {}",
                 validpaths_set.join(", ")
             )),
-            metric.insert(&Path::from_str("zork").unwrap(), "thing".into())
+            metric.insert(&LookupBuf::from_str("zork").unwrap(), "thing".into())
         );
 
         assert_eq!(
             Err(format!(
-                "invalid path .zork: expected one of {}",
+                "invalid path zork: expected one of {}",
                 validpaths_set.join(", ")
             )),
-            metric.remove(&Path::from_str("zork").unwrap(), true)
+            metric.remove(&LookupBuf::from_str("zork").unwrap(), true)
         );
 
         assert_eq!(
             Err(format!(
-                "invalid path .tags.foo.flork: expected one of {}",
+                "invalid path tags.foo.flork: expected one of {}",
                 validpaths_get.join(", ")
             )),
-            metric.get(&Path::from_str("tags.foo.flork").unwrap())
+            metric.get(&LookupBuf::from_str("tags.foo.flork").unwrap())
         );
     }
 }

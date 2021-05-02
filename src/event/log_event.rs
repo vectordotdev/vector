@@ -1,9 +1,11 @@
-use super::{lookup::Segment, util, EventMetadata, Lookup, PathComponent, Value};
+use super::{legacy_lookup::Segment, util, EventMetadata, Lookup, PathComponent, Value};
 use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::Utc;
+use derivative::Derivative;
 use getset::Getters;
-use serde::{Serialize, Serializer};
+use lookup::LookupBuf;
+use serde::{Deserialize, Serialize, Serializer};
 use shared::EventDataEq;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
@@ -12,43 +14,62 @@ use std::{
     iter::FromIterator,
 };
 
-#[derive(Clone, Debug, Default, Getters, PartialEq)]
+#[derive(Clone, Debug, Getters, PartialEq, Derivative, Deserialize)]
 pub struct LogEvent {
-    fields: BTreeMap<String, Value>,
+    // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
+    #[derivative(Default(value = "Value::from(BTreeMap::default())"))]
+    #[serde(flatten)]
+    fields: Value,
+
     #[getset(get = "pub")]
+    #[serde(skip)]
     metadata: EventMetadata,
+}
+
+impl Default for LogEvent {
+    fn default() -> Self {
+        Self {
+            fields: Value::Map(BTreeMap::new()),
+            metadata: EventMetadata,
+        }
+    }
 }
 
 impl LogEvent {
     pub fn new_with_metadata(metadata: EventMetadata) -> Self {
         Self {
-            fields: Default::default(),
+            fields: Value::Map(Default::default()),
             metadata,
         }
     }
 
     pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
-        (self.fields, self.metadata)
+        (
+            self.fields
+                .into_map()
+                .unwrap_or_else(|| unreachable!("fields must be a map")),
+            self.metadata,
+        )
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        util::log::get(&self.fields, key.as_ref())
+        util::log::get(self.as_map(), key.as_ref())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.fields.get(key.as_ref())
+        self.as_map().get(key.as_ref())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
-        util::log::get_mut(&mut self.fields, key.as_ref())
+        util::log::get_mut(self.as_map_mut(), key.as_ref())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn contains(&self, key: impl AsRef<str>) -> bool {
-        util::log::contains(&self.fields, key.as_ref())
+        util::log::contains(self.as_map(), key.as_ref())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
@@ -57,7 +78,7 @@ impl LogEvent {
         key: impl AsRef<str>,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        util::log::insert(&mut self.fields, key.as_ref(), value.into())
+        util::log::insert(self.as_map_mut(), key.as_ref(), value.into())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = ?key))]
@@ -65,7 +86,7 @@ impl LogEvent {
     where
         V: Into<Value> + Debug,
     {
-        util::log::insert_path(&mut self.fields, key, value.into())
+        util::log::insert_path(self.as_map_mut(), key, value.into())
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key))]
@@ -74,7 +95,7 @@ impl LogEvent {
         K: Into<String> + Display,
         V: Into<Value> + Debug,
     {
-        self.fields.insert(key.into(), value.into());
+        self.as_map_mut().insert(key.into(), value.into());
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
@@ -87,43 +108,59 @@ impl LogEvent {
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn remove(&mut self, key: impl AsRef<str>) -> Option<Value> {
-        util::log::remove(&mut self.fields, key.as_ref(), false)
+        util::log::remove(self.as_map_mut(), key.as_ref(), false)
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn remove_prune(&mut self, key: impl AsRef<str>, prune: bool) -> Option<Value> {
-        util::log::remove(&mut self.fields, key.as_ref(), prune)
+        util::log::remove(self.as_map_mut(), key.as_ref(), prune)
     }
 
     #[instrument(level = "trace", skip(self))]
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
-        util::log::keys(&self.fields)
+        match &self.fields {
+            Value::Map(map) => util::log::keys(&map),
+            _ => unreachable!(),
+        }
     }
 
     #[instrument(level = "trace", skip(self))]
     pub fn all_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
-        util::log::all_fields(&self.fields)
+        util::log::all_fields(self.as_map())
     }
 
     #[instrument(level = "trace", skip(self))]
     pub fn is_empty(&self) -> bool {
-        self.fields.is_empty()
+        self.as_map().is_empty()
     }
 
     #[instrument(level = "trace", skip(self))]
     pub fn as_map(&self) -> &BTreeMap<String, Value> {
-        &self.fields
+        match &self.fields {
+            Value::Map(map) => &map,
+            _ => unreachable!(),
+        }
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
+        match self.fields {
+            Value::Map(ref mut map) => map,
+            _ => unreachable!(),
+        }
     }
 
     #[instrument(level = "trace", skip(self, lookup), fields(lookup = %lookup), err)]
     fn entry(&mut self, lookup: Lookup) -> crate::Result<Entry<String, Value>> {
-        trace!("Seeking to entry.");
         let mut walker = lookup.into_iter().enumerate();
 
-        let mut current_pointer = if let Some((index, Segment::Field(segment))) = walker.next() {
-            trace!(%segment, index, "Seeking segment.");
-            self.fields.entry(segment)
+        let mut current_pointer = if let Some((_index, Segment::Field(segment))) = walker.next() {
+            self.as_map_mut().entry(segment)
         } else {
+            // It should be noted that Remap can create a lookup without a contained segment.
+            // This is the root `.` path. That is handled explicitly by the Target implementation
+            // on Value so shouldn't reach here.
+            // However, we should probably handle this better.
             unreachable!(
                 "It is an invariant to have a `Lookup` without a contained `Segment`.\
                 `Lookup::is_valid` should catch this during `Lookup` creation, maybe it was not \
@@ -131,15 +168,13 @@ impl LogEvent {
             );
         };
 
-        for (index, segment) in walker {
-            trace!(%segment, index, "Seeking next segment.");
+        for (_index, segment) in walker {
             current_pointer = match (segment, current_pointer) {
                 (Segment::Field(field), Entry::Occupied(entry)) => match entry.into_mut() {
                     Value::Map(map) => map.entry(field),
                     v => return Err(format!("Looking up field on a non-map value: {:?}", v).into()),
                 },
                 (Segment::Field(field), Entry::Vacant(entry)) => {
-                    trace!(segment = %field, index, "Met vacant entry.");
                     return Err(format!(
                         "Tried to step into `{}` of `{}`, but it did not exist.",
                         field,
@@ -150,7 +185,6 @@ impl LogEvent {
                 _ => return Err("The entry API cannot yet descend into array indices.".into()),
             };
         }
-        trace!(entry = ?current_pointer, "Result.");
         Ok(current_pointer)
     }
 
@@ -204,7 +238,7 @@ impl From<String> for LogEvent {
 impl From<BTreeMap<String, Value>> for LogEvent {
     fn from(map: BTreeMap<String, Value>) -> Self {
         LogEvent {
-            fields: map,
+            fields: Value::Map(map),
             metadata: EventMetadata::default(),
         }
     }
@@ -212,7 +246,10 @@ impl From<BTreeMap<String, Value>> for LogEvent {
 
 impl From<LogEvent> for BTreeMap<String, Value> {
     fn from(event: LogEvent) -> BTreeMap<String, Value> {
-        event.fields
+        match event.fields {
+            Value::Map(map) => map,
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -227,7 +264,8 @@ impl From<HashMap<String, Value>> for LogEvent {
 
 impl From<LogEvent> for HashMap<String, Value> {
     fn from(event: LogEvent) -> HashMap<String, Value> {
-        event.fields.into_iter().collect()
+        let fields: BTreeMap<_, _> = event.into();
+        fields.into_iter().collect()
     }
 }
 
@@ -295,76 +333,51 @@ impl Serialize for LogEvent {
     where
         S: Serializer,
     {
-        serializer.collect_map(self.fields.iter())
+        serializer.collect_map(self.as_map().iter())
     }
 }
 
 impl vrl::Target for LogEvent {
-    fn get(&self, path: &vrl::Path) -> Result<Option<vrl::Value>, String> {
+    fn get(&self, path: &LookupBuf) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
-            let iter = self
-                .as_map()
-                .clone()
-                .into_iter()
-                .map(|(k, v)| (k, v.into()));
-
-            return Ok(Some(vrl::Value::from_iter(iter)));
+            Ok(Some(self.fields.clone().into()))
+        } else {
+            let val = self.fields.get(path);
+            val.map(|val| val.map(|val| val.clone().into()))
+                .map_err(|err| err.to_string())
         }
-
-        let value = path
-            .to_alternative_strings()
-            .iter()
-            .find_map(|key| self.get(key))
-            .cloned()
-            .map(Into::into);
-
-        Ok(value)
     }
 
-    fn remove(&mut self, path: &vrl::Path, compact: bool) -> Result<Option<vrl::Value>, String> {
+    fn remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<vrl::Value>, String> {
         if path.is_root() {
-            return Ok(Some(
-                std::mem::take(&mut self.fields)
-                    .into_iter()
+            Ok(Some({
+                let mut map = BTreeMap::new();
+                std::mem::swap(self.fields.as_map_mut(), &mut map);
+                map.into_iter()
                     .map(|(key, value)| (key, value.into()))
                     .collect::<BTreeMap<_, _>>()
-                    .into(),
-            ));
+                    .into()
+            }))
+        } else {
+            let val = self.fields.remove(path, compact);
+            val.map(|val| val.map(|val| val.into()))
+                .map_err(|err| err.to_string())
         }
-
-        // loop until we find a path that exists.
-        for key in path.to_alternative_strings() {
-            if !self.contains(&key) {
-                continue;
-            }
-
-            return Ok(self.remove_prune(&key, compact).map(Into::into));
-        }
-
-        Ok(None)
     }
 
-    fn insert(&mut self, path: &vrl::Path, value: vrl::Value) -> Result<(), String> {
+    fn insert(&mut self, path: &LookupBuf, value: vrl::Value) -> Result<(), String> {
+        let mut value = Value::from(value);
         if path.is_root() {
-            match value {
-                vrl::Value::Object(map) => {
-                    *self = map
-                        .into_iter()
-                        .map(|(k, v)| (k, v.into()))
-                        .collect::<BTreeMap<_, _>>()
-                        .into();
-
-                    return Ok(());
-                }
-                _ => return Err("tried to assign non-map value to event root path".to_owned()),
+            if let Value::Map(_) = value {
+                std::mem::swap(&mut self.fields, &mut value);
+                Ok(())
+            } else {
+                Err("Cannot insert as root of Event unless it is a map.".into())
             }
+        } else {
+            let _val = self.fields.insert(path.clone(), value);
+            Ok(())
         }
-
-        if let Some(path) = path.to_alternative_strings().first() {
-            self.insert(path, value);
-        }
-
-        Ok(())
     }
 }
 
@@ -475,8 +488,8 @@ mod test {
 
     #[test]
     fn object_get() {
+        use lookup::{FieldBuf, SegmentBuf};
         use shared::btreemap;
-        use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
             (btreemap! {}, vec![], Ok(Some(btreemap! {}.into()))),
@@ -487,32 +500,29 @@ mod test {
             ),
             (
                 btreemap! { "foo" => "bar" },
-                vec![Field(Regular("foo".to_owned()))],
+                vec![SegmentBuf::from("foo")],
                 Ok(Some("bar".into())),
             ),
             (
                 btreemap! { "foo" => "bar" },
-                vec![Field(Regular("bar".to_owned()))],
+                vec![SegmentBuf::from("bar")],
                 Ok(None),
             ),
             (
                 btreemap! { "foo" => vec![btreemap! { "bar" => true }] },
                 vec![
-                    Field(Regular("foo".to_owned())),
-                    Index(0),
-                    Field(Regular("bar".to_owned())),
+                    SegmentBuf::from("foo"),
+                    SegmentBuf::from(0),
+                    SegmentBuf::from("bar"),
                 ],
                 Ok(Some(true.into())),
             ),
             (
                 btreemap! { "foo" => btreemap! { "bar baz" => btreemap! { "baz" => 2 } } },
                 vec![
-                    Field(Regular("foo".to_owned())),
-                    Coalesce(vec![
-                        Regular("qux".to_owned()),
-                        Quoted("bar baz".to_owned()),
-                    ]),
-                    Field(Regular("baz".to_owned())),
+                    SegmentBuf::from("foo"),
+                    SegmentBuf::from(vec![FieldBuf::from("qux"), FieldBuf::from(r#""bar baz""#)]),
+                    SegmentBuf::from("baz"),
                 ],
                 Ok(Some(2.into())),
             ),
@@ -521,7 +531,7 @@ mod test {
         for (value, segments, expect) in cases {
             let value: BTreeMap<String, Value> = value;
             let event = LogEvent::from(value);
-            let path = vrl::Path::new_unchecked(segments);
+            let path = LookupBuf::from_segments(segments);
 
             assert_eq!(vrl::Target::get(&event, &path), expect)
         }
@@ -529,8 +539,8 @@ mod test {
 
     #[test]
     fn object_insert() {
+        use lookup::SegmentBuf;
         use shared::btreemap;
-        use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
             (
@@ -542,7 +552,7 @@ mod test {
             ),
             (
                 btreemap! { "foo" => "bar" },
-                vec![Field(Regular("foo".to_owned()))],
+                vec![SegmentBuf::from("foo")],
                 "baz".into(),
                 btreemap! { "foo" => "baz" },
                 Ok(()),
@@ -550,11 +560,11 @@ mod test {
             (
                 btreemap! { "foo" => "bar" },
                 vec![
-                    Field(Regular("foo".to_owned())),
-                    Index(2),
-                    Field(Quoted("bar baz".to_owned())),
-                    Field(Regular("a".to_owned())),
-                    Field(Regular("b".to_owned())),
+                    SegmentBuf::from("foo"),
+                    SegmentBuf::from(2),
+                    SegmentBuf::from("bar baz"),
+                    SegmentBuf::from("a"),
+                    SegmentBuf::from("b"),
                 ],
                 true.into(),
                 btreemap! {
@@ -570,7 +580,7 @@ mod test {
             ),
             (
                 btreemap! { "foo" => vec![0, 1, 2] },
-                vec![Field(Regular("foo".to_owned())), Index(5)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(5)],
                 "baz".into(),
                 btreemap! {
                     "foo" => vec![
@@ -586,35 +596,35 @@ mod test {
             ),
             (
                 btreemap! { "foo" => "bar" },
-                vec![Field(Regular("foo".to_owned())), Index(0)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 "baz".into(),
                 btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
                 btreemap! { "foo" => Value::Array(vec![]) },
-                vec![Field(Regular("foo".to_owned())), Index(0)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 "baz".into(),
                 btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
                 btreemap! { "foo" => Value::Array(vec![0.into()]) },
-                vec![Field(Regular("foo".to_owned())), Index(0)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 "baz".into(),
                 btreemap! { "foo" => vec!["baz"] },
                 Ok(()),
             ),
             (
                 btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
-                vec![Field(Regular("foo".to_owned())), Index(0)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 "baz".into(),
                 btreemap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
                 Ok(()),
             ),
             (
                 btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
-                vec![Field(Regular("foo".to_owned())), Index(1)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(1)],
                 "baz".into(),
                 btreemap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
                 Ok(()),
@@ -626,7 +636,7 @@ mod test {
             let mut event = LogEvent::from(object);
             let expect = LogEvent::from(expect);
             let value: vrl::Value = value;
-            let path = vrl::Path::new_unchecked(segments);
+            let path = LookupBuf::from_segments(segments);
 
             assert_eq!(
                 vrl::Target::insert(&mut event, &path, value.clone()),
@@ -639,21 +649,21 @@ mod test {
 
     #[test]
     fn object_remove() {
+        use lookup::{FieldBuf, SegmentBuf};
         use shared::btreemap;
-        use vrl::{path::Field::*, path::Segment::*};
 
         let cases = vec![
             (
                 btreemap! { "foo" => "bar" },
-                vec![Field(Regular("foo".to_owned()))],
+                vec![SegmentBuf::from("foo")],
                 false,
                 Some(btreemap! {}.into()),
             ),
             (
                 btreemap! { "foo" => "bar" },
-                vec![Coalesce(vec![
-                    Quoted("foo bar".to_owned()),
-                    Regular("foo".to_owned()),
+                vec![SegmentBuf::from(vec![
+                    FieldBuf::from(r#""foo bar""#),
+                    FieldBuf::from("foo"),
                 ])],
                 false,
                 Some(btreemap! {}.into()),
@@ -672,13 +682,13 @@ mod test {
             ),
             (
                 btreemap! { "foo" => vec![0] },
-                vec![Field(Regular("foo".to_owned())), Index(0)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 false,
                 Some(btreemap! { "foo" => Value::Array(vec![]) }.into()),
             ),
             (
                 btreemap! { "foo" => vec![0] },
-                vec![Field(Regular("foo".to_owned())), Index(0)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 true,
                 Some(btreemap! {}.into()),
             ),
@@ -688,9 +698,9 @@ mod test {
                     "bar" => "baz",
                 },
                 vec![
-                    Field(Regular("foo".to_owned())),
-                    Field(Quoted("bar baz".to_owned())),
-                    Index(0),
+                    SegmentBuf::from("foo"),
+                    SegmentBuf::from(r#""bar baz""#),
+                    SegmentBuf::from(0),
                 ],
                 false,
                 Some(
@@ -707,9 +717,9 @@ mod test {
                     "bar" => "baz",
                 },
                 vec![
-                    Field(Regular("foo".to_owned())),
-                    Field(Quoted("bar baz".to_owned())),
-                    Index(0),
+                    SegmentBuf::from("foo"),
+                    SegmentBuf::from(r#""bar baz""#),
+                    SegmentBuf::from(0),
                 ],
                 true,
                 Some(btreemap! { "bar" => "baz" }.into()),
@@ -718,11 +728,11 @@ mod test {
 
         for (object, segments, compact, expect) in cases {
             let mut event = LogEvent::from(object);
-            let path = vrl::Path::new_unchecked(segments);
+            let path = LookupBuf::from_segments(segments);
             let removed = vrl::Target::get(&event, &path).unwrap();
 
             assert_eq!(vrl::Target::remove(&mut event, &path, compact), Ok(removed));
-            assert_eq!(vrl::Target::get(&event, &vrl::Path::root()), Ok(expect))
+            assert_eq!(vrl::Target::get(&event, &LookupBuf::root()), Ok(expect))
         }
     }
 

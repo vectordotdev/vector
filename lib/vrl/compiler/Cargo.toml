@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
+lookup = { path = "../../lookup" }
 
 bitflags = "1"
 bytes = "1.0.0"
@@ -27,9 +28,6 @@ indoc = "1"
 shared = { path = "../../shared", default-features = false, features = ["btreemap"] }
 
 [[bench]]
-name = "path"
-harness = false
-
-[[bench]]
 name = "kind"
+test = true
 harness = false

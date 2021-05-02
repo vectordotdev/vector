@@ -45,6 +45,18 @@ components: sources: internal_metrics: {
 		platform_name: null
 	}
 
+	configuration: {
+		scrape_interval_secs: {
+			description: "The interval between metric gathering, in seconds."
+			common:      true
+			required:    false
+			type: uint: {
+				default: 2
+				unit:    "seconds"
+			}
+		}
+	}
+
 	output: metrics: {
 		// Default internal metrics tags
 		_internal_metrics_tags: {
