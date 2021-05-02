@@ -1206,4 +1206,22 @@ mod tests {
 
         assert!(parse_timestamp(-1).is_none());
     }
+
+    /// This test will fail once `warp` crate fixes support for
+    /// custom connection listener, at that point this test can be
+    /// modified to pass.
+    /// https://github.com/seanmonstar/warp/issues/830
+    /// https://github.com/seanmonstar/warp/pull/713
+    #[tokio::test]
+    async fn host_test() {
+        trace_init();
+
+        let message = "for the host";
+        let (sink, source) = start(Encoding::Text, Compression::gzip_default()).await;
+
+        let event = channel_n(vec![message], sink, source).await.remove(0);
+
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert!(event.as_log().get(log_schema().host_key()).is_none());
+    }
 }
