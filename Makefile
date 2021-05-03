@@ -285,13 +285,6 @@ test-benches: ## Run benchmarks in debug mode to trigger debug_assertions
 test-benches: export DEFAULT_FEATURES:="benches metrics-benches remap-benches"
 test-benches: test
 
-.PHONY: test-components
-test-components: ## Test with all components enabled
-# TODO(jesse) add `language-benches wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
-# test-components: $(WASM_MODULE_OUTPUTS)
-test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches metrics-benches remap-benches"
-test-components: test
-
 .PHONY: test-all
 test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
 
