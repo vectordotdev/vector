@@ -1,5 +1,5 @@
-#[cfg(any(feature = "sources-vector_grpc", feature = "sinks-vector_grpc"))]
+#[cfg(any(feature = "sources-vector", feature = "sinks-vector"))]
 use crate::event::proto as event;
 
-#[cfg(any(feature = "sources-vector_grpc", feature = "sinks-vector_grpc"))]
+#[cfg(any(feature = "sources-vector", feature = "sinks-vector"))]
 pub(crate) mod vector;

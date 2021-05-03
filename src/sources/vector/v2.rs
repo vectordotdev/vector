@@ -1,6 +1,6 @@
 use crate::{
     config::SourceContext,
-    config::{DataType, GenerateConfig, Resource, SourceConfig, SourceDescription},
+    config::{DataType, GenerateConfig, Resource, SourceConfig},
     event::Event,
     proto::vector as proto,
     shutdown::{ShutdownSignal, ShutdownSignalToken},
@@ -62,7 +62,7 @@ impl proto::Service for Service {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct Config {
+pub struct VectorConfig {
     pub address: SocketAddr,
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
@@ -83,11 +83,7 @@ fn default_shutdown_timeout_secs() -> u64 {
     30
 }
 
-inventory::submit! {
-    SourceDescription::new::<Config>("vector_grpc")
-}
-
-impl GenerateConfig for Config {
+impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             address: "0.0.0.0:6000".parse().unwrap(),
@@ -99,8 +95,8 @@ impl GenerateConfig for Config {
 }
 
 #[tonic::async_trait]
-#[typetag::serde(name = "vector_grpc")]
-impl SourceConfig for Config {
+#[typetag::serde(name = "vector")]
+impl SourceConfig for VectorConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let SourceContext { shutdown, out, .. } = cx;
 

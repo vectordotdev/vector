@@ -1,7 +1,5 @@
 use crate::{
-    config::{
-        DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, SinkHealthcheckOptions,
-    },
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkHealthcheckOptions},
     event::Event,
     proto::vector as proto,
     sinks::util::{
@@ -31,9 +29,9 @@ type Client = proto::Client<Channel>;
 type Response = Result<tonic::Response<proto::EventAck>, tonic::Status>;
 
 // TODO: rename
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
-pub struct VectorSinkConfig {
+pub struct VectorConfig {
     address: String,
     #[serde(default)]
     pub batch: BatchConfig,
@@ -44,7 +42,7 @@ pub struct VectorSinkConfig {
 }
 
 // TODO: duplicated in source
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct GrpcTlsConfig {
     ca_file: PathBuf,
@@ -52,18 +50,14 @@ pub struct GrpcTlsConfig {
     key_file: PathBuf,
 }
 
-inventory::submit! {
-    SinkDescription::new::<VectorSinkConfig>("vector_grpc")
-}
-
-impl GenerateConfig for VectorSinkConfig {
+impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(default_config("127.0.0.1:6000")).unwrap()
     }
 }
 
-fn default_config(address: &str) -> VectorSinkConfig {
-    VectorSinkConfig {
+fn default_config(address: &str) -> VectorConfig {
+    VectorConfig {
         address: address.to_owned(),
         batch: BatchConfig::default(),
         request: TowerRequestConfig::default(),
@@ -78,8 +72,8 @@ lazy_static! {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "vector_grpc")]
-impl SinkConfig for VectorSinkConfig {
+#[typetag::serde(name = "vector")]
+impl SinkConfig for VectorConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = Endpoint::from_shared(self.address.clone())?;
         let endpoint = match &self.tls {
@@ -258,7 +252,7 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<VectorSinkConfig>();
+        crate::test_util::test_generate_config::<VectorConfig>();
     }
 
     #[tokio::test]
@@ -271,7 +265,7 @@ mod tests {
         address = "http://$IN_ADDR/"
     "#
         .replace("$IN_ADDR", &format!("{}", in_addr));
-        let config: VectorSinkConfig = toml::from_str(&config).unwrap();
+        let config: VectorConfig = toml::from_str(&config).unwrap();
 
         let cx = SinkContext::new_test();
 

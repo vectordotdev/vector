@@ -1,7 +1,7 @@
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
     event::{proto, Event},
-    sinks::util::{tcp::TcpSinkConfig, EncodedEvent},
+    sinks::util::{tcp::TcpSinkConfig, EncodedEvent, Healthcheck, VectorSink},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
@@ -11,9 +11,9 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
-#[derive(Deserialize, Serialize, Debug, Setters)]
+#[derive(Deserialize, Serialize, Debug, Clone, Setters)]
 #[serde(deny_unknown_fields)]
-pub struct VectorSinkConfig {
+pub struct VectorConfig {
     address: String,
     keepalive: Option<TcpKeepaliveConfig>,
     #[set = "pub"]
@@ -21,7 +21,7 @@ pub struct VectorSinkConfig {
     send_buffer_bytes: Option<usize>,
 }
 
-impl VectorSinkConfig {
+impl VectorConfig {
     pub fn new(
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
@@ -49,11 +49,7 @@ enum BuildError {
     MissingPort,
 }
 
-inventory::submit! {
-    SinkDescription::new::<VectorSinkConfig>("vector")
-}
-
-impl GenerateConfig for VectorSinkConfig {
+impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self::new("127.0.0.1:5000".to_string(), None, None, None)).unwrap()
     }
@@ -61,11 +57,8 @@ impl GenerateConfig for VectorSinkConfig {
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
-impl SinkConfig for VectorSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+impl SinkConfig for VectorConfig {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink_config = TcpSinkConfig::new(
             self.address.clone(),
             self.keepalive,
@@ -107,6 +100,6 @@ fn encode_event(event: Event) -> EncodedEvent<Bytes> {
 mod test {
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<super::VectorSinkConfig>();
+        crate::test_util::test_generate_config::<super::VectorConfig>();
     }
 }

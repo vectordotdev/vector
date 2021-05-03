@@ -1,8 +1,11 @@
-use super::util::{SocketListenAddr, TcpSource};
 use crate::{
-    config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext},
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
+    sources::{
+        util::{SocketListenAddr, TcpSource},
+        Source,
+    },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
 };
@@ -40,10 +43,6 @@ impl VectorConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<VectorConfig>("vector")
-}
-
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self::from_address(SocketListenAddr::SocketAddr(
@@ -56,7 +55,7 @@ impl GenerateConfig for VectorConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let vector = VectorSource;
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         vector.run(
