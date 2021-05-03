@@ -7850,7 +7850,7 @@ dependencies = [
  "snafu",
  "toml",
  "tracing 0.1.25",
- "tracing-core 0.1.17",
+ "tracing-core 0.1.18",
  "tracing-futures 0.2.5",
  "tracing-log",
  "tracing-subscriber",
