@@ -95,7 +95,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
+            target/debug
+            target/release
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
@@ -117,7 +121,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
+            target/debug
+            target/release
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
@@ -138,7 +146,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
+            target/debug
+            target/release
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
@@ -173,7 +185,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
+            target/debug
+            target/release
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       # Why is this build, not check? Because we need to make sure the linking phase works.
@@ -200,7 +216,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
+            target/debug
+            target/release
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: bash scripts/environment/bootstrap-macos-10.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
@@ -223,7 +243,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
+            target/debug
+            target/release
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: bash scripts/environment/bootstrap-macos-10.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
@@ -250,6 +274,16 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
+      - uses: actions/cache@v2.1.5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/debug
+            target/release
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: |
           TEMP=$(mktemp -d)
           curl \
@@ -291,7 +325,11 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
+            target/debug
+            target/release
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - name: Make slim-builds
