@@ -20,7 +20,6 @@ components: sinks: elasticsearch: {
 				enabled:      true
 				common:       false
 				max_bytes:    10490000
-				max_events:   null
 				timeout_secs: 1
 			}
 			compression: {

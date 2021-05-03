@@ -20,7 +20,6 @@ components: sinks: aws_s3: components._aws & {
 				enabled:      true
 				common:       true
 				max_bytes:    10000000
-				max_events:   null
 				timeout_secs: 300
 			}
 			compression: {
