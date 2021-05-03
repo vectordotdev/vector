@@ -347,7 +347,9 @@ jobs:
       - cross-linux
       - test-misc
       - test-linux
+      - test-benches-linux
       - test-mac
+      - test-benches-mac
       - test-windows
       - test-vrl
       - check-component-features
