@@ -50,12 +50,14 @@ pub struct DatadogLogsConfig {
 #[derive(Clone)]
 pub struct DatadogLogsJsonService {
     config: DatadogLogsConfig,
+    // Used to store the complete URI and avoid calling `get_uri` for each request
     uri: String,
 }
 
 #[derive(Clone)]
 pub struct DatadogLogsTextService {
     config: DatadogLogsConfig,
+    // Used to store the complete URI and avoid calling `get_uri` for each request
     uri: String,
 }
 
@@ -75,19 +77,21 @@ impl GenerateConfig for DatadogLogsConfig {
 
 impl DatadogLogsConfig {
     fn get_uri(&self) -> String {
-        self.endpoint.clone().unwrap_or_else(|| {
-            self.site
-                .as_ref()
-                .map(|s| format!("https://http-intake.logs.{}/v1/input", s))
-                .unwrap_or_else(|| match self.region {
-                    Some(super::Region::Eu) => {
-                        "https://http-intake.logs.datadoghq.eu/v1/input".to_string()
-                    }
-                    None | Some(super::Region::Us) => {
-                        "https://http-intake.logs.datadoghq.com/v1/input".to_string()
-                    }
-                })
-        })
+        self.endpoint
+            .clone()
+            .or_else(|| {
+                self.site
+                    .as_ref()
+                    .map(|s| format!("https://http-intake.logs.{}/v1/input", s))
+            })
+            .unwrap_or_else(|| match self.region {
+                Some(super::Region::Eu) => {
+                    "https://http-intake.logs.datadoghq.eu/v1/input".to_string()
+                }
+                None | Some(super::Region::Us) => {
+                    "https://http-intake.logs.datadoghq.com/v1/input".to_string()
+                }
+            })
     }
 
     fn batch_settings<T: Batch>(&self) -> Result<BatchSettings<T>, BatchError> {

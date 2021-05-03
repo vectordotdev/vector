@@ -83,6 +83,9 @@ impl DatadogConfig {
         })
     }
 
+    // The API endpoint is used for healtcheck/API key validation, it is derived from the `site` or `region` option
+    // the same way the offical Datadog Agent does but the `endpoint` option still override both the main and the
+    // API endpoint.
     fn get_api_endpoint(&self) -> String {
         self.endpoint
             .clone()
