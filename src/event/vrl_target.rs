@@ -549,6 +549,57 @@ mod test {
     }
 
     #[test]
+    fn log_into_events() {
+        use shared::btreemap;
+
+        let cases = vec![
+            (
+                vrl::Value::from(btreemap! {"foo" => "bar"}),
+                vec![btreemap! {"foo" => "bar"}.into()],
+            ),
+            (vrl::Value::from(1), vec![btreemap! {"message" => 1}.into()]),
+            (
+                vrl::Value::from("2"),
+                vec![btreemap! {"message" => "2"}.into()],
+            ),
+            (
+                vrl::Value::from(true),
+                vec![btreemap! {"message" => true}.into()],
+            ),
+            (
+                vrl::Value::from(vec![
+                    vrl::Value::from(1),
+                    vrl::Value::from("2"),
+                    vrl::Value::from(true),
+                    vrl::Value::from(btreemap! {"foo" => "bar"}),
+                ]),
+                vec![
+                    btreemap! {"message" => 1}.into(),
+                    btreemap! {"message" => "2"}.into(),
+                    btreemap! {"message" => true}.into(),
+                    btreemap! {"foo" => "bar"}.into(),
+                ],
+            ),
+        ];
+
+        for (value, expect) in cases {
+            let metadata = EventMetadata::default();
+            let mut target =
+                VrlTarget::new(Event::Log(LogEvent::new_with_metadata(metadata.clone())));
+
+            vrl::Target::insert(&mut target, &LookupBuf::root(), value).unwrap();
+
+            assert_eq!(
+                target.into_events().collect::<Vec<_>>(),
+                expect
+                    .into_iter()
+                    .map(|v| Event::Log(LogEvent::from_parts(v, metadata.clone())))
+                    .collect::<Vec<_>>()
+            )
+        }
+    }
+
+    #[test]
     fn metric_all_fields() {
         let metric = Metric::new(
             "zub",
