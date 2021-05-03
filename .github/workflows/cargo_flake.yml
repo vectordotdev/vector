@@ -34,4 +34,4 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: cargo install cargo-flake
       - run: make slim-builds
-      - run: cargo-flake --features 'default benches metrics-benches remap-benches'
+      - run: cargo flake --features 'default benches metrics-benches remap-benches'
