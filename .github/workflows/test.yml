@@ -101,7 +101,29 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make test-components
+      - run: make test
+
+  # Remove this once https://github.com/timberio/vector/issues/3771 is closed.
+  # Then, modify the `cross-linux` job to run `test` instead of `build`.
+  test-benches-linux:
+    name: Bench Unit - x86_64-unknown-linux-gnu
+    runs-on: [self-hosted, linux, x64, general]
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2.1.5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make test-benches
 
   test-misc:
     name: Miscellaneous - Linux
@@ -183,8 +205,30 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make test-components
+      - run: make test
       - run: make test-behavior
+
+  test-benches-mac:
+    name: Bench Unit - Mac
+    # Full CI suites for this platform were only recently introduced.
+    # Some failures are permitted until we can properly correct them.
+    continue-on-error: true
+    runs-on: macos-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2.1.5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: bash scripts/environment/bootstrap-macos-10.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make test-benches
 
   test-windows:
     name: Unit - Windows
@@ -303,7 +347,9 @@ jobs:
       - cross-linux
       - test-misc
       - test-linux
+      - test-benches-linux
       - test-mac
+      - test-benches-mac
       - test-windows
       - test-vrl
       - check-component-features
