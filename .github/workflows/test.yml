@@ -103,7 +103,7 @@ jobs:
         name: Cache Cargo build
         with:
           path: |
-            ~/target/debug
+            target/debug
           key: ${{ runner.os }}-cargo-build-${{ github.job_id }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-build-${{ github.job_id }}
@@ -135,7 +135,7 @@ jobs:
         name: Cache Cargo build
         with:
           path: |
-            ~/target/debug
+            target/debug
           key: ${{ runner.os }}-cargo-build-${{ github.job_id }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-build-${{ github.job_id }}
@@ -181,7 +181,7 @@ jobs:
         name: Cache Cargo build
         with:
           path: |
-            ~/target/debug
+            target/debug
           key: ${{ runner.os }}-cargo-build-${{ github.job_id }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-build-${{ github.job_id }}
@@ -219,7 +219,7 @@ jobs:
         name: Cache Cargo build
         with:
           path: |
-            ~/target/debug
+            target/debug
           key: ${{ runner.os }}-cargo-build-${{ github.job_id }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-build-${{ github.job_id }}
@@ -299,7 +299,7 @@ jobs:
         name: Cache Cargo build
         with:
           path: |
-            ~/target/debug
+            target/debug
           key: ${{ runner.os }}-cargo-build-${{ github.job_id }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-build-${{ github.job_id }}
