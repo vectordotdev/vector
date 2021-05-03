@@ -129,9 +129,7 @@ macro_rules! update_counter {
     ($label:literal, $value:expr) => {{
         use ::std::sync::atomic::{AtomicU64, Ordering};
 
-        ::lazy_static::lazy_static! {
-            static ref PREVIOUS_VALUE: AtomicU64 = AtomicU64::new(0);
-        }
+        static PREVIOUS_VALUE: AtomicU64 = AtomicU64::new(0);
 
         let new_value = $value;
         let mut previous_value = PREVIOUS_VALUE.load(Ordering::Relaxed);
