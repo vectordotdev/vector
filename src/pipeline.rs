@@ -1,10 +1,11 @@
-use crate::{
-    event::{Event, EventStatus},
-    internal_events::EventOut,
-    transforms::FunctionTransform,
-};
-use futures::{channel::mpsc, task::Poll, Sink, Stream, StreamExt};
+use crate::{internal_events::EventOut, transforms::FunctionTransform};
+use futures::{channel::mpsc, task::Poll, Sink};
+#[cfg(test)]
+use futures::{Stream, StreamExt};
 use std::{collections::VecDeque, fmt, pin::Pin, task::Context};
+use vector_core::event::Event;
+#[cfg(test)]
+use vector_core::event::EventStatus;
 
 #[derive(Debug)]
 pub struct ClosedError;
