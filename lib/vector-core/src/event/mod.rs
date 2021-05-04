@@ -25,7 +25,7 @@ mod log_event;
 #[cfg(feature = "lua")]
 pub mod lua;
 pub mod merge_state;
-pub mod metadata;
+mod metadata;
 pub mod metric;
 pub mod util;
 mod value;

@@ -7651,7 +7651,6 @@ dependencies = [
  "async-nats",
  "async-stream",
  "async-trait",
- "atomig",
  "atty",
  "avro-rs",
  "base64 0.13.0",
@@ -7843,6 +7842,7 @@ name = "vector_core"
 version = "0.1.0"
 dependencies = [
  "async-graphql",
+ "atomig",
  "bytes 1.0.1",
  "chrono",
  "dashmap",
@@ -7870,6 +7870,7 @@ dependencies = [
  "serde_yaml",
  "shared",
  "snafu",
+ "tokio",
  "toml",
  "tracing 0.1.25",
  "tracing-core 0.1.18",
