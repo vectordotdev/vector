@@ -1,8 +1,8 @@
-use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use indexmap::map::IndexMap;
 use std::convert::TryFrom;
 use std::{fs, io::Read, path::Path};
-use vector::event::Lookup;
+use vector_core::event::Lookup;
 
 const FIXTURE_ROOT: &str = "tests/data/fixtures/lookup";
 
@@ -21,7 +21,6 @@ fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<String> {
 // This test iterates over the `tests/data/fixtures/lookup` folder and ensures the lookup parsed,
 // then turned into a string again is the same.
 fn lookup_to_string(c: &mut Criterion) {
-    vector::test_util::trace_init();
     let mut fixtures = IndexMap::new();
 
     std::fs::read_dir(FIXTURE_ROOT)
@@ -29,7 +28,6 @@ fn lookup_to_string(c: &mut Criterion) {
         .for_each(|fixture_file| match fixture_file {
             Ok(fixture_file) => {
                 let path = fixture_file.path();
-                tracing::trace!(?path, "Opening.");
                 let buf = parse_artifact(&path).unwrap();
                 fixtures.insert(path, buf);
             }
@@ -116,3 +114,4 @@ criterion_group!(
     config = Criterion::default().noise_threshold(0.05);
     targets = lookup_to_string
 );
+criterion_main!(benches);

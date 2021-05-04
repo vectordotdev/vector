@@ -6,7 +6,6 @@ mod event;
 mod files;
 mod http;
 mod isolated_buffer;
-mod lookup;
 mod lua;
 mod metrics_snapshot;
 mod regex;
@@ -20,7 +19,6 @@ criterion_main!(
     files::benches,
     http::benches,
     isolated_buffer::benches,
-    lookup::benches,
     lua::benches,
     metrics_snapshot::benches,
     regex::benches,

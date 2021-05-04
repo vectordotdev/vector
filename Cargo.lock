@@ -7823,6 +7823,7 @@ dependencies = [
  "async-graphql",
  "bytes 1.0.1",
  "chrono",
+ "criterion",
  "dashmap",
  "derivative 2.2.0",
  "derive_is_enum_variant",
