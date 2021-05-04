@@ -871,8 +871,9 @@ impl Target for Metric {
                 ["kind"] => return Ok(Some(self.data.kind.into())),
                 ["tags"] => {
                     return Ok(self.tags().map(|map| {
-                        let iter = map.iter().map(|(k, v)| (k.to_owned(), v.to_owned().into()));
-                        vrl_core::Value::from_iter(iter)
+                        map.iter()
+                            .map(|(k, v)| (k.to_owned(), v.to_owned().into()))
+                            .collect::<vrl_core::Value>()
                     }))
                 }
                 ["tags", field] => match self.tag_value(field) {
@@ -910,8 +911,9 @@ impl Target for Metric {
                 ["timestamp"] => return Ok(self.data.timestamp.take().map(Into::into)),
                 ["tags"] => {
                     return Ok(self.series.tags.take().map(|map| {
-                        let iter = map.into_iter().map(|(k, v)| (k, v.into()));
-                        vrl_core::Value::from_iter(iter)
+                        map.into_iter()
+                            .map(|(k, v)| (k, v.into()))
+                            .collect::<vrl_core::Value>()
                     }))
                 }
                 ["tags", field] => return Ok(self.delete_tag(field).map(Into::into)),

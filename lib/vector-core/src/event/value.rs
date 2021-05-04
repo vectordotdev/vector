@@ -49,7 +49,7 @@ impl From<Bytes> for Value {
 
 impl<T: Into<Value>> From<Vec<T>> for Value {
     fn from(set: Vec<T>) -> Self {
-        Value::from_iter(set.into_iter().map(|v| v.into()))
+        set.into_iter().map(|v| v.into()).collect::<Value>()
     }
 }
 
@@ -798,7 +798,7 @@ impl Value {
             | (Some(segment), Value::Float(_))
             | (Some(segment), Value::Integer(_))
             | (Some(segment), Value::Null) => {
-                if working_lookup.len() > 0 {
+                if !working_lookup.is_empty() {
                     trace!("Encountered descent into a primitive.");
                     Err(EventError::PrimitiveDescent {
                         primitive_at: LookupBuf::default(),
@@ -835,7 +835,7 @@ impl Value {
             }
             // Descend into a map
             (Some(Segment::Field(Field { ref name, .. })), Value::Map(map)) => {
-                if working_lookup.len() == 0 {
+                if working_lookup.is_empty() {
                     Ok(map.remove(*name))
                 } else {
                     let mut inner_is_empty = false;
@@ -868,8 +868,9 @@ impl Value {
                     i as usize
                 };
 
-                if working_lookup.len() == 0 {
-                    // We don't **actually** want to remove the index, we just want to swap it with a null.
+                if working_lookup.is_empty() {
+                    // We don't **actually** want to remove the index, we just
+                    // want to swap it with a null.
                     if array.len() > index {
                         Ok(Some(array.remove(index)))
                     } else {

@@ -8,6 +8,7 @@
 //! This library was extracted from the top-level project package, discussed in
 //! RFC 7027.
 
+#![deny(clippy::all)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::approx_constant)]
 
