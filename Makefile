@@ -591,7 +591,7 @@ check-clippy: ## Check code with Clippy
 	${MAYBE_ENVIRONMENT_EXEC} cargo clippy --workspace --all-targets --features all-integration-tests -- -D warnings
 
 .PHONY: check-docs
-qgcheck-docs: ## Check that all /docs file are valid
+check-docs: ## Check that all /docs file are valid
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-docs.sh
 
 .PHONY: check-fmt
