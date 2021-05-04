@@ -267,9 +267,9 @@ mod tests {
                         "ip" => value!([127, 0, 0, 1]),
                         "proto" => "tcp"
                     },
-                    "type" => "nested"
+                    "event" => "log"
                 }],
-                want: Ok("agent.id=1234 agent.name=vector log.file.path=encode_logfmt.rs network.ip.0=127 network.ip.1=0 network.ip.2=0 network.ip.3=1 network.proto=tcp type=nested"),
+                want: Ok("agent.id=1234 agent.name=vector event=log log.file.path=encode_logfmt.rs network.ip.0=127 network.ip.1=0 network.ip.2=0 network.ip.3=1 network.proto=tcp"),
                 tdef: TypeDef::new().bytes().fallible(),
         }
 
@@ -283,6 +283,25 @@ mod tests {
                 fields_ordering: value!(["lvl", "msg"])
             ],
             want: Ok(r#"lvl=info msg="This is a log message" log_id=12345"#),
+            tdef: TypeDef::new().bytes().fallible(),
+        }
+
+        nested_fields_ordering {
+            args: func_args![value:
+                btreemap! {
+                    "log" => btreemap! {
+                        "file" => btreemap! {
+                            "path" => "encode_logfmt.rs"
+                        },
+                    },
+                    "agent" => btreemap! {
+                        "name" => "vector",
+                    },
+                    "event" => "log"
+                },
+                fields_ordering:  value!(["event", "log.file.path", "agent.name"])
+            ],
+            want: Ok("event=log log.file.path=encode_logfmt.rs agent.name=vector"),
             tdef: TypeDef::new().bytes().fallible(),
         }
 
