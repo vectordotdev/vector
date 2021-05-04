@@ -277,12 +277,10 @@ cross-image-%:
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
 .PHONY: test
-test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --quiet --workspace --no-fail-fast --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE}
-
-.PHONY: test-benches
-test-benches: ## Run benchmarks in debug mode to trigger debug_assertions
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --benches --quiet --workspace --no-fail-fast --no-default-features --features "benches metrics-benches remap-benches ${DEFAULT_FEATURES}" ${SCOPE}
+test: ## Run the unit test suite (all targets)
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --all-targets --quiet --workspace --no-fail-fast --no-default-features --features "benches metrics-benches remap-benches ${DEFAULT_FEATURES}" ${SCOPE}
+	# --all-targets doesn't include docs https://github.com/rust-lang/cargo/issues/6669
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --doc --quiet --workspace --no-fail-fast --no-default-features --features "benches metrics-benches remap-benches ${DEFAULT_FEATURES}" ${SCOPE}
 
 .PHONY: test-all
 test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
