@@ -160,13 +160,11 @@ impl Expression for ParseKeyValueFn {
         let value = self.field_delimiter.resolve(ctx)?;
         let field_delimiter = value.try_bytes_utf8_lossy()?;
 
-        let whitespace_strict = self.whitespace == Whitespace::Strict;
-
         let values = parse(
             &bytes,
             &key_value_delimiter,
             &field_delimiter,
-            whitespace_strict,
+            self.whitespace,
         )?;
 
         Ok(Value::from_iter(values))
@@ -183,21 +181,16 @@ fn parse<'a>(
     input: &'a str,
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
-    whitespace_strict: bool,
+    whitespace: Whitespace,
 ) -> Result<Vec<(String, Value)>> {
-    let (rest, result) = parse_line(
-        input,
-        key_value_delimiter,
-        field_delimiter,
-        whitespace_strict,
-    )
-    .map_err(|e| match e {
-        nom::Err::Error(e) | nom::Err::Failure(e) => {
-            // Create a descriptive error message if possible.
-            nom::error::convert_error(input, e)
-        }
-        _ => format!("{}", e),
-    })?;
+    let (rest, result) = parse_line(input, key_value_delimiter, field_delimiter, whitespace)
+        .map_err(|e| match e {
+            nom::Err::Error(e) | nom::Err::Failure(e) => {
+                // Create a descriptive error message if possible.
+                nom::error::convert_error(input, e)
+            }
+            _ => format!("{}", e),
+        })?;
 
     if rest.trim().is_empty() {
         Ok(result)
@@ -211,11 +204,11 @@ fn parse_line<'a>(
     input: &'a str,
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
-    whitespace_strict: bool,
+    whitespace: Whitespace,
 ) -> IResult<&'a str, Vec<(String, Value)>, VerboseError<&'a str>> {
     separated_list1(
         parse_field_delimiter(field_delimiter),
-        parse_key_value(key_value_delimiter, field_delimiter, whitespace_strict),
+        parse_key_value(key_value_delimiter, field_delimiter, whitespace),
     )(input)
 }
 
@@ -238,24 +231,21 @@ fn parse_field_delimiter<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 fn parse_key_value<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     key_value_delimiter: &'a str,
     field_delimiter: &'a str,
-    whitespace_strict: bool,
+    whitespace: Whitespace,
 ) -> impl Fn(&'a str) -> IResult<&'a str, (String, Value), E> {
     move |input| {
         map(
-            |input| {
-                if whitespace_strict {
-                    tuple((
-                        preceded(space0, parse_key(key_value_delimiter)),
-                        tag(key_value_delimiter),
-                        parse_value(field_delimiter),
-                    ))(input)
-                } else {
-                    tuple((
-                        preceded(space0, parse_key(key_value_delimiter)),
-                        preceded(space0, tag(key_value_delimiter)),
-                        preceded(space0, parse_value(field_delimiter)),
-                    ))(input)
-                }
+            |input| match whitespace {
+                Whitespace::Strict => tuple((
+                    preceded(space0, parse_key(key_value_delimiter)),
+                    tag(key_value_delimiter),
+                    parse_value(field_delimiter),
+                ))(input),
+                Whitespace::Lenient => tuple((
+                    preceded(space0, parse_key(key_value_delimiter)),
+                    preceded(space0, tag(key_value_delimiter)),
+                    preceded(space0, parse_value(field_delimiter)),
+                ))(input),
             },
             |(field, _, value): (&str, &str, Value)| (field.to_string(), value),
         )(input)
@@ -359,7 +349,7 @@ mod test {
                 r#"ook=pook @timestamp=2020-12-31T12:43:22.2322232Z key#hash=value "key=with=special=characters"=value key="with special=characters""#,
                 "=",
                 " ",
-                false
+                Whitespace::Lenient
             )
         );
     }
@@ -368,12 +358,12 @@ mod test {
     fn test_parse_key_value() {
         assert_eq!(
             Ok(("", ("ook".to_string(), "pook".into()))),
-            parse_key_value::<VerboseError<&str>>("=", " ", false)("ook=pook")
+            parse_key_value::<VerboseError<&str>>("=", " ", Whitespace::Lenient)("ook=pook")
         );
 
         assert_eq!(
             Ok(("", ("key".to_string(), "".into()))),
-            parse_key_value::<VerboseError<&str>>("=", " ", true)("key=")
+            parse_key_value::<VerboseError<&str>>("=", " ", Whitespace::Strict)("key=")
         );
     }
 
@@ -384,7 +374,7 @@ mod test {
                 ("ook".to_string(), "pook".into()),
                 ("onk".to_string(), "ponk".into())
             ]),
-            parse("ook=pook onk=ponk", "=", " ", false)
+            parse("ook=pook onk=ponk", "=", " ", Whitespace::Lenient)
         );
     }
 
@@ -395,7 +385,7 @@ mod test {
                 ("ook".to_string(), "".into()),
                 ("onk".to_string(), "ponk".into())
             ]),
-            parse("ook= onk=ponk", "=", " ", true)
+            parse("ook= onk=ponk", "=", " ", Whitespace::Strict)
         );
     }
 
