@@ -1,28 +1,30 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
-use shared::EventDataEq;
-use std::collections::{BTreeMap, HashMap};
-
-pub mod discriminant;
-pub mod error;
-pub mod merge_state;
-pub mod metadata;
-pub mod metric;
-pub mod util;
-
-mod legacy_lookup;
-mod log_event;
-mod value;
-
 pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
 pub use metadata::EventMetadata;
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
+use shared::EventDataEq;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::{TryFrom, TryInto};
-pub(crate) use util::log::PathComponent;
-pub(crate) use util::log::PathIter;
+use std::fmt::Debug;
+use tracing::field::{Field, Visit};
+pub use util::log::PathComponent;
+pub use util::log::PathIter;
 pub use value::Value;
+
+pub mod discriminant;
+pub mod error;
+mod legacy_lookup;
+mod log_event;
+#[cfg(feature = "lua")]
+pub mod lua;
+pub mod merge_state;
+pub mod metadata;
+pub mod metric;
+pub mod util;
+mod value;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
@@ -145,6 +147,69 @@ fn decode_value(input: proto::Value) -> Option<Value> {
             error!("Encoded event contains unknown value kind.");
             None
         }
+    }
+}
+
+impl From<&tracing::Event<'_>> for Event {
+    fn from(event: &tracing::Event<'_>) -> Self {
+        let now = chrono::Utc::now();
+        let mut maker = MakeLogEvent(LogEvent::default());
+        event.record(&mut maker);
+
+        let mut log = maker.0;
+        log.insert("timestamp", now);
+
+        let meta = event.metadata();
+        log.insert(
+            "metadata.kind",
+            if meta.is_event() {
+                Value::Bytes("event".to_string().into())
+            } else if meta.is_span() {
+                Value::Bytes("span".to_string().into())
+            } else {
+                Value::Null
+            },
+        );
+        log.insert("metadata.level", meta.level().to_string());
+        log.insert(
+            "metadata.module_path",
+            meta.module_path()
+                .map(|mp| Value::Bytes(mp.to_string().into()))
+                .unwrap_or(Value::Null),
+        );
+        log.insert("metadata.target", meta.target().to_string());
+
+        log.into()
+    }
+}
+
+#[derive(Debug)]
+struct MakeLogEvent(LogEvent);
+
+impl Visit for MakeLogEvent {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        self.0.insert(field.name(), value.to_string());
+    }
+
+    fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
+        self.0.insert(field.name(), format!("{:?}", value));
+    }
+
+    fn record_i64(&mut self, field: &Field, value: i64) {
+        self.0.insert(field.name(), value);
+    }
+
+    fn record_u64(&mut self, field: &Field, value: u64) {
+        let field = field.name();
+        let converted: Result<i64, _> = value.try_into();
+        match converted {
+            Ok(value) => self.0.insert(field, value),
+            Err(_) => self.0.insert(field, value.to_string()),
+        };
+    }
+
+    fn record_bool(&mut self, field: &Field, value: bool) {
+        self.0.insert(field.name(), value);
     }
 }
 

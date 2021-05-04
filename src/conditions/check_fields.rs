@@ -556,7 +556,7 @@ impl CheckFields {
 
 impl Condition for CheckFields {
     fn check(&self, e: &Event) -> bool {
-        self.predicates.iter().find(|(_, p)| !p.check(e)).is_none()
+        !self.predicates.iter().any(|(_, p)| !p.check(e))
     }
 
     fn check_with_context(&self, e: &Event) -> Result<(), String> {
