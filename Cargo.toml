@@ -116,7 +116,7 @@ tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features 
 
 # Metrics
 metrics = { version = "0.14.2", default-features = false }
-metrics-tracing-context = { version = "0.3.0", default-features = false }
+metrics-tracing-context = { version = "0.4.0", default-features = false }
 metrics-util = { version = "0.6.2", default-features = false }
 
 # Aws
