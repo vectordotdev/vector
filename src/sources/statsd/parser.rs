@@ -69,7 +69,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             let val: f64 = parts[0].parse()?;
             Metric::new(
                 name, MetricKind::Incremental, MetricValue::Distribution {
-                    samples: crate::samples![convert_to_base_units(unit, val) => sample_rate as u32],
+                    samples: vector_core::samples![convert_to_base_units(unit, val) => sample_rate as u32],
                     statistic: convert_to_statistic(unit),
                 },
             ).with_tags(tags)
@@ -292,7 +292,7 @@ mod test {
                 "glork",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![0.320 => 10],
+                    samples: vector_core::samples![0.320 => 10],
                     statistic: StatisticKind::Histogram
                 },
             )),
@@ -307,7 +307,7 @@ mod test {
                 "glork",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![320.0 => 10],
+                    samples: vector_core::samples![320.0 => 10],
                     statistic: StatisticKind::Histogram
                 },
             )
@@ -331,7 +331,7 @@ mod test {
                 "glork",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![320.0 => 10],
+                    samples: vector_core::samples![320.0 => 10],
                     statistic: StatisticKind::Summary
                 },
             )

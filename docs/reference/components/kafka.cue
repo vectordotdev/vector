@@ -100,4 +100,17 @@ components: _kafka: {
 				"""
 		}
 	}
+
+	telemetry: metrics: {
+		kafka_queue_messages:                components.sources.internal_metrics.output.metrics.kafka_queue_messages
+		kafka_queue_messages_bytes:          components.sources.internal_metrics.output.metrics.kafka_queue_messages_bytes
+		kafka_requests_total:                components.sources.internal_metrics.output.metrics.kafka_requests_total
+		kafka_requests_bytes_total:          components.sources.internal_metrics.output.metrics.kafka_requests_bytes_total
+		kafka_responses_total:               components.sources.internal_metrics.output.metrics.kafka_responses_total
+		kafka_responses_bytes_total:         components.sources.internal_metrics.output.metrics.kafka_responses_bytes_total
+		kafka_produced_messages_total:       components.sources.internal_metrics.output.metrics.kafka_produced_messages_total
+		kafka_produced_messages_bytes_total: components.sources.internal_metrics.output.metrics.kafka_produced_messages_bytes_total
+		kafka_consumed_messages_total:       components.sources.internal_metrics.output.metrics.kafka_consumed_messages_total
+		kafka_consumed_messages_bytes_total: components.sources.internal_metrics.output.metrics.kafka_consumed_messages_bytes_total
+	}
 }

@@ -19,4 +19,5 @@ mock_instant = { version = "0.2" }
 
 [[bench]]
 name = "limit"
+test = true
 harness = false

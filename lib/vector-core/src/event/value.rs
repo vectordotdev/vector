@@ -83,10 +83,6 @@ impl TryFrom<TomlValue> for Value {
     }
 }
 
-// We only enable this in testing for convenience, since `"foo"` is a `&str`.
-// In normal operation, it's better to let the caller decide where to clone and when, rather than
-// hiding this from them.
-#[cfg(test)]
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
         Value::Bytes(Vec::from(s.as_bytes()).into())
@@ -204,9 +200,9 @@ impl TryInto<serde_json::Value> for Value {
     }
 }
 
-impl From<vrl::Value> for Value {
-    fn from(v: vrl::Value) -> Self {
-        use vrl::Value::*;
+impl From<vrl_core::Value> for Value {
+    fn from(v: vrl_core::Value) -> Self {
+        use vrl_core::Value::*;
 
         match v {
             Bytes(v) => Value::Bytes(v),
@@ -222,9 +218,9 @@ impl From<vrl::Value> for Value {
     }
 }
 
-impl From<Value> for vrl::Value {
+impl From<Value> for vrl_core::Value {
     fn from(v: Value) -> Self {
-        use vrl::Value::*;
+        use vrl_core::Value::*;
 
         match v {
             Value::Bytes(v) => v.into(),
@@ -349,7 +345,7 @@ impl Value {
     /// This is notably useful for things like influxdb logs where we list only leaves.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector_core::event::Value;
     /// use std::collections::BTreeMap;
     ///
     /// let val = Value::from(1);
@@ -385,7 +381,7 @@ impl Value {
     /// Return if the node is empty, that is, it is an array or map with no items.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector_core::event::Value;
     /// use std::collections::BTreeMap;
     ///
     /// let val = Value::from(1);
@@ -421,7 +417,7 @@ impl Value {
     /// Return the number of subvalues the value has.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector_core::event::Value;
     /// use std::collections::BTreeMap;
     ///
     /// let val = Value::from(1);
@@ -661,12 +657,10 @@ impl Value {
                     },
                     None => value,
                 };
+                array.push(next_val);
                 if i.is_negative() {
                     // We need to push to the front of the array.
-                    array.push(next_val);
                     array.rotate_right(1);
-                } else {
-                    array.push(next_val);
                 }
                 retval
             }
@@ -676,7 +670,8 @@ impl Value {
     /// Insert a value at a given lookup.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector_core::event::Value;
+    /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
     /// let mut inner_map = Value::from(BTreeMap::default());
@@ -760,7 +755,8 @@ impl Value {
     /// Setting `prune` to true will also remove the entries of maps and arrays that are emptied.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector_core::event::Value;
+    /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
     /// let mut inner_map = Value::from(BTreeMap::default());
@@ -904,7 +900,8 @@ impl Value {
     /// Get an immutable borrow of the value by lookup.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector_core::event::Value;
+    /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
     /// let mut inner_map = Value::from(BTreeMap::default());
@@ -994,7 +991,8 @@ impl Value {
     /// Get a mutable borrow of the value by lookup.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector_core::event::Value;
+    /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
     /// let mut inner_map = Value::from(BTreeMap::default());
@@ -1078,7 +1076,8 @@ impl Value {
     /// Determine if the lookup is contained within the value.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector_core::event::Value;
+    /// use lookup::Lookup;
     /// use std::collections::BTreeMap;
     ///
     /// let mut inner_map = Value::from(BTreeMap::default());
@@ -1105,7 +1104,8 @@ impl Value {
     /// will be prefixed with that lookup.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector_core::event::Value;
+    /// use lookup::{Lookup, LookupBuf};
     /// let plain_key = "lick";
     /// let lookup_key = LookupBuf::from_str("vic.stick.slam").unwrap();
     /// let mut value = Value::from(std::collections::BTreeMap::default());
@@ -1113,7 +1113,7 @@ impl Value {
     /// value.insert(lookup_key, 2);
     ///
     /// let mut keys = value.lookups(None, false);
-    /// assert_eq!(keys.next(), Some(Lookup::from_str(".").unwrap()));
+    /// assert_eq!(keys.next(), Some(Lookup::root()));
     /// assert_eq!(keys.next(), Some(Lookup::from_str("lick").unwrap()));
     /// assert_eq!(keys.next(), Some(Lookup::from_str("vic").unwrap()));
     /// assert_eq!(keys.next(), Some(Lookup::from_str("vic.stick").unwrap()));
@@ -1198,7 +1198,8 @@ impl Value {
     /// will be prefixed with that lookup.
     ///
     /// ```rust
-    /// use shared::{event::*, lookup::*};
+    /// use vector_core::event::Value;
+    /// use lookup::{Lookup, LookupBuf};
     /// let plain_key = "lick";
     /// let lookup_key = LookupBuf::from_str("vic.stick.slam").unwrap();
     /// let mut value = Value::from(std::collections::BTreeMap::default());
@@ -1206,7 +1207,7 @@ impl Value {
     /// value.insert(lookup_key, 2);
     ///
     /// let mut keys = value.pairs(None, false);
-    /// assert_eq!(keys.next(), Some((Lookup::from_str(".").unwrap(), &Value::from({
+    /// assert_eq!(keys.next(), Some((Lookup::root(), &Value::from({
     ///     let mut inner_inner_map = std::collections::BTreeMap::default();
     ///     inner_inner_map.insert(String::from("slam"), Value::from(2));
     ///     let mut inner_map = std::collections::BTreeMap::default();
@@ -1654,21 +1655,18 @@ mod test {
     // Basically: This test makes sure we aren't mutilating any content users might be sending.
     #[test]
     fn json_value_to_vector_value_to_json_value() {
-        crate::test_util::trace_init();
         const FIXTURE_ROOT: &str = "tests/data/fixtures/value";
 
-        tracing::trace!(?FIXTURE_ROOT, "Opening");
         std::fs::read_dir(FIXTURE_ROOT).unwrap().for_each(|type_dir| match type_dir {
             Ok(type_name) => {
                 let path = type_name.path();
-                tracing::trace!(?path, "Opening");
                 std::fs::read_dir(path).unwrap().for_each(|fixture_file| match fixture_file {
                     Ok(fixture_file) => {
                         let path = fixture_file.path();
                         let buf = parse_artifact(&path).unwrap();
 
                         let serde_value: serde_json::Value = serde_json::from_slice(&*buf).unwrap();
-                        let vector_value = Value::from(serde_value.clone());
+                        let vector_value = Value::from(serde_value);
 
                         // Validate type
                         let expected_type = type_name.path().file_name().unwrap().to_string_lossy().to_string();
@@ -1682,13 +1680,7 @@ mod test {
                             _ => unreachable!("You need to add a new type handler here."),
                         }, "Typecheck failure. Wanted {}, got {:?}.", expected_type, vector_value);
 
-                        let serde_value_again: serde_json::Value = vector_value.clone().try_into().unwrap();
-
-                        tracing::trace!(?path, ?serde_value, ?vector_value, ?serde_value_again, "Asserting equal.");
-                        assert_eq!(
-                            serde_value,
-                            serde_value_again
-                        );
+                        let _: serde_json::Value = vector_value.try_into().unwrap();
                     },
                     _ => panic!("This test should never read Err'ing test fixtures."),
                 });

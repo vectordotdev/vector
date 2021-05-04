@@ -1,4 +1,4 @@
-mod interop;
+pub use vector_core::event::lua;
 
 use crate::{
     config::{DataType, CONFIG_PATHS},

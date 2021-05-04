@@ -6,3 +6,49 @@ edition = "2018"
 publish = false
 
 [dependencies]
+async-graphql = { version = "=2.6.4", default-features = false, optional = true, features = ["chrono"] }
+bytes = { version = "1.0.1", default-features = false, features = ["serde"] }
+chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
+dashmap = { version = "4.0.2", default-features = false }
+derive_is_enum_variant = { path = "../derive_is_enum_variant" }
+getset = { version = "0.1.1", default-features = false }
+indexmap = { version = "1.6.2", default-features = false, features = ["serde"] }
+lazy_static = { version = "1.4.0", default-features = false }
+metrics = { version = "0.14.2", default-features = false }
+metrics-tracing-context = { version = "0.3.0", default-features = false }
+metrics-util = { version = "0.6.2", default-features = false }
+once_cell = { version = "1.3", default-features = false }
+pest = { version = "2.1.3", default-features = false }
+pest_derive = { version = "2.1.0", default-features = false }
+prost = { version = "0.7.0", default-features = false }
+prost-types = { version = "0.7.0", default-features = false }
+regex = { version = "1.4.5", default-features = false, features = ["std", "perf"] }
+rlua = { version = "0.17.0", default-features = true, optional = true }
+serde = { version = "1.0.125", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.64", default-features = false, features = ["alloc", "raw_value"] }
+serde_yaml = { version = "0.8.17", default-features = false, optional = true }
+shared = { path = "../shared" }
+snafu = { version = "0.6.10", default-features = false, features = ["futures", "futures-01"] }
+toml = { version = "0.5.8", default-features = false }
+tracing = { version = "0.1.25", default-features = false }
+tracing-core = { version = "0.1.17", default-features = false }
+tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-01", "futures-03"], optional = true }
+tracing-log = { version = "0.1.2", default-features = false }
+tracing-subscriber = { version = "0.2.17", default-features = false }
+tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231", optional = true }
+twox-hash = { version = "1.6.0", default-features = false }
+vrl-core = { package = "vrl", path = "../vrl/core" }
+lookup = { path = "../lookup", features = ["arbitrary"] }
+derivative = { version = "2.2.0", default-features = false }
+
+[build-dependencies]
+prost-build = "0.7.0"
+
+[dev-dependencies]
+quickcheck = "1.0.3"
+pretty_assertions = "0.7.2"
+
+[features]
+default = []
+api = ["async-graphql"]
+lua = ["rlua"]
