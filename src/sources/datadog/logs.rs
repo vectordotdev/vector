@@ -136,7 +136,7 @@ mod tests {
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
         event::{Event, EventStatus},
-        test_util::{next_addr, spawn_collect_n, stream_update_status, trace_init, wait_for_tcp},
+        test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
     };
     use futures::Stream;
@@ -150,7 +150,7 @@ mod tests {
     }
 
     async fn source() -> (impl Stream<Item = Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test();
+        let (sender, recv) = Pipeline::new_test_finalize(EventStatus::Delivered);
         let address = next_addr();
         tokio::spawn(async move {
             DatadogLogsConfig {
@@ -165,7 +165,6 @@ mod tests {
             .unwrap();
         });
         wait_for_tcp(address).await;
-        let recv = stream_update_status(recv, EventStatus::Delivered);
         (recv, address)
     }
 
