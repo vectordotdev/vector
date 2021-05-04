@@ -282,8 +282,7 @@ test: ## Run the unit test suite
 
 .PHONY: test-benches
 test-benches: ## Run benchmarks in debug mode to trigger debug_assertions
-test-benches: export DEFAULT_FEATURES:="benches metrics-benches remap-benches"
-test-benches: test
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --benches --quiet --workspace --no-fail-fast --no-default-features --features "benches metrics-benches remap-benches ${DEFAULT_FEATURES}" ${SCOPE}
 
 .PHONY: test-all
 test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.

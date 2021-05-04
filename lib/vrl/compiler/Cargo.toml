@@ -29,5 +29,4 @@ shared = { path = "../../shared", default-features = false, features = ["btreema
 
 [[bench]]
 name = "kind"
-test = true
 harness = false
