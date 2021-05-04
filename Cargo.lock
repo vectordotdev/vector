@@ -3723,8 +3723,19 @@ version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58e285601dcfb9f3a8f37a7093b9956a0df730b50848c8ac0117406aff06c851"
 dependencies = [
- "metrics-macros",
+ "metrics-macros 0.2.0",
  "proc-macro-hack",
+]
+
+[[package]]
+name = "metrics"
+version = "0.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c53c23fff9a59f261498953cf41dc9ffc2522fd79723bdf283c1e88dc1633624"
+dependencies = [
+ "metrics-macros 0.3.0",
+ "proc-macro-hack",
+ "t1ha",
 ]
 
 [[package]]
@@ -3742,13 +3753,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics-macros"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b22572ba9964744e261d34553568683b76db277bcd309ebf7215e28e0982505d"
+dependencies = [
+ "lazy_static",
+ "proc-macro-hack",
+ "proc-macro2 1.0.26",
+ "quote 1.0.9",
+ "regex",
+ "syn 1.0.71",
+]
+
+[[package]]
 name = "metrics-tracing-context"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dca72af6651bd11c3496d470b566b0a8d8b671c11e52c86a5d1b157b112d4730"
 dependencies = [
  "itoa",
- "metrics",
+ "metrics 0.14.2",
  "metrics-util",
  "tracing 0.1.25",
  "tracing-core 0.1.18",
@@ -3767,7 +3792,7 @@ dependencies = [
  "crossbeam-utils 0.8.3",
  "dashmap",
  "indexmap",
- "metrics",
+ "metrics 0.14.2",
  "ordered-float",
  "parking_lot",
  "quanta",
@@ -6688,6 +6713,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "t1ha"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa44aa51ae1a544e2c35a38831ba54ae40591f21384816f531b84f3e984b9ccc"
+dependencies = [
+ "cfg-if 0.1.10",
+ "lazy_static",
+ "num-traits",
+ "rustc_version",
+]
+
+[[package]]
 name = "take_mut"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7689,7 +7726,7 @@ dependencies = [
  "lucetc",
  "matches",
  "maxminddb",
- "metrics",
+ "metrics 0.15.1",
  "metrics-tracing-context",
  "metrics-util",
  "mongodb",
