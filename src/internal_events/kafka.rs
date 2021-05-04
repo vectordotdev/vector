@@ -1,6 +1,6 @@
 use super::InternalEvent;
-use crate::update_counter;
 use metrics::{counter, gauge};
+use vector_core::update_counter;
 
 #[derive(Debug)]
 pub struct KafkaEventReceived {
