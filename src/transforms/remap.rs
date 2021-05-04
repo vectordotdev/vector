@@ -105,9 +105,7 @@ impl FunctionTransform for Remap {
                 });
 
                 if !self.drop_on_abort {
-                    if let Some(event) = original_event {
-                        output.push(event)
-                    }
+                    output.push(original_event.expect("event will be set"))
                 }
             }
             Err(Terminate::Error(error)) => {
@@ -117,9 +115,7 @@ impl FunctionTransform for Remap {
                 });
 
                 if !self.drop_on_error {
-                    if let Some(event) = original_event {
-                        output.push(event)
-                    }
+                    output.push(original_event.expect("event will be set"))
                 }
             }
         }
