@@ -1,6 +1,6 @@
 use crate::{
     config::{Config, ConfigDiff, GenerateConfig},
-    event::{Event, EventStatus},
+    event::Event,
     topology::{self, RunningTopology},
     trace,
 };
@@ -536,18 +536,6 @@ pub async fn start_topology(
     topology::start_validated(config, diff, pieces)
         .await
         .unwrap()
-}
-
-pub fn stream_update_status(
-    stream: impl Stream<Item = Event>,
-    status: EventStatus,
-) -> impl Stream<Item = Event> {
-    stream.map(move |mut event| {
-        let metadata = event.metadata_mut();
-        metadata.update_status(status);
-        metadata.update_sources();
-        event
-    })
 }
 
 /// Collect the first `n` events from a stream while a future is spawned

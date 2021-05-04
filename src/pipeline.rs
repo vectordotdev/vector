@@ -1,5 +1,9 @@
-use crate::{event::Event, internal_events::EventOut, transforms::FunctionTransform};
-use futures::{channel::mpsc, task::Poll, Sink};
+use crate::{
+    event::{Event, EventStatus},
+    internal_events::EventOut,
+    transforms::FunctionTransform,
+};
+use futures::{channel::mpsc, task::Poll, Sink, Stream, StreamExt};
 use std::{collections::VecDeque, fmt, pin::Pin, task::Context};
 
 #[derive(Debug)]
@@ -102,6 +106,21 @@ impl Pipeline {
     #[cfg(test)]
     pub fn new_test() -> (Self, mpsc::Receiver<Event>) {
         Self::new_with_buffer(100, vec![])
+    }
+
+    #[cfg(test)]
+    pub fn new_test_finalize(status: EventStatus) -> (Self, impl Stream<Item = Event> + Unpin) {
+        let (pipe, recv) = Self::new_with_buffer(100, vec![]);
+        // In a source test pipeline, there is no sink to acknowledge
+        // events, so we have to add a map to the receiver to handle the
+        // finalization.
+        let recv = recv.map(move |mut event| {
+            let metadata = event.metadata_mut();
+            metadata.update_status(status);
+            metadata.update_sources();
+            event
+        });
+        (pipe, recv)
     }
 
     pub fn new_with_buffer(
