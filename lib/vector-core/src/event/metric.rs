@@ -58,10 +58,10 @@ pub enum MetricKind {
     Absolute,
 }
 
-impl TryFrom<vrl::Value> for MetricKind {
+impl TryFrom<vrl_core::Value> for MetricKind {
     type Error = String;
 
-    fn try_from(value: vrl::Value) -> Result<Self, Self::Error> {
+    fn try_from(value: vrl_core::Value) -> Result<Self, Self::Error> {
         let value = value.try_bytes().map_err(|e| e.to_string())?;
         match std::str::from_utf8(&value).map_err(|e| e.to_string())? {
             "incremental" => Ok(Self::Incremental),
@@ -74,7 +74,7 @@ impl TryFrom<vrl::Value> for MetricKind {
     }
 }
 
-impl From<MetricKind> for vrl::Value {
+impl From<MetricKind> for vrl_core::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
             MetricKind::Incremental => "incremental".into(),
@@ -205,7 +205,7 @@ pub fn zip_quantiles(
 /// Convert the Metric value into a vrl value.
 /// Currently vrl can only read the type of the value and doesn't consider
 /// any actual metric values.
-impl From<MetricValue> for vrl::Value {
+impl From<MetricValue> for vrl_core::Value {
     fn from(value: MetricValue) -> Self {
         match value {
             MetricValue::Counter { .. } => "counter",
@@ -589,7 +589,7 @@ impl MetricValue {
                 *samples = samples
                     .iter()
                     .copied()
-                    .filter(|sample| samples2.iter().find(|sample2| sample == *sample2).is_none())
+                    .filter(|sample| !samples2.iter().any(|sample2| sample == sample2))
                     .collect();
             }
             (

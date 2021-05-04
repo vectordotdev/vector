@@ -710,7 +710,7 @@ mod tests {
 
     #[test]
     fn test_single_value_stats() {
-        let samples = crate::samples![10.0 => 1];
+        let samples = vector_core::samples![10.0 => 1];
 
         assert_eq!(
             stats(&samples),
@@ -727,7 +727,7 @@ mod tests {
     }
     #[test]
     fn test_nan_stats() {
-        let samples = crate::samples![1.0 => 1, std::f64::NAN => 1];
+        let samples = vector_core::samples![1.0 => 1, std::f64::NAN => 1];
         assert!(stats(&samples).is_some());
     }
 
@@ -739,7 +739,7 @@ mod tests {
 
     #[test]
     fn test_zero_counts_stats() {
-        let samples = crate::samples![1.0 => 0, 2.0 => 0];
+        let samples = vector_core::samples![1.0 => 0, 2.0 => 0];
         assert!(stats(&samples).is_none());
     }
 
@@ -750,7 +750,7 @@ mod tests {
             "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -771,7 +771,7 @@ mod tests {
             "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Summary,
             },
         )

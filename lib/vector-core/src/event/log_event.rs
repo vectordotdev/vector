@@ -347,7 +347,6 @@ mod test {
     use crate::test_util::open_fixture;
     use serde_json::json;
     use std::str::FromStr;
-    use tracing::trace;
 
     // This test iterates over the `tests/data/fixtures/log_event` folder and:
     //   * Ensures the EventLog parsed from bytes and turned into a serde_json::Value are equal to the
@@ -356,10 +355,8 @@ mod test {
     // Basically: This test makes sure we aren't mutilating any content users might be sending.
     #[test]
     fn json_value_to_vector_log_event_to_json_value() {
-        crate::test_util::trace_init();
         const FIXTURE_ROOT: &str = "tests/data/fixtures/log_event";
 
-        trace!(?FIXTURE_ROOT, "Opening.");
         std::fs::read_dir(FIXTURE_ROOT)
             .unwrap()
             .for_each(|fixture_file| match fixture_file {
@@ -369,16 +366,8 @@ mod test {
                     let serde_value = open_fixture(&path).unwrap();
 
                     let vector_value = LogEvent::try_from(serde_value.clone()).unwrap();
-                    let serde_value_again: serde_json::Value =
-                        vector_value.clone().try_into().unwrap();
+                    let serde_value_again: serde_json::Value = vector_value.try_into().unwrap();
 
-                    tracing::trace!(
-                        ?path,
-                        ?serde_value,
-                        ?vector_value,
-                        ?serde_value_again,
-                        "Asserting equal."
-                    );
                     assert_eq!(serde_value, serde_value_again);
                 }
                 _ => panic!("This test should never read Err'ing test fixtures."),
@@ -388,7 +377,6 @@ mod test {
     // We use `serde_json` pointers in this test to ensure we're validating that Vector correctly inputs and outputs things as expected.
     #[test]
     fn entry() {
-        crate::test_util::trace_init();
         let fixture =
             open_fixture("tests/data/fixtures/log_event/motivatingly-complex.json").unwrap();
         let mut event = LogEvent::try_from(fixture).unwrap();
@@ -400,7 +388,6 @@ mod test {
         );
         entry.or_insert_with(|| fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
-        trace!(?json);
         assert_eq!(json.pointer("/non-existing"), Some(&fallback));
 
         let lookup = Lookup::from_str("nulled").unwrap();

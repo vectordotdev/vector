@@ -693,7 +693,7 @@ mod test {
                 "http_request_duration_seconds",
                 MetricKind::Absolute,
                 MetricValue::AggregatedHistogram {
-                    buckets: crate::buckets![
+                    buckets: vector_core::buckets![
                         0.05 => 24054, 0.1 => 9390, 0.2 => 66948, 0.5 => 28997, 1.0 => 4599
                     ],
                     count: 144320,
@@ -755,7 +755,7 @@ mod test {
             Ok(vec![
                 Metric::new(
                     "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
-                        buckets: crate::buckets![
+                        buckets: vector_core::buckets![
                             30.0 => 327,
                             60.0 => 147,
                             300.0 => 61,
@@ -775,7 +775,7 @@ mod test {
                     .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
-                        buckets: crate::buckets![
+                        buckets: vector_core::buckets![
                             30.0 => 1,
                             60.0 => 0,
                             300.0 => 0,
@@ -795,7 +795,7 @@ mod test {
                     .with_timestamp(Some(*TIMESTAMP)),
                 Metric::new(
                     "gitlab_runner_job_duration_seconds", MetricKind::Absolute, MetricValue::AggregatedHistogram {
-                        buckets: crate::buckets![
+                        buckets: vector_core::buckets![
                             30.0 => 285, 60.0 => 880, 300.0 => 1906, 600.0 => 80, 1800.0 => 101, 3600.0 => 3,
                             7200.0 => 0, 10800.0 => 0, 18000.0 => 0, 36000.0 => 0
                         ],
@@ -839,7 +839,7 @@ mod test {
                     "rpc_duration_seconds",
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
-                        quantiles: crate::quantiles![
+                        quantiles: vector_core::quantiles![
                             0.01 => 3102.0,
                             0.05 => 3272.0,
                             0.5 => 4773.0,
@@ -858,7 +858,7 @@ mod test {
                     "go_gc_duration_seconds",
                     MetricKind::Absolute,
                     MetricValue::AggregatedSummary {
-                        quantiles: crate::quantiles![
+                        quantiles: vector_core::quantiles![
                             0.0 => 0.009460965,
                             0.25 => 0.009793382,
                             0.5 => 0.009870205,

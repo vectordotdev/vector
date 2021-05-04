@@ -2,8 +2,6 @@ mod handle;
 mod label_filter;
 mod recorder;
 mod registry;
-#[cfg(test)]
-mod tests;
 
 use crate::event::{Event, Metric};
 pub use crate::metrics::handle::{Counter, Handle};
