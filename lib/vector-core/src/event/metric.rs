@@ -593,7 +593,7 @@ impl MetricValue {
                 *samples = samples
                     .iter()
                     .copied()
-                    .filter(|sample| !samples2.iter().any(|sample2| sample == sample2))
+                    .filter(|sample| samples2.iter().all(|sample2| sample != sample2))
                     .collect();
             }
             (
