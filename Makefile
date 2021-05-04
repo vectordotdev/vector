@@ -581,10 +581,14 @@ check: ## Run prerequisite code checks
 .PHONY: check-all
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-style check-markdown check-docs
-check-all: check-version check-examples
+check-all: check-version check-examples check-component-features
 check-all: check-scripts
 check-all: check-helm-lint check-helm-dependencies check-helm-snapshots
 check-all: check-kubernetes-yaml
+
+.PHONY: check-component-features
+check-component-features: ## Check that all component features are setup properly
+	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --each-feature
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy

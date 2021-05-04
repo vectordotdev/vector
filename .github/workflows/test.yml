@@ -285,7 +285,9 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: cargo install cargo-hack
-      - run: cargo hack check --each-feature
+      - run: make check-component-features
+        env:
+          RUSTFLAGS: "-D warnings"
 
   checks:
     name: Checks
