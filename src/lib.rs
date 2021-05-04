@@ -37,7 +37,7 @@ pub mod buffers;
 pub mod encoding_transcode;
 pub mod heartbeat;
 pub mod http;
-#[cfg(feature = "rdkafka")]
+#[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 pub mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
