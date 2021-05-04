@@ -118,6 +118,10 @@ impl Drop for EventFinalizer {
     }
 }
 
+/// A convenience type alias for the one-shot receiver for an individual
+/// batch status.
+pub type BatchStatusReceiver = oneshot::Receiver<BatchStatus>;
+
 /// A batch notifier contains the status of the current batch along with
 /// a one-shot notifier to send that status back to the source. It is
 /// shared among all events of a batch.
@@ -130,7 +134,7 @@ pub struct BatchNotifier {
 impl BatchNotifier {
     /// Create a new `BatchNotifier` along with the receiver used to
     /// await its finalization status.
-    pub fn new_with_receiver() -> (Arc<Self>, oneshot::Receiver<BatchStatus>) {
+    pub fn new_with_receiver() -> (Arc<Self>, BatchStatusReceiver) {
         let (sender, receiver) = oneshot::channel();
         let notifier = Self {
             status: Atomic::new(BatchStatus::Delivered),

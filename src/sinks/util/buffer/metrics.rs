@@ -736,7 +736,7 @@ mod test {
 
     #[test]
     fn compress_distributions() {
-        let samples = crate::samples![
+        let samples = vector_core::samples![
             2.0 => 12,
             2.0 => 12,
             3.0 => 13,
@@ -748,7 +748,7 @@ mod test {
 
         assert_eq!(
             compress_distribution(samples),
-            crate::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
+            vector_core::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
         );
     }
 
@@ -917,7 +917,7 @@ mod test {
             format!("dist-{}", num),
             kind,
             MetricValue::Distribution {
-                samples: crate::samples![num as f64 => rate],
+                samples: vector_core::samples![num as f64 => rate],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -934,7 +934,7 @@ mod test {
             format!("buckets-{}", num),
             kind,
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![
+                buckets: vector_core::buckets![
                     1.0 => cfactor,
                     2.0f64.powf(bpower) => cfactor * 2,
                     4.0f64.powf(bpower) => cfactor * 4
@@ -950,7 +950,7 @@ mod test {
             format!("quantiles-{}", num),
             kind,
             MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![
+                quantiles: vector_core::quantiles![
                     0.0 => factor,
                     0.5 => factor * 2.0,
                     1.0 => factor * 4.0

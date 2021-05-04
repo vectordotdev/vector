@@ -391,7 +391,7 @@ mod tests {
             "latency",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![11.0 => 100, 12.0 => 50],
+                samples: vector_core::samples![11.0 => 100, 12.0 => 50],
                 statistic: StatisticKind::Histogram,
             },
         )];
@@ -501,7 +501,7 @@ mod integration_tests {
                     format!("distribution-{}", distribution_name),
                     MetricKind::Incremental,
                     MetricValue::Distribution {
-                        samples: crate::samples![i as f64 => 100],
+                        samples: vector_core::samples![i as f64 => 100],
                         statistic: StatisticKind::Histogram,
                     },
                 )

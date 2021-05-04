@@ -1,4 +1,4 @@
-use crate::parse_key_value::ParseKeyValueFn;
+use crate::parse_key_value::{ParseKeyValueFn, Whitespace};
 use vrl::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -32,11 +32,13 @@ impl Function for ParseLogFmt {
         // parameters for the delimiters.
         let key_value_delimiter = expr!("=");
         let field_delimiter = expr!(" ");
+        let whitespace = Whitespace::Lenient;
 
         Ok(Box::new(ParseKeyValueFn {
             value,
             key_value_delimiter,
             field_delimiter,
+            whitespace,
         }))
     }
 }

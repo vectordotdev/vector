@@ -333,9 +333,9 @@ dependencies = [
 
 [[package]]
 name = "async-nats"
-version = "0.9.14"
+version = "0.9.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2147a9b6ff608c28974273f4b93ab05b4bf62bac7e8d8b8119e414e0d69a6298"
+checksum = "44a042e52858bf59b58b37ad2e32f9c956b2411a63e53063055bd18755598aac"
 dependencies = [
  "blocking",
  "nats",
@@ -819,9 +819,9 @@ dependencies = [
 
 [[package]]
 name = "bstr"
-version = "0.2.15"
+version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a40b47ad93e1a5404e6c18dec46b628214fee441c70f4ab5d6942142cc268a3d"
+checksum = "90682c8d613ad3373e66de8c6411e0ae2ab2571e879d2efbf73558cc66f21279"
 dependencies = [
  "lazy_static",
  "memchr",
@@ -837,9 +837,9 @@ checksum = "39092a32794787acd8525ee150305ff051b0aa6cc2abaf193924f5ab05425f39"
 
 [[package]]
 name = "built"
-version = "0.4.4"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8f1b029cb3929cb0c99780b0c10fe512f60be5438adf5f757e4afa1bc75a984"
+checksum = "76efeb50f902677353f8f7052c7da1cc8c4f65b46b30cc41fc1e3042249711c7"
 dependencies = [
  "cargo-lock",
  "chrono",
@@ -903,11 +903,11 @@ checksum = "631ae5198c9be5e753e5cc215e1bd73c2b466a3565173db433f52bb9d3e66dba"
 
 [[package]]
 name = "cargo-lock"
-version = "4.0.1"
+version = "6.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8504b63dd1249fd1745b7b4ef9b6f7b107ddeb3c95370043c7dbcc38653a2679"
+checksum = "e6f16e7adc20969298b1e137ac21ab3a7e7a9412fec71f963ff2fdc41663d70f"
 dependencies = [
- "semver 0.9.0",
+ "semver 0.11.0",
  "serde",
  "toml",
  "url",
@@ -1427,42 +1427,17 @@ dependencies = [
 
 [[package]]
 name = "crossterm"
-version = "0.18.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e86d73f2a0b407b5768d10a8c720cf5d2df49a9efc10ca09176d201ead4b7fb"
-dependencies = [
- "bitflags",
- "crossterm_winapi 0.6.2",
- "lazy_static",
- "libc",
- "mio 0.7.11",
- "parking_lot",
- "signal-hook 0.1.17",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "crossterm"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c36c10130df424b2f3552fcc2ddcd9b28a27b1e54b358b45874f88d1ca6888c"
 dependencies = [
  "bitflags",
- "crossterm_winapi 0.7.0",
+ "crossterm_winapi",
  "lazy_static",
  "libc",
  "mio 0.7.11",
  "parking_lot",
  "signal-hook 0.1.17",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "crossterm_winapi"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2265c3f8e080075d9b6417aa72293fc71662f34b4af2612d8d1b074d29510db"
-dependencies = [
  "winapi 0.3.9",
 ]
 
@@ -3396,9 +3371,9 @@ dependencies = [
 
 [[package]]
 name = "libz-sys"
-version = "1.1.2"
+version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "602113192b08db8f38796c4e85c39e960c145965140e918018bcde1952429655"
+checksum = "de5435b8549c16d423ed0c03dbaafe57cf6c3344744f1242520d59c9d8ecec66"
 dependencies = [
  "cc",
  "libc",
@@ -3741,9 +3716,9 @@ checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 
 [[package]]
 name = "memchr"
-version = "2.3.4"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ee1c47aaa256ecabcaea351eae4a9b01ef39ed810004e298d2511ed284b1525"
+checksum = "b16bd47d9e329435e309c58469fe0791c2d0d1ba96ec0954152a5ae2b04387dc"
 
 [[package]]
 name = "memoffset"
@@ -3797,7 +3772,7 @@ dependencies = [
  "metrics",
  "metrics-util",
  "tracing 0.1.25",
- "tracing-core 0.1.17",
+ "tracing-core 0.1.18",
  "tracing-subscriber",
 ]
 
@@ -4018,9 +3993,9 @@ dependencies = [
 
 [[package]]
 name = "nats"
-version = "0.9.14"
+version = "0.9.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6ffb2d2a086e3e5cdb2e0189e628128acaaf72d3a7a3ca76b25838a17d2412e"
+checksum = "a52d8392a8d3d010d503795cfe94e5ed7ca51ee6366d84640addc38b28c9fc5c"
 dependencies = [
  "base64 0.13.0",
  "base64-url",
@@ -5781,9 +5756,9 @@ dependencies = [
 
 [[package]]
 name = "rust_decimal"
-version = "1.12.2"
+version = "1.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d64bd27418c091ebd539b00f50ad059fc41421c87d5033c217cd76c7506d0d71"
+checksum = "3358e4d417d8f4ae6b972d8c2bf4d5d9a39bda57d00a968af06f10e3fed400fd"
 dependencies = [
  "arrayvec 0.5.2",
  "num-traits",
@@ -6015,7 +5990,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403"
 dependencies = [
  "semver-parser 0.7.0",
- "serde",
 ]
 
 [[package]]
@@ -6438,9 +6412,9 @@ dependencies = [
 
 [[package]]
 name = "snap"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc725476a1398f0480d56cd0ad381f6f32acf2642704456f8f59a35df464b59a"
+checksum = "45456094d1983e2ee2a18fdfebce3189fa451699d0502cb8e3b49dba5ba41451"
 
 [[package]]
 name = "socket2"
@@ -7177,7 +7151,7 @@ dependencies = [
  "log",
  "pin-project-lite",
  "tracing-attributes 0.1.15",
- "tracing-core 0.1.17",
+ "tracing-core 0.1.18",
 ]
 
 [[package]]
@@ -7211,9 +7185,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.17"
+version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f50de3927f93d202783f4513cda820ab47ef17f624b03c096e86ef00c67e6b5f"
+checksum = "a9ff14f98b1a4b289c6248a023c1c2fa1491062964e9fed67ab29c4e4da4a052"
 dependencies = [
  "lazy_static",
 ]
@@ -7249,7 +7223,7 @@ dependencies = [
  "dashmap",
  "mock_instant",
  "tracing 0.1.25",
- "tracing-core 0.1.17",
+ "tracing-core 0.1.18",
  "tracing-subscriber",
 ]
 
@@ -7261,7 +7235,7 @@ checksum = "a6923477a48e41c1951f1999ef8bb5a3023eb723ceadafe78ffb65dc366761e3"
 dependencies = [
  "lazy_static",
  "log",
- "tracing-core 0.1.17",
+ "tracing-core 0.1.18",
 ]
 
 [[package]]
@@ -7271,14 +7245,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb65ea441fbb84f9f6748fd496cf7f63ec9af5bca94dd86456978d055e8eb28b"
 dependencies = [
  "serde",
- "tracing-core 0.1.17",
+ "tracing-core 0.1.18",
 ]
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.2.17"
+version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "705096c6f83bf68ea5d357a6aa01829ddbdac531b357b45abeca842938085baa"
+checksum = "aa5553bf0883ba7c9cbe493b085c29926bd41b66afc31ff72cf17ff4fb60dcd5"
 dependencies = [
  "ansi_term 0.12.1",
  "chrono",
@@ -7291,7 +7265,7 @@ dependencies = [
  "smallvec",
  "thread_local",
  "tracing 0.1.25",
- "tracing-core 0.1.17",
+ "tracing-core 0.1.18",
  "tracing-log",
  "tracing-serde",
 ]
@@ -7366,13 +7340,13 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "tui"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ced152a8e9295a5b168adc254074525c17ac4a83c90b2716274cc38118bddc9"
+checksum = "861d8f3ad314ede6219bcb2ab844054b1de279ee37a9bc38e3d606f9d3fb2a71"
 dependencies = [
  "bitflags",
  "cassowary",
- "crossterm 0.18.2",
+ "crossterm",
  "unicode-segmentation",
  "unicode-width",
 ]
@@ -7677,7 +7651,6 @@ dependencies = [
  "async-nats",
  "async-stream",
  "async-trait",
- "atomig",
  "atty",
  "avro-rs",
  "base64 0.13.0",
@@ -7692,7 +7665,7 @@ dependencies = [
  "codec",
  "colored",
  "criterion",
- "crossterm 0.19.0",
+ "crossterm",
  "dashmap",
  "db-key",
  "derivative 2.2.0",
@@ -7759,7 +7732,6 @@ dependencies = [
  "pretty_assertions",
  "prometheus-parser",
  "prost",
- "prost-build",
  "prost-types",
  "pulsar",
  "quickcheck",
@@ -7810,7 +7782,7 @@ dependencies = [
  "tower-layer",
  "tower-test",
  "tracing 0.1.25",
- "tracing-core 0.1.17",
+ "tracing-core 0.1.18",
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-log",
@@ -7868,6 +7840,47 @@ dependencies = [
 [[package]]
 name = "vector_core"
 version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "atomig",
+ "bytes 1.0.1",
+ "chrono",
+ "dashmap",
+ "derivative 2.2.0",
+ "derive_is_enum_variant",
+ "getset",
+ "indexmap",
+ "lazy_static",
+ "lookup",
+ "metrics",
+ "metrics-tracing-context",
+ "metrics-util",
+ "once_cell",
+ "pest",
+ "pest_derive",
+ "pretty_assertions",
+ "prost",
+ "prost-build",
+ "prost-types",
+ "quickcheck",
+ "regex",
+ "rlua",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "shared",
+ "snafu",
+ "tokio",
+ "toml",
+ "tracing 0.1.25",
+ "tracing-core 0.1.18",
+ "tracing-futures 0.2.5",
+ "tracing-log",
+ "tracing-subscriber",
+ "tracing-tower",
+ "twox-hash",
+ "vrl",
+]
 
 [[package]]
 name = "version_check"

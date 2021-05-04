@@ -2,13 +2,15 @@ mod errors;
 mod events_in;
 mod events_out;
 pub mod filter;
-mod host;
 mod processed_bytes;
 mod processed_events;
 mod sink;
 pub mod source;
 mod transform;
 mod uptime;
+
+#[cfg(feature = "sources-host_metrics")]
+mod host;
 
 use async_graphql::{validators::IntRange, Interface, Object, Subscription};
 use chrono::{DateTime, Utc};
@@ -18,7 +20,6 @@ pub use errors::{ComponentErrorsTotal, ErrorsTotal};
 pub use events_in::{ComponentEventsInThroughput, ComponentEventsInTotal, EventsInTotal};
 pub use events_out::{ComponentEventsOutThroughput, ComponentEventsOutTotal, EventsOutTotal};
 pub use filter::*;
-pub use host::HostMetrics;
 pub use processed_bytes::{
     ComponentProcessedBytesThroughput, ComponentProcessedBytesTotal, ProcessedBytesTotal,
 };
@@ -43,9 +44,10 @@ pub struct MetricsQuery;
 
 #[Object]
 impl MetricsQuery {
+    #[cfg(feature = "sources-host_metrics")]
     /// Vector host metrics
-    async fn host_metrics(&self) -> HostMetrics {
-        HostMetrics::new()
+    async fn host_metrics(&self) -> host::HostMetrics {
+        host::HostMetrics::new()
     }
 }
 
