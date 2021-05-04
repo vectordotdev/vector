@@ -5,6 +5,9 @@ mod logfmt {
     use std::collections::{BTreeMap, HashSet};
     use std::fmt::Write;
 
+    use shared::btreemap;
+    use Value::{Array, Object};
+
     use vrl::prelude::*;
 
     fn encode_string(output: &mut String, str: &str) {
@@ -40,6 +43,44 @@ mod logfmt {
         }
     }
 
+    fn flatten(
+        input: &BTreeMap<String, Value>,
+        parent_key: &str,
+        separator: char,
+        depth: usize,
+    ) -> BTreeMap<String, Value> {
+        let mut items = BTreeMap::<String, Value>::new();
+
+        for (key, value) in input.iter() {
+            let new_key = if depth > 0 {
+                format!("{}{}{}", parent_key, separator, key)
+            } else {
+                key.into()
+            };
+
+            match value {
+                Object(map) => {
+                    let mut res = flatten(map, &new_key, separator, depth + 1);
+                    items.append(&mut res);
+                }
+                Array(array) => {
+                    for (idx, v) in array.iter().enumerate() {
+                        let array_map = btreemap! {
+                            idx.to_string() => v.clone()
+                        };
+                        let mut res = flatten(&array_map, &new_key, separator, depth + 1);
+                        items.append(&mut res);
+                    }
+                }
+                _ => {
+                    items.insert(new_key, value.clone());
+                }
+            };
+        }
+
+        items
+    }
+
     fn encode_field(output: &mut String, key: &str, value: &Value) {
         encode_string(output, key);
         output.write_char('=').unwrap();
@@ -50,8 +91,10 @@ mod logfmt {
         let mut output = String::new();
         let mut seen_fields = HashSet::new();
 
+        let flattened = flatten(input, "", '.', 0);
+
         for (idx, field) in fields.iter().enumerate() {
-            if let Some(val) = input.get(field) {
+            if let Some(val) = flattened.get(field) {
                 if idx > 0 {
                     output.write_char(' ').unwrap();
                 }
@@ -60,7 +103,7 @@ mod logfmt {
             }
         }
 
-        for (idx, (key, value)) in input.iter().enumerate() {
+        for (idx, (key, value)) in flattened.iter().enumerate() {
             if seen_fields.contains(key) {
                 continue;
             }
@@ -206,6 +249,28 @@ mod tests {
                 }],
             want: Ok(r#"lvl=info msg="payload: {\"code\": 200}\\n""#),
             tdef: TypeDef::new().bytes().fallible(),
+        }
+
+        nested_fields {
+            args: func_args![value:
+                btreemap! {
+                    "log" => btreemap! {
+                        "file" => btreemap! {
+                            "path" => "encode_logfmt.rs"
+                        },
+                    },
+                    "agent" => btreemap! {
+                        "name" => "vector",
+                        "id" => 1234
+                    },
+                    "network" => btreemap! {
+                        "ip" => value!([127, 0, 0, 1]),
+                        "proto" => "tcp"
+                    },
+                    "type" => "nested"
+                }],
+                want: Ok("agent.id=1234 agent.name=vector log.file.path=encode_logfmt.rs network.ip.0=127 network.ip.1=0 network.ip.2=0 network.ip.3=1 network.proto=tcp type=nested"),
+                tdef: TypeDef::new().bytes().fallible(),
         }
 
         fields_ordering {
