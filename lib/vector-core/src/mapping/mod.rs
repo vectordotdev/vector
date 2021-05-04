@@ -84,12 +84,7 @@ impl Function for OnlyFields {
 
         let keys: Vec<String> = target_log
             .keys()
-            .filter(|k| {
-                self.paths
-                    .iter()
-                    .find(|p| k.starts_with(p.as_str()))
-                    .is_none()
-            })
+            .filter(|k| !self.paths.iter().any(|p| k.starts_with(p.as_str())))
             .collect();
 
         for key in keys {
