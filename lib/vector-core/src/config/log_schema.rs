@@ -1,8 +1,6 @@
-use super::{load_builder_from_paths, FormatHint};
 use getset::{Getters, Setters};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
 
@@ -19,13 +17,12 @@ lazy_static::lazy_static! {
 /// Once this is done, configurations can be correctly loaded using
 /// configured log schema defaults.
 /// If deny is set, will panic if schema has already been set.
-pub fn init_log_schema(
-    config_paths: &[(PathBuf, FormatHint)],
-    deny_if_set: bool,
-) -> Result<(), Vec<String>> {
-    let (builder, _) = load_builder_from_paths(config_paths)?;
-
-    if LOG_SCHEMA.set(builder.global.log_schema).is_err() && deny_if_set {
+pub fn init_log_schema<F>(builder: F, deny_if_set: bool) -> Result<(), Vec<String>>
+where
+    F: FnOnce() -> Result<LogSchema, Vec<String>>,
+{
+    let log_schema = builder()?;
+    if LOG_SCHEMA.set(log_schema).is_err() && deny_if_set {
         panic!("Couldn't set schema");
     }
 

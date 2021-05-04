@@ -7711,7 +7711,6 @@ dependencies = [
  "pretty_assertions",
  "prometheus-parser",
  "prost",
- "prost-build",
  "prost-types",
  "pulsar",
  "quickcheck",
@@ -7820,6 +7819,45 @@ dependencies = [
 [[package]]
 name = "vector_core"
 version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "bytes 1.0.1",
+ "chrono",
+ "dashmap",
+ "derivative 2.2.0",
+ "derive_is_enum_variant",
+ "getset",
+ "indexmap",
+ "lazy_static",
+ "lookup",
+ "metrics",
+ "metrics-tracing-context",
+ "metrics-util",
+ "once_cell",
+ "pest",
+ "pest_derive",
+ "pretty_assertions",
+ "prost",
+ "prost-build",
+ "prost-types",
+ "quickcheck",
+ "regex",
+ "rlua",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "shared",
+ "snafu",
+ "toml",
+ "tracing 0.1.25",
+ "tracing-core 0.1.18",
+ "tracing-futures 0.2.5",
+ "tracing-log",
+ "tracing-subscriber",
+ "tracing-tower",
+ "twox-hash",
+ "vrl",
+]
 
 [[package]]
 name = "version_check"
