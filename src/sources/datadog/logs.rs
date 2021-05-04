@@ -149,8 +149,8 @@ mod tests {
         crate::test_util::test_generate_config::<DatadogLogsConfig>();
     }
 
-    async fn source() -> (impl Stream<Item = Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test_finalize(EventStatus::Delivered);
+    async fn source(status: EventStatus) -> (impl Stream<Item = Event>, SocketAddr) {
+        let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
         tokio::spawn(async move {
             DatadogLogsConfig {
@@ -188,7 +188,7 @@ mod tests {
     #[tokio::test]
     async fn no_api_key() {
         trace_init();
-        let (rx, addr) = source().await;
+        let (rx, addr) = source(EventStatus::Delivered).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -221,7 +221,7 @@ mod tests {
     #[tokio::test]
     async fn api_key_in_url() {
         trace_init();
-        let (rx, addr) = source().await;
+        let (rx, addr) = source(EventStatus::Delivered).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -254,7 +254,7 @@ mod tests {
     #[tokio::test]
     async fn api_key_in_header() {
         trace_init();
-        let (rx, addr) = source().await;
+        let (rx, addr) = source(EventStatus::Delivered).await;
 
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -288,5 +288,29 @@ mod tests {
             assert_eq!(log["dd_api_key"], "12345678abcdefgh12345678abcdefgh".into());
             assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
         }
+    }
+
+    #[tokio::test]
+    async fn delivery_failure() {
+        trace_init();
+        let (rx, addr) = source(EventStatus::Failed).await;
+
+        spawn_collect_n(
+            async move {
+                assert_eq!(
+                    400,
+                    send_with_path(
+                        addr,
+                        r#"[{"message":"foo", "timestamp": 123}]"#,
+                        HeaderMap::new(),
+                        "/v1/input/"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
     }
 }
