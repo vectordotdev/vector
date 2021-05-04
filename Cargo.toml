@@ -16,6 +16,9 @@ name = "graphql-schema"
 path = "src/api/schema/gen.rs"
 required-features = ["default-no-api-client"]
 
+[profile.dev]
+split-debuginfo = "unpacked" # Faster debug builds on macOS
+
 [profile.release]
 lto = true        # Optimize our binary at link stage.
 codegen-units = 1 # Increases compile time but improves optmization alternatives.
