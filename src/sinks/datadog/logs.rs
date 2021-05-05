@@ -30,7 +30,9 @@ use std::{io::Write, time::Duration};
 #[serde(deny_unknown_fields)]
 pub struct DatadogLogsConfig {
     endpoint: Option<String>,
+    // Deprecated, replaced by the site option
     region: Option<super::Region>,
+    site: Option<String>,
     api_key: String,
     encoding: EncodingConfig<Encoding>,
     tls: Option<TlsConfig>,
@@ -48,11 +50,15 @@ pub struct DatadogLogsConfig {
 #[derive(Clone)]
 pub struct DatadogLogsJsonService {
     config: DatadogLogsConfig,
+    // Used to store the complete URI and avoid calling `get_uri` for each request
+    uri: String,
 }
 
 #[derive(Clone)]
 pub struct DatadogLogsTextService {
     config: DatadogLogsConfig,
+    // Used to store the complete URI and avoid calling `get_uri` for each request
+    uri: String,
 }
 
 inventory::submit! {
@@ -70,12 +76,21 @@ impl GenerateConfig for DatadogLogsConfig {
 }
 
 impl DatadogLogsConfig {
-    fn get_endpoint(&self) -> &str {
+    fn get_uri(&self) -> String {
         self.endpoint
-            .as_deref()
+            .clone()
+            .or_else(|| {
+                self.site
+                    .as_ref()
+                    .map(|s| format!("https://http-intake.logs.{}/v1/input", s))
+            })
             .unwrap_or_else(|| match self.region {
-                Some(super::Region::Eu) => "https://http-intake.logs.datadoghq.eu",
-                None | Some(super::Region::Us) => "https://http-intake.logs.datadoghq.com",
+                Some(super::Region::Eu) => {
+                    "https://http-intake.logs.datadoghq.eu/v1/input".to_string()
+                }
+                None | Some(super::Region::Us) => {
+                    "https://http-intake.logs.datadoghq.com/v1/input".to_string()
+                }
             })
     }
 
@@ -129,10 +144,10 @@ impl DatadogLogsConfig {
     /// Build the request, GZipping the contents if the config specifies.
     fn build_request(
         &self,
+        uri: &str,
         content_type: &str,
         body: Vec<u8>,
     ) -> crate::Result<http::Request<Vec<u8>>> {
-        let uri = format!("{}/v1/input", self.get_endpoint());
         let request = Request::post(uri)
             .header("Content-Type", content_type)
             .header("DD-API-KEY", self.api_key.clone());
@@ -177,6 +192,7 @@ impl SinkConfig for DatadogLogsConfig {
                     cx,
                     DatadogLogsJsonService {
                         config: self.clone(),
+                        uri: self.get_uri(),
                     },
                     JsonArrayBuffer::new(batch_settings.size),
                     batch_settings.timeout,
@@ -188,6 +204,7 @@ impl SinkConfig for DatadogLogsConfig {
                     cx,
                     DatadogLogsTextService {
                         config: self.clone(),
+                        uri: self.get_uri(),
                     },
                     VecBuffer::new(batch_settings.size),
                     batch_settings.timeout,
@@ -239,7 +256,8 @@ impl HttpSink for DatadogLogsJsonService {
                 count: events.len(),
             });
         }
-        self.config.build_request("application/json", body)
+        self.config
+            .build_request(self.uri.as_str(), "application/json", body)
     }
 }
 
@@ -260,7 +278,8 @@ impl HttpSink for DatadogLogsTextService {
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let body: Vec<u8> = events.into_iter().flat_map(Bytes::into_iter).collect();
-        self.config.build_request("text/plain", body)
+        self.config
+            .build_request(self.uri.as_str(), "text/plain", body)
     }
 }
 

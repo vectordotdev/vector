@@ -389,7 +389,7 @@ mod tests {
             "latency",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![11.0 => 100, 12.0 => 50],
+                samples: vector_core::samples![11.0 => 100, 12.0 => 50],
                 statistic: StatisticKind::Histogram,
             },
         )];
@@ -430,7 +430,11 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::{event::metric::StatisticKind, event::MetricKind, test_util::random_string, Event};
+    use crate::{
+        event::metric::StatisticKind,
+        event::{Event, MetricKind},
+        test_util::random_string,
+    };
     use chrono::offset::TimeZone;
     use rand::seq::SliceRandom;
 
@@ -495,7 +499,7 @@ mod integration_tests {
                     format!("distribution-{}", distribution_name),
                     MetricKind::Incremental,
                     MetricValue::Distribution {
-                        samples: crate::samples![i as f64 => 100],
+                        samples: vector_core::samples![i as f64 => 100],
                         statistic: StatisticKind::Histogram,
                     },
                 )

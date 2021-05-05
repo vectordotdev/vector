@@ -64,22 +64,43 @@ pub struct RootOpts {
     /// File format is detected from the file name.
     /// If zero files are specified the default config path
     /// `/etc/vector/vector.toml` will be targeted.
-    #[structopt(name = "config", short, long, env = "VECTOR_CONFIG")]
+    #[structopt(
+        name = "config",
+        short,
+        long,
+        env = "VECTOR_CONFIG",
+        use_delimiter(true)
+    )]
     pub config_paths: Vec<PathBuf>,
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// TOML file format is expected.
-    #[structopt(name = "config-toml", long, env = "VECTOR_CONFIG_TOML")]
+    #[structopt(
+        name = "config-toml",
+        long,
+        env = "VECTOR_CONFIG_TOML",
+        use_delimiter(true)
+    )]
     pub config_paths_toml: Vec<PathBuf>,
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// JSON file format is expected.
-    #[structopt(name = "config-json", long, env = "VECTOR_CONFIG_JSON")]
+    #[structopt(
+        name = "config-json",
+        long,
+        env = "VECTOR_CONFIG_JSON",
+        use_delimiter(true)
+    )]
     pub config_paths_json: Vec<PathBuf>,
 
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// YAML file format is expected.
-    #[structopt(name = "config-yaml", long, env = "VECTOR_CONFIG_YAML")]
+    #[structopt(
+        name = "config-yaml",
+        long,
+        env = "VECTOR_CONFIG_YAML",
+        use_delimiter(true)
+    )]
     pub config_paths_yaml: Vec<PathBuf>,
 
     /// Exit on startup if any sinks fail healthchecks

@@ -12,10 +12,10 @@ use tokio::time::{sleep, Duration};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use vector::{
     config::{self, SinkConfig, SinkContext, SourceConfig, SourceContext},
+    event::Event,
     sinks::{self, Healthcheck, VectorSink},
     sources,
     test_util::{next_addr, random_lines, send_lines, start_topology, wait_for_tcp, CountReceiver},
-    Event,
 };
 
 #[derive(Debug, Serialize, Deserialize)]

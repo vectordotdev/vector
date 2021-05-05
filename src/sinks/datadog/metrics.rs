@@ -1,6 +1,7 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, Sample, StatisticKind},
+    event::Event,
     http::HttpClient,
     sinks::{
         util::{
@@ -12,7 +13,6 @@ use crate::{
         },
         Healthcheck, HealthcheckError, UriParseError, VectorSink,
     },
-    Event,
 };
 use chrono::{DateTime, Utc};
 use futures::{stream, FutureExt, SinkExt};
@@ -46,7 +46,9 @@ pub struct DatadogConfig {
     // Deprecated name
     #[serde(alias = "host")]
     pub endpoint: Option<String>,
+    // Deprecated, replaced by the site option
     pub region: Option<super::Region>,
+    pub site: Option<String>,
     pub api_key: String,
     #[serde(default)]
     pub batch: BatchConfig,
@@ -74,13 +76,29 @@ struct DatadogRequest<T> {
 }
 
 impl DatadogConfig {
-    fn get_endpoint(&self) -> &str {
+    fn get_endpoint(&self) -> String {
+        self.endpoint.clone().unwrap_or_else(|| {
+            // Follow the official Datadog agent convention:
+            // <sender-id>.agent.<site>
+            let version = str::replace(crate::built_info::PKG_VERSION, ".", "-");
+            format!("https://{}-vector.agent.{}", version, &self.get_site())
+        })
+    }
+
+    // The API endpoint is used for healtcheck/API key validation, it is derived from the `site` or `region` option
+    // the same way the offical Datadog Agent does but the `endpoint` option still override both the main and the
+    // API endpoint.
+    fn get_api_endpoint(&self) -> String {
         self.endpoint
-            .as_deref()
-            .unwrap_or_else(|| match self.region {
-                Some(super::Region::Eu) => "https://api.datadoghq.eu",
-                None | Some(super::Region::Us) => "https://api.datadoghq.com",
-            })
+            .clone()
+            .unwrap_or_else(|| format!("https://api.{}", &self.get_site()))
+    }
+
+    fn get_site(&self) -> &str {
+        self.site.as_deref().unwrap_or_else(|| match self.region {
+            Some(super::Region::Eu) => "datadoghq.eu",
+            None | Some(super::Region::Us) => "datadoghq.com",
+        })
     }
 }
 
@@ -259,7 +277,7 @@ fn build_uri(host: &str, endpoint: &'static str) -> crate::Result<Uri> {
 }
 
 async fn healthcheck(config: DatadogConfig, client: HttpClient) -> crate::Result<()> {
-    let uri = format!("{}/api/v1/validate", config.get_endpoint())
+    let uri = format!("{}/api/v1/validate", config.get_api_endpoint())
         .parse::<Uri>()
         .context(UriParseError)?;
 
@@ -507,6 +525,7 @@ mod tests {
     use chrono::offset::TimeZone;
     use http::Method;
     use pretty_assertions::assert_eq;
+    use regex::Regex;
     use std::sync::atomic::AtomicI64;
 
     #[test]
@@ -532,6 +551,7 @@ mod tests {
     async fn test_request() {
         let (sink, _cx) = load_sink::<DatadogConfig>(
             r#"
+            site = "us3.datadoghq.com"
             api_key = "test"
         "#,
         )
@@ -576,10 +596,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(req.method(), Method::POST);
-        assert_eq!(
-            req.uri(),
-            &Uri::from_static("https://api.datadoghq.com/api/v1/series")
-        );
+        let uri_validator =
+            Regex::new(r"^https://\d+-\d+-\d+-vector.agent.us3.datadoghq.com/api/v1/series$")
+                .unwrap();
+        assert!(uri_validator.is_match(&req.uri().to_string()));
     }
 
     #[test]
@@ -710,7 +730,7 @@ mod tests {
 
     #[test]
     fn test_single_value_stats() {
-        let samples = crate::samples![10.0 => 1];
+        let samples = vector_core::samples![10.0 => 1];
 
         assert_eq!(
             stats(&samples),
@@ -727,7 +747,7 @@ mod tests {
     }
     #[test]
     fn test_nan_stats() {
-        let samples = crate::samples![1.0 => 1, std::f64::NAN => 1];
+        let samples = vector_core::samples![1.0 => 1, std::f64::NAN => 1];
         assert!(stats(&samples).is_some());
     }
 
@@ -739,7 +759,7 @@ mod tests {
 
     #[test]
     fn test_zero_counts_stats() {
-        let samples = crate::samples![1.0 => 0, 2.0 => 0];
+        let samples = vector_core::samples![1.0 => 0, 2.0 => 0];
         assert!(stats(&samples).is_none());
     }
 
@@ -750,7 +770,7 @@ mod tests {
             "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -771,7 +791,7 @@ mod tests {
             "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Summary,
             },
         )

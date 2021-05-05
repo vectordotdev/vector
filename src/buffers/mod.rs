@@ -1,8 +1,6 @@
-use crate::{config::Resource, internal_events::EventOut, Event};
-#[cfg(feature = "leveldb")]
-use futures::compat::{Sink01CompatExt, Stream01CompatExt};
-use futures::{channel::mpsc, Sink, SinkExt, Stream};
-use futures01::task::AtomicTask;
+use crate::{config::Resource, event::Event, internal_events::EventOut};
+
+use futures::{channel::mpsc, task::AtomicWaker, Sink, SinkExt, Stream};
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -14,8 +12,6 @@ use std::{
     },
     task::{Context, Poll},
 };
-#[cfg(feature = "leveldb")]
-use tokio_stream::StreamExt;
 
 #[cfg(feature = "leveldb")]
 pub mod disk;
@@ -83,7 +79,7 @@ impl BufferInputCloner {
 
             #[cfg(feature = "leveldb")]
             BufferInputCloner::Disk(writer, when_full) => {
-                let inner = writer.clone().sink_compat();
+                let inner = writer.clone();
                 if when_full == &WhenFull::DropNewest {
                     Box::new(DropWhenFull::new(inner))
                 } else {
@@ -137,11 +133,6 @@ impl BufferConfig {
                 let (tx, rx, acker) = disk::open(&data_dir, buffer_dir.as_ref(), *max_size)
                     .map_err(|error| error.to_string())?;
                 let tx = BufferInputCloner::Disk(tx, *when_full);
-                let rx = Box::new(
-                    rx.compat()
-                        .take_while(|event| event.is_ok())
-                        .map(|event| event.unwrap()),
-                );
                 Ok((tx, rx, acker))
             }
         }
@@ -160,7 +151,7 @@ impl BufferConfig {
 
 #[derive(Debug, Clone)]
 pub enum Acker {
-    Disk(Arc<AtomicUsize>, Arc<AtomicTask>),
+    Disk(Arc<AtomicUsize>, Arc<AtomicWaker>),
     Null,
 }
 
@@ -178,7 +169,7 @@ impl Acker {
                 Acker::Null => {}
                 Acker::Disk(counter, notifier) => {
                     counter.fetch_add(num, Ordering::Relaxed);
-                    notifier.notify();
+                    notifier.wake();
                 }
             }
             emit!(EventOut { count: num });
@@ -187,7 +178,7 @@ impl Acker {
 
     pub fn new_for_testing() -> (Self, Arc<AtomicUsize>) {
         let ack_counter = Arc::new(AtomicUsize::new(0));
-        let notifier = Arc::new(AtomicTask::new());
+        let notifier = Arc::new(AtomicWaker::new());
         let acker = Acker::Disk(Arc::clone(&ack_counter), Arc::clone(&notifier));
 
         (acker, ack_counter)
@@ -249,14 +240,12 @@ impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
 #[cfg(test)]
 mod test {
     use super::{Acker, BufferConfig, DropWhenFull, WhenFull};
-    use futures::channel::mpsc;
-    use futures::{future, Sink, Stream};
-    use futures01::task::AtomicTask;
+    use futures::{channel::mpsc, future, task::AtomicWaker, Sink, Stream};
     use std::{
         sync::{atomic::AtomicUsize, Arc},
         task::Poll,
     };
-    use tokio01_test::task::MockTask;
+    use tokio_test::task::spawn;
 
     #[tokio::test]
     async fn drop_when_full() {
@@ -287,18 +276,20 @@ mod test {
     #[test]
     fn ack_with_none() {
         let counter = Arc::new(AtomicUsize::new(0));
-        let task = Arc::new(AtomicTask::new());
+        let task = Arc::new(AtomicWaker::new());
         let acker = Acker::Disk(counter, Arc::clone(&task));
 
-        let mut mock = MockTask::new();
+        let mut mock = spawn(future::poll_fn::<(), _>(|cx| {
+            task.register(cx.waker());
+            Poll::Pending
+        }));
+        let _ = mock.poll();
 
-        mock.enter(|| task.register());
-
-        assert!(!mock.is_notified());
+        assert!(!mock.is_woken());
         acker.ack(0);
-        assert!(!mock.is_notified());
+        assert!(!mock.is_woken());
         acker.ack(1);
-        assert!(mock.is_notified());
+        assert!(mock.is_woken());
     }
 
     #[test]

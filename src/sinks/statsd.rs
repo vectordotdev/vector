@@ -3,6 +3,7 @@ use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue, StatisticKind},
+    event::Event,
     internal_events::StatsdInvalidMetricReceived,
     sinks::util::{
         encode_namespace,
@@ -10,7 +11,6 @@ use crate::{
         udp::{UdpService, UdpSinkConfig},
         BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
     },
-    Event,
 };
 use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
@@ -356,7 +356,7 @@ mod test {
             "distribution",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![1.5 => 1],
+                samples: vector_core::samples![1.5 => 1],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -420,7 +420,7 @@ mod test {
                     "histogram",
                     MetricKind::Incremental,
                     MetricValue::Distribution {
-                        samples: crate::samples![2.0 => 100],
+                        samples: vector_core::samples![2.0 => 100],
                         statistic: StatisticKind::Histogram,
                     },
                 )

@@ -40,10 +40,6 @@ ignore = [
     "RUSTSEC-2019-0036",
     "RUSTSEC-2020-0036",
 
-    # dirs is unmaintained, use dirs-next instead
-    # https://github.com/timberio/vector/issues/5584
-    "RUSTSEC-2020-0053",
-
     # stdweb is unmaintained
     # https://github.com/timberio/vector/issues/5585
     "RUSTSEC-2020-0056",
@@ -55,8 +51,4 @@ ignore = [
     # Soundness issues in `raw-cpuid`
     # https://github.com/timberio/vector/issues/6223
     "RUSTSEC-2021-0013",
-
-    # arr! macro erases lifetimes
-    # https://github.com/timberio/vector/issues/6584
-    "RUSTSEC-2020-0146",
 ]

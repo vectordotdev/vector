@@ -208,7 +208,7 @@ components: transforms: reduce: {
 			]
 			configuration: {
 				group_by: ["host", "pid", "tid"]
-				marge_strategies: message: "concat_newline"
+				merge_strategies: message: "concat_newline"
 				starts_when: #"match(.message, /^[^\s]/)"#
 			}
 			output: [

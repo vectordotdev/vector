@@ -1,5 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSinkConfig,
@@ -7,7 +8,6 @@ use crate::{
     },
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
-    Event,
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};

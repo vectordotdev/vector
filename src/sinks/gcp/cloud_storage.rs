@@ -1,6 +1,7 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
     http::{HttpClient, HttpClientFuture, HttpError},
     internal_events::TemplateRenderingFailed,
     serde::to_string,
@@ -15,7 +16,6 @@ use crate::{
     },
     template::{Template, TemplateParseError},
     tls::{TlsOptions, TlsSettings},
-    Event,
 };
 use bytes::Bytes;
 use chrono::Utc;

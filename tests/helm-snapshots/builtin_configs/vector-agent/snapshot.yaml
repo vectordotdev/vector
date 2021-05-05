@@ -69,6 +69,10 @@ data:
       option1 = "value1"
       option2 = "value2"
       type = "host_metrics"
+      [sources.host_metrics.filesystem]
+        [sources.host_metrics.filesystem.filesystems]
+          excludes = ["binfmt_misc"]
+    [sources.host_metrics]
       arbitrary text 1
     
     

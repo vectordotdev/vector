@@ -187,8 +187,7 @@ mod tests {
     use super::KeyValueConfig;
     use crate::{
         config::{GlobalOptions, TransformConfig},
-        event::{LogEvent, Value},
-        Event,
+        event::{Event, LogEvent, Value},
     };
 
     async fn parse_log(

@@ -8,10 +8,12 @@ publish = false
 [dependencies]
 diagnostic = { package = "vrl-diagnostic", path = "../diagnostic" }
 parser = { package = "vrl-parser", path = "../parser" }
+lookup = { path = "../../lookup" }
 
 bitflags = "1"
 bytes = "1.0.0"
 chrono = "0.4"
+dyn-clone = "1.0.4"
 lalrpop-util = "0.19"
 ordered-float = "2"
 paste = "1"
@@ -19,15 +21,13 @@ regex = "1"
 serde = "1"
 thiserror = "1"
 tracing = "0.1"
-dyn-clone = "1.0.4"
 
 [dev-dependencies]
 criterion = "0.3"
-
-[[bench]]
-name = "path"
-harness = false
+indoc = "1"
+shared = { path = "../../shared", default-features = false, features = ["btreemap"] }
 
 [[bench]]
 name = "kind"
+test = true
 harness = false

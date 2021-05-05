@@ -1,11 +1,12 @@
 use crate::{
     config::{self, GenerateConfig, SourceConfig, SourceContext, SourceDescription},
+    event::Event,
     internal_events::{
         AwsEcsMetricsErrorResponse, AwsEcsMetricsHttpError, AwsEcsMetricsParseError,
         AwsEcsMetricsReceived, AwsEcsMetricsRequestCompleted,
     },
     shutdown::ShutdownSignal,
-    Event, Pipeline,
+    Pipeline,
 };
 use futures::{stream, SinkExt, StreamExt};
 use hyper::{Body, Client, Request};

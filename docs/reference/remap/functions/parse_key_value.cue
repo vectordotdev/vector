@@ -35,6 +35,17 @@ remap: functions: parse_key_value: {
 			default:     " "
 			type: ["string"]
 		},
+		{
+			name:        "whitespace"
+			description: "Defines the acceptance of unnecessary whitespace surrounding the configured `key_value_delimiter`."
+			required:    false
+			enum: {
+				lenient: "Ignore whitespace."
+				strict:  "Parse whitespace as normal character."
+			}
+			default: "lenient"
+			type: ["string"]
+		},
 	]
 	internal_failure_reasons: [
 		"`value` isn't a properly formatted key/value string",

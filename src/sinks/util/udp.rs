@@ -4,6 +4,7 @@ use crate::{
     buffers::Acker,
     config::SinkContext,
     dns,
+    event::Event,
     internal_events::{
         SocketEventsSent, SocketMode, UdpSendIncomplete, UdpSocketConnectionEstablished,
         UdpSocketConnectionFailed, UdpSocketError,
@@ -12,7 +13,6 @@ use crate::{
         util::{retries::ExponentialBackoff, StreamSink},
         Healthcheck, VectorSink,
     },
-    Event,
 };
 use async_trait::async_trait;
 use bytes::Bytes;
