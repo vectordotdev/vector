@@ -40,7 +40,7 @@ Examples of changes that do not require a RFC:
 
 ### Creating a RFC
 
-1. Create a new branch with the `rfcs/YYYY-MM-DD-issue#-title.md` file.
+1. Create a new branch, copy the [`rfcs/_YYYY-MM-DD-issue#-title.md`](rfcs/_YYYY-MM-DD-issue%23-title.md) template and rename/fill it in accordingly.
    * Example: `rfcs/2020-02-10-445-internal-observability.md`
 2. Submit your RFC as a pull request for discussion.
 3. At least 3 other team members must approve your RFC.

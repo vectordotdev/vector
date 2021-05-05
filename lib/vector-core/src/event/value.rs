@@ -200,6 +200,7 @@ impl TryInto<serde_json::Value> for Value {
     }
 }
 
+#[cfg(feature = "vrl")]
 impl From<vrl_core::Value> for Value {
     fn from(v: vrl_core::Value) -> Self {
         use vrl_core::Value::*;
@@ -218,6 +219,7 @@ impl From<vrl_core::Value> for Value {
     }
 }
 
+#[cfg(feature = "vrl")]
 impl From<Value> for vrl_core::Value {
     fn from(v: Value) -> Self {
         use vrl_core::Value::*;
