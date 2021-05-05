@@ -35,9 +35,9 @@ impl<'a> PathIter<'a> {
     }
 }
 
-/// The parsing is implemented using a state machine.
-/// The idea of using Rust enums to model states is taken from
-/// https://hoverbear.org/blog/rust-state-machine-pattern/ .
+/// The parsing is implemented using a state machine. The idea of using Rust
+/// enums to model states is taken from [Pretty State Machine Patterns in
+/// Rust](https://hoverbear.org/blog/rust-state-machine-pattern/).
 enum PathIterState<'a> {
     Start,
     Fast(std::str::Split<'a, char>),

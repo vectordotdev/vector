@@ -93,7 +93,7 @@ impl From<MetricKind> for vrl_core::Value {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, is_enum_variant)]
 #[serde(rename_all = "snake_case")]
-/// A MetricValue is the container for the actual value of a metric.
+/// A `MetricValue` is the container for the actual value of a metric.
 pub enum MetricValue {
     /// A Counter is a simple value that can not decrease except to
     /// reset it to zero.
@@ -303,7 +303,7 @@ impl Metric {
         }
     }
 
-    /// Convert the metrics_runtime::Measurement value plus the name and
+    /// Convert the `metrics_runtime::Measurement` value plus the name and
     /// labels from a Key into our internal Metric format.
     pub fn from_metric_kv(key: &metrics::Key, handle: &Handle) -> Self {
         let value = match handle {
@@ -419,7 +419,7 @@ impl MetricData {
         }
     }
 
-    /// Update this MetricData by adding the value from another.
+    /// Update this `MetricData` by adding the value from another.
     pub fn update(&mut self, other: &Self) {
         self.value.add(&other.value);
         // Update the timestamp to the latest one
@@ -654,7 +654,9 @@ impl MetricValue {
 impl Display for Metric {
     /// Display a metric using something like Prometheus' text format:
     ///
+    /// ```text
     /// TIMESTAMP NAMESPACE_NAME{TAGS} KIND DATA
+    /// ```
     ///
     /// TIMESTAMP is in ISO 8601 format with UTC time zone.
     ///

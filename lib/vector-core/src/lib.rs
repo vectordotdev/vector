@@ -14,7 +14,6 @@
 #![allow(clippy::approx_constant)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::missing_errors_doc)]
-#![allow(clippy::doc_markdown)]
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::cast_sign_loss)]
 #![allow(clippy::cast_possible_truncation)]
