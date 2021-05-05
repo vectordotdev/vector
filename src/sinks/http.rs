@@ -332,6 +332,7 @@ mod tests {
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};
     use std::sync::{atomic, Arc};
+    use vector_core::event::{BatchNotifier, BatchStatus};
 
     #[test]
     fn generate_config() {
@@ -498,7 +499,8 @@ mod tests {
 
         let (in_addr, sink) = build_sink("").await;
 
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
         let pump = tokio::spawn(sink.run(events));
 
         // This ordering starts the sender before the server has built
@@ -511,6 +513,8 @@ mod tests {
 
         pump.await.unwrap().unwrap();
         drop(trigger);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let output_lines = get_received(rx, |parts| {
             assert_eq!(Method::POST, parts.method);
@@ -544,13 +548,16 @@ mod tests {
             }
         });
 
-        let (input_lines, events) = random_lines_with_stream(100, NUM_LINES);
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(100, NUM_LINES, Some(batch));
         let pump = sink.run(events);
 
         tokio::spawn(server);
 
         pump.await.unwrap();
         drop(trigger);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let output_lines = get_received(rx, |parts| {
             assert_eq!(Method::POST, parts.method);
@@ -577,7 +584,8 @@ mod tests {
                 .unwrap_or_else(|_| unreachable!())
         });
 
-        let (_input_lines, events) = random_lines_with_stream(100, num_lines);
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (_input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
         let pump = sink.run(events);
 
         tokio::spawn(server);
@@ -585,8 +593,9 @@ mod tests {
         pump.await.unwrap();
         drop(trigger);
 
-        let output_lines = get_received(rx, |_| unreachable!("There should be no lines")).await;
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
 
+        let output_lines = get_received(rx, |_| unreachable!("There should be no lines")).await;
         assert!(output_lines.is_empty());
     }
 
@@ -614,13 +623,16 @@ mod tests {
         let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
         let pump = sink.run(events);
 
         tokio::spawn(server);
 
         pump.await.unwrap();
         drop(trigger);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let output_lines = rx
             .flat_map(|(parts, body)| {
@@ -667,12 +679,15 @@ mod tests {
 
         let (rx, trigger, server) = build_test_server(in_addr);
 
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));
         let pump = sink.run(events);
 
         tokio::spawn(server);
         pump.await.unwrap();
         drop(trigger);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let output_lines = get_received(rx, assert_parts).await;
 

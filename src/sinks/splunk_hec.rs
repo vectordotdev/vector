@@ -560,7 +560,7 @@ mod integration_tests {
         let config = config(Encoding::Text, vec![]).await;
         let (sink, _) = config.build(cx).await.unwrap();
 
-        let (messages, events) = random_lines_with_stream(100, 10);
+        let (messages, events) = random_lines_with_stream(100, 10, None);
         sink.run(events).await.unwrap();
 
         let mut found_all = false;

@@ -594,7 +594,7 @@ mod integration_tests {
         let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, events) = random_lines_with_stream(100, 10);
+        let (lines, events) = random_lines_with_stream(100, 10, None);
         sink.run(events).await.unwrap();
 
         let keys = get_keys(prefix.unwrap()).await;
@@ -624,7 +624,7 @@ mod integration_tests {
         let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, _events) = random_lines_with_stream(100, 30);
+        let (lines, _events) = random_lines_with_stream(100, 30, None);
 
         let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
             let mut e = Event::from(line);
@@ -669,7 +669,7 @@ mod integration_tests {
         let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, events) = random_lines_with_stream(100, 500);
+        let (lines, events) = random_lines_with_stream(100, 500, None);
         sink.run(events).await.unwrap();
 
         let keys = get_keys(prefix.unwrap()).await;

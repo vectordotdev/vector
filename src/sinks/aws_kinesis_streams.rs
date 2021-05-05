@@ -434,7 +434,7 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 
-        let (mut input_lines, events) = random_lines_with_stream(100, 11);
+        let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
         let mut events = events.map(Ok);
 
         let _ = sink.send_all(&mut events).await.unwrap();

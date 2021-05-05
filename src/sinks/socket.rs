@@ -161,7 +161,7 @@ mod test {
 
         let mut receiver = CountReceiver::receive_lines(addr);
 
-        let (lines, events) = random_lines_with_stream(10, 100);
+        let (lines, events) = random_lines_with_stream(10, 100, None);
         sink.run(events).await.unwrap();
 
         // Wait for output to connect
@@ -295,7 +295,7 @@ mod test {
                 .await;
         });
 
-        let (_, mut events) = random_lines_with_stream(10, 10);
+        let (_, mut events) = random_lines_with_stream(10, 10, None);
         while let Some(event) = events.next().await {
             let _ = sender.send(Some(event)).await.unwrap();
         }
@@ -317,7 +317,7 @@ mod test {
         assert_eq!(conn_counter.load(Ordering::SeqCst), 1);
 
         // Send another 10 events
-        let (_, mut events) = random_lines_with_stream(10, 10);
+        let (_, mut events) = random_lines_with_stream(10, 10, None);
         while let Some(event) = events.next().await {
             let _ = sender.send(Some(event)).await.unwrap();
         }
@@ -346,7 +346,7 @@ mod test {
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-        let (_, events) = random_lines_with_stream(1000, 10000);
+        let (_, events) = random_lines_with_stream(1000, 10000, None);
         let _ = tokio::spawn(sink.run(events));
 
         // First listener

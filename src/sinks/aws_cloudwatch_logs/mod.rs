@@ -893,7 +893,7 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, events) = random_lines_with_stream(100, 11);
+        let (input_lines, events) = random_lines_with_stream(100, 11, None);
         sink.run(events).await.unwrap();
 
         let request = GetLogEventsRequest {
@@ -940,7 +940,7 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
-        let (mut input_lines, events) = random_lines_with_stream(100, 11);
+        let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
 
         // add a historical timestamp to all but the first event, to simulate
         // out-of-order timestamps.
@@ -1078,7 +1078,7 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, events) = random_lines_with_stream(100, 11);
+        let (input_lines, events) = random_lines_with_stream(100, 11, None);
         sink.run(events).await.unwrap();
 
         let request = GetLogEventsRequest {
@@ -1130,7 +1130,7 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, events) = random_lines_with_stream(100, 11);
+        let (input_lines, events) = random_lines_with_stream(100, 11, None);
         let mut events = events.map(Ok);
         let _ = sink.into_sink().send_all(&mut events).await.unwrap();
 
@@ -1178,7 +1178,7 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, _events) = random_lines_with_stream(100, 10);
+        let (input_lines, _events) = random_lines_with_stream(100, 10, None);
 
         let events = input_lines
             .clone()

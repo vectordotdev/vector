@@ -351,7 +351,7 @@ mod integration_tests {
 
         let mut sink = SqsSink::new(config, cx, client.clone()).unwrap();
 
-        let (mut input_lines, events) = random_lines_with_stream(100, 10);
+        let (mut input_lines, events) = random_lines_with_stream(100, 10, None);
         sink.send_all(&mut events.map(Ok)).await.unwrap();
 
         sleep(Duration::from_secs(1)).await;

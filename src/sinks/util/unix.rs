@@ -211,7 +211,7 @@ mod tests {
             .unwrap();
 
         // Send the test data
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let (input_lines, events) = random_lines_with_stream(100, num_lines, None);
         sink.run(events).await.unwrap();
 
         // Wait for output to connect
