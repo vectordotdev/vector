@@ -3,7 +3,7 @@ use crate::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::Event,
+    event::{Event, EventMetadata},
     sources::{
         self,
         util::{decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig},
@@ -98,13 +98,14 @@ impl HttpSource for DatadogLogsSource {
         let api_key = extract_api_key(&header_map, request_path);
 
         decode_body(body, Encoding::Json).map(|mut events| {
-            // Add source type & Datadog API key
+            // Datadog API key in metadat & source type field
             let key = log_schema().source_type_key();
             for event in &mut events {
                 let log = event.as_mut_log();
                 log.try_insert(key, Bytes::from("datadog_logs"));
                 if let Some(k) = &api_key {
-                    log.insert("dd_api_key", k.clone());
+                    log.metadata_mut()
+                        .merge(EventMetadata::with_datadog_api_key(k.clone()));
                 }
             }
             events
