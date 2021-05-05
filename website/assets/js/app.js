@@ -105,4 +105,4 @@ const main = () => {
   showCodeFilename();
 }
 
-document.addEventListener("DOMContentLoaded", main());
+main();

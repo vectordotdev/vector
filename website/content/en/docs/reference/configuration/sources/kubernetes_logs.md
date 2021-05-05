@@ -6,10 +6,6 @@ kind: source
 
 The `kubernetes_logs` source enriches log data with Kubernetes metadata via the Kubernetes API.
 
-## Requirements
-
-{{< component/requirements >}}
-
 ## Setup
 
 The `kubernetes_logs` source is part of a larger setup strategy for the Kubernetes platform.
