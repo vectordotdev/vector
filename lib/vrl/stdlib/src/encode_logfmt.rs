@@ -96,7 +96,7 @@ fn encode_string(output: &mut String, str: &str) {
 
     for c in str.chars() {
         match c {
-            '\\' => output.write_str("\\").unwrap(),
+            '\\' => output.write_str(r#"\\"#).unwrap(),
             '"' => output.write_str(r#"\""#).unwrap(),
             '\n' => output.write_str(r#"\\n"#).unwrap(),
             _ => output.write_char(c).unwrap(),
@@ -175,7 +175,7 @@ pub fn encode(input: BTreeMap<String, Value>, fields: &[String]) -> String {
         output.write_char(' ').unwrap();
     }
 
-    if output.ends_with(" ") {
+    if output.ends_with(' ') {
         output.truncate(output.len() - 1)
     }
 
@@ -225,9 +225,10 @@ mod tests {
             args: func_args![value:
                 btreemap! {
                     "lvl" => "info",
-                    "msg" => r#"payload: {"code": 200}\n"#
+                    "msg" => r#"payload: {"code": 200}\n"#,
+                    "another_field" => "some\nfield\\and things"
                 }],
-            want: Ok(r#"lvl=info msg="payload: {\"code\": 200}\\n""#),
+            want: Ok(r#"another_field="some\\nfield\\and things" lvl=info msg="payload: {\"code\": 200}\\n""#),
             tdef: TypeDef::new().bytes().fallible(),
         }
 
