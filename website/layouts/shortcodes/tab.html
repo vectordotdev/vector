@@ -1,8 +1,8 @@
 {{ $title := .Params.title }}
 {{ $slug := .Params.title | urlize }}
 {{ $.Page.Scratch.SetInMap "tabs" $slug .Inner }}
-<li :class="{ 'is-active': selected === '{{ $slug }}' }">
-  <a class="has-text-weight-bold" @click="selected = '{{ $slug }}'">
+<div :class="{ 'text-gray-100 bg-dark dark:bg-black': selected === '{{ $slug }}' }" class="cursor-pointer py-1.5 px-2.5 rounded text-base dark:text-gray-100">
+  <span @click="selected = '{{ $slug }}'">
 {{ $title }}
-  </a>
-</li>
+  </span>
+</div>

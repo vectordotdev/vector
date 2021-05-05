@@ -3,16 +3,14 @@
 {{ end }}
 
 {{ $default := .Params.default | urlize }}
-<div x-data="{ selected: '{{ $default }}' }" class="tab-container">
-  <div class="tabs is-boxed is-fullwidth">
-<ul>
-{{ .Inner }}
-</ul>
+<div x-data="{ selected: '{{ $default }}' }" class="no-prose border rounded-md p-5 dark:border-gray-700">
+  <div class="flex space-x-3 mb-3">
+    {{ .Inner }}
   </div>
 
   {{ range $k, $v := $.Page.Scratch.Get "tabs" }}
   <div x-show="selected === '{{ $k }}'">
-{{ $v | $.Page.RenderString }}
+    {{ $v | $.Page.RenderString }}
   </div>
   {{ end }}
 </div>
