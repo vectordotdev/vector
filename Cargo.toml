@@ -110,7 +110,7 @@ tokio-stream = { version = "0.1.5", default-features = false, features = ["net",
 tokio-util = { version = "0.6.6", default-features = false, features = ["codec", "time"] }
 
 # Tracing
-tracing = { version = "0.1.25", default-features = false }
+tracing = { version = "0.1.26", default-features = false }
 tracing-core = { version = "0.1.18", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-01", "futures-03"] }
 tracing-log = { version = "0.1.2", default-features = false }
