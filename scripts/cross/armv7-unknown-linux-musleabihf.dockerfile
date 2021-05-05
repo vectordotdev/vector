@@ -1,4 +1,4 @@
 FROM docker.io/rustembedded/cross:armv7-unknown-linux-musleabihf
 
-COPY bootstrap.sh .
-RUN ./bootstrap.sh
+COPY bootstrap-ubuntu.sh .
+RUN ./bootstrap-ubuntu.sh
