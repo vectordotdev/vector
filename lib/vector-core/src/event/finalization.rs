@@ -105,7 +105,7 @@ impl EventFinalizer {
         let status = self
             .status
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |_| {
-                Some(EventStatus::NoOp)
+                Some(EventStatus::Recorded)
             })
             .unwrap_or_else(|_| unreachable!());
         self.batch.update_status(status);
@@ -198,7 +198,7 @@ pub enum EventStatus {
     /// At least one copy of this event failed to be delivered.
     Failed,
     /// This status has been recorded and should not be updated.
-    NoOp,
+    Recorded,
 }
 
 // Can be dropped when this issue is closed:
@@ -209,12 +209,12 @@ impl EventStatus {
     /// Update this status with another event's finalization status and return the result.
     pub fn update(self, status: Self) -> Self {
         match (self, status) {
-            // NoOp always overwrites existing status.
-            (_, Self::NoOp) => status,
+            // Recorded always overwrites existing status.
+            (_, Self::Recorded) => status,
             // Dropped always updates to the new status.
             (Self::Dropped, _) => status,
-            // NoOp is never updated.
-            (Self::NoOp, _) => self,
+            // Recorded is never updated.
+            (Self::Recorded, _) => self,
             // Delivered may update to `Failed`, but not to `Dropped`.
             (Self::Delivered, Self::Dropped) => self,
             (Self::Delivered, _) => status,
