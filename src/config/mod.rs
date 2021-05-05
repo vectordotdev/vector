@@ -26,7 +26,6 @@ pub mod component;
 mod diff;
 pub mod format;
 mod loading;
-mod log_schema;
 pub mod provider;
 mod unit_test;
 mod validation;
