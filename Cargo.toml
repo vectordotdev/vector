@@ -651,7 +651,24 @@ cli-tests = ["sinks-blackhole", "sinks-socket", "sources-generator", "sources-fi
 
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions
-benches = ["leveldb", "rdkafka-plain", "sinks", "sources", "transforms", "unix", "vendor-all"]
+benches = [
+  "leveldb",
+  "sinks-file",
+  "sinks-http",
+  "sinks-socket",
+  "sources-file",
+  "sources-socket",
+  "sources-syslog",
+  "transforms-add_fields",
+  "transforms-coercer",
+  "transforms-field_filter",
+  "transforms-json_parser",
+  "transforms-lua",
+  "transforms-rename_fields",
+  "transforms-regex_parser",
+  "transforms-sample",
+  "transforms-split",
+]
 language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "transforms-json_parser", "transforms-lua", "transforms-regex_parser", "transforms-remap", "transforms-wasm"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
 statistic-benches = []
@@ -662,40 +679,48 @@ wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-
 [[bench]]
 name = "default"
 harness = false
+test = true
 required-features = ["benches"]
 
 [[bench]]
 name = "wasm"
 path = "benches/wasm/mod.rs"
 harness = false
+test = true
 required-features = ["wasm-benches"]
 
 [[bench]]
 name = "remap"
 harness = false
+test = true
 required-features = ["remap-benches"]
 
 [[bench]]
 name = "languages"
 harness = false
+test = true
 required-features = ["language-benches"]
 
 [[bench]]
 name = "metrics_on"
 harness = false
+test = true
 required-features = ["metrics-benches"]
 
 [[bench]]
 name = "metrics_no_tracing_integration"
 harness = false
+test = true
 required-features = ["metrics-benches"]
 
 [[bench]]
 name = "metrics_off"
 harness = false
+test = true
 required-features = ["metrics-benches"]
 
 [[bench]]
 name = "distribution_statistic"
 harness = false
+test = true
 required-features = ["statistic-benches"]
