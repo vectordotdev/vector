@@ -226,9 +226,10 @@ mod tests {
                 btreemap! {
                     "lvl" => "info",
                     "msg" => r#"payload: {"code": 200}\n"#,
-                    "another_field" => "some\nfield\\and things"
+                    "another_field" => "some\nfield\\and things",
+                    "space key" => "foo"
                 }],
-            want: Ok(r#"another_field="some\\nfield\\and things" lvl=info msg="payload: {\"code\": 200}\\n""#),
+            want: Ok(r#"another_field="some\\nfield\\and things" lvl=info msg="payload: {\"code\": 200}\\n" "space key"=foo"#),
             tdef: TypeDef::new().bytes().fallible(),
         }
 
