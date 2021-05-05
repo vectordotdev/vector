@@ -78,6 +78,8 @@ struct DatadogRequest<T> {
 impl DatadogConfig {
     fn get_endpoint(&self) -> String {
         self.endpoint.clone().unwrap_or_else(|| {
+            // Follow the official Datadog agent convention:
+            // <sender-id>.agent.<site>
             let version = str::replace(crate::built_info::PKG_VERSION, ".", "-");
             format!("https://{}-vector.agent.{}", version, &self.get_site())
         })
