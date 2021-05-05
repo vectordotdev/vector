@@ -3,24 +3,26 @@ package metadata
 remap: functions: encode_logfmt: {
 	category: "Codec"
 	description: """
-		Encodes the `value` to logfmt.
+		Encodes the `value` to [logfmt](\#(urls.logfmt)).
 		"""
 
 	arguments: [
 		{
 			name:        "value"
-			description: "The value to convert to a JSON string."
+			description: "The value to convert to a logfmt string."
 			required:    true
 			type: ["object"]
 		},
         {
             name:        "fields_ordering"
-            description: "The ordering of fields to preserve."
+            description: "The ordering of fields to preserve. Any fields not in this list will appear unordered, after any ordered fields."
             required: false
             type: ["array"]
         },
 	]
-	internal_failure_reasons: []
+	internal_failure_reasons: [
+        "`fields_ordering` contains a non-string element"
+    ]
 	return: types: ["string"]
 
 	examples: [
