@@ -23,6 +23,7 @@
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::default_trait_access)]
 #![allow(clippy::enum_glob_use)]
+#![allow(clippy::unnested_or_patterns)]
 
 #[cfg(feature = "api")]
 pub mod api;
