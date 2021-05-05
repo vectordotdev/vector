@@ -14,10 +14,10 @@ dashmap = { version = "4", default-features = false }
 
 [dev-dependencies]
 criterion = "0.3"
-tracing = "0.1.25"
+tracing = "0.1.26"
 mock_instant = { version = "0.2" }
 
 [[bench]]
 name = "limit"
-test = true
 harness = false
+test = true

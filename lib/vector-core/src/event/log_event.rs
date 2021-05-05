@@ -9,6 +9,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
 use getset::{Getters, MutGetters};
+#[cfg(feature = "vrl")]
 use lookup::LookupBuf;
 use serde::{Deserialize, Serialize, Serializer};
 use shared::EventDataEq;
@@ -354,6 +355,7 @@ impl Serialize for LogEvent {
     }
 }
 
+#[cfg(feature = "vrl")]
 impl vrl_core::Target for LogEvent {
     fn get(&self, path: &LookupBuf) -> Result<Option<vrl_core::Value>, String> {
         if path.is_root() {

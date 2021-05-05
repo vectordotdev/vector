@@ -278,12 +278,7 @@ cross-image-%:
 
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --quiet --workspace --no-fail-fast --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE}
-
-.PHONY: test-benches
-test-benches: ## Run benchmarks in debug mode to trigger debug_assertions
-test-benches: export DEFAULT_FEATURES:="benches metrics-benches remap-benches"
-test-benches: test
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --quiet --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES} metrics-benches remap-benches statistic-benches benches" ${SCOPE}
 
 .PHONY: test-all
 test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
@@ -588,7 +583,7 @@ check-all: check-kubernetes-yaml
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-features.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --each-feature --exclude-features "sources-utils-http sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp"
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
