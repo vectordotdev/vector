@@ -72,6 +72,7 @@ fn compare_number_types(
 }
 
 impl Function for Arithmetic {
+    #[allow(clippy::too_many_lines)]
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let left = match self.left.execute(ctx)? {
             QueryValue::Value(value) => value,

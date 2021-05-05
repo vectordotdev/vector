@@ -541,6 +541,7 @@ impl Value {
             })
     }
 
+    #[allow(clippy::too_many_lines)]
     fn insert_array(
         i: isize,
         mut working_lookup: LookupBuf,
@@ -554,8 +555,8 @@ impl Value {
         };
 
         let item = if index.is_negative() {
-            // A negative index is greater than the length of the array, so we are trying to
-            // set an index that doesn't yet exist.
+            // A negative index is greater than the length of the array, so we
+            // are trying to set an index that doesn't yet exist.
             None
         } else {
             array.get_mut(index as usize)
@@ -773,6 +774,7 @@ impl Value {
     /// assert_eq!(map.remove(lookup_key, true).unwrap(), Some(Value::from(1)));
     /// assert!(!map.contains("star"));
     /// ```
+    #[allow(clippy::too_many_lines)]
     pub fn remove<'a>(
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
