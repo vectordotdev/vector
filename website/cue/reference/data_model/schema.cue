@@ -1,40 +1,7 @@
 package metadata
 
 data_model: schema: {
-	log: {
-		common: true
-		description: """
-			A Vector log event is a structured representation of a
-			point-in-time event. It contains an arbitrary set of
-			fields that describe the event.
-
-			A key tenet of Vector is to remain schema neutral. This
-			ensures that Vector can work with any schema, supporting
-			legacy and future schemas as your needs evolve. Vector
-			does not require any specific fields, and each component
-			will document the fields it provides.
-			"""
-		required: false
-		warnings: []
-		type: object: {
-			examples: [
-				{
-					"host":      "my.host.com"
-					"message":   "Hello world"
-					"timestamp": "2020-11-01T21:15:47+00:00"
-					"custom":    "field"
-				},
-			]
-			options: {
-				"*": {
-					common:      true
-					description: "An arbitrary set of key/value pairs that can be infinitely nested."
-					required:    false
-					type: "*": {}
-				}
-			}
-		}
-	}
+	// Log events are described as text in /docs/about/under-the-hood/architecture/data-model/log
 
 	metric: {
 		common: true
@@ -60,9 +27,7 @@ data_model: schema: {
 				counter: {
 					common: true
 					description: """
-						A single value that can only be incremented
-						or reset to zero value, it cannot be
-						decremented.
+						A single value that can be incremented or reset to a zero value but *not* decremented.
 						"""
 					required: false
 					warnings: []

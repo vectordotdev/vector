@@ -192,7 +192,7 @@ vector --config /etc/vector/vector.json
 ### Advanced
 
 {{< jump "/docs/reference/configuration/global-options" >}}
-{{< jump "/docs/reference/configuration/unit-tests" >}}
+{{< jump "/docs/reference/configuration/tests" >}}
 {{< jump "/docs/reference/configuration/template-syntax" >}}
 
 ## How it works
