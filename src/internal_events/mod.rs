@@ -37,6 +37,8 @@ mod dedupe;
 mod docker_logs;
 mod elasticsearch;
 mod encoding_transcode;
+#[cfg(feature = "sources-exec")]
+mod exec;
 #[cfg(feature = "transforms-filter")]
 mod filter;
 #[cfg(feature = "sources-generator")]
@@ -54,7 +56,7 @@ pub mod http_client;
 mod journald;
 #[cfg(feature = "transforms-json_parser")]
 mod json_parser;
-#[cfg(feature = "sources-kafka")]
+#[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 mod kafka;
 #[cfg(feature = "transforms-key_value_parser")]
 mod key_value_parser;
@@ -156,6 +158,8 @@ pub(crate) use self::dedupe::*;
 pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
 pub use self::encoding_transcode::*;
+#[cfg(feature = "sources-exec")]
+pub use self::exec::*;
 #[cfg(any(
     feature = "sources-file",
     feature = "sources-kubernetes-logs",
@@ -179,7 +183,7 @@ pub(crate) use self::http::*;
 pub(crate) use self::journald::*;
 #[cfg(feature = "transforms-json_parser")]
 pub(crate) use self::json_parser::*;
-#[cfg(feature = "sources-kafka")]
+#[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 pub use self::kafka::*;
 #[cfg(feature = "transforms-key_value_parser")]
 pub(crate) use self::key_value_parser::*;

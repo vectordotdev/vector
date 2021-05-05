@@ -162,14 +162,14 @@ impl SplunkSource {
             .and(path!("event").or(path!("event" / "1.0")))
             .and(self.authorization())
             .and(splunk_channel)
-            .and(warp::header::optional::<String>("host"))
+            .and(warp::addr::remote())
             .and(self.gzip())
             .and(warp::body::bytes())
             .and_then(
                 move |_,
                       _,
                       channel: Option<String>,
-                      host: Option<String>,
+                      remote: Option<SocketAddr>,
                       gzip: bool,
                       body: Bytes| {
                     let mut out = out
@@ -182,7 +182,7 @@ impl SplunkSource {
                             Box::new(body.reader())
                         };
 
-                        let events = stream::iter(EventIterator::new(reader, channel, host));
+                        let events = stream::iter(EventIterator::new(reader, channel, remote));
 
                         // `fn send_all` can be used once https://github.com/rust-lang/futures-rs/issues/2402
                         // is resolved.
@@ -215,15 +215,20 @@ impl SplunkSource {
             .and(path!("raw" / "1.0").or(path!("raw")))
             .and(self.authorization())
             .and(splunk_channel)
-            .and(warp::header::optional::<String>("host"))
+            .and(warp::addr::remote())
             .and(self.gzip())
             .and(warp::body::bytes())
             .and_then(
-                move |_, _, channel: String, host: Option<String>, gzip: bool, body: Bytes| {
+                move |_,
+                      _,
+                      channel: String,
+                      remote: Option<SocketAddr>,
+                      gzip: bool,
+                      body: Bytes| {
                     let out = out.clone();
                     async move {
                         // Construct event parser
-                        let event = future::ready(raw_event(body, gzip, channel, host));
+                        let event = future::ready(raw_event(body, gzip, channel, remote));
                         futures::stream::once(event)
                             .forward(
                                 out.sink_map_err(|_| Rejection::from(ApiError::ServerShutdown)),
@@ -327,14 +332,18 @@ struct EventIterator<R: Read> {
 }
 
 impl<R: Read> EventIterator<R> {
-    fn new(data: R, channel: Option<String>, host: Option<String>) -> Self {
+    fn new(data: R, channel: Option<String>, remote: Option<SocketAddr>) -> Self {
         EventIterator {
             data,
             events: 0,
             channel: channel.map(Value::from),
             time: Time::Now(Utc::now()),
             extractors: [
-                DefaultExtractor::new_with("host", log_schema().host_key(), host.map(Value::from)),
+                DefaultExtractor::new_with(
+                    "host",
+                    log_schema().host_key(),
+                    remote.map(|addr| addr.to_string()).map(Value::from),
+                ),
                 DefaultExtractor::new("index", &INDEX),
                 DefaultExtractor::new("source", &SOURCE),
                 DefaultExtractor::new("sourcetype", &SOURCETYPE),
@@ -570,7 +579,7 @@ fn raw_event(
     bytes: Bytes,
     gzip: bool,
     channel: String,
-    host: Option<String>,
+    remote: Option<SocketAddr>,
 ) -> Result<Event, Rejection> {
     // Process gzip
     let message: Value = if gzip {
@@ -598,8 +607,8 @@ fn raw_event(
     log.insert(CHANNEL, channel);
 
     // Add host
-    if let Some(host) = host {
-        log.insert(log_schema().host_key(), host);
+    if let Some(remote) = remote {
+        log.insert(log_schema().host_key(), remote.to_string());
     }
 
     // Add timestamp
@@ -1196,5 +1205,24 @@ mod tests {
         }
 
         assert!(parse_timestamp(-1).is_none());
+    }
+
+    /// This test will fail once `warp` crate fixes support for
+    /// custom connection listener, at that point this test can be
+    /// modified to pass.
+    /// https://github.com/timberio/vector/issues/7097
+    /// https://github.com/seanmonstar/warp/issues/830
+    /// https://github.com/seanmonstar/warp/pull/713
+    #[tokio::test]
+    async fn host_test() {
+        trace_init();
+
+        let message = "for the host";
+        let (sink, source) = start(Encoding::Text, Compression::gzip_default()).await;
+
+        let event = channel_n(vec![message], sink, source).await.remove(0);
+
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert!(event.as_log().get(log_schema().host_key()).is_none());
     }
 }

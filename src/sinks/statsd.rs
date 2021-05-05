@@ -356,7 +356,7 @@ mod test {
             "distribution",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![1.5 => 1],
+                samples: vector_core::samples![1.5 => 1],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -420,7 +420,7 @@ mod test {
                     "histogram",
                     MetricKind::Incremental,
                     MetricValue::Distribution {
-                        samples: crate::samples![2.0 => 100],
+                        samples: vector_core::samples![2.0 => 100],
                         statistic: StatisticKind::Histogram,
                     },
                 )

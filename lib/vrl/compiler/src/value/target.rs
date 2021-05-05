@@ -1,20 +1,19 @@
-use crate::{
-    path::{Field, Segment, Segment::*},
-    Path, Target, Value,
-};
+use crate::{Target, Value};
+use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use std::collections::BTreeMap;
+use std::iter::Peekable;
 
 impl Target for Value {
-    fn insert(&mut self, path: &Path, value: Value) -> Result<(), String> {
+    fn insert(&mut self, path: &LookupBuf, value: Value) -> Result<(), String> {
         self.insert_by_path(path, value);
         Ok(())
     }
 
-    fn get(&self, path: &Path) -> Result<Option<Value>, String> {
+    fn get(&self, path: &LookupBuf) -> Result<Option<Value>, String> {
         Ok(self.get_by_path(path).cloned())
     }
 
-    fn remove(&mut self, path: &Path, compact: bool) -> Result<Option<Value>, String> {
+    fn remove(&mut self, path: &LookupBuf, compact: bool) -> Result<Option<Value>, String> {
         let value = self.get(path)?;
         self.remove_by_path(path, compact);
 
@@ -33,11 +32,12 @@ impl Value {
     ///    value:
     ///
     ///    ```rust
-    ///    # use vrl_compiler::{Path, Value};
+    ///    # use vrl_compiler::Value;
+    ///    # use lookup::LookupBuf;
     ///    # use std::str::FromStr;
     ///
     ///    let value = Value::Boolean(true);
-    ///    let path = Path::from_str(".").unwrap();
+    ///    let path = LookupBuf::root();
     ///
     ///    assert_eq!(value.get_by_path(&path), Some(&Value::Boolean(true)))
     ///    ```
@@ -47,11 +47,12 @@ impl Value {
     ///    `None`:
     ///
     ///    ```rust
-    ///    # use vrl_compiler::{Path, Value};
+    ///    # use vrl_compiler::Value;
+    ///    # use lookup::LookupBuf;
     ///    # use std::str::FromStr;
     ///
     ///    let value = Value::Array(vec![false.into(), true.into()]);
-    ///    let path = Path::from_str(".[1]").unwrap();
+    ///    let path = LookupBuf::from_str("[1]").unwrap();
     ///
     ///    assert_eq!(value.get_by_path(&path), Some(&Value::Boolean(true)))
     ///    ```
@@ -61,26 +62,27 @@ impl Value {
     ///    exists:
     ///
     ///    ```rust
-    ///    # use vrl_compiler::{Path, Value};
+    ///    # use vrl_compiler::Value;
+    ///    # use lookup::LookupBuf;
     ///    # use std::str::FromStr;
     ///    # use std::collections::BTreeMap;
     ///    # use std::iter::FromIterator;
     ///
     ///    let map = BTreeMap::from_iter(vec![("foo".to_owned(), true.into())].into_iter());
     ///    let value = Value::Object(map);
-    ///    let path = Path::from_str(".foo").unwrap();
+    ///    let path = LookupBuf::from_str("foo").unwrap();
     ///
     ///    assert_eq!(value.get_by_path(&path), Some(&Value::Boolean(true)))
     ///    ```
     ///
-    pub fn get_by_path(&self, path: &Path) -> Option<&Value> {
-        self.get_by_segments(path.segments())
+    pub fn get_by_path(&self, path: &LookupBuf) -> Option<&Value> {
+        self.get_by_segments(path.as_segments().iter())
     }
 
     /// Similar to [`Value::get_by_path`], but returns a mutable reference to
     /// the value.
-    pub fn get_by_path_mut(&mut self, path: &Path) -> Option<&mut Value> {
-        self.get_by_segments_mut(path.segments())
+    pub fn get_by_path_mut(&mut self, path: &LookupBuf) -> Option<&mut Value> {
+        self.get_by_segments_mut(path.as_segments().iter())
     }
 
     /// Insert a value, given the provided path.
@@ -90,7 +92,8 @@ impl Value {
     /// ## Insert At Field
     ///
     /// ```
-    /// # use vrl_compiler::{Path, Value};
+    /// # use vrl_compiler::Value;
+    /// # use lookup::LookupBuf;
     /// # use std::str::FromStr;
     /// # use std::collections::BTreeMap;
     /// # use std::iter::FromIterator;
@@ -99,7 +102,7 @@ impl Value {
     /// let map = BTreeMap::from_iter(fields.into_iter());
     ///
     /// let mut value = Value::Object(map);
-    /// let path = Path::from_str(".foo").unwrap();
+    /// let path = LookupBuf::from_str(".foo").unwrap();
     ///
     /// value.insert_by_path(&path, true.into());
     ///
@@ -112,24 +115,25 @@ impl Value {
     /// ## Insert Into Array
     ///
     /// ```
-    /// # use vrl_compiler::{value, Path, Value};
+    /// # use vrl_compiler::{value, Value};
+    /// # use lookup::LookupBuf;
     /// # use std::str::FromStr;
     /// # use std::collections::BTreeMap;
     /// # use std::iter::FromIterator;
     ///
     /// let mut value = value!([false, true]);
-    /// let path = Path::from_str(".[1].foo").unwrap();
+    /// let path = LookupBuf::from_str("[1].foo").unwrap();
     ///
     /// value.insert_by_path(&path, "bar".into());
     ///
     /// assert_eq!(
-    ///     value.get_by_path(&Path::from_str(".").unwrap()),
+    ///     value.get_by_path(&LookupBuf::root()),
     ///     Some(&value!([false, {foo: "bar"}])),
     /// )
     /// ```
     ///
-    pub fn insert_by_path(&mut self, path: &Path, new: Value) {
-        self.insert_by_segments(path.segments(), new)
+    pub fn insert_by_path(&mut self, path: &LookupBuf, new: Value) {
+        self.insert_by_segments(path.as_segments().iter().peekable(), new)
     }
 
     /// Remove a value, given the provided path.
@@ -143,28 +147,33 @@ impl Value {
     /// If the `compact` argument is set to `true`, then any `Array` or `Object`
     /// that had one of its elements removed and is now empty, is removed as
     /// well.
-    pub fn remove_by_path(&mut self, path: &Path, compact: bool) {
-        self.remove_by_segments(path.segments(), compact)
+    pub fn remove_by_path(&mut self, path: &LookupBuf, compact: bool) {
+        self.remove_by_segments(path.as_segments().iter().peekable(), compact)
     }
 
-    fn get_by_segments(&self, segments: &[Segment]) -> Option<&Value> {
-        let (segment, next) = match segments.split_first() {
-            Some(segments) => segments,
+    fn get_by_segments<'a, T>(&self, mut segments: T) -> Option<&Value>
+    where
+        T: Iterator<Item = &'a SegmentBuf>,
+    {
+        let segment = match segments.next() {
+            Some(segment) => segment,
             None => return Some(self),
         };
 
         self.get_by_segment(segment)
-            .and_then(|value| value.get_by_segments(next))
+            .and_then(|value| value.get_by_segments(segments))
     }
 
-    fn get_by_segment(&self, segment: &Segment) -> Option<&Value> {
+    fn get_by_segment(&self, segment: &SegmentBuf) -> Option<&Value> {
         match segment {
-            Field(field) => self.as_object().and_then(|map| map.get(field.as_str())),
-            Coalesce(fields) => self
+            SegmentBuf::Field(FieldBuf { name, .. }) => {
+                self.as_object().and_then(|map| map.get(name.as_str()))
+            }
+            SegmentBuf::Coalesce(fields) => self
                 .as_object()
                 .and_then(|map| fields.iter().find_map(|field| map.get(field.as_str()))),
-            Index(index) => self.as_array().and_then(|array| {
-                let len = array.len() as i64;
+            SegmentBuf::Index(index) => self.as_array().and_then(|array| {
+                let len = array.len() as isize;
                 if *index >= len || index.abs() > len {
                     return None;
                 }
@@ -176,29 +185,32 @@ impl Value {
         }
     }
 
-    fn get_by_segments_mut(&mut self, segments: &[Segment]) -> Option<&mut Value> {
-        let (segment, next) = match segments.split_first() {
+    fn get_by_segments_mut<'a, T>(&mut self, mut segments: T) -> Option<&mut Value>
+    where
+        T: Iterator<Item = &'a SegmentBuf>,
+    {
+        let segment = match segments.next() {
             Some(segments) => segments,
             None => return Some(self),
         };
 
         self.get_by_segment_mut(segment)
-            .and_then(|value| value.get_by_segments_mut(next))
+            .and_then(|value| value.get_by_segments_mut(segments))
     }
 
-    fn get_by_segment_mut(&mut self, segment: &Segment) -> Option<&mut Value> {
+    fn get_by_segment_mut(&mut self, segment: &SegmentBuf) -> Option<&mut Value> {
         match segment {
-            Field(field) => self
+            SegmentBuf::Field(FieldBuf { name, .. }) => self
                 .as_object_mut()
-                .and_then(|map| map.get_mut(field.as_str())),
-            Coalesce(fields) => self.as_object_mut().and_then(|map| {
+                .and_then(|map| map.get_mut(name.as_str())),
+            SegmentBuf::Coalesce(fields) => self.as_object_mut().and_then(|map| {
                 fields
                     .iter()
                     .find(|field| map.contains_key(field.as_str()))
                     .and_then(move |field| map.get_mut(field.as_str()))
             }),
-            Index(index) => self.as_array_mut().and_then(|array| {
-                let len = array.len() as i64;
+            SegmentBuf::Index(index) => self.as_array_mut().and_then(|array| {
+                let len = array.len() as isize;
                 if *index >= len || index.abs() > len {
                     return None;
                 }
@@ -210,8 +222,11 @@ impl Value {
         }
     }
 
-    fn remove_by_segments(&mut self, segments: &[Segment], compact: bool) {
-        let (segment, next) = match segments.split_first() {
+    fn remove_by_segments<'a, T>(&mut self, mut segments: Peekable<T>, compact: bool)
+    where
+        T: Iterator<Item = &'a SegmentBuf> + Clone,
+    {
+        let segment = match segments.next() {
             Some(segments) => segments,
             None => {
                 return match self {
@@ -222,12 +237,12 @@ impl Value {
             }
         };
 
-        if next.is_empty() {
+        if segments.peek().is_none() {
             return self.remove_by_segment(segment);
         }
 
         if let Some(value) = self.get_by_segment_mut(segment) {
-            value.remove_by_segments(next, compact);
+            value.remove_by_segments(segments, compact);
 
             match value {
                 Value::Object(v) if compact & v.is_empty() => self.remove_by_segment(segment),
@@ -237,13 +252,13 @@ impl Value {
         }
     }
 
-    fn remove_by_segment(&mut self, segment: &Segment) {
+    fn remove_by_segment(&mut self, segment: &SegmentBuf) {
         match segment {
-            Field(field) => self
+            SegmentBuf::Field(FieldBuf { name, .. }) => self
                 .as_object_mut()
-                .and_then(|map| map.remove(field.as_str())),
+                .and_then(|map| map.remove(name.as_str())),
 
-            Coalesce(fields) => fields
+            SegmentBuf::Coalesce(fields) => fields
                 .iter()
                 .find(|field| {
                     self.as_object()
@@ -254,9 +269,8 @@ impl Value {
                     self.as_object_mut()
                         .and_then(|map| map.remove(field.as_str()))
                 }),
-
-            Index(index) => self.as_array_mut().and_then(|array| {
-                let len = array.len() as i64;
+            SegmentBuf::Index(index) => self.as_array_mut().and_then(|array| {
+                let len = array.len() as isize;
                 if *index >= len || index.abs() > len {
                     return None;
                 }
@@ -268,9 +282,12 @@ impl Value {
         };
     }
 
-    fn insert_by_segments(&mut self, segments: &[Segment], new: Value) {
-        let (segment, rest) = match segments.split_first() {
-            Some(segments) => segments,
+    fn insert_by_segments<'a, T>(&mut self, mut segments: Peekable<T>, new: Value)
+    where
+        T: Iterator<Item = &'a SegmentBuf> + Clone,
+    {
+        let segment = match segments.peek() {
+            Some(segment) => segment,
             None => return *self = new,
         };
 
@@ -279,19 +296,26 @@ impl Value {
         // match the requested segment, we'll update the value to match and
         // continue on, until we're able to assign the final `new` value.
         match self.get_by_segment_mut(segment) {
-            Some(value) => value.insert_by_segments(rest, new),
+            Some(value) => {
+                // We have already consumed this element via a peek.
+                let _ = segments.next();
+                value.insert_by_segments(segments, new)
+            }
             None => self.update_by_segments(segments, new),
         };
     }
 
-    fn update_by_segments(&mut self, segments: &[Segment], new: Value) {
-        let (segment, rest) = match segments.split_first() {
+    fn update_by_segments<'a, T>(&mut self, mut segments: Peekable<T>, new: Value)
+    where
+        T: Iterator<Item = &'a SegmentBuf> + Clone,
+    {
+        let segment = match segments.next() {
             Some(segments) => segments,
             None => return,
         };
 
-        let mut handle_field = |field: &Field, new| {
-            let key = field.as_str().to_owned();
+        let mut handle_field = |field: &str, new, mut segments: Peekable<T>| {
+            let key = field.to_owned();
 
             // `handle_field` is used to update map values, if the current value
             // isn't a map, we need to make it one.
@@ -304,7 +328,7 @@ impl Value {
                 _ => unreachable!("see invariant above"),
             };
 
-            match rest.first() {
+            match segments.peek() {
                 // If there are no other segments to traverse, we'll add the new
                 // value to the current map.
                 None => {
@@ -315,20 +339,20 @@ impl Value {
                 // or array depending on what the next segment is, and continue
                 // to add the next segment.
                 Some(next) => match next {
-                    Index(_) => map.insert(key, Value::Array(vec![])),
+                    SegmentBuf::Index(_) => map.insert(key, Value::Array(vec![])),
                     _ => map.insert(key, BTreeMap::default().into()),
                 },
             };
 
-            map.get_mut(field.as_str())
+            map.get_mut(field)
                 .unwrap()
-                .insert_by_segments(rest, new);
+                .insert_by_segments(segments, new);
         };
 
         match segment {
-            Field(field) => handle_field(field, new),
+            SegmentBuf::Field(FieldBuf { name, .. }) => handle_field(name, new, segments),
 
-            Coalesce(fields) => {
+            SegmentBuf::Coalesce(fields) => {
                 // At this point, we know that the coalesced field query did not
                 // result in an actual value, so none of the fields match an
                 // existing field. We'll pick the last field in the list to
@@ -338,10 +362,9 @@ impl Value {
                     None => return,
                 };
 
-                handle_field(field, new)
+                handle_field(field.as_str(), new, segments)
             }
-
-            Index(index) => {
+            SegmentBuf::Index(index) => {
                 let array = match self {
                     Value::Array(array) => array,
                     _ => {
@@ -363,13 +386,13 @@ impl Value {
                         array.insert(0, Value::Null)
                     }
 
-                    match rest.first() {
+                    match segments.peek() {
                         None => {
                             array.insert(0, new);
                             return;
                         }
                         Some(next) => match next {
-                            Index(_) => array.insert(0, Value::Array(vec![])),
+                            SegmentBuf::Index(_) => array.insert(0, Value::Array(vec![])),
                             _ => array.insert(0, BTreeMap::default().into()),
                         },
                     };
@@ -377,7 +400,7 @@ impl Value {
                     array
                         .first_mut()
                         .expect("exists")
-                        .insert_by_segments(rest, new);
+                        .insert_by_segments(segments, new);
                 } else {
                     let index = index as usize;
 
@@ -386,13 +409,13 @@ impl Value {
                         array.resize(index, Value::Null);
                     }
 
-                    match rest.first() {
+                    match segments.peek() {
                         None => {
                             array.push(new);
                             return;
                         }
                         Some(next) => match next {
-                            Index(_) => array.push(Value::Array(vec![])),
+                            SegmentBuf::Index(_) => array.push(Value::Array(vec![])),
                             _ => array.push(BTreeMap::default().into()),
                         },
                     }
@@ -400,7 +423,7 @@ impl Value {
                     array
                         .last_mut()
                         .expect("exists")
-                        .insert_by_segments(rest, new);
+                        .insert_by_segments(segments, new);
                 }
             }
         }
@@ -410,48 +433,45 @@ impl Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{path::Field::*, value};
+    use crate::value;
 
     #[test]
     fn target_get() {
         let cases = vec![
             (value!(true), vec![], Ok(Some(value!(true)))),
-            (
-                value!(true),
-                vec![Field(Regular("foo".to_string()))],
-                Ok(None),
-            ),
+            (value!(true), vec![SegmentBuf::from("foo")], Ok(None)),
             (value!({}), vec![], Ok(Some(value!({})))),
             (value!({foo: "bar"}), vec![], Ok(Some(value!({foo: "bar"})))),
             (
                 value!({foo: "bar"}),
-                vec![Field(Regular("foo".to_owned()))],
+                vec![SegmentBuf::from("foo")],
                 Ok(Some(value!("bar"))),
             ),
             (
                 value!({foo: "bar"}),
-                vec![Field(Regular("bar".to_owned()))],
+                vec![SegmentBuf::from("bar")],
                 Ok(None),
             ),
-            (value!([1, 2, 3, 4, 5]), vec![Index(1)], Ok(Some(value!(2)))),
+            (
+                value!([1, 2, 3, 4, 5]),
+                vec![SegmentBuf::from(1)],
+                Ok(Some(value!(2))),
+            ),
             (
                 value!({foo: [{bar: true}]}),
                 vec![
-                    Field(Regular("foo".to_owned())),
-                    Index(0),
-                    Field(Regular("bar".to_owned())),
+                    SegmentBuf::from("foo"),
+                    SegmentBuf::from(0),
+                    SegmentBuf::from("bar"),
                 ],
                 Ok(Some(value!(true))),
             ),
             (
                 value!({foo: {"bar baz": {baz: 2}}}),
                 vec![
-                    Field(Regular("foo".to_owned())),
-                    Coalesce(vec![
-                        Regular("qux".to_owned()),
-                        Quoted("bar baz".to_owned()),
-                    ]),
-                    Field(Regular("baz".to_owned())),
+                    SegmentBuf::from("foo"),
+                    SegmentBuf::from(vec![FieldBuf::from("qux"), FieldBuf::from(r#""bar baz""#)]),
+                    SegmentBuf::from("baz"),
                 ],
                 Ok(Some(value!(2))),
             ),
@@ -459,9 +479,9 @@ mod tests {
 
         for (value, segments, expect) in cases {
             let value: Value = value;
-            let path = Path::new_unchecked(segments);
+            let path = LookupBuf::from_segments(segments);
 
-            assert_eq!(value.get(&path), expect)
+            assert_eq!(value.get(&path), expect);
         }
     }
 
@@ -477,7 +497,7 @@ mod tests {
             ),
             (
                 value!({foo: "bar"}),
-                vec![Field(Regular("baz".to_owned()))],
+                vec![SegmentBuf::from("baz")],
                 true.into(),
                 value!({foo: "bar", baz: true}),
                 Ok(()),
@@ -485,9 +505,9 @@ mod tests {
             (
                 value!({foo: [{bar: "baz"}]}),
                 vec![
-                    Field(Regular("foo".to_owned())),
-                    Index(0),
-                    Field(Regular("baz".to_owned())),
+                    SegmentBuf::from("foo"),
+                    SegmentBuf::from(0),
+                    SegmentBuf::from("baz"),
                 ],
                 true.into(),
                 value!({foo: [{bar: "baz", baz: true}]}),
@@ -495,17 +515,14 @@ mod tests {
             ),
             (
                 value!({foo: {bar: "baz"}}),
-                vec![
-                    Field(Regular("bar".to_owned())),
-                    Field(Regular("baz".to_owned())),
-                ],
+                vec![SegmentBuf::from("bar"), SegmentBuf::from("baz")],
                 true.into(),
                 value!({foo: {bar: "baz"}, bar: {baz: true}}),
                 Ok(()),
             ),
             (
                 value!({foo: "bar"}),
-                vec![Field(Regular("foo".to_owned()))],
+                vec![SegmentBuf::from("foo")],
                 "baz".into(),
                 value!({foo: "baz"}),
                 Ok(()),
@@ -513,62 +530,65 @@ mod tests {
             (
                 value!({foo: "bar"}),
                 vec![
-                    Field(Regular("foo".to_owned())),
-                    Index(2),
-                    Field(Quoted("bar baz".to_owned())),
-                    Field(Regular("a".to_owned())),
-                    Field(Regular("b".to_owned())),
+                    SegmentBuf::from("foo"),
+                    SegmentBuf::from(2),
+                    SegmentBuf::from(r#""bar baz""#),
+                    SegmentBuf::from("a"),
+                    SegmentBuf::from("b"),
                 ],
                 true.into(),
                 value!({foo: [null, null, {"bar baz": {"a": {"b": true}}}]}),
                 Ok(()),
             ),
+            /*
             (
                 value!({foo: [0, 1, 2]}),
-                vec![Field(Regular("foo".to_owned())), Index(5)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(5)],
                 "baz".into(),
                 value!({foo: [0, 1, 2, null, null, "baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: "bar"}),
-                vec![Field(Regular("foo".to_owned())), Index(0)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 "baz".into(),
                 value!({foo: ["baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: []}),
-                vec![Field(Regular("foo".to_owned())), Index(0)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 "baz".into(),
                 value!({foo: ["baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: [0]}),
-                vec![Field(Regular("foo".to_owned())), Index(0)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 "baz".into(),
                 value!({foo: ["baz"]}),
                 Ok(()),
             ),
             (
                 value!({foo: [0, 1]}),
-                vec![Field(Regular("foo".to_owned())), Index(0)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 "baz".into(),
                 value!({foo: ["baz", 1]}),
                 Ok(()),
             ),
             (
                 value!({foo: [0, 1]}),
-                vec![Field(Regular("foo".to_owned())), Index(1)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(1)],
                 "baz".into(),
                 value!({foo: [0, "baz"]}),
                 Ok(()),
             ),
+            */
         ];
 
         for (mut target, segments, value, expect, result) in cases {
-            let path = Path::new_unchecked(segments);
+            println!("Inserting at {:?}", segments);
+            let path = LookupBuf::from_segments(segments);
 
             assert_eq!(Target::insert(&mut target, &path, value.clone()), result);
             assert_eq!(target, expect);
@@ -581,23 +601,23 @@ mod tests {
         let cases = vec![
             (
                 value!({foo: "bar"}),
-                vec![Field(Regular("baz".to_owned()))],
+                vec![SegmentBuf::from("baz")],
                 false,
                 None,
                 Some(value!({foo: "bar"})),
             ),
             (
                 value!({foo: "bar"}),
-                vec![Field(Regular("foo".to_owned()))],
+                vec![SegmentBuf::from("foo")],
                 false,
                 Some(value!("bar")),
                 Some(value!({})),
             ),
             (
                 value!({foo: "bar"}),
-                vec![Coalesce(vec![
-                    Quoted("foo bar".to_owned()),
-                    Regular("foo".to_owned()),
+                vec![SegmentBuf::coalesce(vec![
+                    FieldBuf::from(r#""foo bar""#),
+                    FieldBuf::from("foo"),
                 ])],
                 false,
                 Some(value!("bar")),
@@ -619,14 +639,14 @@ mod tests {
             ),
             (
                 value!({foo: [0]}),
-                vec![Field(Regular("foo".to_owned())), Index(0)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 false,
                 Some(value!(0)),
                 Some(value!({foo: []})),
             ),
             (
                 value!({foo: [0]}),
-                vec![Field(Regular("foo".to_owned())), Index(0)],
+                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
                 true,
                 Some(value!(0)),
                 Some(value!({})),
@@ -634,9 +654,9 @@ mod tests {
             (
                 value!({foo: {"bar baz": [0]}, bar: "baz"}),
                 vec![
-                    Field(Regular("foo".to_owned())),
-                    Field(Quoted("bar baz".to_owned())),
-                    Index(0),
+                    SegmentBuf::from("foo"),
+                    SegmentBuf::from(r#""bar baz""#),
+                    SegmentBuf::from(0),
                 ],
                 false,
                 Some(value!(0)),
@@ -645,9 +665,9 @@ mod tests {
             (
                 value!({foo: {"bar baz": [0]}, bar: "baz"}),
                 vec![
-                    Field(Regular("foo".to_owned())),
-                    Field(Quoted("bar baz".to_owned())),
-                    Index(0),
+                    SegmentBuf::from("foo"),
+                    SegmentBuf::from(r#""bar baz""#),
+                    SegmentBuf::from(0),
                 ],
                 true,
                 Some(value!(0)),
@@ -656,10 +676,10 @@ mod tests {
         ];
 
         for (mut target, segments, compact, value, expect) in cases {
-            let path = Path::new_unchecked(segments);
+            let path = LookupBuf::from_segments(segments);
 
             assert_eq!(Target::remove(&mut target, &path, compact), Ok(value));
-            assert_eq!(Target::get(&target, &Path::root()), Ok(expect));
+            assert_eq!(Target::get(&target, &LookupBuf::root()), Ok(expect));
         }
     }
 }
