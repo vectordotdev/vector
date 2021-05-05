@@ -8,9 +8,10 @@ lalrpop_mod!(
 pub mod ast;
 mod lex;
 
-pub use ast::{Field, Literal, Path, PathSegment, Program};
+pub use ast::{Literal, Program};
 pub use diagnostic::Span;
 pub use lex::{Error, Token};
+use lookup::LookupBuf;
 
 pub fn parse(input: impl AsRef<str>) -> Result<Program, Error> {
     let lexer = lex::Lexer::new(input.as_ref());
@@ -26,7 +27,7 @@ pub fn parse(input: impl AsRef<str>) -> Result<Program, Error> {
         })
 }
 
-pub fn parse_path(input: impl AsRef<str>) -> Result<Path, Error> {
+pub fn parse_path(input: impl AsRef<str>) -> Result<LookupBuf, Error> {
     let lexer = lex::Lexer::new(input.as_ref());
 
     parser::QueryParser::new()
@@ -43,20 +44,6 @@ pub fn parse_path(input: impl AsRef<str>) -> Result<Path, Error> {
             _ => Err(Error::UnexpectedParseError(
                 "unexpected query target".to_owned(),
             )),
-        })
-}
-
-pub fn parse_field(input: impl AsRef<str>) -> Result<Field, Error> {
-    let lexer = lex::Lexer::new(input.as_ref());
-
-    parser::FieldParser::new()
-        .parse(input.as_ref(), lexer)
-        .map_err(|source| Error::ParseError {
-            span: Span::new(0, input.as_ref().len()),
-            source: source
-                .map_token(|t| t.map(|s| s.to_owned()))
-                .map_error(|err| err.to_string()),
-            dropped_tokens: vec![],
         })
 }
 

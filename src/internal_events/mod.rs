@@ -37,6 +37,8 @@ mod dedupe;
 mod docker_logs;
 mod elasticsearch;
 mod encoding_transcode;
+#[cfg(feature = "sources-exec")]
+mod exec;
 #[cfg(feature = "transforms-filter")]
 mod filter;
 #[cfg(feature = "sources-generator")]
@@ -156,6 +158,8 @@ pub(crate) use self::dedupe::*;
 pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
 pub use self::encoding_transcode::*;
+#[cfg(feature = "sources-exec")]
+pub use self::exec::*;
 #[cfg(any(
     feature = "sources-file",
     feature = "sources-kubernetes-logs",

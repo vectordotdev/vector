@@ -16,6 +16,9 @@ name = "graphql-schema"
 path = "src/api/schema/gen.rs"
 required-features = ["default-no-api-client"]
 
+[profile.dev]
+split-debuginfo = "unpacked" # Faster debug builds on macOS
+
 [profile.release]
 lto = true        # Optimize our binary at link stage.
 codegen-units = 1 # Increases compile time but improves optmization alternatives.
@@ -72,6 +75,7 @@ members = [
   "lib/tracing-limit",
   "lib/vector-api-client",
   "lib/vector-wasm",
+  "lib/lookup",
   "lib/vrl/cli",
   "lib/vrl/compiler",
   "lib/vrl/core",
@@ -93,7 +97,7 @@ prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 shared = { path = "lib/shared" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
-vector_core = { path = "lib/vector-core" }
+vector_core = { path = "lib/vector-core", default-features = false, features = [] }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures
@@ -107,10 +111,10 @@ tokio-util = { version = "0.6.6", default-features = false, features = ["codec",
 
 # Tracing
 tracing = { version = "0.1.25", default-features = false }
-tracing-core = { version = "0.1.17", default-features = false }
+tracing-core = { version = "0.1.18", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-01", "futures-03"] }
 tracing-log = { version = "0.1.2", default-features = false }
-tracing-subscriber = { version = "0.2.17", default-features = false }
+tracing-subscriber = { version = "0.2.18", default-features = false }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
@@ -132,7 +136,7 @@ rusoto_sqs = { version = "0.46.0", optional = true }
 rusoto_sts = { version = "0.46.0", optional = true }
 
 # Tower
-tower = { version = "0.4.6", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
+tower = { version = "0.4.7", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util"] }
 tower-layer = { version = "0.3.1", default-features = false }
 
 # Serde
@@ -158,11 +162,14 @@ itertools = { version = "0.10.0", default-features = false, optional = true }
 crossterm = { version = "0.19.0", default-features = false, optional = true }
 num-format = { version = "0.4.0", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
-tui = { version = "0.14.0", optional = true, default-features = false, features = ["crossterm"] }
+tui = { version = "0.15.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # VRL Lang
 vrl = { path = "lib/vrl/core" }
 vrl-stdlib = { path = "lib/vrl/stdlib" }
+
+# Lookup
+lookup = { path = "lib/lookup" }
 
 # External libs
 anyhow = { version = "1.0.40", default-features = false }
@@ -205,19 +212,19 @@ logfmt = { version = "0.0.2", default-features = false, optional = true }
 lru = { version = "0.6.5", default-features = false, optional = true }
 maxminddb = { version = "0.17.2", default-features = false, optional = true }
 mongodb = { version = "2.0.0-alpha.1", default-features = false, features = ["tokio-runtime"], optional = true }
-async-nats = { version = "0.9.14", default-features = false, optional = true }
+async-nats = { version = "0.9.16", default-features = false, optional = true }
 nom = { version = "6.1.2", default-features = false, optional = true }
 notify = { version = "4.0.16", default-features = false }
 num_cpus = { version = "1.13.0", default-features = false }
 once_cell = { version = "1.3", default-features = false }
-openssl = { version = "0.10.33", default-features = false }
+openssl = { version = "0.10.34", default-features = false }
 openssl-probe = { version = "0.1.2", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
 pest = { version = "2.1.3", default-features = false }
 pest_derive = { version = "2.1.0", default-features = false }
 pin-project = { version = "1.0.7", default-features = false }
 postgres-openssl = { version = "0.5.0", default-features = false, features = ["runtime"], optional = true }
-pulsar = { version = "2.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
+pulsar = { version = "2.0.1", default-features = false, features = ["tokio-runtime"], optional = true }
 rand = { version = "0.8.3", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.0", default-features = false }
 rdkafka = { version = "0.26.0", default-features = false, features = ["libz", "ssl", "zstd"], optional = true }
@@ -227,14 +234,14 @@ rlua = { version = "0.17.0", default-features = true, optional = true }
 seahash = { version = "4.1.0", default-features = false, optional = true }
 semver = { version = "0.11.0", default-features = false, features = ["serde"], optional = true }
 snafu = { version = "0.6.10", default-features = false, features = ["futures", "futures-01"] }
-snap = { version = "1.0.4", default-features = false, optional = true }
+snap = { version = "1.0.5", default-features = false, optional = true }
 socket2 = { version = "0.4.0", default-features = false }
 stream-cancel = { version = "0.8.0", default-features = false }
 strip-ansi-escapes = { version = "0.1.0", default-features = false }
 structopt = { version = "0.3.21", default-features = false }
 syslog = { version = "5.0.0", default-features = false, optional = true }
 syslog_loose = { version = "0.10.0", default-features = false, optional = true }
-tokio-postgres = { version = "0.7.1", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
+tokio-postgres = { version = "0.7.2", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 toml = { version = "0.5.8", default-features = false }
 typetag = { version = "0.1.7", default-features = false }
 twox-hash = { version = "1.6.0", default-features = false }
@@ -263,8 +270,7 @@ atty = "0.2.14"
 nix = "0.20.0"
 
 [build-dependencies]
-prost-build = "0.7.0"
-built = { version = "0.4.4", features = ["chrono", "git2"] }
+built = { version = "0.5.0", features = ["chrono", "git2"] }
 
 [dev-dependencies]
 approx = "0.4.0"
@@ -272,8 +278,8 @@ assert_cmd = "1.0.3"
 base64 = "0.13.0"
 criterion = { version = "0.3.4", features = ["html_reports"] }
 httpmock = { version = "0.5.8", default-features = false }
-libc = "0.2.93"
-libz-sys = "1.1.2"
+libc = "0.2.94"
+libz-sys = "1.1.3"
 matches = "0.1.8"
 pretty_assertions = "0.7.2"
 reqwest = { version = "0.11.3", features = ["json"] }
@@ -284,6 +290,7 @@ tokio01-test = "0.1.1"
 tower-test = "0.4.0"
 walkdir = "2.3.2"
 quickcheck = "1.0.3"
+lookup = { path = "lib/lookup", features = ["arbitrary"] }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -339,7 +346,9 @@ api = [
   "async-graphql-warp",
   "base64",
   "itertools",
+  "vector_core/api",
   "warp",
+  "uuid",
 ]
 
 # API client
@@ -348,6 +357,7 @@ api-client = [
   "num-format",
   "number_prefix",
   "tui",
+  "vector_core/api",
   "vector-api-client",
 ]
 
@@ -358,6 +368,7 @@ sources-logs = [
   "sources-aws_s3",
   "sources-datadog",
   "sources-docker_logs",
+  "sources-exec",
   "sources-file",
   "sources-generator",
   "sources-heroku_logs",
@@ -391,6 +402,7 @@ sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
 sources-datadog = ["sources-utils-http"]
 sources-docker_logs = ["bollard", "dirs-next"]
+sources-exec = []
 sources-file = ["bytesize", "file-source"]
 sources-generator = ["fakedata"]
 sources-heroku_logs = ["sources-utils-http"]
@@ -476,7 +488,7 @@ transforms-json_parser = []
 transforms-key_value_parser = []
 transforms-log_to_metric = []
 transforms-logfmt_parser = ["logfmt"]
-transforms-lua = ["rlua"]
+transforms-lua = ["rlua", "vector_core/lua"]
 transforms-merge = []
 transforms-metric_to_log = []
 transforms-reduce = []

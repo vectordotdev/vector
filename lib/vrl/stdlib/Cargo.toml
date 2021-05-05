@@ -8,6 +8,7 @@ license = "MPL-2.0"
 
 [dependencies]
 vrl = { path = "../core" }
+lookup = { path = "../../lookup" }
 
 base64 = { version = "0.13", optional = true }
 bytes = { version = "1.0.0", optional = true }
@@ -235,4 +236,5 @@ bench = false
 
 [[bench]]
 name = "benches"
+test = true
 harness = false
