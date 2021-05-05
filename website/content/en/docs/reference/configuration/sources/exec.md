@@ -15,8 +15,12 @@ kind: source
 
 {{< component/telemetry >}}
 
+## Examples
+
+{{< component/examples >}}
+
 ## How it works
 
 ### Line delimiters
 
-Each line is read until a new line delimiter, the `0xA` byte, is found *or* the end of the `maximum_buffer_size` is reached.
+{{< snippet "line-delimiters" >}}

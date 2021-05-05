@@ -1,7 +1,9 @@
 ---
-title: Heroku Logplex
+title: Datadog logs
 kind: source
 ---
+
+The `datadog_logs` source receives logs from a [Datadog Agent][datadog_agent] over HTTP or HTTPS.
 
 ## Configuration
 
@@ -28,3 +30,5 @@ kind: source
 ### Transport Layer Security (TLS)
 
 {{< snippet "tls" >}}
+
+[datadog_agent]: https://docs.datadoghq.com/agent

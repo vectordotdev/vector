@@ -3,6 +3,7 @@
 {{ $config := index (index site.Data.docs.components $type) $tag }}
 {{ $classes := $config.classes }}
 {{ $output := $config.output }}
+
 <div class="mt-8 block space-y-1">
   {{ if eq $classes.development "beta" }}
   {{ partial "badge.html" (dict "prefix" "status" "word" "beta" "color" "red" "inline" true) }}
@@ -24,6 +25,10 @@
   {{ partial "badge.html" (dict "prefix" "delivery" "word" "at-least-once" "color" "blue" "inline" true) }}
   {{ end }}
 
+  {{ with $classes.egress_method }}
+  {{ partial "badge.html" (dict "prefix" "egress" "word" . "color" "indigo" "inline" true) }}
+  {{ end }}
+
   {{ if eq $classes.stateful false }}
   {{ partial "badge.html" (dict "prefix" "state" "word" "stateless" "color" "indigo" "inline" true) }}
   {{ else }}
@@ -40,3 +45,9 @@
   {{ end }}
   {{ end }}
 </div>
+
+{{ if .Params.deprecated }}
+<div class="mt-4">
+  {{ partial "badge.html" (dict "prefix" "status" "word" "deprecated" "color" "red" "inline" true) }}
+</div>
+{{ end }}

@@ -111,7 +111,7 @@
 
 {{ define "link" }}
 {{ $isActive := eq .here .url }}
-<a href="{{ .url }}" class="block tracking-tight dark:text-gray-400 text-gray-600 dark:hover:text-purple-v hover:text-purple-v{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}">
+<a href="{{ .url }}" class="block tracking-tight leading-snug dark:text-gray-400 text-gray-700 dark:hover:text-purple-v hover:text-purple-v{{ if $isActive }} font-bold text-secondary dark:text-primary{{ end }}">
   {{ .title }}
 </a>
 {{ end }}

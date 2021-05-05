@@ -19,3 +19,17 @@ kind: source
 ## Examples
 
 {{< component/examples >}}
+
+## How it works
+
+### Context
+
+{{< snippet "context" >}}
+
+### State
+
+{{< snippet "stateless" >}}
+
+### Transport Layer Security (TLS)
+
+{{< snippet "tls" >}}

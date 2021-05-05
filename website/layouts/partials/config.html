@@ -114,21 +114,19 @@
           </span>
         </span>
 
-        <div class="mt-2 border rounded py-2 px-3 dark:border-gray-700">
+        <div class="mt-2 border rounded py-2.5 px-4 dark:border-gray-700">
           <span class="tracking-tight font-semibold">
-            Values
+            Options
           </span>
 
           <div class="mt-1 flex flex-col space-y-1.5">
             {{ range $k, $v := . }}
-            <div class="grid grid-cols-5">
-              <div class="col-span-1">
-                <span class="font-mono text-primary-dark dark:text-primary text-sm">
-                  {{ $k }}
-                </span>
-              </div>
+            <div>
+              <span class="font-mono text-primary-dark dark:text-primary text-sm">
+                {{ $k }}
+              </span>
 
-              <div class="col-span-4 prose prose-sm dark:prose-dark leading-snug">
+              <div class="ml-3 mt-1 prose prose-sm dark:prose-dark leading-snug">
                 {{ $v | markdownify }}
               </div>
             </div>
@@ -166,7 +164,7 @@
             {{ template "config-toggler" (dict "size" 4) }}
           </span>
 
-          <div x-show="open" class="flex flex-col ml-2 space-y-2">
+          <div x-show="open" class="mt-3 text-sm flex flex-col space-y-2">
             {{ highlight $json "json" "" }}
           </div>
         </div>
@@ -195,18 +193,18 @@
 
   {{/* Source/transform/sink requirements */}}
   {{ with .requirements }}
-  <div class="no-prose py-4 px-6 flex items-center">
-    <div class="mr-5 flex-shrink-0">
+  <div class="py-4 px-6 flex items-center">
+    <div class="mr-8 flex-shrink-0">
       {{/* Heroicon: outline/exclamation */}}
       <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
       </svg>
     </div>
-    <div class="flex flex-col divide-gray-100">
+    <div class="flex flex-col space-y-4 overflow-x-auto">
       {{ range . }}
-      <span class="leading-normal">
+      <div class="prose dark:prose-dark leading-normal">
         {{ . | markdownify }}
-      </span>
+      </div>
       {{ end }}
     </div>
   </div>
@@ -283,11 +281,11 @@
 
   {{/* Source/transform/sink output */}}
   {{ with .telemetry }}
-  <div class="py-3 px-5">
+  <div class="py-4 px-6">
     {{ with .metrics }}
     <span class="flex items-center justify-between">
-      <h3 class="hover:text-secondary" id="telemetry-metrics">
-        <a href="#metrics">
+      <h3 class="font-bold hover:text-secondary" id="telemetry-metrics">
+        <a href="#telemetry-metrics">
           Metrics
         </a>
       </h3>
@@ -305,7 +303,7 @@
     {{ with .logs }}
     <span class="flex items-center justify-between">
       <h3 class="hover:text-secondary" id="telemetry-logs">
-        <a href="#metrics">
+        <a href="#telemetry-logs">
           Logs
         </a>
       </h3>
@@ -325,16 +323,16 @@
   {{/* Source/transform/sink warnings */}}
   {{ with .warnings }}
   <div class="no-prose py-4 px-6 flex items-center">
-    <div class="mr-5 flex-shrink-0">
+    <div class="mr-8 flex-shrink-0">
       <svg xmlns="http://www.w3.org/2000/svg" class="text-red-400 h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
       </svg>
     </div>
-    <div class="flex flex-col divide-gray-100">
+    <div class="flex flex-col space-y-4 overflow-x-auto">
       {{ range . }}
-      <p class="leading-normal">
+      <div class="prose dark:prose-dark leading-normal">
         {{ . | markdownify }}
-      </p>
+      </div>
       {{ end }}
     </div>
   </div>
@@ -348,7 +346,9 @@
       <span class="flex justify-between items-center">
         <span>
           <h3 id="{{ $k }}" class="font-mono">
-            {{ $k }}
+            <a href="#{{ $k }}">
+              {{ $k }}
+            </a>
           </h3>
         </span>
 
@@ -376,9 +376,9 @@
 
       {{ range $k, $v := $v.type }}
       {{ with $v.default }}
-      <p>
+      <span>
         Default: <code>{{ . }}</code>
-      </p>
+      </span>
       {{ end }}
       {{ end }}
 
@@ -413,17 +413,26 @@
 
 {{ define "example" }}
 {{ $event := .input | jsonify (dict "indent" "  ") }}
-<p>
+<span>
   Given this event...
-</p>
+</span>
 
-{{ highlight $event "json" "" }}
+<div class="my-2.5">
+  {{ highlight $event "json" "" }}
+</div>
 
-<p>
+<span>
   ...and this Vector configuration...
-</p>
+</span>
 
-{{ highlight .configuration "toml" "" }}
+<div class="my-2.5">
+  {{ if or (reflect.IsMap .configuration) (reflect.IsSlice .configuration) }}
+  {{ $json := .configuration | jsonify (dict "indent" "  ") }}
+  {{ highlight $json "json" "" }}
+  {{ else }}
+  {{ highlight .configuration "toml" "" }}
+  {{ end }}
+</div>
 
 {{ if reflect.IsSlice .output }}
 {{ $multiple := gt (len .output) 1 }}
@@ -442,15 +451,15 @@
 {{ end }}
 
 {{ if eq $kind "log" }}
-<p>
+<span>
   ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/log">log</a> event is produced:
-</p>
+</span>
 {{ end }}
 
 {{ if eq $kind "metric" }}
-<p>
+<span>
   ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/metric">metric</a> event is produced:
-</p>
+</span>
 {{ end }}
 
 {{ $json := $event | jsonify (dict "indent" "  ") }}
@@ -459,20 +468,24 @@
 {{ $out := index .output 0 }}
 {{ with $out.metric }}
 {{ $json := . | jsonify (dict "indent" "  ") }}
-<p>
+<span>
   ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/metric">metric</a> event is produced:
-</p>
+</span>
 
-{{ highlight $json "json" "" }}
+<div class="mt-2.5">
+  {{ highlight $json "json" "" }}
+</div>
 {{ end }}
 
 {{ with $out.log }}
 {{ $json := . | jsonify (dict "indent" "  ") }}
-<p>
+<span>
   ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/log">log</a> event is produced:
-</p>
+</span>
 
-{{ highlight $json "json" "" }}
+<div class="mt-2.5">
+  {{ highlight $json "json" "" }}
+</div>
 {{ end }}
 {{ end }}
 {{ end }}
@@ -480,20 +493,24 @@
 {{ if reflect.IsMap .output }}
 {{ with .output.log }}
 {{ $json := . | jsonify (dict "indent" "  ") }}
-<p>
+<span>
   ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/log">log</a> event is produced:
-</p>
+</span>
 
-{{ highlight $json "json" "" }}
+<div class="mt-2.5">
+  {{ highlight $json "json" "" }}
+</div>
 {{ end }}
 
 {{ with .output.metric }}
 {{ $json := . | jsonify (dict "indent" "  ") }}
-<p>
+<span>
   ...this Vector <a href="/docs/about/under-the-hood/architecture/data-model/metric">metric</a> event is produced:
-</p>
+</span>
 
-{{ highlight $json "json" "" }}
+<div class="mt-2.5">
+  {{ highlight $json "json" "" }}
+</div>
 {{ end }}
 {{ end }}
 {{ end }}
@@ -524,7 +541,7 @@
 
 {{ define "telemetry" }}
 {{ range $k, $v := . }}
-<div class="py-3 px-5">
+<div class="py-4 px-6">
   <span class="flex justify-between items-center">
     <span class="font-mono font-bold text-dark dark:text-gray-200">
       <h4 id="{{ $k }}">

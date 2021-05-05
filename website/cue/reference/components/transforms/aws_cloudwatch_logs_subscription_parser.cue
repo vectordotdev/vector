@@ -41,7 +41,7 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 			"""
 			\(aws_cloudwatch_logs_subscription_parser._remap_deprecation_notice)
 
-			```vrl
+			```ruby
 			.message = parse_aws_cloudwatch_log_subscription_message(.message)
 			```
 			""",

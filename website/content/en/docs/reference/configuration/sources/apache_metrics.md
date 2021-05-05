@@ -21,4 +21,12 @@ kind: source
 
 {{< component/telemetry >}}
 
-[httpd]: https://httpd.apache.org
+## How it works
+
+### Context
+
+{{< snippet "context" >}}
+
+### State
+
+{{< snippet "stateless" >}}

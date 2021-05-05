@@ -7,3 +7,17 @@ kind: source
 ## Configuration
 
 {{< component/config >}}
+
+## Telemetry
+
+{{< component/telemetry >}}
+
+## How it works
+
+### Context
+
+{{< snippet "context" >}}
+
+### State
+
+{{< snippet "stateless" >}}

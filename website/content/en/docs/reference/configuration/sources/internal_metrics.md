@@ -3,6 +3,10 @@ title: Internal metrics
 kind: source
 ---
 
+## Requirements
+
+{{< component/requirements >}}
+
 ## Configuration
 
 {{< component/config >}}
@@ -10,3 +14,17 @@ kind: source
 ## Output
 
 {{< component/output >}}
+
+## Telemetry
+
+{{< component/telemetry >}}
+
+## How it works
+
+### Context
+
+{{< snippet "context" >}}
+
+### State
+
+{{< snippet "stateless" >}}
