@@ -24,6 +24,7 @@
 #![allow(clippy::default_trait_access)]
 #![allow(clippy::enum_glob_use)]
 #![allow(clippy::unnested_or_patterns)]
+#![allow(clippy::must_use_candidate)]
 
 #[cfg(feature = "api")]
 pub mod api;

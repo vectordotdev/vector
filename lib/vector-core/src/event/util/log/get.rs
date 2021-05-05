@@ -2,7 +2,6 @@ use super::{PathComponent, PathIter, Value};
 use std::collections::BTreeMap;
 
 /// Returns a reference to a field value specified by the given path.
-#[must_use]
 pub fn get<'a>(fields: &'a BTreeMap<String, Value>, path: &str) -> Option<&'a Value> {
     let mut path_iter = PathIter::new(path);
 

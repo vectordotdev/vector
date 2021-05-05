@@ -272,26 +272,22 @@ impl Metric {
         self
     }
 
-    #[must_use]
     pub fn with_timestamp(mut self, timestamp: Option<DateTime<Utc>>) -> Self {
         self.data.timestamp = timestamp;
         self
     }
 
-    #[must_use]
     pub fn with_tags(mut self, tags: Option<MetricTags>) -> Self {
         self.series.tags = tags;
         self
     }
 
-    #[must_use]
     pub fn with_value(mut self, value: MetricValue) -> Self {
         self.data.value = value;
         self
     }
 
     /// Rewrite this into a Metric with the data marked as absolute.
-    #[must_use]
     pub fn into_absolute(self) -> Self {
         Self {
             series: self.series,
@@ -301,7 +297,6 @@ impl Metric {
     }
 
     /// Rewrite this into a Metric with the data marked as incremental.
-    #[must_use]
     pub fn into_incremental(self) -> Self {
         Self {
             series: self.series,
@@ -349,17 +344,14 @@ impl Metric {
             })
     }
 
-    #[must_use]
     pub fn name(&self) -> &str {
         &self.series.name.name
     }
 
-    #[must_use]
     pub fn namespace(&self) -> Option<&str> {
         self.series.name.namespace.as_deref()
     }
 
-    #[must_use]
     pub fn tags(&self) -> Option<&MetricTags> {
         self.series.tags.as_ref()
     }
@@ -369,7 +361,6 @@ impl Metric {
     }
 
     /// Returns `true` if `name` tag is present, and matches the provided `value`
-    #[must_use]
     pub fn tag_matches(&self, name: &str, value: &str) -> bool {
         self.tags()
             .filter(|t| t.get(name).filter(|v| *v == value).is_some())
@@ -377,7 +368,6 @@ impl Metric {
     }
 
     /// Returns the string value of a tag, if it exists
-    #[must_use]
     pub fn tag_value(&self, name: &str) -> Option<String> {
         self.tags().and_then(|t| t.get(name).cloned())
     }
@@ -395,7 +385,6 @@ impl Metric {
     }
 
     /// Create a new metric from this with the data zeroed.
-    #[must_use]
     pub fn zero(&self) -> Self {
         Self {
             series: self.series.clone(),
@@ -415,7 +404,6 @@ impl EventDataEq for Metric {
 
 impl MetricData {
     /// Rewrite this data to mark it as absolute.
-    #[must_use]
     pub fn into_absolute(self) -> Self {
         Self {
             timestamp: self.timestamp,
@@ -425,7 +413,6 @@ impl MetricData {
     }
 
     /// Rewrite this data to mark it as incremental.
-    #[must_use]
     pub fn into_incremental(self) -> Self {
         Self {
             timestamp: self.timestamp,
@@ -454,7 +441,6 @@ impl MetricData {
     }
 
     /// Create a new metric data from this with a zero value.
-    #[must_use]
     pub fn zero(&self) -> Self {
         Self {
             timestamp: self.timestamp,
@@ -469,7 +455,6 @@ impl MetricValue {
     /// zero. This keeps all the bucket/value vectors for the histogram
     /// and summary metric types intact while zeroing the
     /// counts. Distribution metrics are emptied of all their values.
-    #[must_use]
     pub fn zero(&self) -> Self {
         match self {
             Self::Counter { .. } => Self::Counter { value: 0.0 },
