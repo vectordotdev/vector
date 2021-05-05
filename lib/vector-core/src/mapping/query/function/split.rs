@@ -59,7 +59,7 @@ impl Function for SplitFn {
                 Some(ref limit) => to_value(Box::new(regex.regex().splitn(&string, *limit))),
                 None => to_value(Box::new(regex.regex().split(&string))),
             }),
-            QueryValue::Value(_) => Err("invalid pattern".to_string()),
+            _ => Err("invalid pattern".to_string()),
         }
     }
 

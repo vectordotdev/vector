@@ -36,7 +36,7 @@ impl Function for Assignment {
                 target.as_mut_log().insert(&self.path, v);
                 Ok(())
             }
-            QueryValue::Regex(_) => Err("assignment must be from a value".to_string()),
+            _ => Err("assignment must be from a value".to_string()),
         }
     }
 }
@@ -286,7 +286,7 @@ impl Function for LogFn {
     fn apply(&self, target: &mut Event) -> Result<()> {
         let msg = match self.msg.execute(target)? {
             QueryValue::Value(value) => value,
-            QueryValue::Regex(_) => return Err("Can only log Value parameters".to_string()),
+            _ => return Err("Can only log Value parameters".to_string()),
         };
         let msg = msg.into_bytes();
         let string = String::from_utf8_lossy(&msg);

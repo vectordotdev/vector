@@ -75,7 +75,7 @@ impl Function for Arithmetic {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let left = match self.left.execute(ctx)? {
             QueryValue::Value(value) => value,
-            query @ QueryValue::Regex(_) => {
+            query => {
                 return Err(format!(
                     "arithmetic can not be performed with {}",
                     query.kind()
@@ -84,7 +84,7 @@ impl Function for Arithmetic {
         };
         let right = match self.right.execute(ctx)? {
             QueryValue::Value(value) => value,
-            query @ QueryValue::Regex(_) => {
+            query => {
                 return Err(format!(
                     "arithmetic can not be performed with {}",
                     query.kind()
