@@ -665,6 +665,7 @@ benches = [
   "transforms-lua",
   "transforms-regex_parser",
   "transforms-sample",
+  "transforms-split",
 ]
 language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "transforms-json_parser", "transforms-lua", "transforms-regex_parser", "transforms-remap", "transforms-wasm"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
