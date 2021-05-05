@@ -214,7 +214,6 @@ fn query_function_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Fu
     signature.into_boxed_function(arguments)
 }
 
-#[allow(clippy::redundant_closure_for_method_calls)]
 fn function_arguments_from_pairs(
     mut pairs: Pairs<Rule>,
     signature: FunctionSignature,
@@ -222,7 +221,10 @@ fn function_arguments_from_pairs(
     let mut arguments = ArgumentList::new();
 
     // Check if any arguments are provided.
-    if let Some(pairs) = pairs.next().map(|pair| pair.into_inner()) {
+    if let Some(pairs) = pairs
+        .next()
+        .map(crate::mapping::parser::pest::iterators::Pair::into_inner)
+    {
         // Keeps track of positional argument indices.
         //
         // Used to map a positional argument to its keyword. Keyword arguments
