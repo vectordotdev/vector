@@ -10,8 +10,6 @@ use shared::EventDataEq;
 use snafu::Snafu;
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
-#[cfg(feature = "vrl")]
-use std::iter::FromIterator;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
