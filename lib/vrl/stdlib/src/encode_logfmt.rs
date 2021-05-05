@@ -16,14 +16,13 @@ mod logfmt {
             output.write_char('"').unwrap();
         }
 
-        for c in str.chars() {
-            let needs_escaping = matches!(c, '\\' | '"');
-            if needs_escaping {
-                output.write_char('\\').expect("");
-            }
+        let escaped = str
+            .to_string()
+            .replace(r#"\"#, r#"\\"#)
+            .replace(r#"""#, r#"\""#)
+            .replace("\n", r#"\\n"#);
 
-            output.write_char(c).unwrap();
-        }
+        output.write_str(&escaped).unwrap();
 
         if needs_quotting {
             output.write_char('"').unwrap();
