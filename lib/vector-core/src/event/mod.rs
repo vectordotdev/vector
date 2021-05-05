@@ -153,7 +153,7 @@ fn decode_value(input: proto::Value) -> Option<Value> {
 impl From<&tracing::Event<'_>> for Event {
     fn from(event: &tracing::Event<'_>) -> Self {
         let now = chrono::Utc::now();
-        let mut maker = MakeLogEvent(LogEvent::default());
+        let mut maker = MakeLogEvent::default();
         event.record(&mut maker);
 
         let mut log = maker.0;
@@ -183,7 +183,7 @@ impl From<&tracing::Event<'_>> for Event {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct MakeLogEvent(LogEvent);
 
 impl Visit for MakeLogEvent {
