@@ -39,7 +39,7 @@ components: sinks: _datadog: {
 		endpoint: {
 			common:        false
 			description:   "The endpoint to send data to."
-			relevant_when: "region is not set"
+			relevant_when: "site is not set"
 			required:      false
 			type: string: {
 				default: null
@@ -52,13 +52,25 @@ components: sinks: _datadog: {
 			description:   "The region to send data to."
 			required:      false
 			relevant_when: "endpoint is not set"
-			warnings: []
+			warnings: ["This option has been deprecated, the `site` option should be used."]
 			type: string: {
 				default: null
 				enum: {
 					us: "United States"
 					eu: "Europe"
 				}
+				syntax: "literal"
+			}
+		}
+		site: {
+			common:        false
+			description:   "The (Datadog site)[https://docs.datadoghq.com/getting_started/site/] to send data to. "
+			required:      false
+			relevant_when: "endpoint is not set"
+			warnings: []
+			type: string: {
+				default: "datadoghq.com"
+				examples: ["us3.datadoghq.com", "datadoghq.com", "datadoghq.eu"]
 				syntax: "literal"
 			}
 		}
