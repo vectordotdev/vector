@@ -33,8 +33,18 @@ impl Function for Redact {
     }
 
     fn examples(&self) -> &'static [Example] {
-        // TODO
-        &[]
+        &[
+            Example {
+                title: "regex",
+                source: r#"redact!("my id is 123456", filters = [r'\d+'])"#,
+                result: Ok(r#"my id is [REDACTED]"#),
+            },
+            Example {
+                title: "credit_card",
+                source: r#"redact!({ "name": "John Doe", "card_number": "4916155524184782"}, filters = ["credit_card"])"#,
+                result: Ok(r#"{ "field": "[REDACTED]" }"#),
+            },
+        ]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
@@ -43,16 +53,25 @@ impl Function for Redact {
         let filters = arguments
             .required_array("filters")?
             .into_iter()
-            .map(|value| value.try_into().map_err(Into::into))
-            .collect::<Result<Vec<Filter>>>()
-            .map_err(|err| {
-                dbg!(err);
-                vrl::function::Error::UnexpectedExpression {
-                    keyword: "TODO",
-                    expected: "TODO",
-                    expr: expression::Expr::Literal(expression::Literal::String("TODO".into())),
-                }
-            })?;
+            .map(|expr| {
+                expr.as_value()
+                    .ok_or_else(|| vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "filters",
+                        expr,
+                    })
+            })
+            .map(|value| {
+                value.and_then(|value| {
+                    value.clone().try_into().map_err(|error| {
+                        vrl::function::Error::InvalidArgument {
+                            keyword: "filters",
+                            value,
+                            error,
+                        }
+                    })
+                })
+            })
+            .collect::<std::result::Result<Vec<Filter>, _>>()?;
 
         let redactor = Redactor::Full;
 
@@ -127,22 +146,18 @@ enum Pattern {
     String(String),
 }
 
-impl TryFrom<expression::Expr> for Filter {
+impl TryFrom<Value> for Filter {
     type Error = &'static str;
 
-    fn try_from(value: expression::Expr) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
         match value {
-            expression::Expr::Container(expression::Container {
-                variant: expression::Variant::Object(object),
-            }) => {
+            Value::Object(object) => {
                 let r#type = match object
                     .get("type")
                     .ok_or("filters specified as objects must have type paramater")?
                 {
-                    expression::Expr::Literal(expression::Literal::String(bytes)) => {
-                        Ok(bytes.clone())
-                    }
-                    _ => Err("type key in filters must be a literal string"),
+                    Value::Bytes(bytes) => Ok(bytes.clone()),
+                    _ => Err("type key in filters must be a string"),
                 }?;
 
                 match r#type.as_ref() {
@@ -152,17 +167,11 @@ impl TryFrom<expression::Expr> for Filter {
                             .get("patterns")
                             .ok_or("pattern filter must have `patterns` specified")?
                         {
-                            expression::Expr::Container(expression::Container {
-                                variant: expression::Variant::Array(array),
-                            }) => Ok(array
+                            Value::Array(array) => Ok(array
                                 .iter()
-                                .map(|expr| match expr {
-                                    expression::Expr::Literal(expression::Literal::Regex(
-                                        regex,
-                                    )) => Ok(Pattern::Regex((**regex).clone())),
-                                    expression::Expr::Literal(expression::Literal::String(
-                                        bytes,
-                                    )) => Ok(Pattern::String(
+                                .map(|value| match value {
+                                    Value::Regex(regex) => Ok(Pattern::Regex((**regex).clone())),
+                                    Value::Bytes(bytes) => Ok(Pattern::String(
                                         String::from_utf8_lossy(&bytes).into_owned(),
                                     )),
                                     _ => Err("`patterns` must be regular expressions"),
@@ -175,17 +184,12 @@ impl TryFrom<expression::Expr> for Filter {
                     _ => Err("unknown filter name"),
                 }
             }
-            expression::Expr::Literal(literal) => match literal {
-                expression::Literal::String(bytes) => match bytes.as_ref() {
-                    b"pattern" => Err("pattern cannot be used without arguments"),
-                    b"credit_card" => Ok(Filter::CreditCard),
-                    _ => Err("unknown filter name"),
-                },
-                expression::Literal::Regex(regex) => {
-                    Ok(Filter::Pattern(vec![Pattern::Regex((*regex).clone())]))
-                }
-                _ => Err("unknown literal for filter, must be a regex, filter name, or object"),
+            Value::Bytes(bytes) => match bytes.as_ref() {
+                b"pattern" => Err("pattern cannot be used without arguments"),
+                b"credit_card" => Ok(Filter::CreditCard),
+                _ => Err("unknown filter name"),
             },
+            Value::Regex(regex) => Ok(Filter::Pattern(vec![Pattern::Regex((*regex).clone())])),
             _ => Err("unknown literal for filter, must be a regex, filter name, or object"),
         }
     }
@@ -254,7 +258,6 @@ mod test {
     use super::*;
     use regex::Regex;
 
-    // TODO test error cases
     test_function![
         redact => Redact;
 
@@ -287,6 +290,28 @@ mod test {
                  filters: vec!["credit_card"],
              ],
              want: Ok("hello [REDACTED] world"),
+             tdef: TypeDef::new().infallible().bytes(),
+        }
+
+        invalid_filter {
+             args: func_args![
+                 value: "hello 123456 world",
+                 filters: vec!["not a filter"],
+             ],
+             want: Err("invalid argument"),
+             tdef: TypeDef::new().infallible().bytes(),
+        }
+
+        missing_patterns {
+             args: func_args![
+                 value: "hello 123456 world",
+                 filters: vec![
+                     value!({
+                         "type": "pattern",
+                     })
+                 ],
+             ],
+             want: Err("invalid argument"),
              tdef: TypeDef::new().infallible().bytes(),
         }
     ];
