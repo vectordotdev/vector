@@ -3,16 +3,20 @@ use crate::metrics::Handle;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use getset::Getters;
+#[cfg(feature = "vrl")]
 use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
 use snafu::Snafu;
+#[cfg(feature = "vrl")]
+use std::convert::TryFrom;
+#[cfg(feature = "vrl")]
+use std::iter::FromIterator;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    convert::TryFrom,
     fmt::{self, Display, Formatter},
-    iter::FromIterator,
 };
+#[cfg(feature = "vrl")]
 use vrl_core::Target;
 
 #[derive(Clone, Debug, Deserialize, Getters, PartialEq, Serialize)]
@@ -62,6 +66,7 @@ pub enum MetricKind {
     Absolute,
 }
 
+#[cfg(feature = "vrl")]
 impl TryFrom<vrl_core::Value> for MetricKind {
     type Error = String;
 
@@ -78,6 +83,7 @@ impl TryFrom<vrl_core::Value> for MetricKind {
     }
 }
 
+#[cfg(feature = "vrl")]
 impl From<MetricKind> for vrl_core::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
@@ -209,6 +215,7 @@ pub fn zip_quantiles(
 /// Convert the Metric value into a vrl value.
 /// Currently vrl can only read the type of the value and doesn't consider
 /// any actual metric values.
+#[cfg(feature = "vrl")]
 impl From<MetricValue> for vrl_core::Value {
     fn from(value: MetricValue) -> Self {
         match value {
@@ -737,9 +744,11 @@ impl Display for Metric {
     }
 }
 
+#[cfg(feature = "vrl")]
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
 
 /// We can get the `type` of the metric in Remap, but can't set  it.
+#[cfg(feature = "vrl")]
 const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .timestamp, .kind, .tags, .type";
 
 #[derive(Debug, Snafu)]
@@ -754,8 +763,10 @@ enum MetricPathError<'a> {
 /// Metrics aren't interested in paths that have a length longer than 3
 /// The longest path is 2, and we need to check that a third segment doesn't exist as we don't want
 /// fields such as `.tags.host.thing`.
+#[cfg(feature = "vrl")]
 const MAX_METRIC_PATH_DEPTH: usize = 3;
 
+#[cfg(feature = "vrl")]
 impl Target for Metric {
     fn insert(&mut self, path: &LookupBuf, value: vrl_core::Value) -> Result<(), String> {
         if path.is_root() {

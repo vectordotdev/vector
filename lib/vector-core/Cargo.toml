@@ -37,7 +37,7 @@ tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.2.17", default-features = false }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231", optional = true }
 twox-hash = { version = "1.6.0", default-features = false }
-vrl-core = { package = "vrl", path = "../vrl/core" }
+vrl-core = { package = "vrl", path = "../vrl/core", optional = true }
 lookup = { path = "../lookup", features = ["arbitrary"] }
 derivative = { version = "2.2.0", default-features = false }
 
@@ -53,6 +53,7 @@ pretty_assertions = "0.7.2"
 default = []
 api = ["async-graphql"]
 lua = ["rlua"]
+vrl = ["vrl-core"]
 
 [[bench]]
 name = "lookup"
