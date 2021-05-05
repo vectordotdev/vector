@@ -651,7 +651,21 @@ cli-tests = ["sinks-blackhole", "sinks-socket", "sources-generator", "sources-fi
 
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions
-benches = ["leveldb", "sinks-file", "sinks-http", "sinks-socket", "sources-file", "sources-socket", "sources-syslog", "transforms-add_fields", "transforms-field_filter", "transforms-json_parser", "transforms-lua", "transforms-regex_parser", "transforms-sample"]
+benches = [
+  "leveldb",
+  "sinks-file",
+  "sinks-http",
+  "sinks-socket",
+  "sources-file",
+  "sources-socket",
+  "sources-syslog",
+  "transforms-add_fields",
+  "transforms-field_filter",
+  "transforms-json_parser",
+  "transforms-lua",
+  "transforms-regex_parser",
+  "transforms-sample",
+]
 language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "transforms-json_parser", "transforms-lua", "transforms-regex_parser", "transforms-remap", "transforms-wasm"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
 statistic-benches = []
