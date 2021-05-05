@@ -277,6 +277,16 @@ pub enum Error {
         value: Value,
         variants: Vec<Value>,
     },
+
+    #[error("this argument must be a static expression")]
+    ExpectedStaticExpression { keyword: &'static str, expr: Expr },
+
+    #[error(r#"invalid argument"#)]
+    InvalidArgument {
+        keyword: &'static str,
+        value: Value,
+        error: &'static str,
+    },
 }
 
 impl diagnostic::DiagnosticError for Error {
@@ -286,6 +296,8 @@ impl diagnostic::DiagnosticError for Error {
         match self {
             UnexpectedExpression { .. } => 400,
             InvalidEnumVariant { .. } => 401,
+            ExpectedStaticExpression { .. } => 402,
+            InvalidArgument { .. } => 403,
         }
     }
 
@@ -327,6 +339,27 @@ impl diagnostic::DiagnosticError for Error {
                     ),
                     Span::default(),
                 ),
+            ],
+
+            ExpectedStaticExpression { keyword, expr } => vec![
+                Label::primary(
+                    format!(r#"expected static expression for argument "{}""#, keyword),
+                    Span::default(),
+                ),
+                Label::context(format!("received: {}", expr.as_str()), Span::default()),
+            ],
+
+            InvalidArgument {
+                keyword,
+                value,
+                error,
+            } => vec![
+                Label::primary(
+                    format!(r#"invalid argument "{}""#, keyword),
+                    Span::default(),
+                ),
+                Label::context(format!("received: {}", value.to_string()), Span::default()),
+                Label::context(format!("error: {}", error), Span::default()),
             ],
         }
     }

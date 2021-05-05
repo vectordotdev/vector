@@ -1,4 +1,4 @@
-use crate::expression::{Array, Block, Group, Object, Resolved};
+use crate::expression::{Array, Block, Group, Object, Resolved, Value};
 use crate::{Context, Expression, State, TypeDef};
 use std::fmt;
 
@@ -30,6 +30,17 @@ impl Expression for Container {
             Block(v) => v.resolve(ctx),
             Array(v) => v.resolve(ctx),
             Object(v) => v.resolve(ctx),
+        }
+    }
+
+    fn as_value(&self) -> Option<Value> {
+        use Variant::*;
+
+        match &self.variant {
+            Group(v) => v.as_value(),
+            Block(v) => v.as_value(),
+            Array(v) => v.as_value(),
+            Object(v) => v.as_value(),
         }
     }
 

@@ -31,6 +31,14 @@ impl Expression for Object {
             .map(Value::Object)
     }
 
+    fn as_value(&self) -> Option<Value> {
+        self.inner
+            .iter()
+            .map(|(key, expr)| expr.as_value().map(|v| (key.to_owned(), v)))
+            .collect::<Option<BTreeMap<_, _>>>()
+            .map(Value::Object)
+    }
+
     fn type_def(&self, state: &State) -> TypeDef {
         let type_defs = self
             .inner

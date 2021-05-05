@@ -30,6 +30,14 @@ impl Expression for Array {
             .map(Value::Array)
     }
 
+    fn as_value(&self) -> Option<Value> {
+        self.inner
+            .iter()
+            .map(|expr| expr.as_value())
+            .collect::<Option<Vec<_>>>()
+            .map(Value::Array)
+    }
+
     fn type_def(&self, state: &State) -> TypeDef {
         let type_defs = self
             .inner
