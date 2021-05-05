@@ -1,4 +1,9 @@
-use super::{legacy_lookup::Segment, util, EventMetadata, Lookup, PathComponent, Value};
+use super::{
+    finalization::{BatchNotifier, EventFinalizer},
+    legacy_lookup::Segment,
+    metadata::EventMetadata,
+    util, Lookup, PathComponent, Value,
+};
 use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::Utc;
@@ -7,6 +12,7 @@ use getset::{Getters, MutGetters};
 use lookup::LookupBuf;
 use serde::{Deserialize, Serialize, Serializer};
 use shared::EventDataEq;
+use std::sync::Arc;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
@@ -50,6 +56,17 @@ impl LogEvent {
                 .unwrap_or_else(|| unreachable!("fields must be a map")),
             self.metadata,
         )
+    }
+
+    pub fn from_parts(fields: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
+        let fields = fields.into();
+        Self { fields, metadata }
+    }
+
+    pub fn with_batch_notifier(self, batch: Arc<BatchNotifier>) -> Self {
+        // Don't make new metadata, just modify it
+        let (fields, metadata) = self.into_parts();
+        Self::from_parts(fields, metadata.with_finalizer(EventFinalizer::new(batch)))
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]

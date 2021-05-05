@@ -14,10 +14,9 @@ pub struct EventMetadata {
 
 impl EventMetadata {
     /// Replace the finalizers array with the given one.
-    pub fn with_finalizer(self, finalizer: EventFinalizer) -> Self {
-        Self {
-            finalizers: EventFinalizers::new(finalizer),
-        }
+    pub fn with_finalizer(mut self, finalizer: EventFinalizer) -> Self {
+        self.finalizers = EventFinalizers::new(finalizer);
+        self
     }
 
     /// Merge the other `EventMetadata` into this.
