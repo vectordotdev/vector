@@ -59,9 +59,9 @@ impl Handle {
         Handle::Gauge(Gauge::new())
     }
 
-    pub(crate) fn update_gauge(&mut self, value: &GaugeValue) {
+    pub(crate) fn update_gauge(&mut self, value: GaugeValue) {
         match self {
-            Handle::Gauge(gauge) => gauge.record(&value),
+            Handle::Gauge(gauge) => gauge.record(value),
             _ => unreachable!(),
         }
     }
@@ -210,7 +210,8 @@ impl Gauge {
         }
     }
 
-    pub(crate) fn record(&mut self, value: &GaugeValue) {
+    #[allow(clippy::needless_pass_by_value)]
+    pub(crate) fn record(&mut self, value: GaugeValue) {
         // Because Rust lacks an atomic f64 we store gauges as AtomicU64
         // and transmute back and forth to an f64 here. They have the
         // same size so this operation is safe, just don't read the

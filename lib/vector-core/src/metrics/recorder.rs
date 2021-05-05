@@ -49,7 +49,7 @@ impl Recorder for VectorRecorder {
         let composite_key = CompositeKey::new(MetricKind::Gauge, key.to_owned());
         self.registry.op(
             composite_key,
-            |handle| handle.update_gauge(&value),
+            |handle| handle.update_gauge(value),
             Handle::gauge,
         );
     }
