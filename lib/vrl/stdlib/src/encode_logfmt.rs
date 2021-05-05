@@ -44,18 +44,18 @@ mod logfmt {
     }
 
     fn flatten(
-        input: &BTreeMap<String, Value>,
+        input: BTreeMap<String, Value>,
         parent_key: &str,
         separator: char,
         depth: usize,
     ) -> BTreeMap<String, Value> {
         let mut items = BTreeMap::<String, Value>::new();
 
-        for (key, value) in input.iter() {
+        for (key, value) in input.into_iter() {
             let new_key = if depth > 0 {
                 format!("{}{}{}", parent_key, separator, key)
             } else {
-                key.into()
+                key
             };
 
             match value {
@@ -68,12 +68,12 @@ mod logfmt {
                         let array_map = btreemap! {
                             idx.to_string() => v.clone()
                         };
-                        let mut res = flatten(&array_map, &new_key, separator, depth + 1);
+                        let mut res = flatten(array_map, &new_key, separator, depth + 1);
                         items.append(&mut res);
                     }
                 }
                 _ => {
-                    items.insert(new_key, value.clone());
+                    items.insert(new_key, value);
                 }
             };
         }
@@ -87,14 +87,14 @@ mod logfmt {
         encode_value(output, value)
     }
 
-    pub fn encode(input: &BTreeMap<String, Value>, fields: &[String]) -> String {
+    pub fn encode(input: BTreeMap<String, Value>, fields: &[String]) -> String {
         let mut output = String::new();
         let mut seen_fields = HashSet::new();
 
-        let flattened = flatten(input, "", '.', 0);
+        let input = flatten(input, "", '.', 0);
 
         for (idx, field) in fields.iter().enumerate() {
-            if let Some(val) = flattened.get(field) {
+            if let Some(val) = input.get(field) {
                 if idx > 0 {
                     output.write_char(' ').unwrap();
                 }
@@ -103,7 +103,7 @@ mod logfmt {
             }
         }
 
-        for (idx, (key, value)) in flattened.iter().enumerate() {
+        for (idx, (key, value)) in input.iter().enumerate() {
             if seen_fields.contains(key) {
                 continue;
             }
@@ -194,7 +194,7 @@ impl Expression for EncodeLogfmtFn {
         }?;
 
         let object = value.try_object()?;
-        Ok(logfmt::encode(&object, &fields[..]).into())
+        Ok(logfmt::encode(object, &fields[..]).into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
