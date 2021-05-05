@@ -18,3 +18,9 @@ kind: transform
 ## Telemetry
 
 {{< component/telemetry >}}
+
+## How it works
+
+### State
+
+{{< snippet "stateless" >}}

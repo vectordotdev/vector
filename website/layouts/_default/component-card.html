@@ -3,7 +3,7 @@
 {{ $kind := .Params.kind }}
 {{ $kindLink := printf "/docs/reference/configuration/%ss" $kind | relURL }}
 <div class="no-prose border rounded-md py-3.5 px-5 flex flex-col hover:bg-gray-50 dark:hover:bg-gray-800 dark:border-gray-700 shadow-sm">
-  <span class="flex justify-between items-start space-x-2">
+  <span class="flex justify-between space-x-2">
     <h3 id="{{ $componentTag }}">
       <a href="{{ .RelPermalink }}" class="text-sm text-gray-600 tracking-snug dark:text-gray-300">
         {{ $title }}

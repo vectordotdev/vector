@@ -8,6 +8,14 @@ kind: transform
 
 {{< component/requirements >}}
 
+## Configuration
+
+{{< component/config >}}
+
 ## Telemetry
 
 {{< component/telemetry >}}
+
+## How it works
+
+{{< snippet "stateless" >}}

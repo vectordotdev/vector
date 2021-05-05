@@ -14,3 +14,9 @@ kind: transform
 ## Examples
 
 {{< component/examples >}}
+
+## How it works
+
+### State
+
+{{< snippet "stateless" >}}

@@ -8,5 +8,5 @@
 </p>
 {{ else }}
 {{ $file := printf "snippets/%s.md" $snippet }}
-{{ readFile $file | $.Page.RenderString }}
+{{ readFile $file | $.Page.RenderString (dict "display" "block") }}
 {{ end }}
