@@ -12,4 +12,9 @@
     {{ . | markdownify }}
   </p>
   {{ end }}
+
+  {{/* Component under-hero */}}
+  {{ if .Params.kind }}
+  {{ partial "docs/component-under-hero.html" . }}
+  {{ end }}
 </div>
