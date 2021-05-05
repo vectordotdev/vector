@@ -28,10 +28,10 @@ pub fn build_test_server(
     Trigger,
     impl std::future::Future<Output = Result<(), ()>>,
 ) {
-    build_test_server2(addr, || Response::new(Body::empty()))
+    build_test_server_generic(addr, || Response::new(Body::empty()))
 }
 
-pub fn build_test_server2(
+pub fn build_test_server_generic(
     addr: std::net::SocketAddr,
     responder: impl Fn() -> Response<Body> + Clone + Send + Sync + 'static,
 ) -> (

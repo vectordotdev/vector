@@ -318,7 +318,7 @@ mod tests {
             http::HttpSinkConfig,
             util::{
                 http::HttpSink,
-                test::{build_test_server, build_test_server2},
+                test::{build_test_server, build_test_server_generic},
             },
         },
         test_util::{next_addr, random_lines_with_stream},
@@ -535,7 +535,7 @@ mod tests {
 
         let counter = Arc::new(atomic::AtomicUsize::new(0));
         let in_counter = Arc::clone(&counter);
-        let (rx, trigger, server) = build_test_server2(in_addr, move || {
+        let (rx, trigger, server) = build_test_server_generic(in_addr, move || {
             let count = in_counter.fetch_add(1, atomic::Ordering::Relaxed);
             if count < NUM_FAILURES {
                 // Send a temporary error for the first two responses
@@ -577,7 +577,7 @@ mod tests {
 
         let (in_addr, sink) = build_sink("").await;
 
-        let (rx, trigger, server) = build_test_server2(in_addr, move || {
+        let (rx, trigger, server) = build_test_server_generic(in_addr, move || {
             Response::builder()
                 .status(StatusCode::FORBIDDEN)
                 .body(Body::empty())
