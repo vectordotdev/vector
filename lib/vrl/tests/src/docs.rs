@@ -39,6 +39,7 @@ pub struct Example {
     returns: Option<Value>,
     output: Option<ExampleOutput>,
     raises: Option<Error>,
+    skip_test: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -116,9 +117,10 @@ impl Test {
             returns,
             output,
             raises,
+            skip_test,
         } = example;
 
-        let mut skip = SKIP_FUNCTION_EXAMPLES.contains(&name.as_str());
+        let mut skip = skip_test.unwrap_or_else(|| SKIP_FUNCTION_EXAMPLES.contains(&name.as_str()));
 
         let object = match input {
             Some(event) => {
