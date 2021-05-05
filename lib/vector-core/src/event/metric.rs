@@ -3,15 +3,10 @@ use crate::metrics::Handle;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use getset::Getters;
-#[cfg(feature = "vrl")]
-use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
-use snafu::Snafu;
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
-#[cfg(feature = "vrl")]
-use std::iter::FromIterator;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
@@ -740,24 +735,6 @@ impl Display for Metric {
             }
         }
     }
-}
-
-<<<<<<< HEAD
-=======
-#[cfg(feature = "vrl")]
-const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
-
-/// We can get the `type` of the metric in Remap, but can't set  it.
-#[cfg(feature = "vrl")]
-const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .timestamp, .kind, .tags, .type";
-
-#[derive(Debug, Snafu)]
-enum MetricPathError<'a> {
-    #[snafu(display("cannot set root path"))]
-    SetPathError,
-
-    #[snafu(display("invalid path {}: expected one of {}", path, expected))]
-    InvalidPath { path: &'a str, expected: &'a str },
 }
 
 fn write_list<I, T, W>(

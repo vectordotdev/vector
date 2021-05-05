@@ -3,6 +3,7 @@ use crate::config::log_schema;
 use lookup::LookupBuf;
 use snafu::Snafu;
 use std::{collections::BTreeMap, convert::TryFrom, iter::FromIterator};
+use vrl_core;
 
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
 
