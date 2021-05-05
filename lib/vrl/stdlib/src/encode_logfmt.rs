@@ -1,121 +1,8 @@
+use std::collections::BTreeMap;
+use std::fmt::Write;
 use std::result::Result;
 use vrl::prelude::*;
-
-mod logfmt {
-    use std::collections::{BTreeMap, HashSet};
-    use std::fmt::Write;
-
-    use shared::btreemap;
-    use Value::{Array, Object};
-
-    use vrl::prelude::*;
-
-    fn encode_string(output: &mut String, str: &str) {
-        let needs_quotting = str.find(' ').is_some();
-        if needs_quotting {
-            output.write_char('"').unwrap();
-        }
-
-        let escaped = str
-            .to_string()
-            .replace(r#"\"#, r#"\\"#)
-            .replace(r#"""#, r#"\""#)
-            .replace("\n", r#"\\n"#);
-
-        output.write_str(&escaped).unwrap();
-
-        if needs_quotting {
-            output.write_char('"').unwrap();
-        }
-    }
-
-    fn encode_value(output: &mut String, value: &Value) {
-        match value {
-            Value::Bytes(b) => {
-                let val = String::from_utf8_lossy(b);
-                encode_string(output, &val)
-            }
-            _ => {
-                let val = format!("{}", value);
-                encode_string(output, &val)
-            }
-        }
-    }
-
-    fn flatten(
-        input: BTreeMap<String, Value>,
-        parent_key: &str,
-        separator: char,
-        depth: usize,
-    ) -> BTreeMap<String, Value> {
-        let mut items = BTreeMap::<String, Value>::new();
-
-        for (key, value) in input.into_iter() {
-            let new_key = if depth > 0 {
-                format!("{}{}{}", parent_key, separator, key)
-            } else {
-                key
-            };
-
-            match value {
-                Object(map) => {
-                    let mut res = flatten(map, &new_key, separator, depth + 1);
-                    items.append(&mut res);
-                }
-                Array(array) => {
-                    for (idx, v) in array.iter().enumerate() {
-                        let array_map = btreemap! {
-                            idx.to_string() => v.clone()
-                        };
-                        let mut res = flatten(array_map, &new_key, separator, depth + 1);
-                        items.append(&mut res);
-                    }
-                }
-                _ => {
-                    items.insert(new_key, value);
-                }
-            };
-        }
-
-        items
-    }
-
-    fn encode_field(output: &mut String, key: &str, value: &Value) {
-        encode_string(output, key);
-        output.write_char('=').unwrap();
-        encode_value(output, value)
-    }
-
-    pub fn encode(input: BTreeMap<String, Value>, fields: &[String]) -> String {
-        let mut output = String::new();
-        let mut seen_fields = HashSet::new();
-
-        let input = flatten(input, "", '.', 0);
-
-        for (idx, field) in fields.iter().enumerate() {
-            if let Some(val) = input.get(field) {
-                if idx > 0 {
-                    output.write_char(' ').unwrap();
-                }
-                encode_field(&mut output, field, val);
-                seen_fields.insert(field);
-            }
-        }
-
-        for (idx, (key, value)) in input.iter().enumerate() {
-            if seen_fields.contains(key) {
-                continue;
-            }
-
-            if idx > 0 || !seen_fields.is_empty() {
-                output.write_char(' ').unwrap();
-            }
-            encode_field(&mut output, key, value);
-        }
-
-        output
-    }
-}
+use Value::{Array, Object};
 
 #[derive(Clone, Copy, Debug)]
 pub struct EncodeLogfmt;
@@ -193,12 +80,106 @@ impl Expression for EncodeLogfmtFn {
         }?;
 
         let object = value.try_object()?;
-        Ok(logfmt::encode(object, &fields[..]).into())
+        Ok(encode(object, &fields[..]).into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value.type_def(state).fallible().bytes()
     }
+}
+
+fn encode_string(output: &mut String, str: &str) {
+    let needs_quoting = str.find(' ').is_some();
+    if needs_quoting {
+        output.write_char('"').unwrap();
+    }
+
+    for c in str.chars() {
+        match c {
+            '\\' => output.write_str("\\").unwrap(),
+            '"' => output.write_str(r#"\""#).unwrap(),
+            '\n' => output.write_str(r#"\\n"#).unwrap(),
+            _ => output.write_char(c).unwrap(),
+        }
+    }
+
+    if needs_quoting {
+        output.write_char('"').unwrap();
+    }
+}
+
+fn encode_value(output: &mut String, value: &Value) {
+    match value {
+        Value::Bytes(b) => {
+            let val = String::from_utf8_lossy(b);
+            encode_string(output, &val)
+        }
+        _ => {
+            let val = format!("{}", value);
+            encode_string(output, &val)
+        }
+    }
+}
+
+fn flatten<'a>(
+    input: impl IntoIterator<Item = (String, Value)> + 'a,
+    parent_key: String,
+    separator: char,
+    depth: usize,
+) -> Box<dyn Iterator<Item = (String, Value)> + 'a> {
+    let iter = input.into_iter().map(move |(key, value)| {
+        let new_key = if depth > 0 {
+            format!("{}{}{}", parent_key, separator, key)
+        } else {
+            key
+        };
+
+        match value {
+            Object(map) => flatten(map, new_key, separator, depth + 1),
+            Array(array) => {
+                let array_map: BTreeMap<_, _> = array
+                    .into_iter()
+                    .enumerate()
+                    .map(|(key, value)| (key.to_string(), value))
+                    .collect();
+                flatten(array_map, new_key, separator, depth + 1)
+            }
+            _ => Box::new(std::iter::once((new_key, value)))
+                as Box<dyn Iterator<Item = (std::string::String, vrl::Value)>>,
+        }
+    });
+
+    Box::new(iter.flatten())
+}
+
+fn encode_field(output: &mut String, key: &str, value: &Value) {
+    encode_string(output, key);
+    output.write_char('=').unwrap();
+    encode_value(output, value)
+}
+
+pub fn encode(input: BTreeMap<String, Value>, fields: &[String]) -> String {
+    let mut output = String::new();
+
+    let mut input: BTreeMap<_, _> = flatten(input, String::from(""), '.', 0).collect();
+
+    for field in fields.iter() {
+        if let Some(val) = input.remove(field) {
+            encode_field(&mut output, field, &val);
+            output.write_char(' ').unwrap();
+        }
+    }
+
+    for (key, value) in input.iter() {
+        encode_field(&mut output, key, value);
+        output.write_char(' ').unwrap();
+    }
+
+    if output.ends_with(" ") {
+        output.truncate(output.len() - 1)
+    }
+
+    output
 }
 
 #[cfg(test)]
