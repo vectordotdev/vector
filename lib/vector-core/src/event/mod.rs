@@ -44,6 +44,11 @@ impl Event {
         Event::Log(LogEvent::default())
     }
 
+    /// Return self as a `LogEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Log`.
     pub fn as_log(&self) -> &LogEvent {
         match self {
             Event::Log(log) => log,
@@ -51,6 +56,11 @@ impl Event {
         }
     }
 
+    /// Return self as a mutable `LogEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Log`.
     pub fn as_mut_log(&mut self) -> &mut LogEvent {
         match self {
             Event::Log(log) => log,
@@ -58,6 +68,11 @@ impl Event {
         }
     }
 
+    /// Coerces self into a `LogEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Log`.
     pub fn into_log(self) -> LogEvent {
         match self {
             Event::Log(log) => log,
@@ -65,6 +80,11 @@ impl Event {
         }
     }
 
+    /// Return self as a `Metric`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Metric`.
     pub fn as_metric(&self) -> &Metric {
         match self {
             Event::Metric(metric) => metric,
@@ -72,6 +92,11 @@ impl Event {
         }
     }
 
+    /// Return self as a mutable `Metric`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Metric`.
     pub fn as_mut_metric(&mut self) -> &mut Metric {
         match self {
             Event::Metric(metric) => metric,
@@ -79,6 +104,11 @@ impl Event {
         }
     }
 
+    /// Coerces self into `Metric`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Metric`.
     pub fn into_metric(self) -> Metric {
         match self {
             Event::Metric(metric) => metric,

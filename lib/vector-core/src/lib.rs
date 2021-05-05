@@ -15,7 +15,6 @@
 #![allow(clippy::default_trait_access)] // triggers on generated prost code
 #![allow(clippy::float_cmp)]
 #![allow(clippy::match_wildcard_for_single_variants)]
-#![allow(clippy::missing_panics_doc)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)] // many false positives in this package
 #![allow(clippy::unnested_or_patterns)] // nightly-only feature as of 1.51.0

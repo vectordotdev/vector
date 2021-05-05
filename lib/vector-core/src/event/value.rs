@@ -294,6 +294,11 @@ impl Value {
         }
     }
 
+    /// Returns self as a mutable `BTreeMap<String, Value>`
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if self is anything other than `Value::Map`.
     pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
         match self {
             Value::Map(ref mut m) => m,
@@ -301,6 +306,11 @@ impl Value {
         }
     }
 
+    /// Returns self as a `Vec<Value>`
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if self is anything other than `Value::Array`.
     pub fn as_array(&self) -> &Vec<Value> {
         match self {
             Value::Array(ref a) => a,
@@ -308,6 +318,11 @@ impl Value {
         }
     }
 
+    /// Returns self as a mutable `Vec<Value>`
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if self is anything other than `Value::Array`.
     pub fn as_array_mut(&mut self) -> &mut Vec<Value> {
         match self {
             Value::Array(ref mut a) => a,
@@ -1013,6 +1028,11 @@ impl Value {
     /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
     /// assert_eq!(map.get_mut(lookup_key).unwrap(), Some(&mut Value::from(1)));
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function may panic if an invariant is violated, indicating a
+    /// serious bug.
     #[allow(clippy::missing_errors_doc)]
     pub fn get_mut<'a>(
         &mut self,
