@@ -16,4 +16,4 @@ We have a new [`pulsar` sink][docs.sinks.pulsar]! This was a community
 contribution and effort. Thanks to [Evan](https://github.com/leshow) for his
 help building this sink!
 
-[docs.sinks.pulsar]: /docs/reference/sinks/pulsar/
+[docs.sinks.pulsar]: /docs/reference/configuration/sinks/pulsar/

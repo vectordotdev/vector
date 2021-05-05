@@ -28,7 +28,7 @@ Let's build similar in Vector!
 
 We'll take a series of events:
 
-```log file=input.log
+```log title=input.log
 {"timestamp": "...", "message": "Received GET /path", "request_id": "abcd1234", "request_path": "/path", "request_params": "..."}
 {"timestamp": "...", "message": "Executed query in 5.2ms", "request_id": "abcd1234", "query": "SELECT * FROM table", "query_duration_ms": 5.2}
 {"timestamp": "...", "message": "Rendered partial _partial.erb in 2.3ms", "request_id": "abcd1234", "template": "_partial.erb", "render_duration_ms": 2.3}
@@ -38,7 +38,7 @@ We'll take a series of events:
 
 Then output this (but not formatted so nicely!):
 
-```json file=output.log
+```json title=output.log
 {
   "timestamp_start": "...",
   "timestamp_end": "...",
@@ -54,7 +54,7 @@ Then output this (but not formatted so nicely!):
 
 We'll run this config:
 
-```toml file=vector.toml
+```toml title=vector.toml
 data_dir = "tmp"
 
 [sources.source0]
@@ -94,5 +94,5 @@ data_dir = "tmp"
 
 We hope you find this useful!
 
-[docs.transforms.reduce]: /docs/reference/transforms/reduce/
+[docs.transforms.reduce]: /docs/reference/configuration/transforms/reduce/
 [urls.stripe_blog_canonical_log_lines]: https://stripe.com/blog/canonical-log-lines

@@ -134,9 +134,9 @@ operations, such as merging multi-line logs together:
 +  group_by = ["my_field"]
 ```
 
-[internal_metrics_output]: /docs/reference/sources/internal_metrics/#metric-events
+[internal_metrics_output]: /docs/reference/configuration/sources/internal_metrics/#output-metrics
 [metric_names_diff]: https://github.com/timberio/vector/pull/4647/files
 [metric_naming_convention]: https://github.com/timberio/vector/blob/master/CONTRIBUTING.md#metric-naming-convention
 [prometheus_naming_convention]: https://prometheus.io/docs/practices/naming/
 [removed_systemd_syslog_options]: https://github.com/timberio/vector/pull/3427/files
-[statsd_sink]: /docs/reference/sinks/statsd/
+[statsd_sink]: /docs/reference/configuration/sinks/statsd/

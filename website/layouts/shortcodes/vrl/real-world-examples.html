@@ -1,7 +1,7 @@
 {{ $key := .Get 0 }}
 {{ $examples := site.Data.docs.remap.examples }}
 {{ $first := index $examples 0 }}
-<div class="no-prose border rounded flex flex-col divide-y">
+<div class="no-prose border rounded flex flex-col divide-y dark:divide-gray-700 dark:border-gray-700">
   {{ range $examples }}
   {{ $input := dict "message" .input.log.message | jsonify }}
   {{ $vrlSourceCode := highlight .source "toml" "" }}
