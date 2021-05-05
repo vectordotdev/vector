@@ -67,7 +67,9 @@ impl<'a> Iterator for PathIter<'a> {
     type Item = PathComponent;
 
     fn next(&mut self) -> Option<Self::Item> {
-        use PathIterState::*;
+        use PathIterState::{
+            ClosingBracket, Dot, End, Fast, Index, Invalid, Key, KeyEscape, OpeningBracket, Start,
+        };
 
         if self.state.is_start() && FAST_RE.is_match(self.path) {
             self.state = Fast(self.path.split('.'));
