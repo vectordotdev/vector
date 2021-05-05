@@ -44,6 +44,7 @@ impl Arithmetic {
 /// integer type the integer is "degraded" into a float. This allows us to
 /// perform arithmetic on common values, but if both are integers then their
 /// precision is preserved.
+#[allow(clippy::cast_precision_loss)]
 fn coerce_number_types(left: Value, right: Value) -> (Value, Value) {
     match (&left, &right) {
         (Value::Float(lf), Value::Integer(ri)) => (Value::Float(*lf), Value::Float(*ri as f64)),
@@ -54,6 +55,7 @@ fn coerce_number_types(left: Value, right: Value) -> (Value, Value) {
 
 // Degrades non-float numerical types into floats for the purposes of convenient
 // boolean comparison.
+#[allow(clippy::cast_precision_loss)]
 fn compare_number_types(
     left: Value,
     right: Value,
@@ -73,6 +75,7 @@ fn compare_number_types(
 
 impl Function for Arithmetic {
     #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cast_precision_loss)]
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let left = match self.left.execute(ctx)? {
             QueryValue::Value(value) => value,

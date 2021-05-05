@@ -517,6 +517,12 @@ fn mapping_from_pairs(pairs: Pairs<Rule>) -> Result<Mapping> {
     Ok(Mapping::new(assignments))
 }
 
+/// Parse an input string into a `Mapping`
+///
+/// # Errors
+///
+/// This function will fail if the parsing does not succeed because of syntax
+/// errors in the input.
 pub fn parse(input: &str) -> Result<Mapping> {
     match MappingParser::parse(Rule::mapping, input) {
         Ok(a) => mapping_from_pairs(a),

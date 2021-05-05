@@ -13,9 +13,16 @@ lazy_static::lazy_static! {
     };
 }
 
-/// Loads Log Schema from configurations and sets global schema.
-/// Once this is done, configurations can be correctly loaded using
-/// configured log schema defaults.
+/// Loads Log Schema from configurations and sets global schema. Once this is
+/// done, configurations can be correctly loaded using configured log schema
+/// defaults.
+///
+/// # Errors
+///
+/// This function will fail if the `F` fails.
+///
+/// # Panics
+///
 /// If deny is set, will panic if schema has already been set.
 pub fn init_log_schema<F>(builder: F, deny_if_set: bool) -> Result<(), Vec<String>>
 where
@@ -102,6 +109,12 @@ impl LogSchema {
         self.source_type_key = v;
     }
 
+    /// Merge two `LogSchema` instances together.
+    ///
+    /// # Errors
+    ///
+    /// This function will fail when the `LogSchema` to be merged contains
+    /// conflicting keys.
     pub fn merge(&mut self, other: &LogSchema) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 

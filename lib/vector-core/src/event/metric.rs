@@ -305,9 +305,12 @@ impl Metric {
 
     /// Convert the `metrics_runtime::Measurement` value plus the name and
     /// labels from a Key into our internal Metric format.
+    #[allow(clippy::cast_precision_loss)]
     pub fn from_metric_kv(key: &metrics::Key, handle: &Handle) -> Self {
         let value = match handle {
             Handle::Counter(counter) => MetricValue::Counter {
+                // NOTE this will truncate if `counter.count()` is a value
+                // greater than 2**52.
                 value: counter.count() as f64,
             },
             Handle::Gauge(gauge) => MetricValue::Gauge {

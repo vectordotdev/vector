@@ -686,6 +686,7 @@ impl Value {
     /// assert!(map.contains("bar"));
     /// assert!(map.contains(Lookup::from_str("star.baz").unwrap()));
     /// ```
+    #[allow(clippy::missing_errors_doc)]
     pub fn insert(
         &mut self,
         lookup: impl Into<LookupBuf> + Debug,
@@ -775,6 +776,7 @@ impl Value {
     /// assert!(!map.contains("star"));
     /// ```
     #[allow(clippy::too_many_lines)]
+    #[allow(clippy::missing_errors_doc)]
     pub fn remove<'a>(
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
@@ -919,6 +921,7 @@ impl Value {
     /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
     /// assert_eq!(map.get(lookup_key).unwrap(), Some(&Value::from(1)));
     /// ```
+    #[allow(clippy::missing_errors_doc)]
     pub fn get<'a>(
         &self,
         lookup: impl Into<Lookup<'a>> + Debug,
@@ -1010,6 +1013,7 @@ impl Value {
     /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
     /// assert_eq!(map.get_mut(lookup_key).unwrap(), Some(&mut Value::from(1)));
     /// ```
+    #[allow(clippy::missing_errors_doc)]
     pub fn get_mut<'a>(
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,

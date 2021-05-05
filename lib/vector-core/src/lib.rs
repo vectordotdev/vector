@@ -10,17 +10,15 @@
 
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
-#![allow(clippy::float_cmp)]
-#![allow(clippy::module_name_repetitions)]
-#![allow(clippy::missing_errors_doc)]
-#![allow(clippy::cast_precision_loss)]
-#![allow(clippy::cast_sign_loss)]
 #![allow(clippy::cast_possible_wrap)]
-#![allow(clippy::missing_panics_doc)]
-#![allow(clippy::default_trait_access)]
-#![allow(clippy::unnested_or_patterns)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::default_trait_access)] // triggers on generated prost code
+#![allow(clippy::float_cmp)]
 #![allow(clippy::match_wildcard_for_single_variants)]
-#![allow(clippy::must_use_candidate)]
+#![allow(clippy::missing_panics_doc)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::must_use_candidate)] // many false positives in this package
+#![allow(clippy::unnested_or_patterns)] // nightly-only feature as of 1.51.0
 
 #[cfg(feature = "api")]
 pub mod api;
