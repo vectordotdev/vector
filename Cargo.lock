@@ -7727,7 +7727,6 @@ dependencies = [
  "maxminddb",
  "metrics",
  "metrics-tracing-context",
- "metrics-util",
  "mongodb",
  "nix 0.20.0",
  "nom 6.1.2",
