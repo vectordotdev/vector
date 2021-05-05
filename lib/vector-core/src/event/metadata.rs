@@ -5,6 +5,7 @@ use shared::EventDataEq;
 pub struct EventMetadata;
 
 impl EventMetadata {
+    #[allow(clippy::unused_self)]
     pub fn merge(&mut self, _other: &Self) {
         // Just a stub function for when there is actual metadata
     }

@@ -16,7 +16,7 @@ impl Function for NotFn {
         self.query.execute(ctx).and_then(|v| match v {
             QueryValue::Value(Value::Boolean(b)) => Ok(Value::Boolean(!b).into()),
             QueryValue::Value(v) => Err(format!("unable to perform NOT on {:?} value", v)),
-            v => Err(format!("unable to perform NOT on {:?} value", v)),
+            v @ QueryValue::Regex(_) => Err(format!("unable to perform NOT on {:?} value", v)),
         })
     }
 }

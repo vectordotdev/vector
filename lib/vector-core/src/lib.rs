@@ -9,8 +9,20 @@
 //! RFC 7027.
 
 #![deny(clippy::all)]
+#![deny(clippy::pedantic)]
 #![allow(clippy::float_cmp)]
 #![allow(clippy::approx_constant)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_possible_wrap)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::missing_panics_doc)]
+#![allow(clippy::default_trait_access)]
+#![allow(clippy::enum_glob_use)]
 
 #[cfg(feature = "api")]
 pub mod api;

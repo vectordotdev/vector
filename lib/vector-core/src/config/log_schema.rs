@@ -32,6 +32,7 @@ where
 /// Components should use global LogShema returned by this function.
 /// The returned value can differ from LogSchema::default()
 /// which is unchanging.
+#[must_use]
 pub fn log_schema() -> &'static LogSchema {
     LOG_SCHEMA.get().unwrap_or(&LOG_SCHEMA_DEFAULT)
 }
@@ -74,15 +75,22 @@ impl LogSchema {
         String::from("source_type")
     }
 
+    #[must_use]
     pub fn message_key(&self) -> &str {
         &self.message_key
     }
+
+    #[must_use]
     pub fn timestamp_key(&self) -> &str {
         &self.timestamp_key
     }
+
+    #[must_use]
     pub fn host_key(&self) -> &str {
         &self.host_key
     }
+
+    #[must_use]
     pub fn source_type_key(&self) -> &str {
         &self.source_type_key
     }
@@ -100,10 +108,10 @@ impl LogSchema {
         self.source_type_key = v;
     }
 
-    pub fn merge(&mut self, other: LogSchema) -> Result<(), Vec<String>> {
+    pub fn merge(&mut self, other: &LogSchema) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
-        if other != *LOG_SCHEMA_DEFAULT {
+        if *other != *LOG_SCHEMA_DEFAULT {
             // If the set value is the default, override it. If it's already overridden, error.
             if self.host_key() != LOG_SCHEMA_DEFAULT.host_key()
                 && self.host_key() != other.host_key()

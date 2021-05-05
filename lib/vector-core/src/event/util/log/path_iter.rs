@@ -25,6 +25,7 @@ pub struct PathIter<'a> {
 }
 
 impl<'a> PathIter<'a> {
+    #[must_use]
     pub fn new(path: &'a str) -> PathIter {
         PathIter {
             path,

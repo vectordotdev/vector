@@ -272,22 +272,26 @@ impl Metric {
         self
     }
 
+    #[must_use]
     pub fn with_timestamp(mut self, timestamp: Option<DateTime<Utc>>) -> Self {
         self.data.timestamp = timestamp;
         self
     }
 
+    #[must_use]
     pub fn with_tags(mut self, tags: Option<MetricTags>) -> Self {
         self.series.tags = tags;
         self
     }
 
+    #[must_use]
     pub fn with_value(mut self, value: MetricValue) -> Self {
         self.data.value = value;
         self
     }
 
     /// Rewrite this into a Metric with the data marked as absolute.
+    #[must_use]
     pub fn into_absolute(self) -> Self {
         Self {
             series: self.series,
@@ -297,6 +301,7 @@ impl Metric {
     }
 
     /// Rewrite this into a Metric with the data marked as incremental.
+    #[must_use]
     pub fn into_incremental(self) -> Self {
         Self {
             series: self.series,
@@ -344,14 +349,17 @@ impl Metric {
             })
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.series.name.name
     }
 
+    #[must_use]
     pub fn namespace(&self) -> Option<&str> {
         self.series.name.namespace.as_deref()
     }
 
+    #[must_use]
     pub fn tags(&self) -> Option<&MetricTags> {
         self.series.tags.as_ref()
     }
@@ -361,6 +369,7 @@ impl Metric {
     }
 
     /// Returns `true` if `name` tag is present, and matches the provided `value`
+    #[must_use]
     pub fn tag_matches(&self, name: &str, value: &str) -> bool {
         self.tags()
             .filter(|t| t.get(name).filter(|v| *v == value).is_some())
@@ -368,6 +377,7 @@ impl Metric {
     }
 
     /// Returns the string value of a tag, if it exists
+    #[must_use]
     pub fn tag_value(&self, name: &str) -> Option<String> {
         self.tags().and_then(|t| t.get(name).cloned())
     }
@@ -385,6 +395,7 @@ impl Metric {
     }
 
     /// Create a new metric from this with the data zeroed.
+    #[must_use]
     pub fn zero(&self) -> Self {
         Self {
             series: self.series.clone(),
@@ -404,6 +415,7 @@ impl EventDataEq for Metric {
 
 impl MetricData {
     /// Rewrite this data to mark it as absolute.
+    #[must_use]
     pub fn into_absolute(self) -> Self {
         Self {
             timestamp: self.timestamp,
@@ -413,6 +425,7 @@ impl MetricData {
     }
 
     /// Rewrite this data to mark it as incremental.
+    #[must_use]
     pub fn into_incremental(self) -> Self {
         Self {
             timestamp: self.timestamp,
@@ -427,8 +440,7 @@ impl MetricData {
         // Update the timestamp to the latest one
         self.timestamp = match (self.timestamp, other.timestamp) {
             (None, None) => None,
-            (Some(t), None) => Some(t),
-            (None, Some(t)) => Some(t),
+            (Some(t), None) | (None, Some(t)) => Some(t),
             (Some(t1), Some(t2)) => Some(t1.max(t2)),
         };
     }
@@ -442,6 +454,7 @@ impl MetricData {
     }
 
     /// Create a new metric data from this with a zero value.
+    #[must_use]
     pub fn zero(&self) -> Self {
         Self {
             timestamp: self.timestamp,
@@ -456,6 +469,7 @@ impl MetricValue {
     /// zero. This keeps all the bucket/value vectors for the histogram
     /// and summary metric types intact while zeroing the
     /// counts. Distribution metrics are emptied of all their values.
+    #[must_use]
     pub fn zero(&self) -> Self {
         match self {
             Self::Counter { .. } => Self::Counter { value: 0.0 },
@@ -495,10 +509,8 @@ impl MetricValue {
     /// Add another same value to this.
     pub fn add(&mut self, other: &Self) {
         match (self, other) {
-            (Self::Counter { ref mut value }, Self::Counter { value: value2 }) => {
-                *value += value2;
-            }
-            (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
+            (Self::Counter { ref mut value }, Self::Counter { value: value2 })
+            | (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
                 *value += value2;
             }
             (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
@@ -573,10 +585,8 @@ impl MetricValue {
     /// Subtract another (same type) value from this.
     pub fn subtract(&mut self, other: &Self) {
         match (self, other) {
-            (Self::Counter { ref mut value }, Self::Counter { value: value2 }) => {
-                *value -= value2;
-            }
-            (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
+            (Self::Counter { ref mut value }, Self::Counter { value: value2 })
+            | (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
                 *value -= value2;
             }
             (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
@@ -702,8 +712,9 @@ impl Display for Metric {
             }
         )?;
         match &self.data.value {
-            MetricValue::Counter { value } => write!(fmt, "{}", value),
-            MetricValue::Gauge { value } => write!(fmt, "{}", value),
+            MetricValue::Counter { value } | MetricValue::Gauge { value } => {
+                write!(fmt, "{}", value)
+            }
             MetricValue::Set { values } => {
                 write_list(fmt, " ", values.iter(), |fmt, value| write_word(fmt, value))
             }
@@ -777,7 +788,7 @@ impl Target for Metric {
             match paths.as_slice() {
                 ["tags"] => {
                     let value = value.try_object().map_err(|e| e.to_string())?;
-                    for (field, value) in value.iter() {
+                    for (field, value) in &value {
                         self.set_tag_value(
                             field.as_str().to_owned(),
                             value
@@ -791,7 +802,7 @@ impl Target for Metric {
                 ["tags", field] => {
                     let value = value.try_bytes().map_err(|e| e.to_string())?;
                     self.set_tag_value(
-                        field.to_string(),
+                        (*field).to_string(),
                         String::from_utf8_lossy(&value).into_owned(),
                     );
                     return Ok(());
@@ -942,7 +953,7 @@ where
     W: Fn(&mut Formatter<'_>, T) -> Result<(), fmt::Error>,
 {
     let mut this_sep = "";
-    for item in items.into_iter() {
+    for item in items {
         write!(fmt, "{}", this_sep)?;
         writer(fmt, item)?;
         this_sep = sep;

@@ -63,7 +63,7 @@ fn target_path_from_pair(pair: Pair<Rule>) -> Result<String> {
 
 fn quoted_path_from_pair(pair: Pair<Rule>) -> Result<String> {
     let (first, mut other) = split_inner_rules_from_pair(pair)?;
-    let base = inner_quoted_string_escaped_from_pair(first)?;
+    let base = inner_quoted_string_escaped_from_pair(&first)?;
     Ok(match other.next() {
         Some(pair) => base + pair.as_str(),
         None => base,
@@ -214,6 +214,7 @@ fn query_function_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Fu
     signature.into_boxed_function(arguments)
 }
 
+#[allow(clippy::redundant_closure_for_method_calls)]
 fn function_arguments_from_pairs(
     mut pairs: Pairs<Rule>,
     signature: FunctionSignature,
@@ -319,9 +320,8 @@ fn regex_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
         Rule::regex => {
             let mut inner = pair.into_inner();
             let pattern = inner.next().ok_or(TOKEN_ERR)?.as_str();
-            let (global, insensitive, multiline) = inner
-                .next()
-                .map(|flags| {
+            let (global, insensitive, multiline) =
+                inner.next().map_or((false, false, false), |flags| {
                     flags
                         .as_str()
                         .chars()
@@ -331,9 +331,7 @@ fn regex_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
                             'm' => (g, i, true),
                             _ => (g, i, m),
                         })
-                })
-                .unwrap_or((false, false, false));
-
+                });
             let regex = Regex::new(pattern.into(), multiline, insensitive, global)?;
 
             Ok(Box::new(Literal::from(QueryValue::from(regex))))
@@ -369,7 +367,7 @@ fn keyword_item_from_pair(
     Ok(())
 }
 
-fn inner_quoted_string_escaped_from_pair(pair: Pair<Rule>) -> Result<String> {
+fn inner_quoted_string_escaped_from_pair(pair: &Pair<Rule>) -> Result<String> {
     // This is only executed once per string at parse time, and so I'm not
     // losing sleep over the reallocation. However, if we want to mutate the
     // underlying string then we can take some inspiration from:
@@ -409,7 +407,7 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
             Box::new(NotFn::new(inner_query))
         }
         Rule::string => Box::new(Literal::from(Value::from(
-            inner_quoted_string_escaped_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?,
+            inner_quoted_string_escaped_from_pair(&pair.into_inner().next().ok_or(TOKEN_ERR)?)?,
         ))),
         Rule::null => Box::new(Literal::from(Value::Null)),
         Rule::float => Box::new(Literal::from(Value::from(
@@ -533,10 +531,10 @@ pub fn parse(input: &str) -> Result<Mapping> {
             {
                 let mut i = 0;
                 while i != positives.len() {
-                    match positives[i] {
-                        Rule::arithmetic_operator_boolean
-                        | Rule::arithmetic_operator_compare
-                        | Rule::arithmetic_operator_sum => {
+                    match positives.get(i) {
+                        Some(Rule::arithmetic_operator_boolean)
+                        | Some(Rule::arithmetic_operator_compare)
+                        | Some(Rule::arithmetic_operator_sum) => {
                             positives.remove(i);
                         }
                         _ => {
@@ -545,9 +543,12 @@ pub fn parse(input: &str) -> Result<Mapping> {
                     };
                 }
             }
-            error = error.renamed_rules(|rule| match *rule {
-                Rule::arithmetic_operator_product => "operator".to_owned(),
-                _ => format!("{:?}", rule),
+            error = error.renamed_rules(|rule| {
+                if *rule == Rule::arithmetic_operator_product {
+                    "operator".to_owned()
+                } else {
+                    format!("{:?}", rule)
+                }
             });
             Err(format!("mapping parse error\n{}", error))
         }

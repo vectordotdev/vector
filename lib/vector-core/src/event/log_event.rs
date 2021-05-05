@@ -37,6 +37,7 @@ impl Default for LogEvent {
 }
 
 impl LogEvent {
+    #[must_use]
     pub fn new_with_metadata(metadata: EventMetadata) -> Self {
         Self {
             fields: Value::Map(Default::default()),
@@ -263,8 +264,11 @@ impl From<HashMap<String, Value>> for LogEvent {
     }
 }
 
-impl From<LogEvent> for HashMap<String, Value> {
-    fn from(event: LogEvent) -> HashMap<String, Value> {
+impl<S> From<LogEvent> for HashMap<String, Value, S>
+where
+    S: std::hash::BuildHasher + Default,
+{
+    fn from(event: LogEvent) -> HashMap<String, Value, S> {
         let fields: BTreeMap<_, _> = event.into();
         fields.into_iter().collect()
     }

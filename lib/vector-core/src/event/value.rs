@@ -49,7 +49,9 @@ impl From<Bytes> for Value {
 
 impl<T: Into<Value>> From<Vec<T>> for Value {
     fn from(set: Vec<T>) -> Self {
-        set.into_iter().map(|v| v.into()).collect::<Value>()
+        set.into_iter()
+            .map(::std::convert::Into::into)
+            .collect::<Value>()
     }
 }
 
@@ -203,7 +205,9 @@ impl TryInto<serde_json::Value> for Value {
 #[cfg(feature = "vrl")]
 impl From<vrl_core::Value> for Value {
     fn from(v: vrl_core::Value) -> Self {
-        use vrl_core::Value::*;
+        use vrl_core::Value::{
+            Array, Boolean, Bytes, Float, Integer, Null, Object, Regex, Timestamp,
+        };
 
         match v {
             Bytes(v) => Value::Bytes(v),
@@ -222,7 +226,7 @@ impl From<vrl_core::Value> for Value {
 #[cfg(feature = "vrl")]
 impl From<Value> for vrl_core::Value {
     fn from(v: Value) -> Self {
-        use vrl_core::Value::*;
+        use vrl_core::Value::{Array, Object};
 
         match v {
             Value::Bytes(v) => v.into(),
@@ -375,8 +379,7 @@ impl Value {
             | Value::Float(_)
             | Value::Integer(_)
             | Value::Null => true,
-            Value::Map(_) => self.is_empty(),
-            Value::Array(_) => self.is_empty(),
+            Value::Map(_) | Value::Array(_) => self.is_empty(),
         }
     }
 
@@ -454,7 +457,7 @@ impl Value {
 
     fn insert_coalesce(
         sub_segments: Vec<FieldBuf>,
-        working_lookup: LookupBuf,
+        working_lookup: &LookupBuf,
         sub_value: &mut Value,
         value: Value,
     ) -> std::result::Result<Option<Value>, EventError> {
@@ -516,8 +519,9 @@ impl Value {
                     SegmentBuf::Index(next_len) => {
                         Value::Array(Vec::with_capacity(next_len.abs() as usize))
                     }
-                    SegmentBuf::Field(_) => Value::Map(Default::default()),
-                    SegmentBuf::Coalesce(_) => Value::Map(Default::default()),
+                    SegmentBuf::Field(_) | SegmentBuf::Coalesce(_) => {
+                        Value::Map(Default::default())
+                    }
                 }
             })
             .insert(working_lookup, value)
@@ -727,7 +731,7 @@ impl Value {
             }
             // Descend into a coalesce
             (Some(SegmentBuf::Coalesce(sub_segments)), sub_value) => {
-                Value::insert_coalesce(sub_segments, working_lookup, sub_value, value)
+                Value::insert_coalesce(sub_segments, &working_lookup, sub_value, value)
             }
             // Descend into a map
             (
@@ -798,7 +802,10 @@ impl Value {
             | (Some(segment), Value::Float(_))
             | (Some(segment), Value::Integer(_))
             | (Some(segment), Value::Null) => {
-                if !working_lookup.is_empty() {
+                if working_lookup.is_empty() {
+                    trace!("Cannot remove self. Caller must remove.");
+                    Err(EventError::RemovingSelf)
+                } else {
                     trace!("Encountered descent into a primitive.");
                     Err(EventError::PrimitiveDescent {
                         primitive_at: LookupBuf::default(),
@@ -809,9 +816,6 @@ impl Value {
                         },
                         original_value: None,
                     })
-                } else {
-                    trace!("Cannot remove self. Caller must remove.");
-                    Err(EventError::RemovingSelf)
                 }
             }
             // Descend into a coalesce
@@ -855,7 +859,8 @@ impl Value {
                     retval
                 }
             }
-            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
+            (Some(Segment::Index(_)), Value::Map(_))
+            | (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
             // Descend into an array
             (Some(Segment::Index(i)), Value::Array(array)) => {
                 let index = if i.is_negative() {
@@ -894,7 +899,6 @@ impl Value {
                     retval
                 }
             }
-            (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
         };
 
         retval
@@ -1054,7 +1058,8 @@ impl Value {
                     None => Ok(None),
                 }
             }
-            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
+            (Some(Segment::Index(_)), Value::Map(_))
+            | (Some(Segment::Field(_)), Value::Array(_)) => Ok(None),
             // Descend into an array
             (Some(Segment::Index(i)), Value::Array(array)) => {
                 let index = if i.is_negative() {
@@ -1072,7 +1077,6 @@ impl Value {
                     None => Ok(None),
                 }
             }
-            (Some(Segment::Field(_)), Value::Array(_)) => Ok(None),
         }
     }
 
@@ -1144,19 +1148,16 @@ impl Value {
                     .clone()
                     .or_else(|| Some(Lookup::default()))
                     .into_iter();
-                let children = m
-                    .iter()
-                    .map(move |(k, v)| {
-                        let lookup = prefix.clone().map_or_else(
-                            || Lookup::from(k),
-                            |mut l| {
-                                l.push_back(Segment::from(k.as_str()));
-                                l
-                            },
-                        );
-                        v.lookups(Some(lookup), only_leaves)
-                    })
-                    .flatten();
+                let children = m.iter().flat_map(move |(k, v)| {
+                    let lookup = prefix.clone().map_or_else(
+                        || Lookup::from(k),
+                        |mut l| {
+                            l.push_back(Segment::from(k.as_str()));
+                            l
+                        },
+                    );
+                    v.lookups(Some(lookup), only_leaves)
+                });
 
                 if only_leaves && !self.is_empty() {
                     Box::new(children)
@@ -1169,20 +1170,16 @@ impl Value {
                     .clone()
                     .or_else(|| Some(Lookup::default()))
                     .into_iter();
-                let children = a
-                    .iter()
-                    .enumerate()
-                    .map(move |(k, v)| {
-                        let lookup = prefix.clone().map_or_else(
-                            || Lookup::from(k as isize),
-                            |mut l| {
-                                l.push_back(Segment::index(k as isize));
-                                l
-                            },
-                        );
-                        v.lookups(Some(lookup), only_leaves)
-                    })
-                    .flatten();
+                let children = a.iter().enumerate().flat_map(move |(k, v)| {
+                    let lookup = prefix.clone().map_or_else(
+                        || Lookup::from(k as isize),
+                        |mut l| {
+                            l.push_back(Segment::index(k as isize));
+                            l
+                        },
+                    );
+                    v.lookups(Some(lookup), only_leaves)
+                });
 
                 if only_leaves && !self.is_empty() {
                     Box::new(children)
@@ -1258,19 +1255,16 @@ impl Value {
                     .or_else(|| Some(Lookup::default()))
                     .map(|v| (v, self))
                     .into_iter();
-                let children = m
-                    .iter()
-                    .map(move |(k, v)| {
-                        let lookup = prefix.clone().map_or_else(
-                            || Lookup::from(k),
-                            |mut l| {
-                                l.push_back(Segment::from(k.as_str()));
-                                l
-                            },
-                        );
-                        v.pairs(Some(lookup), only_leaves)
-                    })
-                    .flatten();
+                let children = m.iter().flat_map(move |(k, v)| {
+                    let lookup = prefix.clone().map_or_else(
+                        || Lookup::from(k),
+                        |mut l| {
+                            l.push_back(Segment::from(k.as_str()));
+                            l
+                        },
+                    );
+                    v.pairs(Some(lookup), only_leaves)
+                });
 
                 if only_leaves && !self.is_empty() {
                     Box::new(children)
@@ -1284,20 +1278,16 @@ impl Value {
                     .or_else(|| Some(Lookup::default()))
                     .map(|v| (v, self))
                     .into_iter();
-                let children = a
-                    .iter()
-                    .enumerate()
-                    .map(move |(k, v)| {
-                        let lookup = prefix.clone().map_or_else(
-                            || Lookup::from(k as isize),
-                            |mut l| {
-                                l.push_back(Segment::index(k as isize));
-                                l
-                            },
-                        );
-                        v.pairs(Some(lookup), only_leaves)
-                    })
-                    .flatten();
+                let children = a.iter().enumerate().flat_map(move |(k, v)| {
+                    let lookup = prefix.clone().map_or_else(
+                        || Lookup::from(k as isize),
+                        |mut l| {
+                            l.push_back(Segment::index(k as isize));
+                            l
+                        },
+                    );
+                    v.pairs(Some(lookup), only_leaves)
+                });
 
                 if only_leaves && !self.is_empty() {
                     Box::new(children)

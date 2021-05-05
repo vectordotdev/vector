@@ -39,6 +39,7 @@ pub enum Event {
 }
 
 impl Event {
+    #[must_use]
     pub fn new_empty_log() -> Self {
         Event::Log(LogEvent::default())
     }
@@ -46,42 +47,42 @@ impl Event {
     pub fn as_log(&self) -> &LogEvent {
         match self {
             Event::Log(log) => log,
-            _ => panic!("Failed type coercion, {:?} is not a log event", self),
+            Event::Metric(_) => panic!("Failed type coercion, {:?} is not a log event", self),
         }
     }
 
     pub fn as_mut_log(&mut self) -> &mut LogEvent {
         match self {
             Event::Log(log) => log,
-            _ => panic!("Failed type coercion, {:?} is not a log event", self),
+            Event::Metric(_) => panic!("Failed type coercion, {:?} is not a log event", self),
         }
     }
 
     pub fn into_log(self) -> LogEvent {
         match self {
             Event::Log(log) => log,
-            _ => panic!("Failed type coercion, {:?} is not a log event", self),
+            Event::Metric(_) => panic!("Failed type coercion, {:?} is not a log event", self),
         }
     }
 
     pub fn as_metric(&self) -> &Metric {
         match self {
             Event::Metric(metric) => metric,
-            _ => panic!("Failed type coercion, {:?} is not a metric", self),
+            Event::Log(_) => panic!("Failed type coercion, {:?} is not a metric", self),
         }
     }
 
     pub fn as_mut_metric(&mut self) -> &mut Metric {
         match self {
             Event::Metric(metric) => metric,
-            _ => panic!("Failed type coercion, {:?} is not a metric", self),
+            Event::Log(_) => panic!("Failed type coercion, {:?} is not a metric", self),
         }
     }
 
     pub fn into_metric(self) -> Metric {
         match self {
             Event::Metric(metric) => metric,
-            _ => panic!("Failed type coercion, {:?} is not a metric", self),
+            Event::Log(_) => panic!("Failed type coercion, {:?} is not a metric", self),
         }
     }
 
@@ -174,8 +175,7 @@ impl From<&tracing::Event<'_>> for Event {
         log.insert(
             "metadata.module_path",
             meta.module_path()
-                .map(|mp| Value::Bytes(mp.to_string().into()))
-                .unwrap_or(Value::Null),
+                .map_or(Value::Null, |mp| Value::Bytes(mp.to_string().into())),
         );
         log.insert("metadata.target", meta.target().to_string());
 
@@ -286,10 +286,10 @@ impl From<proto::EventWrapper> for Event {
                     .timestamp
                     .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
 
-                let tags = if !proto.tags.is_empty() {
-                    Some(proto.tags)
-                } else {
+                let tags = if proto.tags.is_empty() {
                     None
+                } else {
+                    Some(proto.tags)
                 };
 
                 let value = match proto.value.unwrap() {
