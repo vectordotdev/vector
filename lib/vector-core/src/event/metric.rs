@@ -883,7 +883,7 @@ impl Target for Metric {
                 ["tags"] => {
                     return Ok(self.tags().map(|map| {
                         map.iter()
-                            .map(|(k, v)| (k.to_owned(), v.to_owned().into()))
+                            .map(|(k, v)| (k.clone(), v.clone().into()))
                             .collect::<vrl_core::Value>()
                     }))
                 }

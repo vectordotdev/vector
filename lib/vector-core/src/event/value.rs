@@ -563,113 +563,110 @@ impl Value {
             array.get_mut(index as usize)
         };
 
-        match item {
-            Some(inner) => {
-                if let Some(next_segment) = working_lookup.get(0) {
-                    Value::correct_type(inner, next_segment);
-                }
-
-                inner.insert(working_lookup, value).map_err(|mut e| {
-                    if let EventError::PrimitiveDescent {
-                        original_target,
-                        primitive_at,
-                        original_value: _,
-                    } = &mut e
-                    {
-                        let segment = SegmentBuf::Index(i);
-                        original_target.push_front(segment.clone());
-                        primitive_at.push_front(segment);
-                    };
-                    e
-                })
+        if let Some(inner) = item {
+            if let Some(next_segment) = working_lookup.get(0) {
+                Value::correct_type(inner, next_segment);
             }
-            None => {
-                if i.is_negative() {
-                    // Resizing for a negative index must resize to the left.
-                    // Setting x[-4] to true for an array [0,1] must end up with
-                    // [true, null, 0, 1]
-                    let abs = i.abs() as usize - 1;
-                    let len = array.len();
 
-                    array.resize(abs, Value::Null);
-                    array.rotate_right(abs - len);
-                } else {
-                    // Fill the vector to the index.
-                    array.resize(i as usize, Value::Null);
-                }
-                let mut retval = Ok(None);
-                let next_val = match working_lookup.get(0) {
-                    Some(SegmentBuf::Index(next_len)) => {
-                        let mut inner = Value::Array(Vec::with_capacity(next_len.abs() as usize));
-                        retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                            if let EventError::PrimitiveDescent {
-                                original_target,
-                                primitive_at,
-                                original_value: _,
-                            } = &mut e
-                            {
-                                let segment = SegmentBuf::Index(i);
-                                original_target.push_front(segment.clone());
-                                primitive_at.push_front(segment);
-                            };
-                            e
-                        });
-                        inner
-                    }
-                    Some(SegmentBuf::Field(FieldBuf {
-                        name,
-                        requires_quoting,
-                    })) => {
-                        let mut inner = Value::Map(Default::default());
-                        let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
-                        let requires_quoting = *requires_quoting; // This is for navigating an ownership issue in the error stack reporting.
-                        retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                            if let EventError::PrimitiveDescent {
-                                original_target,
-                                primitive_at,
-                                original_value: _,
-                            } = &mut e
-                            {
-                                let segment = SegmentBuf::Field(FieldBuf {
-                                    name,
-                                    requires_quoting,
-                                });
-                                original_target.push_front(segment.clone());
-                                primitive_at.push_front(segment);
-                            };
-                            e
-                        });
-                        inner
-                    }
-                    Some(SegmentBuf::Coalesce(set)) => match set.get(0) {
-                        None => return Err(EventError::EmptyCoalesceSubSegment),
-                        Some(_) => {
-                            let mut inner = Value::Map(Default::default());
-                            let set = SegmentBuf::Coalesce(set.clone());
-                            retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                                if let EventError::PrimitiveDescent {
-                                    original_target,
-                                    primitive_at,
-                                    original_value: _,
-                                } = &mut e
-                                {
-                                    original_target.push_front(set.clone());
-                                    primitive_at.push_front(set.clone());
-                                };
-                                e
-                            });
-                            inner
-                        }
-                    },
-                    None => value,
+            inner.insert(working_lookup, value).map_err(|mut e| {
+                if let EventError::PrimitiveDescent {
+                    original_target,
+                    primitive_at,
+                    original_value: _,
+                } = &mut e
+                {
+                    let segment = SegmentBuf::Index(i);
+                    original_target.push_front(segment.clone());
+                    primitive_at.push_front(segment);
                 };
-                array.push(next_val);
-                if i.is_negative() {
-                    // We need to push to the front of the array.
-                    array.rotate_right(1);
-                }
-                retval
+                e
+            })
+        } else {
+            if i.is_negative() {
+                // Resizing for a negative index must resize to the left.
+                // Setting x[-4] to true for an array [0,1] must end up with
+                // [true, null, 0, 1]
+                let abs = i.abs() as usize - 1;
+                let len = array.len();
+
+                array.resize(abs, Value::Null);
+                array.rotate_right(abs - len);
+            } else {
+                // Fill the vector to the index.
+                array.resize(i as usize, Value::Null);
             }
+            let mut retval = Ok(None);
+            let next_val = match working_lookup.get(0) {
+                Some(SegmentBuf::Index(next_len)) => {
+                    let mut inner = Value::Array(Vec::with_capacity(next_len.abs() as usize));
+                    retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                        if let EventError::PrimitiveDescent {
+                            original_target,
+                            primitive_at,
+                            original_value: _,
+                        } = &mut e
+                        {
+                            let segment = SegmentBuf::Index(i);
+                            original_target.push_front(segment.clone());
+                            primitive_at.push_front(segment);
+                        };
+                        e
+                    });
+                    inner
+                }
+                Some(SegmentBuf::Field(FieldBuf {
+                    name,
+                    requires_quoting,
+                })) => {
+                    let mut inner = Value::Map(Default::default());
+                    let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
+                    let requires_quoting = *requires_quoting; // This is for navigating an ownership issue in the error stack reporting.
+                    retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                        if let EventError::PrimitiveDescent {
+                            original_target,
+                            primitive_at,
+                            original_value: _,
+                        } = &mut e
+                        {
+                            let segment = SegmentBuf::Field(FieldBuf {
+                                name,
+                                requires_quoting,
+                            });
+                            original_target.push_front(segment.clone());
+                            primitive_at.push_front(segment);
+                        };
+                        e
+                    });
+                    inner
+                }
+                Some(SegmentBuf::Coalesce(set)) => match set.get(0) {
+                    None => return Err(EventError::EmptyCoalesceSubSegment),
+                    Some(_) => {
+                        let mut inner = Value::Map(Default::default());
+                        let set = SegmentBuf::Coalesce(set.clone());
+                        retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                            if let EventError::PrimitiveDescent {
+                                original_target,
+                                primitive_at,
+                                original_value: _,
+                            } = &mut e
+                            {
+                                original_target.push_front(set.clone());
+                                primitive_at.push_front(set.clone());
+                            };
+                            e
+                        });
+                        inner
+                    }
+                },
+                None => value,
+            };
+            array.push(next_val);
+            if i.is_negative() {
+                // We need to push to the front of the array.
+                array.rotate_right(1);
+            }
+            retval
         }
     }
 
