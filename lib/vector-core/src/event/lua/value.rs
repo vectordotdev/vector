@@ -63,18 +63,14 @@ mod test {
             ("4.333", Value::Float(4.333)),
             ("true", Value::Boolean(true)),
             (
-                "{ x = 1, y = '2', nested = { other = 2.718281828 } }",
+                "{ x = 1, y = '2', nested = { other = 5.678 } }",
                 Value::Map(
                     vec![
                         ("x".into(), 1.into()),
                         ("y".into(), "2".into()),
                         (
                             "nested".into(),
-                            Value::Map(
-                                vec![("other".into(), 2.718_281_828.into())]
-                                    .into_iter()
-                                    .collect(),
-                            ),
+                            Value::Map(vec![("other".into(), 5.678.into())].into_iter().collect()),
                         ),
                     ]
                     .into_iter()
