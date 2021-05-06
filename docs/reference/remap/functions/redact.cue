@@ -62,8 +62,8 @@ remap: functions: redact: {
 				redact({ "name": "John Doe", "card_number": "4916155524184782"})
 				"""#
 			return: {
-				name:  "John Doe"
-				field: "[REDACTED]"
+				name:        "John Doe"
+				card_number: "[REDACTED]"
 			}
 		},
 		{
@@ -79,8 +79,8 @@ remap: functions: redact: {
 				redact({ "name": "John Doe", "card_number": "4916155524184782"}, filters: ["credit_card"])
 				"""#
 			return: {
-				name:  "John Doe"
-				field: "[REDACTED]"
+				name:        "John Doe"
+				card_number: "[REDACTED]"
 			}
 		},
 	]

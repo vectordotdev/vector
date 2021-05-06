@@ -44,7 +44,7 @@ impl Function for Redact {
             Example {
                 title: "credit_card",
                 source: r#"redact({ "name": "John Doe", "card_number": "4916155524184782"}, filters: ["credit_card"])"#,
-                result: Ok(r#"{ "name": "John Doe", "field": "[REDACTED]" }"#),
+                result: Ok(r#"{ "name": "John Doe", "card_number": "[REDACTED]" }"#),
             },
         ]
     }
