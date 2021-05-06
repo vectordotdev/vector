@@ -488,6 +488,7 @@ mod test {
         assert_eq!(json.pointer("/map/map/non-existing"), Some(&fallback));
     }
 
+    #[cfg(feature = "vrl")]
     #[test]
     fn object_get() {
         use lookup::{FieldBuf, SegmentBuf};
@@ -540,6 +541,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "vrl")]
     #[allow(clippy::too_many_lines)]
     fn object_insert() {
         use lookup::SegmentBuf;
@@ -651,6 +653,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "vrl")]
     fn object_remove() {
         use lookup::{FieldBuf, SegmentBuf};
         use shared::btreemap;

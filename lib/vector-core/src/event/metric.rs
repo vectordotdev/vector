@@ -962,7 +962,9 @@ mod test {
     use super::*;
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
+    #[cfg(feature = "vrl")]
     use shared::btreemap;
+    #[cfg(feature = "vrl")]
     use vrl_core::Value;
 
     fn ts() -> DateTime<Utc> {
@@ -1215,6 +1217,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "vrl")]
     fn object_metric_all_fields() {
         let metric = Metric::new(
             "zub",
@@ -1246,6 +1249,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "vrl")]
     fn object_metric_fields() {
         let mut metric = Metric::new(
             "name",
@@ -1296,6 +1300,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "vrl")]
     fn object_metric_invalid_paths() {
         let mut metric = Metric::new(
             "name",

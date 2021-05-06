@@ -253,7 +253,7 @@ mod test {
     }
 
     #[test]
-    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::needless_pass_by_value)] // `&[T]` does not implement `Arbitrary`
     fn histogram() {
         fn inner(values: Vec<f64>) -> TestResult {
             let mut sut = Histogram::new();
@@ -281,7 +281,7 @@ mod test {
     }
 
     #[test]
-    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::needless_pass_by_value)] // `&[T]` does not implement `Arbitrary`
     fn count() {
         fn inner(values: Vec<u64>) -> TestResult {
             let mut sut = Counter::new();
