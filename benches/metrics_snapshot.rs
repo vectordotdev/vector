@@ -10,10 +10,7 @@ fn benchmark(c: &mut Criterion) {
             &cardinality,
             |b, &cardinality| {
                 let controller = prepare_metrics(cardinality);
-                b.iter(|| {
-                    let iter = vector::metrics::capture_metrics(controller);
-                    iter
-                });
+                b.iter(|| vector::metrics::capture_metrics(controller));
             },
         );
     }

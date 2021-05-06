@@ -97,7 +97,7 @@ prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 shared = { path = "lib/shared" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
-vector_core = { path = "lib/vector-core", default-features = false, features = [] }
+vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures
@@ -110,7 +110,7 @@ tokio-stream = { version = "0.1.5", default-features = false, features = ["net",
 tokio-util = { version = "0.6.6", default-features = false, features = ["codec", "time"] }
 
 # Tracing
-tracing = { version = "0.1.25", default-features = false }
+tracing = { version = "0.1.26", default-features = false }
 tracing-core = { version = "0.1.18", default-features = false }
 tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-01", "futures-03"] }
 tracing-log = { version = "0.1.2", default-features = false }
@@ -228,7 +228,7 @@ pulsar = { version = "2.0.1", default-features = false, features = ["tokio-runti
 rand = { version = "0.8.3", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.0", default-features = false }
 rdkafka = { version = "0.26.0", default-features = false, features = ["libz", "ssl", "zstd"], optional = true }
-regex = { version = "1.4.6", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.5.3", default-features = false, features = ["std", "perf"] }
 # make sure to update the external docs when the Lua version changes
 rlua = { version = "0.17.0", default-features = true, optional = true }
 seahash = { version = "4.1.0", default-features = false, optional = true }
@@ -568,7 +568,7 @@ sinks-honeycomb = ["bytesize"]
 sinks-http = ["bytesize"]
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = ["bytesize"]
-sinks-kafka = []
+sinks-kafka = ["rdkafka"]
 sinks-logdna = ["bytesize"]
 sinks-loki = ["bytesize", "uuid"]
 sinks-nats = ["async-nats"]
@@ -651,7 +651,24 @@ cli-tests = ["sinks-blackhole", "sinks-socket", "sources-generator", "sources-fi
 
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions
-benches = ["leveldb", "rdkafka-plain", "sinks", "sources", "transforms", "unix", "vendor-all"]
+benches = [
+  "leveldb",
+  "sinks-file",
+  "sinks-http",
+  "sinks-socket",
+  "sources-file",
+  "sources-socket",
+  "sources-syslog",
+  "transforms-add_fields",
+  "transforms-coercer",
+  "transforms-field_filter",
+  "transforms-json_parser",
+  "transforms-lua",
+  "transforms-rename_fields",
+  "transforms-regex_parser",
+  "transforms-sample",
+  "transforms-split",
+]
 language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "transforms-json_parser", "transforms-lua", "transforms-regex_parser", "transforms-remap", "transforms-wasm"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
 statistic-benches = []
@@ -662,40 +679,48 @@ wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-
 [[bench]]
 name = "default"
 harness = false
+test = true
 required-features = ["benches"]
 
 [[bench]]
 name = "wasm"
 path = "benches/wasm/mod.rs"
 harness = false
+test = true
 required-features = ["wasm-benches"]
 
 [[bench]]
 name = "remap"
 harness = false
+test = true
 required-features = ["remap-benches"]
 
 [[bench]]
 name = "languages"
 harness = false
+test = true
 required-features = ["language-benches"]
 
 [[bench]]
 name = "metrics_on"
 harness = false
+test = true
 required-features = ["metrics-benches"]
 
 [[bench]]
 name = "metrics_no_tracing_integration"
 harness = false
+test = true
 required-features = ["metrics-benches"]
 
 [[bench]]
 name = "metrics_off"
 harness = false
+test = true
 required-features = ["metrics-benches"]
 
 [[bench]]
 name = "distribution_statistic"
 harness = false
+test = true
 required-features = ["statistic-benches"]
