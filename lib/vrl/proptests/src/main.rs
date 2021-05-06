@@ -1,11 +1,12 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 use diagnostic::Span;
+use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use ordered_float::NotNan;
 use parser::ast::{
-    Assignment, AssignmentOp, AssignmentTarget, Block, Container, Expr, Field, FunctionArgument,
-    FunctionCall, Group, Ident, IfStatement, Literal, Node, Op, Opcode, Path, PathSegment,
-    Predicate, Program, Query, QueryTarget, RootExpr,
+    Assignment, AssignmentOp, AssignmentTarget, Block, Container, Expr, FunctionArgument,
+    FunctionCall, Group, Ident, IfStatement, Literal, Node, Op, Opcode, Predicate, Program, Query,
+    QueryTarget, RootExpr,
 };
 use proptest::prelude::*;
 
@@ -69,9 +70,8 @@ prop_compose! {
 }
 
 prop_compose! {
-    fn variable()(ident in prop::collection::vec(identifier(), 1..100)) -> Ident {
-        let ident = ident.join(".");
-        Ident::new(ident)
+    fn variable()(ident in ident(), lookup in path()) -> (Ident, LookupBuf) {
+        (ident, lookup)
     }
 }
 
@@ -113,12 +113,13 @@ prop_compose! {
 }
 
 prop_compose! {
-    fn path() (path in prop::collection::vec(ident(), 1..100)) -> Path {
-        Path(
+    fn path() (path in prop::collection::vec(ident(), 1..2)) -> LookupBuf {
+        LookupBuf {
+            segments:
             path.into_iter()
-                .map(|field| PathSegment::Field(Field::Regular(field)))
+                .map(|field| SegmentBuf::Field(FieldBuf::from(field.as_ref())))
                 .collect(),
-        )
+        }
     }
 }
 
@@ -186,7 +187,7 @@ prop_compose! {
 fn assignment_target() -> impl Strategy<Value = AssignmentTarget> {
     prop_oneof![
         noop(),
-        variable().prop_map(|v| AssignmentTarget::Internal(v, None)),
+        variable().prop_map(|(v, lookup)| AssignmentTarget::Internal(v, Some(lookup))),
         // TODO Paths
     ]
 }

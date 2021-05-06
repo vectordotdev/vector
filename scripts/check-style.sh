@@ -33,6 +33,7 @@ for FILE in $(git ls-files); do
     *ico) continue;;
     *sig) continue;;
     tests/data*) continue;;
+    lib/vector-core/tests/data*) continue;;
     distribution/kubernetes/*/*.yaml) continue;;
     tests/helm-snapshots/*/snapshot.yaml) continue;;
     lib/remap-tests/tests/*.vrl) continue;;

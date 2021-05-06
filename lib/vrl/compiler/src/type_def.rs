@@ -1,5 +1,6 @@
+use crate::map;
 use crate::value::Kind;
-use crate::{map, path, Path};
+use lookup::{FieldBuf, LookupBuf, SegmentBuf};
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::Sub,
@@ -151,21 +152,21 @@ impl KindInfo {
     /// }
     ///
     /// e.g., the existing [`KindInfo`] gets nested into the provided path.
-    pub fn for_path(mut self, path: Path) -> Self {
-        use path::Segment;
-
-        for segment in path.segments().iter().rev() {
+    pub fn for_path(mut self, path: LookupBuf) -> Self {
+        for segment in path.iter().rev() {
             match segment {
-                Segment::Field(field) => {
+                SegmentBuf::Field(FieldBuf { name, .. }) => {
                     let mut map = BTreeMap::default();
-                    map.insert(Field::Field(field.as_str().to_owned()), self);
+                    map.insert(Field::Field(name.as_str().to_owned()), self);
 
                     let mut set = BTreeSet::new();
                     set.insert(TypeKind::Object(map));
 
                     self = KindInfo::Known(set);
                 }
-                Segment::Coalesce(fields) => {
+                SegmentBuf::Coalesce(fields) => {
+                    // TODO: I'm not sure this is right - it should be the
+                    // combined typedef of all the fields in the coalesce.
                     let field = fields.last().unwrap();
                     let mut map = BTreeMap::default();
                     map.insert(Field::Field(field.as_str().to_owned()), self);
@@ -175,7 +176,7 @@ impl KindInfo {
 
                     self = KindInfo::Known(set);
                 }
-                Segment::Index(index) => {
+                SegmentBuf::Index(index) => {
                     // For negative indices, we have to mark the array contents
                     // as unknown.
                     let (index, info) = if index.is_negative() {
@@ -212,9 +213,7 @@ impl KindInfo {
     /// }
     ///
     /// And a path `.foo`. This would return `KindInfo::Bytes`.
-    pub fn at_path(&self, path: Path) -> Self {
-        use path::Segment;
-
+    pub fn at_path(&self, path: LookupBuf) -> Self {
         let mut iter = path.into_iter();
 
         let info = match self {
@@ -223,7 +222,7 @@ impl KindInfo {
                 let new = match iter.next() {
                     None => return kind.clone(),
                     Some(segment) => match segment {
-                        Segment::Coalesce(fields) => match kind.object() {
+                        SegmentBuf::Coalesce(fields) => match kind.object() {
                             None => KindInfo::Unknown,
                             Some(kind) => fields
                                 .into_iter()
@@ -239,7 +238,7 @@ impl KindInfo {
                                     }
                                 }),
                         },
-                        Segment::Field(field) => match kind.object() {
+                        SegmentBuf::Field(FieldBuf { name: field, .. }) => match kind.object() {
                             None => KindInfo::Unknown,
                             Some(kind) => {
                                 let field = Field::Field(field.as_str().to_owned());
@@ -253,7 +252,7 @@ impl KindInfo {
                                 }
                             }
                         },
-                        Segment::Index(index) => match kind.array() {
+                        SegmentBuf::Index(index) => match kind.array() {
                             None => KindInfo::Unknown,
                             Some(kind) => {
                                 let index = Index::Index(index as usize);
@@ -277,7 +276,7 @@ impl KindInfo {
             }
         };
 
-        info.at_path(iter.collect())
+        info.at_path(LookupBuf::from_segments(iter.collect()))
     }
 
     fn merge(self, rhs: Self, shallow: bool, overwrite: bool) -> Self {
@@ -537,14 +536,14 @@ impl TypeDef {
         Self::default()
     }
 
-    pub fn at_path(&self, path: Path) -> TypeDef {
+    pub fn at_path(&self, path: LookupBuf) -> TypeDef {
         let fallible = self.fallible;
         let kind = self.kind.at_path(path);
 
         Self { fallible, kind }
     }
 
-    pub fn for_path(self, path: Path) -> TypeDef {
+    pub fn for_path(self, path: LookupBuf) -> TypeDef {
         let fallible = self.fallible;
         let kind = self.kind.for_path(path);
 
@@ -975,8 +974,7 @@ impl From<Kind> for TypeDef {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use path::{self, Segment};
-    use std::str::FromStr;
+    use lookup::{FieldBuf, SegmentBuf};
 
     #[test]
     fn collect_subtypes() {
@@ -1014,7 +1012,7 @@ mod tests {
         fn for_path() {
             struct TestCase {
                 info: KindInfo,
-                path: Vec<Segment>,
+                path: Vec<SegmentBuf>,
                 want: KindInfo,
             }
 
@@ -1022,7 +1020,7 @@ mod tests {
                 // overwrite unknown
                 TestCase {
                     info: KindInfo::Unknown,
-                    path: vec![Segment::Index(0)],
+                    path: vec![SegmentBuf::Index(0)],
                     want: KindInfo::Known({
                         let mut map = BTreeMap::new();
                         map.insert(Index::Index(0), KindInfo::Unknown);
@@ -1053,7 +1051,7 @@ mod tests {
                         set.insert(TypeKind::Integer);
                         set
                     }),
-                    path: vec![Segment::Field(path::Field::from_str("foo").unwrap())],
+                    path: vec![SegmentBuf::Field(FieldBuf::from("foo"))],
                     want: KindInfo::Known({
                         let map = {
                             let mut set = BTreeSet::new();
@@ -1076,7 +1074,7 @@ mod tests {
                         set.insert(TypeKind::Integer);
                         set
                     }),
-                    path: vec![Segment::Index(1)],
+                    path: vec![SegmentBuf::Index(1)],
                     want: KindInfo::Known({
                         let map = {
                             let mut set = BTreeSet::new();
@@ -1099,7 +1097,7 @@ mod tests {
                         set.insert(TypeKind::Integer);
                         set
                     }),
-                    path: vec![Segment::Index(-1)],
+                    path: vec![SegmentBuf::Index(-1)],
                     want: KindInfo::Known({
                         let mut set = BTreeSet::new();
                         set.insert(TypeKind::Array({
@@ -1113,7 +1111,7 @@ mod tests {
             ];
 
             for TestCase { info, path, want } in cases {
-                let path = Path::new_unchecked(path);
+                let path = LookupBuf::from_segments(path);
 
                 assert_eq!(info.for_path(path), want);
             }

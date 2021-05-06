@@ -78,3 +78,4 @@ tempfile = "3.1.0"
 [[bench]]
 name = "buffer"
 harness = false
+test = true

@@ -183,7 +183,7 @@ mod tests {
                     "metric2",
                     MetricKind::Absolute,
                     MetricValue::Distribution {
-                        samples: crate::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],
+                        samples: vector_core::samples![1.0 => 100, 2.0 => 200, 3.0 => 300],
                         statistic: StatisticKind::Histogram,
                     },
                 )

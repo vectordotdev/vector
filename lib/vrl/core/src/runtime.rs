@@ -1,5 +1,6 @@
-use crate::{state, Context, Path, Program, Target, Value};
+use crate::{state, Context, Program, Target, Value};
 use compiler::ExpressionError;
+use lookup::LookupBuf;
 use std::{error::Error, fmt};
 
 pub type RuntimeResult = Result<Value, Terminate>;
@@ -50,7 +51,7 @@ impl Runtime {
         //
         // VRL technically supports any `Value` object as the root, but the
         // assumption is people are expected to use it to query objects.
-        match target.get(&Path::root()) {
+        match target.get(&LookupBuf::root()) {
             Ok(Some(Value::Object(_))) => {}
             Ok(Some(value)) => {
                 return Err(Terminate::Error(format!(

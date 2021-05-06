@@ -3,8 +3,9 @@ use crate::parser::{
     ast::{self, Ident},
     Node,
 };
-use crate::{Context, Expression, Path, Span, State, TypeDef, Value};
+use crate::{Context, Expression, Span, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Note};
+use lookup::LookupBuf;
 use std::convert::TryFrom;
 use std::fmt;
 
@@ -184,8 +185,8 @@ impl fmt::Debug for Assignment {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Target {
     Noop,
-    Internal(Ident, Option<Path>),
-    External(Option<Path>),
+    Internal(Ident, Option<LookupBuf>),
+    External(Option<LookupBuf>),
 }
 
 impl Target {
@@ -195,7 +196,7 @@ impl Target {
         fn set_type_def(
             current_type_def: &TypeDef,
             new_type_def: TypeDef,
-            path: &Option<Path>,
+            path: &Option<LookupBuf>,
         ) -> TypeDef {
             // If the assignment is onto root or has no path (root variable assignment), use the
             // new type def, otherwise merge the type defs.
@@ -268,7 +269,7 @@ impl Target {
             External(path) => {
                 let _ = ctx
                     .target_mut()
-                    .insert(path.as_ref().unwrap_or(&Path::root()), value);
+                    .insert(path.as_ref().unwrap_or(&LookupBuf::root()), value);
             }
         }
     }
@@ -281,9 +282,9 @@ impl fmt::Display for Target {
         match self {
             Noop => f.write_str("_"),
             Internal(ident, Some(path)) => write!(f, "{}{}", ident, path),
-            Internal(ident, _) => ident.fmt(f),
-            External(Some(path)) => path.fmt(f),
-            External(_) => f.write_str("."),
+            Internal(ident, None) => ident.fmt(f),
+            External(Some(path)) => write!(f, ".{}", path),
+            External(None) => f.write_str("."),
         }
     }
 }
@@ -319,8 +320,8 @@ impl TryFrom<ast::AssignmentTarget> for Target {
                 let span = Span::new(target_span.start(), path_span.end());
 
                 match target {
-                    ast::QueryTarget::Internal(ident) => Internal(ident, Some(path.into())),
-                    ast::QueryTarget::External => External(Some(path.into())),
+                    ast::QueryTarget::Internal(ident) => Internal(ident, Some(path)),
+                    ast::QueryTarget::External => External(Some(path)),
                     _ => {
                         return Err(Error {
                             variant: ErrorVariant::InvalidTarget(span),

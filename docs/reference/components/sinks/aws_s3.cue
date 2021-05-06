@@ -394,7 +394,7 @@ components: sinks: aws_s3: components._aws & {
 				AWS S3 offers [server-side encryption](\(urls.aws_s3_sse)). You can apply defaults
 				at the bucket level or set the encryption at the object level. In the context,
 				of Vector only the object level is relevant (Vector does not create or modify
-				buckets). Although, we recommend setting defaults at the bucket level whne
+				buckets). Although, we recommend setting defaults at the bucket level when
 				possible. You can explicitly set the object level encryption via the
 				`server_side_encryption` option.
 				"""
