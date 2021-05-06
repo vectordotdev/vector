@@ -210,7 +210,7 @@ impl Gauge {
         }
     }
 
-    #[allow(clippy::needless_pass_by_value)]
+    #[allow(clippy::needless_pass_by_value)] // see https://github.com/timberio/vector/pull/7341#discussion_r626693005
     pub(crate) fn record(&mut self, value: GaugeValue) {
         // Because Rust lacks an atomic f64 we store gauges as AtomicU64
         // and transmute back and forth to an f64 here. They have the
