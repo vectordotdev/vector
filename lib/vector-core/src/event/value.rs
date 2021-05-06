@@ -51,7 +51,7 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
     fn from(set: Vec<T>) -> Self {
         set.into_iter()
             .map(::std::convert::Into::into)
-            .collect::<Value>()
+            .collect::<Self>()
     }
 }
 
