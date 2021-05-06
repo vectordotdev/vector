@@ -16,7 +16,7 @@ use bytes::Bytes;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use warp::http::HeaderMap;
 
@@ -103,10 +103,11 @@ impl HttpSource for DatadogLogsSource {
         let api_key = extract_api_key(&header_map, request_path);
 
         let (batch, receiver) = BatchNotifier::new_with_receiver();
-        decode_body(body, Encoding::Json, batch).map(|mut events| {
+        decode_body(body, Encoding::Json).map(|mut events| {
             // Add source type & Datadog API key
             let key = log_schema().source_type_key();
-            for event in events.iter_mut() {
+            for event in &mut events {
+                event.add_batch_notifier(Arc::clone(&batch));
                 let log = event.as_mut_log();
                 log.try_insert(key, Bytes::from("datadog_logs"));
                 if let Some(k) = &api_key {

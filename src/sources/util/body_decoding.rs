@@ -1,6 +1,6 @@
 use crate::{
     config::log_schema,
-    event::{BatchNotifier, Event, LogEvent},
+    event::{Event, LogEvent},
     sources::util::http::ErrorMessage,
 };
 use bytes::{Bytes, BytesMut};
@@ -8,7 +8,6 @@ use chrono::Utc;
 use codec::BytesDelimitedCodec;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use std::sync::Arc;
 use tokio_util::codec::Decoder;
 use warp::http::StatusCode;
 
@@ -46,40 +45,28 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>
 }
 
 #[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
-pub fn decode_body(
-    body: Bytes,
-    enc: Encoding,
-    batch: Arc<BatchNotifier>,
-) -> Result<Vec<Event>, ErrorMessage> {
+pub fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
     match enc {
         Encoding::Text => body_to_lines(body)
-            .map(|r| {
-                Ok(LogEvent::from(r?)
-                    .with_batch_notifier(Arc::clone(&batch))
-                    .into())
-            })
+            .map(|r| Ok(LogEvent::from(r?).into()))
             .collect::<Result<_, _>>(),
         Encoding::Ndjson => body_to_lines(body)
             .map(|j| {
                 let parsed_json = serde_json::from_slice(&j?)
                     .map_err(|error| json_error(format!("Error parsing Ndjson: {:?}", error)))?;
-                json_parse_object(parsed_json, &batch)
-                    .map(|log| log.with_batch_notifier(Arc::clone(&batch)).into())
+                json_parse_object(parsed_json).map(Into::into)
             })
             .collect::<Result<_, _>>(),
         Encoding::Json => {
             let parsed_json = serde_json::from_slice(&body)
                 .map_err(|error| json_error(format!("Error parsing Json: {:?}", error)))?;
-            json_parse_array_of_object(parsed_json, batch)
+            json_parse_array_of_object(parsed_json)
         }
     }
 }
 
 #[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
-fn json_parse_object(
-    value: JsonValue,
-    batch: &Arc<BatchNotifier>,
-) -> Result<LogEvent, ErrorMessage> {
+fn json_parse_object(value: JsonValue) -> Result<LogEvent, ErrorMessage> {
     match value {
         JsonValue::Object(map) => {
             let mut log = LogEvent::default();
@@ -87,7 +74,7 @@ fn json_parse_object(
             for (k, v) in map {
                 log.insert_flat(k, v);
             }
-            Ok(log.with_batch_notifier(Arc::clone(batch)))
+            Ok(log)
         }
         _ => Err(json_error(format!(
             "Expected Object, got {}",
@@ -97,20 +84,15 @@ fn json_parse_object(
 }
 
 #[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
-fn json_parse_array_of_object(
-    value: JsonValue,
-    batch: Arc<BatchNotifier>,
-) -> Result<Vec<Event>, ErrorMessage> {
+fn json_parse_array_of_object(value: JsonValue) -> Result<Vec<Event>, ErrorMessage> {
     match value {
         JsonValue::Array(v) => v
             .into_iter()
-            .map(|object| json_parse_object(object, &batch).map(Into::into))
+            .map(|object| json_parse_object(object).map(Into::into))
             .collect::<Result<_, _>>(),
         JsonValue::Object(map) => {
             //treat like an array of one object
-            Ok(vec![
-                json_parse_object(JsonValue::Object(map), &batch)?.into()
-            ])
+            Ok(vec![json_parse_object(JsonValue::Object(map))?.into()])
         }
         _ => Err(json_error(format!(
             "Expected Array or Object, got {}.",

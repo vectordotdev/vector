@@ -12,7 +12,7 @@ use crate::{
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use warp::http::{HeaderMap, HeaderValue};
 
@@ -81,14 +81,15 @@ impl HttpSource for SimpleHttpSource {
         request_path: &str,
     ) -> Result<BuiltEvents, ErrorMessage> {
         let (batch, receiver) = BatchNotifier::new_with_receiver();
-        decode_body(body, self.encoding, batch)
+        decode_body(body, self.encoding)
             .map(|events| add_headers(events, &self.headers, header_map))
             .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
             .map(|events| add_path(events, self.path_key.as_str(), request_path))
             .map(|mut events| {
                 // Add source type
                 let key = log_schema().source_type_key();
-                for event in events.iter_mut() {
+                for event in &mut events {
+                    event.add_batch_notifier(Arc::clone(&batch));
                     event.as_mut_log().try_insert(key, Bytes::from("http"));
                 }
                 let receiver = Some(receiver);
