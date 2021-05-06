@@ -19,7 +19,7 @@ lazy_static::lazy_static! {
 ///
 /// # Errors
 ///
-/// This function will fail if the `F` fails.
+/// This function will fail if the `builder` fails.
 ///
 /// # Panics
 ///
