@@ -58,12 +58,11 @@ impl Function for Redact {
                 filters
                     .into_iter()
                     .map(|expr| {
-                        expr.as_value().ok_or_else(|| {
-                            vrl::function::Error::ExpectedStaticExpression {
+                        expr.as_value()
+                            .ok_or(vrl::function::Error::ExpectedStaticExpression {
                                 keyword: "filters",
                                 expr,
-                            }
-                        })
+                            })
                     })
                     .map(|value| {
                         value.and_then(|value| {
@@ -99,7 +98,7 @@ struct RedactFn {
     redactor: Redactor,
 }
 
-fn redact(value: Value, filters: &Vec<Filter>, redactor: &Redactor) -> Value {
+fn redact(value: Value, filters: &[Filter], redactor: &Redactor) -> Value {
     match value {
         Value::Bytes(bytes) => {
             let input = String::from_utf8_lossy(&bytes);
