@@ -1125,6 +1125,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "cpufeatures"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5cd5a7748210e7ec1a9696610b1015e6e31fbf58f77a160801f124bd1c36592a"
+
+[[package]]
 name = "cpuid-bool"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2537,7 +2543,7 @@ dependencies = [
  "headers-core",
  "http",
  "mime",
- "sha-1 0.9.4",
+ "sha-1 0.9.5",
  "time 0.1.44",
 ]
 
@@ -3908,7 +3914,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_with",
- "sha-1 0.9.4",
+ "sha-1 0.9.5",
  "sha2",
  "socket2 0.4.0",
  "stringprep",
@@ -6150,13 +6156,13 @@ dependencies = [
 
 [[package]]
 name = "sha-1"
-version = "0.9.4"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfebf75d25bd900fd1e7d11501efab59bc846dbc76196839663e6637bba9f25f"
+checksum = "b659df5fc3ce22274daac600ffb845300bd2125bcfaec047823075afdab81c00"
 dependencies = [
  "block-buffer 0.9.0",
  "cfg-if 1.0.0",
- "cpuid-bool",
+ "cpufeatures",
  "digest 0.9.0",
  "opaque-debug 0.3.0",
 ]
@@ -7310,7 +7316,7 @@ dependencies = [
  "log",
  "native-tls",
  "rand 0.8.3",
- "sha-1 0.9.4",
+ "sha-1 0.9.5",
  "url",
  "utf-8",
 ]
@@ -7940,7 +7946,7 @@ dependencies = [
  "regex",
  "rust_decimal",
  "serde_json",
- "sha-1 0.9.4",
+ "sha-1 0.9.5",
  "sha2",
  "sha3",
  "shared",
