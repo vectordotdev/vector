@@ -23,7 +23,6 @@ ci-production-build: setup build-cue production-build
 preview-build:
 	hugo \
 	--baseURL $(DEPLOY_PRIME_URL) \
-	--buildDrafts \
 	--buildFuture \
 	--minify
 

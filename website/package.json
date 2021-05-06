@@ -5,7 +5,7 @@
     "alpinejs": "^2.8.2",
     "autoprefixer": "^10.2.5",
     "postcss-import": "^14.0.1",
-    "tailwindcss": "^2.1.1",
+    "tailwindcss": "^2.1.2",
     "tocbot": "^4.12.2"
   },
   "devDependencies": {
