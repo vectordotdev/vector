@@ -350,7 +350,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		processed_events_total: {
-			description:       """
+			description: """
 				The total number of events processed by this component.
 				This metric is deprecated in place of using
 				[`events_in_total`][docs.sources.internal_metrics.events_in_total] and
