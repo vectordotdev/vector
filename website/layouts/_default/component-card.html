@@ -2,7 +2,7 @@
 {{ $componentTag := .File.BaseFileName }}
 {{ $kind := .Params.kind }}
 {{ $kindLink := printf "/docs/reference/configuration/%ss" $kind | relURL }}
-<div class="no-prose border rounded-md py-3.5 px-5 flex flex-col hover:bg-gray-50 dark:hover:bg-gray-800 dark:border-gray-700 shadow-sm">
+<div class="no-prose border rounded-md py-3.5 px-5 flex flex-col hover:bg-gray-50 dark:hover:bg-black dark:border-gray-700 shadow-sm">
   <span class="flex justify-between space-x-2">
     <h3 id="{{ $componentTag }}">
       <a href="{{ .RelPermalink }}" class="text-sm text-gray-600 tracking-snug dark:text-gray-300">
@@ -15,8 +15,8 @@
     </a>
   </span>
 
-  <div class="my-6">
-    <span class="font-mono tracking-tight font-semibold dark:text-gray-300">
+  <div class="my-6 break-words">
+    <span class="font-mono tracking-tight font-semibold dark:text-gray-300 hover:text-secondary dark:hover:text-primary">
       <a href="{{ .RelPermalink }}">
         {{ $componentTag }}
       </a>

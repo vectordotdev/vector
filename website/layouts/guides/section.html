@@ -24,7 +24,13 @@
         </a>
       </h2>
 
-      <div class="mt-6 flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700 border shadow-md rounded-lg">
+      {{ with .Description }}
+      <h3 class="mt-2 dark:text-gray-300 text-lg">
+        {{ . | markdownify }}
+      </h3>
+      {{ end }}
+
+      <div class="mt-4 flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700 border shadow-md rounded-lg">
         {{ range .RegularPages }}
         {{ .Render "guide-card" }}
         {{ end }}

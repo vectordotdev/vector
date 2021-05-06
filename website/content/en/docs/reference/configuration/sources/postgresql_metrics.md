@@ -6,10 +6,6 @@ kind: source
 
 [PostgreSQL], also known as **Postgres**, is a powerful open source object-relational database system with over 30 years of active development. Postgres has earned its strong reputation for reliability, feature robustness, and performance.
 
-## Requirements
-
-{{< component/requirements >}}
-
 ## Configuration
 
 {{< component/config >}}

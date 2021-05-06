@@ -41,4 +41,4 @@ Data is encoded via Vector's [event protobuf][event_proto] before it is sent ove
 
 {{< snippet "tls" >}}
 
-[event_proto]: https://github.com/timberio/vector/blob/master/proto/event.proto
+[event_proto]: https://github.com/timberio/vector/blob/master/lib/vector-core/proto/event.proto
