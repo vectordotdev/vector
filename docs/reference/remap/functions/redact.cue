@@ -57,6 +57,7 @@ remap: functions: redact: {
 
 	examples: [
 		{
+			title: "Replace sensitive data with default filters."
 			source: #"""
 				redact({ "name": "John Doe", "card_number": "4916155524184782"})
 				"""#
