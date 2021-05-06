@@ -74,6 +74,9 @@ fn compare_number_types(
 }
 
 impl Function for Arithmetic {
+    // This long function could potentially be shortened but when clippy lints
+    // were made more strict in #7341 there was no desire to add functional
+    // changes to the work. Similar story for the precision loss cast.
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::cast_precision_loss)]
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
@@ -243,6 +246,8 @@ mod tests {
     use crate::mapping::query::{path::Path, regex::Regex, Literal};
 
     #[test]
+    // `too_many_lines` is mostly just useful for production code but we're not
+    // able to flag the lint on only for non-test.
     #[allow(clippy::too_many_lines)]
     fn check_compare_query() {
         let cases = vec![

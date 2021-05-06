@@ -569,6 +569,8 @@ mod tests {
     use crate::mapping::query::function::SplitFn;
 
     #[test]
+    // `too_many_lines` is mostly just useful for production code but we're not
+    // able to flag the lint on only for non-test.
     #[allow(clippy::too_many_lines)]
     fn check_parser() {
         let cases = vec![
