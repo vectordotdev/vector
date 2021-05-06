@@ -26,7 +26,7 @@ use tonic::{
 use tower::ServiceBuilder;
 
 type Client = proto::Client<Channel>;
-type Response = Result<tonic::Response<proto::EventAck>, tonic::Status>;
+type Response = Result<tonic::Response<proto::EventResponse>, tonic::Status>;
 
 // TODO: rename
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -41,7 +41,6 @@ pub struct VectorConfig {
     pub tls: Option<GrpcTlsConfig>,
 }
 
-// TODO: duplicated in source
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct GrpcTlsConfig {
@@ -95,7 +94,15 @@ impl SinkConfig for VectorConfig {
         };
 
         let client = proto::Client::new(endpoint.connect_lazy()?);
-        let healthcheck = healthcheck(client.clone(), cx.healthcheck.clone());
+
+        let healthcheck_client = if let Some(uri) = cx.healthcheck.uri.clone() {
+            let endpoint = Endpoint::from(uri.uri);
+            proto::Client::new(endpoint.connect_lazy()?)
+        } else {
+            client.clone()
+        };
+
+        let healthcheck = healthcheck(healthcheck_client, cx.healthcheck.clone());
 
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let batch = BatchSettings::default()
@@ -111,7 +118,7 @@ impl SinkConfig for VectorConfig {
         let buffer = VecBuffer::new(batch.size);
         let sink = BatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal Vector GRPC sink error.", %error))
-            .with_flat_map(move |event| stream::iter(encode_event(event)).map(Ok));
+            .with_flat_map(move |event| stream::iter(Some(encode_event(event))).map(Ok));
 
         Ok((VectorSink::Sink(Box::new(sink)), Box::pin(healthcheck)))
     }
@@ -121,13 +128,12 @@ impl SinkConfig for VectorConfig {
     }
 
     fn sink_type(&self) -> &'static str {
-        "vector_grpc"
+        "vector"
     }
 }
 
 /// Check to see if the remote service accepts new events.
 async fn healthcheck(mut client: Client, options: SinkHealthcheckOptions) -> crate::Result<()> {
-    // TODO: if enabled, allow changing the endpoint through `options.uri`.
     if !options.enabled {
         return Ok(());
     }
@@ -180,19 +186,18 @@ impl tower::Service<Vec<proto::EventRequest>> for Client {
             future::join_all(futures)
                 .await
                 .into_iter()
-                .map(|v| match v {
+                .try_for_each(|v| match v {
                     Ok(..) => Ok(()),
                     Err(err) => Err(Error::Request { source: err }),
                 })
-                .collect::<Result<_, _>>()
         })
     }
 }
 
-fn encode_event(event: Event) -> Option<proto::EventRequest> {
-    Some(proto::EventRequest {
+fn encode_event(event: Event) -> proto::EventRequest {
+    proto::EventRequest {
         message: Some(event.into()),
-    })
+    }
 }
 
 impl EncodedLength for proto::EventRequest {

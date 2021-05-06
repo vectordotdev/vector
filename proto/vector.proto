@@ -7,14 +7,11 @@ message EventRequest {
   event.EventWrapper message = 1;
 }
 
-message EventAck {
-  string message = 1;
-}
+message EventResponse {}
 
 enum ServingStatus {
-    UNKNOWN = 0;
-    SERVING = 1;
-    NOT_SERVING = 2;
+    SERVING = 0;
+    NOT_SERVING = 1;
 }
 
 message HealthCheckRequest {}
@@ -24,7 +21,7 @@ message HealthCheckResponse {
 }
 
 service Vector {
-  rpc PushEvents(EventRequest) returns (EventAck) {}
+  rpc PushEvents(EventRequest) returns (EventResponse) {}
 
   rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 }

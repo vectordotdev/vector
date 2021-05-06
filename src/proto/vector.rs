@@ -1,3 +1,5 @@
+#![allow(clippy::clone_on_ref_ptr)]
+
 tonic::include_proto!("vector");
 
 pub use vector_client::VectorClient as Client;

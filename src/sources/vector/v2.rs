@@ -27,17 +27,14 @@ impl proto::Service for Service {
     async fn push_events(
         &self,
         request: Request<proto::EventRequest>,
-    ) -> Result<Response<proto::EventAck>, Status> {
+    ) -> Result<Response<proto::EventResponse>, Status> {
         let event = request
             .into_inner()
             .message
             .map(Event::from)
-            .ok_or(Status::invalid_argument("missing event"))?;
+            .ok_or_else(|| Status::invalid_argument("missing event"))?;
 
-        let response = Response::new(proto::EventAck {
-            // TODO: There is no need for any body in the ack.
-            message: "success".to_owned(),
-        });
+        let response = Response::new(proto::EventResponse {});
 
         self.pipeline
             .clone()
@@ -70,7 +67,6 @@ pub struct VectorConfig {
     pub tls: Option<GrpcTlsConfig>,
 }
 
-// TODO: duplicated in sink
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct GrpcTlsConfig {
@@ -112,7 +108,7 @@ impl SourceConfig for VectorConfig {
     }
 
     fn source_type(&self) -> &'static str {
-        "vector_grpc"
+        "vector"
     }
 
     fn resources(&self) -> Vec<Resource> {
