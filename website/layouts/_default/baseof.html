@@ -19,8 +19,14 @@
     </title>
 
     {{ partial "css.html" . }}
+
+    <script>
+      function showBody() {
+        document.body.style.visibility = 'visible';
+      }
+    </script>
   </head>
-  <body x-cloak class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}">
+  <body x-cloak class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}" style="visibility: hidden;" onload="showBody()">
     <div class="flex-1 z-1">
       {{ partial "banner.html" . }}
       {{ partial "navbar.html" . }}
