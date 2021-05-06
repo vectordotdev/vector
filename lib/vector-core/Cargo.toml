@@ -28,11 +28,11 @@ serde = { version = "1.0.125", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.64", default-features = false, features = ["alloc", "raw_value"] }
 serde_yaml = { version = "0.8.17", default-features = false, optional = true }
 shared = { path = "../shared" }
-snafu = { version = "0.6.10", default-features = false, features = ["futures", "futures-01"] }
+snafu = { version = "0.6.10", default-features = false, features = ["futures"] }
 toml = { version = "0.5.8", default-features = false }
 tracing = { version = "0.1.26", default-features = false }
 tracing-core = { version = "0.1.17", default-features = false }
-tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-01", "futures-03"], optional = true }
+tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"], optional = true }
 tracing-log = { version = "0.1.2", default-features = false }
 tracing-subscriber = { version = "0.2.17", default-features = false }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231", optional = true }

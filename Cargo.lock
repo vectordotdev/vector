@@ -6372,7 +6372,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eab12d3c261b2308b0d80c26fffb58d17eba81a4be97890101f416b478c79ca7"
 dependencies = [
  "doc-comment",
- "futures 0.1.31",
  "futures-core",
  "pin-project 0.4.28",
  "snafu-derive",
@@ -6894,16 +6893,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-executor"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb2d1b8f4548dbf5e1f7818512e9c406860678f29c300cdf0ebac72d1a3a1671"
-dependencies = [
- "crossbeam-utils 0.7.2",
- "futures 0.1.31",
-]
-
-[[package]]
 name = "tokio-io"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7007,18 +6996,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-timer"
-version = "0.2.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93044f2d313c95ff1cb7809ce9a7a05735b012288a888b62d4434fd58c94f296"
-dependencies = [
- "crossbeam-utils 0.7.2",
- "futures 0.1.31",
- "slab",
- "tokio-executor",
-]
-
-[[package]]
 name = "tokio-tungstenite"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7046,17 +7023,6 @@ dependencies = [
  "pin-project-lite",
  "slab",
  "tokio",
-]
-
-[[package]]
-name = "tokio01-test"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f552746ce9d11b2f7d175bfff335a8d7bd0e965d9e2974ce2c19b508bd0c1bb9"
-dependencies = [
- "futures 0.1.31",
- "tokio-executor",
- "tokio-timer",
 ]
 
 [[package]]
@@ -7177,7 +7143,6 @@ version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
 dependencies = [
- "futures 0.1.31",
  "futures 0.3.14",
  "futures-task",
  "pin-project 1.0.7",
@@ -7657,7 +7622,6 @@ dependencies = [
  "fakedata",
  "file-source",
  "flate2",
- "futures 0.1.31",
  "futures 0.3.14",
  "getset",
  "glob 0.3.0",
@@ -7755,7 +7719,6 @@ dependencies = [
  "tokio-stream",
  "tokio-test",
  "tokio-util",
- "tokio01-test",
  "toml",
  "tower",
  "tower-layer",
