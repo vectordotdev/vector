@@ -31,7 +31,7 @@ Data is encoded via Vector's [event protobuf][event_proto] before it is sent ove
 
 ### Message acknowledgment
 
-Currently, Vector doesn't perform any application-level message acknowledgement. This means that individual messages can be lost, although this should be rare.
+{{< snippet "ack" >}}
 
 ### State
 

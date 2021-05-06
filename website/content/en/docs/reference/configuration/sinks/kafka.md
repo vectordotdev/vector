@@ -3,10 +3,6 @@ title: Kafka
 kind: sink
 ---
 
-## Requirements
-
-{{< component/requirements >}}
-
 ## Configuration
 
 {{< component/config >}}
@@ -14,3 +10,25 @@ kind: sink
 ## Telemetry
 
 {{< component/config >}}
+
+## How it works
+
+### Buffers and batches
+
+{{< snippet "buffers-and-batches" >}}
+
+### Health checks
+
+{{< snippet "health-checks" >}}
+
+### State
+
+{{< snippet "stateless" >}}
+
+### Transport Layer Security (TLS)
+
+{{< snippet "tls" >}}
+
+### librdkafka
+
+{{< snippet "librdkafka" >}}

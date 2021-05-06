@@ -10,3 +10,9 @@ kind: sink
 ## Telemetry
 
 {{< component/config >}}
+
+## How it works
+
+### State
+
+{{< snippet "stateless" >}}

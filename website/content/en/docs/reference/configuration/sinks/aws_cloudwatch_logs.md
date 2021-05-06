@@ -14,3 +14,13 @@ kind: sink
 ## Telemetry
 
 {{< component/config >}}
+
+## How it works
+
+### AWS authentication
+
+{{< snippet "aws/auth" >}}
+
+### Buffers and batches
+
+{{< snippet "buffers-and-batches" >}}

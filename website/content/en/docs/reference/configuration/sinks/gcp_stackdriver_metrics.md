@@ -1,11 +1,15 @@
 ---
-title: Splunk HEC
+title: GCP Cloud Monitoring (formerly Stackdrive)
 kind: sink
 ---
 
 ## Configuration
 
 {{< component/config >}}
+
+## Environment variables
+
+{{< component/env-vars >}}
 
 ## Telemetry
 
@@ -17,9 +21,9 @@ kind: sink
 
 {{< snippet "buffers-and-batches" >}}
 
-### Health checks
+### GCP authentication
 
-{{< snippet "health-checks" >}}
+{{< snippet "gcp/auth" >}}
 
 ### Partitioning
 

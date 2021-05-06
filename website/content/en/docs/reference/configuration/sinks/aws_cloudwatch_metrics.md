@@ -11,10 +11,24 @@ kind: sink
 
 {{< component/config >}}
 
-## Output
+## Environment variables
 
-{{< component/output >}}
+{{< component/env-vars >}}
 
 ## Telemetry
 
 {{< component/config >}}
+
+## How it works
+
+### AWS authentication
+
+{{< snippet "aws/auth" >}}
+
+### Health checks
+
+{{< snippet "health-checks" >}}
+
+### State
+
+{{< snippet "stateless" >}}

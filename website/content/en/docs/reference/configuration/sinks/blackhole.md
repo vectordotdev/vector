@@ -11,3 +11,7 @@ kind: sink
 ## Telemetry
 
 {{< component/config >}}
+
+## How it works
+
+{{< snippet "stateless" >}}

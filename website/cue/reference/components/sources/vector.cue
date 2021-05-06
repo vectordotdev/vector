@@ -107,32 +107,6 @@ components: sources: vector: {
 		}
 	}
 
-	how_it_works: {
-		encoding: {
-			title: "Encoding"
-			body:  """
-				Data is encoded via Vector's [event protobuf](\(urls.event_proto))
-				before it is sent over the wire.
-				"""
-		}
-		communication_protocol: {
-			title: "Communication Protocol"
-			body: """
-				Upstream Vector instances forward data to downstream Vector
-				instances via the TCP protocol.
-				"""
-		}
-		message_acknowledgement: {
-			title: "Message Acknowledgement"
-			body: """
-				Currently, Vector does not perform any application level message
-				acknowledgement. While rare, this means the individual message
-				could be lost.
-				"""
-		}
-
-	}
-
 	telemetry: metrics: {
 		events_in_total:              components.sources.internal_metrics.output.metrics.events_in_total
 		protobuf_decode_errors_total: components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
