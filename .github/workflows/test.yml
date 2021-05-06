@@ -209,6 +209,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: choco install llvm
+      - run: choco install winpcap
       - run: make test
 
   test-vrl:
