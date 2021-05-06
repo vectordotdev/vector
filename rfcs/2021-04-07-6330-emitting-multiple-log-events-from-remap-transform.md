@@ -26,7 +26,6 @@ The proposal is to:
 
 1. Extend `remap` so that if `.` is an array at the end, it will emit one event for each element in that array
 2. Add an `unnest` VRL function that will transform an object into an array of objects using a specified field on the input object
-3. Add an `unnest` transform that can be used for simple cases (could just "expand" into a `remap` transform)
 
 Example input:
 
@@ -51,17 +50,8 @@ Ouput:
 { "host": "localhost", "message": "bar" }
 ```
 
-This would also be available as an `unnest` transform for simple cases where the user does not need to do any additional mapping:
-
-```toml
-[transforms.unnest]
-type = "unnest"
-field = "events"
-```
-
-Which would have the same effect. I think the implementation could just take advantage of the "expand" feature of transforms that lets them replace themselves at vector start time with another transform.
-
-Additionally, we will provide `only_fields` and `except_fields` as options on the `unnest` function and transform to allow users to select which fields will be kept. These match similar semantics to the `encoding` options on sinks.
+Additionally, we will provide `only_fields` and `except_fields` as options on the `unnest` function to allow users to
+select which fields will be kept. These match similar semantics to the `encoding` options on sinks.
 
 Example input:
 
@@ -90,7 +80,8 @@ Here the `timestamp` field is not preserved.
 
 ## Doc-level Proposal
 
-To convert an incoming event into multiple events, the `unnest` transform can be used.
+The `remap` transform can also be used to emit multiple events from a single incoming event by setting the root path,
+`.`, to an array.
 
 For example, given an input of:
 
@@ -101,9 +92,11 @@ For example, given an input of:
 And a transform of:
 
 ```toml
-[transforms.unnest]
-type = "unnest"
-field = "events"
+[transforms.remap]
+type = "remap"
+source = """
+. = unnest(., "events")
+"""
 ```
 
 The following events will be output:
@@ -114,23 +107,15 @@ The following events will be output:
 { "host": "localhost", "message": "1" }
 ```
 
-That is, each record in the indicated field will be emitted as its own event, merged with any other fields existing at the top-level of the event.
+That is, each record in the indicated field will be emitted as its own event, merged with any other fields existing at
+the top-level of the event.
 
-If any elements in the array field are not an object, they will be turned into a string and set as the `message` key.
-
-The `remap` transform can also be used to emit multiple events from a single incoming event by setting the root path, `.`, to an array. The above transform is synonymous with:
-
-```toml
-[transforms.remap]
-type = "remap"
-source = """
-. = unnest(., "events")
-"""
-```
+If any elements in the array field are not an object, they will be set as the `message` key.
 
 ## Rationale
 
-This enhances `remap` to be able to emit multiple events as well as provides a `unnest` transform for simple cases. Without this, users will continue to have to use Lua or WASM to acheive this, which introduces a performance bottleneck compared to this proposal.
+This enhances `remap` to be able to emit multiple events. Without this, users will continue to have to use Lua or WASM
+to acheive this, which introduces a performance bottleneck compared to this proposal.
 
 ## Prior Art
 
@@ -151,7 +136,9 @@ These are similar to the proposed approach.
 
 (previous proposal)
 
-We add an `explode` transform that makes use of the Vector Remap Language (VRL) to emit a set of events from one input event by requiring the VRL program to resolve to an array. For each element of the array, a separate event will be published.
+We add an `explode` transform that makes use of the Vector Remap Language (VRL) to emit a set of events from one input
+event by requiring the VRL program to resolve to an array. For each element of the array, a separate event will be
+published.
 
 Example input:
 
@@ -174,7 +161,8 @@ Ouput:
 {"message": "bar"}
 ```
 
-Support for iteration as part of [#6031](https://github.com/timberio/vector/issues/6031) will allow for users to do things like map fields onto each element. An example might look something like:
+Support for iteration as part of [#6031](https://github.com/timberio/vector/issues/6031) will allow for users to do
+things like map fields onto each element. An example might look something like:
 
 Input:
 
@@ -197,7 +185,8 @@ Output:
 {"host": "foobar", "message": "bar"}
 ```
 
-This is similar to the support that the current [`explode` transform PR](https://github.com/timberio/vector/pull/6545) has for merging in top-level fields when creating events from a subfield that has an array.
+This is similar to the support that the current [`explode` transform PR](https://github.com/timberio/vector/pull/6545)
+has for merging in top-level fields when creating events from a subfield that has an array.
 
 ### emit_log function
 
@@ -211,11 +200,17 @@ A new `emit_log` function will be added to the VRL stdlib
 emit_log(value: Object)
 ```
 
-This function will cause the object passed as value to be emitted at that point and flushed downstream. The emitted log will have its metadata copied from the input event.
+This function will cause the object passed as value to be emitted at that point and flushed downstream. The emitted log
+will have its metadata copied from the input event.
 
-Additionally, an `emit_root` (we can work on the naming) config option will be added to the `remap` transform to configure whether `.` is emitted after the transform runs. It will default to `true` to preserve the current behavior but can be set to `false` by users to supress this behavior. Admittedly, I'm not wild about introducing this additional config option, but I'm not seeing another great alternative.
+Additionally, an `emit_root` (we can work on the naming) config option will be added to the `remap` transform to
+configure whether `.` is emitted after the transform runs. It will default to `true` to preserve the current behavior
+but can be set to `false` by users to supress this behavior. Admittedly, I'm not wild about introducing this additional
+config option, but I'm not seeing another great alternative.
 
-This will be able to be combined with the iteration mechanism that will be introduced [#6031](https://github.com/timberio/vector/issues/6031) to emit an unknown number of events. Naively this might look something like:
+This will be able to be combined with the iteration mechanism that will be introduced
+[#6031](https://github.com/timberio/vector/issues/6031) to emit an unknown number of events. Naively this might look
+something like:
 
 ```text
 for stooge in .stooges
@@ -229,7 +224,8 @@ In the future we can also add functions for emitting metrics like:
 emit_counter(namespace: String, name: String, timestamp: Timestamp, value: Float, kind: "absolute"|"relative")
 ```
 
-I considered having just an `emit_metric()` but it would require users to pass in objects that match exactly the internal representation we have for metrics.
+I considered having just an `emit_metric()` but it would require users to pass in objects that match exactly the
+internal representation we have for metrics.
 
 The `remap` tranform would gain an extra configuration option:
 
@@ -237,9 +233,12 @@ The `remap` tranform would gain an extra configuration option:
 emit_root = true/false # default false
 ```
 
-When `emit_root` is `true`, the value of `.` will be emitted at the end of the remap program. When `emit_root` is false, the value of `.` will not be emitted. Instead users should use the `emit_log` function to emit.
+When `emit_root` is `true`, the value of `.` will be emitted at the end of the remap program. When `emit_root` is false,
+the value of `.` will not be emitted. Instead users should use the `emit_log` function to emit.
 
-We could avoid having an `emit_root` config option on the remap transform by just not emitting automatically if we see an `emit_log` function in the user-provided source. I personally think this would be a bit suprising, but it is an option.
+We could avoid having an `emit_root` config option on the remap transform by just not emitting automatically if we see
+an `emit_log` function in the user-provided source. I personally think this would be a bit suprising, but it is an
+option.
 
 ### Modifying remap to accept setting the root object to an array
 
@@ -247,19 +246,18 @@ https://github.com/timberio/vector/issues/6988
 
 This would modify remap to allow setting `.` to an array of objects to have each element emitted independently.
 
-This turned out to require a bigger change than I expected in that `.` is linked to mutating the underlying event (metric or log). It's definitely doable, but would require a substantial refactoring and so caused me to take a step back and consider the alternatives, prompting this RFC.
+This turned out to require a bigger change than I expected in that `.` is linked to mutating the underlying event
+(metric or log). It's definitely doable, but would require a substantial refactoring and so caused me to take a step
+back and consider the alternatives, prompting this RFC.
 
-Using a separate `explode` transform keeps the responsibilities of the transform more clear and avoids having to refactor the `remap` transform to decouple `.` from the underlying Vector `Event` object; though we may still want to do this in the future anyway.
-
-## Open Questions
-
-1. Do we want the additional `unnest` transform? I included it based on [feedback that using VRL was offputting for simple cases](https://github.com/timberio/vector/pull/7038#issuecomment-817043491), but maybe the newly proposed `remap` modifications are easy enough to use that we don't need the additional transform.
+Using a separate `explode` transform keeps the responsibilities of the transform more clear and avoids having to
+refactor the `remap` transform to decouple `.` from the underlying Vector `Event` object; though we may still want to do
+this in the future anyway.
 
 ## Plan Of Attack
 
-1. Implement `unnest` VRL function
-2. Modify `remap` to treat setting `.` to an array to indicate that multiple events should be emitted
-3. Implement `unnest` transform
+1. Modify `remap` to treat setting `.` to an array to indicate that multiple events should be emitted
+2. Implement `unnest` VRL function
 
 [1]: https://github.com/timberio/vector/issues/6330#issue-799809382
 [2]: https://discord.com/channels/742820443487993987/764187584452493323/808744293945704479
