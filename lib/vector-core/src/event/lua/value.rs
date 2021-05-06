@@ -53,6 +53,9 @@ mod test {
     use chrono::{TimeZone, Utc};
 
     #[test]
+    // We allow approximate constants in this test to avoid needing to update
+    // the test if Rust ever updates the accuracy of its constants. The actual
+    // constant doesn't matter just it's stringy representation.
     #[allow(clippy::approx_constant)]
     fn from_lua() {
         let pairs = vec![
@@ -109,7 +112,11 @@ mod test {
     }
 
     #[test]
+    // We allow approximate constants in this test to avoid needing to update
+    // the test if Rust ever updates the accuracy of its constants. The actual
+    // constant doesn't matter just it's stringy representation.
     #[allow(clippy::approx_constant)]
+    // Long test is long.
     #[allow(clippy::too_many_lines)]
     fn to_lua() {
         let pairs = vec![
