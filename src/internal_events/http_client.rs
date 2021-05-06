@@ -84,8 +84,8 @@ impl<'a> InternalEvent for GotHttpError<'a> {
 
     fn emit_metrics(&self) {
         counter!("http_client_errors_total", 1, "error_kind" => self.error.to_string());
-        histogram!("http_client_rtt_ns", self.roundtrip);
-        histogram!("http_client_error_rtt_ns", self.roundtrip, "error_kind" => self.error.to_string());
+        histogram!("http_client_rtt_seconds", self.roundtrip);
+        histogram!("http_client_error_rtt_seconds", self.roundtrip, "error_kind" => self.error.to_string());
     }
 }
 

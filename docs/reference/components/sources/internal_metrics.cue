@@ -216,8 +216,8 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		command_execution_duration_ns: {
-			description:       "The command execution duration in nanoseconds."
+		command_execution_duration_seconds: {
+			description:       "The command execution duration in seconds."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _component_tags
