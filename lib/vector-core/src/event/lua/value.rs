@@ -53,11 +53,15 @@ mod test {
     use chrono::{TimeZone, Utc};
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn from_lua() {
         let pairs = vec![
-            ("'⍺βγ'", Value::Bytes("⍺βγ".into())),
+            (
+                "'\u{237a}\u{3b2}\u{3b3}'",
+                Value::Bytes("\u{237a}\u{3b2}\u{3b3}".into()),
+            ),
             ("123", Value::Integer(123)),
-            ("3.14159265359", Value::Float(3.14159265359)),
+            ("3.14159265359", Value::Float(3.141_592_653_59)),
             ("true", Value::Boolean(true)),
             (
                 "{ x = 1, y = '2', nested = { other = 2.718281828 } }",
@@ -68,7 +72,7 @@ mod test {
                         (
                             "nested".into(),
                             Value::Map(
-                                vec![("other".into(), 2.718281828.into())]
+                                vec![("other".into(), 2.718_281_828.into())]
                                     .into_iter()
                                     .collect(),
                             ),
@@ -80,7 +84,7 @@ mod test {
             ),
             (
                 "{1, '2', 0.57721566}",
-                Value::Array(vec![1.into(), "2".into(), 0.57721566.into()]),
+                Value::Array(vec![1.into(), "2".into(), 0.577_215_66.into()]),
             ),
             (
                 "os.date('!*t', 1584297428)",
@@ -92,12 +96,12 @@ mod test {
             ),
             (
                 "{year=2020, month=3, day=15, hour=18, min=37, sec=8, nanosec=666666666}",
-                Value::Timestamp(Utc.ymd(2020, 3, 15).and_hms_nano(18, 37, 8, 666666666)),
+                Value::Timestamp(Utc.ymd(2020, 3, 15).and_hms_nano(18, 37, 8, 666_666_666)),
             ),
         ];
 
         Lua::new().context(move |ctx| {
-            for (expression, expected) in pairs.into_iter() {
+            for (expression, expected) in pairs {
                 let value: Value = ctx.load(expression).eval().unwrap();
                 assert_eq!(value, expected, "expression: {:?}", expression);
             }
@@ -105,13 +109,15 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
+    #[allow(clippy::too_many_lines)]
     fn to_lua() {
         let pairs = vec![
             (
-                Value::Bytes("⍺βγ".into()),
+                Value::Bytes("\u{237a}\u{3b2}\u{3b3}".into()),
                 r#"
                 function (value)
-                    return value == '⍺βγ'
+                    return value == '\u{237a}\u{3b2}\u{3b3}'
                 end
                 "#,
             ),
@@ -124,7 +130,7 @@ mod test {
                 "#,
             ),
             (
-                Value::Float(3.14159265359),
+                Value::Float(3.141_592_653_59),
                 r#"
                 function (value)
                     return value == 3.14159265359
@@ -147,7 +153,7 @@ mod test {
                         (
                             "nested".into(),
                             Value::Map(
-                                vec![("other".into(), 2.718281828.into())]
+                                vec![("other".into(), 2.718_281_828.into())]
                                     .into_iter()
                                     .collect(),
                             ),
@@ -165,7 +171,7 @@ mod test {
                 "#,
             ),
             (
-                Value::Array(vec![1.into(), "2".into(), 0.57721566.into()]),
+                Value::Array(vec![1.into(), "2".into(), 0.577_215_66.into()]),
                 r#"
                 function (value)
                     return value[1] == 1 and
@@ -175,7 +181,7 @@ mod test {
                 "#,
             ),
             (
-                Value::Timestamp(Utc.ymd(2020, 3, 15).and_hms_nano(18, 37, 8, 666666666)),
+                Value::Timestamp(Utc.ymd(2020, 3, 15).and_hms_nano(18, 37, 8, 666_666_666)),
                 r#"
                 function (value)
                     local expected = os.date("!*t", 1584297428)
@@ -192,7 +198,7 @@ mod test {
         ];
 
         Lua::new().context(move |ctx| {
-            for (value, test_src) in pairs.into_iter() {
+            for (value, test_src) in pairs {
                 let test_fn: LuaFunction = ctx.load(test_src).eval().unwrap_or_else(|_| {
                     panic!("Failed to load {} for value {:?}", test_src, value)
                 });

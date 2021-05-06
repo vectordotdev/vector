@@ -1099,6 +1099,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn display() {
         assert_eq!(
             format!(
@@ -1155,14 +1156,14 @@ mod test {
         let mut values = BTreeSet::<String>::new();
         values.insert("v1".into());
         values.insert("v2_two".into());
-        values.insert("thrəë".into());
+        values.insert("thr\u{259}\u{eb}".into());
         values.insert("four=4".into());
         assert_eq!(
             format!(
                 "{}",
                 Metric::new("three", MetricKind::Absolute, MetricValue::Set { values })
             ),
-            r#"three{} = "four=4" "thrəë" v1 v2_two"#
+            r#"three{} = "four=4" "thr\u{259}\u{eb}" v1 v2_two"#
         );
 
         assert_eq!(

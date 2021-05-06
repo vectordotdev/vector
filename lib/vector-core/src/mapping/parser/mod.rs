@@ -569,6 +569,7 @@ mod tests {
     use crate::mapping::query::function::SplitFn;
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn check_parser() {
         let cases = vec![
             (

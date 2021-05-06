@@ -540,6 +540,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn object_insert() {
         use lookup::SegmentBuf;
         use shared::btreemap;

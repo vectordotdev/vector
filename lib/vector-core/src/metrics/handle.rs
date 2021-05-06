@@ -253,6 +253,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::needless_pass_by_value)]
     fn histogram() {
         fn inner(values: Vec<f64>) -> TestResult {
             let mut sut = Histogram::new();
@@ -280,6 +281,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::needless_pass_by_value)]
     fn count() {
         fn inner(values: Vec<u64>) -> TestResult {
             let mut sut = Counter::new();

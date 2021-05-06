@@ -161,6 +161,7 @@ mod test {
     use serde_json::json;
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn check_flatten() {
         let cases = vec![
             (

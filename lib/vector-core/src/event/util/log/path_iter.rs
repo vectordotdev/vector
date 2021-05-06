@@ -170,7 +170,7 @@ mod test {
 
     #[test]
     fn path_iter_complex() {
-        use PathComponent::*;
+        use PathComponent::{Index, Key};
 
         let inputs = vec![
             "flying.squirrels.are.everywhere",
@@ -224,7 +224,7 @@ mod test {
             "invalid\\ escaping",
         ];
 
-        for i in inputs.into_iter() {
+        for i in inputs {
             assert_eq!(PathIter::new(i).last(), Some(PathComponent::Invalid));
         }
     }

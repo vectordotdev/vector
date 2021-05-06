@@ -243,6 +243,7 @@ mod tests {
     use crate::mapping::query::{path::Path, regex::Regex, Literal};
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn check_compare_query() {
         let cases = vec![
             (
