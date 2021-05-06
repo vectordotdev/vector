@@ -3,7 +3,6 @@
 <!DOCTYPE html>
 <html
   lang="{{ site.LanguageCode }}"
-  x-cloak
   x-data="{ dark: $store.global.dark{{ if $hasBottomNav }}, slideover: false {{ end }} }"
   x-on:toggle-dark="dark = !dark"
   :class="{ 'dark': dark, 'light': !dark }"
@@ -20,13 +19,16 @@
 
     {{ partial "css.html" . }}
 
+    {{/* Ensure smooth page loading */}}
+    <style>
+      body { visibility: hidden; }
+    </style>
+
     <script>
-      function showBody() {
-        document.body.style.visibility = 'visible';
-      }
+      function showBody() { document.body.style.visibility = 'visible'; }
     </script>
   </head>
-  <body x-cloak class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}" style="visibility: hidden;" onload="showBody()">
+  <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}" onload="showBody()">
     <div class="flex-1 z-1">
       {{ partial "banner.html" . }}
       {{ partial "navbar.html" . }}
