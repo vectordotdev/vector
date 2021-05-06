@@ -9,6 +9,8 @@ lazy_static! {
     static ref CREDIT_CARD_REGEX: regex::Regex = regex::Regex::new(r"(?:4[0-9]{12}(?:[0-9]{3})?|[25][1-7][0-9]{14}|6(?:011|5[0-9][0-9])[0-9]{12}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|(?:2131|1800|35\d{3})\d{11})").unwrap();
 }
 
+const DEFAULT_FILTERS: [Filter; 1] = [Filter::CreditCard];
+
 #[derive(Clone, Copy, Debug)]
 pub struct Redact;
 
@@ -27,7 +29,7 @@ impl Function for Redact {
             Parameter {
                 keyword: "filters",
                 kind: kind::ARRAY,
-                required: true,
+                required: false,
             },
         ]
     }
@@ -36,13 +38,13 @@ impl Function for Redact {
         &[
             Example {
                 title: "regex",
-                source: r#"redact!("my id is 123456", filters = [r'\d+'])"#,
+                source: r#"redact("my id is 123456", filters: [r'\d+'])"#,
                 result: Ok(r#"my id is [REDACTED]"#),
             },
             Example {
                 title: "credit_card",
-                source: r#"redact!({ "name": "John Doe", "card_number": "4916155524184782"}, filters = ["credit_card"])"#,
-                result: Ok(r#"{ "field": "[REDACTED]" }"#),
+                source: r#"redact({ "name": "John Doe", "card_number": "4916155524184782"}, filters: ["credit_card"])"#,
+                result: Ok(r#"{ "name": "John Doe", "field": "[REDACTED]" }"#),
             },
         ]
     }
@@ -51,27 +53,32 @@ impl Function for Redact {
         let value = arguments.required("value");
 
         let filters = arguments
-            .required_array("filters")?
-            .into_iter()
-            .map(|expr| {
-                expr.as_value()
-                    .ok_or_else(|| vrl::function::Error::ExpectedStaticExpression {
-                        keyword: "filters",
-                        expr,
+            .optional_array("filters")?
+            .map(|filters| {
+                filters
+                    .into_iter()
+                    .map(|expr| {
+                        expr.as_value().ok_or_else(|| {
+                            vrl::function::Error::ExpectedStaticExpression {
+                                keyword: "filters",
+                                expr,
+                            }
+                        })
                     })
-            })
-            .map(|value| {
-                value.and_then(|value| {
-                    value.clone().try_into().map_err(|error| {
-                        vrl::function::Error::InvalidArgument {
-                            keyword: "filters",
-                            value,
-                            error,
-                        }
+                    .map(|value| {
+                        value.and_then(|value| {
+                            value.clone().try_into().map_err(|error| {
+                                vrl::function::Error::InvalidArgument {
+                                    keyword: "filters",
+                                    value,
+                                    error,
+                                }
+                            })
+                        })
                     })
-                })
+                    .collect::<std::result::Result<Vec<Filter>, _>>()
             })
-            .collect::<std::result::Result<Vec<Filter>, _>>()?;
+            .unwrap_or_else(|| Ok(DEFAULT_FILTERS.to_vec()))?;
 
         let redactor = Redactor::Full;
 
