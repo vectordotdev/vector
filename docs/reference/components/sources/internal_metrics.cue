@@ -204,7 +204,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		collect_duration_nanoseconds: {
+		collect_duration_seconds: {
 			description:       "The duration spent collecting of metrics for this component."
 			type:              "histogram"
 			default_namespace: "vector"
@@ -608,7 +608,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		request_duration_nanoseconds: {
+		request_duration_seconds: {
 			description:       "The total request duration in nanoseconds."
 			type:              "histogram"
 			default_namespace: "vector"
