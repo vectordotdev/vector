@@ -20,13 +20,7 @@
     {{ partial "css.html" . }}
 
     {{/* Ensure smooth page loading */}}
-    <style>
-      body { visibility: hidden; }
-    </style>
-
-    <script>
-      function showBody() { document.body.style.visibility = 'visible'; }
-    </script>
+    {{ partial "page-load.html" . }}
   </head>
   <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}" onload="showBody()">
     <div class="flex-1 z-1">
