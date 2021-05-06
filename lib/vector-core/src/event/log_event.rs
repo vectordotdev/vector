@@ -45,6 +45,11 @@ impl LogEvent {
         }
     }
 
+    /// Convert a `LogEvent` into a tuple of its components
+    ///
+    /// # Panics
+    ///
+    /// Panics if the fields of the `LogEvent` are not a `Value::Map`.
     pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
         (
             self.fields
