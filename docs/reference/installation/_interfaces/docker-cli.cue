@@ -19,7 +19,7 @@ installation: _interfaces: "docker-cli": {
 	platform_name: "docker"
 
 	role_implementations: [Name=string]: {
-		_api_port:         8383
+		_api_port:         8686
 		_config_path:      paths.config
 		_docker_sock_path: "/var/run/docker.sock"
 		commands: {
