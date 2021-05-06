@@ -39,6 +39,11 @@ fn tracing_context_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
+/// Initialize the metrics sub-system
+///
+/// # Errors
+///
+/// This function will error if it is called multiple times.
 pub fn init() -> crate::Result<()> {
     // An escape hatch to allow disabing internal metrics core. May be used for
     // performance reasons. This is a hidden and undocumented functionality.
@@ -97,6 +102,11 @@ pub fn reset(controller: &Controller) {
 }
 
 /// Get a handle to the globally registered controller, if it's initialized.
+///
+/// # Errors
+///
+/// This function will fail if the metrics subsystem has not been correctly
+/// initialized.
 pub fn get_controller() -> crate::Result<&'static Controller> {
     CONTROLLER
         .get()
