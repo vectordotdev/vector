@@ -609,7 +609,7 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		request_duration_seconds: {
-			description:       "The total request duration in nanoseconds."
+			description:       "The total request duration in seconds."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
