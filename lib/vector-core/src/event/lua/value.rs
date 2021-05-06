@@ -53,10 +53,6 @@ mod test {
     use chrono::{TimeZone, Utc};
 
     #[test]
-    // We allow approximate constants in this test to avoid needing to update
-    // the test if Rust ever updates the accuracy of its constants. The actual
-    // constant doesn't matter just it's stringy representation.
-    #[allow(clippy::approx_constant)]
     fn from_lua() {
         let pairs = vec![
             (
@@ -64,7 +60,7 @@ mod test {
                 Value::Bytes("\u{237a}\u{3b2}\u{3b3}".into()),
             ),
             ("123", Value::Integer(123)),
-            ("3.14159265359", Value::Float(3.141_592_653_59)),
+            ("4.333", Value::Float(4.333)),
             ("true", Value::Boolean(true)),
             (
                 "{ x = 1, y = '2', nested = { other = 2.718281828 } }",
@@ -112,10 +108,6 @@ mod test {
     }
 
     #[test]
-    // We allow approximate constants in this test to avoid needing to update
-    // the test if Rust ever updates the accuracy of its constants. The actual
-    // constant doesn't matter just it's stringy representation.
-    #[allow(clippy::approx_constant)]
     // Long test is long.
     #[allow(clippy::too_many_lines)]
     fn to_lua() {
@@ -137,10 +129,10 @@ mod test {
                 "#,
             ),
             (
-                Value::Float(3.141_592_653_59),
+                Value::Float(4.333),
                 r#"
                 function (value)
-                    return value == 3.14159265359
+                    return value == 4.333
                 end
                 "#,
             ),
@@ -159,11 +151,7 @@ mod test {
                         ("y".into(), "2".into()),
                         (
                             "nested".into(),
-                            Value::Map(
-                                vec![("other".into(), 2.718_281_828.into())]
-                                    .into_iter()
-                                    .collect(),
-                            ),
+                            Value::Map(vec![("other".into(), 5.111.into())].into_iter().collect()),
                         ),
                     ]
                     .into_iter()
@@ -173,7 +161,7 @@ mod test {
                 function (value)
                     return value.x == 1 and
                         value['y'] == '2' and
-                        value.nested.other == 2.718281828
+                        value.nested.other == 5.111
                 end
                 "#,
             ),
