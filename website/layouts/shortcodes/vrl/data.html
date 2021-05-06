@@ -17,8 +17,8 @@
 </div>
 
 {{ with $v.grammar }}
-<div class="mt-2 no-prose">
-  <div>
+<div class="mt-4 no-prose">
+  <span>
     <h4 x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $id }}-grammar" class="flex items-center">
       Grammar
       <a class="ml-2" x-cloak x-show="show" href="#{{ $id }}">
@@ -27,21 +27,21 @@
         </svg>
       </a>
     </h4>
-  </div>
+  </span>
 
-  <div class="mt-2">
+  <div class="mt-3">
     {{ highlight .source "ruby" "" }}
   </div>
 
   {{ with .definitions }}
-  <div class="mt-2 ml-4 flex flex-col space-y-1.5">
+  <div class="mt-3 ml-4 flex flex-col space-y-2">
     {{ range $k, $v := . }}
     <div>
-      <span class="font-mono font-semibold text-base">
+      <span class="font-mono font-semibold text-sm">
         {{ $k }}
       </span>
 
-      <div class="ml-4 prose dark:prose-dark leading-snug prose-sm">
+      <div class="mt-1 ml-4 prose dark:prose-dark leading-snug prose-sm">
         {{ $v.description | markdownify }}
       </div>
     </div>
@@ -55,16 +55,18 @@
 
 {{ with $v.examples }}
 {{ $id := printf "%s-examples" $k }}
-<h4 x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $id }}-examples" class="flex items-center">
-  Examples
-  <a class="ml-2" x-cloak x-show="show" href="#{{ $id }}">
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
-    </svg>
-  </a>
-</h4>
+<span>
+  <h4 x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $id }}-examples" class="flex items-center">
+    Examples
+    <a class="ml-2" x-cloak x-show="show" href="#{{ $id }}">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+      </svg>
+    </a>
+  </h4>
+</span>
 
-<div class="no-prose border rounded-md flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700">
+<div class="mt-3 no-prose border rounded-md flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700">
   <div>
     <div class="flex flex-col space-y-2 divide-y dark:divide-gray-700">
       {{ range . }}
@@ -86,7 +88,7 @@
 {{ end }}
 
 {{ define "vrl-data-example" }}
-<div class="py-2 px-3">
+<div class="py-4 px-6">
   {{ with .title }}
   <span class="font-bold">
     {{ . }}
@@ -95,32 +97,38 @@
 
   <div>
     {{ with .input }}
-    <div>
+    <div class="mt-2">
       <span class="text-base">
         Vector event
       </span>
 
-      {{ template "code" . }}
+      <div class="mt-2">
+        {{ template "code" . }}
+      </div>
     </div>
     {{ end }}
 
     {{ with .source }}
-    <div>
+    <div class="mt-2">
       <span class="text-base">
         VRL program
       </span>
 
-      {{ template "code" . }}
+      <div class="mt-2">
+        {{ template "code" . }}
+      </div>
     </div>
     {{ end }}
 
     {{ with .return }}
-    <div>
+    <div class="mt-2">
       <span class="text-base">
         Resulting event
       </span>
 
-      {{ template "code" . }}
+      <div class="mt-2">
+        {{ template "code" . }}
+      </div>
     </div>
     {{ end }}
   </div>

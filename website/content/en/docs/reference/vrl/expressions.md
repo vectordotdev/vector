@@ -225,4 +225,4 @@ VRL is an expression-oriented language. A VRL program consists entirely of expre
 [regex]: https://en.wikipedia.org/wiki/Regular_expression
 [rfc3339]: https://tools.ietf.org/html/rfc3339
 [rust_regex]: https://docs.rs/regex/latest/regex/#syntax
-[utf_8]: https://en.wikipedia.org/wiki/UTF-8
+[utf8]: https://en.wikipedia.org/wiki/UTF-8
