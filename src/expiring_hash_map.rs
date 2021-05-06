@@ -172,7 +172,7 @@ where
     ///                 println!("Expired: {}", val);
     ///                 break;
     ///             }
-    ///             Some(Err(error)) => panic!(format!("Timer error: {:?}", error)),
+    ///             Some(Err(error)) => panic!("Timer error: {:?}", error),
     ///         },
     ///         _ = tokio::time::sleep(Duration::from_millis(100)) => map.insert(
     ///             "key".to_owned(),

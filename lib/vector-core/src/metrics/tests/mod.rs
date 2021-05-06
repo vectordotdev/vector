@@ -1,11 +1,10 @@
-use crate::{event::Event, test_util::trace_init};
+use crate::event::Event;
 use metrics::counter;
 use tracing::{span, Level};
 
 #[ignore]
 #[test]
 fn test_labels_injection() {
-    trace_init();
     let _ = super::init();
 
     let span = span!(
@@ -44,7 +43,6 @@ fn test_labels_injection() {
 
 #[test]
 fn test_cardinality_metric() {
-    trace_init();
     let _ = super::init();
 
     let capture_value = || {

@@ -2,15 +2,13 @@ mod handle;
 mod label_filter;
 mod recorder;
 mod registry;
-#[cfg(test)]
-mod tests;
 
 use crate::event::{Event, Metric};
 pub use crate::metrics::handle::{Counter, Handle};
 use crate::metrics::label_filter::VectorLabelFilter;
 use crate::metrics::recorder::VectorRecorder;
 use crate::metrics::registry::VectorRegistry;
-use metrics::{Key, KeyData, SharedString};
+use metrics::{Key, SharedString};
 use metrics_tracing_context::TracingContextLayer;
 use metrics_util::layers::Layer;
 use metrics_util::{CompositeKey, MetricKind};
@@ -23,9 +21,10 @@ static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality_total";
 static CARDINALITY_KEY_DATA_NAME: [SharedString; 1] =
     [SharedString::const_str(&CARDINALITY_KEY_NAME)];
-static CARDINALITY_KEY_DATA: KeyData = KeyData::from_static_name(&CARDINALITY_KEY_DATA_NAME);
-static CARDINALITY_KEY: CompositeKey =
-    CompositeKey::new(MetricKind::Counter, Key::Borrowed(&CARDINALITY_KEY_DATA));
+static CARDINALITY_KEY: CompositeKey = CompositeKey::new(
+    MetricKind::Counter,
+    Key::from_static_name(&CARDINALITY_KEY_DATA_NAME),
+);
 
 /// Controller allows capturing metric snapshots.
 pub struct Controller {
@@ -117,4 +116,48 @@ pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
     events.push(Metric::from_metric_kv(CARDINALITY_KEY.key(), &handle).into());
 
     events.into_iter()
+}
+
+#[macro_export]
+/// This macro is used to emit metrics as a `counter` while simultaneously
+/// converting from absolute values to incremental values.
+///
+/// Values that do not arrive in strictly monotonically increasing order are
+/// ignored and will not be emitted.
+macro_rules! update_counter {
+    ($label:literal, $value:expr) => {{
+        use ::std::sync::atomic::{AtomicU64, Ordering};
+
+        static PREVIOUS_VALUE: AtomicU64 = AtomicU64::new(0);
+
+        let new_value = $value;
+        let mut previous_value = PREVIOUS_VALUE.load(Ordering::Relaxed);
+
+        loop {
+            // Either a new greater value has been emitted before this thread updated the counter
+            // or values were provided that are not in strictly monotonically increasing order.
+            // Ignore.
+            if new_value <= previous_value {
+                break;
+            }
+
+            match PREVIOUS_VALUE.compare_exchange_weak(
+                previous_value,
+                new_value,
+                Ordering::SeqCst,
+                Ordering::Relaxed,
+            ) {
+                // Another thread has written a new value before us. Re-enter loop.
+                Err(value) => previous_value = value,
+                // Calculate delta to last emitted value and emit it.
+                Ok(_) => {
+                    let delta = new_value - previous_value;
+                    // Albeit very unlikely, note that this sequence of deltas might be emitted in
+                    // a different order than they were calculated.
+                    counter!($label, delta);
+                    break;
+                }
+            }
+        }
+    }};
 }

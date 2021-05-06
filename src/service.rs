@@ -27,20 +27,20 @@ struct InstallOpts {
     display_name: Option<String>,
 
     /// Vector config files in TOML format to be used by the service.
-    #[structopt(name = "config-toml", long)]
+    #[structopt(name = "config-toml", long, use_delimiter(true))]
     config_paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format to be used by the service.
-    #[structopt(name = "config-json", long)]
+    #[structopt(name = "config-json", long, use_delimiter(true))]
     config_paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format to be used by the service.
-    #[structopt(name = "config-yaml", long)]
+    #[structopt(name = "config-yaml", long, use_delimiter(true))]
     config_paths_yaml: Vec<PathBuf>,
 
     /// The configuration files that will be used by the service.
     /// If no configuration file is specified, will target default configuration file.
-    #[structopt(name = "config", short, long)]
+    #[structopt(name = "config", short, long, use_delimiter(true))]
     config_paths: Vec<PathBuf>,
 }
 
