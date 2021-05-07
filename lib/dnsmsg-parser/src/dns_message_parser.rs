@@ -2,7 +2,7 @@ use super::dns_message::{
     self, DnsQueryMessage, DnsRecord, DnsUpdateMessage, EdnsOptionEntry, OptPseudoSection,
     QueryHeader, QueryQuestion, UpdateHeader, ZoneInfo,
 };
-use data_encoding::{BASE32HEX_NOPAD, HEXUPPER};
+use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
 use snafu::{ResultExt, Snafu};
 use std::str::Utf8Error;
 use trust_dns_proto::{
@@ -561,7 +561,7 @@ impl DnsMessageParser {
                     let key_tag = parse_u16(&mut decoder)?;
                     let algorithm = Algorithm::from_u8(parse_u8(&mut decoder)?).as_str();
                     let crl_len = raw_rdata.len() as u16 - 5;
-                    let crl = base64::encode(&parse_vec_with_u16_len(&mut decoder, crl_len)?);
+                    let crl = BASE64.encode(&parse_vec_with_u16_len(&mut decoder, crl_len)?);
                     Ok((
                         Some(format!(
                             "{} {} {} {}",
@@ -592,7 +592,7 @@ impl DnsMessageParser {
                     let coding = parse_u8(&mut decoder)?;
                     let subcoding = parse_u8(&mut decoder)?;
                     let data_len = raw_rdata.len() as u16 - 3;
-                    let data = base64::encode(&parse_vec_with_u16_len(&mut decoder, data_len)?);
+                    let data = BASE64.encode(&parse_vec_with_u16_len(&mut decoder, data_len)?);
 
                     Ok((
                         Some(format!("{} {} {} {}", meaning, coding, subcoding, data)),
@@ -616,7 +616,7 @@ impl DnsMessageParser {
                     let mut decoder = BinDecoder::new(raw_rdata);
                     let raw_data_len = raw_rdata.len() as u16;
                     let digest =
-                        base64::encode(&parse_vec_with_u16_len(&mut decoder, raw_data_len)?);
+                        BASE64.encode(&parse_vec_with_u16_len(&mut decoder, raw_data_len)?);
                     Ok((Some(digest), None))
                 }
                 None => Err(DnsMessageParserError::SimpleError {
@@ -661,7 +661,7 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
             Ok((Some(srv_rdata), None))
         }
         RData::NULL(null) => match null.anything() {
-            Some(raw_rdata) => Ok((Some(base64::encode(raw_rdata)), None)),
+            Some(raw_rdata) => Ok((Some(BASE64.encode(raw_rdata)), None)),
             None => Ok((Some(String::from("")), None)),
         },
         RData::NS(ns) => Ok((Some(ns.to_string()), None)),
@@ -813,7 +813,7 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
                         }
                     },
                     u8::from(dnskey.algorithm()),
-                    base64::encode(dnskey.public_key())
+                    BASE64.encode(dnskey.public_key())
                 );
                 Ok((Some(dnskey_rdata), None))
             }
@@ -871,7 +871,7 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
                     sig.sig_inception(),  // currently in epoch convert to human readable ?
                     sig.key_tag(),
                     sig.signer_name().to_string(),
-                    base64::encode(sig.sig())
+                    BASE64.encode(sig.sig())
                 );
                 Ok((Some(sig_rdata), None))
             }
@@ -1000,7 +1000,7 @@ fn parse_edns_opt(opt_code: EdnsCode, opt_data: &[u8]) -> EdnsOptionEntry {
     EdnsOptionEntry {
         opt_code: Into::<u16>::into(opt_code),
         opt_name: format!("{:?}", opt_code),
-        opt_data: base64::encode(&opt_data),
+        opt_data: BASE64.encode(&opt_data),
     }
 }
 
@@ -1213,6 +1213,7 @@ mod tests {
         str::FromStr,
         time::Instant,
     };
+    use tracing::error;
     use trust_dns_proto::{
         rr::{
             dnssec::{
@@ -1242,7 +1243,7 @@ mod tests {
     #[test]
     fn test_parse_as_query_message() {
         let raw_dns_message = "szgAAAABAAAAAAAAAmg1B2V4YW1wbGUDY29tAAAGAAE=";
-        if let Ok(raw_qeury_message) = base64::decode(raw_dns_message) {
+        if let Ok(raw_qeury_message) = BASE64.decode(raw_dns_message.as_bytes()) {
             let parse_result = DnsMessageParser::new(raw_qeury_message).parse_as_query_message();
             assert!(parse_result.is_ok());
             if let Ok(message) = parse_result {
@@ -1307,7 +1308,7 @@ mod tests {
         AAAAAAADDAowAcAAEAAqMAABAgAQUCCMwAAAAAAAAAAAAwwLMAHAABAAKjAAAQIAEFAznBAAAAAAAAAAAAMMDDABwAAQACow\
         AAECABBQJwlAAAAAAAAAAAADDA0wAcAAEAAqMAABAgAQUDDS0AAAAAAAAAAAAwwOMAHAABAAKjAAAQIAEFANk3AAAAAAAAAA\
         AAMMDzABwAAQACowAAECABBQGx+QAAAAAAAAAAADAAACkFqgAAgAAAAA==";
-        if let Ok(raw_query_message) = base64::decode(raw_query_message_base64) {
+        if let Ok(raw_query_message) = BASE64.decode(raw_query_message_base64.as_bytes()) {
             if let Err(err) = DnsMessageParser::new(raw_query_message).parse_as_query_message() {
                 assert!(err.to_string().contains("Unsupported rdata"));
                 match err {
@@ -1361,7 +1362,7 @@ mod tests {
         DdKSzI1RU1ISE04QTAxTU8wQUVRUU43RzJVUEoyODY3wBYAMgABAAFRgAAiAQEAAAAUPOhC39uAx9ZAH4EOHcsrn9Pusu\
         cABiAAAAAAEsArAAEAAQACowAABGw9EwrAKwABAAEAAqMAAASsYsAiwEYAAQABAAKjAAAELqa2M8BGAAEAAQACowAABF1\
         zHGgAACkQAAAAgAAAAHgB";
-        if let Ok(raw_update_message) = base64::decode(raw_dns_message) {
+        if let Ok(raw_update_message) = BASE64.decode(raw_dns_message.as_bytes()) {
             assert!(DnsMessageParser::new(raw_update_message)
                 .parse_as_update_message()
                 .is_err());
@@ -1373,7 +1374,7 @@ mod tests {
     #[test]
     fn test_parse_as_update_message() {
         let raw_dns_message = "xjUoAAABAAAAAQAAB2V4YW1wbGUDY29tAAAGAAECaDXADAD/AP8AAAAAAAA=";
-        if let Ok(raw_update_message) = base64::decode(raw_dns_message) {
+        if let Ok(raw_update_message) = BASE64.decode(raw_dns_message.as_bytes()) {
             let parse_result = DnsMessageParser::new(raw_update_message).parse_as_update_message();
             assert!(parse_result.is_ok());
             if let Ok(message) = parse_result {
@@ -1394,15 +1395,15 @@ mod tests {
     fn test_parse_loc_rdata_size() {
         let data: u8 = 51;
         let expected: f64 = 30.0;
-        assert_eq!(expected, parse_loc_rdata_size(data).unwrap());
+        assert!((expected - parse_loc_rdata_size(data).unwrap()).abs() < f64::EPSILON);
 
         let data: u8 = 22;
         let expected: f64 = 10000.0;
-        assert_eq!(expected, parse_loc_rdata_size(data).unwrap());
+        assert!((expected - parse_loc_rdata_size(data).unwrap()).abs() < f64::EPSILON);
 
         let data: u8 = 19;
         let expected: f64 = 10.0;
-        assert_eq!(expected, parse_loc_rdata_size(data).unwrap());
+        assert!((expected - parse_loc_rdata_size(data).unwrap()).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -1933,7 +1934,7 @@ mod tests {
     }
 
     fn test_format_rdata(raw_data: &str, code: u16, expected_output: &str) {
-        if let Ok(raw_rdata) = base64::decode(raw_data) {
+        if let Ok(raw_rdata) = BASE64.decode(raw_data.as_bytes()) {
             let mut decoder = BinDecoder::new(&raw_rdata);
             let record_rdata =
                 null::read(&mut decoder, Restrict::new(raw_rdata.len() as u16)).unwrap();
@@ -1952,10 +1953,10 @@ mod tests {
         code: u16,
         expected_output: &str,
     ) {
-        if let Ok(raw_message) = base64::decode(raw_message) {
+        if let Ok(raw_message) = BASE64.decode(raw_message.as_bytes()) {
             let raw_message_len = raw_message.len();
             let mut message_parser = DnsMessageParser::new(raw_message);
-            if let Ok(raw_rdata) = base64::decode(raw_data_encoded) {
+            if let Ok(raw_rdata) = BASE64.decode(raw_data_encoded.as_bytes()) {
                 for i in 1..=2 {
                     let mut decoder = BinDecoder::new(&raw_rdata);
                     let record_rdata =
@@ -1980,7 +1981,7 @@ mod tests {
     #[ignore]
     fn benchmark_parse_as_query_message() {
         let raw_dns_message = "szgAAAABAAAAAAAAAmg1B2V4YW1wbGUDY29tAAAGAAE=";
-        if let Ok(raw_qeury_message) = base64::decode(raw_dns_message) {
+        if let Ok(raw_qeury_message) = BASE64.decode(raw_dns_message.as_bytes()) {
             let start = Instant::now();
             let num = 10_000;
             for _ in 0..num {

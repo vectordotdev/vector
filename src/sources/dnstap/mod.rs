@@ -15,8 +15,8 @@ pub use parser::DnstapParser;
 pub mod schema;
 pub use schema::DnstapEventSchema;
 
-mod dns_message;
-mod dns_message_parser;
+use dnsmsg_parser::dns_message;
+use dnsmsg_parser::dns_message_parser;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct DnstapConfig {

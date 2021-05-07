@@ -68,6 +68,7 @@ members = [
   "lib/codec",
   "lib/vector-core",
   "lib/vector-core/buffers",
+  "lib/dnsmsg-parser",
   "lib/fakedata",
   "lib/file-source",
   "lib/k8s-e2e-tests",
@@ -92,6 +93,7 @@ members = [
 [dependencies]
 # Internal libs
 codec = { path = "lib/codec" }
+dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
 portpicker = { path = "lib/portpicker" }
@@ -409,7 +411,7 @@ sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
 sources-datadog = ["sources-utils-http"]
-sources-dnstap = ["bytesize", "listenfd", "base64", "data-encoding", "trust-dns-proto"]
+sources-dnstap = ["bytesize", "listenfd", "base64", "data-encoding", "trust-dns-proto", "dnsmsg-parser"]
 sources-docker_logs = ["bollard", "dirs-next"]
 sources-exec = []
 sources-file = ["bytesize", "file-source"]
