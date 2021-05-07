@@ -1,44 +1,52 @@
 # RFC 7351 - 2021-05-05 - Framing and Codecs
 
-This RFC discusses a standardized way of specifying framing and codecs across sources and sinks. _Framing_ is concerned with turning sequences of bytes into byte frames. Codecs consist of _decoders_, which deserialize a byte frame into structured data, and _encoders_, which serialize structured data into a byte frame.
+This RFC discusses a standardized way of specifying framing and codecs across sources and sinks. _Framing_ is concerned with turning sequences of bytes into byte frames (which indicate the boundaries of a complete message). Codecs consist of _decoders_, which deserialize a byte frame into structured data, and _encoders_, which serialize structured data into a byte frame.
 
-Conceptually, we want reusable pieces of logic which would allow us to collapse a source + (decoder) transform into a source with decoder config, and to collapse an (encoder) transform + sink into a sink with enocoder config, in a way that is transparent to the user. These transforms merely convert between encoding formats, e.g. from `bytes` to `json` and vice versa.
+Conceptually, we want reusable pieces of logic which would allow us to collapse a source + (decoder) transform into a source with decoder config, and to collapse an (encoder) transform + sink into a sink with encoder config, in a way that is transparent to the user. These transforms merely convert between encoding formats, e.g. from `bytes` to `json` and vice versa.
 
 ## Scope
 
-The scope of this RFC concern at which level framing and decoding operates, how these framers and codecs can be configured, and how they can be shared in a uniform way. It does not cover any specific implementation for framing or any codec.
+The scope of this RFC concern at which level framing and decoding operates, how these framers and codecs can be configured, and how they can be shared in a uniform way. It does not cover any specific implementation for framing or a codec. Also see [future work](#future-work) for extended goals that are not covered by this RFC.
 
 ## Motivation
 
-Currently, we have no explicit abstraction that is responsible for handling framing and codecs, such that each source and sink may implement them in their own way. Components have their own defaults, making behavior unpredictable and surprising users, e.g. as documented in #3453.
+Currently, we have no explicit abstraction that is responsible for handling framing and codecs, such that each source and sink may implement them in their own way. This can introduce inconsistencies and additional maintenance burden. Components have their own defaults, making behavior unpredictable and surprising users, e.g. as documented in [#3453](https://github.com/timberio/vector/issues/3453).
 
 ## Internal Proposal
 
-// TODO.
+Since decoding and encoding should apply universally to all sources and sinks, it should be configurable by a shared field. This is accomplished by the `SourceOuter` and `SinkOuter` wrappers:
 
 ```rust
+// Newly introduced wrapper, analogously to `SinkOuter`.
 struct SourceOuter {
-    // … existing fields …
-    framing: Framing,
-    decoding: Decoding,
+    framing: Framer,
+    decoding: Decoder,
 }
 ```
 
 ```rust
 struct SinkOuter {
-    // … existing fields …
+    // … existing fields
     encoding: Encoder,
 }
 ```
 
-- Framing and decoding is applied _after_ a source has processed an event.
-- Encoding is applied _before_ a sink has processed an event.
+Conceptually, decoding is applied _after_ a source has processed an event and encoding is applied _before_ a sink has processed an event. These can be implemented as `FunctionTransform`s in our pipeline, in the same way transforms are implemented.
 
-<!--
-- Describe your change as if you were presenting it to the Vector team.
-- Use lists, examples, and code blocks for efficient reading.
-- Be specific!
--->
+Framing takes place before an event is created since the message boundary required to form an event is not known yet. Therefore the source needs to be aware of framing and call the framer to determine message boundaries before creating an event.
+
+To make the source aware of framing, the `Framer` needs to be passed to the `SourceContext`, so that the source implementation can call it:
+
+```rust
+struct SourceContext {
+    // … existing fields
+    framing: Framer,
+}
+```
+
+In the context of Vector, decoders and encoders implement functions with the signature `fn decode(value: Value) -> Result<Value>` / `fn encode(value: Value) -> Result<Value>` where e.g. a `json` encoder can convert a `Value::Bytes` to `Value::Map`.
+
+For the implementation of a framer, we can defer to Tokio's [`FramedRead`](https://docs.rs/tokio-util/0.6.6/tokio_util/codec/struct.FramedRead.html) trait which does exactly what we want here.
 
 ## Doc-level Proposal
 
@@ -51,9 +59,9 @@ struct SinkOuter {
 
 ## Rationale
 
-One prime example where a source's implementation may be reused with a different codec is the `syslog` source, or the upcoming `syslog` sink in #7106. Instead of reimplementing socket-based connection handling, the `syslog` components could be replaced by the `socket` counterparts combined with octet-framing.
+One prime example where a source's implementation may be reused with a different codec is the `syslog` source, or the upcoming `syslog` sink in [#7106](https://github.com/timberio/vector/issues/7106). Instead of re-implementing socket-based connection handling, the `syslog` components could be replaced by the `socket` counterparts combined with `octet-framing`. This reduces a possible source of bugs and inconsistencies and therefore leads to less maintenance burden.
 
-// TODO.
+Introducing codecs may also shrink unnecessary noise in config files by removing transform steps / input indirections, when basic transforms were used that are only concerned with encoding formats.
 
 <!--
 - Why is this change worth it?
@@ -96,22 +104,15 @@ One prime example where a source's implementation may be reused with a different
 
 ## Outstanding Questions
 
-Is there a realistic chance that multiple framing / codec options might be applied?
+Is there a realistic chance that multiple framing / codec options might need be applied / composed?
 
 Now that we establish a pattern for encoding, do we want to make the distinction internally when we have bytes or (e.g. UTF-8) strings at hand? Currently we are just relying on the next component to handle possibly invalid encodings.
 
-<!--
-- List any remaining questions that you have.
-- These must be resolved before the RFC can be merged.
--->
-
 ## Future Work
 
-// TODO.
+In this first release, we plan to implement a variety of framing and codec options that cover the most common use cases. However, users might want to use a custom codec that only applies to their specific use case or is not supported by Vector yet. Adding a system that would allow custom-defined codecs could be considered in the future, for now this is can be accomplished by the `wasm` or `lua` transform.
 
-User-provided custom codecs.
-
-Codecs with options.
+Codecs are very close to transform steps. When looking at e.g. the existing `json` transform, it is apparent that it can be further configured. In this initial design, we will not allow any configuration and choose common defaults.
 
 ## Plan Of Attack
 
