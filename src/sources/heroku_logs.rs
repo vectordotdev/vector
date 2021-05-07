@@ -5,9 +5,7 @@ use crate::{
     },
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
-    sources::util::{
-        add_query_parameters, BuiltEvents, ErrorMessage, HttpSource, HttpSourceAuthConfig,
-    },
+    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
 };
 use bytes::{Buf, Bytes};
@@ -63,11 +61,9 @@ impl HttpSource for LogplexSource {
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
         _full_path: &str,
-    ) -> Result<BuiltEvents, ErrorMessage> {
-        decode_message(body, header_map).map(|events| BuiltEvents {
-            events: add_query_parameters(events, &self.query_parameters, query_parameters),
-            receiver: None,
-        })
+    ) -> Result<Vec<Event>, ErrorMessage> {
+        decode_message(body, header_map)
+            .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
     }
 }
 
@@ -234,14 +230,14 @@ mod tests {
     use super::{HttpSourceAuthConfig, LogplexConfig};
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
-        event::{Event, Value},
-        test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
+        test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
     };
     use chrono::{DateTime, Utc};
-    use futures::channel::mpsc;
+    use futures::Stream;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
+    use vector_core::event::{Event, EventStatus, Value};
 
     #[test]
     fn generate_config() {
@@ -251,8 +247,8 @@ mod tests {
     async fn source(
         auth: Option<HttpSourceAuthConfig>,
         query_parameters: Vec<String>,
-    ) -> (mpsc::Receiver<Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test();
+    ) -> (impl Stream<Item = Event>, SocketAddr) {
+        let (sender, recv) = Pipeline::new_test_finalize(EventStatus::Delivered);
         let address = next_addr();
         tokio::spawn(async move {
             LogplexConfig {
@@ -310,12 +306,18 @@ mod tests {
         )
         .await;
 
-        assert_eq!(
-            200,
-            send(addr, body, Some(auth), "appname=lumberjack-store").await
-        );
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send(addr, body, Some(auth), "appname=lumberjack-store").await
+                )
+            },
+            rx,
+            body.lines().count(),
+        )
+        .await;
 
-        let mut events = collect_n(rx, body.lines().count()).await;
         let event = events.remove(0);
         let log = event.as_log();
 

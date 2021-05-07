@@ -3,16 +3,15 @@ use crate::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::{BatchNotifier, Event, Value},
+    event::{Event, Value},
     sources::util::{
-        add_query_parameters, decode_body, BuiltEvents, Encoding, ErrorMessage, HttpSource,
-        HttpSourceAuthConfig,
+        add_query_parameters, decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
     },
     tls::TlsConfig,
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr};
 
 use warp::http::{HeaderMap, HeaderValue};
 
@@ -79,8 +78,7 @@ impl HttpSource for SimpleHttpSource {
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
         request_path: &str,
-    ) -> Result<BuiltEvents, ErrorMessage> {
-        let (batch, receiver) = BatchNotifier::new_with_receiver();
+    ) -> Result<Vec<Event>, ErrorMessage> {
         decode_body(body, self.encoding)
             .map(|events| add_headers(events, &self.headers, header_map))
             .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
@@ -89,11 +87,9 @@ impl HttpSource for SimpleHttpSource {
                 // Add source type
                 let key = log_schema().source_type_key();
                 for event in &mut events {
-                    event.add_batch_notifier(Arc::clone(&batch));
                     event.as_mut_log().try_insert(key, Bytes::from("http"));
                 }
-                let receiver = Some(receiver);
-                BuiltEvents { events, receiver }
+                events
             })
     }
 }

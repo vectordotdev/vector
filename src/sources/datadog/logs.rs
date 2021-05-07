@@ -3,12 +3,10 @@ use crate::{
         log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
         SourceDescription,
     },
-    event::BatchNotifier,
+    event::Event,
     sources::{
         self,
-        util::{
-            decode_body, BuiltEvents, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig,
-        },
+        util::{decode_body, Encoding, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     },
     tls::TlsConfig,
 };
@@ -16,7 +14,7 @@ use bytes::Bytes;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr};
 
 use warp::http::HeaderMap;
 
@@ -87,35 +85,29 @@ impl HttpSource for DatadogLogsSource {
         header_map: HeaderMap,
         _query_parameters: HashMap<String, String>,
         request_path: &str,
-    ) -> Result<BuiltEvents, ErrorMessage> {
+    ) -> Result<Vec<Event>, ErrorMessage> {
         if body.is_empty() {
             // The datadog agent may sent empty payload as keep alive
             debug!(
                 message = "Empty payload ignored.",
                 internal_log_rate_secs = 30
             );
-            return Ok(BuiltEvents {
-                events: Vec::new(),
-                receiver: None,
-            });
+            return Ok(Vec::new());
         }
 
         let api_key = extract_api_key(&header_map, request_path);
 
-        let (batch, receiver) = BatchNotifier::new_with_receiver();
         decode_body(body, Encoding::Json).map(|mut events| {
             // Add source type & Datadog API key
             let key = log_schema().source_type_key();
             for event in &mut events {
-                event.add_batch_notifier(Arc::clone(&batch));
                 let log = event.as_mut_log();
                 log.try_insert(key, Bytes::from("datadog_logs"));
                 if let Some(k) = &api_key {
                     log.insert("dd_api_key", k.clone());
                 }
             }
-            let receiver = Some(receiver);
-            BuiltEvents { events, receiver }
+            events
         })
     }
 }
