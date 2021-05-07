@@ -19,7 +19,7 @@ enum LeafIter<'a> {
     Array(iter::Enumerate<slice::Iter<'a, Value>>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 enum PathComponent<'a> {
     Key(&'a String),
     Index(usize),

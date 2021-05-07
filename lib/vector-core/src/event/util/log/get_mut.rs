@@ -83,7 +83,7 @@ mod test {
             ("", None),
         ];
 
-        for (query, expected) in queries.iter_mut() {
+        for (query, expected) in &mut queries {
             assert_eq!(get_mut(&mut fields, query), expected.as_mut(), "{}", query);
         }
     }

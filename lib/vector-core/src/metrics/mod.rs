@@ -8,7 +8,7 @@ pub use crate::metrics::handle::{Counter, Handle};
 use crate::metrics::label_filter::VectorLabelFilter;
 use crate::metrics::recorder::VectorRecorder;
 use crate::metrics::registry::VectorRegistry;
-use metrics::{Key, KeyData, SharedString};
+use metrics::{Key, SharedString};
 use metrics_tracing_context::TracingContextLayer;
 use metrics_util::layers::Layer;
 use metrics_util::{CompositeKey, MetricKind};
@@ -21,9 +21,10 @@ static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality_total";
 static CARDINALITY_KEY_DATA_NAME: [SharedString; 1] =
     [SharedString::const_str(&CARDINALITY_KEY_NAME)];
-static CARDINALITY_KEY_DATA: KeyData = KeyData::from_static_name(&CARDINALITY_KEY_DATA_NAME);
-static CARDINALITY_KEY: CompositeKey =
-    CompositeKey::new(MetricKind::Counter, Key::Borrowed(&CARDINALITY_KEY_DATA));
+static CARDINALITY_KEY: CompositeKey = CompositeKey::new(
+    MetricKind::Counter,
+    Key::from_static_name(&CARDINALITY_KEY_DATA_NAME),
+);
 
 /// Controller allows capturing metric snapshots.
 pub struct Controller {
@@ -38,6 +39,11 @@ fn tracing_context_layer_enabled() -> bool {
     !matches!(std::env::var("DISABLE_INTERNAL_METRICS_TRACING_INTEGRATION"), Ok(x) if x == "true")
 }
 
+/// Initialize the metrics sub-system
+///
+/// # Errors
+///
+/// This function will error if it is called multiple times.
 pub fn init() -> crate::Result<()> {
     // An escape hatch to allow disabing internal metrics core. May be used for
     // performance reasons. This is a hidden and undocumented functionality.
@@ -96,6 +102,11 @@ pub fn reset(controller: &Controller) {
 }
 
 /// Get a handle to the globally registered controller, if it's initialized.
+///
+/// # Errors
+///
+/// This function will fail if the metrics subsystem has not been correctly
+/// initialized.
 pub fn get_controller() -> crate::Result<&'static Controller> {
     CONTROLLER
         .get()
@@ -111,6 +122,16 @@ pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
         .iter()
         .map(|kv| Metric::from_metric_kv(kv.key().key(), kv.value()).into())
         .collect::<Vec<Event>>();
+
+    // Add alias `events_processed_total` for `events_out_total`.
+    for i in 0..events.len() {
+        let metric = events[i].as_metric();
+        if metric.name() == "events_out_total" {
+            let alias = metric.clone().with_name("events_processed_total");
+            events.push(alias.into());
+        }
+    }
+
     let handle = Handle::Counter(Counter::with_count(events.len() as u64 + 1));
     events.push(Metric::from_metric_kv(CARDINALITY_KEY.key(), &handle).into());
 
