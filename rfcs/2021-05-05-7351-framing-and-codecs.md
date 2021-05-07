@@ -91,8 +91,9 @@ trait which does exactly what we want here.
 ## Rationale
 
 One prime example where a source's implementation may be reused with a different
-codec is the `syslog` source, or the upcoming `syslog` sink in
-[#7106](https://github.com/timberio/vector/issues/7106). Instead of
+codec is the `syslog` source (see
+[#7046](https://github.com/timberio/vector/pull/7046)), or the upcoming `syslog`
+sink in [#7106](https://github.com/timberio/vector/issues/7106). Instead of
 re-implementing socket-based connection handling, the `syslog` components could
 be replaced by the `socket` counterparts combined with `octet-framing`. This
 reduces a possible source of bugs and inconsistencies and therefore leads to
