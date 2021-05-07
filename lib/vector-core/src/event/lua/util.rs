@@ -2,6 +2,11 @@ use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 use rlua::prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Convert a `DateTime<Utc>` to a `LuaTable`
+///
+/// # Errors
+///
+/// This function will fail insertion into the table fails.
 pub fn timestamp_to_table(ctx: LuaContext<'_>, ts: DateTime<Utc>) -> LuaResult<LuaTable> {
     let table = ctx.create_table()?;
     table.set("year", ts.year())?;
@@ -18,6 +23,11 @@ pub fn timestamp_to_table(ctx: LuaContext<'_>, ts: DateTime<Utc>) -> LuaResult<L
     Ok(table)
 }
 
+/// Determines if a `LuaTable` is a timestamp.
+///
+/// # Errors
+///
+/// This function will fail if the table is malformed.
 pub fn table_is_timestamp(t: &LuaTable<'_>) -> LuaResult<bool> {
     for &key in &["year", "month", "day", "hour", "min", "sec"] {
         if !t.contains_key(key)? {
@@ -27,6 +37,12 @@ pub fn table_is_timestamp(t: &LuaTable<'_>) -> LuaResult<bool> {
     Ok(true)
 }
 
+/// Convert a `LuaTable` to a `DateTime<Utc>`
+///
+/// # Errors
+///
+/// This function will fail if the table is malformed.
+#[allow(clippy::needless_pass_by_value)] // constrained by rlua types
 pub fn table_to_timestamp(t: LuaTable<'_>) -> LuaResult<DateTime<Utc>> {
     let year = t.get("year")?;
     let month = t.get("month")?;
@@ -38,6 +54,11 @@ pub fn table_to_timestamp(t: LuaTable<'_>) -> LuaResult<DateTime<Utc>> {
     Ok(Utc.ymd(year, month, day).and_hms_nano(hour, min, sec, nano))
 }
 
+/// Convert a `LuaTable` to a `BTreeMap<T>`
+///
+/// # Errors
+///
+/// This function will fail if the table is malformed.
 pub fn table_to_map<'a, K, V>(t: LuaTable<'a>) -> LuaResult<BTreeMap<K, V>>
 where
     K: From<String> + Ord,
@@ -51,6 +72,11 @@ where
     Ok(map)
 }
 
+/// Convert a `LuaTable` to a `BTreeSet<T>`
+///
+/// # Errors
+///
+/// This function will fail if the table is malformed.
 pub fn table_to_set<'a, T>(t: LuaTable<'a>) -> LuaResult<BTreeSet<T>>
 where
     T: FromLua<'a> + Ord,
@@ -62,10 +88,20 @@ where
     Ok(set)
 }
 
+/// Determines whether a `LuaTable` is an array.
+///
+/// # Errors
+///
+/// This function will fail if the table is malformed.
 pub fn table_is_array(t: &LuaTable<'_>) -> LuaResult<bool> {
     Ok(t.len()? > 0)
 }
 
+/// Convert a `LuaTable` to a `Vec<T>`
+///
+/// # Errors
+///
+/// This function will fail if the table is malformed.
 pub fn table_to_array<'a, T>(t: LuaTable<'a>) -> LuaResult<Vec<T>>
 where
     T: FromLua<'a>,

@@ -208,6 +208,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
+      - run: choco install llvm
       - run: make test
 
   test-vrl:

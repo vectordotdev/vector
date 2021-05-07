@@ -97,7 +97,7 @@ impl Histogram {
         // long-tail.
         let buckets = Box::new([
             (f64::NEG_INFINITY, AtomicU32::new(0)),
-            (0.015625, AtomicU32::new(0)),
+            (0.015_625, AtomicU32::new(0)),
             (0.03125, AtomicU32::new(0)),
             (0.0625, AtomicU32::new(0)),
             (0.125, AtomicU32::new(0)),
@@ -132,9 +132,8 @@ impl Histogram {
             if value > prev_bound && value <= *bound {
                 bucket.fetch_add(1, Ordering::Relaxed);
                 break;
-            } else {
-                prev_bound = *bound;
             }
+            prev_bound = *bound;
         }
 
         self.count.fetch_add(1, Ordering::Relaxed);
@@ -211,6 +210,7 @@ impl Gauge {
         }
     }
 
+    #[allow(clippy::needless_pass_by_value)] // see https://github.com/timberio/vector/pull/7341#discussion_r626693005
     pub(crate) fn record(&mut self, value: GaugeValue) {
         // Because Rust lacks an atomic f64 we store gauges as AtomicU64
         // and transmute back and forth to an f64 here. They have the
@@ -253,6 +253,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::needless_pass_by_value)] // `&[T]` does not implement `Arbitrary`
     fn histogram() {
         fn inner(values: Vec<f64>) -> TestResult {
             let mut sut = Histogram::new();
@@ -280,6 +281,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::needless_pass_by_value)] // `&[T]` does not implement `Arbitrary`
     fn count() {
         fn inner(values: Vec<u64>) -> TestResult {
             let mut sut = Counter::new();

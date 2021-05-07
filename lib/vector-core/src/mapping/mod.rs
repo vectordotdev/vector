@@ -151,6 +151,11 @@ impl Mapping {
         Mapping { assignments }
     }
 
+    /// Execute the mapping with a given `Event`
+    ///
+    /// # Errors
+    ///
+    /// This function will fail if the underlying mapping could not be applied.
     pub fn execute(&self, event: &mut Event) -> Result<()> {
         for (i, assignment) in self.assignments.iter().enumerate() {
             if let Err(err) = assignment.apply(event) {
@@ -163,21 +168,22 @@ impl Mapping {
 
 //------------------------------------------------------------------------------
 
-/// Merges two BTreeMaps of `Value`s.
+/// Merges two `BTreeMap`s of `Value`s.
 /// The second map is merged into the first one.
 ///
-/// If `deep` is true, only the top level values are merged in. If both maps contain a field
-/// with the same name, the field from the first is overwritten with the field from the second.
+/// If `deep` is true, only the top level values are merged in. If both maps
+/// contain a field with the same name, the field from the first is overwritten
+/// with the field from the second.
 ///
-/// If `deep` is false, should both maps contain a field with the same name, and both those
-/// fields are also maps, the function will recurse and will merge the child fields from the second
-/// into the child fields from the first.
+/// If `deep` is false, should both maps contain a field with the same name, and
+/// both those fields are also maps, the function will recurse and will merge
+/// the child fields from the second into the child fields from the first.
 ///
-/// Note, this does recurse, so there is the theoretical possibility that it could blow up the
-/// stack. From quick tests on a sample project I was able to merge maps with a depth of 3,500
-/// before encountering issues. So I think that is likely to be within acceptable limits.
-/// If it becomes a problem, we can unroll this function, but that will come at a cost of extra
-/// code complexity.
+/// Note, this does recurse, so there is the theoretical possibility that it
+/// could blow up the stack. From quick tests on a sample project I was able to
+/// merge maps with a depth of 3,500 before encountering issues. So I think that
+/// is likely to be within acceptable limits.  If it becomes a problem, we can
+/// unroll this function, but that will come at a cost of extra code complexity.
 fn merge_maps<K>(map1: &mut BTreeMap<K, Value>, map2: &BTreeMap<K, Value>, deep: bool)
 where
     K: std::cmp::Ord + Clone,
@@ -245,7 +251,7 @@ impl Function for MergeFn {
 
 //------------------------------------------------------------------------------
 
-/// Represents the different log levels that can be used by LogFn
+/// Represents the different log levels that can be used by `LogFn`
 #[derive(Debug, Clone, Copy)]
 pub(in crate::mapping) enum LogLevel {
     Trace,

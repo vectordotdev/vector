@@ -15,7 +15,6 @@ impl InternalEvent for AwsEcsMetricsReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("processed_events_total", self.count as u64);
         counter!("events_in_total", self.count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
@@ -34,7 +33,7 @@ impl InternalEvent for AwsEcsMetricsRequestCompleted {
 
     fn emit_metrics(&self) {
         counter!("requests_completed_total", 1);
-        histogram!("request_duration_nanoseconds", self.end - self.start);
+        histogram!("request_duration_seconds", self.end - self.start);
     }
 }
 

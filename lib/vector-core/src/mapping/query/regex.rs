@@ -51,7 +51,7 @@ impl Regex {
     }
 }
 
-/// regex::Regex doesn't implement PartialEq.
+/// `regex::Regex` doesn't implement `PartialEq`.
 impl PartialEq for Regex {
     fn eq(&self, other: &Self) -> bool {
         self.pattern == other.pattern

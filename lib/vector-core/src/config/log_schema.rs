@@ -13,9 +13,16 @@ lazy_static::lazy_static! {
     };
 }
 
-/// Loads Log Schema from configurations and sets global schema.
-/// Once this is done, configurations can be correctly loaded using
-/// configured log schema defaults.
+/// Loads Log Schema from configurations and sets global schema. Once this is
+/// done, configurations can be correctly loaded using configured log schema
+/// defaults.
+///
+/// # Errors
+///
+/// This function will fail if the `builder` fails.
+///
+/// # Panics
+///
 /// If deny is set, will panic if schema has already been set.
 pub fn init_log_schema<F>(builder: F, deny_if_set: bool) -> Result<(), Vec<String>>
 where
@@ -29,9 +36,8 @@ where
     Ok(())
 }
 
-/// Components should use global LogShema returned by this function.
-/// The returned value can differ from LogSchema::default()
-/// which is unchanging.
+/// Components should use global `LogShema` returned by this function.  The
+/// returned value can differ from `LogSchema::default()` which is unchanging.
 pub fn log_schema() -> &'static LogSchema {
     LOG_SCHEMA.get().unwrap_or(&LOG_SCHEMA_DEFAULT)
 }
@@ -77,12 +83,15 @@ impl LogSchema {
     pub fn message_key(&self) -> &str {
         &self.message_key
     }
+
     pub fn timestamp_key(&self) -> &str {
         &self.timestamp_key
     }
+
     pub fn host_key(&self) -> &str {
         &self.host_key
     }
+
     pub fn source_type_key(&self) -> &str {
         &self.source_type_key
     }
@@ -100,10 +109,16 @@ impl LogSchema {
         self.source_type_key = v;
     }
 
-    pub fn merge(&mut self, other: LogSchema) -> Result<(), Vec<String>> {
+    /// Merge two `LogSchema` instances together.
+    ///
+    /// # Errors
+    ///
+    /// This function will fail when the `LogSchema` to be merged contains
+    /// conflicting keys.
+    pub fn merge(&mut self, other: &LogSchema) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
-        if other != *LOG_SCHEMA_DEFAULT {
+        if *other != *LOG_SCHEMA_DEFAULT {
             // If the set value is the default, override it. If it's already overridden, error.
             if self.host_key() != LOG_SCHEMA_DEFAULT.host_key()
                 && self.host_key() != other.host_key()

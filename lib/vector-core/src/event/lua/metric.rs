@@ -267,7 +267,9 @@ mod test {
         let metric = Metric::new(
             "example counter",
             MetricKind::Absolute,
-            MetricValue::Counter { value: 0.57721566 },
+            MetricValue::Counter {
+                value: 0.577_215_66,
+            },
         );
         let assertions = vec![
             "metric.timestamp == nil",
@@ -283,7 +285,7 @@ mod test {
         let metric = Metric::new(
             "example gauge",
             MetricKind::Absolute,
-            MetricValue::Gauge { value: 1.6180339 },
+            MetricValue::Gauge { value: 1.618_033_9 },
         );
         let assertions = vec!["metric.gauge.value == 1.6180339", "metric.counter == nil"];
         assert_metric(metric, assertions);
@@ -393,7 +395,9 @@ mod test {
         let expected = Metric::new(
             "example counter",
             MetricKind::Absolute,
-            MetricValue::Counter { value: 0.57721566 },
+            MetricValue::Counter {
+                value: 0.577_215_66,
+            },
         );
         Lua::new().context(|ctx| {
             assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);
@@ -449,7 +453,7 @@ mod test {
         let expected = Metric::new(
             "example gauge",
             MetricKind::Absolute,
-            MetricValue::Gauge { value: 1.6180339 },
+            MetricValue::Gauge { value: 1.618_033_9 },
         );
         Lua::new().context(|ctx| {
             assert_event_data_eq!(ctx.load(value).eval::<Metric>().unwrap(), expected);

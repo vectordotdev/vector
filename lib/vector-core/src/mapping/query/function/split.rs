@@ -24,6 +24,7 @@ impl SplitFn {
 
 impl Function for SplitFn {
     #[allow(clippy::collapsible_match)] // I expect this file to be going away shortly
+    #[allow(clippy::cast_possible_truncation)] // `limit as usize` might misbehave on 32bit platforms
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let string = {
             let bytes = required_value!(ctx, self.path, Value::Bytes(v) => v);
