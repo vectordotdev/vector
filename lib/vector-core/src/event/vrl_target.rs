@@ -3,14 +3,14 @@ use crate::config::log_schema;
 use lookup::LookupBuf;
 use snafu::Snafu;
 use std::{collections::BTreeMap, convert::TryFrom, iter::FromIterator};
-use vrl_core;
 
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
 
 /// We can get the `type` of the metric in Remap, but can't set it.
 const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .timestamp, .kind, .tags, .type";
 
-/// Metrics aren't interested in paths that have a length longer than 3
+/// Metrics aren't interested in paths that have a length longer than 3.
+///
 /// The longest path is 2, and we need to check that a third segment doesn't exist as we don't want
 /// fields such as `.tags.host.thing`.
 const MAX_METRIC_PATH_DEPTH: usize = 3;
@@ -18,8 +18,8 @@ const MAX_METRIC_PATH_DEPTH: usize = 3;
 /// An adapter to turn `Event`s into `vrl_core::Target`s.
 #[derive(Debug, Clone)]
 pub enum VrlTarget {
-    // LogEvent is essentially just a destructured `event::LogEvent`, but without the semantics
-    // that `fields` must always be a Map variant
+    // `LogEvent` is essentially just a destructured `event::LogEvent`, but without the semantics
+    // that `fields` must always be a `Map` variant.
     LogEvent(Value, EventMetadata),
     Metric(Metric),
 }
@@ -255,12 +255,12 @@ impl From<Event> for VrlTarget {
     }
 }
 
-// Turn a Value back into LogEvents:
-// * In the common case, where `.` is an map, just create an event using it as fields
+// Turn a `Value` back into `LogEvents`:
+// * In the common case, where `.` is a map, just create an event using it as the event fields.
 // * If `.` is an array, map over all of the values to create log events:
-//   * If an element is an object, create an event using that as fields
-//   * If an element is anything else, assign to the `message` key
-// * If `.` is anything else, assign to the `message` key
+//   * If an element is an object, create an event using that as fields.
+//   * If an element is anything else, assign to the `message` key.
+// * If `.` is anything else, assign to the `message` key.
 fn value_into_log_events(value: Value, metadata: EventMetadata) -> impl Iterator<Item = Event> {
     match value {
         Value::Map(object) => Box::new(std::iter::once(Event::from(LogEvent::from_parts(
@@ -563,19 +563,16 @@ mod test {
         let cases = vec![
             (
                 vrl_core::Value::from(btreemap! {"foo" => "bar"}),
-                vec![btreemap! {"foo" => "bar"}.into()],
+                vec![btreemap! {"foo" => "bar"}],
             ),
-            (
-                vrl_core::Value::from(1),
-                vec![btreemap! {"message" => 1}.into()],
-            ),
+            (vrl_core::Value::from(1), vec![btreemap! {"message" => 1}]),
             (
                 vrl_core::Value::from("2"),
-                vec![btreemap! {"message" => "2"}.into()],
+                vec![btreemap! {"message" => "2"}],
             ),
             (
                 vrl_core::Value::from(true),
-                vec![btreemap! {"message" => true}.into()],
+                vec![btreemap! {"message" => true}],
             ),
             (
                 vrl_core::Value::from(vec![
@@ -585,10 +582,10 @@ mod test {
                     vrl_core::Value::from(btreemap! {"foo" => "bar"}),
                 ]),
                 vec![
-                    btreemap! {"message" => 1}.into(),
-                    btreemap! {"message" => "2"}.into(),
-                    btreemap! {"message" => true}.into(),
-                    btreemap! {"foo" => "bar"}.into(),
+                    btreemap! {"message" => 1},
+                    btreemap! {"message" => "2"},
+                    btreemap! {"message" => true},
+                    btreemap! {"foo" => "bar"},
                 ],
             ),
         ];

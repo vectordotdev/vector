@@ -145,8 +145,9 @@ components: transforms: "remap": {
 				to the root path `.`. One log event will be emitted for each input
 				element of the array.
 
-				If any of the array elements is not an object, they will be set as
-				the `message` key for the corresponding emitted log event.
+				If any of the array elements is not an object, a log event will
+				be created that uses the element value as the `message` key. For
+				example, `123` will be emitted as `{ "message": 123 }`
 				"""#
 		}
 	}
