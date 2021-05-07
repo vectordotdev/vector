@@ -67,7 +67,7 @@ impl vrl_core::Target for VrlTarget {
                     match paths.as_slice() {
                         ["tags"] => {
                             let value = value.try_object().map_err(|e| e.to_string())?;
-                            for (field, value) in value.iter() {
+                            for (field, value) in &value {
                                 metric.set_tag_value(
                                     field.as_str().to_owned(),
                                     value
@@ -81,7 +81,7 @@ impl vrl_core::Target for VrlTarget {
                         ["tags", field] => {
                             let value = value.try_bytes().map_err(|e| e.to_string())?;
                             metric.set_tag_value(
-                                field.to_string(),
+                                (*field).to_owned(),
                                 String::from_utf8_lossy(&value).into_owned(),
                             );
                             return Ok(());
@@ -351,6 +351,7 @@ mod test {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     #[test]
     fn log_insert() {
         use lookup::SegmentBuf;

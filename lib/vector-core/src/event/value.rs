@@ -49,7 +49,9 @@ impl From<Bytes> for Value {
 
 impl<T: Into<Value>> From<Vec<T>> for Value {
     fn from(set: Vec<T>) -> Self {
-        Value::from_iter(set.into_iter().map(|v| v.into()))
+        set.into_iter()
+            .map(::std::convert::Into::into)
+            .collect::<Self>()
     }
 }
 
@@ -161,13 +163,11 @@ impl From<serde_json::Value> for Value {
         match json_value {
             serde_json::Value::Bool(b) => Value::Boolean(b),
             serde_json::Value::Number(n) => {
-                if let Some(i) = n.as_i64() {
-                    Value::Integer(i)
-                } else if let Some(f) = n.as_f64() {
-                    Value::Float(f)
-                } else {
-                    Value::Bytes(n.to_string().into())
-                }
+                let float_or_byte = || {
+                    n.as_f64()
+                        .map_or_else(|| Value::Bytes(n.to_string().into()), Value::Float)
+                };
+                n.as_i64().map_or_else(float_or_byte, Value::Integer)
             }
             serde_json::Value::String(s) => Value::Bytes(Bytes::from(s)),
             serde_json::Value::Object(obj) => Value::Map(
@@ -203,7 +203,9 @@ impl TryInto<serde_json::Value> for Value {
 #[cfg(feature = "vrl")]
 impl From<vrl_core::Value> for Value {
     fn from(v: vrl_core::Value) -> Self {
-        use vrl_core::Value::*;
+        use vrl_core::Value::{
+            Array, Boolean, Bytes, Float, Integer, Null, Object, Regex, Timestamp,
+        };
 
         match v {
             Bytes(v) => Value::Bytes(v),
@@ -222,7 +224,7 @@ impl From<vrl_core::Value> for Value {
 #[cfg(feature = "vrl")]
 impl From<Value> for vrl_core::Value {
     fn from(v: Value) -> Self {
-        use vrl_core::Value::*;
+        use vrl_core::Value::{Array, Object};
 
         match v {
             Value::Bytes(v) => v.into(),
@@ -292,6 +294,11 @@ impl Value {
         }
     }
 
+    /// Returns self as a mutable `BTreeMap<String, Value>`
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if self is anything other than `Value::Map`.
     pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
         match self {
             Value::Map(ref mut m) => m,
@@ -299,6 +306,11 @@ impl Value {
         }
     }
 
+    /// Returns self as a `Vec<Value>`
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if self is anything other than `Value::Array`.
     pub fn as_array(&self) -> &Vec<Value> {
         match self {
             Value::Array(ref a) => a,
@@ -306,6 +318,11 @@ impl Value {
         }
     }
 
+    /// Returns self as a mutable `Vec<Value>`
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if self is anything other than `Value::Array`.
     pub fn as_array_mut(&mut self) -> &mut Vec<Value> {
         match self {
             Value::Array(ref mut a) => a,
@@ -375,8 +392,7 @@ impl Value {
             | Value::Float(_)
             | Value::Integer(_)
             | Value::Null => true,
-            Value::Map(_) => self.is_empty(),
-            Value::Array(_) => self.is_empty(),
+            Value::Map(_) | Value::Array(_) => self.is_empty(),
         }
     }
 
@@ -454,7 +470,7 @@ impl Value {
 
     fn insert_coalesce(
         sub_segments: Vec<FieldBuf>,
-        working_lookup: LookupBuf,
+        working_lookup: &LookupBuf,
         sub_value: &mut Value,
         value: Value,
     ) -> std::result::Result<Option<Value>, EventError> {
@@ -516,8 +532,9 @@ impl Value {
                     SegmentBuf::Index(next_len) => {
                         Value::Array(Vec::with_capacity(next_len.abs() as usize))
                     }
-                    SegmentBuf::Field(_) => Value::Map(Default::default()),
-                    SegmentBuf::Coalesce(_) => Value::Map(Default::default()),
+                    SegmentBuf::Field(_) | SegmentBuf::Coalesce(_) => {
+                        Value::Map(Default::default())
+                    }
                 }
             })
             .insert(working_lookup, value)
@@ -539,6 +556,7 @@ impl Value {
             })
     }
 
+    #[allow(clippy::too_many_lines)]
     fn insert_array(
         i: isize,
         mut working_lookup: LookupBuf,
@@ -552,120 +570,117 @@ impl Value {
         };
 
         let item = if index.is_negative() {
-            // A negative index is greater than the length of the array, so we are trying to
-            // set an index that doesn't yet exist.
+            // A negative index is greater than the length of the array, so we
+            // are trying to set an index that doesn't yet exist.
             None
         } else {
             array.get_mut(index as usize)
         };
 
-        match item {
-            Some(inner) => {
-                if let Some(next_segment) = working_lookup.get(0) {
-                    Value::correct_type(inner, next_segment);
-                }
-
-                inner.insert(working_lookup, value).map_err(|mut e| {
-                    if let EventError::PrimitiveDescent {
-                        original_target,
-                        primitive_at,
-                        original_value: _,
-                    } = &mut e
-                    {
-                        let segment = SegmentBuf::Index(i);
-                        original_target.push_front(segment.clone());
-                        primitive_at.push_front(segment);
-                    };
-                    e
-                })
+        if let Some(inner) = item {
+            if let Some(next_segment) = working_lookup.get(0) {
+                Value::correct_type(inner, next_segment);
             }
-            None => {
-                if i.is_negative() {
-                    // Resizing for a negative index must resize to the left.
-                    // Setting x[-4] to true for an array [0,1] must end up with
-                    // [true, null, 0, 1]
-                    let abs = i.abs() as usize - 1;
-                    let len = array.len();
 
-                    array.resize(abs, Value::Null);
-                    array.rotate_right(abs - len);
-                } else {
-                    // Fill the vector to the index.
-                    array.resize(i as usize, Value::Null);
-                }
-                let mut retval = Ok(None);
-                let next_val = match working_lookup.get(0) {
-                    Some(SegmentBuf::Index(next_len)) => {
-                        let mut inner = Value::Array(Vec::with_capacity(next_len.abs() as usize));
-                        retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                            if let EventError::PrimitiveDescent {
-                                original_target,
-                                primitive_at,
-                                original_value: _,
-                            } = &mut e
-                            {
-                                let segment = SegmentBuf::Index(i);
-                                original_target.push_front(segment.clone());
-                                primitive_at.push_front(segment);
-                            };
-                            e
-                        });
-                        inner
-                    }
-                    Some(SegmentBuf::Field(FieldBuf {
-                        name,
-                        requires_quoting,
-                    })) => {
-                        let mut inner = Value::Map(Default::default());
-                        let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
-                        let requires_quoting = *requires_quoting; // This is for navigating an ownership issue in the error stack reporting.
-                        retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                            if let EventError::PrimitiveDescent {
-                                original_target,
-                                primitive_at,
-                                original_value: _,
-                            } = &mut e
-                            {
-                                let segment = SegmentBuf::Field(FieldBuf {
-                                    name,
-                                    requires_quoting,
-                                });
-                                original_target.push_front(segment.clone());
-                                primitive_at.push_front(segment);
-                            };
-                            e
-                        });
-                        inner
-                    }
-                    Some(SegmentBuf::Coalesce(set)) => match set.get(0) {
-                        None => return Err(EventError::EmptyCoalesceSubSegment),
-                        Some(_) => {
-                            let mut inner = Value::Map(Default::default());
-                            let set = SegmentBuf::Coalesce(set.clone());
-                            retval = inner.insert(working_lookup, value).map_err(|mut e| {
-                                if let EventError::PrimitiveDescent {
-                                    original_target,
-                                    primitive_at,
-                                    original_value: _,
-                                } = &mut e
-                                {
-                                    original_target.push_front(set.clone());
-                                    primitive_at.push_front(set.clone());
-                                };
-                                e
-                            });
-                            inner
-                        }
-                    },
-                    None => value,
+            inner.insert(working_lookup, value).map_err(|mut e| {
+                if let EventError::PrimitiveDescent {
+                    original_target,
+                    primitive_at,
+                    original_value: _,
+                } = &mut e
+                {
+                    let segment = SegmentBuf::Index(i);
+                    original_target.push_front(segment.clone());
+                    primitive_at.push_front(segment);
                 };
-                array.push(next_val);
-                if i.is_negative() {
-                    // We need to push to the front of the array.
-                    array.rotate_right(1);
-                }
-                retval
+                e
+            })
+        } else {
+            if i.is_negative() {
+                // Resizing for a negative index must resize to the left.
+                // Setting x[-4] to true for an array [0,1] must end up with
+                // [true, null, 0, 1]
+                let abs = i.abs() as usize - 1;
+                let len = array.len();
+
+                array.resize(abs, Value::Null);
+                array.rotate_right(abs - len);
+            } else {
+                // Fill the vector to the index.
+                array.resize(i as usize, Value::Null);
             }
+            let mut retval = Ok(None);
+            let next_val = match working_lookup.get(0) {
+                Some(SegmentBuf::Index(next_len)) => {
+                    let mut inner = Value::Array(Vec::with_capacity(next_len.abs() as usize));
+                    retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                        if let EventError::PrimitiveDescent {
+                            original_target,
+                            primitive_at,
+                            original_value: _,
+                        } = &mut e
+                        {
+                            let segment = SegmentBuf::Index(i);
+                            original_target.push_front(segment.clone());
+                            primitive_at.push_front(segment);
+                        };
+                        e
+                    });
+                    inner
+                }
+                Some(SegmentBuf::Field(FieldBuf {
+                    name,
+                    requires_quoting,
+                })) => {
+                    let mut inner = Value::Map(Default::default());
+                    let name = name.clone(); // This is for navigating an ownership issue in the error stack reporting.
+                    let requires_quoting = *requires_quoting; // This is for navigating an ownership issue in the error stack reporting.
+                    retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                        if let EventError::PrimitiveDescent {
+                            original_target,
+                            primitive_at,
+                            original_value: _,
+                        } = &mut e
+                        {
+                            let segment = SegmentBuf::Field(FieldBuf {
+                                name,
+                                requires_quoting,
+                            });
+                            original_target.push_front(segment.clone());
+                            primitive_at.push_front(segment);
+                        };
+                        e
+                    });
+                    inner
+                }
+                Some(SegmentBuf::Coalesce(set)) => match set.get(0) {
+                    None => return Err(EventError::EmptyCoalesceSubSegment),
+                    Some(_) => {
+                        let mut inner = Value::Map(Default::default());
+                        let set = SegmentBuf::Coalesce(set.clone());
+                        retval = inner.insert(working_lookup, value).map_err(|mut e| {
+                            if let EventError::PrimitiveDescent {
+                                original_target,
+                                primitive_at,
+                                original_value: _,
+                            } = &mut e
+                            {
+                                original_target.push_front(set.clone());
+                                primitive_at.push_front(set.clone());
+                            };
+                            e
+                        });
+                        inner
+                    }
+                },
+                None => value,
+            };
+            array.push(next_val);
+            if i.is_negative() {
+                // We need to push to the front of the array.
+                array.rotate_right(1);
+            }
+            retval
         }
     }
 
@@ -686,6 +701,7 @@ impl Value {
     /// assert!(map.contains("bar"));
     /// assert!(map.contains(Lookup::from_str("star.baz").unwrap()));
     /// ```
+    #[allow(clippy::missing_errors_doc)]
     pub fn insert(
         &mut self,
         lookup: impl Into<LookupBuf> + Debug,
@@ -727,7 +743,7 @@ impl Value {
             }
             // Descend into a coalesce
             (Some(SegmentBuf::Coalesce(sub_segments)), sub_value) => {
-                Value::insert_coalesce(sub_segments, working_lookup, sub_value, value)
+                Value::insert_coalesce(sub_segments, &working_lookup, sub_value, value)
             }
             // Descend into a map
             (
@@ -774,6 +790,8 @@ impl Value {
     /// assert_eq!(map.remove(lookup_key, true).unwrap(), Some(Value::from(1)));
     /// assert!(!map.contains("star"));
     /// ```
+    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::missing_errors_doc)]
     pub fn remove<'a>(
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
@@ -798,7 +816,10 @@ impl Value {
             | (Some(segment), Value::Float(_))
             | (Some(segment), Value::Integer(_))
             | (Some(segment), Value::Null) => {
-                if working_lookup.len() > 0 {
+                if working_lookup.is_empty() {
+                    trace!("Cannot remove self. Caller must remove.");
+                    Err(EventError::RemovingSelf)
+                } else {
                     trace!("Encountered descent into a primitive.");
                     Err(EventError::PrimitiveDescent {
                         primitive_at: LookupBuf::default(),
@@ -809,9 +830,6 @@ impl Value {
                         },
                         original_value: None,
                     })
-                } else {
-                    trace!("Cannot remove self. Caller must remove.");
-                    Err(EventError::RemovingSelf)
                 }
             }
             // Descend into a coalesce
@@ -835,7 +853,7 @@ impl Value {
             }
             // Descend into a map
             (Some(Segment::Field(Field { ref name, .. })), Value::Map(map)) => {
-                if working_lookup.len() == 0 {
+                if working_lookup.is_empty() {
                     Ok(map.remove(*name))
                 } else {
                     let mut inner_is_empty = false;
@@ -855,7 +873,8 @@ impl Value {
                     retval
                 }
             }
-            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
+            (Some(Segment::Index(_)), Value::Map(_))
+            | (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
             // Descend into an array
             (Some(Segment::Index(i)), Value::Array(array)) => {
                 let index = if i.is_negative() {
@@ -868,8 +887,9 @@ impl Value {
                     i as usize
                 };
 
-                if working_lookup.len() == 0 {
-                    // We don't **actually** want to remove the index, we just want to swap it with a null.
+                if working_lookup.is_empty() {
+                    // We don't **actually** want to remove the index, we just
+                    // want to swap it with a null.
                     if array.len() > index {
                         Ok(Some(array.remove(index)))
                     } else {
@@ -893,7 +913,6 @@ impl Value {
                     retval
                 }
             }
-            (Some(Segment::Field { .. }), Value::Array(_)) => Ok(None),
         };
 
         retval
@@ -917,6 +936,7 @@ impl Value {
     /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
     /// assert_eq!(map.get(lookup_key).unwrap(), Some(&Value::from(1)));
     /// ```
+    #[allow(clippy::missing_errors_doc)]
     pub fn get<'a>(
         &self,
         lookup: impl Into<Lookup<'a>> + Debug,
@@ -1008,6 +1028,12 @@ impl Value {
     /// let lookup_key = Lookup::from_str("bar.baz").unwrap();
     /// assert_eq!(map.get_mut(lookup_key).unwrap(), Some(&mut Value::from(1)));
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// This function may panic if an invariant is violated, indicating a
+    /// serious bug.
+    #[allow(clippy::missing_errors_doc)]
     pub fn get_mut<'a>(
         &mut self,
         lookup: impl Into<Lookup<'a>> + Debug,
@@ -1053,7 +1079,8 @@ impl Value {
                     None => Ok(None),
                 }
             }
-            (Some(Segment::Index(_)), Value::Map(_)) => Ok(None),
+            (Some(Segment::Index(_)), Value::Map(_))
+            | (Some(Segment::Field(_)), Value::Array(_)) => Ok(None),
             // Descend into an array
             (Some(Segment::Index(i)), Value::Array(array)) => {
                 let index = if i.is_negative() {
@@ -1071,7 +1098,6 @@ impl Value {
                     None => Ok(None),
                 }
             }
-            (Some(Segment::Field(_)), Value::Array(_)) => Ok(None),
         }
     }
 
@@ -1143,19 +1169,16 @@ impl Value {
                     .clone()
                     .or_else(|| Some(Lookup::default()))
                     .into_iter();
-                let children = m
-                    .iter()
-                    .map(move |(k, v)| {
-                        let lookup = prefix.clone().map_or_else(
-                            || Lookup::from(k),
-                            |mut l| {
-                                l.push_back(Segment::from(k.as_str()));
-                                l
-                            },
-                        );
-                        v.lookups(Some(lookup), only_leaves)
-                    })
-                    .flatten();
+                let children = m.iter().flat_map(move |(k, v)| {
+                    let lookup = prefix.clone().map_or_else(
+                        || Lookup::from(k),
+                        |mut l| {
+                            l.push_back(Segment::from(k.as_str()));
+                            l
+                        },
+                    );
+                    v.lookups(Some(lookup), only_leaves)
+                });
 
                 if only_leaves && !self.is_empty() {
                     Box::new(children)
@@ -1168,20 +1191,16 @@ impl Value {
                     .clone()
                     .or_else(|| Some(Lookup::default()))
                     .into_iter();
-                let children = a
-                    .iter()
-                    .enumerate()
-                    .map(move |(k, v)| {
-                        let lookup = prefix.clone().map_or_else(
-                            || Lookup::from(k as isize),
-                            |mut l| {
-                                l.push_back(Segment::index(k as isize));
-                                l
-                            },
-                        );
-                        v.lookups(Some(lookup), only_leaves)
-                    })
-                    .flatten();
+                let children = a.iter().enumerate().flat_map(move |(k, v)| {
+                    let lookup = prefix.clone().map_or_else(
+                        || Lookup::from(k as isize),
+                        |mut l| {
+                            l.push_back(Segment::index(k as isize));
+                            l
+                        },
+                    );
+                    v.lookups(Some(lookup), only_leaves)
+                });
 
                 if only_leaves && !self.is_empty() {
                     Box::new(children)
@@ -1257,19 +1276,16 @@ impl Value {
                     .or_else(|| Some(Lookup::default()))
                     .map(|v| (v, self))
                     .into_iter();
-                let children = m
-                    .iter()
-                    .map(move |(k, v)| {
-                        let lookup = prefix.clone().map_or_else(
-                            || Lookup::from(k),
-                            |mut l| {
-                                l.push_back(Segment::from(k.as_str()));
-                                l
-                            },
-                        );
-                        v.pairs(Some(lookup), only_leaves)
-                    })
-                    .flatten();
+                let children = m.iter().flat_map(move |(k, v)| {
+                    let lookup = prefix.clone().map_or_else(
+                        || Lookup::from(k),
+                        |mut l| {
+                            l.push_back(Segment::from(k.as_str()));
+                            l
+                        },
+                    );
+                    v.pairs(Some(lookup), only_leaves)
+                });
 
                 if only_leaves && !self.is_empty() {
                     Box::new(children)
@@ -1283,20 +1299,16 @@ impl Value {
                     .or_else(|| Some(Lookup::default()))
                     .map(|v| (v, self))
                     .into_iter();
-                let children = a
-                    .iter()
-                    .enumerate()
-                    .map(move |(k, v)| {
-                        let lookup = prefix.clone().map_or_else(
-                            || Lookup::from(k as isize),
-                            |mut l| {
-                                l.push_back(Segment::index(k as isize));
-                                l
-                            },
-                        );
-                        v.pairs(Some(lookup), only_leaves)
-                    })
-                    .flatten();
+                let children = a.iter().enumerate().flat_map(move |(k, v)| {
+                    let lookup = prefix.clone().map_or_else(
+                        || Lookup::from(k as isize),
+                        |mut l| {
+                            l.push_back(Segment::index(k as isize));
+                            l
+                        },
+                    );
+                    v.pairs(Some(lookup), only_leaves)
+                });
 
                 if only_leaves && !self.is_empty() {
                     Box::new(children)

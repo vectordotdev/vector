@@ -1,11 +1,17 @@
-use super::{legacy_lookup::Segment, util, EventMetadata, Lookup, PathComponent, Value};
+use super::{
+    finalization::{BatchNotifier, EventFinalizer},
+    legacy_lookup::Segment,
+    metadata::EventMetadata,
+    util, Lookup, PathComponent, Value,
+};
 use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
-use getset::Getters;
+use getset::{Getters, MutGetters};
 use serde::{Deserialize, Serialize, Serializer};
 use shared::EventDataEq;
+use std::sync::Arc;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
@@ -13,14 +19,14 @@ use std::{
     iter::FromIterator,
 };
 
-#[derive(Clone, Debug, Getters, PartialEq, Derivative, Deserialize)]
+#[derive(Clone, Debug, Getters, MutGetters, PartialEq, Derivative, Deserialize)]
 pub struct LogEvent {
     // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
     #[derivative(Default(value = "Value::from(BTreeMap::default())"))]
     #[serde(flatten)]
     fields: Value,
 
-    #[getset(get = "pub")]
+    #[getset(get = "pub", get_mut = "pub")]
     #[serde(skip)]
     metadata: EventMetadata,
 }
@@ -29,12 +35,13 @@ impl Default for LogEvent {
     fn default() -> Self {
         Self {
             fields: Value::Map(BTreeMap::new()),
-            metadata: EventMetadata,
+            metadata: EventMetadata::default(),
         }
     }
 }
 
 impl LogEvent {
+    #[must_use]
     pub fn new_with_metadata(metadata: EventMetadata) -> Self {
         Self {
             fields: Value::Map(Default::default()),
@@ -42,11 +49,17 @@ impl LogEvent {
         }
     }
 
+    ///  Create a `LogEvent` into a tuple of its components
     pub fn from_parts(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
         let fields = Value::Map(map);
         Self { fields, metadata }
     }
 
+    /// Convert a `LogEvent` into a tuple of its components
+    ///
+    /// # Panics
+    ///
+    /// Panics if the fields of the `LogEvent` are not a `Value::Map`.
     pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
         (
             self.fields
@@ -54,6 +67,12 @@ impl LogEvent {
                 .unwrap_or_else(|| unreachable!("fields must be a map")),
             self.metadata,
         )
+    }
+
+    pub fn with_batch_notifier(self, batch: Arc<BatchNotifier>) -> Self {
+        // Don't make new metadata, just modify it
+        let (fields, metadata) = self.into_parts();
+        Self::from_parts(fields, metadata.with_finalizer(EventFinalizer::new(batch)))
     }
 
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
@@ -206,7 +225,7 @@ impl LogEvent {
                 Some(current_val) => current_val.merge(incoming_val),
             }
         }
-        self.metadata.merge(incoming.metadata());
+        self.metadata.merge(incoming.metadata);
     }
 }
 
@@ -266,8 +285,11 @@ impl From<HashMap<String, Value>> for LogEvent {
     }
 }
 
-impl From<LogEvent> for HashMap<String, Value> {
-    fn from(event: LogEvent) -> HashMap<String, Value> {
+impl<S> From<LogEvent> for HashMap<String, Value, S>
+where
+    S: std::hash::BuildHasher + Default,
+{
+    fn from(event: LogEvent) -> HashMap<String, Value, S> {
         let fields: BTreeMap<_, _> = event.into();
         fields.into_iter().collect()
     }

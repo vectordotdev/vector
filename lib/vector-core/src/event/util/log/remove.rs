@@ -123,7 +123,7 @@ mod test {
             ("", None, None),
         ];
 
-        for (query, expected_first, expected_second) in queries.iter() {
+        for (query, expected_first, expected_second) in &queries {
             assert_eq!(
                 remove(&mut fields, query, false),
                 *expected_first,

@@ -135,8 +135,9 @@ impl Function for FlattenFn {
         &[Parameter {
             keyword: "value",
             accepts: |v| {
-                matches!(v, QueryValue::Value(Value::Array(_)) |
-                                      QueryValue::Value(Value::Map(_))
+                matches!(
+                    v,
+                    QueryValue::Value(Value::Array(_)) | QueryValue::Value(Value::Map(_))
                 )
             },
             required: true,
@@ -160,6 +161,7 @@ mod test {
     use serde_json::json;
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn check_flatten() {
         let cases = vec![
             (

@@ -25,6 +25,7 @@ pub struct PathIter<'a> {
 }
 
 impl<'a> PathIter<'a> {
+    #[must_use]
     pub fn new(path: &'a str) -> PathIter {
         PathIter {
             path,
@@ -34,9 +35,9 @@ impl<'a> PathIter<'a> {
     }
 }
 
-/// The parsing is implemented using a state machine.
-/// The idea of using Rust enums to model states is taken from
-/// https://hoverbear.org/blog/rust-state-machine-pattern/ .
+/// The parsing is implemented using a state machine. The idea of using Rust
+/// enums to model states is taken from [Pretty State Machine Patterns in
+/// Rust](https://hoverbear.org/blog/rust-state-machine-pattern/).
 enum PathIterState<'a> {
     Start,
     Fast(std::str::Split<'a, char>),
@@ -66,7 +67,9 @@ impl<'a> Iterator for PathIter<'a> {
     type Item = PathComponent;
 
     fn next(&mut self) -> Option<Self::Item> {
-        use PathIterState::*;
+        use PathIterState::{
+            ClosingBracket, Dot, End, Fast, Index, Invalid, Key, KeyEscape, OpeningBracket, Start,
+        };
 
         if self.state.is_start() && FAST_RE.is_match(self.path) {
             self.state = Fast(self.path.split('.'));
@@ -167,7 +170,7 @@ mod test {
 
     #[test]
     fn path_iter_complex() {
-        use PathComponent::*;
+        use PathComponent::{Index, Key};
 
         let inputs = vec![
             "flying.squirrels.are.everywhere",
@@ -221,7 +224,7 @@ mod test {
             "invalid\\ escaping",
         ];
 
-        for i in inputs.into_iter() {
+        for i in inputs {
             assert_eq!(PathIter::new(i).last(), Some(PathComponent::Invalid));
         }
     }

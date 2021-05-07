@@ -1,6 +1,9 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
+pub use finalization::{
+    BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
+};
 pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
 pub use metadata::EventMetadata;
@@ -19,12 +22,13 @@ pub use vrl_target::VrlTarget;
 
 pub mod discriminant;
 pub mod error;
+mod finalization;
 mod legacy_lookup;
 mod log_event;
 #[cfg(feature = "lua")]
 pub mod lua;
 pub mod merge_state;
-pub mod metadata;
+mod metadata;
 pub mod metric;
 pub mod util;
 mod value;
@@ -44,10 +48,16 @@ pub enum Event {
 }
 
 impl Event {
+    #[must_use]
     pub fn new_empty_log() -> Self {
         Event::Log(LogEvent::default())
     }
 
+    /// Return self as a `LogEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Log`.
     pub fn as_log(&self) -> &LogEvent {
         match self {
             Event::Log(log) => log,
@@ -55,6 +65,11 @@ impl Event {
         }
     }
 
+    /// Return self as a mutable `LogEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Log`.
     pub fn as_mut_log(&mut self) -> &mut LogEvent {
         match self {
             Event::Log(log) => log,
@@ -62,6 +77,11 @@ impl Event {
         }
     }
 
+    /// Coerces self into a `LogEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Log`.
     pub fn into_log(self) -> LogEvent {
         match self {
             Event::Log(log) => log,
@@ -69,6 +89,11 @@ impl Event {
         }
     }
 
+    /// Return self as a `Metric`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Metric`.
     pub fn as_metric(&self) -> &Metric {
         match self {
             Event::Metric(metric) => metric,
@@ -76,6 +101,11 @@ impl Event {
         }
     }
 
+    /// Return self as a mutable `Metric`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Metric`.
     pub fn as_mut_metric(&mut self) -> &mut Metric {
         match self {
             Event::Metric(metric) => metric,
@@ -83,6 +113,11 @@ impl Event {
         }
     }
 
+    /// Coerces self into `Metric`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Metric`.
     pub fn into_metric(self) -> Metric {
         match self {
             Event::Metric(metric) => metric,
@@ -94,6 +129,13 @@ impl Event {
         match self {
             Self::Log(log) => log.metadata(),
             Self::Metric(metric) => metric.metadata(),
+        }
+    }
+
+    pub fn metadata_mut(&mut self) -> &mut EventMetadata {
+        match self {
+            Self::Log(log) => log.metadata_mut(),
+            Self::Metric(metric) => metric.metadata_mut(),
         }
     }
 }
@@ -158,7 +200,7 @@ fn decode_value(input: proto::Value) -> Option<Value> {
 impl From<&tracing::Event<'_>> for Event {
     fn from(event: &tracing::Event<'_>) -> Self {
         let now = chrono::Utc::now();
-        let mut maker = MakeLogEvent(LogEvent::default());
+        let mut maker = MakeLogEvent::default();
         event.record(&mut maker);
 
         let mut log = maker.0;
@@ -179,8 +221,7 @@ impl From<&tracing::Event<'_>> for Event {
         log.insert(
             "metadata.module_path",
             meta.module_path()
-                .map(|mp| Value::Bytes(mp.to_string().into()))
-                .unwrap_or(Value::Null),
+                .map_or(Value::Null, |mp| Value::Bytes(mp.to_string().into())),
         );
         log.insert("metadata.target", meta.target().to_string());
 
@@ -188,7 +229,7 @@ impl From<&tracing::Event<'_>> for Event {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct MakeLogEvent(LogEvent);
 
 impl Visit for MakeLogEvent {
@@ -291,10 +332,10 @@ impl From<proto::EventWrapper> for Event {
                     .timestamp
                     .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
 
-                let tags = if !proto.tags.is_empty() {
-                    Some(proto.tags)
-                } else {
+                let tags = if proto.tags.is_empty() {
                     None
+                } else {
+                    Some(proto.tags)
                 };
 
                 let value = match proto.value.unwrap() {
