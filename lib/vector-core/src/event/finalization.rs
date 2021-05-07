@@ -41,7 +41,7 @@ impl EventFinalizers {
             result.reserve_exact(other.0.len());
             // Box<[T]> is missing IntoIterator
             let other: Vec<_> = other.0.into();
-            for entry in other.into_iter() {
+            for entry in other {
                 // Deduplicate by hand, assume the list is trivially small
                 if !result.iter().any(|existing| Arc::ptr_eq(existing, &entry)) {
                     result.push(entry);
@@ -91,6 +91,7 @@ impl EventFinalizer {
     }
 
     /// Update this finalizer's status in place with the given `EventStatus`.
+    #[allow(clippy::missing_panics_doc)] // Panic is unreachable
     pub fn update_status(&self, status: EventStatus) {
         self.status
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old_status| {
@@ -101,6 +102,7 @@ impl EventFinalizer {
 
     /// Update the batch for this event with this finalizer's
     /// status, and mark this event as no longer requiring update.
+    #[allow(clippy::missing_panics_doc)] // Panic is unreachable
     pub fn update_batch(&self) {
         let status = self
             .status
@@ -207,19 +209,20 @@ impl AtomInteger for EventStatus {}
 
 impl EventStatus {
     /// Update this status with another event's finalization status and return the result.
+    #[allow(clippy::match_same_arms)] // https://github.com/rust-lang/rust-clippy/issues/860
     pub fn update(self, status: Self) -> Self {
         match (self, status) {
             // Recorded always overwrites existing status.
-            (_, Self::Recorded) => status,
+            (_, Self::Recorded)
             // Dropped always updates to the new status.
-            (Self::Dropped, _) => status,
+                | (Self::Dropped, _) => status,
             // Recorded is never updated.
-            (Self::Recorded, _) => self,
+            (Self::Recorded, _)
             // Delivered may update to `Failed`, but not to `Dropped`.
-            (Self::Delivered, Self::Dropped) => self,
-            (Self::Delivered, _) => status,
+                | (Self::Delivered, Self::Dropped)
             // Failed does not otherwise update.
-            (Self::Failed, _) => self,
+                | (Self::Failed, _) => self,
+            (Self::Delivered, _) => status,
         }
     }
 }
