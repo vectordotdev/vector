@@ -84,12 +84,13 @@ impl Expression for EncodeLogfmtFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.value.type_def(state).fallible().bytes()
+        TypeDef::new().bytes().fallible()
     }
 }
 
 fn encode_string(output: &mut String, str: &str) {
-    let needs_quoting = str.find(' ').is_some();
+    let needs_quoting = str.chars().any(char::is_whitespace);
+
     if needs_quoting {
         output.write_char('"').unwrap();
     }
