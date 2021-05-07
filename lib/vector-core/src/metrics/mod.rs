@@ -127,7 +127,7 @@ pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
     for i in 0..events.len() {
         let metric = events[i].as_metric();
         if metric.name() == "events_out_total" {
-            let alias = metric.clone().with_name("events_processed_total");
+            let alias = metric.clone().with_name("processed_events_total");
             events.push(alias.into());
         }
     }
