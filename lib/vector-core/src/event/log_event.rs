@@ -9,6 +9,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
 use getset::{Getters, MutGetters};
+#[cfg(feature = "vrl")]
 use lookup::LookupBuf;
 use serde::{Deserialize, Serialize, Serializer};
 use shared::EventDataEq;
@@ -42,6 +43,7 @@ impl Default for LogEvent {
 }
 
 impl LogEvent {
+    #[must_use]
     pub fn new_with_metadata(metadata: EventMetadata) -> Self {
         Self {
             fields: Value::Map(Default::default()),
@@ -49,6 +51,11 @@ impl LogEvent {
         }
     }
 
+    /// Convert a `LogEvent` into a tuple of its components
+    ///
+    /// # Panics
+    ///
+    /// Panics if the fields of the `LogEvent` are not a `Value::Map`.
     pub fn into_parts(self) -> (BTreeMap<String, Value>, EventMetadata) {
         (
             self.fields
@@ -279,8 +286,11 @@ impl From<HashMap<String, Value>> for LogEvent {
     }
 }
 
-impl From<LogEvent> for HashMap<String, Value> {
-    fn from(event: LogEvent) -> HashMap<String, Value> {
+impl<S> From<LogEvent> for HashMap<String, Value, S>
+where
+    S: std::hash::BuildHasher + Default,
+{
+    fn from(event: LogEvent) -> HashMap<String, Value, S> {
         let fields: BTreeMap<_, _> = event.into();
         fields.into_iter().collect()
     }
@@ -354,6 +364,7 @@ impl Serialize for LogEvent {
     }
 }
 
+#[cfg(feature = "vrl")]
 impl vrl_core::Target for LogEvent {
     fn get(&self, path: &LookupBuf) -> Result<Option<vrl_core::Value>, String> {
         if path.is_root() {
@@ -494,6 +505,7 @@ mod test {
         assert_eq!(json.pointer("/map/map/non-existing"), Some(&fallback));
     }
 
+    #[cfg(feature = "vrl")]
     #[test]
     fn object_get() {
         use lookup::{FieldBuf, SegmentBuf};
@@ -546,6 +558,10 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "vrl")]
+    // `too_many_lines` is mostly just useful for production code but we're not
+    // able to flag the lint on only for non-test.
+    #[allow(clippy::too_many_lines)]
     fn object_insert() {
         use lookup::SegmentBuf;
         use shared::btreemap;
@@ -656,6 +672,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "vrl")]
     fn object_remove() {
         use lookup::{FieldBuf, SegmentBuf};
         use shared::btreemap;

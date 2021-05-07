@@ -75,7 +75,7 @@ mod test {
             ("", false),
         ];
 
-        for (query, expected) in queries.iter() {
+        for (query, expected) in &queries {
             assert_eq!(contains(&fields, query), *expected, "{}", query);
         }
     }

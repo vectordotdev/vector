@@ -79,7 +79,7 @@ mod test {
             ("", None),
         ];
 
-        for (query, expected) in queries.iter() {
+        for (query, expected) in &queries {
             assert_eq!(get(&fields, query), expected.as_ref(), "{}", query);
         }
     }

@@ -164,6 +164,10 @@ impl<'a> Look<'a> for Lookup<'a> {
         self.segments.len()
     }
 
+    fn is_empty(&self) -> bool {
+        self.segments.is_empty()
+    }
+
     /// Parse the lookup from a str.
     fn from_str(input: &'a str) -> Result<Self, LookupError> {
         crate::parser::parse_lookup(input).map_err(|err| LookupError::Invalid { message: err })

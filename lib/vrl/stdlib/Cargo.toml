@@ -236,5 +236,5 @@ bench = false
 
 [[bench]]
 name = "benches"
-test = true
 harness = false
+test = true

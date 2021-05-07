@@ -86,7 +86,9 @@ mod test {
         let event = Event::Metric(Metric::new(
             "example counter",
             MetricKind::Absolute,
-            MetricValue::Counter { value: 0.57721566 },
+            MetricValue::Counter {
+                value: 0.577_215_66,
+            },
         ));
 
         let assertions = vec![
@@ -134,7 +136,9 @@ mod test {
         let expected = Event::Metric(Metric::new(
             "example counter",
             MetricKind::Absolute,
-            MetricValue::Counter { value: 0.57721566 },
+            MetricValue::Counter {
+                value: 0.577_215_66,
+            },
         ));
 
         Lua::new().context(|ctx| {
