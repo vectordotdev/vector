@@ -71,7 +71,7 @@ lazy_static! {
 }
 
 impl VectorConfig {
-    pub(super) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    pub(crate) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = Endpoint::from_shared(self.address.clone())?;
         let endpoint = match &self.tls {
             Some(tls) => {
@@ -121,15 +121,15 @@ impl VectorConfig {
         Ok((VectorSink::Sink(Box::new(sink)), Box::pin(healthcheck)))
     }
 
-    pub(super) fn input_type(&self) -> DataType {
+    pub(crate) fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    pub(super) fn sink_type(&self) -> &'static str {
+    pub(crate) fn sink_type(&self) -> &'static str {
         "vector"
     }
 
-    pub(super) fn resources(&self) -> Vec<Resource> {
+    pub(crate) fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
 }

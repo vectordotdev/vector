@@ -56,7 +56,7 @@ impl GenerateConfig for VectorConfig {
 }
 
 impl VectorConfig {
-    pub(super) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    pub(crate) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink_config = TcpSinkConfig::new(
             self.address.clone(),
             self.keepalive,
@@ -67,15 +67,15 @@ impl VectorConfig {
         sink_config.build(cx, |event| Some(encode_event(event)))
     }
 
-    pub(super) fn input_type(&self) -> DataType {
+    pub(crate) fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    pub(super) fn sink_type(&self) -> &'static str {
+    pub(crate) fn sink_type(&self) -> &'static str {
         "vector"
     }
 
-    pub(super) fn resources(&self) -> Vec<Resource> {
+    pub(crate) fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
 }

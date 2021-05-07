@@ -53,7 +53,7 @@ impl GenerateConfig for VectorConfig {
 }
 
 impl VectorConfig {
-    pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+    pub(crate) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let vector = VectorSource;
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         vector.run(
@@ -67,15 +67,15 @@ impl VectorConfig {
         )
     }
 
-    pub(super) fn output_type(&self) -> DataType {
+    pub(crate) fn output_type(&self) -> DataType {
         DataType::Any
     }
 
-    pub(super) fn source_type(&self) -> &'static str {
+    pub(crate) fn source_type(&self) -> &'static str {
         "vector"
     }
 
-    pub(super) fn resources(&self) -> Vec<Resource> {
+    pub(crate) fn resources(&self) -> Vec<Resource> {
         vec![self.address.into()]
     }
 }
