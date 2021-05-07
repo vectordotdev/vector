@@ -471,6 +471,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "065374052e7df7ee4047b1160cca5e1467a12351a40b3da123c870ba0b8eda2a"
 
 [[package]]
+name = "atomig"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5802d4a527d4a66fc176d963f7587a9637dec22d3bf0e1ed2f6fb4707b7c383a"
+dependencies = [
+ "atomig-macro",
+ "serde",
+]
+
+[[package]]
+name = "atomig-macro"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24a05324eb223dafe0bee247fba5ca1ba693299a24ed6912410bd6f8ccfc6452"
+dependencies = [
+ "proc-macro2 0.4.30",
+ "quote 0.6.13",
+ "syn 0.15.44",
+]
+
+[[package]]
 name = "attohttpc"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7863,6 +7884,7 @@ name = "vector_core"
 version = "0.1.0"
 dependencies = [
  "async-graphql",
+ "atomig",
  "bytes 1.0.1",
  "chrono",
  "criterion",
@@ -7891,6 +7913,7 @@ dependencies = [
  "serde_yaml",
  "shared",
  "snafu",
+ "tokio",
  "toml",
  "tracing 0.1.26",
  "tracing-core 0.1.18",

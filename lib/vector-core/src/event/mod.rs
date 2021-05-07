@@ -1,6 +1,9 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
+pub use finalization::{
+    BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
+};
 pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
 pub use metadata::EventMetadata;
@@ -16,12 +19,13 @@ pub use value::Value;
 
 pub mod discriminant;
 pub mod error;
+mod finalization;
 mod legacy_lookup;
 mod log_event;
 #[cfg(feature = "lua")]
 pub mod lua;
 pub mod merge_state;
-pub mod metadata;
+mod metadata;
 pub mod metric;
 pub mod util;
 mod value;
@@ -120,6 +124,13 @@ impl Event {
         match self {
             Self::Log(log) => log.metadata(),
             Self::Metric(metric) => metric.metadata(),
+        }
+    }
+
+    pub fn metadata_mut(&mut self) -> &mut EventMetadata {
+        match self {
+            Self::Log(log) => log.metadata_mut(),
+            Self::Metric(metric) => metric.metadata_mut(),
         }
     }
 }
