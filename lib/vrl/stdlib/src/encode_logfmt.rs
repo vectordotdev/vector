@@ -83,7 +83,7 @@ impl Expression for EncodeLogfmtFn {
         Ok(encode(object, &fields[..]).into())
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+    fn type_def(&self, _state: &state::Compiler) -> TypeDef {
         TypeDef::new().bytes().fallible()
     }
 }
