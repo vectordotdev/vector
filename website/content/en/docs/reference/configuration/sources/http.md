@@ -2,38 +2,9 @@
 title: HTTP
 description: Receive logs via [HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Client_request)
 kind: source
+layout: component
 ---
 
-## Configuration
-
-{{< component/config >}}
-
-## Output
-
-{{< component/output >}}
-
-## Telemetry
-
-{{< component/telemetry >}}
-
-## Examples
-
-{{< component/examples >}}
-
-## How it works
-
-### Context
-
-{{< snippet "context" >}}
-
-### Decompression
-
-The received body is decompressed according to the `Content-Encoding` header. Supported algorithms are `gzip`, `deflate`, and `snappy`.
-
-### State
-
-{{< snippet "stateless" >}}
-
-### Transport Layer Security (TLS)
-
-{{< snippet "tls" >}}
+{{/* This doc is generated using:
+     1. The template in layouts/docs/component.html
+     2. The relevant CUE data in cue/reference/components/... */}}

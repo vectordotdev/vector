@@ -1,38 +1,9 @@
 ---
 title: InfluxDB metrics
 kind: sink
+layout: component
 ---
 
-## Configuration
-
-{{< component/config >}}
-
-## Telemetry
-
-{{< component/config >}}
-
-## Examples
-
-{{< component/examples >}}
-
-## How it works
-
-### Health checks
-
-{{< snippet "health-checks" >}}
-
-### Partitioning
-
-{{< snippet "partitioning" >}}
-
-### Rate limits and adaptive concurrency
-
-{{< snippet "arc" >}}
-
-### Retry policy
-
-{{< snippet "retry-policy" >}}
-
-### State
-
-{{< snippet "stateless" >}}
+{{/* This doc is generated using:
+     1. The template in layouts/docs/component.html
+     2. The relevant CUE data in cue/reference/components/... */}}

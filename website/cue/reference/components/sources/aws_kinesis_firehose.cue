@@ -53,10 +53,10 @@ components: sources: aws_kinesis_firehose: {
 		}
 		requirements: [
 			"""
-				AWS Kinesis Firehose can only deliver data over HTTP. You will need
-				to solve TLS termination by fronting Vector with a load balaner or
-				configuring the `tls.*` options.
-				""",
+			AWS Kinesis Firehose can only deliver data over HTTP. You will need
+			to solve TLS termination by fronting Vector with a load balaner or
+			configuring the `tls.*` options.
+			""",
 		]
 
 		warnings: []
@@ -168,26 +168,26 @@ components: sources: aws_kinesis_firehose: {
 
 				1. Deploy vector with a publicly exposed HTTP endpoint using
 				   this source. You will likely also want to use the
-				   [`aws_cloudwatch_logs_subscription_parser`][vector_transform_aws_cloudwatch_logs_subscription_parser]
+				   [`aws_cloudwatch_logs_subscription_parser`](\(urls.vector_transform_aws_cloudwatch_logs_subscription_parser))
 				   transform to extract the log events. Make sure to set
 				   the `access_key` to secure this endpoint. Your
 				   configuration might look something like:
 
 				   ```toml
-						[sources.firehose]
-						  # General
-						  type = "aws_kinesis_firehose"
-						  address = "127.0.0.1:9000"
-						  access_key = "secret"
+					[sources.firehose]
+					# General
+					type = "aws_kinesis_firehose"
+					address = "127.0.0.1:9000"
+					access_key = "secret"
 
-						[transforms.cloudwatch]
-						  type = "aws_cloudwatch_logs_subscription_parser"
-						  inputs = ["firehose"]
+					[transforms.cloudwatch]
+					type = "aws_cloudwatch_logs_subscription_parser"
+					inputs = ["firehose"]
 
-						[sinks.console]
-						  type = "console"
-						  inputs = ["cloudwatch"]
-						  encoding.codec = "json"
+					[sinks.console]
+					type = "console"
+					inputs = ["cloudwatch"]
+					encoding.codec = "json"
 				   ```
 
 				2. Create a Kinesis Firewatch delivery stream in the region

@@ -136,6 +136,7 @@ _values: {
 	name:  Name
 	title: string
 	body:  string | null
+	svg?:  string
 	sub_sections?: [#Subsection, ...#Subsection]
 }
 

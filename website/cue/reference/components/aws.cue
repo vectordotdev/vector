@@ -154,17 +154,17 @@ components: _aws: {
 
 	how_it_works: {
 		aws_authentication: {
-			title: "AWS Authentication"
-			body:  """
+			title: "AWS authentication"
+			body: """
 				Vector checks for AWS credentials in the following order:
 
-				1. Options [`access_key_id`](#access_key_id) and [`secret_access_key`](#secret_access_key).
-				2. Environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-				3. The [`credential_process` command](\(urls.aws_credential_process)) in the AWS config file. (usually located at `~/.aws/config`)
-				4. The [AWS credentials file](\(urls.aws_credentials_file)). (usually located at `~/.aws/credentials`)
-				5. The [IAM instance profile](\(urls.iam_instance_profile)). (will only work if running on an EC2 instance with an instance profile/role)
+				1. The [`access_key_id`](#access_key_id) and [`secret_access_key`](#secret_access_key) options.
+				2. The [`AWS_ACCESS_KEY_ID`](#AWS_ACCESS_KEY_ID) and [`AWS_SECRET_ACCESS_KEY`](#AWS_SECRET_ACCESS_KEY) environment variables.
+				3. The [`credential_process` command](\(urls.aws_credential_process)) in the AWS config file (usually located at `~/.aws/config`).
+				4. The [AWS credentials file](\(urls.aws_credentials_file)) (usually located at `~/.aws/credentials`).
+				5. The [IAM instance profile](\(urls.iam_instance_profile)) (only works if running on an EC2 instance with an instance profile/role).
 
-				If credentials are not found the [healtcheck](#healthchecks) will fail and an
+				If no credentials are found, the [healt check](#healthchecks) will fail and an
 				error will be [logged][docs.monitoring#logs].
 				"""
 			sub_sections: [

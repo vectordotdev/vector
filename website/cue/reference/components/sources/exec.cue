@@ -211,7 +211,7 @@ components: sources: exec: {
 			title: "Line Delimiters"
 			body: """
 				Each line is read until a new line delimiter, the `0xA` byte, is found or the end of the
-				maximum_buffer_size is reached.
+				[`maximum_buffer_size_bytes`](#maximum_buffer_size_bytes) is reached.
 				"""
 		}
 	}

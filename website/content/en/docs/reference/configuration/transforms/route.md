@@ -1,24 +1,9 @@
 ---
 title: Route
 kind: transforms
+layout: component
 ---
 
-The `route` transform splits a stream of events into multiple sub-streams based on a set of conditions.
-
-## Configuration
-
-{{< component/config >}}
-
-## Telemetry
-
-{{< component/telemetry >}}
-
-## Examples
-
-{{< component/examples >}}
-
-## How it works
-
-### State
-
-{{< snippet "stateless" >}}
+{{/* This doc is generated using:
+     1. The template in layouts/docs/component.html
+     2. The relevant CUE data in cue/reference/components/... */}}

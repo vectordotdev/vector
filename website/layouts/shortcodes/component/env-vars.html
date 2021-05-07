@@ -1,4 +1,0 @@
-{{ $tag := $.Page.File.BaseFileName }}
-{{ $type := $.Page.CurrentSection.Params.component_type }}
-{{ $envVars := (index (index site.Data.docs.components $type) $tag).env_vars }}
-{{ partial "config.html" (dict "env_vars" $envVars) }}

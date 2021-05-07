@@ -85,21 +85,21 @@ components: sources: docker_logs: {
 		requirements: []
 		warnings: [
 			"""
-				Collecting logs directly from the Docker Engine is known to have
-				performance problems for very large setups. If you have a large
-				setup, please consider alternative collection methods, such as the
-				Docker [`syslog`](\(urls.docker_logging_driver_syslog)) or
-				[Docker `journald` driver](\(urls.docker_logging_driver_journald))
-				drivers.
-				""",
+			Collecting logs directly from the Docker Engine is known to have
+			performance problems for very large setups. If you have a large
+			setup, please consider alternative collection methods, such as the
+			Docker [`syslog`](\(urls.docker_logging_driver_syslog)) or
+			[Docker `journald` driver](\(urls.docker_logging_driver_journald))
+			drivers.
+			""",
 			"""
-				To avoid collecting logs from itself when deployed as a container,
-				the Docker source uses current hostname to find out which container
-				it is inside. If a container's ID matches the hostname, that container
-				will be excluded.
-				If you change container's hostname, consider manually excluding Vector
-				container using [`exclude_containers`](#exclude_containers).
-				""",
+			To avoid collecting logs from itself when deployed as a container,
+			the Docker source uses current hostname to find out which container
+			it is inside. If a container's ID matches the hostname, that container
+			will be excluded.
+			If you change container's hostname, consider manually excluding Vector
+			container using [`exclude_containers`](#exclude_containers).
+			""",
 		]
 		notices: []
 	}
@@ -381,7 +381,7 @@ components: sources: docker_logs: {
 		message_merging: {
 			title: "Merging Split Messages"
 			body: """
-				Docker, by default, will split log messages that exceed 16kb. This can be a
+				Docker, by default, splits log messages that exceed 16kb. This can be a
 				rather frustrating problem because it produces malformed log messages that are
 				difficult to work with. Vector's solves this by default, automatically merging
 				these messages into a single message. You can turn this off via the

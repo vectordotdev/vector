@@ -1,6 +1,7 @@
 {{/* A hack to check for the presence of a TOC */}}
-{{ if gt (len .TableOfContents) 32 }}
-{{ $scrollableToc := .Params.scrollable_toc }}
+{{ $hasToc := gt (len .TableOfContents) 32 }}
+{{ $isComponent := eq .Layout "component" }}
+{{ if or $hasToc $isComponent }}
 <div class="pb-16">
   <p class="uppercase font-semibold text-md dark:text-gray-200 text-gray-600 mb-3">
     On this page

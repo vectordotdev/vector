@@ -1,22 +1,9 @@
 ---
 title: Apache Pulsar
 kind: sink
+layout: component
 ---
 
-## Configuration
-
-{{< component/config >}}
-
-## Telemetry
-
-{{< component/telemetry >}}
-
-## How it works
-
-### Health checks
-
-{{< snippet "health-checks" >}}
-
-### State
-
-{{< snippet "stateless" >}}
+{{/* This doc is generated using:
+     1. The template in layouts/docs/component.html
+     2. The relevant CUE data in cue/reference/components/... */}}

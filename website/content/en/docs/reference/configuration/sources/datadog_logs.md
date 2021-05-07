@@ -1,34 +1,9 @@
 ---
 title: Datadog logs
 kind: source
+layout: component
 ---
 
-The `datadog_logs` source receives logs from a [Datadog Agent][datadog_agent] over HTTP or HTTPS.
-
-## Configuration
-
-{{< component/config >}}
-
-## Output
-
-{{< component/output >}}
-
-## Telemetry
-
-{{< component/telemetry >}}
-
-## How it works
-
-### Context
-
-{{< snippet "context" >}}
-
-### State
-
-{{< snippet "stateless" >}}
-
-### Transport Layer Security (TLS)
-
-{{< snippet "tls" >}}
-
-[datadog_agent]: https://docs.datadoghq.com/agent
+{{/* This doc is generated using:
+     1. The template in layouts/docs/component.html
+     2. The relevant CUE data in cue/reference/components/... */}}

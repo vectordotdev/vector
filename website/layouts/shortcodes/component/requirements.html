@@ -1,4 +1,0 @@
-{{ $tag := $.Page.File.BaseFileName }}
-{{ $type := $.Page.CurrentSection.Params.component_type }}
-{{ $requirements := (index (index site.Data.docs.components $type) $tag).support.requirements }}
-{{ partial "config.html" (dict "requirements" $requirements) }}

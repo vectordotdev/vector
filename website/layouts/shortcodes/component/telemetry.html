@@ -1,4 +1,0 @@
-{{ $tag := $.Page.File.BaseFileName }}
-{{ $type := $.Page.CurrentSection.Params.component_type }}
-{{ $telemetry := (index (index site.Data.docs.components $type) $tag).telemetry }}
-{{ partial "config.html" (dict "telemetry" $telemetry) }}

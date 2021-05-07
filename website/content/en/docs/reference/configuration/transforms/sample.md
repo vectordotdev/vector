@@ -1,20 +1,9 @@
 ---
 title: Sample
 kind: transform
+layout: component
 ---
 
-The `sample` transform samples events at a configurable rate.
-
-## Configuration
-
-{{< component/config >}}
-
-## Telemetry
-
-{{< component/telemetry >}}
-
-## How it works
-
-### State
-
-{{< snippet "stateless" >}}
+{{/* This doc is generated using:
+     1. The template in layouts/docs/component.html
+     2. The relevant CUE data in cue/reference/components/... */}}

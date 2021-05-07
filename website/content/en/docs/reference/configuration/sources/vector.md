@@ -1,44 +1,9 @@
 ---
 title: Vector
 kind: source
+layout: component
 ---
 
-## Requirements
-
-{{< component/requirements >}}
-
-## Configuration
-
-{{< component/config >}}
-
-## Output
-
-{{< component/output >}}
-
-## Telemetry
-
-{{< component/telemetry >}}
-
-## How it works
-
-### Communication protocol
-
-Upstream Vector instances forward data to downstream Vector instances via the TCP protocol.
-
-### Encoding
-
-Data is encoded via Vector's [event protobuf][event_proto] before it is sent over the wire.
-
-### Message acknowledgment
-
-{{< snippet "ack" >}}
-
-### State
-
-{{< snippet "stateless" >}}
-
-### Transport Layer Security (TLS)
-
-{{< snippet "tls" >}}
-
-[event_proto]: https://github.com/timberio/vector/blob/master/lib/vector-core/proto/event.proto
+{{/* This doc is generated using:
+     1. The template in layouts/docs/component.html
+     2. The relevant CUE data in cue/reference/components/... */}}

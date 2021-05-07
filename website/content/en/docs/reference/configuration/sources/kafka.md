@@ -2,34 +2,9 @@
 title: Kafka
 description: Collect logs from [Kafka](https://kafka.apache.org)
 kind: source
+layout: component
 ---
 
-## Configuration
-
-{{< component/config >}}
-
-## Output
-
-{{< component/output >}}
-
-## Telemetry
-
-{{< component/telemetry >}}
-
-## How it works
-
-### Context
-
-{{< snippet "context" >}}
-
-### State
-
-{{< snippet "stateless" >}}
-
-### Transport Layer Security (TLS)
-
-{{< snippet "tls" >}}
-
-### librdkafka
-
-{{< snippet "librdkafka" >}}
+{{/* This doc is generated using:
+     1. The template in layouts/docs/component.html
+     2. The relevant CUE data in cue/reference/components/... */}}

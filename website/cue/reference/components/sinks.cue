@@ -407,22 +407,21 @@ components: sinks: [Name=string]: {
 				if features.send.batch != _|_ {
 					if features.send.batch.enabled {
 						buffers_batches: {
-							title: "Buffers & batches"
+							title: "Buffers and batches"
+							svg: "/img/buffers-and-batches-serial.svg"
 							body: #"""
-									{{< svg "buffers-and-batches-serial.svg" }}
+								This component buffers & batches data as shown in the diagram above. You'll notice that Vector treats these concepts
+								differently, instead of treating them as global concepts, Vector treats them
+								as sink specific concepts. This isolates sinks, ensuring services disruptions
+								are contained and delivery guarantees are honored.
 
-									This component buffers & batches data as shown in the diagram above. You'll notice that Vector treats these concepts
-									differently, instead of treating them as global concepts, Vector treats them
-									as sink specific concepts. This isolates sinks, ensuring services disruptions
-									are contained and delivery guarantees are honored.
+								*Batches* are flushed when 1 of 2 conditions are met:
 
-									*Batches* are flushed when 1 of 2 conditions are met:
+								1. The batch age meets or exceeds the configured `timeout_secs`.
+								2. The batch size meets or exceeds the configured `max_size` or `max_events`.
 
-									1. The batch age meets or exceeds the configured `timeout_secs`.
-									2. The batch size meets or exceeds the configured `max_size` or `max_events`.
-
-									*Buffers* are controlled via the [`buffer.*`](#buffer) options.
-									"""#
+								*Buffers* are controlled via the [`buffer.*`](#buffer) options.
+								"""#
 						}
 					}
 				}
@@ -431,9 +430,8 @@ components: sinks: [Name=string]: {
 			if features.send == _|_ {
 				buffers: {
 					title: "Buffers"
+					svg: "/img/buffers.svg"
 					body: """
-						{{< svg "buffers.svg" >}}
-
 						This component buffers events as shown in
 						the diagram above. This helps to smooth out data processing if the downstream
 						service applies backpressure. Buffers are controlled via the

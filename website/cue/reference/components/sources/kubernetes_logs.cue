@@ -383,6 +383,187 @@ components: sources: kubernetes_logs: {
 		},
 	]
 
+	// Note that these sections are also copied over the
+	// `installation.platforms.kubernetes.how_it_works` key. Therefore, full
+	// URLs should be used in links and language should be used that works in
+	// both contexts.
+	how_it_works: {
+		enrichment: {
+			title: "Enrichment"
+			body:  """
+					Vector will enrich data with Kubernetes context. A comprehensive
+					list of fields can be found in the
+					[`kubernetes_logs` source output docs](\(urls.vector_kubernetes_logs_source)#output).
+					"""
+		}
+
+		filtering: {
+			title: "Filtering"
+			body: """
+				Vector provides rich filtering options for Kubernetes log collection:
+
+				* Built-in [`Pod`](#pod-exclusion) and [`container`](#container-exclusion)
+				  exclusion rules.
+				* The `exclude_paths_glob_patterns` option allows you to exclude
+				  Kuberenetes log files by the file name and path.
+				* The `extra_field_selector` option specifies the field selector to
+				  filter Pods with, to be used in addition to the built-in `Node` filter.
+				* The `extra_label_selector` option specifies the label selector to
+				  filter `Pod`s with, to be used in addition to the [built-in
+				  `vector.dev/exclude` filter](#pod-exclusion).
+				"""
+		}
+
+		pod_exclusion: {
+			title: "Pod exclusion"
+			body:  """
+					By default, the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+					will skip logs from the `Pod`s that have a `vector.dev/exclude: "true"` *label*.
+					You can configure additional exclusion rules via label or field selectors,
+					see [the available options](\(urls.vector_kubernetes_logs_source)#configuration).
+					"""
+		}
+
+		container_exclusion: {
+			title: "Container exclusion"
+			body:  """
+					The [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+					can skip the logs from the individual `container`s of a particular
+					`Pod`. Add an *annotation* `vector.dev/exclude-containers` to the
+					`Pod`, and enumerate the `name`s of all the `container`s to exclude in
+					the value of the annotation like so:
+
+					```yaml
+					vector.dev/exclude-containers: "container1,container2"
+					```
+
+					This annotation will make Vector skip logs originating from the
+					`container1` and `container2` of the `Pod` marked with the annotation,
+					while logs from other `container`s in the `Pod` will still be
+					collected.
+					"""
+		}
+
+		kubernetes_api_communication: {
+			title: "Kubernetes API communication"
+			body:  """
+					Vector communicates with the Kubernetes API to enrich the data it collects with
+					Kubernetes context. Therefore, Vector must have access to communicate with the
+					[Kubernetes API server](\(urls.kubernetes_api_server)). If Vector is running in
+					a Kubernetes cluster then Vector will connect to that cluster using the
+					[Kubernetes provided access information](\(urls.kubernetes_accessing_api_from_pod)).
+
+					In addition to access, Vector implements proper desync handling to ensure
+					communication is safe and reliable. This ensures that Vector will not overwhelm
+					the Kubernetes API or compromise its stability.
+					"""
+		}
+
+		partial_message_merging: {
+			title: "Partial message merging"
+			body:  """
+					Vector, by default, will merge partial messages that are
+					split due to the Docker size limit. For everything else, it
+					is recommended to use the [`reduce`
+					transform](\(urls.vector_reduce_transform)) which offers
+					the ability to handle custom merging of things like
+					stacktraces.
+					"""
+		}
+
+		pod_removal: {
+			title: "Pod removal"
+			body: """
+				To ensure all data is collected, Vector will continue to collect logs from the
+				`Pod` for some time after its removal. This ensures that Vector obtains some of
+				the most important data, such as crash details.
+				"""
+		}
+
+		resource_limits: {
+			title: "Resource limits"
+			body: """
+				Vector recommends the following resource limits.
+				"""
+			sub_sections: [
+				{
+					title: "Agent resource limits"
+					body: """
+						If deploy Vector as an agent (collecting data for each of your
+						Nodes), then we recommend the following limits:
+
+						```yaml
+						resources:
+						  requests:
+						    memory: "64Mi"
+						    cpu: "500m"
+						  limits:
+						    memory: "1024Mi"
+						    cpu: "6000m"
+						```
+
+						**As with all Kubernetes resource limit recommendations, use these
+						as a reference point and adjust as ncessary. If your configured
+						Vector pipeline is complex, you may need more resources. If you
+						have a pipeline you may need less.**
+						"""
+				},
+			]
+		}
+
+		state_management: {
+			title: "State management"
+			body:  null
+			sub_sections: [
+				{
+					title: "Agent state management"
+					body: """
+						For the agent role, Vector stores its state at the host-mapped dir with a static
+						path, so if it's redeployed it'll continue from where it was interrupted.
+						"""
+				},
+			]
+		}
+
+		testing_and_reliability: {
+			title: "Testing & reliability"
+			body: """
+				Vector is tested extensively against Kubernetes. In addition to Kubernetes
+				being Vector's most popular installation method, Vector implements a
+				comprehensive end-to-end test suite for all minor Kubernetes versions starting
+				with `1.14.
+				"""
+		}
+
+		kubernetes_api_access_control: {
+			title: "Kubernetes API access control"
+			body:  """
+				Vector requires access to the Kubernetes API.
+				Specifically, the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+				uses the `/api/v1/pods` endpoint to "watch" the pods from
+				all namespaces.
+
+				Modern Kubernetes clusters run with RBAC (role-based access control)
+				scheme. RBAC-enabled clusters require some configuration to grant Vector
+				the authorization to access the Kubernetes API endpoints.	As RBAC is
+				currently the standard way of controlling access to the Kubernetes API,
+				we ship the necessary configuration out of the box: see `ClusterRole`,
+				`ClusterRoleBinding` and a `ServiceAccount` in our `kubectl` YAML
+				config, and the `rbac` configuration at the Helm chart.
+
+				If your cluster doesn't use any access control scheme	and doesn't
+				restrict access to the Kubernetes API, you don't need to do any extra
+				configuration - Vector willjust work.
+
+				Clusters using legacy ABAC scheme are not officially supported
+				(although Vector might work if you configure access properly) -
+				we encourage switching to RBAC. If you use a custom access control
+				scheme - make sure Vector `Pod`/`ServiceAccount` is granted access to
+				the `/api/v1/pods` resource.
+				"""
+		}
+	}
+
 	telemetry: metrics: {
 		events_in_total:                        components.sources.internal_metrics.output.metrics.events_in_total
 		k8s_format_picker_edge_cases_total:     components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total

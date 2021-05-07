@@ -218,53 +218,41 @@ components: sinks: gcp_cloud_storage: {
 					"""
 		}
 		object_naming: {
-			title: "Object Naming"
+			title: "Object naming"
 			body: """
-				By default, Vector will name your GCS objects in the following format:
+				By default, Vector names your GCS objects in accordance with one of two formats.
 
-				<Tabs
-				  block={true}
-				  defaultValue="without_compression"
-				  values={[
-				    { label: 'Without Compression', value: 'without_compression', },
-				    { label: 'With Compression', value: 'with_compression', },
-				  ]
-				}>
-
-				<TabItem value="without_compression">
+				If compression *is* enabled, this format is used:
 
 				```text
-				<key_prefix><timestamp>-<uuidv4>.log
+				key_prefix><timestamp>-<uuidv4>.log.gz
 				```
 
-				For example:
-
-				```text
-				date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log
-				```
-
-				</TabItem>
-				<TabItem value="with_compression">
-
-				```text
-				<key_prefix><timestamp>-<uuidv4>.log.gz
-				```
-
-				For example:
+				Here's an example name in the compression-enabled format:
 
 				```text
 				date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log.gz
 				```
 
-				</TabItem>
-				</Tabs>
+				If compression is *not* enabled, this format is used:
 
-				Vector appends a [UUIDV4][urls.uuidv4] token to ensure there are no name
-				conflicts in the unlikely event 2 Vector instances are writing data at the same
+				```text
+				<key_prefix><timestamp>-<uuidv4>.log
+				```
+
+				Here's an example name in the compression-disabled format:
+
+				```text
+				date=2019-06-18/1560886634-fddd7a0e-fad9-4f7e-9bce-00ae5debc563.log
+				```
+
+				Vector appends a [UUIDV4](\(urls.uuidv4)) token to ensure there are no name
+				conflicts in the unlikely event that two Vector instances are writing data at the same
 				time.
 
-				You can control the resulting name via the `key_prefix`, `filename_time_format`,
-				and `filename_append_uuid` options.
+				You can control the resulting name via the [`key_prefix`](#key_prefix),
+				[`filename_time_format`](#filename_time_format),
+				and [`filename_append_uuid`](#filename_append_uuid) options.
 				"""
 		}
 

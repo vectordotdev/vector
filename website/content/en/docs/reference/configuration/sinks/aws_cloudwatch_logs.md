@@ -1,26 +1,9 @@
 ---
 title: AWS Cloudwatch logs
 kind: sink
+layout: component
 ---
 
-## Configuration
-
-{{< component/config >}}
-
-## Environment variables
-
-{{< component/env-vars >}}
-
-## Telemetry
-
-{{< component/config >}}
-
-## How it works
-
-### AWS authentication
-
-{{< snippet "aws/auth" >}}
-
-### Buffers and batches
-
-{{< snippet "buffers-and-batches" >}}
+{{/* This doc is generated using:
+     1. The template in layouts/docs/component.html
+     2. The relevant CUE data in cue/reference/components/... */}}

@@ -2,36 +2,9 @@
 title: NGINX metrics
 description: Collect metrics from [NGINX](https://nginx.com)
 kind: source
+layout: component
 ---
 
-## Requirements
-
-{{< component/requirements >}}
-
-## Configuration
-
-{{< component/config >}}
-
-## Output
-
-{{< component/output >}}
-
-## Telemetry
-
-{{< component/telemetry >}}
-
-## How it works
-
-### Context
-
-{{< snippet "context" >}}
-
-### Module `ngx_http_stub_status_module`
-
-The [`ngx_http_stub_status_module`][ngx_http_stub_status_module] module provides access to basic status information. Basic status information is a simple web page with text data.
-
-### State
-
-{{< snippet "stateless" >}}
-
-[ngx_http_stub_status_module]: http://nginx.org/en/docs/http/ngx_http_stub_status_module.html
+{{/* This doc is generated using:
+     1. The template in layouts/docs/component.html
+     2. The relevant CUE data in cue/reference/components/... */}}

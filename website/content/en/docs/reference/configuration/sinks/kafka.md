@@ -1,34 +1,9 @@
 ---
 title: Kafka
 kind: sink
+layout: component
 ---
 
-## Configuration
-
-{{< component/config >}}
-
-## Telemetry
-
-{{< component/config >}}
-
-## How it works
-
-### Buffers and batches
-
-{{< snippet "buffers-and-batches" >}}
-
-### Health checks
-
-{{< snippet "health-checks" >}}
-
-### State
-
-{{< snippet "stateless" >}}
-
-### Transport Layer Security (TLS)
-
-{{< snippet "tls" >}}
-
-### librdkafka
-
-{{< snippet "librdkafka" >}}
+{{/* This doc is generated using:
+     1. The template in layouts/docs/component.html
+     2. The relevant CUE data in cue/reference/components/... */}}

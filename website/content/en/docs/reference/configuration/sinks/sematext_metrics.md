@@ -1,30 +1,9 @@
 ---
 title: Sematext metrics
 kind: sink
+layout: component
 ---
 
-## Warnings
-
-{{< component/warnings >}}
-
-## Configuration
-
-{{< component/config >}}
-
-## Telemetry
-
-{{< component/config >}}
-
-## How it works
-
-### Buffers and batches
-
-{{< snippet "buffers-and-batches" >}}
-
-### Health checks
-
-{{< snippet "health-checks" >}}
-
-### State
-
-{{< snippet "stateless" >}}
+{{/* This doc is generated using:
+     1. The template in layouts/docs/component.html
+     2. The relevant CUE data in cue/reference/components/... */}}
