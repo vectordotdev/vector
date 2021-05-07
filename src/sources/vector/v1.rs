@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext},
+    config::{DataType, GenerateConfig, Resource, SourceContext},
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     sources::{
@@ -52,10 +52,8 @@ impl GenerateConfig for VectorConfig {
     }
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "vector")]
-impl SourceConfig for VectorConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+impl VectorConfig {
+    pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let vector = VectorSource;
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         vector.run(
@@ -69,15 +67,15 @@ impl SourceConfig for VectorConfig {
         )
     }
 
-    fn output_type(&self) -> DataType {
+    pub(super) fn output_type(&self) -> DataType {
         DataType::Any
     }
 
-    fn source_type(&self) -> &'static str {
+    pub(super) fn source_type(&self) -> &'static str {
         "vector"
     }
 
-    fn resources(&self) -> Vec<Resource> {
+    pub(super) fn resources(&self) -> Vec<Resource> {
         vec![self.address.into()]
     }
 }

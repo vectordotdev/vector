@@ -1,6 +1,6 @@
 use crate::{
     config::SourceContext,
-    config::{DataType, GenerateConfig, Resource, SourceConfig},
+    config::{DataType, GenerateConfig, Resource},
     event::Event,
     proto::vector as proto,
     shutdown::{ShutdownSignal, ShutdownSignalToken},
@@ -90,10 +90,8 @@ impl GenerateConfig for VectorConfig {
     }
 }
 
-#[tonic::async_trait]
-#[typetag::serde(name = "vector")]
-impl SourceConfig for VectorConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
+impl VectorConfig {
+    pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let SourceContext { shutdown, out, .. } = cx;
 
         let source = run(self.address, self.tls.clone(), out, shutdown).map_err(|error| {
@@ -103,15 +101,15 @@ impl SourceConfig for VectorConfig {
         Ok(Box::pin(source))
     }
 
-    fn output_type(&self) -> DataType {
+    pub(super) fn output_type(&self) -> DataType {
         DataType::Any
     }
 
-    fn source_type(&self) -> &'static str {
+    pub(super) fn source_type(&self) -> &'static str {
         "vector"
     }
 
-    fn resources(&self) -> Vec<Resource> {
+    pub(super) fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
 }

@@ -38,6 +38,7 @@ pub enum VectorConfig {
     V1(VectorConfigV1),
     V2(VectorConfigV2),
 }
+
 inventory::submit! {
     SinkDescription::new::<VectorConfig>("vector")
 }

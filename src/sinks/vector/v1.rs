@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext},
+    config::{DataType, GenerateConfig, Resource, SinkContext},
     event::{proto, Event},
     sinks::util::{tcp::TcpSinkConfig, EncodedEvent, Healthcheck, VectorSink},
     tcp::TcpKeepaliveConfig,
@@ -55,10 +55,8 @@ impl GenerateConfig for VectorConfig {
     }
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "vector")]
-impl SinkConfig for VectorConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+impl VectorConfig {
+    pub(super) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink_config = TcpSinkConfig::new(
             self.address.clone(),
             self.keepalive,
@@ -69,12 +67,16 @@ impl SinkConfig for VectorConfig {
         sink_config.build(cx, |event| Some(encode_event(event)))
     }
 
-    fn input_type(&self) -> DataType {
+    pub(super) fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    fn sink_type(&self) -> &'static str {
+    pub(super) fn sink_type(&self) -> &'static str {
         "vector"
+    }
+
+    pub(super) fn resources(&self) -> Vec<Resource> {
+        Vec::new()
     }
 }
 

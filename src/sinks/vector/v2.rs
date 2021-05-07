@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkHealthcheckOptions},
+    config::{DataType, GenerateConfig, Resource, SinkContext, SinkHealthcheckOptions},
     event::Event,
     proto::vector as proto,
     sinks::util::{
@@ -70,10 +70,8 @@ lazy_static! {
     };
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "vector")]
-impl SinkConfig for VectorConfig {
-    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+impl VectorConfig {
+    pub(super) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = Endpoint::from_shared(self.address.clone())?;
         let endpoint = match &self.tls {
             Some(tls) => {
@@ -123,12 +121,16 @@ impl SinkConfig for VectorConfig {
         Ok((VectorSink::Sink(Box::new(sink)), Box::pin(healthcheck)))
     }
 
-    fn input_type(&self) -> DataType {
+    pub(super) fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    fn sink_type(&self) -> &'static str {
+    pub(super) fn sink_type(&self) -> &'static str {
         "vector"
+    }
+
+    pub(super) fn resources(&self) -> Vec<Resource> {
+        Vec::new()
     }
 }
 
