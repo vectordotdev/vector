@@ -112,7 +112,7 @@ mod test {
     use super::VectorConfig;
     use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{GlobalOptions, SinkConfig as _, SinkContext, SourceConfig, SourceContext},
+        config::{GlobalOptions, SinkContext, SourceContext},
         event::Event,
         event::{
             metric::{MetricKind, MetricValue},
