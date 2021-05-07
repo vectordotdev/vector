@@ -1,7 +1,7 @@
 fn main() {
     #[cfg(any(feature = "sources-vector", feature = "sinks-vector"))]
     {
-        println!("cargo:rerun-if-changed=proto");
+        println!("cargo:rerun-if-changed=proto/vector.proto");
         let mut prost_build = prost_build::Config::new();
         prost_build.btree_map(&["."]);
 
