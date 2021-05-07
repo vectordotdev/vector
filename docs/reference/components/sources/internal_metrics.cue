@@ -350,12 +350,15 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		processed_events_total: {
-			description:       "The total number of events processed by this component."
+			description: """
+				The total number of events processed by this component.
+				This metric is deprecated in place of using
+				[`events_in_total`][docs.sources.internal_metrics.events_in_total] and
+				[`events_out_total`][docs.sources.internal_metrics.events_out_total] metrics.
+				"""
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags & {
-				file: _file
-			}
+			tags:              _component_tags
 		}
 		kafka_queue_messages: {
 			description:       "Current number of messages in producer queues."

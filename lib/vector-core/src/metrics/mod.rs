@@ -122,6 +122,16 @@ pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
         .iter()
         .map(|kv| Metric::from_metric_kv(kv.key().key(), kv.value()).into())
         .collect::<Vec<Event>>();
+
+    // Add alias `events_processed_total` for `events_out_total`.
+    for i in 0..events.len() {
+        let metric = events[i].as_metric();
+        if metric.name() == "events_out_total" {
+            let alias = metric.clone().with_name("events_processed_total");
+            events.push(alias.into());
+        }
+    }
+
     let handle = Handle::Counter(Counter::with_count(events.len() as u64 + 1));
     events.push(Metric::from_metric_kv(CARDINALITY_KEY.key(), &handle).into());
 

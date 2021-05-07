@@ -265,6 +265,11 @@ impl Metric {
         }
     }
 
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.series.name.name = name.into();
+        self
+    }
+
     pub fn with_namespace<T: Into<String>>(mut self, namespace: Option<T>) -> Self {
         self.series.name.namespace = namespace.map(Into::into);
         self
