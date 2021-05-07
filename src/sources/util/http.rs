@@ -1,5 +1,5 @@
 use crate::{
-    event::{BatchStatus, BatchStatusReceiver, Event},
+    event::{BatchNotifier, BatchStatus, Event},
     internal_events::{HttpBadRequest, HttpDecompressError, HttpEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -12,7 +12,9 @@ use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use headers::{Authorization, HeaderMapExt};
 use serde::{Deserialize, Serialize};
 use snap::raw::Decoder as SnappyDecoder;
-use std::{collections::HashMap, convert::TryFrom, error::Error, fmt, io::Read, net::SocketAddr};
+use std::{
+    collections::HashMap, convert::TryFrom, error::Error, fmt, io::Read, net::SocketAddr, sync::Arc,
+};
 use tracing_futures::Instrument;
 use warp::{
     filters::{path::FullPath, path::Tail, BoxedFilter},
@@ -173,11 +175,6 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
     )
 }
 
-pub struct BuiltEvents {
-    pub events: Vec<Event>,
-    pub receiver: Option<BatchStatusReceiver>,
-}
-
 #[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
     fn build_events(
@@ -186,7 +183,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
         path: &str,
-    ) -> Result<BuiltEvents, ErrorMessage>;
+    ) -> Result<Vec<Event>, ErrorMessage>;
 
     fn run(
         self,
@@ -243,17 +240,22 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             .and_then(|body| {
                                 let body_len = body.len();
                                 self.build_events(body, headers, query_parameters, path.as_str())
-                                    .map(|built| (built, body_len))
+                                    .map(|events|(events, body_len))
                             });
 
                         async move {
                             match events {
-                                Ok((built, body_size)) => {
-                                    let BuiltEvents { events, receiver } = built;
+                                Ok((mut events, body_size)) => {
                                     emit!(HttpEventsReceived {
                                         events_count: events.len(),
                                         byte_size: body_size,
                                     });
+
+                                    let (batch, receiver) = BatchNotifier::new_with_receiver();
+                                    for event in &mut events {
+                                        event.add_batch_notifier(Arc::clone(&batch));
+                                    }
+
                                     out.send_all(&mut futures::stream::iter(events).map(Ok))
                                         .map_err(move |error: crate::pipeline::ClosedError| {
                                             // can only fail if receiving end disconnected, so we are shutting down,
@@ -263,11 +265,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                             warp::reject::custom(RejectShuttingDown)
                                         })
                                         .and_then(|_| async move {
-                                            let status = match receiver {
-                                                None => BatchStatus::Delivered,
-                                                Some(receiver) => receiver.await.unwrap_or(BatchStatus::Delivered),
-                                            };
-                                            match status {
+                                            match receiver.await.unwrap_or(BatchStatus::Delivered) {
                                                 BatchStatus::Delivered => Ok(warp::reply()),
                                                 BatchStatus::Failed => Err(warp::reject::custom(
                                                     ErrorMessage::new(
