@@ -110,7 +110,7 @@ impl InternalEvent for ExecCommandExecuted<'_> {
         );
 
         histogram!(
-            "command_execution_duration_ns", self.exec_duration,
+            "command_execution_duration_seconds", self.exec_duration,
             "command" => self.command.to_owned(),
             "exit_status" => self.exit_status_string(),
         );
