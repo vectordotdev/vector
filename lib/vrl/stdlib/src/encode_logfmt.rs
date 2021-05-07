@@ -115,10 +115,7 @@ fn encode_value(output: &mut String, value: &Value) {
             let val = String::from_utf8_lossy(b);
             encode_string(output, &val)
         }
-        _ => {
-            let val = format!("{}", value);
-            encode_string(output, &val)
-        }
+        _ => encode_string(output, &value.to_string()),
     }
 }
 
