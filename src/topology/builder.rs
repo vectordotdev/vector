@@ -7,9 +7,8 @@ use crate::{
     buffers,
     config::{DataType, SinkContext, SourceContext},
     event::Event,
-    internal_events::{EventIn, EventOut, EventProcessed, EventZeroIn},
+    internal_events::{EventIn, EventOut, EventZeroIn},
     shutdown::SourceShutdownCoordinator,
-    stream::VecStreamExt,
     transforms::Transform,
     Pipeline,
 };
@@ -134,7 +133,6 @@ pub async fn build_pieces(
                     let mut buf = Vec::with_capacity(1);
                     t.transform(&mut buf, v);
                     emit!(EventOut { count: buf.len() });
-                    emit!(EventProcessed);
                     stream::iter(buf.into_iter()).map(Ok)
                 })
                 .forward(output)
@@ -142,8 +140,7 @@ pub async fn build_pieces(
             Transform::Task(t) => {
                 let filtered = input_rx
                     .filter(move |event| ready(filter_event_type(event, input_type)))
-                    .inspect(|_| emit!(EventIn))
-                    .on_processed(|| emit!(EventProcessed));
+                    .inspect(|_| emit!(EventIn));
                 t.transform(Box::pin(filtered))
                     .map(Ok)
                     .forward(output.with(|event| async {

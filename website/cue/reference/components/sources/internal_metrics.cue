@@ -204,7 +204,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		collect_duration_nanoseconds: {
+		collect_duration_seconds: {
 			description:       "The duration spent collecting of metrics for this component."
 			type:              "histogram"
 			default_namespace: "vector"
@@ -216,8 +216,8 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		command_execution_duration_ns: {
-			description:       "The command execution duration in nanoseconds."
+		command_execution_duration_seconds: {
+			description:       "The command execution duration in seconds."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _component_tags
@@ -350,12 +350,15 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		processed_events_total: {
-			description:       "The total number of events processed by this component."
+			description: """
+				The total number of events processed by this component.
+				This metric is deprecated in place of using
+				[`events_in_total`][docs.sources.internal_metrics.events_in_total] and
+				[`events_out_total`][docs.sources.internal_metrics.events_out_total] metrics.
+				"""
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags & {
-				file: _file
-			}
+			tags:              _component_tags
 		}
 		kafka_queue_messages: {
 			description:       "Current number of messages in producer queues."
@@ -608,8 +611,8 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		request_duration_nanoseconds: {
-			description:       "The total request duration in nanoseconds."
+		request_duration_seconds: {
+			description:       "The total request duration in seconds."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
