@@ -47,7 +47,7 @@ impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
             r#"version = "2"
-            endpoint = "127.0.0.1:6000"
+            address = "127.0.0.1:6000"
             "#,
         )
         .unwrap()
