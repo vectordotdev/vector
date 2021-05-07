@@ -271,7 +271,7 @@ nix = "0.20.0"
 
 [build-dependencies]
 built = { version = "0.5.0", features = ["chrono", "git2"] }
-prost-build = "0.7.0"
+prost-build = { version = "0.7.0", optional = true }
 tonic-build = { version = "0.4", features = ["transport"], optional = true }
 
 [dev-dependencies]
@@ -434,7 +434,7 @@ sources-utils-tcp-socket = []
 sources-utils-tls = []
 sources-utils-udp = []
 sources-utils-unix = []
-sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "tonic", "tonic-build"]
+sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "tonic", "tonic-build", "prost-build"]
 
 # Transforms
 transforms = ["transforms-logs", "transforms-metrics"]
@@ -587,7 +587,7 @@ sinks-socket = ["sinks-utils-udp"]
 sinks-splunk_hec = ["bytesize"]
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
-sinks-vector = ["sinks-utils-udp", "tonic", "tonic-build"]
+sinks-vector = ["sinks-utils-udp", "tonic", "tonic-build", "prost-build"]
 
 # Identifies that the build is a nightly build
 nightly = []
