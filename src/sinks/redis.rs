@@ -58,6 +58,8 @@ pub struct RedisSinkConfig {
     list: Option<ListConfig>,
     url: String,
     key: String,
+    #[serde(default = "crate::serde::default_true")]
+    safe: bool,
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
@@ -74,9 +76,10 @@ enum RedisSinkState {
 }
 
 pub struct RedisSink {
+    safe: bool,
     key: Template,
     data_type: DataType,
-    method: Method,
+    method: Option<Method>,
     encoding: EncodingConfig<Encoding>,
     state: RedisSinkState,
     in_flight: FuturesOrdered<BoxFuture<'static, (usize, Result<i32, RedisError>)>>,
@@ -100,8 +103,9 @@ impl GenerateConfig for RedisSinkConfig {
             list: Some(ListConfig {
                 method: Method::LPush,
             }),
+            safe: true,
         })
-            .unwrap()
+        .unwrap()
     }
 }
 
@@ -121,6 +125,7 @@ impl SinkConfig for RedisSinkConfig {
             RedisSinkState::Ready(conn) => conn.clone(),
             _ => unreachable!(),
         };
+
         let healthcheck = healthcheck(conn).boxed();
 
         Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
@@ -153,18 +158,25 @@ impl RedisSink {
         let key_tmpl = Template::try_from(config.key).context(KeyTemplate)?;
 
         match res {
-            Ok(conn) => Ok(RedisSink {
-                data_type: config.data_type,
-                method: config.list.unwrap().method,
-                key: key_tmpl,
-                encoding: config.encoding,
-                acker,
-                seq_head: 0,
-                seq_tail: 0,
-                pending_acks: HashSet::new(),
-                in_flight: FuturesOrdered::new(),
-                state: RedisSinkState::Ready(conn),
-            }),
+            Ok(conn) => {
+                let mut method: Option<Method> = None;
+                if config.list.is_some() {
+                    method = Option::from(config.list.unwrap().method)
+                }
+                Ok(RedisSink {
+                    safe: config.safe,
+                    data_type: config.data_type,
+                    method,
+                    key: key_tmpl,
+                    encoding: config.encoding,
+                    acker,
+                    seq_head: 0,
+                    seq_tail: 0,
+                    pending_acks: HashSet::new(),
+                    in_flight: FuturesOrdered::new(),
+                    state: RedisSinkState::Ready(conn),
+                })
+            }
             Err(error) => {
                 error!(message = "Redis sink init generated an error.", %error);
                 Err(error.to_string().into())
@@ -180,6 +192,7 @@ impl RedisSink {
             self.seq_head += 1;
 
             self.state = RedisSinkState::Ready(conn);
+
             self.in_flight
                 .push(Box::pin(async move { (seqno, result) }));
         }
@@ -192,6 +205,35 @@ impl Sink<Event> for RedisSink {
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         ready!(self.poll_in_flight_prepare(cx));
+
+        if self.safe {
+            let this = Pin::into_inner(self);
+            while !this.in_flight.is_empty() {
+                match ready!(Pin::new(&mut this.in_flight).poll_next(cx)) {
+                    Some((seqno, Ok(result))) => {
+                        trace!(
+                            message = "Redis sink produced message.",
+                            length = %result,
+                        );
+                        this.pending_acks.insert(seqno);
+                        let mut num_to_ack = 0;
+
+                        while this.pending_acks.remove(&this.seq_tail) {
+                            num_to_ack += 1;
+                            this.seq_tail += 1
+                        }
+                        this.acker.ack(num_to_ack);
+                    }
+                    Some((_, Err(error))) => {
+                        error!(message = "Redis sink generated an error.", %error);
+                        emit!(RedisSendEventFailed { error });
+                        return Poll::Ready(Err(()));
+                    }
+                    None => break,
+                }
+            }
+        }
+
         Poll::Ready(Ok(()))
     }
 
@@ -217,11 +259,13 @@ impl Sink<Event> for RedisSink {
 
         self.state = RedisSinkState::Sending(Box::pin(async move {
             let send = match (data_type, method) {
-                (DataType::List, Method::LPush) => ConnectionManager::lpush,
-                (DataType::List, Method::RPush) => ConnectionManager::rpush,
-                (DataType::Channel, _) => ConnectionManager::publish,
+                (DataType::List, Some(Method::LPush)) => ConnectionManager::lpush,
+                (DataType::List, Some(Method::RPush)) => ConnectionManager::rpush,
+                (DataType::Channel, None) => ConnectionManager::publish,
+                _ => {
+                    panic!("The `data_type` can't be empty, when `data_type` is `list`, `method` cannot be empty.")
+                }
             };
-
             let result = send(&mut conn, key.clone(), encoded.clone()).await;
             if result.is_ok() {
                 emit!(RedisEventSent {
@@ -237,7 +281,6 @@ impl Sink<Event> for RedisSink {
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         ready!(self.poll_in_flight_prepare(cx));
-
         let this = Pin::into_inner(self);
         while !this.in_flight.is_empty() {
             match ready!(Pin::new(&mut this.in_flight).poll_next(cx)) {
@@ -248,6 +291,7 @@ impl Sink<Event> for RedisSink {
                     );
                     this.pending_acks.insert(seqno);
                     let mut num_to_ack = 0;
+
                     while this.pending_acks.remove(&this.seq_tail) {
                         num_to_ack += 1;
                         this.seq_tail += 1
@@ -370,6 +414,7 @@ mod integration_tests {
             list: Some(ListConfig {
                 method: Method::LPush,
             }),
+            safe: true,
         };
 
         // Publish events.
@@ -403,10 +448,8 @@ mod integration_tests {
         for i in 0..num_events {
             let e = events.get(i).unwrap().as_log();
             let s = serde_json::to_string(e).unwrap_or_default();
-            debug!("Raw event:{}", s);
             let payload: (String, String) = conn.brpop(key.clone(), 2000).await.unwrap();
             let val = payload.1;
-            debug!("Read val:{}", val);
             assert_eq!(val, s);
         }
     }
@@ -429,6 +472,7 @@ mod integration_tests {
             list: Some(ListConfig {
                 method: Method::RPush,
             }),
+            safe: true,
         };
 
         // Publish events.
@@ -461,10 +505,8 @@ mod integration_tests {
         for i in 0..num_events {
             let e = events.get(i).unwrap().as_log();
             let s = serde_json::to_string(e).unwrap_or_default();
-            debug!("Raw event:{}", s);
             let payload: (String, String) = conn.blpop(key.clone(), 2000).await.unwrap();
             let val = payload.1;
-            debug!("Read val:{}", val);
             assert_eq!(val, s);
         }
     }
@@ -501,12 +543,13 @@ mod integration_tests {
             encoding: Encoding::Json.into(),
             data_type: DataType::Channel,
             list: None,
+            safe: true,
         };
 
         // Publish events.
         let (acker, ack_counter) = Acker::new_for_testing();
         let sink = RedisSink::new(cnf.clone(), acker).await.unwrap();
-        let (_input, events) = random_lines_with_stream(100, num_events);
+        let (_input, events) = random_lines_with_stream(100, num_events, None);
         events.map(Ok).forward(sink).await.unwrap();
 
         assert_eq!(

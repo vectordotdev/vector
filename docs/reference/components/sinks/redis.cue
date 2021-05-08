@@ -81,6 +81,13 @@ components: sinks: redis: {
 				syntax: "template"
 			}
 		}
+		safe: {
+			common:      false
+			description: "If this is set to `true` the messages would be serially inserted in-of-order into Redis,If this is set to `false` the messages would be written to Redis in parallel,it can improve throughput but messages may be inserted out-of-order into Redis in a complex network environment."
+			required:    false
+			warnings: []
+			type: bool: default: true
+		}
 		data_type: {
 			common:      false
 			description: "The Redis data type (`list` or `channel`) to use."
@@ -94,17 +101,28 @@ components: sinks: redis: {
 				syntax: "literal"
 			}
 		}
-		method: {
+		list: {
 			common:      false
-			description: "The method (`lpush` or `rpush`) to publish messages when `data_type` is list."
+			description: "Options for the Redis `list` data type."
 			required:    false
-			type: string: {
-				default: "lpush"
-				enum: {
-					lpush: "Use the `lpush` method to publish messages."
-					rpush: "Use the `rpush` method to publish messages."
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					method: {
+						common:      false
+						description: "The method (`lpush` or `rpush`) to publish messages when `data_type` is list."
+						required:    false
+						type: string: {
+							default: "lpush"
+							enum: {
+								lpush: "Use the `lpush` method to publish messages."
+								rpush: "Use the `rpush` method to publish messages."
+							}
+							syntax: "literal"
+						}
+					}
 				}
-				syntax: "literal"
 			}
 		}
 	}
