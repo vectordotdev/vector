@@ -3,16 +3,18 @@ use crate::metrics::Handle;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use getset::{Getters, MutGetters};
+#[cfg(feature = "vrl")]
 use lookup::LookupBuf;
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
 use snafu::Snafu;
+#[cfg(feature = "vrl")]
+use std::convert::TryFrom;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    convert::TryFrom,
     fmt::{self, Display, Formatter},
-    iter::FromIterator,
 };
+#[cfg(feature = "vrl")]
 use vrl_core::Target;
 
 #[derive(Clone, Debug, Deserialize, Getters, MutGetters, PartialEq, Serialize)]
@@ -62,6 +64,7 @@ pub enum MetricKind {
     Absolute,
 }
 
+#[cfg(feature = "vrl")]
 impl TryFrom<vrl_core::Value> for MetricKind {
     type Error = String;
 
@@ -78,6 +81,7 @@ impl TryFrom<vrl_core::Value> for MetricKind {
     }
 }
 
+#[cfg(feature = "vrl")]
 impl From<MetricKind> for vrl_core::Value {
     fn from(kind: MetricKind) -> Self {
         match kind {
@@ -89,7 +93,7 @@ impl From<MetricKind> for vrl_core::Value {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, is_enum_variant)]
 #[serde(rename_all = "snake_case")]
-/// A MetricValue is the container for the actual value of a metric.
+/// A `MetricValue` is the container for the actual value of a metric.
 pub enum MetricValue {
     /// A Counter is a simple value that can not decrease except to
     /// reset it to zero.
@@ -209,6 +213,7 @@ pub fn zip_quantiles(
 /// Convert the Metric value into a vrl value.
 /// Currently vrl can only read the type of the value and doesn't consider
 /// any actual metric values.
+#[cfg(feature = "vrl")]
 impl From<MetricValue> for vrl_core::Value {
     fn from(value: MetricValue) -> Self {
         match value {
@@ -260,6 +265,11 @@ impl Metric {
         }
     }
 
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.series.name.name = name.into();
+        self
+    }
+
     pub fn with_namespace<T: Into<String>>(mut self, namespace: Option<T>) -> Self {
         self.series.name.namespace = namespace.map(Into::into);
         self
@@ -302,11 +312,14 @@ impl Metric {
         }
     }
 
-    /// Convert the metrics_runtime::Measurement value plus the name and
+    /// Convert the `metrics_runtime::Measurement` value plus the name and
     /// labels from a Key into our internal Metric format.
+    #[allow(clippy::cast_precision_loss)]
     pub fn from_metric_kv(key: &metrics::Key, handle: &Handle) -> Self {
         let value = match handle {
             Handle::Counter(counter) => MetricValue::Counter {
+                // NOTE this will truncate if `counter.count()` is a value
+                // greater than 2**52.
                 value: counter.count() as f64,
             },
             Handle::Gauge(gauge) => MetricValue::Gauge {
@@ -418,14 +431,13 @@ impl MetricData {
         }
     }
 
-    /// Update this MetricData by adding the value from another.
+    /// Update this `MetricData` by adding the value from another.
     pub fn update(&mut self, other: &Self) {
         self.value.add(&other.value);
         // Update the timestamp to the latest one
         self.timestamp = match (self.timestamp, other.timestamp) {
             (None, None) => None,
-            (Some(t), None) => Some(t),
-            (None, Some(t)) => Some(t),
+            (Some(t), None) | (None, Some(t)) => Some(t),
             (Some(t1), Some(t2)) => Some(t1.max(t2)),
         };
     }
@@ -492,10 +504,8 @@ impl MetricValue {
     /// Add another same value to this.
     pub fn add(&mut self, other: &Self) {
         match (self, other) {
-            (Self::Counter { ref mut value }, Self::Counter { value: value2 }) => {
-                *value += value2;
-            }
-            (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
+            (Self::Counter { ref mut value }, Self::Counter { value: value2 })
+            | (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
                 *value += value2;
             }
             (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
@@ -570,10 +580,8 @@ impl MetricValue {
     /// Subtract another (same type) value from this.
     pub fn subtract(&mut self, other: &Self) {
         match (self, other) {
-            (Self::Counter { ref mut value }, Self::Counter { value: value2 }) => {
-                *value -= value2;
-            }
-            (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
+            (Self::Counter { ref mut value }, Self::Counter { value: value2 })
+            | (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
                 *value -= value2;
             }
             (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
@@ -597,7 +605,7 @@ impl MetricValue {
                 *samples = samples
                     .iter()
                     .copied()
-                    .filter(|sample| !samples2.iter().any(|sample2| sample == sample2))
+                    .filter(|sample| samples2.iter().all(|sample2| sample != sample2))
                     .collect();
             }
             (
@@ -658,7 +666,9 @@ impl MetricValue {
 impl Display for Metric {
     /// Display a metric using something like Prometheus' text format:
     ///
+    /// ```text
     /// TIMESTAMP NAMESPACE_NAME{TAGS} KIND DATA
+    /// ```
     ///
     /// TIMESTAMP is in ISO 8601 format with UTC time zone.
     ///
@@ -699,8 +709,9 @@ impl Display for Metric {
             }
         )?;
         match &self.data.value {
-            MetricValue::Counter { value } => write!(fmt, "{}", value),
-            MetricValue::Gauge { value } => write!(fmt, "{}", value),
+            MetricValue::Counter { value } | MetricValue::Gauge { value } => {
+                write!(fmt, "{}", value)
+            }
             MetricValue::Set { values } => {
                 write_list(fmt, " ", values.iter(), |fmt, value| write_word(fmt, value))
             }
@@ -741,9 +752,11 @@ impl Display for Metric {
     }
 }
 
+#[cfg(feature = "vrl")]
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .timestamp, .kind, .tags";
 
 /// We can get the `type` of the metric in Remap, but can't set  it.
+#[cfg(feature = "vrl")]
 const VALID_METRIC_PATHS_GET: &str = ".name, .namespace, .timestamp, .kind, .tags, .type";
 
 #[derive(Debug, Snafu)]
@@ -758,8 +771,10 @@ enum MetricPathError<'a> {
 /// Metrics aren't interested in paths that have a length longer than 3
 /// The longest path is 2, and we need to check that a third segment doesn't exist as we don't want
 /// fields such as `.tags.host.thing`.
+#[cfg(feature = "vrl")]
 const MAX_METRIC_PATH_DEPTH: usize = 3;
 
+#[cfg(feature = "vrl")]
 impl Target for Metric {
     fn insert(&mut self, path: &LookupBuf, value: vrl_core::Value) -> Result<(), String> {
         if path.is_root() {
@@ -770,7 +785,7 @@ impl Target for Metric {
             match paths.as_slice() {
                 ["tags"] => {
                     let value = value.try_object().map_err(|e| e.to_string())?;
-                    for (field, value) in value.iter() {
+                    for (field, value) in &value {
                         self.set_tag_value(
                             field.as_str().to_owned(),
                             value
@@ -784,7 +799,7 @@ impl Target for Metric {
                 ["tags", field] => {
                     let value = value.try_bytes().map_err(|e| e.to_string())?;
                     self.set_tag_value(
-                        field.to_string(),
+                        (*field).to_string(),
                         String::from_utf8_lossy(&value).into_owned(),
                     );
                     return Ok(());
@@ -864,8 +879,9 @@ impl Target for Metric {
                 ["kind"] => return Ok(Some(self.data.kind.into())),
                 ["tags"] => {
                     return Ok(self.tags().map(|map| {
-                        let iter = map.iter().map(|(k, v)| (k.to_owned(), v.to_owned().into()));
-                        vrl_core::Value::from_iter(iter)
+                        map.iter()
+                            .map(|(k, v)| (k.clone(), v.clone().into()))
+                            .collect::<vrl_core::Value>()
                     }))
                 }
                 ["tags", field] => match self.tag_value(field) {
@@ -903,8 +919,9 @@ impl Target for Metric {
                 ["timestamp"] => return Ok(self.data.timestamp.take().map(Into::into)),
                 ["tags"] => {
                     return Ok(self.series.tags.take().map(|map| {
-                        let iter = map.into_iter().map(|(k, v)| (k, v.into()));
-                        vrl_core::Value::from_iter(iter)
+                        map.into_iter()
+                            .map(|(k, v)| (k, v.into()))
+                            .collect::<vrl_core::Value>()
                     }))
                 }
                 ["tags", field] => return Ok(self.delete_tag(field).map(Into::into)),
@@ -933,7 +950,7 @@ where
     W: Fn(&mut Formatter<'_>, T) -> Result<(), fmt::Error>,
 {
     let mut this_sep = "";
-    for item in items.into_iter() {
+    for item in items {
         write!(fmt, "{}", this_sep)?;
         writer(fmt, item)?;
         this_sep = sep;
@@ -954,7 +971,9 @@ mod test {
     use super::*;
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
+    #[cfg(feature = "vrl")]
     use shared::btreemap;
+    #[cfg(feature = "vrl")]
     use vrl_core::Value;
 
     fn ts() -> DateTime<Utc> {
@@ -1091,6 +1110,9 @@ mod test {
     }
 
     #[test]
+    // `too_many_lines` is mostly just useful for production code but we're not
+    // able to flag the lint on only for non-test.
+    #[allow(clippy::too_many_lines)]
     fn display() {
         assert_eq!(
             format!(
@@ -1206,6 +1228,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "vrl")]
     fn object_metric_all_fields() {
         let metric = Metric::new(
             "zub",
@@ -1237,6 +1260,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "vrl")]
     fn object_metric_fields() {
         let mut metric = Metric::new(
             "name",
@@ -1287,6 +1311,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "vrl")]
     fn object_metric_invalid_paths() {
         let mut metric = Metric::new(
             "name",

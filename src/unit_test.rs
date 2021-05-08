@@ -7,19 +7,20 @@ use structopt::StructOpt;
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
     /// Vector config files in TOML format to test.
-    #[structopt(name = "config-toml", long)]
+    #[structopt(name = "config-toml", long, use_delimiter(true))]
     paths_toml: Vec<PathBuf>,
 
     /// Vector config files in JSON format to test.
-    #[structopt(name = "config-json", long)]
+    #[structopt(name = "config-json", long, use_delimiter(true))]
     paths_json: Vec<PathBuf>,
 
     /// Vector config files in YAML format to test.
-    #[structopt(name = "config-yaml", long)]
+    #[structopt(name = "config-yaml", long, use_delimiter(true))]
     paths_yaml: Vec<PathBuf>,
 
     /// Any number of Vector config files to test. If none are specified the
     /// default config path `/etc/vector/vector.toml` will be targeted.
+    #[structopt(use_delimiter(true))]
     paths: Vec<PathBuf>,
 }
 

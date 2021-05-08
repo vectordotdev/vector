@@ -37,7 +37,7 @@ pub mod buffers;
 pub mod encoding_transcode;
 pub mod heartbeat;
 pub mod http;
-#[cfg(feature = "rdkafka")]
+#[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 pub mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
@@ -103,7 +103,7 @@ pub fn get_version() -> String {
 }
 
 #[allow(unused)]
-mod built_info {
+pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 

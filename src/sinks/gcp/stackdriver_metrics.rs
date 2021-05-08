@@ -4,12 +4,11 @@ use crate::http::HttpClient;
 use crate::sinks::gcp;
 use crate::sinks::util::buffer::metrics::MetricsBuffer;
 use crate::sinks::util::http::{BatchedHttpSink, HttpSink};
-use crate::sinks::util::{BatchConfig, BatchSettings, TowerRequestConfig};
+use crate::sinks::util::{BatchConfig, BatchSettings, EncodedEvent, TowerRequestConfig};
 use crate::sinks::{Healthcheck, VectorSink};
 use crate::tls::{TlsOptions, TlsSettings};
 use chrono::{DateTime, Utc};
-use futures::sink::SinkExt;
-use futures::FutureExt;
+use futures::{sink::SinkExt, FutureExt};
 use http::header::AUTHORIZATION;
 use http::{HeaderValue, Uri};
 use lazy_static::lazy_static;
@@ -102,20 +101,21 @@ struct HttpEventSink {
 
 #[async_trait::async_trait]
 impl HttpSink for HttpEventSink {
-    type Input = Event;
+    type Input = Metric;
     type Output = Vec<Metric>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
         let metric = event.into_metric();
 
         match &metric.data.value {
-            &MetricValue::Counter { .. } => Some(Event::Metric(metric)),
-            &MetricValue::Gauge { .. } => Some(Event::Metric(metric)),
+            &MetricValue::Counter { .. } => Some(metric),
+            &MetricValue::Gauge { .. } => Some(metric),
             not_supported => {
                 warn!("Unsupported metric type: {:?}.", not_supported);
                 None
             }
         }
+        .map(EncodedEvent::new)
     }
 
     async fn build_request(

@@ -44,10 +44,16 @@ pub enum Event {
 }
 
 impl Event {
+    #[must_use]
     pub fn new_empty_log() -> Self {
         Event::Log(LogEvent::default())
     }
 
+    /// Return self as a `LogEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Log`.
     pub fn as_log(&self) -> &LogEvent {
         match self {
             Event::Log(log) => log,
@@ -55,6 +61,11 @@ impl Event {
         }
     }
 
+    /// Return self as a mutable `LogEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Log`.
     pub fn as_mut_log(&mut self) -> &mut LogEvent {
         match self {
             Event::Log(log) => log,
@@ -62,6 +73,11 @@ impl Event {
         }
     }
 
+    /// Coerces self into a `LogEvent`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Log`.
     pub fn into_log(self) -> LogEvent {
         match self {
             Event::Log(log) => log,
@@ -69,6 +85,11 @@ impl Event {
         }
     }
 
+    /// Return self as a `Metric`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Metric`.
     pub fn as_metric(&self) -> &Metric {
         match self {
             Event::Metric(metric) => metric,
@@ -76,6 +97,11 @@ impl Event {
         }
     }
 
+    /// Return self as a mutable `Metric`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Metric`.
     pub fn as_mut_metric(&mut self) -> &mut Metric {
         match self {
             Event::Metric(metric) => metric,
@@ -83,6 +109,11 @@ impl Event {
         }
     }
 
+    /// Coerces self into `Metric`
+    ///
+    /// # Panics
+    ///
+    /// This function panics if self is anything other than an `Event::Metric`.
     pub fn into_metric(self) -> Metric {
         match self {
             Event::Metric(metric) => metric,
@@ -173,7 +204,7 @@ fn decode_value(input: proto::Value) -> Option<Value> {
 impl From<&tracing::Event<'_>> for Event {
     fn from(event: &tracing::Event<'_>) -> Self {
         let now = chrono::Utc::now();
-        let mut maker = MakeLogEvent(LogEvent::default());
+        let mut maker = MakeLogEvent::default();
         event.record(&mut maker);
 
         let mut log = maker.0;
@@ -194,8 +225,7 @@ impl From<&tracing::Event<'_>> for Event {
         log.insert(
             "metadata.module_path",
             meta.module_path()
-                .map(|mp| Value::Bytes(mp.to_string().into()))
-                .unwrap_or(Value::Null),
+                .map_or(Value::Null, |mp| Value::Bytes(mp.to_string().into())),
         );
         log.insert("metadata.target", meta.target().to_string());
 
@@ -203,7 +233,7 @@ impl From<&tracing::Event<'_>> for Event {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct MakeLogEvent(LogEvent);
 
 impl Visit for MakeLogEvent {
@@ -306,10 +336,10 @@ impl From<proto::EventWrapper> for Event {
                     .timestamp
                     .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
 
-                let tags = if !proto.tags.is_empty() {
-                    Some(proto.tags)
-                } else {
+                let tags = if proto.tags.is_empty() {
                     None
+                } else {
+                    Some(proto.tags)
                 };
 
                 let value = match proto.value.unwrap() {
@@ -568,6 +598,35 @@ impl From<LogEvent> for Event {
 impl From<Metric> for Event {
     fn from(metric: Metric) -> Self {
         Event::Metric(metric)
+    }
+}
+
+/// A wrapper for references to inner event types, where reconstituting
+/// a full `Event` from a `LogEvent` or `Metric` might be inconvenient.
+#[derive(Clone, Copy, Debug)]
+pub enum EventRef<'a> {
+    Log(&'a LogEvent),
+    Metric(&'a Metric),
+}
+
+impl<'a> From<&'a Event> for EventRef<'a> {
+    fn from(event: &'a Event) -> Self {
+        match event {
+            Event::Log(log) => log.into(),
+            Event::Metric(metric) => metric.into(),
+        }
+    }
+}
+
+impl<'a> From<&'a LogEvent> for EventRef<'a> {
+    fn from(log: &'a LogEvent) -> Self {
+        Self::Log(log)
+    }
+}
+
+impl<'a> From<&'a Metric> for EventRef<'a> {
+    fn from(metric: &'a Metric) -> Self {
+        Self::Metric(metric)
     }
 }
 

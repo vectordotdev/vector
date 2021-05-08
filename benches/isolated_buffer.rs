@@ -1,11 +1,9 @@
 use async_trait::async_trait;
 use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
 use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
     stream::{self, BoxStream},
     Sink, SinkExt, Stream, StreamExt,
 };
-use futures01::Stream as Stream01;
 use tempfile::tempdir;
 use tokio_stream::wrappers::ReceiverStream;
 use vector::{
@@ -43,30 +41,6 @@ fn benchmark_buffers(c: &mut Criterion) {
     let mut group = c.benchmark_group("isolated_buffers");
     group.throughput(Throughput::Bytes((num_lines * line_size) as u64));
     group.sampling_mode(SamplingMode::Flat);
-
-    group.bench_function("channels/futures01", |b| {
-        b.iter_batched(
-            || {
-                let rt = runtime();
-
-                let (writer, reader) = futures01::sync::mpsc::channel(100);
-                let writer = writer.sink_compat().sink_map_err(|e| panic!("{}", e));
-
-                let read_loop = reader.for_each(move |_| Ok(()));
-
-                (rt, writer, read_loop)
-            },
-            |(rt, writer, read_loop)| {
-                let write_handle = rt.spawn(send_random(line_size, num_lines, writer));
-
-                let read_handle = rt.spawn(read_loop.compat());
-
-                rt.block_on(write_handle).unwrap();
-                rt.block_on(read_handle).unwrap().unwrap();
-            },
-            BatchSize::SmallInput,
-        );
-    });
 
     group.bench_function("channels/futures", |b| {
         b.iter_batched(

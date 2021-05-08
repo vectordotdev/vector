@@ -7,7 +7,8 @@ use crate::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            BatchConfig, BatchSettings, BoxedRawValue, EncodedEvent, JsonArrayBuffer,
+            TowerRequestConfig,
         },
         Healthcheck, UriParseError, VectorSink,
     },
@@ -162,12 +163,12 @@ impl HttpSink for PubsubSink {
     type Input = Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         self.encoding.apply_rules(&mut event);
         // Each event needs to be base64 encoded, and put into a JSON object
         // as the `data` item.
         let json = serde_json::to_string(&event.into_log()).unwrap();
-        Some(json!({ "data": base64::encode(&json) }))
+        Some(EncodedEvent::new(json!({ "data": base64::encode(&json) })))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {

@@ -1,6 +1,5 @@
 use crate::{
     config::{Config, ConfigDiff, GenerateConfig},
-    event::Event,
     topology::{self, RunningTopology},
     trace,
 };
@@ -40,6 +39,7 @@ use tokio_stream::wrappers::TcpListenerStream;
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
+use vector_core::event::{BatchNotifier, Event, LogEvent};
 
 const WAIT_FOR_SECS: u64 = 5; // The default time to wait in `wait_for`
 const WAIT_FOR_MIN_MILLIS: u64 = 5; // The minimum time to pause before retrying
@@ -186,9 +186,17 @@ pub fn temp_dir() -> PathBuf {
 pub fn random_lines_with_stream(
     len: usize,
     count: usize,
+    batch: Option<Arc<BatchNotifier>>,
 ) -> (Vec<String>, impl Stream<Item = Event>) {
     let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
-    let stream = stream::iter(lines.clone()).map(Event::from);
+    let stream = stream::iter(lines.clone()).map(move |line| {
+        let log = LogEvent::from(line);
+        match &batch {
+            None => log,
+            Some(batch) => log.with_batch_notifier(Arc::clone(batch)),
+        }
+        .into()
+    });
     (lines, stream)
 }
 

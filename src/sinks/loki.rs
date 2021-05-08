@@ -21,8 +21,8 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
         service::ConcurrencyOption,
-        BatchConfig, BatchSettings, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
-        UriSerde,
+        BatchConfig, BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer,
+        TowerRequestConfig, UriSerde,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -181,7 +181,7 @@ impl HttpSink for LokiSink {
     type Input = PartitionInnerBuffer<LokiRecord, PartitionKey>;
     type Output = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         let tenant_id = self.tenant_id.as_ref().and_then(|t| {
             t.render_string(&event)
                 .map_err(|missing| {
@@ -242,14 +242,14 @@ impl HttpSink for LokiSink {
         }
 
         let event = LokiEvent { timestamp, event };
-        Some(PartitionInnerBuffer::new(
+        Some(EncodedEvent::new(PartitionInnerBuffer::new(
             LokiRecord {
                 labels,
                 event,
                 partition: key.clone(),
             },
             key,
-        ))
+        )))
     }
 
     async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -325,7 +325,7 @@ mod tests {
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let mut record = sink.encode_event(e1).unwrap().into_parts().0;
+        let mut record = sink.encode_event(e1).unwrap().item.into_parts().0;
 
         // HashMap -> Vec doesn't like keeping ordering
         record.labels.sort();
@@ -364,7 +364,7 @@ mod tests {
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let record = sink.encode_event(e1).unwrap().into_parts().0;
+        let record = sink.encode_event(e1).unwrap().item.into_parts().0;
 
         let expected_line = serde_json::to_string(&serde_json::json!({
             "message": "hello world",
