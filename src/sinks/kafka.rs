@@ -790,7 +790,7 @@ mod integration_test {
         let sink = KafkaSink::new(config, acker).unwrap();
 
         let num_events = 1000;
-        let (input, events) = random_lines_with_stream(100, num_events);
+        let (input, events) = random_lines_with_stream(100, num_events, None);
         events.map(Ok).forward(sink).await.unwrap();
 
         // read back everything from the beginning

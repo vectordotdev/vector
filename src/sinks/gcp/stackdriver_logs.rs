@@ -7,7 +7,8 @@ use crate::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
+            BatchConfig, BatchSettings, BoxedRawValue, EncodedEvent, JsonArrayBuffer,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -157,7 +158,7 @@ impl HttpSink for StackdriverSink {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
         let mut log = event.into_log();
         let severity = self
             .severity_key
@@ -180,7 +181,7 @@ impl HttpSink for StackdriverSink {
             entry.insert("timestamp".into(), json!(timestamp));
         }
 
-        Some(json!(entry))
+        Some(EncodedEvent::new(json!(entry)))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
@@ -303,7 +304,7 @@ mod tests {
                 .iter()
                 .copied(),
         );
-        let json = sink.encode_event(Event::from(log)).unwrap();
+        let json = sink.encode_event(Event::from(log)).unwrap().item;
         let body = serde_json::to_string(&json).unwrap();
         assert_eq!(
             body,
@@ -335,7 +336,7 @@ mod tests {
             Value::Timestamp(Utc.ymd(2020, 1, 1).and_hms(12, 30, 0)),
         );
 
-        let json = sink.encode_event(Event::from(log)).unwrap();
+        let json = sink.encode_event(Event::from(log)).unwrap().item;
         let body = serde_json::to_string(&json).unwrap();
         assert_eq!(
             body,
@@ -389,8 +390,8 @@ mod tests {
 
         let log1 = LogEvent::from_iter([("message", "hello")].iter().copied());
         let log2 = LogEvent::from_iter([("message", "world")].iter().copied());
-        let event1 = sink.encode_event(Event::from(log1)).unwrap();
-        let event2 = sink.encode_event(Event::from(log2)).unwrap();
+        let event1 = sink.encode_event(Event::from(log1)).unwrap().item;
+        let event2 = sink.encode_event(Event::from(log2)).unwrap().item;
 
         let json1 = serde_json::to_string(&event1).unwrap();
         let json2 = serde_json::to_string(&event2).unwrap();

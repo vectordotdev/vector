@@ -9,8 +9,8 @@ use crate::{
             encode_event,
             encoding::{EncodingConfig, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, Compression, Encoding, JsonArrayBuffer,
-            TowerRequestConfig, VecBuffer,
+            BatchConfig, BatchSettings, BoxedRawValue, Compression, EncodedEvent, Encoding,
+            JsonArrayBuffer, TowerRequestConfig, VecBuffer,
         },
         Healthcheck, VectorSink,
     },
@@ -227,7 +227,7 @@ impl HttpSink for DatadogLogsJsonService {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         let log = event.as_mut_log();
 
         if let Some(message) = log.remove(log_schema().message_key()) {
@@ -244,7 +244,7 @@ impl HttpSink for DatadogLogsJsonService {
 
         self.config.encoding.apply_rules(&mut event);
 
-        Some(json!(event.into_log()))
+        Some(EncodedEvent::new(json!(event.into_log())))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -266,13 +266,13 @@ impl HttpSink for DatadogLogsTextService {
     type Input = Bytes;
     type Output = Vec<Bytes>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
         encode_event(event, &self.config.encoding).map(|e| {
             emit!(DatadogLogEventProcessed {
-                byte_size: e.len(),
+                byte_size: e.item.len(),
                 count: 1,
             });
-            e
+            EncodedEvent::new(e.item)
         })
     }
 
@@ -359,7 +359,7 @@ mod tests {
         let (rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let (expected, events) = random_lines_with_stream(100, 10);
+        let (expected, events) = random_lines_with_stream(100, 10, None);
 
         let _ = sink.run(events).await.unwrap();
 
@@ -392,7 +392,7 @@ mod tests {
         let (rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let (expected, events) = random_lines_with_stream(100, 10);
+        let (expected, events) = random_lines_with_stream(100, 10, None);
 
         let _ = sink.run(events).await.unwrap();
 

@@ -592,6 +592,35 @@ impl From<Metric> for Event {
     }
 }
 
+/// A wrapper for references to inner event types, where reconstituting
+/// a full `Event` from a `LogEvent` or `Metric` might be inconvenient.
+#[derive(Clone, Copy, Debug)]
+pub enum EventRef<'a> {
+    Log(&'a LogEvent),
+    Metric(&'a Metric),
+}
+
+impl<'a> From<&'a Event> for EventRef<'a> {
+    fn from(event: &'a Event) -> Self {
+        match event {
+            Event::Log(log) => log.into(),
+            Event::Metric(metric) => metric.into(),
+        }
+    }
+}
+
+impl<'a> From<&'a LogEvent> for EventRef<'a> {
+    fn from(log: &'a LogEvent) -> Self {
+        Self::Log(log)
+    }
+}
+
+impl<'a> From<&'a Metric> for EventRef<'a> {
+    fn from(metric: &'a Metric) -> Self {
+        Self::Metric(metric)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

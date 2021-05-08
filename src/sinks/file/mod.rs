@@ -371,7 +371,7 @@ mod tests {
         };
 
         let mut sink = FileSink::new(&config, Acker::Null);
-        let (input, _events) = random_lines_with_stream(100, 64);
+        let (input, _events) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
         sink.run(events).await.unwrap();
@@ -396,7 +396,7 @@ mod tests {
         };
 
         let mut sink = FileSink::new(&config, Acker::Null);
-        let (input, _) = random_lines_with_stream(100, 64);
+        let (input, _) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
         sink.run(events).await.unwrap();
@@ -507,7 +507,7 @@ mod tests {
         };
 
         let mut sink = FileSink::new(&config, Acker::Null);
-        let (mut input, _events) = random_lines_with_stream(10, 64);
+        let (mut input, _events) = random_lines_with_stream(10, 64, None);
 
         let (mut tx, rx) = futures::channel::mpsc::channel(0);
 

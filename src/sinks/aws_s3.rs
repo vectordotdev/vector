@@ -5,11 +5,12 @@ use crate::{
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     serde::to_string,
     sinks::util::{
+        batch::{BatchConfig, BatchSettings},
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
-        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, PartitionBatchSink,
-        PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
+        Buffer, Compression, Concurrency, EncodedEvent, PartitionBatchSink, PartitionBuffer,
+        PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
     },
     template::Template,
 };
@@ -394,7 +395,7 @@ fn encode_event(
     mut event: Event,
     key_prefix: &Template,
     encoding: &EncodingConfig<Encoding>,
-) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
+) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8>, Bytes>>> {
     let key = key_prefix
         .render_string(&event)
         .map_err(|error| {
@@ -426,7 +427,10 @@ fn encode_event(
         }
     };
 
-    Some(PartitionInnerBuffer::new(bytes, key.into()))
+    Some(EncodedEvent::new(PartitionInnerBuffer::new(
+        bytes,
+        key.into(),
+    )))
 }
 
 #[cfg(test)]
@@ -442,7 +446,7 @@ mod tests {
     fn s3_encode_event_text() {
         let message = "hello world".to_string();
         let batch_time_format = Template::try_from("date=%F").unwrap();
-        let bytes = encode_event(
+        let encoded = encode_event(
             message.clone().into(),
             &batch_time_format,
             &Encoding::Text.into(),
@@ -450,7 +454,7 @@ mod tests {
         .unwrap();
 
         let encoded_message = message + "\n";
-        let (bytes, _) = bytes.into_parts();
+        let (bytes, _) = encoded.item.into_parts();
         assert_eq!(&bytes[..], encoded_message.as_bytes());
     }
 
@@ -461,9 +465,9 @@ mod tests {
         event.as_mut_log().insert("key", "value");
 
         let batch_time_format = Template::try_from("date=%F").unwrap();
-        let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
+        let encoded = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
 
-        let (bytes, _) = bytes.into_parts();
+        let (bytes, _) = encoded.item.into_parts();
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(map[&log_schema().message_key().to_string()], message);
@@ -486,9 +490,9 @@ mod tests {
             timestamp_format: None,
         };
 
-        let bytes = encode_event(event, &key_prefix, &encoding_config).unwrap();
+        let encoded = encode_event(event, &key_prefix, &encoding_config).unwrap();
 
-        let (bytes, _) = bytes.into_parts();
+        let (bytes, _) = encoded.item.into_parts();
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(map[&log_schema().message_key().to_string()], message);
@@ -590,7 +594,7 @@ mod integration_tests {
         let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, events) = random_lines_with_stream(100, 10);
+        let (lines, events) = random_lines_with_stream(100, 10, None);
         sink.run(events).await.unwrap();
 
         let keys = get_keys(prefix.unwrap()).await;
@@ -620,7 +624,7 @@ mod integration_tests {
         let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, _events) = random_lines_with_stream(100, 30);
+        let (lines, _events) = random_lines_with_stream(100, 30, None);
 
         let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
             let mut e = Event::from(line);
@@ -665,7 +669,7 @@ mod integration_tests {
         let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, events) = random_lines_with_stream(100, 500);
+        let (lines, events) = random_lines_with_stream(100, 500, None);
         sink.run(events).await.unwrap();
 
         let keys = get_keys(prefix.unwrap()).await;
