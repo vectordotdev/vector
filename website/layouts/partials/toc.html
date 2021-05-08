@@ -1,6 +1,6 @@
 {{/* A hack to check for the presence of a TOC */}}
 {{ $hasToc := gt (len .TableOfContents) 32 }}
-{{ $isComponent := eq .Layout "component" }}
+{{ $isComponent := in (slice "component" "integrate") .Layout }}
 {{ if or $hasToc $isComponent }}
 <div class="pb-16">
   <p class="uppercase font-semibold text-md dark:text-gray-200 text-gray-600 mb-3">
