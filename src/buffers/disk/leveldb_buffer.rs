@@ -14,7 +14,7 @@ use std::{
     collections::VecDeque,
     convert::TryInto,
     mem::size_of,
-    path::PathBuf,
+    path::{Path, PathBuf},
     pin::Pin,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -343,7 +343,7 @@ pub struct Buffer;
 /// This function does not solve the problem -- LevelDB will still map 1000
 /// files if it wants -- but we at least avoid forcing this to happen at the
 /// start of vector.
-fn db_initial_size(path: &PathBuf) -> Result<usize, Error> {
+fn db_initial_size(path: &Path) -> Result<usize, Error> {
     let mut options = Options::new();
     options.create_if_missing = true;
     let db: Database<Key> = Database::open(&path, options).with_context(|| DataDirOpenError {
