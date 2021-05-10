@@ -46,10 +46,10 @@ impl SignalHandler {
 
     /// Takes a stream who's elements are convertible to `SignalTo`, and spawns a permanent
     /// task for transmitting to the receiver.
-    pub fn add<T, S>(&mut self, stream: S)
+    pub fn forever<T, S>(&mut self, stream: S)
     where
         T: Into<SignalTo> + Send + Sync,
-        S: Stream<Item = T> + 'static + Send + Sync,
+        S: Stream<Item = T> + 'static + Send,
     {
         let tx = self.tx.clone();
 
@@ -68,15 +68,15 @@ impl SignalHandler {
     /// Takes a stream, sending to the underlying signal receiver. Returns a broadcast tx
     /// channel which can be used by the caller to either subscribe to cancelation, or trigger
     /// it. Useful for providers that may need to do both.
-    pub fn with_shutdown<T, S>(&mut self, stream: S) -> ShutdownTx
+    pub fn add<T, S>(&mut self, stream: S)
     where
-        T: Into<SignalTo> + Send + Sync,
-        S: Stream<Item = T> + 'static + Send + Sync,
+        T: Into<SignalTo> + Send,
+        S: Stream<Item = T> + 'static + Send,
     {
         let (shutdown_tx, mut shutdown_rx) = broadcast::channel::<()>(2);
         let tx = self.tx.clone();
 
-        self.shutdown_txs.push(shutdown_tx.clone());
+        self.shutdown_txs.push(shutdown_tx);
 
         tokio::spawn(async move {
             tokio::pin!(stream);
@@ -99,12 +99,10 @@ impl SignalHandler {
                 }
             }
         });
-
-        shutdown_tx
     }
 
-    /// Triggers a shutdown on the underlying broadcast channel(s).
-    pub fn trigger_shutdown(&mut self) {
+    /// Shutdown active signal handlers.
+    pub fn clear(&mut self) {
         for shutdown_tx in self.shutdown_txs.drain(..) {
             // An error just means the channel was already shut down; safe to ignore.
             let _ = shutdown_tx.send(());

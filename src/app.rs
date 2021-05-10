@@ -112,6 +112,7 @@ impl Application {
             rt.block_on(async move {
                 // Signal handler for OS and provider messages.
                 let (mut signal_handler, signal_rx) = signal::SignalHandler::new();
+                signal_handler.forever(signal::os_signals());
 
                 if let Some(s) = sub_command {
                     let code = match s {

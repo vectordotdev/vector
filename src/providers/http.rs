@@ -8,11 +8,13 @@ use crate::{
     signal,
     tls::{TlsOptions, TlsSettings},
 };
+use async_stream::stream;
+use bytes::Buf;
+use futures::Stream;
 use hyper::Body;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use tokio::{sync::mpsc, time};
-use tokio_stream::wrappers::ReceiverStream;
+use tokio::time;
 use url::Url;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -50,11 +52,12 @@ impl Default for HttpConfig {
     }
 }
 
+/// Makes an HTTP request to the provided endpoint, returning the String body.
 async fn http_request(
     url: &Url,
     tls_options: &Option<TlsOptions>,
     headers: &IndexMap<String, String>,
-) -> std::result::Result<String, &'static str> {
+) -> std::result::Result<bytes::Bytes, &'static str> {
     let tls_settings = TlsSettings::from_options(tls_options).map_err(|_| "Invalid TLS options")?;
     let http_client = HttpClient::<Body>::new(tls_settings).map_err(|_| "Invalid TLS settings")?;
 
@@ -87,7 +90,7 @@ async fn http_request(
 
     info!(message = "Response received.", url = ?url.as_str());
 
-    let body = hyper::body::to_bytes(response.into_body())
+    hyper::body::to_bytes(response.into_body())
         .await
         .map_err(|err| {
             let message = "Error interpreting response.";
@@ -97,9 +100,7 @@ async fn http_request(
                     error = ?cause);
 
             message
-        })?;
-
-    Ok(String::from_utf8_lossy(body.as_ref()).to_string())
+        })
 }
 
 /// Calls `http_request`, serializing the result to a `ConfigBuilder`.
@@ -112,13 +113,40 @@ async fn http_request_to_config_builder(
         .await
         .map_err(|e| vec![e.to_owned()])?;
 
-    let (config_builder, warnings) = config::load(config_str.as_bytes(), None)?;
+    let (config_builder, warnings) = config::load(config_str.chunk(), None)?;
 
     for warning in warnings.into_iter() {
         warn!("{}", warning);
     }
 
     Ok(config_builder)
+}
+
+/// Polls the HTTP endpoint after/every `poll_interval_secs`, returning a stream of `ConfigBuilder`.
+fn poll_http(
+    poll_interval_secs: u64,
+    url: Url,
+    tls_options: Option<TlsOptions>,
+    headers: IndexMap<String, String>,
+) -> impl Stream<Item = signal::SignalTo> {
+    let duration = time::Duration::from_secs(poll_interval_secs);
+    let mut interval = time::interval_at(time::Instant::now() + duration, duration);
+
+    stream! {
+        loop {
+            interval.tick().await;
+
+            match http_request_to_config_builder(&url, &tls_options, &headers).await {
+                Ok(config_builder) => yield signal::SignalTo::ReloadFromConfigBuilder(config_builder),
+                Err(_) => return,
+            };
+
+            info!(
+                message = "HTTP provider is waiting.",
+                poll_interval_secs = ?poll_interval_secs,
+                url = ?url.as_str());
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -128,52 +156,22 @@ impl ProviderConfig for HttpConfig {
         let url = self
             .url
             .take()
-            .ok_or(vec!["URL is required for the `http` provider.".to_owned()])?;
+            .ok_or_else(|| vec!["URL is required for the `http` provider.".to_owned()])?;
 
         let tls_options = self.tls_options.take();
         let poll_interval_secs = self.poll_interval_secs;
         let request = self.request.clone();
 
-        let (signal_tx, signal_rx) = mpsc::channel(2);
-
-        let mut shutdown_rx = signal_handler
-            .with_shutdown(ReceiverStream::new(signal_rx))
-            .subscribe();
-
         let config_builder =
             http_request_to_config_builder(&url, &tls_options, &request.headers).await?;
 
-        tokio::spawn(async move {
-            let mut interval = time::interval(time::Duration::from_secs(poll_interval_secs));
-
-            loop {
-                tokio::select! {
-                    biased;
-
-                    _ = shutdown_rx.recv() => break,
-                    _ = interval.tick() => {
-                        if signal_tx.is_closed() {
-                            info!("Provider control channel has gone away.");
-                            break;
-                        }
-
-                        match http_request_to_config_builder(&url, &tls_options, &request.headers).await {
-                            Ok(config_builder) => {
-                                if signal_tx.send(signal::SignalTo::ReloadFromConfigBuilder(config_builder)).await.is_err() {
-                                    info!("Signal channel has gone away.");
-                                }
-                            },
-                            Err(_) => continue,
-                        }
-
-                        info!(
-                            message = "HTTP provider is waiting.",
-                            poll_interval_secs = ?poll_interval_secs,
-                            url = ?url.as_str());
-                    }
-                }
-            }
-        });
+        // Start a stream that yields
+        signal_handler.add(poll_http(
+            poll_interval_secs,
+            url,
+            tls_options,
+            request.headers.clone(),
+        ));
 
         Ok(config_builder)
     }
