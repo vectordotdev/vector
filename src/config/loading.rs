@@ -94,32 +94,22 @@ pub async fn load_from_paths_with_provider(
     config_paths: &[(PathBuf, FormatHint)],
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Config, Vec<String>> {
-    let (builder, load_warnings) = load_builder_from_paths(config_paths)?;
+    let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
     validation::check_provider(&builder)?;
 
-    match builder.provider {
-        Some(mut provider) => match provider.build(signal_handler).await {
-            Ok(config) => {
-                debug!(message = "Provider configured.", provider = ?provider.provider_type());
-                load_from_str(&config, None)
-            }
-            Err(err) => Err(vec![format!("provider error: {}", err)]),
-        },
-        _ => {
-            let (config, build_warnings) = builder.build_with_warnings()?;
-
-            // Trigger a shutdown in the signal handler, which will terminate any provider
-            // streams that may exist prior to loading this configuration to prevent any
-            // in-flight polling/retrieval.
-            signal_handler.trigger_shutdown();
-
-            for warning in load_warnings.into_iter().chain(build_warnings) {
-                warn!("{}", warning);
-            }
-
-            Ok(config)
-        }
+    // If there's a provider, overwrite the existing config builder with the remote variant.
+    if let Some(mut provider) = builder.provider {
+        builder = provider.build(signal_handler).await?;
+        debug!(message = "Provider configured.", provider = ?provider.provider_type());
     }
+
+    let (new_config, build_warnings) = builder.build_with_warnings()?;
+
+    for warning in load_warnings.into_iter().chain(build_warnings) {
+        warn!("{}", warning);
+    }
+
+    Ok(new_config)
 }
 
 pub fn load_builder_from_paths(
@@ -193,7 +183,7 @@ fn open_config(path: &Path) -> Option<File> {
     }
 }
 
-fn load(
+pub fn load(
     mut input: impl std::io::Read,
     format: FormatHint,
 ) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {

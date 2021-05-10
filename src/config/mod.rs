@@ -36,7 +36,7 @@ pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
 pub use loading::{
-    load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
+    load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
     merge_path_lists, process_paths, CONFIG_PATHS,
 };
 pub use unit_test::build_unit_tests_main as build_unit_tests;

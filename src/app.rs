@@ -242,8 +242,8 @@ impl Application {
                 tokio::select! {
                     Some(signal) = signals.recv() => {
                         match signal {
-                            SignalTo::ReloadFromString(new_config) => {
-                                match config::load_from_str(&new_config, None) {
+                            SignalTo::ReloadFromConfigBuilder(config_builder) => {
+                                match config_builder.build().map_err(handle_config_errors) {
                                     Ok(mut new_config) => {
                                         new_config.healthchecks.set_require_healthy(opts.require_healthy);
                                         match topology
