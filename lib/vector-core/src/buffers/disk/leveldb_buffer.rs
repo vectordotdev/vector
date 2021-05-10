@@ -27,8 +27,7 @@ use super::{DataDirOpenError, Error};
 use crate::buffers::Acker;
 
 /// How much of disk buffer needs to be deleted before we trigger compaction.
-/// <0,1>
-const MAX_UNCOMPACTED: f64 = 0.1;
+const MAX_UNCOMPACTED_DENOMINATOR: usize = 10;
 
 #[derive(Copy, Clone, Debug)]
 struct Key(pub usize);
@@ -356,10 +355,12 @@ impl super::DiskBuffer for Buffer {
     type Writer = Writer;
     type Reader = Reader;
 
+    // We convert `max_size` into an f64 at
+    #[allow(clippy::cast_precision_loss)]
     fn build(path: PathBuf, max_size: usize) -> Result<(Self::Writer, Self::Reader, Acker), Error> {
         // New `max_size` of the buffer is used for storing the unacked events.
         // The rest is used as a buffer which when filled triggers compaction.
-        let max_uncompacted_size = (max_size as f64 * MAX_UNCOMPACTED) as usize;
+        let max_uncompacted_size = max_size / MAX_UNCOMPACTED_DENOMINATOR;
         let max_size = max_size - max_uncompacted_size;
 
         let initial_size = db_initial_size(&path)?;
@@ -377,7 +378,7 @@ impl super::DiskBuffer for Buffer {
         let tail;
         {
             let mut iter = db.keys_iter(ReadOptions::new());
-            head = iter.next().map(|k| k.0).unwrap_or(0);
+            head = iter.next().map_or(0, |k| k.0);
             iter.seek_to_last();
             tail = if iter.valid() { iter.key().0 + 1 } else { 0 };
         }

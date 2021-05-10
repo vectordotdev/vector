@@ -1,10 +1,8 @@
-use crate::{config::Resource, event::Event, internal_events::EventOut};
-
-use futures::{channel::mpsc, task::AtomicWaker, Sink, SinkExt, Stream};
+use crate::event::Event;
+use futures::{channel::mpsc, task::AtomicWaker, Sink, SinkExt};
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
 use std::{
-    path::PathBuf,
     pin::Pin,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -13,35 +11,8 @@ use std::{
     task::{Context, Poll},
 };
 
-#[cfg(feature = "leveldb")]
+#[cfg(feature = "disk-buffer")]
 pub mod disk;
-
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
-pub enum BufferConfig {
-    Memory {
-        #[serde(default = "BufferConfig::memory_max_events")]
-        max_events: usize,
-        #[serde(default)]
-        when_full: WhenFull,
-    },
-    #[cfg(feature = "leveldb")]
-    Disk {
-        max_size: usize,
-        #[serde(default)]
-        when_full: WhenFull,
-    },
-}
-
-impl Default for BufferConfig {
-    fn default() -> Self {
-        BufferConfig::Memory {
-            max_events: BufferConfig::memory_max_events(),
-            when_full: Default::default(),
-        }
-    }
-}
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -63,7 +34,7 @@ impl Default for WhenFull {
 #[derive(Clone)]
 pub enum BufferInputCloner {
     Memory(mpsc::Sender<Event>, WhenFull),
-    #[cfg(feature = "leveldb")]
+    #[cfg(feature = "disk-buffer")]
     Disk(disk::Writer, WhenFull),
 }
 
@@ -81,7 +52,7 @@ impl BufferInputCloner {
                 }
             }
 
-            #[cfg(feature = "leveldb")]
+            #[cfg(feature = "disk-buffer")]
             BufferInputCloner::Disk(writer, when_full) => {
                 let inner = writer.clone();
                 if when_full == &WhenFull::DropNewest {
@@ -94,65 +65,6 @@ impl BufferInputCloner {
     }
 }
 
-impl BufferConfig {
-    #[inline]
-    const fn memory_max_events() -> usize {
-        500
-    }
-
-    #[cfg_attr(not(feature = "leveldb"), allow(unused))]
-    pub fn build(
-        &self,
-        data_dir: &Option<PathBuf>,
-        sink_name: &str,
-    ) -> Result<
-        (
-            BufferInputCloner,
-            Box<dyn Stream<Item = Event> + Send>,
-            Acker,
-        ),
-        String,
-    > {
-        match &self {
-            BufferConfig::Memory {
-                max_events,
-                when_full,
-            } => {
-                let (tx, rx) = mpsc::channel(*max_events);
-                let tx = BufferInputCloner::Memory(tx, *when_full);
-                let rx = Box::new(rx);
-                Ok((tx, rx, Acker::Null))
-            }
-
-            #[cfg(feature = "leveldb")]
-            BufferConfig::Disk {
-                max_size,
-                when_full,
-            } => {
-                let data_dir = data_dir
-                    .as_ref()
-                    .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?;
-                let buffer_dir = format!("{}_buffer", sink_name);
-
-                let (tx, rx, acker) = disk::open(&data_dir, buffer_dir.as_ref(), *max_size)
-                    .map_err(|error| error.to_string())?;
-                let tx = BufferInputCloner::Disk(tx, *when_full);
-                Ok((tx, rx, acker))
-            }
-        }
-    }
-
-    /// Resources that the sink is using.
-    #[cfg_attr(not(feature = "leveldb"), allow(unused))]
-    pub fn resources(&self, sink_name: &str) -> Vec<Resource> {
-        match self {
-            BufferConfig::Memory { .. } => Vec::new(),
-            #[cfg(feature = "leveldb")]
-            BufferConfig::Disk { .. } => vec![Resource::DiskBuffer(sink_name.to_string())],
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum Acker {
     Disk(Arc<AtomicUsize>, Arc<AtomicWaker>),
@@ -160,12 +72,12 @@ pub enum Acker {
 }
 
 impl Acker {
-    // This method should be called by a sink to indicate that it has successfully
-    // flushed the next `num` events from its input stream. If there are events that
-    // have flushed, but events that came before them in the stream have not been flushed,
-    // the later events must _not_ be acked until all preceding elements are also acked.
-    // This is primary used by the on-disk buffer to know which events are okay to
-    // delete from disk.
+    // This method should be called by a sink to indicate that it has
+    // successfully flushed the next `num` events from its input stream. If
+    // there are events that have flushed, but events that came before them in
+    // the stream have not been flushed, the later events must _not_ be acked
+    // until all preceding elements are also acked.  This is primary used by the
+    // on-disk buffer to know which events are okay to delete from disk.
     pub fn ack(&self, num: usize) {
         // Only ack items if the amount to ack is larger than zero.
         if num > 0 {
@@ -176,7 +88,9 @@ impl Acker {
                     notifier.wake();
                 }
             }
-            emit!(EventOut { count: num });
+
+            // TODO re-enable
+            // emit!(EventOut { count: num });
         }
     }
 
@@ -243,7 +157,7 @@ impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
 
 #[cfg(test)]
 mod test {
-    use super::{Acker, BufferConfig, DropWhenFull, WhenFull};
+    use super::{Acker, DropWhenFull};
     use futures::{channel::mpsc, future, task::AtomicWaker, Sink, Stream};
     use std::{
         sync::{atomic::AtomicUsize, Arc},
@@ -294,57 +208,5 @@ mod test {
         assert!(!mock.is_woken());
         acker.ack(1);
         assert!(mock.is_woken());
-    }
-
-    #[test]
-    fn config_default_values() {
-        fn check(source: &str, config: BufferConfig) {
-            let conf: BufferConfig = toml::from_str(source).unwrap();
-            assert_eq!(toml::to_string(&conf), toml::to_string(&config));
-        }
-
-        check(
-            r#"
-          type = "memory"
-          "#,
-            BufferConfig::Memory {
-                max_events: 500,
-                when_full: WhenFull::Block,
-            },
-        );
-
-        check(
-            r#"
-          type = "memory"
-          max_events = 100
-          "#,
-            BufferConfig::Memory {
-                max_events: 100,
-                when_full: WhenFull::Block,
-            },
-        );
-
-        check(
-            r#"
-          type = "memory"
-          when_full = "drop_newest"
-          "#,
-            BufferConfig::Memory {
-                max_events: 500,
-                when_full: WhenFull::DropNewest,
-            },
-        );
-
-        #[cfg(feature = "leveldb")]
-        check(
-            r#"
-          type = "disk"
-          max_size = 1024
-          "#,
-            BufferConfig::Disk {
-                max_size: 1024,
-                when_full: WhenFull::Block,
-            },
-        );
     }
 }
