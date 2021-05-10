@@ -38,6 +38,7 @@ pub struct ApplicationConfig {
     #[cfg(feature = "api")]
     pub api: config::api::Options,
     pub signal_handler: signal::SignalHandler,
+    pub signal_rx: signal::SignalRx,
 }
 
 pub struct Application {
@@ -110,8 +111,7 @@ impl Application {
 
             rt.block_on(async move {
                 // Signal handler for OS and provider messages.
-                let mut signal_handler = signal::SignalHandler::new();
-                signal_handler.add(signal::os_signals());
+                let (mut signal_handler, signal_rx) = signal::SignalHandler::new();
 
                 if let Some(s) = sub_command {
                     let code = match s {
@@ -183,6 +183,7 @@ impl Application {
                     #[cfg(feature = "api")]
                     api,
                     signal_handler,
+                    signal_rx,
                 })
             })
         }?;
@@ -208,7 +209,7 @@ impl Application {
         let api_config = self.config.api;
 
         let mut signal_handler = self.config.signal_handler;
-        let mut signals = signal_handler.take_rx().expect("no signal receiver");
+        let mut signal_rx = self.config.signal_rx;
 
         // Any internal_logs sources will have grabbed a copy of the
         // early buffer by this point and set up a subscriber.
@@ -240,7 +241,7 @@ impl Application {
 
             let signal = loop {
                 tokio::select! {
-                    Some(signal) = signals.recv() => {
+                    Some(signal) = signal_rx.recv() => {
                         match signal {
                             SignalTo::ReloadFromConfigBuilder(config_builder) => {
                                 match config_builder.build().map_err(handle_config_errors) {
@@ -325,7 +326,7 @@ impl Application {
                     emit!(VectorStopped);
                     tokio::select! {
                         _ = topology.stop() => (), // Graceful shutdown finished
-                        _ = signals.recv() => {
+                        _ = signal_rx.recv() => {
                             // It is highly unlikely that this event will exit from topology.
                             emit!(VectorQuit);
                             // Dropping the shutdown future will immediately shut the server down

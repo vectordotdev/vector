@@ -23,21 +23,20 @@ pub enum SignalTo {
 /// OS signals and providers to surface control events to the root of the application.
 pub struct SignalHandler {
     tx: SignalTx,
-    rx: Option<SignalRx>,
     shutdown_txs: Vec<ShutdownTx>,
 }
 
 impl SignalHandler {
     /// Create a new signal handler. We'll have space for 2 control messages at a time, to
     /// ensure the channel isn't blocking.
-    pub fn new() -> Self {
+    pub fn new() -> (Self, SignalRx) {
         let (tx, rx) = mpsc::channel(2);
-
-        Self {
+        let handler = Self {
             tx,
-            rx: Some(rx),
             shutdown_txs: vec![],
-        }
+        };
+
+        (handler, rx)
     }
 
     /// Clones the transmitter.
@@ -110,18 +109,6 @@ impl SignalHandler {
             // An error just means the channel was already shut down; safe to ignore.
             let _ = shutdown_tx.send(());
         }
-    }
-
-    /// Takes the receiver, replacing it with `None`. A controller is intended to have only one
-    /// consumer, typically at the root of the application.
-    pub fn take_rx(&mut self) -> Option<SignalRx> {
-        self.rx.take()
-    }
-}
-
-impl Default for SignalHandler {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
