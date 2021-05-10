@@ -146,6 +146,7 @@ impl BatchNotifier {
     }
 
     /// Update this notifier's status from the status of a finalized event.
+    #[allow(clippy::missing_panics_doc)] // Panic is unreachable
     fn update_status(&self, status: EventStatus) {
         // The status starts as Delivered and can only change if the new
         // status is different than that.
@@ -191,6 +192,7 @@ pub enum BatchStatus {
 
 impl BatchStatus {
     /// Update this status with another batch's delivery status, and return the result.
+    #[allow(clippy::match_same_arms)] // False positive: https://github.com/rust-lang/rust-clippy/issues/860
     fn update(self, status: EventStatus) -> Self {
         match (self, status) {
             // `Dropped` and `Delivered` do not change the status.
@@ -233,7 +235,12 @@ impl AtomInteger for EventStatus {}
 
 impl EventStatus {
     /// Update this status with another event's finalization status and return the result.
-    #[allow(clippy::match_same_arms)] // https://github.com/rust-lang/rust-clippy/issues/860
+    ///
+    /// # Panics
+    ///
+    /// Passing a new status of `Dropped` is a programming error and
+    /// will panic in debug/test builds.
+    #[allow(clippy::match_same_arms)] // False positive: https://github.com/rust-lang/rust-clippy/issues/860
     pub fn update(self, status: Self) -> Self {
         match (self, status) {
             // `Recorded` always overwrites existing status and is never updated
@@ -371,7 +378,7 @@ mod tests {
 
     #[test]
     fn event_status_updates() {
-        use EventStatus::*;
+        use EventStatus::{Delivered, Dropped, Errored, Failed, Recorded};
 
         assert_eq!(Dropped.update(Dropped), Dropped);
         assert_eq!(Dropped.update(Delivered), Delivered);
@@ -406,7 +413,7 @@ mod tests {
 
     #[test]
     fn batch_status_update() {
-        use BatchStatus::*;
+        use BatchStatus::{Delivered, Errored, Failed};
 
         assert_eq!(Delivered.update(EventStatus::Dropped), Delivered);
         assert_eq!(Delivered.update(EventStatus::Delivered), Delivered);
