@@ -1,43 +1,11 @@
 #[cfg(feature = "api")]
 use super::api;
 use super::{
-    compiler, default_data_dir, provider::ProviderConfig, Config, GlobalOptions,
-    HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, TestDefinition, TransformConfig,
-    TransformOuter,
+    compiler, default_data_dir, provider, Config, GlobalOptions, HealthcheckOptions, SinkConfig,
+    SinkOuter, SourceConfig, TestDefinition, TransformConfig, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-
-/// A "bootstrapping" config can either contain a [provider] key and top-level types, or
-/// top-level types and topology. This directs serialization accordingly.
-#[derive(Deserialize, Serialize, Debug)]
-pub enum Builder {
-    Config(ConfigBuilder),
-    Provider(ProviderBuilder),
-}
-
-impl Builder {
-    pub fn is_provider(&self) -> bool {
-        matches!(self, Self::Provider(_))
-    }
-
-    pub fn into_config_builder(self) -> ConfigBuilder {
-        match self {
-            Self::Config(builder) => builder,
-            Self::Provider(builder) => builder.into(),
-        }
-    }
-
-    pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
-        match (self, with) {
-            (Self::Config(mut config_builder), Self::Config(with)) => config_builder.append(with),
-            (Self::Provider(mut provider_builder), Self::Provider(with)) => {
-                provider_builder.append(with)
-            }
-            _ => Err(vec!["Conflicting builder type".to_owned()]),
-        }
-    }
-}
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -57,6 +25,7 @@ pub struct ConfigBuilder {
     pub transforms: IndexMap<String, TransformOuter>,
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
+    pub provider: Option<Box<dyn provider::ProviderConfig>>,
 }
 
 impl Clone for ConfigBuilder {
@@ -81,6 +50,7 @@ impl From<Config> for ConfigBuilder {
             sources: c.sources,
             sinks: c.sinks,
             transforms: c.transforms,
+            provider: None,
             tests: c.tests,
         }
     }
@@ -140,6 +110,8 @@ impl ConfigBuilder {
             errors.push(error);
         }
 
+        self.provider = with.provider;
+
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
             self.global.data_dir = with.global.data_dir;
         } else if with.global.data_dir != default_data_dir()
@@ -188,73 +160,5 @@ impl ConfigBuilder {
         self.tests.extend(with.tests);
 
         Ok(())
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Default)]
-#[serde(deny_unknown_fields)]
-pub struct ProviderBuilder {
-    #[serde(flatten)]
-    pub global: GlobalOptions,
-    #[cfg(feature = "api")]
-    #[serde(default)]
-    pub api: api::Options,
-    #[serde(default)]
-    pub healthchecks: HealthcheckOptions,
-    pub tests: Vec<TestDefinition>,
-    pub provider: Option<Box<dyn ProviderConfig>>,
-}
-
-impl ProviderBuilder {
-    pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
-        let mut errors = Vec::new();
-
-        #[cfg(feature = "api")]
-        if let Err(error) = self.api.merge(with.api) {
-            errors.push(error);
-        }
-
-        if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
-            self.global.data_dir = with.global.data_dir;
-        } else if with.global.data_dir != default_data_dir()
-            && self.global.data_dir != with.global.data_dir
-        {
-            // If two configs both set 'data_dir' and have conflicting values
-            // we consider this an error.
-            errors.push("conflicting values for 'data_dir' found".to_owned());
-        }
-
-        // If the user has multiple config files, we must *merge* log schemas
-        // until we meet a conflict, then we are allowed to error.
-        if let Err(merge_errors) = self.global.log_schema.merge(&with.global.log_schema) {
-            errors.extend(merge_errors);
-        }
-
-        self.healthchecks.merge(with.healthchecks);
-
-        with.tests.iter().for_each(|wt| {
-            if self.tests.iter().any(|t| t.name == wt.name) {
-                errors.push(format!("duplicate test name found: {}", wt.name));
-            }
-        });
-        if !errors.is_empty() {
-            return Err(errors);
-        }
-
-        self.tests.extend(with.tests);
-
-        Ok(())
-    }
-}
-
-impl From<ProviderBuilder> for ConfigBuilder {
-    fn from(provider_builder: ProviderBuilder) -> Self {
-        Self {
-            global: provider_builder.global,
-            #[cfg(feature = "api")]
-            api: provider_builder.api,
-            healthchecks: provider_builder.healthchecks,
-            ..Self::default()
-        }
     }
 }
