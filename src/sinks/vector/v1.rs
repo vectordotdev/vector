@@ -1,7 +1,8 @@
 use crate::{
     config::{DataType, GenerateConfig, Resource, SinkContext},
     event::{proto, Event},
-    sinks::util::{tcp::TcpSinkConfig, EncodedEvent, Healthcheck, VectorSink},
+    sinks::util::{tcp::TcpSinkConfig, EncodedEvent},
+    sinks::{Healthcheck, VectorSink},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };

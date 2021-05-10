@@ -3,8 +3,8 @@ use crate::{
     event::Event,
     proto::vector as proto,
     sinks::util::{
-        retries::RetryLogic, sink, BatchConfig, BatchSettings, BatchSink, EncodedLength,
-        ServiceBuilderExt, TowerRequestConfig, VecBuffer,
+        retries::RetryLogic, sink, BatchConfig, BatchSettings, BatchSink, EncodedEvent,
+        EncodedLength, ServiceBuilderExt, TowerRequestConfig, VecBuffer,
     },
     sinks::{Healthcheck, VectorSink},
 };
@@ -196,10 +196,12 @@ impl tower::Service<Vec<proto::EventRequest>> for Client {
     }
 }
 
-fn encode_event(event: Event) -> proto::EventRequest {
-    proto::EventRequest {
+fn encode_event(event: Event) -> EncodedEvent<proto::EventRequest> {
+    let request = proto::EventRequest {
         message: Some(event.into()),
-    }
+    };
+
+    EncodedEvent::new(request)
 }
 
 impl EncodedLength for proto::EventRequest {
