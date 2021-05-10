@@ -249,73 +249,75 @@ impl RetryLogic for VectorGrpcRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    // use crate::{
-    //     config::SinkContext,
-    //     sinks::util::test::build_test_server,
-    //     test_util::{next_addr, random_lines_with_stream},
-    // };
-    // use bytes::Bytes;
-    // use futures::{channel::mpsc, stream, StreamExt};
-    // use http::request::Parts;
-    // use hyper::Method;
+    use crate::{
+        config::SinkContext,
+        sinks::util::test::build_test_server,
+        test_util::{next_addr, random_lines_with_stream},
+    };
+    use bytes::Bytes;
+    use futures::{channel::mpsc, stream, StreamExt};
+    use http::request::Parts;
+    use hyper::Method;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<VectorConfig>();
     }
 
-    // #[tokio::test]
-    // async fn deliver_message() {
-    //     let num_lines = 1000;
+    #[tokio::test]
+    async fn deliver_message() {
+        let num_lines = 10;
 
-    //     let in_addr = next_addr();
+        let in_addr = next_addr();
 
-    //     let config = r#"
-    //     address = "http://$IN_ADDR/"
-    // "#
-    //     .replace("$IN_ADDR", &format!("{}", in_addr));
-    //     let config: VectorConfig = toml::from_str(&config).unwrap();
+        let config = r#"
+        address = "http://$IN_ADDR/"
+    "#
+        .replace("$IN_ADDR", &format!("{}", in_addr));
+        let config: VectorConfig = toml::from_str(&config).unwrap();
 
-    //     let cx = SinkContext::new_test();
+        let cx = SinkContext::new_test();
 
-    //     let (sink, _) = config.build(cx).await.unwrap();
-    //     let (rx, trigger, server) = build_test_server(in_addr);
+        let (sink, _) = config.build(cx).await.unwrap();
+        let (rx, trigger, server) = build_test_server(in_addr);
 
-    //     let (_input_lines, events) = random_lines_with_stream(1, num_lines);
-    //     let pump = sink.run(events);
+        let (_input_lines, events) = random_lines_with_stream(1, num_lines, None);
+        let pump = sink.run(events);
 
-    //     tokio::spawn(server);
+        tokio::spawn(server);
 
-    //     pump.await.unwrap();
-    //     drop(trigger);
+        pump.await.unwrap();
+        drop(trigger);
 
-    //     let _output_lines = get_received(rx, |parts| {
-    //         assert_eq!(Method::POST, parts.method);
-    //         assert_eq!("/vector.Vector/PushEvents", parts.uri.path());
-    //         assert_eq!(
-    //             "application/grpc",
-    //             parts.headers.get("content-type").unwrap().to_str().unwrap()
-    //         );
-    //     })
-    //     .await;
+        let _output_lines = get_received(rx, |parts| {
+            assert_eq!(Method::POST, parts.method);
+            assert_eq!("/vector.Vector/PushEvents", parts.uri.path());
+            assert_eq!(
+                "application/grpc",
+                parts.headers.get("content-type").unwrap().to_str().unwrap()
+            );
+        })
+        .await;
 
-    //     // TODO: decode messages and compare...
-    //     // assert_eq!(num_lines, output_lines.len());
-    //     // assert_eq!(input_lines, output_lines);
-    // }
+        // TODO: decode messages and compare...
+        // assert_eq!(num_lines, output_lines.len());
+        // assert_eq!(input_lines, output_lines);
+    }
 
-    // async fn get_received(
-    //     rx: mpsc::Receiver<(Parts, Bytes)>,
-    //     assert_parts: impl Fn(Parts),
-    // ) -> Vec<String> {
-    //     rx.flat_map(|(parts, _body)| {
-    //         assert_parts(parts);
+    async fn get_received(
+        rx: mpsc::Receiver<(Parts, Bytes)>,
+        assert_parts: impl Fn(Parts),
+    ) -> Vec<String> {
+        rx.flat_map(|(parts, body)| {
+            assert_parts(parts);
 
-    //         // TODO: decode message and compare...
-    //         stream::iter("".lines())
-    //     })
-    //     .map(ToOwned::to_owned)
-    //     .collect::<Vec<_>>()
-    //     .await
-    // }
+            // TODO: decode message and compare...
+            let _req = crate::event::proto::EventWrapper::decode(body);
+
+            stream::iter("".lines())
+        })
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>()
+        .await
+    }
 }
