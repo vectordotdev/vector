@@ -20,7 +20,6 @@ components: sinks: loki: {
 				enabled:      true
 				common:       false
 				max_events:   100000
-				max_bytes:    null
 				timeout_secs: 1
 			}
 			compression: enabled: false

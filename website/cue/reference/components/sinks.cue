@@ -19,7 +19,7 @@ components: sinks: [Name=string]: {
 					type: object: {
 						examples: []
 						options: {
-							if features.send.batch.max_bytes != null {
+							if features.send.batch.max_bytes != _|_ {
 								max_bytes: {
 									common:      true
 									description: "The maximum size of a batch, in bytes, before it is flushed."
@@ -30,7 +30,7 @@ components: sinks: [Name=string]: {
 									}
 								}
 							}
-							if features.send.batch.max_events != null {
+							if features.send.batch.max_events != _|_ {
 								max_events: {
 									common:      true
 									description: "The maximum size of a batch, in events, before it is flushed."
@@ -410,10 +410,10 @@ components: sinks: [Name=string]: {
 							title: "Buffers and batches"
 							svg: "/img/buffers-and-batches-serial.svg"
 							body: #"""
-								This component buffers & batches data as shown in the diagram above. You'll notice that Vector treats these concepts
-								differently, instead of treating them as global concepts, Vector treats them
-								as sink specific concepts. This isolates sinks, ensuring services disruptions
-								are contained and delivery guarantees are honored.
+								This component buffers & batches data as shown in the diagram above. You'll notice that
+								Vector treats these concepts differently, instead of treating them as global concepts,
+								Vector treats them as sink specific concepts. This isolates sinks, ensuring services
+								disruptions are contained and delivery guarantees are honored.
 
 								*Batches* are flushed when 1 of 2 conditions are met:
 
@@ -454,22 +454,20 @@ components: sinks: [Name=string]: {
 					{
 						title: "Require health checks"
 						body: """
-								If you'd like to exit immediately upon a health
-								check failure, you can pass the
-								`--require-healthy` flag:
+							If you'd like to exit immediately upon a health check failure, you can pass the
+							`--require-healthy` flag:
 
-								```bash
-								vector --config /etc/vector/vector.toml --require-healthy
-								```
-								"""
+							```bash
+							vector --config /etc/vector/vector.toml --require-healthy
+							```
+							"""
 					},
 					{
 						title: "Disable health checks"
 						body: """
-								If you'd like to disable health checks for this
-								sink you can set the `healthcheck` option to
-								`false`.
-								"""
+							If you'd like to disable health checks for this sink you can set the `healthcheck` option to
+							`false`.
+							"""
 					},
 				]
 			}
@@ -487,7 +485,7 @@ components: sinks: [Name=string]: {
 
 						```toml title="vector.toml"
 						[sinks.my-sink]
-							dynamic_option = "application={{ application_id }}"
+						dynamic_option = "application={{ application_id }}"
 						```
 
 						In the above example, the `application_id` for each event will be
@@ -559,9 +557,8 @@ components: sinks: [Name=string]: {
 				transport_layer_security: {
 					title: "Transport Layer Security (TLS)"
 					body:  """
-						Vector uses [Openssl](\(urls.openssl)) for TLS protocols for it's
-						maturity. You can enable and adjust TLS behavior via the `tls.*`
-						options.
+						Vector uses [OpenSSL](\(urls.openssl)) for TLS protocols due to OpenSSL's maturity. You can
+						enable and adjust TLS behavior using the [`tls.*`](#tls) options.
 						"""
 				}
 			}

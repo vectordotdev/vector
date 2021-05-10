@@ -148,7 +148,7 @@ mod tests {
         let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let (expected, events) = random_lines_with_stream(100, 10);
+        let (expected, events) = random_lines_with_stream(100, 10, None);
         sink.run(events).await.unwrap();
 
         let output = rx.next().await.unwrap();

@@ -7,7 +7,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
-        BatchSettings, EncodedLength, TowerRequestConfig, VecBuffer,
+        BatchSettings, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
     },
     template::{Template, TemplateParseError},
 };
@@ -252,7 +252,7 @@ fn encode_event(
     mut event: Event,
     encoding: &EncodingConfig<Encoding>,
     message_group_id: Option<&Template>,
-) -> Option<SendMessageEntry> {
+) -> Option<EncodedEvent<SendMessageEntry>> {
     encoding.apply_rules(&mut event);
 
     let message_group_id = match message_group_id {
@@ -279,10 +279,10 @@ fn encode_event(
         Encoding::Json => serde_json::to_string(&log).expect("Error encoding event as json."),
     };
 
-    Some(SendMessageEntry {
+    Some(EncodedEvent::new(SendMessageEntry {
         message_body,
         message_group_id,
-    })
+    }))
 }
 
 #[cfg(test)]
@@ -295,7 +295,7 @@ mod tests {
         let message = "hello world".to_string();
         let event = encode_event(message.clone().into(), &Encoding::Text.into(), None).unwrap();
 
-        assert_eq!(&event.message_body, &message);
+        assert_eq!(&event.item.message_body, &message);
     }
 
     #[test]
@@ -305,7 +305,7 @@ mod tests {
         event.as_mut_log().insert("key", "value");
         let event = encode_event(event, &Encoding::Json.into(), None).unwrap();
 
-        let map: BTreeMap<String, String> = serde_json::from_str(&event.message_body).unwrap();
+        let map: BTreeMap<String, String> = serde_json::from_str(&event.item.message_body).unwrap();
 
         assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
@@ -351,7 +351,7 @@ mod integration_tests {
 
         let mut sink = SqsSink::new(config, cx, client.clone()).unwrap();
 
-        let (mut input_lines, events) = random_lines_with_stream(100, 10);
+        let (mut input_lines, events) = random_lines_with_stream(100, 10, None);
         sink.send_all(&mut events.map(Ok)).await.unwrap();
 
         sleep(Duration::from_secs(1)).await;

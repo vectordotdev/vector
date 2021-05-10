@@ -1,6 +1,9 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
+pub use finalization::{
+    BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
+};
 pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
 pub use metadata::EventMetadata;
@@ -14,17 +17,23 @@ pub use util::log::PathComponent;
 pub use util::log::PathIter;
 pub use value::Value;
 
+#[cfg(feature = "vrl")]
+pub use vrl_target::VrlTarget;
+
 pub mod discriminant;
 pub mod error;
+mod finalization;
 mod legacy_lookup;
 mod log_event;
 #[cfg(feature = "lua")]
 pub mod lua;
 pub mod merge_state;
-pub mod metadata;
+mod metadata;
 pub mod metric;
 pub mod util;
 mod value;
+#[cfg(feature = "vrl")]
+mod vrl_target;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
@@ -120,6 +129,13 @@ impl Event {
         match self {
             Self::Log(log) => log.metadata(),
             Self::Metric(metric) => metric.metadata(),
+        }
+    }
+
+    pub fn metadata_mut(&mut self) -> &mut EventMetadata {
+        match self {
+            Self::Log(log) => log.metadata_mut(),
+            Self::Metric(metric) => metric.metadata_mut(),
         }
     }
 }
@@ -578,6 +594,35 @@ impl From<LogEvent> for Event {
 impl From<Metric> for Event {
     fn from(metric: Metric) -> Self {
         Event::Metric(metric)
+    }
+}
+
+/// A wrapper for references to inner event types, where reconstituting
+/// a full `Event` from a `LogEvent` or `Metric` might be inconvenient.
+#[derive(Clone, Copy, Debug)]
+pub enum EventRef<'a> {
+    Log(&'a LogEvent),
+    Metric(&'a Metric),
+}
+
+impl<'a> From<&'a Event> for EventRef<'a> {
+    fn from(event: &'a Event) -> Self {
+        match event {
+            Event::Log(log) => log.into(),
+            Event::Metric(metric) => metric.into(),
+        }
+    }
+}
+
+impl<'a> From<&'a LogEvent> for EventRef<'a> {
+    fn from(log: &'a LogEvent) -> Self {
+        Self::Log(log)
+    }
+}
+
+impl<'a> From<&'a Metric> for EventRef<'a> {
+    fn from(metric: &'a Metric) -> Self {
+        Self::Metric(metric)
     }
 }
 

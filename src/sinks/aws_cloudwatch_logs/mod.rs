@@ -6,10 +6,11 @@ use crate::{
     internal_events::TemplateRenderingFailed,
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
+        batch::{BatchConfig, BatchSettings},
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchConfig, BatchSettings, Compression, EncodedLength, PartitionBatchSink,
-        PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
+        Compression, EncodedEvent, EncodedLength, PartitionBatchSink, PartitionBuffer,
+        PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
     },
     template::Template,
 };
@@ -440,7 +441,7 @@ fn partition_encode(
     encoding: &EncodingConfig<Encoding>,
     group: &Template,
     stream: &Template,
-) -> Option<PartitionInnerBuffer<InputLogEvent, CloudwatchKey>> {
+) -> Option<EncodedEvent<PartitionInnerBuffer<InputLogEvent, CloudwatchKey>>> {
     let group = match group.render_string(&event) {
         Ok(b) => b,
         Err(error) => {
@@ -474,7 +475,7 @@ fn partition_encode(
         )
         .ok()?;
 
-    Some(PartitionInnerBuffer::new(event, key))
+    Some(EncodedEvent::new(PartitionInnerBuffer::new(event, key)))
 }
 
 #[derive(Debug, Snafu)]
@@ -693,9 +694,8 @@ mod tests {
         let group = "group".try_into().unwrap();
         let encoding = Encoding::Text.into();
 
-        let (_event, key) = partition_encode(event, &encoding, &group, &stream)
-            .unwrap()
-            .into_parts();
+        let encoded = partition_encode(event, &encoding, &group, &stream).unwrap();
+        let (_event, key) = encoded.item.into_parts();
 
         let expected = CloudwatchKey {
             stream: "stream".into(),
@@ -715,9 +715,8 @@ mod tests {
         let group = "group".try_into().unwrap();
         let encoding = Encoding::Text.into();
 
-        let (_event, key) = partition_encode(event, &encoding, &group, &stream)
-            .unwrap()
-            .into_parts();
+        let encoded = partition_encode(event, &encoding, &group, &stream).unwrap();
+        let (_event, key) = encoded.item.into_parts();
 
         let expected = CloudwatchKey {
             stream: "stream".into(),
@@ -737,9 +736,8 @@ mod tests {
         let group = "group".try_into().unwrap();
         let encoding = Encoding::Text.into();
 
-        let (_event, key) = partition_encode(event, &encoding, &group, &stream)
-            .unwrap()
-            .into_parts();
+        let encoded = partition_encode(event, &encoding, &group, &stream).unwrap();
+        let (_event, key) = encoded.item.into_parts();
 
         let expected = CloudwatchKey {
             stream: "abcd-stream".into(),
@@ -759,9 +757,8 @@ mod tests {
         let group = "group".try_into().unwrap();
         let encoding = Encoding::Text.into();
 
-        let (_event, key) = partition_encode(event, &encoding, &group, &stream)
-            .unwrap()
-            .into_parts();
+        let encoded = partition_encode(event, &encoding, &group, &stream).unwrap();
+        let (_event, key) = encoded.item.into_parts();
 
         let expected = CloudwatchKey {
             stream: "stream-abcd".into(),
@@ -896,7 +893,7 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, events) = random_lines_with_stream(100, 11);
+        let (input_lines, events) = random_lines_with_stream(100, 11, None);
         sink.run(events).await.unwrap();
 
         let request = GetLogEventsRequest {
@@ -943,7 +940,7 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
-        let (mut input_lines, events) = random_lines_with_stream(100, 11);
+        let (mut input_lines, events) = random_lines_with_stream(100, 11, None);
 
         // add a historical timestamp to all but the first event, to simulate
         // out-of-order timestamps.
@@ -1081,7 +1078,7 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, events) = random_lines_with_stream(100, 11);
+        let (input_lines, events) = random_lines_with_stream(100, 11, None);
         sink.run(events).await.unwrap();
 
         let request = GetLogEventsRequest {
@@ -1133,7 +1130,7 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, events) = random_lines_with_stream(100, 11);
+        let (input_lines, events) = random_lines_with_stream(100, 11, None);
         let mut events = events.map(Ok);
         let _ = sink.into_sink().send_all(&mut events).await.unwrap();
 
@@ -1181,7 +1178,7 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, _events) = random_lines_with_stream(100, 10);
+        let (input_lines, _events) = random_lines_with_stream(100, 10, None);
 
         let events = input_lines
             .clone()

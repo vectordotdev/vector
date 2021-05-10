@@ -220,7 +220,7 @@ As defined in [RFC 3339][rfc_3339] format, timestamp literals support UTC and lo
 
 VRL is an expression-oriented language. A VRL program consists entirely of expressions and every expression returns a value.
 
-{{< vrl/data "expressions" >}}
+{{< vrl/dynamic-expressions >}}
 
 [regex]: https://en.wikipedia.org/wiki/Regular_expression
 [rfc3339]: https://tools.ietf.org/html/rfc3339

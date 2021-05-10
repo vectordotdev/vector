@@ -6,7 +6,8 @@ use crate::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
         retries::{RetryAction, RetryLogic},
-        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
+        BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
+        UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -111,13 +112,13 @@ impl HttpSink for ClickhouseConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         self.encoding.apply_rules(&mut event);
 
         let mut body = serde_json::to_vec(&event.as_log()).expect("Events should be valid json!");
         body.push(b'\n');
 
-        Some(body)
+        Some(EncodedEvent::new(body))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {

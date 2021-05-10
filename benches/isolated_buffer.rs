@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
 use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
     stream::{self, BoxStream},
     Sink, SinkExt, Stream, StreamExt,
 };

@@ -12,7 +12,7 @@ use crate::{
         util::{
             retries::ExponentialBackoff,
             socket_bytes_sink::{BytesSink, ShutdownCheck},
-            SinkBuildError, StreamSink,
+            EncodedEvent, SinkBuildError, StreamSink,
         },
         Healthcheck, VectorSink,
     },
@@ -86,7 +86,7 @@ impl TcpSinkConfig {
     pub fn build(
         &self,
         cx: SinkContext,
-        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
+        encode_event: impl Fn(Event) -> Option<EncodedEvent<Bytes>> + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -196,14 +196,14 @@ impl TcpConnector {
 struct TcpSink {
     connector: TcpConnector,
     acker: Acker,
-    encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
+    encode_event: Arc<dyn Fn(Event) -> Option<EncodedEvent<Bytes>> + Send + Sync>,
 }
 
 impl TcpSink {
     fn new(
         connector: TcpConnector,
         acker: Acker,
-        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
+        encode_event: impl Fn(Event) -> Option<EncodedEvent<Bytes>> + Send + Sync + 'static,
     ) -> Self {
         Self {
             connector,
@@ -254,14 +254,17 @@ impl StreamSink for TcpSink {
         // connection only when we have something to send.
         let encode_event = Arc::clone(&self.encode_event);
         let mut input = input
-            .map(|event| encode_event(event).unwrap_or_else(Bytes::new))
+            .map(|event| encode_event(event).unwrap_or_else(|| EncodedEvent::new(Bytes::new())))
             .peekable();
 
         while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
 
-            let result = match sink.send_all_peekable(&mut input).await {
+            let result = match sink
+                .send_all_peekable(&mut (&mut input).map(|item| item.item).peekable())
+                .await
+            {
                 Ok(()) => sink.close().await,
                 Err(error) => Err(error),
             };

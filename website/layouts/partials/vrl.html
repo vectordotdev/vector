@@ -1,0 +1,533 @@
+{{/* Used by several shortcodes to display info about VRL (expressions, functions, examples, etc.) */}}
+<div class="no-prose flex flex-col divide-y divide-gray-200 dark:divide-gray-700 dark:border-gray-700 border rounded-md shadow-sm">
+  {{/* Function info (/vrl/functions) */}}
+  {{ with .functions }}
+  {{ range . }}
+  {{ $name := .name }}
+  {{ $func := index site.Data.docs.remap.functions .name }}
+  {{ $infallible := not $func.internal_failure_reasons }}
+  {{ $args := $func.arguments }}
+  {{ $lastArg := sub (len $args) 1 }}
+  {{ $return := $func.return }}
+  <div class="py-4 px-6">
+    {{/* Function title */}}
+    <span class="flex justify-between items-center">
+      <h3 id="{{ $name }}" class="font-mono">
+        <a href="#{{ $name }}" class="text-white">
+          {{ $name }}
+        </a>
+      </h3>
+
+      {{/* Badges */}}
+      <span class="flex space-x-1">
+        {{ if $infallible }}
+        {{ partial "badge.html" (dict "word" "infallible" "color" "blue") }}
+        {{ else }}
+        {{ partial "badge.html" (dict "word" "fallible" "color" "red") }}
+        {{ end }}
+      </span>
+    </span>
+
+    {{/* Function description */}}
+    <div class="mt-4 text-md">
+      {{ $func.description | markdownify }}
+    </div>
+
+    {{/* Function spec, etc. */}}
+    <div class="mt-2.5 border rounded-md py-3 px-4 dark:border-gray-700">
+      <span class="font-semibold text-md">
+        Function spec
+      </span>
+
+      <div class="my-2 font-mono text-sm bg-dark dark:bg-black px-3.5 py-2.5 rounded text-gray-100">
+        <span class="text-primary dark:text-primary font-semibold">{{ $name }}</span>(
+          {{- range $idx, $arg := $args -}}
+          {{ $isLast := eq $idx $lastArg -}}
+          <span class="{{ if .required }} font-bold text-orange-400{{ else }} font-semibold text-purple-400{{ end }}">
+            {{- .name -}}
+          </span>:
+          <span class="text-gray-200"><{{ delimit .type `<span class="text-grey-500"> | </span>` }}></span>{{ if not $isLast }}, {{ end -}}
+          {{ end -}}
+        )
+        {{- with $return -}}
+        <div class="ml-3">
+          <span class="font-extrabold">::</span> <span class="text-gray-200"><{{ delimit .types " | " }}></span>
+        </div>
+        {{- end -}}
+      </div>
+
+      {{/* Function arguments */}}
+      <div class="flex flex-col space-y-2">
+        {{ range $args }}
+        {{ template "arg" . }}
+        {{ end }}
+      </div>
+
+      <div class="mt-6 flex flex-row-reverse">
+        {{ template "legend" }}
+      </div>
+
+      {{ with $func.notices }}
+      <div class="mt-3 border rounded border-yellow-400 py-3 px-4">
+        <span class="block font-semibold">
+          Notices
+        </span>
+
+        <span class="my-1.5 block">
+          This function has special behavior that you should be aware of.
+        </span>
+
+        <div class="mt-1.5 flex flex-col space-y-2">
+          {{ range . }}
+          <div class="flex space-x-5">
+            <div class="flex-shrink-0 py-1">
+              {{/* Heroicon: outline/exclamation */}}
+              <svg xmlns="http://www.w3.org/2000/svg" class="text-yellow-500 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+
+            <div class="prose dark:prose-dark prose-sm">
+              {{ . | $.Page.RenderString }}
+            </div>
+          </div>
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+  {{ end }}
+
+  {{/* Real-world examples */}}
+  {{ with .real_world_examples }}
+  {{ range . }}
+  {{ $input := dict "message" .input.log.message | jsonify }}
+  {{ $vrlSourceCode := highlight .source "toml" "" }}
+  {{ $output := .output | jsonify (dict "indent" "  ") }}
+  {{ $outputCode := highlight $output "json" "" }}
+  {{ $id := .title | urlize }}
+  <div class="py-4 px-6">
+    <span>
+      <h3 id="{{ $id }}">
+        <a href="#{{ $id }}" class="text-lg font-semibold tracking-tight">
+          {{ .title }}
+        </a>
+      </h3>
+    </span>
+
+    <div class="mt-3 flex flex-col space-y-2">
+      {{ with .input.log }}
+      {{ $json := . | jsonify (dict "indent" "  ") }}
+      {{ $code := highlight $json "json" "" }}
+      <span>
+        Given the following <a href="/docs/about/under-the-hood/architecture/data-model/log">Vector log event</a>...
+      </span>
+      {{ $code }}
+      {{ end }}
+
+      {{ with .input.metric }}
+      {{ $json := . | jsonify (dict "indent" "  ") }}
+      {{ $code := highlight $json "json" "" }}
+      <span>
+        Given the following <a href="/docs/about/under-the-hood/architecture/data-model/metric">Vector metric event</a>...
+      </span>
+      {{ $code }}
+      {{ end }}
+
+      <span>
+        ...and this VRL program...
+      </span>
+
+      {{ $vrlSourceCode }}
+
+      {{ if .raises }}
+      {{ $errorCode := highlight .raises.compiletime "ruby" "" }}
+      <span>
+        ...you should see this error:
+      </span>
+
+      {{ $errorCode }}
+      {{ else }}
+      {{ with .input.log }}
+      <span>...the following log event is output:</span>
+      {{ end }}
+
+      {{ with .input.metric }}
+      <span>...the following metric event is output:</span>
+      {{ end }}
+
+      {{ $outputCode }}
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+  {{ end }}
+
+  {{/* Compile-time errors */}}
+  {{ with .compile_time_errors }}
+  {{ range $code, $error := . }}
+  {{ $id := printf "%s %s" $code $error.title | urlize }}
+  <div class="dark:border-gray-700 py-4 px-6">
+    <span>
+      <h3 id="{{ $code }}">
+        <span class="font-mono text-secondary">
+          {{ $code }}
+        </span>
+
+        <a href="#{{ $code }}" class="text-gray-700 dark:text-white">
+          {{ $error.title }}
+        </a>
+      </h3>
+    </span>
+
+    <div x-show="open" class="mt-4">
+      {{ with $error.description }}
+      <div class="leading-tight">
+        {{ . | markdownify }}
+      </div>
+      {{ end }}
+
+      {{ with $error.rationale }}
+      <div class="mt-3">
+        <span class="font-semibold">
+          Rationale
+        </span>
+
+        <div class="mt-1 leading-tight">
+          {{ . | markdownify }}
+        </div>
+      </div>
+      {{ end }}
+
+      {{ with $error.resolution }}
+      <div class="mt-3">
+        <span class="font-semibold">
+          Resolution
+        </span>
+
+        <div class="mt-1 leading-tight">
+          {{ . | markdownify }}
+        </div>
+      </div>
+      {{ end }}
+
+      {{ with $error.examples }}
+      <div x-data="{ open: false }" class="mt-5 rounded-md px-3 py-2 dark:border-gray-700 border">
+        <span class="flex justify-between items-center">
+          <span class="font-semibold tracking-tight text-sm">
+            Examples
+          </span>
+
+          {{ template "vrl-toggler" }}
+        </span>
+
+        <div x-show="open" class="mt-2 flex flex-col divide-y dark:divide-gray-700 border rounded-sm dark:border-gray-700">
+          {{ range . }}
+          <div class="flex flex-col space-y-1 py-2.5 px-4 rounded-sm dark:border-gray-700">
+            <span class="font-semibold">
+              {{ .title }}
+            </span>
+
+            {{/* Example event (log or metric) */}}
+            {{ with .input }}
+            {{ with .log }} {{/* Log event */}}
+            {{ $json := . | jsonify (dict "indent" "  ") }}
+            <div>
+              <span class="tracking-tighter font-semibold text-sm">
+                Log event
+              </span>
+
+              {{ highlight $json "json" "" }}
+            </div>
+            {{ end }}
+
+            {{ with .metric }} {{/* Metric event */}}
+            {{ $json := . | jsonify (dict "indent" "  ") }}
+            <div>
+              <span class="tracking-tighter font-semibold text-sm">
+                Metric event
+              </span>
+
+              {{ highlight $json "json" "" }}
+            </div>
+            {{ end }}
+            {{ end }}
+
+            {{ with .source }}
+            <div>
+              <span class="tracking-tighter font-semibold text-sm">
+                VRL program
+              </span>
+
+              {{ highlight . "ruby" "" }}
+            </div>
+            {{ end }}
+
+            {{/* Example diff */}}
+            {{ with .diff }}
+            <div>
+              <span class="tracking-tighter font-semibold text-sm">
+                How to fix it
+              </span>
+
+              {{ highlight . "diff" "" }}
+            </div>
+            {{ end }}
+          </div>
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+  {{ end }}
+
+  {{/* VRL expressions */}}
+  {{ with .expressions }}
+  {{ range $k, $v := . }}
+  {{ $id := $v.title | urlize }}
+  <div class="py-4 px-6">
+    <span>
+      {{ partial "heading.html" (dict "text" $v.title "level" 3) }}
+    </span>
+
+    <div class="mt-3 prose dark:prose-dark leading-snug">
+      {{ $v.description | markdownify }}
+    </div>
+
+    {{ with $v.grammar }}
+    {{ $id := printf "%s-grammar" $k }}
+    <div class="mt-3">
+      <span>
+        {{ partial "heading.html" (dict "text" "Grammar" "level" 4 "id" $id) }}
+      </span>
+
+      <div class="mt-2">
+        {{ highlight .source "ruby" "" }}
+      </div>
+
+      {{ with .definitions }}
+      <div class="mt-3 ml-4 flex flex-col space-y-2">
+        {{ range $k, $v := . }}
+        <div>
+          <span class="font-mono font-semibold text-sm">
+            {{ $k }}
+          </span>
+
+          <div class="mt-1 ml-4 prose dark:prose-dark leading-snug prose-sm">
+            {{ $v.description | markdownify }}
+          </div>
+        </div>
+        {{ end }}
+      </div>
+      {{ end }}
+    </div>
+    {{ end }}
+
+    {{ with $v.examples }}
+    {{ $id := printf "%s-examples" $k }}
+    <div class="mt-4">
+      <span>
+        {{ partial "heading.html" (dict "text" "Examples" "level" 4 "id" $id) }}
+      </span>
+
+      <div class="mt-3 no-prose border rounded-md flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700">
+        {{ range . }}
+        {{ template "vrl-data-example" . }}
+        {{ end }}
+      </div>
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+  {{ end }}
+
+  {{/* VRL examples */}}
+  {{ with .examples }}
+  {{ range . }}
+  {{ $name := .name }}
+  {{ $link := printf "docs/reference/vrl/functions/#%s" $name | relURL }}
+  <div class="py-4 px-6">
+    <span class="text-base font-mono">
+      <h3 id="{{ $name }}">
+        <a href="#{{ $name }}">
+          {{ $name }}
+        </a>
+      </h3>
+    </span>
+
+    <div class="my-4 prose dark:prose-dark leading-snug">
+      {{ .description | markdownify }}
+    </div>
+
+    <div class="border rounded divide-y dark:border-gray-700 dark:divide-gray-700">
+      {{ range .examples }}
+      {{ $id := .title | urlize }}
+      <div class="py-3 px-5">
+        <span class="font-semibold">
+          <h4 id="{{ $id}}">
+            <a href="#{{ $id }}">
+              {{ .title }}
+            </a>
+          </h4>
+        </span>
+
+        <div class="mt-2">
+          <span>
+            Source
+          </span>
+
+          <div>
+            {{ highlight .source "ruby" "" }}
+          </div>
+        </div>
+
+        {{ with .return }}
+        <div class="mt-2.5">
+          <span>
+            Return
+          </span>
+
+          <div>
+            {{ if or (reflect.IsMap .) (reflect.IsSlice .) }}
+            {{ $json := . | jsonify (dict "indent" "  ") }}
+            {{ highlight $json "json" "" }}
+            {{ else }}
+            {{ highlight . "text" "" }}
+            {{ end }}
+          </div>
+        </div>
+        {{ end }}
+
+        <div class="mt-4 flex items-center space-x-2 justify-end">
+          <span>
+            {{/* Heroicon: outline/light-bulb */}}
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+          </span>
+
+          <span class="text-sm">
+            Learn more about the <a href="{{ $link }}" class="font-mono font-semibold text-secondary dark:text-primary">{{ $name }}</a> function
+          </span>
+        </div>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+  {{ end }}
+</div>
+
+{{ define "legend" }}
+{{/* Heroicon: outline/map */}}
+<div class="flex items-center space-x-2">
+  <svg xmlns="http://www.w3.org/2000/svg" class="text-gray-400 dark:text-gray-300 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+  </svg>
+
+  <span class="font-mono text-xs text-orange-400 font-semibold">
+    required
+  </span>
+
+  <span class="font-mono text-xs text-purple-400 font-semibold">
+    optional
+  </span>
+
+  <span class="font-mono text-xs text-gray-500 dark:text-gray-300 font-semibold">
+    &lt;types | ...&gt;
+  </span>
+</div>
+{{ end }}
+
+{{ define "arg" }}
+<div class="flex flex-col space-y-0.5">
+  <span class="flex justify-between items-center">
+    <span class="font-mono tracking-tight{{ if .required }} font-extrabold text-orange-400{{ else }} font-semibold text-purple-400{{ end }}">
+      {{ .name }}
+    </span>
+
+    <span class="font-mono text-gray-500 dark:text-gray-300 text-sm">
+      {{ delimit .type " | " }}
+    </span>
+  </span>
+
+  <div class="leading-snug ml-4">
+    {{ .description | markdownify }}
+  </div>
+</div>
+{{ end }}
+
+{{ define "vrl-toggler" }}
+<button @click="open = !open">
+  {{/* Heroicon: outline/plus */}}
+  <svg x-show="!open" xmlns="http://www.w3.org/2000/svg" class=" h-5 w-5 text-gray-600 dark:text-gray-400 hover:text-secondary dark:hover:text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+  </svg>
+
+  {{/* Heroicon: outline/minus-sm */}}
+  <svg x-show="open" xmlns="http://www.w3.org/2000/svg" class="h-5 2-5 text-gray-600 dark:text-gray-400 hover:text-secondary dark:hover:text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
+  </svg>
+</button>
+{{ end }}
+
+{{ define "vrl-data-example" }}
+<div class="py-3 px-5">
+  {{ with .title }}
+  <span class="font-bold">
+    {{ . }}
+  </span>
+  {{ end }}
+
+  <div>
+    {{ with .input }}
+    <div class="mt-2">
+      <span class="text-base">
+        Vector event
+      </span>
+
+      <div class="mt-2">
+        {{ template "code" . }}
+      </div>
+    </div>
+    {{ end }}
+
+    {{ with .source }}
+    <div class="mt-2">
+      <span class="text-base">
+        VRL program
+      </span>
+
+      <div class="mt-2">
+        {{ template "code" . }}
+      </div>
+    </div>
+    {{ end }}
+
+    {{ with .return }}
+    <div class="mt-2">
+      <span class="text-base">
+        Resulting event
+      </span>
+
+      <div class="mt-2">
+        {{ template "code" . }}
+      </div>
+    </div>
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+
+{{ define "code" }}
+{{ if or (reflect.IsMap .) (reflect.IsSlice .) }}
+{{ $json := . | jsonify (dict "indent" "  ") }}
+{{ highlight $json "ruby" "" }}
+{{ else }}
+{{ highlight . "ruby" "" }}
+{{ end }}
+{{ end }}

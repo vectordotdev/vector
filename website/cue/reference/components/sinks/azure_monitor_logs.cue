@@ -20,7 +20,6 @@ components: sinks: azure_monitor_logs: {
 				enabled:      true
 				common:       false
 				max_bytes:    30000000
-				max_events:   null
 				timeout_secs: 1
 			}
 			compression: enabled: false

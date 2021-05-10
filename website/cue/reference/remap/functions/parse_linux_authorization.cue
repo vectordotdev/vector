@@ -3,14 +3,14 @@ package metadata
 remap: functions: parse_linux_authorization: {
 	category:    "Parse"
 	description: """
-		Parses Linux authorization logs usually found under either /var/log/auth.log (for Debian based systems) or under /var/log/secure (for RedHat based system).
-		according to [Syslog](\(urls.syslog)) format.
+		Parses Linux authorization logs usually found under either `/var/log/auth.log` (for Debian-based systems) or
+		`/var/log/secure` (for RedHat-based systems) according to [Syslog](\(urls.syslog)) format.
 		"""
 	notices: [
 		"""
-			The function resolves the year for messages that don't include it. If the current month is January, and the message is for
-			December, it will take the previous year. Otherwise, take the current year.
-			""",
+		The function resolves the year for messages that don't include it. If the current month is January, and the message is for
+		December, it will take the previous year. Otherwise, take the current year.
+		""",
 	]
 
 	arguments: [
