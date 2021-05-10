@@ -96,13 +96,12 @@ pub async fn load_from_paths_with_provider(
 ) -> Result<Config, Vec<String>> {
     let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
     validation::check_provider(&builder)?;
+    signal_handler.clear();
 
     // If there's a provider, overwrite the existing config builder with the remote variant.
     if let Some(mut provider) = builder.provider {
         builder = provider.build(signal_handler).await?;
         debug!(message = "Provider configured.", provider = ?provider.provider_type());
-    } else {
-        signal_handler.clear();
     }
 
     let (new_config, build_warnings) = builder.build_with_warnings()?;

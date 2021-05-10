@@ -165,7 +165,7 @@ impl ProviderConfig for HttpConfig {
         let config_builder =
             http_request_to_config_builder(&url, &tls_options, &request.headers).await?;
 
-        // Start a stream that yields
+        // Poll for changes to remote configuration.
         signal_handler.add(poll_http(
             poll_interval_secs,
             url,
