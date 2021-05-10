@@ -255,6 +255,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     for event in &mut events {
                                         event.add_batch_notifier(Arc::clone(&batch));
                                     }
+                                    drop(batch);
 
                                     out.send_all(&mut futures::stream::iter(events).map(Ok))
                                         .map_err(move |error: crate::pipeline::ClosedError| {
@@ -267,6 +268,12 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                         .and_then(|_| async move {
                                             match receiver.await.unwrap_or(BatchStatus::Delivered) {
                                                 BatchStatus::Delivered => Ok(warp::reply()),
+                                                BatchStatus::Errored => Err(warp::reject::custom(
+                                                    ErrorMessage::new(
+                                                        StatusCode::INTERNAL_SERVER_ERROR,
+                                                        "Error delivering contents to sink".into(),
+                                                    ),
+                                                )),
                                                 BatchStatus::Failed => Err(warp::reject::custom(
                                                     ErrorMessage::new(
                                                         StatusCode::BAD_REQUEST,
