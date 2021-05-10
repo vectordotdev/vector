@@ -19,7 +19,6 @@ components: sinks: gcp_stackdriver_metrics: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    null
 				max_events:   1
 				timeout_secs: 1
 			}
