@@ -1,0 +1,35 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - cd website
+        # install golang for hugo ext
+        - curl -OL https://golang.org/dl/go1.15.7.linux-amd64.tar.gz
+        - tar -C /usr/local -xzf ./go1.15.7.linux-amd64.tar.gz
+        # download and install hugo extended
+        - wget https://github.com/gohugoio/hugo/releases/download/v0.83.1/hugo_extended_0.83.1_Linux-64bit.tar.gz
+        - tar -xf hugo_extended_0.83.1_Linux-64bit.tar.gz hugo
+        - mv hugo /usr/bin/hugo
+        - rm -rf hugo_extended_0.83.1_Linux-64bit.tar.gz
+        # add go to path
+        - GOPATH=/usr/local/go:/usr/local/go/bin
+        - PATH=$PATH:$GOPATH
+        # install cue as go module
+        - GO111MODULE=on go get cuelang.org/go/cmd/cue
+        # output versions
+        - cue version
+        - hugo version
+    build:
+      commands:
+        # - if [ "${AWS_BRANCH}" = "master" ]; then make ci-production-build; else make ci-preview-build; fi
+        - make ci-production-build
+  artifacts:
+    baseDirectory: website/public
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+      - /usr/bin/hugo
+      - /usr/local/go/**/*
