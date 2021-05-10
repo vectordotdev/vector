@@ -249,15 +249,15 @@ impl RetryLogic for VectorGrpcRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        config::SinkContext,
-        sinks::util::test::build_test_server,
-        test_util::{next_addr, random_lines_with_stream},
-    };
-    use bytes::Bytes;
-    use futures::{channel::mpsc, stream, StreamExt};
-    use http::request::Parts;
-    use hyper::Method;
+    // use crate::{
+    //     config::SinkContext,
+    //     sinks::util::test::build_test_server,
+    //     test_util::{next_addr, random_lines_with_stream},
+    // };
+    // use bytes::Bytes;
+    // use futures::{channel::mpsc, stream, StreamExt};
+    // use http::request::Parts;
+    // use hyper::Method;
 
     #[test]
     fn generate_config() {
