@@ -9,6 +9,7 @@ installation: {
 
 		_shell: string | *null
 		let Shell = _shell
+		shell: Shell
 
 		configure: string | null | *"none"
 		install:   string | null
@@ -39,8 +40,9 @@ installation: {
 	}
 
 	#Interface: {
-		_shell: string | *null
+		_shell: string
 		let Shell = _shell
+		shell: Shell
 
 		archs: [#Arch, ...#Arch]
 		description: string
@@ -72,7 +74,8 @@ installation: {
 	#RoleImplementation: {
 		_shell: string | *null
 		let Shell = _shell
-		commands:    #Commands & {_shell: Shell}
+		shell:       Shell
+		commands:    #Commands & {_shell: _shell}
 		description: string
 		name:        string
 		title:       string
@@ -81,7 +84,9 @@ installation: {
 	}
 
 	#RoleImplementations: [Name=string]: #RoleImplementation & {
-		name: Name
+		name:   Name
+		shell:  _shell
+		_shell: _shell
 	}
 
 	#Tutorials: {
