@@ -3,10 +3,19 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use k8s_test_framework::{Framework, Interface, Reader};
+use std::env;
 
 pub mod metrics;
 
 pub const BUSYBOX_IMAGE: &str = "busybox:1.28";
+
+pub fn get_namespace() -> String {
+    env::var("NAMESPACE").unwrap_or_else(|_| "test-vector".to_string())
+}
+
+pub fn get_namespace_appended(suffix: &str) -> String {
+    format!("{}-{}", get_namespace(), suffix)
+}
 
 pub fn make_framework() -> Framework {
     let interface = Interface::from_env().expect("interface is not ready");

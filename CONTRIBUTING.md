@@ -271,7 +271,7 @@ Since not everyone has a full working native environment, we took our environmen
 
 This is ideal for users who want it to "Just work" and just want to start contributing. It's also what we use for our CI, so you know if it breaks we can't do anything else until we fix it. 😉
 
-**Before you go farther, install Docker or Podman through your official package manager, or from the [Docker](https://docs.docker.com/get-docker/) or [Podman](https://podman.io/) sites.**
+**Before you go further, install Docker or Podman through your official package manager, or from the [Docker](https://docs.docker.com/get-docker/) or [Podman](https://podman.io/) sites.**
 
 ```bash
 # Optional: Only if you use `podman`
@@ -745,6 +745,21 @@ Vector:
 - [`minikube`](https://minikube.sigs.k8s.io/)-powered or other k8s cluster
 - [`cargo watch`](https://github.com/passcod/cargo-watch)
 
+
+#### Installing on mac
+Note, it currently doesn't work properly on the mac. These are just some 
+preliminary notes.
+
+Install docker for mac
+In docker for mac enable Kubernetes
+
+Run this to ensure our kubectl points to docker destop
+❯ kubectl config get-contexts
+CURRENT   NAME             CLUSTER          AUTHINFO         NAMESPACE
+*         docker-desktop   docker-desktop   docker-desktop
+
+
+
 ##### The dev flow
 
 Once you have the requirements, use the `scripts/skaffold.sh dev` command.
@@ -819,6 +834,8 @@ E2E (end-to-end) tests.
 - `docker`
 - `kubectl`
 - `bash`
+- `cross` - `cargo install cross`
+- [`helm`](https://helm.sh/) 
 
 Vector release artifacts are prepared for E2E tests, so the ability to do that
 is required too, see Vector [docs](https://vector.dev) for more details.
@@ -875,6 +892,9 @@ You can also pass additional parameters to adjust the behavior of the test:
 
 - `SCOPE` - pass a filter to the `cargo test` command to filter out the tests,
   effectively equivalent to `cargo test -- $SCOPE`.
+
+- `NAMESPACE` - specifies the k8s namespace to run the tests in. Some tests are 
+  run in another namespace with this one prepended: `<NAMESPACE>-test-pod`.
 
 Passing additional commands is done like so:
 
