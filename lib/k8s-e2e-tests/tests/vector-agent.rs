@@ -1058,7 +1058,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
 
-    let CONFIG: &str = &format!(
+    let config: &str = &format!(
         indoc! {r#"
         kubernetesLogsSource:
           rawConfig: |
@@ -1072,7 +1072,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &format!("{}\n{}", CONFIG, HELM_VALUES_STDOUT_SINK),
+                custom_helm_values: &format!("{}\n{}", config, HELM_VALUES_STDOUT_SINK),
                 ..Default::default()
             },
         )
