@@ -1,4 +1,4 @@
-use super::{builder::ConfigBuilder, format, validation, vars, Config, Format, FormatHint};
+use super::{builder::Builder, format, validation, vars, Config, Format, FormatHint};
 use crate::signal;
 use glob::glob;
 use lazy_static::lazy_static;
@@ -95,36 +95,39 @@ pub async fn load_from_paths_with_provider(
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Config, Vec<String>> {
     let (builder, load_warnings) = load_builder_from_paths(config_paths)?;
-    validation::check_provider(&builder)?;
 
-    match builder.provider {
-        Some(mut provider) => match provider.build(signal_handler).await {
-            Ok(config) => {
+    let config_builder = match builder {
+        Builder::Provider(mut provider_builder) => match provider_builder.provider {
+            Some(mut provider) => {
+                provider
+                    .build(signal_handler)
+                    .await
+                    .map_err(|err| vec![format!("provider error: {}", err)])?;
                 debug!(message = "Provider configured.", provider = ?provider.provider_type());
-                load_from_str(&config, None)
+                config_builder
             }
-            Err(err) => Err(vec![format!("provider error: {}", err)]),
+            None => provider_builder.into(),
         },
-        _ => {
-            let (config, build_warnings) = builder.build_with_warnings()?;
+        Builder::Config(config_builder) => config_builder,
+    };
 
-            // Trigger a shutdown in the signal handler, which will terminate any provider
-            // streams that may exist prior to loading this configuration to prevent any
-            // in-flight polling/retrieval.
-            signal_handler.trigger_shutdown();
+    let (config, build_warnings) = config_builder.build_with_warnings()?;
 
-            for warning in load_warnings.into_iter().chain(build_warnings) {
-                warn!("{}", warning);
-            }
+    // Trigger a shutdown in the signal handler, which will terminate any provider
+    // streams that may exist prior to loading this configuration to prevent any
+    // in-flight polling/retrieval.
+    signal_handler.trigger_shutdown();
 
-            Ok(config)
-        }
+    for warning in load_warnings.into_iter().chain(build_warnings) {
+        warn!("{}", warning);
     }
+
+    Ok(config)
 }
 
 pub fn load_builder_from_paths(
     config_paths: &[(PathBuf, FormatHint)],
-) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+) -> Result<(Builder, Vec<String>), Vec<String>> {
     let mut inputs = Vec::new();
     let mut errors = Vec::new();
 
@@ -145,7 +148,7 @@ pub fn load_builder_from_paths(
 
 pub fn load_from_str(input: &str, format: FormatHint) -> Result<Config, Vec<String>> {
     let (builder, load_warnings) = load_from_inputs(std::iter::once((input.as_bytes(), format)))?;
-    let (config, build_warnings) = builder.build_with_warnings()?;
+    let (config, build_warnings) = builder.into_config_builder().build_with_warnings()?;
 
     for warning in load_warnings.into_iter().chain(build_warnings) {
         warn!("{}", warning);
@@ -156,7 +159,7 @@ pub fn load_from_str(input: &str, format: FormatHint) -> Result<Config, Vec<Stri
 
 fn load_from_inputs(
     inputs: impl IntoIterator<Item = (impl std::io::Read, FormatHint)>,
-) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+) -> Result<(Builder, Vec<String>), Vec<String>> {
     let mut config = Config::builder();
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
@@ -196,7 +199,7 @@ fn open_config(path: &Path) -> Option<File> {
 fn load(
     mut input: impl std::io::Read,
     format: FormatHint,
-) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
+) -> Result<(Builder, Vec<String>), Vec<String>> {
     let mut source_string = String::new();
     input
         .read_to_string(&mut source_string)
