@@ -377,6 +377,10 @@ impl<T: fmt::Debug> sink::Response for http::Response<T> {
     fn is_successful(&self) -> bool {
         self.status().is_success()
     }
+
+    fn is_transient(&self) -> bool {
+        self.status().is_server_error()
+    }
 }
 
 #[derive(Debug, Default, Clone)]

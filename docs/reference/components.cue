@@ -313,8 +313,8 @@ components: {
 			batch: {
 				enabled:      bool
 				common:       bool
-				max_bytes:    uint | null
-				max_events:   uint | null
+				max_bytes?:   uint | null
+				max_events?:  uint | null
 				timeout_secs: uint16 | null
 			}
 		}

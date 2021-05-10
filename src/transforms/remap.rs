@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GlobalOptions, TransformConfig, TransformDescription},
-    event::Event,
+    event::{Event, VrlTarget},
     internal_events::{RemapMappingAbort, RemapMappingError},
     transforms::{FunctionTransform, Transform},
     Result,
@@ -69,7 +69,7 @@ impl Remap {
 }
 
 impl FunctionTransform for Remap {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         // If a program can fail or abort at runtime, we need to clone the
         // original event and keep it around, to allow us to discard any
         // mutations made to the event while the VRL program runs, before it
@@ -87,22 +87,25 @@ impl FunctionTransform for Remap {
             None
         };
 
+        let mut target: VrlTarget = event.into();
+
         let mut runtime = Runtime::default();
 
-        let result = match event {
-            Event::Log(ref mut event) => runtime.resolve(event, &self.program),
-            Event::Metric(ref mut event) => runtime.resolve(event, &self.program),
-        };
+        let result = runtime.resolve(&mut target, &self.program);
 
         match result {
-            Ok(_) => output.push(event),
+            Ok(_) => {
+                for event in target.into_events() {
+                    output.push(event)
+                }
+            }
             Err(Terminate::Abort) => {
                 emit!(RemapMappingAbort {
                     event_dropped: self.drop_on_abort,
                 });
 
                 if !self.drop_on_abort {
-                    output.push(original_event.unwrap_or(event))
+                    output.push(original_event.expect("event will be set"))
                 }
             }
             Err(Terminate::Error(error)) => {
@@ -112,7 +115,7 @@ impl FunctionTransform for Remap {
                 });
 
                 if !self.drop_on_error {
-                    output.push(original_event.unwrap_or(event))
+                    output.push(original_event.expect("event will be set"))
                 }
             }
         }
@@ -126,7 +129,8 @@ mod tests {
         metric::{MetricKind, MetricValue},
         LogEvent, Metric, Value,
     };
-    use indoc::formatdoc;
+    use indoc::{formatdoc, indoc};
+    use shared::btreemap;
     use std::collections::BTreeMap;
 
     #[test]
@@ -165,6 +169,37 @@ mod tests {
         assert_eq!(get_field_string(&result, "bar"), "baz");
         assert_eq!(get_field_string(&result, "copy"), "buz");
         assert_eq!(result.metadata(), &metadata);
+    }
+
+    #[test]
+    fn check_remap_emits_multiple() {
+        let event = {
+            let mut event = LogEvent::from("augment me");
+            event.insert(
+                "events",
+                vec![btreemap!("message" => "foo"), btreemap!("message" => "bar")],
+            );
+            Event::from(event)
+        };
+        let metadata = event.metadata().clone();
+
+        let conf = RemapConfig {
+            source: indoc! {r#"
+                . = .events
+            "#}
+            .to_owned(),
+            drop_on_error: true,
+            drop_on_abort: false,
+        };
+        let mut tform = Remap::new(conf).unwrap();
+
+        let mut result = vec![];
+        tform.transform(&mut result, event);
+
+        assert_eq!(get_field_string(&result[0], "message"), "foo");
+        assert_eq!(get_field_string(&result[1], "message"), "bar");
+        assert_eq!(result[0].metadata(), &metadata);
+        assert_eq!(result[1].metadata(), &metadata);
     }
 
     #[test]

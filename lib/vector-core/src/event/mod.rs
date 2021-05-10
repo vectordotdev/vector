@@ -18,6 +18,9 @@ pub use util::log::PathComponent;
 pub use util::log::PathIter;
 pub use value::Value;
 
+#[cfg(feature = "vrl")]
+pub use vrl_target::VrlTarget;
+
 pub mod discriminant;
 pub mod error;
 mod finalization;
@@ -30,6 +33,8 @@ mod metadata;
 pub mod metric;
 pub mod util;
 mod value;
+#[cfg(feature = "vrl")]
+mod vrl_target;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
