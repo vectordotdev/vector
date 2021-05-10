@@ -9,8 +9,6 @@ use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
 use getset::{Getters, MutGetters};
-#[cfg(feature = "vrl")]
-use lookup::LookupBuf;
 use serde::{Deserialize, Serialize, Serializer};
 use shared::EventDataEq;
 use std::sync::Arc;
@@ -51,6 +49,12 @@ impl LogEvent {
         }
     }
 
+    ///  Create a `LogEvent` into a tuple of its components
+    pub fn from_parts(map: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
+        let fields = Value::Map(map);
+        Self { fields, metadata }
+    }
+
     /// Convert a `LogEvent` into a tuple of its components
     ///
     /// # Panics
@@ -63,11 +67,6 @@ impl LogEvent {
                 .unwrap_or_else(|| unreachable!("fields must be a map")),
             self.metadata,
         )
-    }
-
-    pub fn from_parts(fields: BTreeMap<String, Value>, metadata: EventMetadata) -> Self {
-        let fields = fields.into();
-        Self { fields, metadata }
     }
 
     pub fn with_batch_notifier(self, batch: Arc<BatchNotifier>) -> Self {
@@ -364,55 +363,6 @@ impl Serialize for LogEvent {
     }
 }
 
-#[cfg(feature = "vrl")]
-impl vrl_core::Target for LogEvent {
-    fn get(&self, path: &LookupBuf) -> Result<Option<vrl_core::Value>, String> {
-        if path.is_root() {
-            Ok(Some(self.fields.clone().into()))
-        } else {
-            let val = self.fields.get(path);
-            val.map(|val| val.map(|val| val.clone().into()))
-                .map_err(|err| err.to_string())
-        }
-    }
-
-    fn remove(
-        &mut self,
-        path: &LookupBuf,
-        compact: bool,
-    ) -> Result<Option<vrl_core::Value>, String> {
-        if path.is_root() {
-            Ok(Some({
-                let mut map = BTreeMap::new();
-                std::mem::swap(self.fields.as_map_mut(), &mut map);
-                map.into_iter()
-                    .map(|(key, value)| (key, value.into()))
-                    .collect::<BTreeMap<_, _>>()
-                    .into()
-            }))
-        } else {
-            let val = self.fields.remove(path, compact);
-            val.map(|val| val.map(|val| val.into()))
-                .map_err(|err| err.to_string())
-        }
-    }
-
-    fn insert(&mut self, path: &LookupBuf, value: vrl_core::Value) -> Result<(), String> {
-        let mut value = Value::from(value);
-        if path.is_root() {
-            if let Value::Map(_) = value {
-                std::mem::swap(&mut self.fields, &mut value);
-                Ok(())
-            } else {
-                Err("Cannot insert as root of Event unless it is a map.".into())
-            }
-        } else {
-            let _val = self.fields.insert(path.clone(), value);
-            Ok(())
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -503,268 +453,6 @@ mod test {
         entry.or_insert_with(|| fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
         assert_eq!(json.pointer("/map/map/non-existing"), Some(&fallback));
-    }
-
-    #[cfg(feature = "vrl")]
-    #[test]
-    fn object_get() {
-        use lookup::{FieldBuf, SegmentBuf};
-        use shared::btreemap;
-
-        let cases = vec![
-            (btreemap! {}, vec![], Ok(Some(btreemap! {}.into()))),
-            (
-                btreemap! { "foo" => "bar" },
-                vec![],
-                Ok(Some(btreemap! { "foo" => "bar" }.into())),
-            ),
-            (
-                btreemap! { "foo" => "bar" },
-                vec![SegmentBuf::from("foo")],
-                Ok(Some("bar".into())),
-            ),
-            (
-                btreemap! { "foo" => "bar" },
-                vec![SegmentBuf::from("bar")],
-                Ok(None),
-            ),
-            (
-                btreemap! { "foo" => vec![btreemap! { "bar" => true }] },
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(0),
-                    SegmentBuf::from("bar"),
-                ],
-                Ok(Some(true.into())),
-            ),
-            (
-                btreemap! { "foo" => btreemap! { "bar baz" => btreemap! { "baz" => 2 } } },
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(vec![FieldBuf::from("qux"), FieldBuf::from(r#""bar baz""#)]),
-                    SegmentBuf::from("baz"),
-                ],
-                Ok(Some(2.into())),
-            ),
-        ];
-
-        for (value, segments, expect) in cases {
-            let value: BTreeMap<String, Value> = value;
-            let event = LogEvent::from(value);
-            let path = LookupBuf::from_segments(segments);
-
-            assert_eq!(vrl_core::Target::get(&event, &path), expect)
-        }
-    }
-
-    #[test]
-    #[cfg(feature = "vrl")]
-    // `too_many_lines` is mostly just useful for production code but we're not
-    // able to flag the lint on only for non-test.
-    #[allow(clippy::too_many_lines)]
-    fn object_insert() {
-        use lookup::SegmentBuf;
-        use shared::btreemap;
-
-        let cases = vec![
-            (
-                btreemap! { "foo" => "bar" },
-                vec![],
-                btreemap! { "baz" => "qux" }.into(),
-                btreemap! { "baz" => "qux" },
-                Ok(()),
-            ),
-            (
-                btreemap! { "foo" => "bar" },
-                vec![SegmentBuf::from("foo")],
-                "baz".into(),
-                btreemap! { "foo" => "baz" },
-                Ok(()),
-            ),
-            (
-                btreemap! { "foo" => "bar" },
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(2),
-                    SegmentBuf::from("bar baz"),
-                    SegmentBuf::from("a"),
-                    SegmentBuf::from("b"),
-                ],
-                true.into(),
-                btreemap! {
-                    "foo" => vec![
-                        Value::Null,
-                        Value::Null,
-                        btreemap! {
-                            "bar baz" => btreemap! { "a" => btreemap! { "b" => true } },
-                        }.into()
-                    ]
-                },
-                Ok(()),
-            ),
-            (
-                btreemap! { "foo" => vec![0, 1, 2] },
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(5)],
-                "baz".into(),
-                btreemap! {
-                    "foo" => vec![
-                        0.into(),
-                        1.into(),
-                        2.into(),
-                        Value::Null,
-                        Value::Null,
-                        Value::from("baz"),
-                    ],
-                },
-                Ok(()),
-            ),
-            (
-                btreemap! { "foo" => "bar" },
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
-                "baz".into(),
-                btreemap! { "foo" => vec!["baz"] },
-                Ok(()),
-            ),
-            (
-                btreemap! { "foo" => Value::Array(vec![]) },
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
-                "baz".into(),
-                btreemap! { "foo" => vec!["baz"] },
-                Ok(()),
-            ),
-            (
-                btreemap! { "foo" => Value::Array(vec![0.into()]) },
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
-                "baz".into(),
-                btreemap! { "foo" => vec!["baz"] },
-                Ok(()),
-            ),
-            (
-                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
-                "baz".into(),
-                btreemap! { "foo" => Value::Array(vec!["baz".into(), 1.into()]) },
-                Ok(()),
-            ),
-            (
-                btreemap! { "foo" => Value::Array(vec![0.into(), 1.into()]) },
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(1)],
-                "baz".into(),
-                btreemap! { "foo" => Value::Array(vec![0.into(), "baz".into()]) },
-                Ok(()),
-            ),
-        ];
-
-        for (object, segments, value, expect, result) in cases {
-            let object: BTreeMap<String, Value> = object;
-            let mut event = LogEvent::from(object);
-            let expect = LogEvent::from(expect);
-            let value: vrl_core::Value = value;
-            let path = LookupBuf::from_segments(segments);
-
-            assert_eq!(
-                vrl_core::Target::insert(&mut event, &path, value.clone()),
-                result
-            );
-            shared::assert_event_data_eq!(event, expect);
-            assert_eq!(vrl_core::Target::get(&event, &path), Ok(Some(value)));
-        }
-    }
-
-    #[test]
-    #[cfg(feature = "vrl")]
-    fn object_remove() {
-        use lookup::{FieldBuf, SegmentBuf};
-        use shared::btreemap;
-
-        let cases = vec![
-            (
-                btreemap! { "foo" => "bar" },
-                vec![SegmentBuf::from("foo")],
-                false,
-                Some(btreemap! {}.into()),
-            ),
-            (
-                btreemap! { "foo" => "bar" },
-                vec![SegmentBuf::from(vec![
-                    FieldBuf::from(r#""foo bar""#),
-                    FieldBuf::from("foo"),
-                ])],
-                false,
-                Some(btreemap! {}.into()),
-            ),
-            (
-                btreemap! { "foo" => "bar", "baz" => "qux" },
-                vec![],
-                false,
-                Some(btreemap! {}.into()),
-            ),
-            (
-                btreemap! { "foo" => "bar", "baz" => "qux" },
-                vec![],
-                true,
-                Some(btreemap! {}.into()),
-            ),
-            (
-                btreemap! { "foo" => vec![0] },
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
-                false,
-                Some(btreemap! { "foo" => Value::Array(vec![]) }.into()),
-            ),
-            (
-                btreemap! { "foo" => vec![0] },
-                vec![SegmentBuf::from("foo"), SegmentBuf::from(0)],
-                true,
-                Some(btreemap! {}.into()),
-            ),
-            (
-                btreemap! {
-                    "foo" => btreemap! { "bar baz" => vec![0] },
-                    "bar" => "baz",
-                },
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(r#""bar baz""#),
-                    SegmentBuf::from(0),
-                ],
-                false,
-                Some(
-                    btreemap! {
-                        "foo" => btreemap! { "bar baz" => Value::Array(vec![]) },
-                        "bar" => "baz",
-                    }
-                    .into(),
-                ),
-            ),
-            (
-                btreemap! {
-                    "foo" => btreemap! { "bar baz" => vec![0] },
-                    "bar" => "baz",
-                },
-                vec![
-                    SegmentBuf::from("foo"),
-                    SegmentBuf::from(r#""bar baz""#),
-                    SegmentBuf::from(0),
-                ],
-                true,
-                Some(btreemap! { "bar" => "baz" }.into()),
-            ),
-        ];
-
-        for (object, segments, compact, expect) in cases {
-            let mut event = LogEvent::from(object);
-            let path = LookupBuf::from_segments(segments);
-            let removed = vrl_core::Target::get(&event, &path).unwrap();
-
-            assert_eq!(
-                vrl_core::Target::remove(&mut event, &path, compact),
-                Ok(removed)
-            );
-            assert_eq!(
-                vrl_core::Target::get(&event, &LookupBuf::root()),
-                Ok(expect)
-            )
-        }
     }
 
     fn assert_merge_value(

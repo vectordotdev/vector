@@ -37,8 +37,16 @@ pub struct Example {
     source: String,
     #[serde(rename = "return")]
     returns: Option<Value>,
-    output: Option<Event>,
+    output: Option<ExampleOutput>,
     raises: Option<Error>,
+    skip_test: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum ExampleOutput {
+    Events(Vec<Event>),
+    Event(Event),
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -109,9 +117,10 @@ impl Test {
             returns,
             output,
             raises,
+            skip_test,
         } = example;
 
-        let mut skip = SKIP_FUNCTION_EXAMPLES.contains(&name.as_str());
+        let mut skip = skip_test.unwrap_or_else(|| SKIP_FUNCTION_EXAMPLES.contains(&name.as_str()));
 
         let object = match input {
             Some(event) => {
@@ -128,7 +137,12 @@ impl Test {
         }
 
         if let Some(output) = &output {
-            if output.metric.is_some() {
+            let contains_metric_event = match &output {
+                ExampleOutput::Events(events) => events.iter().any(|event| event.metric.is_some()),
+                ExampleOutput::Event(event) => event.metric.is_some(),
+            };
+
+            if contains_metric_event {
                 skip = true;
             }
 
@@ -141,7 +155,17 @@ impl Test {
             Some(error) => error.compiletime,
             None => serde_json::to_string(
                 &returns
-                    .or_else(|| output.map(|event| serde_json::Value::Object(event.log)))
+                    .or_else(|| {
+                        output.map(|output| match output {
+                            ExampleOutput::Events(events) => serde_json::Value::Array(
+                                events
+                                    .into_iter()
+                                    .map(|event| serde_json::Value::Object(event.log))
+                                    .collect(),
+                            ),
+                            ExampleOutput::Event(event) => serde_json::Value::Object(event.log),
+                        })
+                    })
                     .unwrap_or_default(),
             )
             .unwrap(),
