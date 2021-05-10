@@ -278,14 +278,7 @@ cross-image-%:
 
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --workspace --no-fail-fast --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
-
-.PHONY: test-components
-test-components: ## Test with all components enabled
-# TODO(jesse) add `language-benches wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
-# test-components: $(WASM_MODULE_OUTPUTS)
-test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches metrics-benches remap-benches"
-test-components: test
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --quiet --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES} metrics-benches remap-benches statistic-benches benches" ${SCOPE}
 
 .PHONY: test-all
 test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
@@ -590,7 +583,7 @@ check-all: check-kubernetes-yaml
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-features.sh
+	${MAYBE_ENVIRONMENT_EXEC} cargo hack check --each-feature --exclude-features "sources-utils-http sources-utils-tcp-keepalive sources-utils-tcp-socket sources-utils-tls sources-utils-udp sources-utils-unix sinks-utils-udp"
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy

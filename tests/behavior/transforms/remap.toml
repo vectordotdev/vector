@@ -1,3 +1,42 @@
+[transforms.remap_emit_multiple]
+  inputs = []
+  type = "remap"
+  source = """
+    . = [{"message": "hello"}, {"message": "world"}]
+  """
+[[tests]]
+  name = "remap_emit_multiple"
+  [tests.input]
+    insert_at = "remap_emit_multiple"
+    type = "log"
+    [tests.input.log_fields]
+      foo = true
+  [[tests.outputs]]
+    extract_from = "remap_emit_multiple"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      # unit test will only catch the first one output
+      source = ".message == \"hello\""
+
+[transforms.remap_mapped_scalars]
+  inputs = []
+  type = "remap"
+  source = """
+    . = 5
+  """
+[[tests]]
+  name = "remap_mapped_scalars"
+  [tests.input]
+    insert_at = "remap_mapped_scalars"
+    type = "log"
+    [tests.input.log_fields]
+      foo = true
+  [[tests.outputs]]
+    extract_from = "remap_mapped_scalars"
+    [[tests.outputs.conditions]]
+      type = "remap"
+      source = ".message == 5"
+
 [transforms.remap_abort]
   inputs = []
   type = "remap"

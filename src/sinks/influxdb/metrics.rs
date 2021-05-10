@@ -15,7 +15,7 @@ use crate::{
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
             statistic::{validate_quantiles, DistributionStatistic},
-            BatchConfig, BatchSettings, TowerRequestConfig,
+            BatchConfig, BatchSettings, EncodedEvent, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -148,7 +148,13 @@ impl InfluxDbSvc {
                 batch.timeout,
                 cx.acker(),
             )
-            .with_flat_map(move |event: Event| stream::iter(normalizer.apply(event).map(Ok)))
+            .with_flat_map(move |event: Event| {
+                stream::iter(
+                    normalizer
+                        .apply(event)
+                        .map(|metric| Ok(EncodedEvent::new(metric))),
+                )
+            })
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
         Ok(VectorSink::Sink(Box::new(sink)))
@@ -435,7 +441,7 @@ mod tests {
             "requests",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
+                buckets: vector_core::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
@@ -474,7 +480,7 @@ mod tests {
             "requests",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
+                buckets: vector_core::buckets![1.0 => 1, 2.1 => 2, 3.0 => 3],
                 count: 6,
                 sum: 12.5,
             },
@@ -513,7 +519,7 @@ mod tests {
             "requests_sum",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
+                quantiles: vector_core::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
@@ -552,7 +558,7 @@ mod tests {
             "requests_sum",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
+                quantiles: vector_core::quantiles![0.01 => 1.5, 0.5 => 2.0, 0.99 => 3.0],
                 count: 6,
                 sum: 12.0,
             },
@@ -592,7 +598,7 @@ mod tests {
                 "requests",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                    samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                     statistic: StatisticKind::Histogram,
                 },
             )
@@ -717,7 +723,7 @@ mod tests {
             "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 0, 2.0 => 0],
+                samples: vector_core::samples![1.0 => 0, 2.0 => 0],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -735,7 +741,7 @@ mod tests {
             "requests",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
+                samples: vector_core::samples![1.0 => 3, 2.0 => 3, 3.0 => 2],
                 statistic: StatisticKind::Summary,
             },
         )

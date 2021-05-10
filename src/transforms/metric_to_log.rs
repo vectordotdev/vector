@@ -239,7 +239,7 @@ mod tests {
             "distro",
             MetricKind::Absolute,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 10, 2.0 => 20],
+                samples: vector_core::samples![1.0 => 10, 2.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -286,7 +286,7 @@ mod tests {
             "histo",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![1.0 => 10, 2.0 => 20],
+                buckets: vector_core::buckets![1.0 => 10, 2.0 => 20],
                 count: 30,
                 sum: 50.0,
             },
@@ -332,7 +332,7 @@ mod tests {
             "summary",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![50.0 => 10.0, 90.0 => 20.0],
+                quantiles: vector_core::quantiles![50.0 => 10.0, 90.0 => 20.0],
                 count: 30,
                 sum: 50.0,
             },

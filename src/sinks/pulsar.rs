@@ -403,7 +403,7 @@ mod integration_tests {
         trace_init();
 
         let num_events = 1_000;
-        let (_input, events) = random_lines_with_stream(100, num_events);
+        let (_input, events) = random_lines_with_stream(100, num_events, None);
 
         let topic = format!("test-{}", random_string(10));
         let cnf = PulsarSinkConfig {

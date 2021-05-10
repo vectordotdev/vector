@@ -16,6 +16,9 @@ name = "graphql-schema"
 path = "src/api/schema/gen.rs"
 required-features = ["default-no-api-client"]
 
+[profile.dev]
+split-debuginfo = "unpacked" # Faster debug builds on macOS
+
 [profile.release]
 lto = true        # Optimize our binary at link stage.
 codegen-units = 1 # Increases compile time but improves optmization alternatives.
@@ -94,30 +97,28 @@ prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 shared = { path = "lib/shared" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
-vector_core = { path = "lib/vector-core" }
+vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
 
 # Tokio / Futures
 async-trait = "0.1.50"
 futures = { version = "0.3.14", default-features = false, features = ["compat", "io-compat"], package = "futures" }
-futures01 = { version = "0.1.25", package = "futures", default-features = false }
 tokio = { version = "1.5.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.1", default-features = false }
 tokio-stream = { version = "0.1.5", default-features = false, features = ["net", "sync"] }
 tokio-util = { version = "0.6.6", default-features = false, features = ["codec", "time"] }
 
 # Tracing
-tracing = { version = "0.1.25", default-features = false }
-tracing-core = { version = "0.1.17", default-features = false }
-tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-01", "futures-03"] }
+tracing = { version = "0.1.26", default-features = false }
+tracing-core = { version = "0.1.18", default-features = false }
+tracing-futures = { version = "0.2.5", default-features = false, features = ["futures-03"] }
 tracing-log = { version = "0.1.2", default-features = false }
-tracing-subscriber = { version = "0.2.17", default-features = false }
+tracing-subscriber = { version = "0.2.18", default-features = false }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
-metrics = { version = "0.14.2", default-features = false }
-metrics-tracing-context = { version = "0.3.0", default-features = false }
-metrics-util = { version = "0.6.2", default-features = false }
+metrics = { version = "0.15.1", default-features = false, features = ["std"]}
+metrics-tracing-context = { version = "0.4.0", default-features = false }
 
 # Aws
 rusoto_cloudwatch = { version = "0.46.0", optional = true }
@@ -159,7 +160,7 @@ itertools = { version = "0.10.0", default-features = false, optional = true }
 crossterm = { version = "0.19.0", default-features = false, optional = true }
 num-format = { version = "0.4.0", default-features = false, features = ["with-num-bigint"], optional = true }
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
-tui = { version = "0.14.0", optional = true, default-features = false, features = ["crossterm"] }
+tui = { version = "0.15.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # VRL Lang
 vrl = { path = "lib/vrl/core" }
@@ -191,7 +192,7 @@ exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.0.20", default-features = false }
 getset = { version = "0.1.1", default-features = false }
 glob = { version = "0.3.0", default-features = false }
-grok = { version = "~1.0.1", default-features = false, optional = true }
+grok = { version = "1.1.0", default-features = false, optional = true }
 headers = { version = "0.3.4", default-features = false }
 heim = { version = "0.1.0-rc.1", default-features = false, features = ["cpu", "disk", "host", "memory", "net"], optional = true }
 hostname = { version = "0.3.1", default-features = false }
@@ -225,13 +226,13 @@ pulsar = { version = "2.0.1", default-features = false, features = ["tokio-runti
 rand = { version = "0.8.3", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.0", default-features = false }
 rdkafka = { version = "0.26.0", default-features = false, features = ["libz", "ssl", "zstd"], optional = true }
-regex = { version = "1.4.6", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
 # make sure to update the external docs when the Lua version changes
 rlua = { version = "0.17.0", default-features = true, optional = true }
 seahash = { version = "4.1.0", default-features = false, optional = true }
 semver = { version = "0.11.0", default-features = false, features = ["serde"], optional = true }
-snafu = { version = "0.6.10", default-features = false, features = ["futures", "futures-01"] }
-snap = { version = "1.0.4", default-features = false, optional = true }
+snafu = { version = "0.6.10", default-features = false, features = ["futures"] }
+snap = { version = "1.0.5", default-features = false, optional = true }
 socket2 = { version = "0.4.0", default-features = false }
 stream-cancel = { version = "0.8.0", default-features = false }
 strip-ansi-escapes = { version = "0.1.0", default-features = false }
@@ -267,8 +268,7 @@ atty = "0.2.14"
 nix = "0.20.0"
 
 [build-dependencies]
-prost-build = "0.7.0"
-built = { version = "0.4.4", features = ["chrono", "git2"] }
+built = { version = "0.5.0", features = ["chrono", "git2"] }
 
 [dev-dependencies]
 approx = "0.4.0"
@@ -284,7 +284,6 @@ reqwest = { version = "0.11.3", features = ["json"] }
 tempfile = "3.2.0"
 tokio = { version = "1.5.0", features = ["test-util"] }
 tokio-test = "0.4.1"
-tokio01-test = "0.1.1"
 tower-test = "0.4.0"
 walkdir = "2.3.2"
 quickcheck = "1.0.3"
@@ -344,6 +343,7 @@ api = [
   "async-graphql-warp",
   "base64",
   "itertools",
+  "vector_core/api",
   "warp",
   "uuid",
 ]
@@ -354,6 +354,7 @@ api-client = [
   "num-format",
   "number_prefix",
   "tui",
+  "vector_core/api",
   "vector-api-client",
 ]
 
@@ -484,7 +485,7 @@ transforms-json_parser = []
 transforms-key_value_parser = []
 transforms-log_to_metric = []
 transforms-logfmt_parser = ["logfmt"]
-transforms-lua = ["rlua"]
+transforms-lua = ["rlua", "vector_core/lua"]
 transforms-merge = []
 transforms-metric_to_log = []
 transforms-reduce = []
@@ -564,7 +565,7 @@ sinks-honeycomb = ["bytesize"]
 sinks-http = ["bytesize"]
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = ["bytesize"]
-sinks-kafka = []
+sinks-kafka = ["rdkafka"]
 sinks-logdna = ["bytesize"]
 sinks-loki = ["bytesize", "uuid"]
 sinks-nats = ["async-nats"]
@@ -647,7 +648,24 @@ cli-tests = ["sinks-blackhole", "sinks-socket", "sources-generator", "sources-fi
 
 # grouping together features for benchmarks
 # excluing API client due to running out of memory during linking in Github Actions
-benches = ["leveldb", "rdkafka-plain", "sinks", "sources", "transforms", "unix", "vendor-all"]
+benches = [
+  "leveldb",
+  "sinks-file",
+  "sinks-http",
+  "sinks-socket",
+  "sources-file",
+  "sources-socket",
+  "sources-syslog",
+  "transforms-add_fields",
+  "transforms-coercer",
+  "transforms-field_filter",
+  "transforms-json_parser",
+  "transforms-lua",
+  "transforms-rename_fields",
+  "transforms-regex_parser",
+  "transforms-sample",
+  "transforms-split",
+]
 language-benches = ["sinks-socket", "sources-socket", "transforms-add_fields", "transforms-json_parser", "transforms-lua", "transforms-regex_parser", "transforms-remap", "transforms-wasm"]
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
 statistic-benches = []

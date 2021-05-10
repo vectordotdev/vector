@@ -96,6 +96,7 @@ default = [
     "parse_grok",
     "parse_json",
     "parse_key_value",
+    "parse_klog",
     "parse_linux_authorization",
     "parse_logfmt",
     "parse_nginx_log",
@@ -192,6 +193,7 @@ parse_glog = ["chrono"]
 parse_grok = ["grok"]
 parse_json = ["serde_json"]
 parse_key_value = ["nom"]
+parse_klog = ["chrono"]
 parse_linux_authorization = ["parse_syslog"]
 parse_logfmt = ["parse_key_value"]
 parse_nginx_log = ["chrono", "regex"]
@@ -236,5 +238,5 @@ bench = false
 
 [[bench]]
 name = "benches"
-test = true
 harness = false
+test = true

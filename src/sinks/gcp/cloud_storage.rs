@@ -7,10 +7,11 @@ use crate::{
     serde::to_string,
     sinks::{
         util::{
+            batch::{BatchConfig, BatchSettings},
             encoding::{EncodingConfig, EncodingConfiguration},
             retries::{RetryAction, RetryLogic},
-            BatchConfig, BatchSettings, Buffer, Compression, Concurrency, PartitionBatchSink,
-            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
+            Buffer, Compression, Concurrency, EncodedEvent, PartitionBatchSink, PartitionBuffer,
+            PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -230,7 +231,9 @@ impl GcsSink {
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal gcp_cloud_storage error.", %error))
-            .with_flat_map(move |e| stream::iter(encode_event(e, &key_prefix, &encoding)).map(Ok));
+            .with_flat_map(move |event| {
+                stream::iter(encode_event(event, &key_prefix, &encoding)).map(Ok)
+            });
 
         Ok(VectorSink::Sink(Box::new(sink)))
     }
@@ -402,7 +405,7 @@ fn encode_event(
     mut event: Event,
     key_prefix: &Template,
     encoding: &EncodingConfig<Encoding>,
-) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
+) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8>, Bytes>>> {
     let key = key_prefix
         .render_string(&event)
         .map_err(|error| {
@@ -432,7 +435,10 @@ fn encode_event(
         }
     };
 
-    Some(PartitionInnerBuffer::new(bytes, key.into()))
+    Some(EncodedEvent::new(PartitionInnerBuffer::new(
+        bytes,
+        key.into(),
+    )))
 }
 
 #[derive(Clone)]
@@ -475,7 +481,7 @@ mod tests {
     fn gcs_encode_event_text() {
         let message = "hello world".to_string();
         let batch_time_format = Template::try_from("date=%F").unwrap();
-        let bytes = encode_event(
+        let encoded = encode_event(
             message.clone().into(),
             &batch_time_format,
             &Encoding::Text.into(),
@@ -483,7 +489,7 @@ mod tests {
         .unwrap();
 
         let encoded_message = message + "\n";
-        let (bytes, _) = bytes.into_parts();
+        let (bytes, _) = encoded.item.into_parts();
         assert_eq!(&bytes[..], encoded_message.as_bytes());
     }
 
@@ -494,9 +500,9 @@ mod tests {
         event.as_mut_log().insert("key", "value");
 
         let batch_time_format = Template::try_from("date=%F").unwrap();
-        let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
+        let encoded = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
 
-        let (bytes, _) = bytes.into_parts();
+        let (bytes, _) = encoded.item.into_parts();
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(
@@ -515,9 +521,9 @@ mod tests {
         event.as_mut_log().insert("key", "value");
 
         let key_format = Template::try_from("key: {{ key }}").unwrap();
-        let bytes = encode_event(event, &key_format, &Encoding::Text.into()).unwrap();
+        let encoded = encode_event(event, &key_format, &Encoding::Text.into()).unwrap();
 
-        let (_, key) = bytes.into_parts();
+        let (_, key) = encoded.item.into_parts();
         assert_eq!(key, "key: value");
     }
 

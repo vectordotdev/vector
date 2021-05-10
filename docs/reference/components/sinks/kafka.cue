@@ -19,8 +19,8 @@ components: sinks: kafka: {
 			batch: {
 				enabled:      true
 				common:       true
-				max_bytes:    null
 				max_events:   null
+				max_bytes:    null
 				timeout_secs: null
 			}
 			compression: {
@@ -152,7 +152,17 @@ components: sinks: kafka: {
 	how_it_works: components._kafka.how_it_works
 
 	telemetry: metrics: {
-		events_discarded_total:  components.sources.internal_metrics.output.metrics.events_discarded_total
-		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+		events_discarded_total:              components.sources.internal_metrics.output.metrics.events_discarded_total
+		processing_errors_total:             components.sources.internal_metrics.output.metrics.processing_errors_total
+		kafka_queue_messages:                components.sources.internal_metrics.output.metrics.kafka_queue_messages
+		kafka_queue_messages_bytes:          components.sources.internal_metrics.output.metrics.kafka_queue_messages_bytes
+		kafka_requests_total:                components.sources.internal_metrics.output.metrics.kafka_requests_total
+		kafka_requests_bytes_total:          components.sources.internal_metrics.output.metrics.kafka_requests_bytes_total
+		kafka_responses_total:               components.sources.internal_metrics.output.metrics.kafka_responses_total
+		kafka_responses_bytes_total:         components.sources.internal_metrics.output.metrics.kafka_responses_bytes_total
+		kafka_produced_messages_total:       components.sources.internal_metrics.output.metrics.kafka_produced_messages_total
+		kafka_produced_messages_bytes_total: components.sources.internal_metrics.output.metrics.kafka_produced_messages_bytes_total
+		kafka_consumed_messages_total:       components.sources.internal_metrics.output.metrics.kafka_consumed_messages_total
+		kafka_consumed_messages_bytes_total: components.sources.internal_metrics.output.metrics.kafka_consumed_messages_bytes_total
 	}
 }

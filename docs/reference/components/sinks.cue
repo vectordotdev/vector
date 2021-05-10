@@ -19,7 +19,7 @@ components: sinks: [Name=string]: {
 					type: object: {
 						examples: []
 						options: {
-							if features.send.batch.max_bytes != null {
+							if features.send.batch.max_bytes != _|_ {
 								max_bytes: {
 									common:      true
 									description: "The maximum size of a batch, in bytes, before it is flushed."
@@ -30,7 +30,7 @@ components: sinks: [Name=string]: {
 									}
 								}
 							}
-							if features.send.batch.max_events != null {
+							if features.send.batch.max_events != _|_ {
 								max_events: {
 									common:      true
 									description: "The maximum size of a batch, in events, before it is flushed."
@@ -407,8 +407,18 @@ components: sinks: [Name=string]: {
 				if features.send.batch != _|_ {
 					if features.send.batch.enabled {
 						buffers_batches: {
+							_parameter: string
+							if features.send.batch.max_bytes != _|_ && features.send.batch.max_events == _|_ {
+								_parameter: "`max_bytes`"
+							}
+							if features.send.batch.max_bytes == _|_ && features.send.batch.max_events != _|_ {
+								_parameter: "`max_events`"
+							}
+							if features.send.batch.max_bytes != _|_ && features.send.batch.max_events != _|_ {
+								_parameter: "`max_bytes` or `max_events`"
+							}
 							title: "Buffers & batches"
-							body: #"""
+							body:  """
 									<SVG src="/optimized_svg/buffers-and-batches-serial_538_160.svg" />
 
 									This component buffers & batches data as shown in the diagram above. You'll notice that Vector treats these concepts
@@ -419,10 +429,10 @@ components: sinks: [Name=string]: {
 									*Batches* are flushed when 1 of 2 conditions are met:
 
 									1. The batch age meets or exceeds the configured `timeout_secs`.
-									2. The batch size meets or exceeds the configured <% if component.options.batch.children.respond_to?(:max_size) %>`max_size`<% else %>`max_events`<% end %>.
+									2. The batch meets or exceeds the configured \(_parameter)
 
 									*Buffers* are controlled via the [`buffer.*`](#buffer) options.
-									"""#
+									"""
 						}
 					}
 				}

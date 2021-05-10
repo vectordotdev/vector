@@ -11,7 +11,7 @@ use crate::{
             encode_namespace,
             encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
+            BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -157,7 +157,7 @@ impl HttpSink for InfluxDbLogsSink {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         self.encoding.apply_rules(&mut event);
         let mut event = event.into_log();
 
@@ -182,7 +182,7 @@ impl HttpSink for InfluxDbLogsSink {
             if self.tags.contains(&key) {
                 tags.insert(key, value.to_string_lossy());
             } else {
-                fields.insert(key, value.to_field());
+                fields.insert(key, to_field(&value));
             }
         });
 
@@ -200,7 +200,7 @@ impl HttpSink for InfluxDbLogsSink {
             return None;
         };
 
-        Some(output.into_bytes())
+        Some(EncodedEvent::new(output.into_bytes()))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
@@ -227,14 +227,12 @@ impl InfluxDbLogsConfig {
     }
 }
 
-impl Value {
-    fn to_field(&self) -> Field {
-        match self {
-            Value::Integer(num) => Field::Int(*num),
-            Value::Float(num) => Field::Float(*num),
-            Value::Boolean(b) => Field::Bool(*b),
-            _ => Field::String(self.to_string_lossy()),
-        }
+fn to_field(value: &Value) -> Field {
+    match value {
+        Value::Integer(num) => Field::Int(*num),
+        Value::Float(num) => Field::Float(*num),
+        Value::Boolean(b) => Field::Bool(*b),
+        _ => Field::String(value.to_string_lossy()),
     }
 }
 
@@ -287,7 +285,7 @@ mod tests {
         );
         sink.encoding.except_fields = Some(vec!["host".into()]);
 
-        let bytes = sink.encode_event(event).unwrap();
+        let bytes = sink.encode_event(event).unwrap().item;
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(&string);
@@ -317,7 +315,7 @@ mod tests {
             ["source_type", "host"].to_vec(),
         );
 
-        let bytes = sink.encode_event(event).unwrap();
+        let bytes = sink.encode_event(event).unwrap().item;
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(&string);
@@ -361,7 +359,7 @@ mod tests {
             ["source_type", "host"].to_vec(),
         );
 
-        let bytes = sink.encode_event(event).unwrap();
+        let bytes = sink.encode_event(event).unwrap().item;
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(&string);
@@ -400,7 +398,7 @@ mod tests {
             [].to_vec(),
         );
 
-        let bytes = sink.encode_event(event).unwrap();
+        let bytes = sink.encode_event(event).unwrap().item;
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(&string);
@@ -437,7 +435,7 @@ mod tests {
             [].to_vec(),
         );
 
-        let bytes = sink.encode_event(event).unwrap();
+        let bytes = sink.encode_event(event).unwrap().item;
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(&string);
@@ -474,7 +472,7 @@ mod tests {
             ["as_a_tag", "not_exists_field", "source_type"].to_vec(),
         );
 
-        let bytes = sink.encode_event(event).unwrap();
+        let bytes = sink.encode_event(event).unwrap().item;
         let string = std::str::from_utf8(&bytes).unwrap();
 
         let line_protocol = split_line_protocol(&string);

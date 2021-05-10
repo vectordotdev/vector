@@ -19,7 +19,6 @@ components: sinks: influxdb_metrics: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    null
 				max_events:   20
 				timeout_secs: 1
 			}

@@ -91,17 +91,20 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2.1.5
+        name: Cache Cargo registry + index
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make test-components
+      - run: make test
 
   test-misc:
     name: Miscellaneous - Linux
@@ -112,11 +115,14 @@ jobs:
       - uses: actions/checkout@v2
       - run: make ci-sweep
       - uses: actions/cache@v2.1.5
+        name: Cache Cargo registry + index
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
@@ -147,11 +153,14 @@ jobs:
       - uses: actions/checkout@v2
       - run: make ci-sweep
       - uses: actions/cache@v2.1.5
+        name: Cache Cargo registry + index
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       # Why is this build, not check? Because we need to make sure the linking phase works.
@@ -174,16 +183,19 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2.1.5
+        name: Cache Cargo registry + index
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: bash scripts/environment/bootstrap-macos-10.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make test-components
+      - run: make test
       - run: make test-behavior
 
   test-windows:
@@ -196,6 +208,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
+      - run: choco install llvm
       - run: make test
 
   test-vrl:
@@ -219,15 +232,16 @@ jobs:
 
   check-component-features:
     name: Component Features - Linux
+    runs-on: [self-hosted, linux, x64, general]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
-    runs-on: ubuntu-20.04
-    container: timberio/ci_image
     steps:
       - uses: actions/checkout@v2
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: echo "home/runner/.local/bin" >> "$GITHUB_PATH"
+      - run: cargo install cargo-hack
       - run: make check-component-features
         env:
           RUSTFLAGS: "-D warnings"
@@ -243,11 +257,14 @@ jobs:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
       - uses: actions/cache@v2.1.5
+        name: Cache Cargo registry + index
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - name: Make slim-builds

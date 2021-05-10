@@ -2,7 +2,7 @@ use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
     event::{Event, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
-    kafka::KafkaAuthConfig,
+    kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -132,7 +132,7 @@ impl SourceConfig for KafkaSourceConfig {
 }
 
 async fn kafka_source(
-    consumer: StreamConsumer,
+    consumer: StreamConsumer<KafkaStatisticsContext>,
     key_field: String,
     topic_key: String,
     partition_key: String,
@@ -218,7 +218,9 @@ async fn kafka_source(
     Ok(())
 }
 
-fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> {
+fn create_consumer(
+    config: &KafkaSourceConfig,
+) -> crate::Result<StreamConsumer<KafkaStatisticsContext>> {
     let mut client_config = ClientConfig::new();
     client_config
         .set("group.id", &config.group_id)
@@ -234,6 +236,7 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> 
             &config.commit_interval_ms.to_string(),
         )
         .set("enable.auto.offset.store", "false")
+        .set("statistics.interval.ms", "1000")
         .set("client.id", "vector");
 
     config.auth.apply(&mut client_config)?;
@@ -244,7 +247,9 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> 
         }
     }
 
-    let consumer: StreamConsumer = client_config.create().context(KafkaCreateError)?;
+    let consumer = client_config
+        .create_with_context::<_, StreamConsumer<_>>(KafkaStatisticsContext)
+        .context(KafkaCreateError)?;
     let topics: Vec<&str> = config.topics.iter().map(|s| s.as_str()).collect();
     consumer.subscribe(&topics).context(KafkaSubscribeError)?;
 

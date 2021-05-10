@@ -6,7 +6,7 @@ use vector::{
     buffers::Acker,
     sinks::util::{
         batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
-        BatchSink, Buffer, Compression, Partition, PartitionBatchSink,
+        BatchSink, Buffer, Compression, EncodedEvent, Partition, PartitionBatchSink,
     },
     test_util::{random_lines, runtime},
 };
@@ -55,7 +55,7 @@ fn benchmark_batch(c: &mut Criterion) {
                             inner: b,
                             key: Bytes::from("key"),
                         }))
-                        .map(Ok),
+                        .map(|item| Ok(EncodedEvent::new(item))),
                         batch_sink,
                     )
                 },
@@ -83,7 +83,11 @@ fn benchmark_batch(c: &mut Criterion) {
                         )
                         .sink_map_err(|error| panic!("{}", error));
 
-                        (rt, stream::iter(input.clone()).map(Ok), batch_sink)
+                        (
+                            rt,
+                            stream::iter(input.clone()).map(|item| Ok(EncodedEvent::new(item))),
+                            batch_sink,
+                        )
                     },
                     |(rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
                     criterion::BatchSize::LargeInput,

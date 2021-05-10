@@ -15,8 +15,6 @@
 extern crate tracing;
 #[macro_use]
 extern crate derivative;
-#[macro_use]
-extern crate pest_derive;
 #[cfg(feature = "vrl-cli")]
 extern crate vrl_cli;
 
@@ -25,7 +23,6 @@ pub mod config;
 pub mod cli;
 pub mod conditions;
 pub mod dns;
-pub mod event;
 pub mod expiring_hash_map;
 pub mod generate;
 #[cfg(feature = "wasm")]
@@ -40,13 +37,11 @@ pub mod buffers;
 pub mod encoding_transcode;
 pub mod heartbeat;
 pub mod http;
-#[cfg(feature = "rdkafka")]
+#[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 pub mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
-pub mod mapping;
-pub mod metrics;
 pub(crate) mod pipeline;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
@@ -81,7 +76,7 @@ pub mod vector_windows;
 
 pub use pipeline::Pipeline;
 
-pub use vector_core::{Error, Result};
+pub use vector_core::{event, mapping, metrics, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
@@ -108,7 +103,7 @@ pub fn get_version() -> String {
 }
 
 #[allow(unused)]
-mod built_info {
+pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 

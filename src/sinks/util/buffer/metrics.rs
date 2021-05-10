@@ -1,6 +1,8 @@
 use crate::{
-    event::metric::{Metric, MetricKind, MetricValue, Sample},
-    event::Event,
+    event::{
+        metric::{Metric, MetricKind, MetricValue, Sample},
+        Event,
+    },
     sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
 };
 use std::{
@@ -127,7 +129,7 @@ impl MetricsBuffer {
 }
 
 impl Batch for MetricsBuffer {
-    type Input = Event;
+    type Input = Metric;
     type Output = Vec<Metric>;
 
     fn get_settings_defaults(
@@ -144,7 +146,6 @@ impl Batch for MetricsBuffer {
         if self.num_items() >= self.max_events {
             PushResult::Overflow(item)
         } else {
-            let item = item.into_metric();
             let max_events = self.max_events;
             let metrics = self
                 .metrics
@@ -210,9 +211,9 @@ impl<N: MetricNormalize> MetricNormalizer<N> {
     }
 
     /// This wraps `MetricNormalize::apply_state`, converting to/from
-    /// the `Event` type wrapper. See that function for return values.
-    pub fn apply(&mut self, event: Event) -> Option<Event> {
-        N::apply_state(&mut self.state, event.into_metric()).map(Into::into)
+    /// the `Metric` type wrapper. See that function for return values.
+    pub fn apply(&mut self, event: Event) -> Option<Metric> {
+        N::apply_state(&mut self.state, event.into_metric())
     }
 }
 
@@ -735,7 +736,7 @@ mod test {
 
     #[test]
     fn compress_distributions() {
-        let samples = crate::samples![
+        let samples = vector_core::samples![
             2.0 => 12,
             2.0 => 12,
             3.0 => 13,
@@ -747,7 +748,7 @@ mod test {
 
         assert_eq!(
             compress_distribution(samples),
-            crate::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
+            vector_core::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
         );
     }
 
@@ -916,7 +917,7 @@ mod test {
             format!("dist-{}", num),
             kind,
             MetricValue::Distribution {
-                samples: crate::samples![num as f64 => rate],
+                samples: vector_core::samples![num as f64 => rate],
                 statistic: StatisticKind::Histogram,
             },
         )
@@ -933,7 +934,7 @@ mod test {
             format!("buckets-{}", num),
             kind,
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![
+                buckets: vector_core::buckets![
                     1.0 => cfactor,
                     2.0f64.powf(bpower) => cfactor * 2,
                     4.0f64.powf(bpower) => cfactor * 4
@@ -949,7 +950,7 @@ mod test {
             format!("quantiles-{}", num),
             kind,
             MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![
+                quantiles: vector_core::quantiles![
                     0.0 => factor,
                     0.5 => factor * 2.0,
                     1.0 => factor * 4.0

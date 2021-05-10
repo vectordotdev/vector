@@ -8,7 +8,27 @@ remap: concepts: event: {
 		.new_field = "new value"
 		```
 
-		The event at hand is the entire context of the VRL program.
+		The event, `.`, at hand is the entire context of the VRL program.
+
+		The event can be set to a value other than an object; for example (`. = 5`). If it is set to an array, each
+		element of that array will be emitted as its own event from the `remap` function. For any elements that are not
+		an object, or if the top-level `.` is set to a scalar value, that value will be set as the `message` key on the
+		emitted object.
+
+		For example:
+
+		```vrl
+		. = ["hello", 1, true, { "foo": "bar" }]
+		```
+
+		Will result in the following four events being emitted:
+
+		```json
+		{ "message": "hello" }
+		{ "message": 1 }
+		{ "message": true }
+		{ "foo": "bar" }
+		```
 		"""
 
 	characteristics: {

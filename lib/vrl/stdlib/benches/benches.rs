@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Local, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
 use shared::btreemap;
@@ -61,6 +61,7 @@ criterion_group!(
               parse_glog,
               parse_grok,
               parse_key_value,
+              parse_klog,
               parse_json,
               parse_nginx_log,
               parse_query_string,
@@ -898,6 +899,22 @@ bench_function! {
             id: "ConsumerFetcherManager-1382721708341",
             module: "kafka.consumer.ConsumerFetcherManager"
         }))
+    }
+}
+
+bench_function! {
+    parse_klog  => vrl_stdlib::ParseKlog;
+
+    literal {
+        args: func_args![value: "I0505 17:59:40.692994   28133 klog.go:70] hello from klog"],
+        want: Ok(btreemap! {
+            "level" => "info",
+            "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339(&format!("{}-05-05T17:59:40.692994Z", Utc::now().year())).unwrap().into()),
+            "id" => 28133,
+            "file" => "klog.go",
+            "line" => 70,
+            "message" => "hello from klog",
+        }),
     }
 }
 

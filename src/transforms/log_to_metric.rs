@@ -144,7 +144,7 @@ enum TransformError {
 fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
     let template = Template::try_from(s).map_err(TransformError::TemplateParseError)?;
     template
-        .render_string(&event)
+        .render_string(event)
         .map_err(TransformError::TemplateRenderingError)
 }
 
@@ -259,7 +259,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 name,
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![value => 1],
+                    samples: vector_core::samples![value => 1],
                     statistic: StatisticKind::Histogram,
                 },
                 metadata,
@@ -285,7 +285,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 name,
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![value => 1],
+                    samples: vector_core::samples![value => 1],
                     statistic: StatisticKind::Summary,
                 },
                 metadata,
@@ -777,7 +777,7 @@ mod tests {
                 "response_time",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![2.5 => 1],
+                    samples: vector_core::samples![2.5 => 1],
                     statistic: StatisticKind::Histogram
                 },
                 metadata
@@ -807,7 +807,7 @@ mod tests {
                 "response_time",
                 MetricKind::Incremental,
                 MetricValue::Distribution {
-                    samples: crate::samples![2.5 => 1],
+                    samples: vector_core::samples![2.5 => 1],
                     statistic: StatisticKind::Summary
                 },
                 metadata

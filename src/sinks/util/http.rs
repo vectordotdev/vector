@@ -1,6 +1,6 @@
 use super::{
     retries::{RetryAction, RetryLogic},
-    sink, Batch, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
+    sink, Batch, EncodedEvent, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestSettings,
 };
 use crate::{
@@ -31,7 +31,7 @@ pub trait HttpSink: Send + Sync + 'static {
     type Input;
     type Output;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input>;
+    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>>;
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>>;
 }
 
@@ -61,12 +61,11 @@ where
         HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>, B::Output>,
         B,
         L,
-        B::Output,
     >,
     // An empty slot is needed to buffer an item where we encoded it but
     // the inner sink is applying back pressure. This trick is used in the `WithFlatMap`
     // sink combinator. https://docs.rs/futures/0.1.29/src/futures/sink/with_flat_map.rs.html#20
-    slot: Option<B::Input>,
+    slot: Option<EncodedEvent<B::Input>>,
 }
 
 impl<T, B> BatchedHttpSink<T, B, HttpRetryLogic>
@@ -197,9 +196,8 @@ where
         B,
         L,
         K,
-        B::Output,
     >,
-    slot: Option<B::Input>,
+    slot: Option<EncodedEvent<B::Input>>,
 }
 
 impl<T, B, K> PartitionHttpSink<T, B, K, HttpRetryLogic>

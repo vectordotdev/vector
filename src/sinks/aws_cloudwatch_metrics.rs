@@ -6,10 +6,11 @@ use crate::{
     },
     rusoto::{self, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
+        batch::{BatchConfig, BatchSettings},
         buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
         retries::RetryLogic,
-        BatchConfig, BatchSettings, Compression, PartitionBatchSink, PartitionBuffer,
-        PartitionInnerBuffer, TowerRequestConfig,
+        Compression, EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+        TowerRequestConfig,
     },
 };
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -149,15 +150,16 @@ impl CloudWatchMetricsSvc {
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
             .with_flat_map(move |event: Event| {
-                stream::iter(normalizer.apply(event).map(|mut event| {
-                    let namespace = event
-                        .as_mut_metric()
+                stream::iter(normalizer.apply(event).map(|mut metric| {
+                    let namespace = metric
                         .series
                         .name
                         .namespace
                         .take()
                         .unwrap_or_else(|| default_namespace.clone());
-                    Ok(PartitionInnerBuffer::new(event, namespace))
+                    Ok(EncodedEvent::new(PartitionInnerBuffer::new(
+                        metric, namespace,
+                    )))
                 }))
             });
 
@@ -389,7 +391,7 @@ mod tests {
             "latency",
             MetricKind::Incremental,
             MetricValue::Distribution {
-                samples: crate::samples![11.0 => 100, 12.0 => 50],
+                samples: vector_core::samples![11.0 => 100, 12.0 => 50],
                 statistic: StatisticKind::Histogram,
             },
         )];
@@ -499,7 +501,7 @@ mod integration_tests {
                     format!("distribution-{}", distribution_name),
                     MetricKind::Incremental,
                     MetricValue::Distribution {
-                        samples: crate::samples![i as f64 => 100],
+                        samples: vector_core::samples![i as f64 => 100],
                         statistic: StatisticKind::Histogram,
                     },
                 )

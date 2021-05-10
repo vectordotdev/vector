@@ -16,7 +16,7 @@ pub mod udp;
 pub mod unix;
 pub mod uri;
 
-use crate::event::Event;
+use crate::event::{Event, EventMetadata};
 use bytes::Bytes;
 use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};
@@ -44,6 +44,38 @@ enum SinkBuildError {
     MissingPort,
 }
 
+#[derive(Debug)]
+pub struct EncodedEvent<I> {
+    pub item: I,
+    pub metadata: Option<EventMetadata>,
+}
+
+impl<I> EncodedEvent<I> {
+    /// Create a trivial input with no metadata. This method will be
+    /// removed when all sinks are converted.
+    pub fn new(item: I) -> Self {
+        Self {
+            item,
+            metadata: None,
+        }
+    }
+
+    // This should be:
+    // ```impl<F, I: From<F>> From<EncodedEvent<F>> for EncodedEvent<I>```
+    // however, the compiler rejects that due to conflicting
+    // implementations of `From` due to the generic
+    // ```impl<T> From<T> for T```
+    pub fn from<F>(that: EncodedEvent<F>) -> Self
+    where
+        I: From<F>,
+    {
+        Self {
+            item: I::from(that.item),
+            metadata: that.metadata,
+        }
+    }
+}
+
 /**
  * Enum representing different ways to encode events as they are sent into a Sink.
  */
@@ -59,7 +91,10 @@ pub enum Encoding {
 * the given encoding. If there are any errors encoding the event, logs a warning
 * and returns None.
 **/
-pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
+pub fn encode_event(
+    mut event: Event,
+    encoding: &EncodingConfig<Encoding>,
+) -> Option<EncodedEvent<Bytes>> {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
 
@@ -76,7 +111,7 @@ pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Op
 
     b.map(|mut b| {
         b.push(b'\n');
-        Bytes::from(b)
+        EncodedEvent::new(Bytes::from(b))
     })
     .map_err(|error| error!(message = "Unable to encode.", %error))
     .ok()
