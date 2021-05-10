@@ -147,10 +147,14 @@ impl BatchNotifier {
 
     /// Update this notifier's status from the status of a finalized event.
     fn update_status(&self, status: EventStatus) {
-        // The status starts as Delivered and can only change to Failed
-        // here. A store cycle is much faster than fetch+update.
-        if status == EventStatus::Failed {
-            self.status.store(BatchStatus::Failed, Ordering::Relaxed);
+        // The status starts as Delivered and can only change if the new
+        // status is different than that.
+        if status != EventStatus::Delivered && status != EventStatus::Dropped {
+            self.status
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old_status| {
+                    Some(old_status.update(status))
+                })
+                .unwrap_or_else(|_| unreachable!());
         }
     }
 
@@ -179,8 +183,26 @@ pub enum BatchStatus {
     /// All events in the batch were accepted (the default)
     #[derivative(Default)]
     Delivered,
-    /// At least one event in the batch failed delivery.
+    /// At least one event in the batch had a transient error in delivery.
+    Errored,
+    /// At least one event in the batch had a permanent failure.
     Failed,
+}
+
+impl BatchStatus {
+    /// Update this status with another batch's delivery status, and return the result.
+    fn update(self, status: EventStatus) -> Self {
+        match (self, status) {
+            // `Dropped` and `Delivered` do not change the status.
+            (_, EventStatus::Dropped) | (_, EventStatus::Delivered) => self,
+            // `Failed` overrides `Errored` and `Delivered`
+            (Self::Failed, _) | (_, EventStatus::Failed) => Self::Failed,
+            // `Errored` overrides `Delivered`
+            (Self::Errored, _) | (_, EventStatus::Errored) => Self::Errored,
+            // No change for `Delivered`
+            _ => self,
+        }
+    }
 }
 
 // Can be dropped when this issue is closed:
@@ -197,7 +219,9 @@ pub enum EventStatus {
     Dropped,
     /// All copies of this event were delivered successfully.
     Delivered,
-    /// At least one copy of this event failed to be delivered.
+    /// At least one copy of this event encountered a retriable error.
+    Errored,
+    /// At least one copy of this event encountered a permanent failure or rejection.
     Failed,
     /// This status has been recorded and should not be updated.
     Recorded,
@@ -212,17 +236,18 @@ impl EventStatus {
     #[allow(clippy::match_same_arms)] // https://github.com/rust-lang/rust-clippy/issues/860
     pub fn update(self, status: Self) -> Self {
         match (self, status) {
-            // Recorded always overwrites existing status.
-            (_, Self::Recorded)
-            // Dropped always updates to the new status.
-                | (Self::Dropped, _) => status,
-            // Recorded is never updated.
-            (Self::Recorded, _)
-            // Delivered may update to `Failed`, but not to `Dropped`.
-                | (Self::Delivered, Self::Dropped)
-            // Failed does not otherwise update.
-                | (Self::Failed, _) => self,
-            (Self::Delivered, _) => status,
+            // `Recorded` always overwrites existing status and is never updated
+            (_, Self::Recorded) | (Self::Recorded, _) => Self::Recorded,
+            // `Dropped` always updates to the new status.
+            (Self::Dropped, _) => status,
+            // Updates *to* `Dropped` are nonsense.
+            (_, Self::Dropped) => self,
+            // `Failed` overrides `Errored` or `Delivered`.
+            (Self::Failed, _) | (_, Self::Failed) => Self::Failed,
+            // `Errored` overrides `Delivered`.
+            (Self::Errored, _) | (_, Self::Errored) => Self::Errored,
+            // No change for `Delivered`.
+            (Self::Delivered, Self::Delivered) => Self::Delivered,
         }
     }
 }
