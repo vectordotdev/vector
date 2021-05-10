@@ -56,6 +56,10 @@ impl Default for WhenFull {
     }
 }
 
+// Clippy warns that the `Disk` variant below is much larger than the
+// `Memory` variant (currently 233 vs 25 bytes) and recommends boxing
+// the large fields to reduce the total size.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
 pub enum BufferInputCloner {
     Memory(mpsc::Sender<Event>, WhenFull),

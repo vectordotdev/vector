@@ -30,9 +30,11 @@ pub mod metrics;
 mod test_util;
 
 #[macro_use]
-extern crate tracing;
+extern crate derivative;
 #[macro_use]
 extern crate pest_derive;
+#[macro_use]
+extern crate tracing;
 
 /// Vector's basic error type, dynamically dispatched and safe to send across
 /// threads.

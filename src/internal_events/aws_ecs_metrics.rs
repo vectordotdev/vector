@@ -33,7 +33,7 @@ impl InternalEvent for AwsEcsMetricsRequestCompleted {
 
     fn emit_metrics(&self) {
         counter!("requests_completed_total", 1);
-        histogram!("request_duration_nanoseconds", self.end - self.start);
+        histogram!("request_duration_seconds", self.end - self.start);
     }
 }
 

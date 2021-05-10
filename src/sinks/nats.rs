@@ -272,7 +272,7 @@ mod integration_tests {
         let (acker, ack_counter) = Acker::new_for_testing();
         let mut sink = NatsSink::new(cnf.clone(), acker).unwrap();
         let num_events = 1_000;
-        let (input, events) = random_lines_with_stream(100, num_events);
+        let (input, events) = random_lines_with_stream(100, num_events, None);
 
         let _ = sink.run(Box::pin(events)).await.unwrap();
 

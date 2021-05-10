@@ -4,7 +4,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSinkConfig,
-        Encoding, UriSerde,
+        EncodedEvent, Encoding, UriSerde,
     },
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
@@ -77,7 +77,11 @@ impl SinkConfig for PapertrailConfig {
     }
 }
 
-fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>) -> Bytes {
+fn encode_event(
+    mut event: Event,
+    pid: u32,
+    encoding: &EncodingConfig<Encoding>,
+) -> EncodedEvent<Bytes> {
     let host = event
         .as_mut_log()
         .remove(log_schema().host_key())
@@ -109,7 +113,7 @@ fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>)
 
     s.push(b'\n');
 
-    Bytes::from(s)
+    EncodedEvent::new(Bytes::from(s))
 }
 
 #[cfg(test)]
@@ -136,7 +140,8 @@ mod tests {
                 except_fields: Some(vec!["magic".into()]),
                 timestamp_format: None,
             },
-        );
+        )
+        .item;
 
         let msg =
             bytes.slice(String::from_utf8_lossy(&bytes).find(": ").unwrap() + 2..bytes.len() - 1);

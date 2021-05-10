@@ -183,6 +183,7 @@ jobs:
           curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
           unzip wix-binaries.zip
           rm wix-binaries.zip
+      - run: choco install llvm
       - name: "Build archive"
         shell: bash
         run: |

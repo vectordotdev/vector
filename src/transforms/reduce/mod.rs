@@ -102,7 +102,7 @@ impl ReduceState {
 
     fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) {
         let (fields, metadata) = e.into_parts();
-        self.metadata.merge(&metadata);
+        self.metadata.merge(metadata);
 
         for (k, v) in fields.into_iter() {
             let strategy = strategies.get(&k);

@@ -10,5 +10,5 @@ then
   # Add Vector to systemd-journal to read journald logs
   usermod --append --groups systemd-journal vector || true
   # Reload the daemon to reflect new group membership
-  systemctl daemon-reload
+  systemctl daemon-reload || true
 fi

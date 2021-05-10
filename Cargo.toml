@@ -226,7 +226,7 @@ pulsar = { version = "2.0.1", default-features = false, features = ["tokio-runti
 rand = { version = "0.8.3", default-features = false, features = ["small_rng"] }
 rand_distr = { version = "0.4.0", default-features = false }
 rdkafka = { version = "0.26.0", default-features = false, features = ["libz", "ssl", "zstd"], optional = true }
-regex = { version = "1.5.3", default-features = false, features = ["std", "perf"] }
+regex = { version = "1.5.4", default-features = false, features = ["std", "perf"] }
 # make sure to update the external docs when the Lua version changes
 rlua = { version = "0.17.0", default-features = true, optional = true }
 seahash = { version = "4.1.0", default-features = false, optional = true }
