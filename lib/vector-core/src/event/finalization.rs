@@ -241,7 +241,10 @@ impl EventStatus {
             // `Dropped` always updates to the new status.
             (Self::Dropped, _) => status,
             // Updates *to* `Dropped` are nonsense.
-            (_, Self::Dropped) => self,
+            (_, Self::Dropped) => {
+                debug_assert!(false, "Updating EventStatus to Dropped is nonsense");
+                self
+            }
             // `Failed` overrides `Errored` or `Delivered`.
             (Self::Failed, _) | (_, Self::Failed) => Self::Failed,
             // `Errored` overrides `Delivered`.
@@ -376,25 +379,25 @@ mod tests {
         assert_eq!(Dropped.update(Failed), Failed);
         assert_eq!(Dropped.update(Recorded), Recorded);
 
-        assert_eq!(Delivered.update(Dropped), Delivered);
+        //assert_eq!(Delivered.update(Dropped), Delivered);
         assert_eq!(Delivered.update(Delivered), Delivered);
         assert_eq!(Delivered.update(Errored), Errored);
         assert_eq!(Delivered.update(Failed), Failed);
         assert_eq!(Delivered.update(Recorded), Recorded);
 
-        assert_eq!(Errored.update(Dropped), Errored);
+        //assert_eq!(Errored.update(Dropped), Errored);
         assert_eq!(Errored.update(Delivered), Errored);
         assert_eq!(Errored.update(Errored), Errored);
         assert_eq!(Errored.update(Failed), Failed);
         assert_eq!(Errored.update(Recorded), Recorded);
 
-        assert_eq!(Failed.update(Dropped), Failed);
+        //assert_eq!(Failed.update(Dropped), Failed);
         assert_eq!(Failed.update(Delivered), Failed);
         assert_eq!(Failed.update(Errored), Failed);
         assert_eq!(Failed.update(Failed), Failed);
         assert_eq!(Failed.update(Recorded), Recorded);
 
-        assert_eq!(Recorded.update(Dropped), Recorded);
+        //assert_eq!(Recorded.update(Dropped), Recorded);
         assert_eq!(Recorded.update(Delivered), Recorded);
         assert_eq!(Recorded.update(Errored), Recorded);
         assert_eq!(Recorded.update(Failed), Recorded);
