@@ -114,11 +114,12 @@ impl HttpSink for ClickhouseConfig {
 
     fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         self.encoding.apply_rules(&mut event);
+        let log = event.into_log();
 
-        let mut body = serde_json::to_vec(&event.as_log()).expect("Events should be valid json!");
+        let mut body = serde_json::to_vec(&log).expect("Events should be valid json!");
         body.push(b'\n');
 
-        Some(EncodedEvent::new(body))
+        Some(EncodedEvent::new(body).with_metadata(log))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -268,7 +269,6 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{log_schema, SinkConfig, SinkContext},
-        event::Event,
         sinks::util::encoding::TimestampFormat,
         test_util::{random_string, trace_init},
     };
@@ -284,6 +284,7 @@ mod integration_tests {
         },
     };
     use tokio::time::{timeout, Duration};
+    use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent};
     use warp::Filter;
 
     #[tokio::test]
@@ -318,8 +319,7 @@ mod integration_tests {
 
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
-        let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("host", "example.com");
+        let (mut input_event, mut receiver) = make_event();
         input_event
             .as_mut_log()
             .insert("items", vec!["item1", "item2"]);
@@ -333,6 +333,8 @@ mod integration_tests {
 
         let expected = serde_json::to_value(input_event.into_log()).unwrap();
         assert_eq!(expected, output.data[0]);
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 
     #[tokio::test]
@@ -372,8 +374,7 @@ mod integration_tests {
 
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
-        let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("host", "example.com");
+        let (mut input_event, _receiver) = make_event();
 
         sink.run(stream::once(future::ready(input_event.clone())))
             .await
@@ -432,8 +433,7 @@ timestamp_format = "unix""#,
 
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
-        let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("host", "example.com");
+        let (mut input_event, _receiver) = make_event();
 
         sink.run(stream::once(future::ready(input_event.clone())))
             .await
@@ -487,8 +487,7 @@ timestamp_format = "unix""#,
 
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
-        let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("host", "example.com");
+        let (input_event, mut receiver) = make_event();
 
         // Retries should go on forever, so if we are retrying incorrectly
         // this timeout should trigger.
@@ -499,6 +498,8 @@ timestamp_format = "unix""#,
         .await
         .unwrap()
         .unwrap();
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
     }
 
     #[tokio::test]
@@ -531,8 +532,7 @@ timestamp_format = "unix""#,
         };
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
-        let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("host", "example.com");
+        let (input_event, mut receiver) = make_event();
 
         // Retries should go on forever, so if we are retrying incorrectly
         // this timeout should trigger.
@@ -543,6 +543,15 @@ timestamp_format = "unix""#,
         .await
         .unwrap()
         .unwrap();
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
+    }
+
+    fn make_event() -> (Event, BatchStatusReceiver) {
+        let (batch, receiver) = BatchNotifier::new_with_receiver();
+        let mut event = LogEvent::from("raw log line").with_batch_notifier(&batch);
+        event.insert("host", "example.com");
+        (event.into(), receiver)
     }
 
     struct ClickhouseClient {
