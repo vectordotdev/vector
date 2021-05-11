@@ -251,7 +251,6 @@ mod tests {
     use futures::{channel::mpsc, stream, StreamExt};
     use http::{request::Parts, StatusCode};
     use indoc::indoc;
-    use std::sync::Arc;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     type Receiver = mpsc::Receiver<(Parts, bytes::Bytes)>;
@@ -586,8 +585,7 @@ mod tests {
 
         // Create 5 events with custom field
         for (i, line) in lines.iter().enumerate() {
-            let mut event =
-                LogEvent::from(line.to_string()).with_batch_notifier(Arc::clone(&batch));
+            let mut event = LogEvent::from(line.to_string()).with_batch_notifier(&batch);
             event.insert(format!("key{}", i), format!("value{}", i));
 
             let timestamp = Utc.ymd(1970, 1, 1).and_hms_nano(0, 0, (i as u32) + 1, 0);
@@ -673,7 +671,6 @@ mod integration_tests {
     };
     use chrono::Utc;
     use futures::stream;
-    use std::sync::Arc;
     use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     #[tokio::test]
@@ -704,11 +701,11 @@ mod integration_tests {
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
 
-        let mut event1 = LogEvent::from("message_1").with_batch_notifier(Arc::clone(&batch));
+        let mut event1 = LogEvent::from("message_1").with_batch_notifier(&batch);
         event1.insert("host", "aws.cloud.eur");
         event1.insert("source_type", "file");
 
-        let mut event2 = LogEvent::from("message_2").with_batch_notifier(Arc::clone(&batch));
+        let mut event2 = LogEvent::from("message_2").with_batch_notifier(&batch);
         event2.insert("host", "aws.cloud.eur");
         event2.insert("source_type", "file");
 

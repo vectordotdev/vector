@@ -69,10 +69,11 @@ impl LogEvent {
         )
     }
 
-    pub fn with_batch_notifier(self, batch: Arc<BatchNotifier>) -> Self {
+    pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
         // Don't make new metadata, just modify it
+        let finalizer = EventFinalizer::new(Arc::clone(batch));
         let (fields, metadata) = self.into_parts();
-        Self::from_parts(fields, metadata.with_finalizer(EventFinalizer::new(batch)))
+        Self::from_parts(fields, metadata.with_finalizer(finalizer))
     }
 
     pub fn add_finalizer(&mut self, finalizer: EventFinalizer) {

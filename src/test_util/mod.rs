@@ -193,7 +193,7 @@ pub fn random_lines_with_stream(
         let log = LogEvent::from(line);
         match &batch {
             None => log,
-            Some(batch) => log.with_batch_notifier(Arc::clone(batch)),
+            Some(batch) => log.with_batch_notifier(batch),
         }
         .into()
     });
