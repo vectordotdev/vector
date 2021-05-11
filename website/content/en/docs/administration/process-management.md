@@ -8,15 +8,9 @@ This document shows you how to manage the Vector process using various platforms
 
 ## Administrate
 
-### Linux
+{{< administrate >}}
 
-#### Start
-
-```bash
-sudo systemctl start vector
-```
-
-##### Health checks
+### Health checks
 
 By default, Vector performs health checks on all components. Health checks ensure that the downstream service is accessible and ready to accept data. This is check is perform when the component is initialized. If the check fails, an error is logged and Vector proceeds to start.
 

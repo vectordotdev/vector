@@ -1,50 +1,21 @@
-{{ $platforms := slice "macOS" "Linux" "Windows" }}
-{{ $tools := slice "Docker CLI" "YUM" "RPM" }}
-{{ $macosTools := slice "Homebrew" "Vector Installer" "Docker CLI" }}
-{{ $dockerCliVersions := slice "latest" "0.12.x" "0.11.x" "0.10.x" }}
-{{ $dockerDistros := slice "debian" "alpine" "distroless" }}
-{{ $arches := slice "x86_64" "aarch64" "armv7" }}
-<div class="administrate" x-data="{
-  Platform: '{{ index $platforms 0 }}',
-  LinuxTool: '{{ index $tools 0 }}',
-  MacOSTool: '{{ index $macosTools 0 }}',
-  DockerDistro: '{{ index $dockerDistros 0 }}',
-  openPlatform: false,
-  openLinuxTool: false,
-  openMacOSTool: false,
-  openDockerDistro: false
-}">
-  {{ template "dropdown" (dict "tag" "Platform" "options" $platforms) }}
-  {{ template "dropdown" (dict "tag" "LinuxTool" "options" $tools "show" "Platform === 'Linux'") }}
-  {{ template "dropdown" (dict "tag" "MacOSTool" "options" $macosTools "show" "Platform === 'macOS'") }}
-  {{ template "dropdown" (dict "tag" "DockerDistro" "options" $dockerDistros "show" "Platform === 'Linux' && LinuxTool === 'Docker CLI'") }}
-
-  <div class="mt-5">
-    <div x-show="MacOSTool === 'Homebrew'">
-    </div>
-  </div>
-</div>
-
-{{ define "dropdown" }}
-{{ $tag := .tag }}
-{{ $openVar := print "open" $tag }}
-<div class="dropdown" :class="{ 'is-active': {{ $openVar  }} }"{{ with .show }} x-show="{{ . }}"{{ end }}>
-  <div class="dropdown-trigger">
-    <button class="button is-primary is-outlined" aria-haspopup="true" aria-controls="{{ .tag }}-dropdown-menu" @click="{{ $openVar }} = !{{ $openVar }}">
-      <span class="has-text-weight-bold" x-text="{{ $tag }}"></span>
-      <span class="icon is-small">
-        <i class="fas fa-angle-down" aria-hidden="true"></i>
-      </span>
-    </button>
-  </div>
-  <div class="dropdown-menu" id="{{ .tag }}-dropdown-menu" role="menu" @click.away="{{ $openVar }} = false">
-    <div class="dropdown-content">
-      {{ range .options }}
-      <a class="dropdown-item" @click="{{ $openVar }} = false; {{ $tag }} = '{{ . }}'">
-        {{ . }}
-      </a>
-      {{ end }}
-    </div>
-  </div>
-</div>
+{{ $platforms := slice }}
+{{ range site.Data.ui.platforms }}
+{{ $platforms = $platforms | append .name }}
 {{ end }}
+
+<div class="no-prose border rounded-md shadow py-3 px-4 dark:border-gray-700">
+  <div class="flex flex-col space-y-2">
+    {{ partial "ui/selector.html" (dict "name" "Platform" "items" $platforms "var" "platform") }}
+
+    {{ range $platforms }}
+    {{ $platform := index (where site.Data.ui.platforms ".name" .) 0 }}
+    <div x-show="$store.ui.platform === '{{ . }}'">
+      {{ partial "ui/selector.html" (dict "name" "Interface" "items" $platform.interfaces "var" "interface") }}
+    </div>
+    {{ end }}
+
+    <div x-show="$store.ui.interface === 'Docker CLI'">
+      {{ partial "ui/docker-cli.html" . }}
+    </div>
+  </div>
+</div>

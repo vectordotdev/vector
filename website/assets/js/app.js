@@ -19,7 +19,6 @@ const tableOfContents = () => {
 }
 
 /* Global state management */
-
 const manageState = () => {
   // Persist global state in localStorage
   const useLocalStorage = true;
@@ -38,6 +37,7 @@ const manageState = () => {
     versionBackup: '{{ $latest }}',
     // Release version
     release: 'stable',
+
     // Set release directly
     setRelease(release) {
       this.release = release;
@@ -83,6 +83,14 @@ const manageState = () => {
     isCurrent(version) {
       return this.version === version;
     },
+  }, useLocalStorage);
+
+  window.Spruce.store('ui', {
+    // Management UI data
+    platform: '{{ site.Data.ui.defaults.platform }}',
+    interface: '{{ site.Data.ui.defaults.interface }}',
+    dockerVersion: '{{ site.Data.ui.default.dockerVersion }}',
+    dockerDistro: '{{ site.Data.ui.default.dockerDistro }}',
   }, useLocalStorage);
 }
 
