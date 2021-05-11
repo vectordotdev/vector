@@ -98,14 +98,14 @@ impl HttpSource for DatadogLogsSource {
         let api_key = extract_api_key(&header_map, request_path);
 
         decode_body(body, Encoding::Json).map(|mut events| {
-            // Datadog API key in metadat & source type field
+            // Datadog API key in metadata & source type field
             let key = log_schema().source_type_key();
             for event in &mut events {
                 let log = event.as_mut_log();
                 log.try_insert(key, Bytes::from("datadog_logs"));
                 if let Some(k) = &api_key {
                     log.metadata_mut()
-                        .merge(EventMetadata::with_datadog_api_key(k.clone()));
+                        .merge(EventMetadata::new_with_datadog_api_key(k.clone()));
                 }
             }
             events
@@ -242,7 +242,7 @@ mod tests {
             assert_eq!(log["timestamp"], 456.into());
             assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
             assert_eq!(
-                event.metadata().datadog_api_key().as_ref().unwrap(),
+                event.metadata().datadog_api_key.as_ref().unwrap(),
                 "12345678abcdefgh12345678abcdefgh"
             );
         }
@@ -284,7 +284,7 @@ mod tests {
             assert_eq!(log["timestamp"], 789.into());
             assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
             assert_eq!(
-                event.metadata().datadog_api_key().as_ref().unwrap(),
+                event.metadata().datadog_api_key.as_ref().unwrap(),
                 "12345678abcdefgh12345678abcdefgh"
             );
         }

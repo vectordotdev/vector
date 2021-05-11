@@ -250,9 +250,9 @@ impl HttpSink for DatadogLogsJsonService {
         self.config.encoding.apply_rules(&mut event);
 
         let api_key = event
-            .metadata()
-            .datadog_api_key()
-            .to_owned()
+            .metadata_mut()
+            .datadog_api_key
+            .take()
             .unwrap_or_else(|| self.config.api_key.clone());
         let json_event = json!(event.into_log());
 
@@ -283,17 +283,14 @@ impl HttpSink for DatadogLogsJsonService {
 
 #[async_trait::async_trait]
 impl HttpSink for DatadogLogsTextService {
-    // type Input = Bytes;
-    // type Output = Vec<Bytes>;
-
     type Input = PartitionInnerBuffer<Bytes, String>;
     type Output = PartitionInnerBuffer<Vec<Bytes>, String>;
 
-    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
+    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         let api_key = event
-            .metadata()
-            .datadog_api_key()
-            .to_owned()
+            .metadata_mut()
+            .datadog_api_key
+            .take()
             .unwrap_or_else(|| self.config.api_key.clone());
 
         encode_event(event, &self.config.encoding).map(|e| {
@@ -382,7 +379,7 @@ mod tests {
         let mut e = Event::from(msg);
         e.as_mut_log()
             .metadata_mut()
-            .merge(EventMetadata::with_datadog_api_key(key.to_string()));
+            .merge(EventMetadata::new_with_datadog_api_key(key.to_string()));
         e
     }
 
@@ -514,7 +511,7 @@ mod tests {
         let mut events = events.map(|mut e| {
             e.as_mut_log()
                 .metadata_mut()
-                .merge(EventMetadata::with_datadog_api_key(
+                .merge(EventMetadata::new_with_datadog_api_key(
                     "from_metadata".to_string(),
                 ));
             Ok(e)
