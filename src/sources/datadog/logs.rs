@@ -240,8 +240,11 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["message"], "bar".into());
             assert_eq!(log["timestamp"], 456.into());
-            assert_eq!(log["dd_api_key"], "12345678abcdefgh12345678abcdefgh".into());
             assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
+            assert_eq!(
+                event.metadata().datadog_api_key().as_ref().unwrap(),
+                "12345678abcdefgh12345678abcdefgh"
+            );
         }
     }
 
@@ -279,8 +282,11 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
             assert_eq!(log["timestamp"], 789.into());
-            assert_eq!(log["dd_api_key"], "12345678abcdefgh12345678abcdefgh".into());
             assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
+            assert_eq!(
+                event.metadata().datadog_api_key().as_ref().unwrap(),
+                "12345678abcdefgh12345678abcdefgh"
+            );
         }
     }
 

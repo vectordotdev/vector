@@ -8,24 +8,23 @@ use crate::{
             batch::{Batch, BatchError},
             encode_event,
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{HttpBatchService, HttpRetryLogic},
+            http::{HttpSink, PartitionHttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, Compression, EncodedEvent, Encoding,
-            JsonArrayBuffer, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-            TowerRequestConfig, VecBuffer,
+            JsonArrayBuffer, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, VecBuffer,
         },
-        Healthcheck, UriParseError, VectorSink,
+        Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsConfig},
 };
 use bytes::Bytes;
 use flate2::write::GzEncoder;
-use futures::{stream, FutureExt, SinkExt, StreamExt};
-use http::{Request, StatusCode, Uri};
+use futures::{FutureExt, SinkExt};
+use http::{Request, StatusCode};
+use hyper::body::Body;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use snafu::ResultExt;
-use std::{future::ready, io::Write, time::Duration};
+use std::{io::Write, time::Duration};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -46,21 +45,6 @@ pub struct DatadogLogsConfig {
 
     #[serde(default)]
     request: TowerRequestConfig,
-}
-
-trait DatadogLogsService: Sized {
-    type Input;
-    type Output;
-
-    fn build_request(
-        &self,
-        events: PartitionInnerBuffer<Self::Output, String>,
-    ) -> crate::Result<Request<Vec<u8>>>;
-
-    fn encode(
-        &self,
-        event: Event,
-    ) -> Option<EncodedEvent<PartitionInnerBuffer<Self::Input, String>>>;
 }
 
 #[derive(Clone)]
@@ -125,41 +109,38 @@ impl DatadogLogsConfig {
         &self,
         cx: SinkContext,
         service: T,
-        buffer: B,
+        batch: B,
         timeout: Duration,
     ) -> crate::Result<(VectorSink, Healthcheck)>
     where
         O: 'static,
-        T: 'static,
         B: Batch<Output = Vec<O>> + std::marker::Send + 'static,
         B::Output: std::marker::Send + Clone,
         B::Input: std::marker::Send,
-        T: DatadogLogsService<Input = B::Input, Output = B::Output>
-            + Clone
-            + std::marker::Send
-            + std::marker::Sync,
+        T: HttpSink<
+                Input = PartitionInnerBuffer<B::Input, String>,
+                Output = PartitionInnerBuffer<B::Output, String>,
+            > + Clone,
     {
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+
         let tls_settings = MaybeTlsSettings::from_config(
             &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
             false,
         )?;
+
         let client = HttpClient::new(tls_settings)?;
-
-        let healthcheck = healthcheck(self.clone(), client.clone()).boxed();
-
-        let request = self.request.unwrap_with(&TowerRequestConfig::default());
-        let request_builder = service.clone();
-        let svc = request.service(
-            HttpRetryLogic,
-            HttpBatchService::new(client, move |request| {
-                ready(request_builder.build_request(request))
-            }),
-        );
-
-        let buffer = PartitionBuffer::new(buffer);
-        let sink = PartitionBatchSink::new(svc, buffer, timeout, cx.acker())
-            .sink_map_err(|error| error!(message = "Fatal datadog log sink error.", %error))
-            .with_flat_map(move |e| stream::iter(service.encode(e)).map(Ok));
+        let healthcheck =
+            healthcheck(service.clone(), client.clone(), self.api_key.clone()).boxed();
+        let sink = PartitionHttpSink::new(
+            service,
+            PartitionBuffer::new(batch),
+            request_settings,
+            timeout,
+            client,
+            cx.acker(),
+        )
+        .sink_map_err(|error| error!(message = "Fatal datadog_logs text sink error.", %error));
 
         Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
@@ -246,36 +227,12 @@ impl SinkConfig for DatadogLogsConfig {
     }
 }
 
-impl DatadogLogsService for DatadogLogsJsonService {
-    type Input = serde_json::Value;
-    type Output = Vec<BoxedRawValue>;
+#[async_trait::async_trait]
+impl HttpSink for DatadogLogsJsonService {
+    type Input = PartitionInnerBuffer<serde_json::Value, String>;
+    type Output = PartitionInnerBuffer<Vec<BoxedRawValue>, String>;
 
-    fn build_request(
-        &self,
-        events: PartitionInnerBuffer<Self::Output, String>,
-    ) -> crate::Result<Request<Vec<u8>>> {
-        let (events, api_key) = events.into_parts();
-
-        let body = serde_json::to_vec(&events)?;
-        // check the number of events to ignore health-check requests
-        if !events.is_empty() {
-            emit!(DatadogLogEventProcessed {
-                byte_size: body.len(),
-                count: events.len(),
-            });
-        }
-        self.config.build_request(
-            self.uri.as_str(),
-            api_key.as_str(),
-            "application/json",
-            body,
-        )
-    }
-
-    fn encode(
-        &self,
-        mut event: Event,
-    ) -> Option<EncodedEvent<PartitionInnerBuffer<Self::Input, String>>> {
+    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         let log = event.as_mut_log();
 
         if let Some(message) = log.remove(log_schema().message_key()) {
@@ -303,16 +260,36 @@ impl DatadogLogsService for DatadogLogsJsonService {
             json_event, api_key,
         )))
     }
+
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+        let (events, api_key) = events.into_parts();
+
+        let body = serde_json::to_vec(&events)?;
+        // check the number of events to ignore health-check requests
+        if !events.is_empty() {
+            emit!(DatadogLogEventProcessed {
+                byte_size: body.len(),
+                count: events.len(),
+            });
+        }
+        self.config.build_request(
+            self.uri.as_str(),
+            api_key.as_str(),
+            "application/json",
+            body,
+        )
+    }
 }
 
-impl DatadogLogsService for DatadogLogsTextService {
-    type Input = Bytes;
-    type Output = Vec<Bytes>;
+#[async_trait::async_trait]
+impl HttpSink for DatadogLogsTextService {
+    // type Input = Bytes;
+    // type Output = Vec<Bytes>;
 
-    fn encode(
-        &self,
-        event: Event,
-    ) -> Option<EncodedEvent<PartitionInnerBuffer<Self::Input, String>>> {
+    type Input = PartitionInnerBuffer<Bytes, String>;
+    type Output = PartitionInnerBuffer<Vec<Bytes>, String>;
+
+    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
         let api_key = event
             .metadata()
             .datadog_api_key()
@@ -328,10 +305,7 @@ impl DatadogLogsService for DatadogLogsTextService {
         })
     }
 
-    fn build_request(
-        &self,
-        events: PartitionInnerBuffer<Self::Output, String>,
-    ) -> crate::Result<Request<Vec<u8>>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let (events, api_key) = events.into_parts();
         let body: Vec<u8> = events.into_iter().flat_map(Bytes::into_iter).collect();
 
@@ -342,16 +316,17 @@ impl DatadogLogsService for DatadogLogsTextService {
 
 /// The healthcheck is performed by sending an empty request to Datadog and checking
 /// the return.
-async fn healthcheck(config: DatadogLogsConfig, client: HttpClient) -> crate::Result<()> {
-    let uri = config.get_uri().parse::<Uri>().context(UriParseError)?;
+async fn healthcheck<T, O>(sink: T, client: HttpClient, api_key: String) -> crate::Result<()>
+where
+    T: HttpSink<Output = PartitionInnerBuffer<Vec<O>, std::string::String>>,
+{
+    let req = sink
+        .build_request(PartitionInnerBuffer::new(Vec::new(), api_key.clone()))
+        .await?
+        .map(Body::from);
 
-    let request = Request::post(uri)
-        .header("content-type", "application/json")
-        .header("DD-API-KEY", config.api_key)
-        .body(hyper::Body::empty())
-        .unwrap();
+    let res = client.send(req).await?;
 
-    let res = client.send(request).await?;
     let status = res.status();
     let body = hyper::body::to_bytes(res.into_body()).await?;
 
@@ -391,7 +366,7 @@ mod tests {
     };
     use futures::{
         channel::mpsc::{Receiver, TryRecvError},
-        StreamExt,
+        stream, StreamExt,
     };
     use hyper::StatusCode;
     use indoc::indoc;
@@ -407,7 +382,7 @@ mod tests {
         let mut e = Event::from(msg);
         e.as_mut_log()
             .metadata_mut()
-            .merge(&EventMetadata::with_datadog_api_key(key.to_string()));
+            .merge(EventMetadata::with_datadog_api_key(key.to_string()));
         e
     }
 
@@ -451,7 +426,6 @@ mod tests {
         }
     }
 
-<<<<<<< HEAD
     async fn smoke_test(encoding: &str) -> (Vec<String>, Vec<(http::request::Parts, Bytes)>) {
         let (expected, rx) = start_test(encoding, StatusCode::OK, BatchStatus::Delivered).await;
 
@@ -492,7 +466,28 @@ mod tests {
             encoding
         );
         let (mut config, cx) = load_sink::<DatadogLogsConfig>(&config).unwrap();
-=======
+
+        let addr = next_addr();
+        // Swap out the endpoint so we can force send it
+        // to our local server
+        let endpoint = format!("http://{}", addr);
+        config.endpoint = Some(endpoint.clone());
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        let (rx, _trigger, server) = build_test_server_status(addr, http_status);
+        tokio::spawn(server);
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (expected, events) = random_lines_with_stream(100, 10, Some(batch));
+
+        let _ = sink.run(events).await.unwrap();
+
+        assert_eq!(receiver.try_recv(), Ok(batch_status));
+
+        (expected, rx)
+    }
+
     #[tokio::test]
     async fn api_key_in_metadata() {
         let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
@@ -514,12 +509,12 @@ mod tests {
         let (rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let (expected, events) = random_lines_with_stream(100, 10);
+        let (expected, events) = random_lines_with_stream(100, 10, None);
 
         let mut events = events.map(|mut e| {
             e.as_mut_log()
                 .metadata_mut()
-                .merge(&EventMetadata::with_datadog_api_key(
+                .merge(EventMetadata::with_datadog_api_key(
                     "from_metadata".to_string(),
                 ));
             Ok(e)
@@ -565,7 +560,6 @@ mod tests {
             batch.max_events = 1
         "#})
         .unwrap();
->>>>>>> 6f7987a80 (Use per-API key partition for datadog logs sink)
 
         let addr = next_addr();
         // Swap out the endpoint so we can force send it
@@ -575,19 +569,6 @@ mod tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
 
-<<<<<<< HEAD
-        let (rx, _trigger, server) = build_test_server_status(addr, http_status);
-        tokio::spawn(server);
-
-        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let (expected, events) = random_lines_with_stream(100, 10, Some(batch));
-
-        let _ = sink.run(events).await.unwrap();
-
-        assert_eq!(receiver.try_recv(), Ok(batch_status));
-
-        (expected, rx)
-=======
         let (rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
@@ -607,6 +588,5 @@ mod tests {
 
         keys.sort();
         assert_eq!(keys, vec!["atoken", "pkc", "vvo"])
->>>>>>> 6f7987a80 (Use per-API key partition for datadog logs sink)
     }
 }

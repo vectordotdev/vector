@@ -10,6 +10,7 @@ use shared::EventDataEq;
 #[derive(Clone, Debug, Default, Deserialize, Getters, PartialEq, PartialOrd, Serialize)]
 pub struct EventMetadata {
     #[serde(default, skip)]
+    /// Used to store the datadog API from sources to sinks
     #[get = "pub"]
     datadog_api_key: Option<String>,
     #[serde(default, skip)]
