@@ -33,6 +33,9 @@ spec:
       serviceAccountName: {{ include "libvector.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.podPriorityClassName }}
+      priorityClassName: {{ .Values.podPriorityClassName }}
+      {{- end }}
       containers:
         - name: vector
           securityContext:
@@ -126,8 +129,7 @@ spec:
             path: /var/lib/
         # Vector will store it's data here.
         - name: data-dir
-          hostPath:
-            path: /var/lib/vector/
+          {{- toYaml .Values.dataVolume | nindent 10 }}
         # Vector config dir.
         - name: config-dir
           projected:

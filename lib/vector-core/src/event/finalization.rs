@@ -146,11 +146,16 @@ impl BatchNotifier {
     }
 
     /// Update this notifier's status from the status of a finalized event.
+    #[allow(clippy::missing_panics_doc)] // Panic is unreachable
     fn update_status(&self, status: EventStatus) {
-        // The status starts as Delivered and can only change to Failed
-        // here. A store cycle is much faster than fetch+update.
-        if status == EventStatus::Failed {
-            self.status.store(BatchStatus::Failed, Ordering::Relaxed);
+        // The status starts as Delivered and can only change if the new
+        // status is different than that.
+        if status != EventStatus::Delivered && status != EventStatus::Dropped {
+            self.status
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old_status| {
+                    Some(old_status.update(status))
+                })
+                .unwrap_or_else(|_| unreachable!());
         }
     }
 
@@ -179,8 +184,27 @@ pub enum BatchStatus {
     /// All events in the batch were accepted (the default)
     #[derivative(Default)]
     Delivered,
-    /// At least one event in the batch failed delivery.
+    /// At least one event in the batch had a transient error in delivery.
+    Errored,
+    /// At least one event in the batch had a permanent failure.
     Failed,
+}
+
+impl BatchStatus {
+    /// Update this status with another batch's delivery status, and return the result.
+    #[allow(clippy::match_same_arms)] // False positive: https://github.com/rust-lang/rust-clippy/issues/860
+    fn update(self, status: EventStatus) -> Self {
+        match (self, status) {
+            // `Dropped` and `Delivered` do not change the status.
+            (_, EventStatus::Dropped) | (_, EventStatus::Delivered) => self,
+            // `Failed` overrides `Errored` and `Delivered`
+            (Self::Failed, _) | (_, EventStatus::Failed) => Self::Failed,
+            // `Errored` overrides `Delivered`
+            (Self::Errored, _) | (_, EventStatus::Errored) => Self::Errored,
+            // No change for `Delivered`
+            _ => self,
+        }
+    }
 }
 
 // Can be dropped when this issue is closed:
@@ -197,7 +221,9 @@ pub enum EventStatus {
     Dropped,
     /// All copies of this event were delivered successfully.
     Delivered,
-    /// At least one copy of this event failed to be delivered.
+    /// At least one copy of this event encountered a retriable error.
+    Errored,
+    /// At least one copy of this event encountered a permanent failure or rejection.
     Failed,
     /// This status has been recorded and should not be updated.
     Recorded,
@@ -209,20 +235,29 @@ impl AtomInteger for EventStatus {}
 
 impl EventStatus {
     /// Update this status with another event's finalization status and return the result.
-    #[allow(clippy::match_same_arms)] // https://github.com/rust-lang/rust-clippy/issues/860
+    ///
+    /// # Panics
+    ///
+    /// Passing a new status of `Dropped` is a programming error and
+    /// will panic in debug/test builds.
+    #[allow(clippy::match_same_arms)] // False positive: https://github.com/rust-lang/rust-clippy/issues/860
     pub fn update(self, status: Self) -> Self {
         match (self, status) {
-            // Recorded always overwrites existing status.
-            (_, Self::Recorded)
-            // Dropped always updates to the new status.
-                | (Self::Dropped, _) => status,
-            // Recorded is never updated.
-            (Self::Recorded, _)
-            // Delivered may update to `Failed`, but not to `Dropped`.
-                | (Self::Delivered, Self::Dropped)
-            // Failed does not otherwise update.
-                | (Self::Failed, _) => self,
-            (Self::Delivered, _) => status,
+            // `Recorded` always overwrites existing status and is never updated
+            (_, Self::Recorded) | (Self::Recorded, _) => Self::Recorded,
+            // `Dropped` always updates to the new status.
+            (Self::Dropped, _) => status,
+            // Updates *to* `Dropped` are nonsense.
+            (_, Self::Dropped) => {
+                debug_assert!(false, "Updating EventStatus to Dropped is nonsense");
+                self
+            }
+            // `Failed` overrides `Errored` or `Delivered`.
+            (Self::Failed, _) | (_, Self::Failed) => Self::Failed,
+            // `Errored` overrides `Delivered`.
+            (Self::Errored, _) | (_, Self::Errored) => Self::Errored,
+            // No change for `Delivered`.
+            (Self::Delivered, Self::Delivered) => Self::Delivered,
         }
     }
 }
@@ -339,5 +374,63 @@ mod tests {
         let finalizer = EventFinalizers::new(EventFinalizer::new(batch));
         assert_eq!(finalizer.count_finalizers(), 1);
         (finalizer, receiver)
+    }
+
+    #[test]
+    fn event_status_updates() {
+        use EventStatus::{Delivered, Dropped, Errored, Failed, Recorded};
+
+        assert_eq!(Dropped.update(Dropped), Dropped);
+        assert_eq!(Dropped.update(Delivered), Delivered);
+        assert_eq!(Dropped.update(Errored), Errored);
+        assert_eq!(Dropped.update(Failed), Failed);
+        assert_eq!(Dropped.update(Recorded), Recorded);
+
+        //assert_eq!(Delivered.update(Dropped), Delivered);
+        assert_eq!(Delivered.update(Delivered), Delivered);
+        assert_eq!(Delivered.update(Errored), Errored);
+        assert_eq!(Delivered.update(Failed), Failed);
+        assert_eq!(Delivered.update(Recorded), Recorded);
+
+        //assert_eq!(Errored.update(Dropped), Errored);
+        assert_eq!(Errored.update(Delivered), Errored);
+        assert_eq!(Errored.update(Errored), Errored);
+        assert_eq!(Errored.update(Failed), Failed);
+        assert_eq!(Errored.update(Recorded), Recorded);
+
+        //assert_eq!(Failed.update(Dropped), Failed);
+        assert_eq!(Failed.update(Delivered), Failed);
+        assert_eq!(Failed.update(Errored), Failed);
+        assert_eq!(Failed.update(Failed), Failed);
+        assert_eq!(Failed.update(Recorded), Recorded);
+
+        //assert_eq!(Recorded.update(Dropped), Recorded);
+        assert_eq!(Recorded.update(Delivered), Recorded);
+        assert_eq!(Recorded.update(Errored), Recorded);
+        assert_eq!(Recorded.update(Failed), Recorded);
+        assert_eq!(Recorded.update(Recorded), Recorded);
+    }
+
+    #[test]
+    fn batch_status_update() {
+        use BatchStatus::{Delivered, Errored, Failed};
+
+        assert_eq!(Delivered.update(EventStatus::Dropped), Delivered);
+        assert_eq!(Delivered.update(EventStatus::Delivered), Delivered);
+        assert_eq!(Delivered.update(EventStatus::Errored), Errored);
+        assert_eq!(Delivered.update(EventStatus::Failed), Failed);
+        assert_eq!(Delivered.update(EventStatus::Recorded), Delivered);
+
+        assert_eq!(Errored.update(EventStatus::Dropped), Errored);
+        assert_eq!(Errored.update(EventStatus::Delivered), Errored);
+        assert_eq!(Errored.update(EventStatus::Errored), Errored);
+        assert_eq!(Errored.update(EventStatus::Failed), Failed);
+        assert_eq!(Errored.update(EventStatus::Recorded), Errored);
+
+        assert_eq!(Failed.update(EventStatus::Dropped), Failed);
+        assert_eq!(Failed.update(EventStatus::Delivered), Failed);
+        assert_eq!(Failed.update(EventStatus::Errored), Failed);
+        assert_eq!(Failed.update(EventStatus::Failed), Failed);
+        assert_eq!(Failed.update(EventStatus::Recorded), Failed);
     }
 }
