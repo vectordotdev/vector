@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 use prost::Message;
 use snafu::Snafu;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
 };
 use std::{convert::TryInto, fmt::Debug};
@@ -22,8 +22,8 @@ mod dnstap_proto {
 }
 
 use dnstap_proto::{
-    dnstap::Type as DnstapDataType, message::Type as DnstapMessageType, Dnstap,
-    Message as DnstapMessage, SocketFamily, SocketProtocol,
+    message::Type as DnstapMessageType, Dnstap, Message as DnstapMessage, SocketFamily,
+    SocketProtocol,
 };
 
 use super::dns_message::{
@@ -32,6 +32,8 @@ use super::dns_message::{
 };
 use super::dns_message_parser::DnsMessageParser;
 use super::schema::DnstapEventSchema;
+
+const MAX_DNSTAP_QUERY_MESSAGE_TYPE_ID: i32 = 12;
 
 #[derive(Debug, Snafu)]
 enum DnstapParserError {
@@ -62,31 +64,20 @@ lazy_static! {
     ]
     .into_iter()
     .collect();
-    static ref DNSTAP_MESSAGE_TYPE_ID_MAP: HashMap<i32, DnstapMessageType> = vec![
-        (1, DnstapMessageType::AuthQuery),
-        (2, DnstapMessageType::AuthResponse),
-        (3, DnstapMessageType::ResolverQuery),
-        (4, DnstapMessageType::ResolverResponse),
-        (5, DnstapMessageType::ClientQuery),
-        (6, DnstapMessageType::ClientResponse),
-        (7, DnstapMessageType::ForwarderQuery),
-        (8, DnstapMessageType::ForwarderResponse),
-        (9, DnstapMessageType::StubQuery),
-        (10, DnstapMessageType::StubResponse),
-        (11, DnstapMessageType::ToolQuery),
-        (12, DnstapMessageType::ToolResponse),
-        (13, DnstapMessageType::UpdateQuery),
-        (14, DnstapMessageType::UpdateResponse),
-    ]
-    .into_iter()
-    .map(|(k, v)| (k, v))
-    .collect();
 }
 
 pub struct DnstapParser<'a> {
     event_schema: &'a DnstapEventSchema,
     parent_key_path: Vec<PathComponent>,
     log_event: &'a mut LogEvent,
+}
+
+pub fn parse_dnstap_data(
+    event_schema: &DnstapEventSchema,
+    log_event: &mut LogEvent,
+    frame: Bytes,
+) -> Result<()> {
+    DnstapParser::new(event_schema, log_event).parse_dnstap_data(frame)
 }
 
 impl<'a> DnstapParser<'a> {
@@ -144,10 +135,10 @@ impl<'a> DnstapParser<'a> {
         if let Some(dnstap_data_type) = to_dnstap_data_type(dnstap_data_type_id) {
             self.insert(
                 self.event_schema.dnstap_root_data_schema().data_type(),
-                format!("{:?}", dnstap_data_type),
+                dnstap_data_type.clone(),
             );
 
-            if dnstap_data_type == DnstapDataType::Message {
+            if dnstap_data_type == "Message" {
                 if let Some(message) = proto_msg.message {
                     if let Err(err) = self.parse_dnstap_message(message) {
                         emit!(DnstapParseDataError {
@@ -263,7 +254,7 @@ impl<'a> DnstapParser<'a> {
             self.event_schema
                 .dnstap_message_schema()
                 .dnstap_message_type(),
-            format!("{:?}", to_dnstap_message_type(dnstap_message_type_id)?),
+            to_dnstap_message_type(dnstap_message_type_id),
         );
 
         let request_message_key = self
@@ -278,12 +269,13 @@ impl<'a> DnstapParser<'a> {
             .to_string();
 
         if let Some(query_time_sec) = dnstap_message.query_time_sec {
-            let mut time_in_nanosec: i64 = query_time_sec as i64 * 1_000_000_000_i64;
-            let mut query_time_nsec = 0;
-            if let Some(nsec) = dnstap_message.query_time_nsec {
-                query_time_nsec = nsec;
-                time_in_nanosec += query_time_nsec as i64;
-            }
+            let (time_in_nanosec, query_time_nsec) = match dnstap_message.query_time_nsec {
+                Some(nsec) => (
+                    query_time_sec as i64 * 1_000_000_000_i64 + nsec as i64,
+                    nsec,
+                ),
+                None => (query_time_sec as i64 * 1_000_000_000_i64, 0),
+            };
 
             if DNSTAP_MESSAGE_REQUEST_TYPE_IDS.contains(&dnstap_message_type_id) {
                 self.log_time(
@@ -304,21 +296,22 @@ impl<'a> DnstapParser<'a> {
                 self.parent_key_path
                     .push(PathComponent::Key(request_message_key.clone()));
 
-                let time_key_name = if dnstap_message_type_id <= 12 {
+                let time_key_name = if dnstap_message_type_id <= MAX_DNSTAP_QUERY_MESSAGE_TYPE_ID {
                     self.event_schema.dns_query_message_schema().time()
                 } else {
                     self.event_schema.dns_update_message_schema().time()
                 };
 
-                let time_precision_key_name = if dnstap_message_type_id <= 12 {
-                    self.event_schema
-                        .dns_query_message_schema()
-                        .time_precision()
-                } else {
-                    self.event_schema
-                        .dns_update_message_schema()
-                        .time_precision()
-                };
+                let time_precision_key_name =
+                    if dnstap_message_type_id <= MAX_DNSTAP_QUERY_MESSAGE_TYPE_ID {
+                        self.event_schema
+                            .dns_query_message_schema()
+                            .time_precision()
+                    } else {
+                        self.event_schema
+                            .dns_update_message_schema()
+                            .time_precision()
+                    };
 
                 self.log_time(
                     time_key_name,
@@ -332,13 +325,13 @@ impl<'a> DnstapParser<'a> {
         }
 
         if let Some(response_time_sec) = dnstap_message.response_time_sec {
-            let mut time_in_nanosec: i64 = response_time_sec as i64 * 1_000_000_000_i64;
-
-            let mut response_time_nsec = 0;
-            if let Some(nsec) = dnstap_message.response_time_nsec {
-                response_time_nsec = nsec;
-                time_in_nanosec += response_time_nsec as i64;
-            }
+            let (time_in_nanosec, response_time_nsec) = match dnstap_message.response_time_nsec {
+                Some(nsec) => (
+                    response_time_sec as i64 * 1_000_000_000_i64 + nsec as i64,
+                    nsec,
+                ),
+                None => (response_time_sec as i64 * 1_000_000_000_i64, 0),
+            };
 
             if DNSTAP_MESSAGE_RESPONSE_TYPE_IDS.contains(&dnstap_message_type_id) {
                 self.log_time(
@@ -360,21 +353,22 @@ impl<'a> DnstapParser<'a> {
                 self.parent_key_path
                     .push(PathComponent::Key(response_message_key.clone()));
 
-                let time_key_name = if dnstap_message_type_id <= 12 {
+                let time_key_name = if dnstap_message_type_id <= MAX_DNSTAP_QUERY_MESSAGE_TYPE_ID {
                     self.event_schema.dns_query_message_schema().time()
                 } else {
                     self.event_schema.dns_update_message_schema().time()
                 };
 
-                let time_precision_key_name = if dnstap_message_type_id <= 12 {
-                    self.event_schema
-                        .dns_query_message_schema()
-                        .time_precision()
-                } else {
-                    self.event_schema
-                        .dns_update_message_schema()
-                        .time_precision()
-                };
+                let time_precision_key_name =
+                    if dnstap_message_type_id <= MAX_DNSTAP_QUERY_MESSAGE_TYPE_ID {
+                        self.event_schema
+                            .dns_query_message_schema()
+                            .time_precision()
+                    } else {
+                        self.event_schema
+                            .dns_update_message_schema()
+                            .time_precision()
+                    };
 
                 self.log_time(
                     time_key_name,
@@ -959,20 +953,30 @@ fn to_socket_protocol_name(socket_protocol: i32) -> Result<&'static str> {
     }
 }
 
-fn to_dnstap_data_type(data_type_id: i32) -> Option<DnstapDataType> {
+fn to_dnstap_data_type(data_type_id: i32) -> Option<String> {
     match data_type_id {
-        1 => Some(DnstapDataType::Message),
+        1 => Some(String::from("Message")),
         _ => None,
     }
 }
 
-fn to_dnstap_message_type(type_id: i32) -> Result<DnstapMessageType> {
-    match DNSTAP_MESSAGE_TYPE_ID_MAP.get(&type_id) {
-        Some(msg_type) => Ok(*msg_type),
-        None => Err(Error::from(format!(
-            "Unknown dnstap message type: {}",
-            type_id
-        ))),
+fn to_dnstap_message_type(type_id: i32) -> String {
+    match type_id {
+        1 => String::from("AuthQuery"),
+        2 => String::from("AuthResponse"),
+        3 => String::from("ResolverQuery"),
+        4 => String::from("ResolverResponse"),
+        5 => String::from("ClientQuery"),
+        6 => String::from("ClientResponse"),
+        7 => String::from("ForwarderQuery"),
+        8 => String::from("ForwarderResponse"),
+        9 => String::from("StubQuery"),
+        10 => String::from("StubResponse"),
+        11 => String::from("ToolQuery"),
+        12 => String::from("ToolResponse"),
+        13 => String::from("UpdateQuery"),
+        14 => String::from("UpdateResponse"),
+        _ => format!("Unknown dnstap message type: {}", type_id),
     }
 }
 
@@ -991,43 +995,40 @@ mod tests {
         let raw_dnstap_data = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcnoIAxACGAEiEAAAAAAAAA\
         AAAAAAAAAAAAAqECABBQJwlAAAAAAAAAAAADAw8+0CODVA7+zq9wVNMU3WNlI2kwIAAAABAAAAAAABCWZhY2Vib29rMQNjb\
         20AAAEAAQAAKQIAAACAAAAMAAoACOxjCAG9zVgzWgUDY29tAHgB";
-        if let Ok(dnstap_data) = base64::decode(raw_dnstap_data) {
-            let parse_result = parser.parse_dnstap_data(Bytes::from(dnstap_data));
-            assert!(parse_result.is_ok());
-            assert!(log_event.all_fields().any(|(key, value)| key == "time"
+        let dnstap_data = base64::decode(raw_dnstap_data).expect("Invalid base64 encoded data.");
+        let parse_result = parser.parse_dnstap_data(Bytes::from(dnstap_data));
+        assert!(parse_result.is_ok());
+        assert!(log_event.all_fields().any(|(key, value)| key == "time"
+            && match *value {
+                Value::Integer(time) => time == 1_593_489_007_920_014_129,
+                _ => false,
+            }));
+        assert!(log_event.all_fields().any(|(key, value)| key == "timestamp"
+            && match *value {
+                Value::Timestamp(timestamp) =>
+                    timestamp.timestamp_nanos() == 1_593_489_007_920_014_129,
+                _ => false,
+            }));
+        assert!(log_event
+            .all_fields()
+            .any(|(key, value)| key == "requestData.header.qr"
                 && match *value {
-                    Value::Integer(time) => time == 1_593_489_007_920_014_129,
+                    Value::Integer(qr) => qr == 0,
                     _ => false,
                 }));
-            assert!(log_event.all_fields().any(|(key, value)| key == "timestamp"
-                && match *value {
-                    Value::Timestamp(timestamp) =>
-                        timestamp.timestamp_nanos() == 1_593_489_007_920_014_129,
-                    _ => false,
-                }));
-            assert!(log_event
-                .all_fields()
-                .any(|(key, value)| key == "requestData.header.qr"
-                    && match *value {
-                        Value::Integer(qr) => qr == 0,
-                        _ => false,
-                    }));
-            assert!(log_event.all_fields().any(|(key, value)| key
-                == "requestData.opt.udpPayloadSize"
+        assert!(log_event
+            .all_fields()
+            .any(|(key, value)| key == "requestData.opt.udpPayloadSize"
                 && match *value {
                     Value::Integer(udp_payload_size) => udp_payload_size == 512,
                     _ => false,
                 }));
-            assert!(log_event.all_fields().any(|(key, value)| key
-                == "requestData.question[0].domainName"
-                && match value {
-                    Value::Bytes(domain_name) =>
-                        *domain_name == Bytes::from_static(b"facebook1.com."),
-                    _ => false,
-                }));
-        } else {
-            error!("Invalid base64 encoded data.");
-        }
+        assert!(log_event.all_fields().any(|(key, value)| key
+            == "requestData.question[0].domainName"
+            && match value {
+                Value::Bytes(domain_name) => *domain_name == Bytes::from_static(b"facebook1.com."),
+                _ => false,
+            }));
     }
 
     #[test]
@@ -1039,46 +1040,42 @@ mod tests {
         let raw_dnstap_data = "ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zcmsIDhABGAEiBH8AAA\
         EqBH8AAAEwrG44AEC+iu73BU14gfofUh1wi6gAAAEAAAAAAAAHZXhhbXBsZQNjb20AAAYAAWC+iu73BW0agDwvch1wi6gAA\
         AEAAAAAAAAHZXhhbXBsZQNjb20AAAYAAXgB";
-        if let Ok(dnstap_data) = base64::decode(raw_dnstap_data) {
-            let parse_result = parser.parse_dnstap_data(Bytes::from(dnstap_data));
-            assert!(parse_result.is_ok());
-            assert!(log_event.all_fields().any(|(key, value)| key == "time"
+        let dnstap_data = base64::decode(raw_dnstap_data).expect("Invalid base64 encoded data.");
+        let parse_result = parser.parse_dnstap_data(Bytes::from(dnstap_data));
+        assert!(parse_result.is_ok());
+        assert!(log_event.all_fields().any(|(key, value)| key == "time"
+            && match *value {
+                Value::Integer(time) => time == 1_593_541_950_792_494_106,
+                _ => false,
+            }));
+        assert!(log_event.all_fields().any(|(key, value)| key == "timestamp"
+            && match *value {
+                Value::Timestamp(timestamp) =>
+                    timestamp.timestamp_nanos() == 1_593_541_950_792_494_106,
+                _ => false,
+            }));
+        assert!(log_event
+            .all_fields()
+            .any(|(key, value)| key == "requestData.header.qr"
                 && match *value {
-                    Value::Integer(time) => time == 1_593_541_950_792_494_106,
+                    Value::Integer(qr) => qr == 1,
                     _ => false,
                 }));
-            assert!(log_event.all_fields().any(|(key, value)| key == "timestamp"
-                && match *value {
-                    Value::Timestamp(timestamp) =>
-                        timestamp.timestamp_nanos() == 1_593_541_950_792_494_106,
+        assert!(log_event
+            .all_fields()
+            .any(|(key, value)| key == "messageType"
+                && match value {
+                    Value::Bytes(data_type) => *data_type == Bytes::from_static(b"UpdateResponse"),
                     _ => false,
                 }));
-            assert!(log_event
-                .all_fields()
-                .any(|(key, value)| key == "requestData.header.qr"
-                    && match *value {
-                        Value::Integer(qr) => qr == 1,
-                        _ => false,
-                    }));
-            assert!(log_event
-                .all_fields()
-                .any(|(key, value)| key == "messageType"
-                    && match value {
-                        Value::Bytes(data_type) =>
-                            *data_type == Bytes::from_static(b"UpdateResponse"),
-                        _ => false,
-                    }));
-            assert!(log_event
-                .all_fields()
-                .any(|(key, value)| key == "requestData.zone.zName"
-                    && match value {
-                        Value::Bytes(domain_name) =>
-                            *domain_name == Bytes::from_static(b"example.com."),
-                        _ => false,
-                    }));
-        } else {
-            error!("Invalid base64 encoded data.");
-        }
+        assert!(log_event
+            .all_fields()
+            .any(|(key, value)| key == "requestData.zone.zName"
+                && match value {
+                    Value::Bytes(domain_name) =>
+                        *domain_name == Bytes::from_static(b"example.com."),
+                    _ => false,
+                }));
     }
 
     #[test]
@@ -1087,11 +1084,10 @@ mod tests {
         let log_event = event.as_mut_log();
         let schema = DnstapEventSchema::new();
         let mut parser = DnstapParser::new(&schema, log_event);
-        if let Err(e) = parser.parse_dnstap_data(Bytes::from(vec![1, 2, 3])) {
-            assert!(e.to_string().contains("Protobuf message"));
-        } else {
-            error!("Expected TrustDnsError.");
-        }
+        let e = parser
+            .parse_dnstap_data(Bytes::from(vec![1, 2, 3]))
+            .expect_err("Expected TrustDnsError.");
+        assert!(e.to_string().contains("Protobuf message"));
     }
 
     #[test]

@@ -88,44 +88,6 @@ components: sources: dnstap: {
 				examples: [0o777, 0o754, 508]
 			}
 		}
-		multithreaded: {
-			common: false
-			description: """
-				Whether or not to spawn a new asynchronous task for each dnstap
-				frame. This is to enable concurrent dnstap frame handling.
-				"""
-			required: false
-			type: bool: default: false
-			warnings: [
-				"""
-					Enabling concurrent dnstap frame handling may increase memory
-					consumption significantly. To limit memory usage,
-					set \"max_frame_handling_tasks\" accordingly.
-					""",
-			]
-		}
-		max_frame_handling_tasks: {
-			common: false
-			description: """
-				Max number of outstanding dnstap frame handling tasks to be allowed
-				at any given time.
-				"""
-			required: false
-			type: uint: {
-				default: 1000
-				unit:    null
-			}
-			warnings: [
-				"""
-					Once the limit is reached, the reading of incoming dnstap data
-					will be paused until the number of outstanding tasks decreases
-					below the limit.
-					""",
-				"""
-					Raising the limit may increase memory consumption. Be cautious!
-					""",
-			]
-		}
 		socket_receive_buffer_size: {
 			common: false
 			description: """
@@ -979,7 +941,6 @@ components: sources: dnstap: {
 				max_frame_length:         102400
 				socket_file_mode:         508
 				socket_path:              "/run/bind/dnstap.sock"
-				multithreaded:            true
 				max_frame_handling_tasks: 10000
 			}
 			input: """
@@ -1276,49 +1237,6 @@ components: sources: dnstap: {
 						"""#
 				},
 			]
-		}
-
-		multithreaded_mode: {
-			title: "Multi-threaded Mode"
-			body: #"""
-				By default, the dnstap source component reads and processes dnstap
-				data sequentially as a pipeline: retrieving a dnstap data frame,
-				parsing it thoroughly and composing a new Vector event out of it,
-				and finally sending the event composed onto the next Vector component
-				for further processing, then starting to retrieve next dnstap data frame.
-				The pipeline should work fine with casual DNS query flows, but may
-				become inefficient on a multi-cpu-core machine under extreme load,
-				and cause inbound UDS channel to be jammed over time, which might in turn
-				cause BIND to start dropping dnstap data.
-
-				To make the process more efficient on multi-cpu-core machine, we need to
-				spread the load to all available CPU cores as much as possible, especially
-				the part of parsing dnstap data frame and composing Vector event out of it.
-				And that's exactly what the "multi-threaded mode" is for.
-
-				When "multi-threaded mode" is enabled, retrieving of dnstap data frames
-				out of UDS will still work as a pipeline. However, for each dnstap data
-				frame read, an asynchronous task will be spawned for the rest of processing
-				on the frame.
-
-				The max number of outstanding asynchronous tasks (i.e. spawned but unfinished
-				yet) allowed is regulated by option "max_frame_handling_tasks". Once the
-				limit has reached, the frame retrieving pipeline will pause for a few
-				milliseconds, and try again, until some tasks are finished, and the number of
-				outstanding tasks decreases below the limit.
-
-				To enable "multi-threaded mode" and configure the max number of outstanding
-				tasks allowed, add options "multithreaded" and "max_frame_handling_tasks"
-				in dnstap source configuration like below:
-
-				```toml
-						[sources.my_dnstap_source]
-							type = "dnstap"
-							# ...
-							multithreaded = true
-							max_frame_handling_tasks = 10_000
-				```
-				"""#
 		}
 
 		manipulate_uds_buffer_size: {

@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 pub mod parser;
+pub use parser::parse_dnstap_data;
 pub use parser::DnstapParser;
 
 pub mod schema;
@@ -192,7 +193,7 @@ impl FrameHandler for DnstapFrameHandler {
             });
             Some(event)
         } else {
-            match DnstapParser::new(&self.schema, log_event).parse_dnstap_data(frame) {
+            match parse_dnstap_data(&self.schema, log_event, frame) {
                 Err(err) => {
                     emit!(DnstapParseDataError {
                         error: format!("Dnstap protobuf decode error {:?}.", err).as_str()

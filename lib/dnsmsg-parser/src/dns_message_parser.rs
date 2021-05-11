@@ -35,14 +35,20 @@ pub enum DnsMessageParserError {
 
 pub struct DnsMessageParser {
     raw_message: Vec<u8>,
-    raw_message_clone: Option<Vec<u8>>, // Used only for parsing compressed domain names
+    // This field is used to facilitate parsing of compressed domain names contained
+    // in some record data. We could instantiate a new copy of the raw_message whenever
+    // we need to parse rdata, but to avoid impact on performance, we'll instantiate
+    // only one copy of raw_message upon the first call to parse an rdata that may
+    // contain compressed domain name, and store it here as a member field; for
+    // subsequent invocations of the same call, we simply reuse this copy.
+    raw_message_for_rdata_parsing: Option<Vec<u8>>,
 }
 
 impl DnsMessageParser {
     pub fn new(raw_message: Vec<u8>) -> Self {
         DnsMessageParser {
             raw_message,
-            raw_message_clone: None,
+            raw_message_for_rdata_parsing: None,
         }
     }
 
@@ -92,11 +98,11 @@ impl DnsMessageParser {
         &self,
         dns_message: &TrustDnsMessage,
     ) -> Vec<QueryQuestion> {
-        let mut questions: Vec<QueryQuestion> = Vec::new();
-        for query in dns_message.queries().iter() {
-            questions.push(self.parse_dns_query_question(query));
-        }
-        questions
+        dns_message
+            .queries()
+            .iter()
+            .map(|query| self.parse_dns_query_question(query))
+            .collect()
     }
 
     fn parse_dns_query_question(&self, question: &Query) -> QueryQuestion {
@@ -159,19 +165,20 @@ impl DnsMessageParser {
     }
 
     fn get_rdata_decoder_with_raw_message(&mut self, raw_rdata: &[u8]) -> BinDecoder {
-        let (index, raw_message_clone_data) = if let Some(mut buf) = self.raw_message_clone.take() {
-            let index = buf.len();
-            buf.extend_from_slice(raw_rdata);
-            (index, buf)
-        } else {
-            let mut buf = Vec::<u8>::with_capacity(self.raw_message.len() * 2);
-            buf.extend(&self.raw_message);
-            buf.extend_from_slice(raw_rdata);
-            (self.raw_message.len(), buf)
-        };
-        self.raw_message_clone = Some(raw_message_clone_data);
+        let (index, raw_message_for_rdata_parsing_data) =
+            if let Some(mut buf) = self.raw_message_for_rdata_parsing.take() {
+                let index = buf.len();
+                buf.extend_from_slice(raw_rdata);
+                (index, buf)
+            } else {
+                let mut buf = Vec::<u8>::with_capacity(self.raw_message.len() * 2);
+                buf.extend(&self.raw_message);
+                buf.extend_from_slice(raw_rdata);
+                (self.raw_message.len(), buf)
+            };
+        self.raw_message_for_rdata_parsing = Some(raw_message_for_rdata_parsing_data);
 
-        BinDecoder::new(self.raw_message_clone.as_ref().unwrap()).clone(index as u16)
+        BinDecoder::new(self.raw_message_for_rdata_parsing.as_ref().unwrap()).clone(index as u16)
     }
 
     fn parse_wks_rdata(
@@ -1213,7 +1220,6 @@ mod tests {
         str::FromStr,
         time::Instant,
     };
-    use tracing::error;
     use trust_dns_proto::{
         rr::{
             dnssec::{
@@ -1235,97 +1241,65 @@ mod tests {
     };
 
     impl DnsMessageParser {
-        pub fn raw_message_clone(&self) -> Option<&Vec<u8>> {
-            self.raw_message_clone.as_ref()
+        pub fn raw_message_for_rdata_parsing(&self) -> Option<&Vec<u8>> {
+            self.raw_message_for_rdata_parsing.as_ref()
         }
     }
 
     #[test]
     fn test_parse_as_query_message() {
         let raw_dns_message = "szgAAAABAAAAAAAAAmg1B2V4YW1wbGUDY29tAAAGAAE=";
-        if let Ok(raw_qeury_message) = BASE64.decode(raw_dns_message.as_bytes()) {
-            let parse_result = DnsMessageParser::new(raw_qeury_message).parse_as_query_message();
-            assert!(parse_result.is_ok());
-            if let Ok(message) = parse_result {
-                assert_eq!(message.header.qr, 0);
-                assert_eq!(message.question_section.len(), 1);
-                assert_eq!(
-                    message.question_section.first().unwrap().name,
-                    "h5.example.com."
-                );
-                assert_eq!(
-                    &message
-                        .question_section
-                        .first()
-                        .unwrap()
-                        .record_type
-                        .clone()
-                        .unwrap(),
-                    "SOA"
-                );
-            } else {
-                error!("Message is not parsed.");
-            }
-        } else {
-            error!("Invalid base64 encoded data.");
-        }
+        let raw_query_message = BASE64
+            .decode(raw_dns_message.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        let parse_result = DnsMessageParser::new(raw_query_message).parse_as_query_message();
+        assert!(parse_result.is_ok());
+        let message = parse_result.expect("Message is not parsed.");
+        assert_eq!(message.header.qr, 0);
+        assert_eq!(message.question_section.len(), 1);
+        assert_eq!(
+            message.question_section.first().unwrap().name,
+            "h5.example.com."
+        );
+        assert_eq!(
+            &message
+                .question_section
+                .first()
+                .unwrap()
+                .record_type
+                .clone()
+                .unwrap(),
+            "SOA"
+        );
     }
 
     #[test]
     fn test_parse_as_query_message_with_invalid_data() {
-        if let Err(err) = DnsMessageParser::new(vec![1, 2, 3]).parse_as_query_message() {
-            assert!(err.to_string().contains("unexpected end of input"));
-            match err {
-                DnsMessageParserError::TrustDnsError { source: e } => {
-                    assert!(e.to_string().contains("unexpected end of input"))
-                }
-                DnsMessageParserError::SimpleError { cause: e } => {
-                    error!("Expected TrustDnsError, got {}.", &e)
-                }
-                _ => error!("{}.", err),
+        let err = DnsMessageParser::new(vec![1, 2, 3])
+            .parse_as_query_message()
+            .expect_err("Expected TrustDnsError.");
+        match err {
+            DnsMessageParserError::TrustDnsError { source: e } => {
+                assert_eq!(e.to_string(), "unexpected end of input reached")
             }
-        } else {
-            error!("Expected TrustDnsError.");
+            DnsMessageParserError::SimpleError { cause: e } => {
+                panic!("Expected TrustDnsError, got {}.", &e)
+            }
+            _ => panic!("{}.", err),
         }
     }
 
     #[test]
     fn test_parse_as_query_message_with_unsupported_rdata() {
-        let raw_query_message_base64 = "S9iAAAABAAAADwAbAV8DY29tAAABAAHADgACAAEAAqMAABQBYQxndGxkLX\
-        NlcnZlcnMDbmV0AMAOAAIAAQACowAABAFiwCXADgACAAEAAqMAAAQBY8AlwA4AAgABAAKjAAAEAWTAJcAOAAIAAQACowAABA\
-        FlwCXADgACAAEAAqMAAAQBZsAlwA4AAgABAAKjAAAEAWfAJcAOAAIAAQACowAABAFowCXADgACAAEAAqMAAAQBacAlwA4AAg\
-        ABAAKjAAAEAWrAJcAOAAIAAQACowAABAFrwCXADgACAAEAAqMAAAQBbMAlwA4AAgABAAKjAAAEAW3AJcAOACsAAQABUYAAJH\
-        i9CALi08kW9t7qxzKU6CaPtYhQRKgz/FRZWI9KkYTPxBpXZsAOAC4AAQABUYABEwArCAEAAVGAXwVS0F70IUC/BwCNcUk9rv\
-        6TfbDiupYh7mlNIozd6xvNJLF7rJYhXTtCmw0eonl5dDZ5MWsIy11VHRQlwDMLYD691Imn8Pc+FqPBeWxT2ooZn2PT6dFiMo\
-        D9lRGid8In5x5x7xqDOC0yORGXGq1slMk1yB+SXYU5GSBGc455QZT4m/voD8WcG8KFQNmb/J8RwVOLcHveQl+7BMF2ol0Uzg\
-        TinFFfG4icEw5lMySS9HCCezFVxU1BFBF6pMqNAa/725+1VyfHbN1OVw5I47+IIvtn+nw3tiCJQLPo7hWlenKUUqFpHHL7II\
-        sS5Z+fY2EFjjoZdqKMBBvcbqZkhyHUYDf01xsDPGDx6g/YwCMAAQABAAKjAAAEwAUGHsBDAAEAAQACowAABMAhDh7AUwABAA\
-        EAAqMAAATAGlwewGMAAQABAAKjAAAEwB9QHsBzAAEAAQACowAABMAMXh7AgwABAAEAAqMAAATAIzMewJMAAQABAAKjAAAEwC\
-        pdHsCjAAEAAQACowAABMA2cB7AswABAAEAAqMAAATAK6wewMMAAQABAAKjAAAEwDBPHsDTAAEAAQACowAABMA0sh7A4wABAA\
-        EAAqMAAATAKaIewPMAAQABAAKjAAAEwDdTHsAjABwAAQACowAAECABBQOoPgAAAAAAAAACADDAQwAcAAEAAqMAABAgAQUDIx\
-        0AAAAAAAAAAgAwwFMAHAABAAKjAAAQIAEFA4PrAAAAAAAAAAAAMMBjABwAAQACowAAECABBQCFbgAAAAAAAAAAADDAcwAcAA\
-        EAAqMAABAgAQUCHKEAAAAAAAAAAAAwwIMAHAABAAKjAAAQIAEFA9QUAAAAAAAAAAAAMMCTABwAAQACowAAECABBQPuowAAAA\
-        AAAAAAADDAowAcAAEAAqMAABAgAQUCCMwAAAAAAAAAAAAwwLMAHAABAAKjAAAQIAEFAznBAAAAAAAAAAAAMMDDABwAAQACow\
-        AAECABBQJwlAAAAAAAAAAAADDA0wAcAAEAAqMAABAgAQUDDS0AAAAAAAAAAAAwwOMAHAABAAKjAAAQIAEFANk3AAAAAAAAAA\
-        AAMMDzABwAAQACowAAECABBQGx+QAAAAAAAAAAADAAACkFqgAAgAAAAA==";
-        if let Ok(raw_query_message) = BASE64.decode(raw_query_message_base64.as_bytes()) {
-            if let Err(err) = DnsMessageParser::new(raw_query_message).parse_as_query_message() {
-                assert!(err.to_string().contains("Unsupported rdata"));
-                match err {
-                    DnsMessageParserError::TrustDnsError { source: e } => {
-                        error!("Expected TrustDnsError, got {}.", &e)
-                    }
-                    DnsMessageParserError::SimpleError { cause: e } => {
-                        assert!(e.contains("Unsupported rdata"))
-                    }
-                    _ => error!("{}.", err),
-                }
-            } else {
-                error!("Expected Error.");
-            }
-        } else {
-            error!("Invalid base64 encoded data.");
-        }
+        let raw_query_message_base64 = "eEaFgAABAAEAAAAABGRvYTEHZXhhbXBsZQNjb20AAQMAAcAMAQMAAQAADhAAIAAAAAAAAAAAAgIiImh0dHBzOi8vd3d3LmlzYy5vcmcv";
+        let raw_query_message = BASE64
+            .decode(raw_query_message_base64.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        let dns_query_message = DnsMessageParser::new(raw_query_message)
+            .parse_as_query_message()
+            .expect("Invalid DNS query message.");
+        assert_eq!(dns_query_message.answer_section[0].rdata, None);
+        assert_ne!(dns_query_message.answer_section[0].rdata_bytes, None);
     }
 
     #[test]
@@ -1362,33 +1336,28 @@ mod tests {
         DdKSzI1RU1ISE04QTAxTU8wQUVRUU43RzJVUEoyODY3wBYAMgABAAFRgAAiAQEAAAAUPOhC39uAx9ZAH4EOHcsrn9Pusu\
         cABiAAAAAAEsArAAEAAQACowAABGw9EwrAKwABAAEAAqMAAASsYsAiwEYAAQABAAKjAAAELqa2M8BGAAEAAQACowAABF1\
         zHGgAACkQAAAAgAAAAHgB";
-        if let Ok(raw_update_message) = BASE64.decode(raw_dns_message.as_bytes()) {
-            assert!(DnsMessageParser::new(raw_update_message)
-                .parse_as_update_message()
-                .is_err());
-        } else {
-            error!("Invalid base64 encoded data.");
-        }
+        let raw_update_message = BASE64
+            .decode(raw_dns_message.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        assert!(DnsMessageParser::new(raw_update_message)
+            .parse_as_update_message()
+            .is_err());
     }
 
     #[test]
     fn test_parse_as_update_message() {
         let raw_dns_message = "xjUoAAABAAAAAQAAB2V4YW1wbGUDY29tAAAGAAECaDXADAD/AP8AAAAAAAA=";
-        if let Ok(raw_update_message) = BASE64.decode(raw_dns_message.as_bytes()) {
-            let parse_result = DnsMessageParser::new(raw_update_message).parse_as_update_message();
-            assert!(parse_result.is_ok());
-            if let Ok(message) = parse_result {
-                assert_eq!(message.header.qr, 0);
-                assert_eq!(message.update_section.len(), 1);
-                assert_eq!(message.update_section.first().unwrap().class, "ANY");
-                assert_eq!(&message.zone_to_update.zone_type.clone().unwrap(), "SOA");
-                assert_eq!(message.zone_to_update.name, "example.com.");
-            } else {
-                error!("Message is not parsed.");
-            }
-        } else {
-            error!("Invalid base64 encoded data.");
-        }
+        let raw_update_message = BASE64
+            .decode(raw_dns_message.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        let parse_result = DnsMessageParser::new(raw_update_message).parse_as_update_message();
+        assert!(parse_result.is_ok());
+        let message = parse_result.expect("Message is not parsed.");
+        assert_eq!(message.header.qr, 0);
+        assert_eq!(message.update_section.len(), 1);
+        assert_eq!(message.update_section.first().unwrap().class, "ANY");
+        assert_eq!(&message.zone_to_update.zone_type.clone().unwrap(), "SOA");
+        assert_eq!(message.zone_to_update.name, "example.com.");
     }
 
     #[test]
@@ -1759,28 +1728,6 @@ mod tests {
         test_format_rdata("gAgBDgYAAAFA", 11, "128.8.1.14 6 23 25");
 
         test_format_rdata("gAgBDgYAAAE=", 11, "128.8.1.14 6 23");
-
-        test_format_rdata(
-            "gAgBDgYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\
-            AAAAAAAAAAAAAAAAAAAA...",
-            11,
-            "128.8.1.14 6 10042",
-        );
     }
 
     #[test]
@@ -1869,10 +1816,10 @@ mod tests {
     #[test]
     fn test_format_rdata_for_cert_type() {
         test_format_rdata(
-            "//7//wUzEVxvL2T/K950x9CArOEfl6vQy7+8gvPjkiSyRx4UaCJYKf8bEeFq
+            "//7//wUzEVxvL2T/K950x9CArOEfl6vQy7+8gvPjkiSyRx4UaCJYKf8bEeFq\
             LpUC4cCg1TPhihTW1V9IJKpBifr//XVTo2V3zSMR4LxpOs74oqYJpg==",
             37,
-            "65534 65535 RSASHA1 MxFcby9k/yvedMfQgKzhH5er0Mu/vILz4
+            "65534 65535 RSASHA1 MxFcby9k/yvedMfQgKzhH5er0Mu/vILz4\
             5IkskceFGgiWCn/GxHhai6VAuHAoNUz4YoU1tVfSCSqQYn6//11U6Nld80jEeC8aTrO+KKmCaY=",
         );
     }
@@ -1934,17 +1881,15 @@ mod tests {
     }
 
     fn test_format_rdata(raw_data: &str, code: u16, expected_output: &str) {
-        if let Ok(raw_rdata) = BASE64.decode(raw_data.as_bytes()) {
-            let mut decoder = BinDecoder::new(&raw_rdata);
-            let record_rdata =
-                null::read(&mut decoder, Restrict::new(raw_rdata.len() as u16)).unwrap();
-            let rdata_text =
-                DnsMessageParser::new(Vec::<u8>::new()).format_unknown_rdata(code, &record_rdata);
-            assert!(rdata_text.is_ok());
-            assert_eq!(expected_output, rdata_text.unwrap().0.unwrap());
-        } else {
-            error!("Invalid base64 encoded rdata.");
-        }
+        let raw_rdata = BASE64
+            .decode(raw_data.as_bytes())
+            .expect("Invalid base64 encoded rdata.");
+        let mut decoder = BinDecoder::new(&raw_rdata);
+        let record_rdata = null::read(&mut decoder, Restrict::new(raw_rdata.len() as u16)).unwrap();
+        let rdata_text =
+            DnsMessageParser::new(Vec::<u8>::new()).format_unknown_rdata(code, &record_rdata);
+        assert!(rdata_text.is_ok());
+        assert_eq!(expected_output, rdata_text.unwrap().0.unwrap());
     }
 
     fn test_format_rdata_with_compressed_domain_names(
@@ -1953,27 +1898,28 @@ mod tests {
         code: u16,
         expected_output: &str,
     ) {
-        if let Ok(raw_message) = BASE64.decode(raw_message.as_bytes()) {
-            let raw_message_len = raw_message.len();
-            let mut message_parser = DnsMessageParser::new(raw_message);
-            if let Ok(raw_rdata) = BASE64.decode(raw_data_encoded.as_bytes()) {
-                for i in 1..=2 {
-                    let mut decoder = BinDecoder::new(&raw_rdata);
-                    let record_rdata =
-                        null::read(&mut decoder, Restrict::new(raw_rdata.len() as u16)).unwrap();
-                    let rdata_text = message_parser.format_unknown_rdata(code, &record_rdata);
-                    assert!(rdata_text.is_ok());
-                    assert_eq!(expected_output, rdata_text.unwrap().0.unwrap());
-                    assert_eq!(
-                        raw_message_len + i * raw_rdata.len(),
-                        message_parser.raw_message_clone().unwrap().len()
-                    );
-                }
-            } else {
-                error!("Invalid base64 encoded raw rdata.");
-            }
-        } else {
-            error!("Invalid base64 encoded raw message.");
+        let raw_message = BASE64
+            .decode(raw_message.as_bytes())
+            .expect("Invalid base64 encoded raw message.");
+        let raw_message_len = raw_message.len();
+        let mut message_parser = DnsMessageParser::new(raw_message);
+        let raw_rdata = BASE64
+            .decode(raw_data_encoded.as_bytes())
+            .expect("Invalid base64 encoded raw rdata.");
+        for i in 1..=2 {
+            let mut decoder = BinDecoder::new(&raw_rdata);
+            let record_rdata =
+                null::read(&mut decoder, Restrict::new(raw_rdata.len() as u16)).unwrap();
+            let rdata_text = message_parser.format_unknown_rdata(code, &record_rdata);
+            assert!(rdata_text.is_ok());
+            assert_eq!(expected_output, rdata_text.unwrap().0.unwrap());
+            assert_eq!(
+                raw_message_len + i * raw_rdata.len(),
+                message_parser
+                    .raw_message_for_rdata_parsing()
+                    .unwrap()
+                    .len()
+            );
         }
     }
 
@@ -1981,21 +1927,20 @@ mod tests {
     #[ignore]
     fn benchmark_parse_as_query_message() {
         let raw_dns_message = "szgAAAABAAAAAAAAAmg1B2V4YW1wbGUDY29tAAAGAAE=";
-        if let Ok(raw_qeury_message) = BASE64.decode(raw_dns_message.as_bytes()) {
-            let start = Instant::now();
-            let num = 10_000;
-            for _ in 0..num {
-                let parse_result =
-                    DnsMessageParser::new(raw_qeury_message.clone()).parse_as_query_message();
-                assert!(parse_result.is_ok());
-            }
-            let time_taken = Instant::now().duration_since(start);
-            println!(
-                "Time taken to parse {} DNS query messages: {:#?}.",
-                num, time_taken
-            );
-        } else {
-            error!("Invalid base64 encoded data.");
+        let raw_query_message = BASE64
+            .decode(raw_dns_message.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        let start = Instant::now();
+        let num = 10_000;
+        for _ in 0..num {
+            let parse_result =
+                DnsMessageParser::new(raw_query_message.clone()).parse_as_query_message();
+            assert!(parse_result.is_ok());
         }
+        let time_taken = Instant::now().duration_since(start);
+        println!(
+            "Time taken to parse {} DNS query messages: {:#?}.",
+            num, time_taken
+        );
     }
 }

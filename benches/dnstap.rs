@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use criterion::{criterion_group, Criterion, Throughput};
+use criterion::{criterion_group, BatchSize, Criterion, Throughput};
 use vector::event::Event;
 use vector::sources::dnstap::{schema::DnstapEventSchema, DnstapParser};
 
@@ -16,11 +16,13 @@ fn benchmark_query_parsing(c: &mut Criterion) {
     let mut group = c.benchmark_group("dnstap");
     group.throughput(Throughput::Bytes(dnstap_data.len() as u64));
     group.bench_function("dns_query_parsing", |b| {
-        b.iter(|| {
-            parser
-                .parse_dnstap_data(Bytes::from(dnstap_data.clone()))
-                .unwrap();
-        })
+        b.iter_batched(
+            || dnstap_data.clone(),
+            |dnstap_data| {
+                parser.parse_dnstap_data(Bytes::from(dnstap_data)).unwrap();
+            },
+            BatchSize::SmallInput,
+        )
     });
 
     group.finish();
@@ -39,11 +41,13 @@ fn benchmark_update_parsing(c: &mut Criterion) {
     let mut group = c.benchmark_group("dnstap");
     group.throughput(Throughput::Bytes(dnstap_data.len() as u64));
     group.bench_function("dns_update_parsing", |b| {
-        b.iter(|| {
-            parser
-                .parse_dnstap_data(Bytes::from(dnstap_data.clone()))
-                .unwrap();
-        })
+        b.iter_batched(
+            || dnstap_data.clone(),
+            |dnstap_data| {
+                parser.parse_dnstap_data(Bytes::from(dnstap_data)).unwrap();
+            },
+            BatchSize::SmallInput,
+        )
     });
 
     group.finish();

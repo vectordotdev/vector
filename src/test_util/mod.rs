@@ -17,7 +17,7 @@ use std::{
     fs::File,
     future::{ready, Future},
     io::Read,
-    iter, mem,
+    iter,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     path::{Path, PathBuf},
     pin::Pin,
@@ -262,7 +262,7 @@ pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(stream: &mut S, n:
         let e = stream.next().await.unwrap();
         events.push(e);
     }
-    mem::replace(&mut events, Vec::new())
+    events
 }
 
 pub async fn collect_ready<S>(mut rx: S) -> Vec<S::Item>

@@ -1841,7 +1841,6 @@ dependencies = [
  "data-encoding",
  "getset",
  "snafu",
- "tracing 0.1.25",
  "trust-dns-proto",
 ]
 
