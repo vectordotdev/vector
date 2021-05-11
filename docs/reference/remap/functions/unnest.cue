@@ -15,7 +15,7 @@ remap: functions: unnest: {
 			name:        "path"
 			description: "The path of the field to unnest."
 			required:    true
-			type: ["string"]
+			type: ["path"]
 		},
 	]
 	internal_failure_reasons: [
