@@ -1,5 +1,3 @@
-#![cfg(feature = "leveldb")]
-
 use crate::event::Event;
 use futures::{Sink, Stream};
 use pin_project::pin_project;
@@ -14,6 +12,7 @@ use std::{
 pub mod leveldb_buffer;
 
 #[derive(Debug, Snafu)]
+#[allow(clippy::pub_enum_variant_names)]
 pub enum Error {
     #[snafu(display("The configured data_dir {:?} does not exist, please create it and make sure the vector process can write to it", data_dir))]
     DataDirNotFound { data_dir: PathBuf },
@@ -35,6 +34,12 @@ pub trait DiskBuffer {
     type Writer: Sink<Event, Error = ()>;
     type Reader: Stream<Item = Event> + Send;
 
+    /// Build a new `DiskBuffer` rooted at `path`
+    ///
+    /// # Errors
+    ///
+    /// Function will fail if the permissions of `path` are not correct, if
+    /// there is no space available on disk etc.
     fn build(
         path: PathBuf,
         max_size: usize,
@@ -67,6 +72,12 @@ impl Sink<Event> for Writer {
     }
 }
 
+/// Open a [`leveldb_buffer::Buffer`]
+///
+/// # Errors
+///
+/// This function will fail with [`Error`] if the directory does not exist at
+/// `data_dir`, if permissions are not sufficient etc.
 pub fn open(
     data_dir: &Path,
     name: &str,
