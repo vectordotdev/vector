@@ -80,7 +80,6 @@ impl Sink<Event> for Writer {
 ///
 /// This function will fail with [`Error`] if the directory does not exist at
 /// `data_dir`, if permissions are not sufficient etc.
-#[allow(clippy::type_complexity)]
 pub fn open(
     data_dir: &Path,
     name: &str,
