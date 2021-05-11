@@ -52,6 +52,9 @@ podAnnotations: {}
 # Labels to add to the `Pod`s managed by `DaemonSet`.
 podLabels: {}
 
+# Priority class name to add to the `Pod`s managed by `DaemonSet`.
+podPriorityClassName: ""
+
 # PodSecurityContext to set at the `Pod`s managed by `DaemonSet`.
 podSecurityContext: {}
   # fsGroup: 2000
