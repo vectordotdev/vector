@@ -15,7 +15,6 @@ Components - Sources, Transforms, and Sinks | {{ site.Title }}
     {{ $components := where site.RegularPages ".CurrentSection.Params.short" . }}
     {{ $num := len $components }}
     {{ $link := printf "docs/reference/configuration/%s" (. | lower) | relURL }}
-
     <div>
       <p class="flex items-end justify-between space-x-2 text-2xl md:text-3xl lg:text-4xl mb-4 dark:text-gray-200">
         <a href="{{ $link }}" class="font-bold hover:text-secondary dark:hover:text-primary">
@@ -32,7 +31,7 @@ Components - Sources, Transforms, and Sinks | {{ site.Title }}
         </span>
       </p>
 
-      <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
         {{ range $components }}
         {{ .Render "component-card" }}
         {{ end }}

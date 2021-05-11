@@ -41,8 +41,9 @@ module.exports = {
                 display: 'none',
               },
             },
-            '.admonition + .tabs': {
-              'margin-top': '0.75rem'
+            // Spacing between certain shortcode combinations
+            '.admonition + .tabs, .svg + .admonition': {
+              'margin-top': '1rem',
             },
             '.no-prose': {
               a: {
@@ -69,14 +70,14 @@ module.exports = {
             'table th, table td': {
               color: theme('colors.gray.200'),
             },
+            code: {
+              color: theme('colors.primary', 'currentColor'),
+            },
             color: theme('colors.gray.200'),
             'p, h1, h2, h3, h4, h5, h6': {
               color: theme('colors.gray.100')
             },
-            'code, a code, p code, td code': {
-              color: theme('colors.primary'),
-            },
-            'a': {
+            'a, a code': {
               color: theme('colors.primary', 'currentColor'),
               'text-decoration': 'none',
               '&:hover, &:active': {

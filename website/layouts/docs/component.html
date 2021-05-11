@@ -24,43 +24,43 @@
           {{/* Component requirements */}}
           {{ with $config.support.requirements }}
           {{ partial "heading.html" (dict "text" "Requirements" "level" 2) }}
-          {{ partial "config.html" (dict "requirements" .) }}
+          {{ partial "data.html" (dict "requirements" .) }}
           {{ end }}
 
           {{/* Component warnings */}}
           {{ with $config.support.warnings }}
           {{ partial "heading.html" (dict "text" "Warnings" "level" 2) }}
-          {{ partial "config.html" (dict "warnings" .) }}
+          {{ partial "data.html" (dict "warnings" .) }}
           {{ end }}
 
           {{/* Component configuration */}}
           {{ with $config.configuration }}
           {{ partial "heading.html" (dict "text" "Configuration" "level" 2) }}
-          {{ partial "config.html" (dict "config" . ) }}
+          {{ partial "data.html" (dict "config" . ) }}
           {{ end }}
 
           {{/* Component environment variables */}}
           {{ with $config.env_vars }}
           {{ partial "heading.html" (dict "text" "Environment variables" "level" 2) }}
-          {{ partial "config.html" (dict "env_vars" . ) }}
+          {{ partial "data.html" (dict "env_vars" . ) }}
           {{ end }}
 
           {{/* Component log/metric output */}}
           {{ with $config.output }}
           {{ partial "heading.html" (dict "text" "Output" "level" 2) }}
-          {{ partial "config.html" (dict "output" . ) }}
+          {{ partial "data.html" (dict "output" . ) }}
           {{ end }}
 
           {{/* Component telemetry output */}}
           {{ with $config.telemetry }}
           {{ partial "heading.html" (dict "text" "Telemetry" "level" 2) }}
-          {{ partial "config.html" (dict "telemetry" . ) }}
+          {{ partial "data.html" (dict "telemetry" . ) }}
           {{ end }}
 
           {{/* Component examples */}}
           {{ with $config.examples }}
           {{ partial "heading.html" (dict "text" "Examples" "level" 2) }}
-          {{ partial "config.html" (dict "examples" . ) }}
+          {{ partial "data.html" (dict "examples" . ) }}
           {{ end }}
 
           {{/* How it works */}}

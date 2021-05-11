@@ -8,18 +8,21 @@
   {{ $prefix := .prefix }}
   <div class="grid grid-cols-8 items-center">
     <div class="col-span-2">
+      {{/* Platform */}}
       <span class="text-gray-700 dark:text-gray-300 text-lg font-semibold tracking-tight">
         {{ .name }}
       </span>
     </div>
 
     <div class="col-span-1">
+      {{/* File type */}}
       <span class="font-mono text-xs text-dark dark:text-gray-300">
         {{ $file }}
       </span>
     </div>
 
     <div class="col-span-5">
+      {{/* Targets (ARM, x86_64, etc.) */}}
       <div class="flex space-x-1.5">
         {{ range .releases }}
         <a
