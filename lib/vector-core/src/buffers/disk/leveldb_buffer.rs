@@ -328,18 +328,18 @@ pub struct Buffer;
 
 /// Read the byte size of the database
 ///
-/// There is a mismatch between LevelDB's mechanism and vector's. While
-/// vector would prefer to keep as little in-memory as possible LevelDB,
-/// being a database, has the opposite consideration. As such it may mmap
-/// 1000 of its LDB files into vector's address space at a time with no
-/// ability for us to change this number. See
-/// https://github.com/google/leveldb/issues/866. Because we do need to know
-/// the byte size of our store we are forced to iterate through all the LDB
-/// files on disk, meaning we impose a huge memory burden on our end users
-/// right at the jump in conditions where the disk buffer has filled
-/// up. This'll OOM vector, meaning we're trapped in a catch 22.
+/// There is a mismatch between leveldb's mechanism and vector's. While vector
+/// would prefer to keep as little in-memory as possible leveldb, being a
+/// database, has the opposite consideration. As such it may mmap 1000 of its
+/// LDB files into vector's address space at a time with no ability for us to
+/// change this number. See [leveldb issue
+/// 866](https://github.com/google/leveldb/issues/866). Because we do need to
+/// know the byte size of our store we are forced to iterate through all the LDB
+/// files on disk, meaning we impose a huge memory burden on our end users right
+/// at the jump in conditions where the disk buffer has filled up. This'll OOM
+/// vector, meaning we're trapped in a catch 22.
 ///
-/// This function does not solve the problem -- LevelDB will still map 1000
+/// This function does not solve the problem -- leveldb will still map 1000
 /// files if it wants -- but we at least avoid forcing this to happen at the
 /// start of vector.
 fn db_initial_size(path: &Path) -> Result<usize, Error> {
