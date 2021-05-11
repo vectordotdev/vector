@@ -23,7 +23,7 @@ use std::{
     task::{Context, Poll, Waker},
 };
 
-use super::{DataDirOpenError, Error};
+use super::{DataDirError, Open};
 use crate::buffers::Acker;
 
 /// How much of disk buffer needs to be deleted before we trigger compaction.
@@ -342,10 +342,10 @@ pub struct Buffer;
 /// This function does not solve the problem -- leveldb will still map 1000
 /// files if it wants -- but we at least avoid forcing this to happen at the
 /// start of vector.
-fn db_initial_size(path: &Path) -> Result<usize, Error> {
+fn db_initial_size(path: &Path) -> Result<usize, DataDirError> {
     let mut options = Options::new();
     options.create_if_missing = true;
-    let db: Database<Key> = Database::open(&path, options).with_context(|| DataDirOpenError {
+    let db: Database<Key> = Database::open(&path, options).with_context(|| Open {
         data_dir: path.parent().expect("always a parent"),
     })?;
     Ok(db.value_iter(ReadOptions::new()).map(|v| v.len()).sum())
@@ -357,7 +357,10 @@ impl super::DiskBuffer for Buffer {
 
     // We convert `max_size` into an f64 at
     #[allow(clippy::cast_precision_loss)]
-    fn build(path: PathBuf, max_size: usize) -> Result<(Self::Writer, Self::Reader, Acker), Error> {
+    fn build(
+        path: PathBuf,
+        max_size: usize,
+    ) -> Result<(Self::Writer, Self::Reader, Acker), DataDirError> {
         // New `max_size` of the buffer is used for storing the unacked events.
         // The rest is used as a buffer which when filled triggers compaction.
         let max_uncompacted_size = max_size / MAX_UNCOMPACTED_DENOMINATOR;
@@ -368,10 +371,9 @@ impl super::DiskBuffer for Buffer {
         let mut options = Options::new();
         options.create_if_missing = true;
 
-        let db: Database<Key> =
-            Database::open(&path, options).with_context(|| DataDirOpenError {
-                data_dir: path.parent().expect("always a parent"),
-            })?;
+        let db: Database<Key> = Database::open(&path, options).with_context(|| Open {
+            data_dir: path.parent().expect("always a parent"),
+        })?;
         let db = Arc::new(db);
 
         let head;
