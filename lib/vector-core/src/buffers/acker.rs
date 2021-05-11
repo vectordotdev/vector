@@ -38,4 +38,12 @@ impl Acker {
             counter!("events_out_total", num as u64);
         }
     }
+
+    pub fn new_for_testing() -> (Self, Arc<AtomicUsize>) {
+        let ack_counter = Arc::new(AtomicUsize::new(0));
+        let notifier = Arc::new(AtomicWaker::new());
+        let acker = Acker::Disk(Arc::clone(&ack_counter), Arc::clone(&notifier));
+
+        (acker, ack_counter)
+    }
 }
