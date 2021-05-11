@@ -168,14 +168,14 @@ impl HttpSink for AzureMonitorLogsSink {
             chrono::Utc::now()
         };
 
-        let mut entry = serde_json::json!(log);
+        let mut entry = serde_json::json!(&log);
         let object_entry = entry.as_object_mut().unwrap();
         object_entry.insert(
             timestamp_key.to_string(),
             JsonValue::String(timestamp.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)),
         );
 
-        Some(EncodedEvent::new(entry))
+        Some(EncodedEvent::new(entry).with_metadata(log))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
