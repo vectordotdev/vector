@@ -427,17 +427,21 @@ where
             .err_into()
             .map(move |result| {
                 let status = match result {
-                    Ok(response) if response.is_successful() => {
-                        trace!(message = "Response successful.", ?response);
-                        EventStatus::Delivered
-                    }
                     Ok(response) => {
-                        error!(message = "Response wasn't successful.", ?response);
-                        EventStatus::Failed
+                        if response.is_successful() {
+                            trace!(message = "Response successful.", ?response);
+                            EventStatus::Delivered
+                        } else if response.is_transient() {
+                            error!(message = "Response wasn't successful.", ?response);
+                            EventStatus::Errored
+                        } else {
+                            error!(message = "Response failed.", ?response);
+                            EventStatus::Failed
+                        }
                     }
                     Err(error) => {
                         error!(message = "Request failed.", %error);
-                        EventStatus::Failed
+                        EventStatus::Errored
                     }
                 };
                 for metadata in metadata {
@@ -497,9 +501,14 @@ pub trait Response: fmt::Debug {
     fn is_successful(&self) -> bool {
         true
     }
+
+    fn is_transient(&self) -> bool {
+        true
+    }
 }
 
 impl Response for () {}
+
 impl<'a> Response for &'a str {}
 
 #[cfg(test)]

@@ -52,6 +52,9 @@ podAnnotations: {}
 # Labels to add to the `Pod`s managed by `DaemonSet`.
 podLabels: {}
 
+# Priority class name to add to the `Pod`s managed by `DaemonSet`.
+podPriorityClassName: ""
+
 # PodSecurityContext to set at the `Pod`s managed by `DaemonSet`.
 podSecurityContext: {}
   # fsGroup: 2000
@@ -95,6 +98,11 @@ extraVolumes: []
 # Additional volume mounts to pass to the `vector` container of the `Pod`s
 # managed by `DaemonSet`.
 extraVolumeMounts: []
+
+# Vector will store it's data here.
+dataVolume:
+  hostPath:
+    path: /var/lib/vector/
 
 rbac:
   # Whether to create rbac resources or not. Disable for non-rbac clusters.

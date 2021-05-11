@@ -167,8 +167,8 @@ Event finalization is a three step process:
 1. When a sink completes delivery of an event, the delivery status is
    recorded in the finalizer status that is shared across all clones of
    the event. This may change that status from `Dropped` (the
-   initialization state) to either `Delivered` or `Failed`, or from
-   `Delivered` to `Failed`. The `Recorded` state is never changed.
+   initialization state) to either `Delivered`, `Errored`, or `Failed`.
+   The `Recorded` state is never changed.
 2. If one of those sinks is configured to be authoritative, it will
    immediately update the status of all its source batches and update
    the event status to `Recorded` that no extraneous updates happen.
@@ -221,12 +221,14 @@ struct BatchNotifier {
 
 enum BatchStatus {
     Delivered,
+    Errored,
     Failed,
 }
 
 enum EventStatus {
     Dropped, // default status
     Delivered,
+    Errored,
     Failed,
     Recorded,
 }
