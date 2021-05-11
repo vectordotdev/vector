@@ -1,11 +1,12 @@
 package metadata
 
 remap: functions: unnest: {
-	category: "Object"
+	category:    "Object"
 	description: """
 		Unnest an array field from an object to create an array of objects using that field; keeping all other fields.
 
-		Assigning the array result of this to `.` will result in multiple events being emitted from `remap`.
+		Assigning the array result of this to `.` will result in multiple events being emitted from `remap`. See the
+		[`remap` transform docs](\(urls.vector_remap_transform_multiple)) for more details.
 
 		This is also referred to as `explode`ing in some languages.
 		"""
