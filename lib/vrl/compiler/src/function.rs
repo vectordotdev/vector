@@ -4,7 +4,7 @@ use crate::expression::{
 use crate::parser::Node;
 use crate::value::Kind;
 use crate::{Span, Value};
-use diagnostic::{DiagnosticError, Label};
+use diagnostic::{DiagnosticError, Label, Note};
 use std::collections::HashMap;
 use std::fmt;
 
@@ -362,6 +362,10 @@ impl diagnostic::DiagnosticError for Error {
                 Label::context(format!("error: {}", error), Span::default()),
             ],
         }
+    }
+
+    fn notes(&self) -> Vec<Note> {
+        vec![Note::SeeCodeDocs(self.code())]
     }
 }
 

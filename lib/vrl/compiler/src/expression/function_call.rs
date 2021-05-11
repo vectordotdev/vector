@@ -374,7 +374,7 @@ pub enum Error {
         position: usize,
     },
 
-    #[error("function compilation error")]
+    #[error("function compilation error: error[E{}] {}", error.code(), error)]
     Compilation {
         call_span: Span,
         error: Box<dyn DiagnosticError>,
@@ -635,6 +635,9 @@ impl DiagnosticError for Error {
 
                 notes
             }
+
+            Compilation { error, .. } => error.notes(),
+
             _ => vec![],
         }
     }
