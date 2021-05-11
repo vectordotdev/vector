@@ -57,7 +57,7 @@ pub trait Expression: Send + Sync + fmt::Debug + DynClone {
 
     /// Resolve an expression to a value without any context, if possible.
     ///
-    /// This returns Some for static expressions, or None for dynnamic expressions.
+    /// This returns `Some` for static expressions, or `None` for dynamic expressions.
     fn as_value(&self) -> Option<Value> {
         None
     }

@@ -4,7 +4,7 @@ use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Container {
-    pub variant: Variant,
+    variant: Variant,
 }
 
 impl Container {

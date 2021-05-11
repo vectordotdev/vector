@@ -13,9 +13,9 @@ remap: functions: redact: {
 				The value to redact sensitive data from.
 
 				Its behavior differs depending on the type of `value`:
-				- For strings it simply redacts the sensitive data and returns a new string
+				- For strings, it simply redacts the sensitive data and returns a new string
 				- For arrays, it redacts the sensitive data in each string element
-				- For objects it masks the sensitive data in each value
+				- For objects, it masks the sensitive data in each value, but not keys
 
 				For arrays and objects it will recurse into any nested arrays or objects. Any non-string elements will
 				be skipped.
@@ -42,7 +42,7 @@ remap: functions: redact: {
 					   key. This is the expanded form of just passing a regular expression as a filter.
 					- `credit_card`: Redact credit card numbers.
 
-					See examples for mare.
+					See examples for more details.
 
 					Note: This parameter must be a static expression. You cannot use variables or other dynamic
 					expressions with it. This allows us to validate the argument at compile-time to avoid runtime
