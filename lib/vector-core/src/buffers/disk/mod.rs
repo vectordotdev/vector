@@ -1,5 +1,3 @@
-#![cfg(feature = "leveldb")]
-
 use crate::event::Event;
 use futures::{Sink, Stream};
 use pin_project::pin_project;
