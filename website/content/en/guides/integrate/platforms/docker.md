@@ -10,8 +10,10 @@ sources: ["docker_logs"]
 data: logs
 from:
   name: Docker
+  href: https://docker.com
 to:
   name: anywhere
 background: Docker
+tutorial: docker
 weight: 1
 ---

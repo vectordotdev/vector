@@ -18,9 +18,6 @@
     </title>
 
     {{ partial "css.html" . }}
-
-    {{/* Ensure smooth page loading */}}
-    {{ partial "page-load.html" . }}
   </head>
   <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}" onload="showBody()">
     <div class="flex-1 z-1">
@@ -40,6 +37,9 @@
     {{/* For the mobile nav footer */}}
     {{ block "subfooter" . }}
     {{ end }}
+
+    {{/* Ensure smooth page loading */}}
+    {{ partial "page-load.html" . }}
 
     {{ partial "javascript.html" . }}
   </body>

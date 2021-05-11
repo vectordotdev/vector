@@ -12,8 +12,7 @@
   </div>
 
   <div class="xl:col-span-2 flex flex-col space-y-10">
-    {{/* Guide listing on main /guides page */}}
-
+    {{/* Pages with sub-sections (/guides, /guides/integrate, etc.) */}}
     {{ with .Sections }}
     {{ range . }}
     <div>
@@ -28,13 +27,15 @@
       {{ end }}
 
       {{ with .Sections }}
-      <div>
+      <div class="mt-4 flex flex-col space-y-8">
         {{ range . }}
-        <span class="prose">
-          {{ partial "heading.html" (dict "text" .Title "level" 3 "href" .RelPermalink) }}
-        </span>
+        <div>
+          <span class="prose">
+            {{ partial "heading.html" (dict "text" .Title "level" 3 "href" .RelPermalink) }}
+          </span>
 
-        {{ .Render "list" }}
+          {{ .Render "list" }}
+        </div>
         {{ end }}
       </div>
       {{ else }}

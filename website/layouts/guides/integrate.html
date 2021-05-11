@@ -11,7 +11,7 @@ Send {{ .Params.data }}{{ with .Params.from }} from {{ .name }}{{ end }}{{ with 
       {{ partial "guides/integrate/hero.html" . }}
     </div>
 
-    <div class="pb-32 prose" id="page-content">
+    <div class="pb-32 prose dark:prose-dark leading-6" id="page-content">
       {{ with .Params.data }}
       {{ $src := printf "data/%s" . }}
       {{ template "snippet" (dict "src" $src "ctx" $ctx) }}
@@ -45,20 +45,33 @@ Send {{ .Params.data }}{{ with .Params.from }} from {{ .name }}{{ end }}{{ with 
       {{ $src := printf "img/%s-role.svg" $img }}
       {{ partial "svg.html" (dict "src" $src) }}
 
-      {{ partial "heading.html" (dict "text" "What we'll accomplish" "level" 2) }}
+      {{/* Accomplish section */}}
+      <div>
+        {{ partial "heading.html" (dict "text" "What we'll accomplish" "level" 2) }}
 
-      <p>
-        We'll build an observability pipeline that:
-      </p>
+        <p>
+          We'll build an observability pipeline that:
+        </p>
 
-      <ul>
-        <li>
-          Collects your {{ .Params.data }} from {{ .Params.from.name }}.
-        </li>
-        <li>
-          Sends {{ .Params.data }} to
-        </li>
-      </ul>
+        <div class="flex items-center space-x-2">
+          {{ template "check" }}
+
+          <span>
+            Collects your {{ .Params.data }} {{ template "from-to" .Params }}
+          </span>
+        </div>
+      </div>
+
+      {{/* Tutorial section */}}
+      {{ with .Params.tutorial }}
+      <div>
+        {{ partial "heading.html" (dict "text" "Tutorial" "level" 2) }}
+
+        <div>
+          {{ partial "guides/tutorial.html" . }}
+        </div>
+      </div>
+      {{ end }}
     </div>
   </main>
 
@@ -79,4 +92,19 @@ Send {{ .Params.data }}{{ with .Params.from }} from {{ .name }}{{ end }}{{ with 
 <p>
   Fear not! In this guide we'll build an observability pipeline that sends {{ .data }}{{ with .from }} from {{ .name }}{{ end }}{{ with .to }} to {{ .name }}{{ end }}.
 </p>
+{{ end }}
+
+{{ define "link" }}
+{{ if .href }}<a href="{{ .href }}">{{ .name }}</a>{{ else }}{{ .name }}{{ end }}
+{{ end }}
+
+{{ define "from-to" }}
+{{ with .from }} from {{ template "link" . }}{{ end }}
+{{ end }}
+
+{{ define "check" }}
+{{/* Heroicon: outline/check */}}
+<svg xmlns="http://www.w3.org/2000/svg" class="text-green-400 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+</svg>
 {{ end }}

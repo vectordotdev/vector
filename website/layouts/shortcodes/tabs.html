@@ -3,8 +3,8 @@
 {{ end }}
 
 {{ $default := .Params.default | urlize }}
-<div x-data="{ selected: '{{ $default }}' }" class="no-prose border rounded-md p-5 dark:border-gray-700">
-  <div class="flex space-x-3 mb-3">
+<div x-data="{ selected: '{{ $default }}' }" class="tabs no-prose border rounded-md p-4 shadow dark:border-gray-700">
+  <div class="flex space-x-2.5 mb-3">
     {{ .Inner }}
   </div>
 
@@ -15,5 +15,5 @@
   {{ end }}
 </div>
 
-{{/* Reset Scratch for the "tabs" key */}}
+{{/* Reset Scratch for the "tabs" key, allowing for more than one tabs shortcode on a page */}}
 {{ $.Page.Scratch.Set "tabs" dict }}

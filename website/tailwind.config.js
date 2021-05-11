@@ -41,6 +41,9 @@ module.exports = {
                 display: 'none',
               },
             },
+            '.admonition + .tabs': {
+              'margin-top': '0.75rem'
+            },
             '.no-prose': {
               a: {
                 color: 'inherit',
