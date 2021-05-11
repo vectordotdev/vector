@@ -1,16 +1,16 @@
 mod retry;
 
+use self::retry::{ElasticSearchRetryLogic, ElasticSearchServiceLogic};
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
-    event::{Event, Value},
     http::{Auth, HttpClient, MaybeAuth},
     internal_events::{ElasticSearchEventEncoded, TemplateRenderingFailed},
     rusoto::{self, region_from_endpoint, AwsAuthentication, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
-        sink, BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
+        BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
         UriSerde,
     },
     template::{Template, TemplateParseError},
@@ -25,7 +25,6 @@ use http::{
 use hyper::Body;
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
-use retry::ElasticSearchRetryLogic;
 use rusoto_core::Region;
 use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
@@ -34,6 +33,7 @@ use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
+use vector_core::event::{Event, Value};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -392,7 +392,7 @@ impl SinkConfig for ElasticSearchConfig {
             batch.timeout,
             client,
             cx.acker(),
-            sink::StdServiceLogic::default(),
+            ElasticSearchServiceLogic,
         )
         .sink_map_err(|error| error!(message = "Fatal elasticsearch sink error.", %error));
 
@@ -538,7 +538,8 @@ impl HttpSink for ElasticSearchCommon {
 
         self.encoding.apply_rules(&mut event);
 
-        serde_json::to_writer(&mut body, &event.into_log()).unwrap();
+        let log = event.into_log();
+        serde_json::to_writer(&mut body, &log).unwrap();
         body.push(b'\n');
 
         emit!(ElasticSearchEventEncoded {
@@ -546,7 +547,7 @@ impl HttpSink for ElasticSearchCommon {
             index
         });
 
-        Some(EncodedEvent::new(body))
+        Some(EncodedEvent::new(body).with_metadata(log))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -1068,7 +1069,6 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::Event,
         http::HttpClient,
         sinks::HealthcheckError,
         test_util::{random_events_with_stream, random_string, trace_init},
@@ -1079,6 +1079,7 @@ mod integration_tests {
     use hyper::Body;
     use serde_json::{json, Value};
     use std::{fs::File, future::ready, io::Read};
+    use vector_core::event::{BatchNotifier, BatchStatus, LogEvent};
 
     impl ElasticSearchCommon {
         async fn flush_request(&self) -> crate::Result<()> {
@@ -1182,13 +1183,19 @@ mod integration_tests {
         let cx = SinkContext::new_test();
         let (sink, _hc) = config.build(cx.clone()).await.unwrap();
 
-        let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("my_id", "42");
-        input_event.as_mut_log().insert("foo", "bar");
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let mut input_event = LogEvent::from("raw log line").with_batch_notifier(&batch);
+        input_event.insert("my_id", "42");
+        input_event.insert("foo", "bar");
+        drop(batch);
 
-        sink.run(stream::once(ready(input_event.clone())))
+        let timestamp = input_event[crate::config::log_schema().timestamp_key()].clone();
+
+        sink.run(stream::once(ready(input_event.into())))
             .await
             .unwrap();
+
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         // make sure writes all all visible
         flush(common).await.unwrap();
@@ -1226,7 +1233,7 @@ mod integration_tests {
         let expected = json!({
             "message": "raw log line",
             "foo": "bar",
-            "timestamp": input_event.as_log()[crate::config::log_schema().timestamp_key()],
+            "timestamp": timestamp,
         });
         assert_eq!(&expected, value);
     }
@@ -1243,6 +1250,7 @@ mod integration_tests {
                 ..config()
             },
             false,
+            BatchStatus::Delivered,
         )
         .await;
     }
@@ -1267,6 +1275,7 @@ mod integration_tests {
                 ..config()
             },
             false,
+            BatchStatus::Delivered,
         )
         .await;
     }
@@ -1282,6 +1291,7 @@ mod integration_tests {
                 ..config()
             },
             false,
+            BatchStatus::Delivered,
         )
         .await;
     }
@@ -1298,6 +1308,7 @@ mod integration_tests {
                 ..config()
             },
             false,
+            BatchStatus::Delivered,
         )
         .await;
     }
@@ -1314,6 +1325,7 @@ mod integration_tests {
                 ..config()
             },
             true,
+            BatchStatus::Failed,
         )
         .await;
     }
@@ -1340,12 +1352,16 @@ mod integration_tests {
             .await
             .expect("Data stream creation error");
 
-        run_insert_tests_with_config(&cfg, true).await;
+        run_insert_tests_with_config(&cfg, true, BatchStatus::Delivered).await;
     }
 
-    async fn run_insert_tests(mut config: ElasticSearchConfig, break_events: bool) {
+    async fn run_insert_tests(
+        mut config: ElasticSearchConfig,
+        break_events: bool,
+        status: BatchStatus,
+    ) {
         config.index = Some(gen_index());
-        run_insert_tests_with_config(&config, break_events).await;
+        run_insert_tests_with_config(&config, break_events, status).await;
     }
 
     fn create_http_client() -> reqwest::Client {
@@ -1363,7 +1379,11 @@ mod integration_tests {
             .expect("Could not build HTTP client")
     }
 
-    async fn run_insert_tests_with_config(config: &ElasticSearchConfig, break_events: bool) {
+    async fn run_insert_tests_with_config(
+        config: &ElasticSearchConfig,
+        break_events: bool,
+        batch_status: BatchStatus,
+    ) {
         let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
         let index = config.index.clone().unwrap();
         let base_url = common.base_url.clone();
@@ -1376,7 +1396,8 @@ mod integration_tests {
 
         healthcheck.await.expect("Health check failed");
 
-        let (input, events) = random_events_with_stream(100, 100, None);
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input, events) = random_events_with_stream(100, 100, Some(batch));
         if break_events {
             // Break all but the first event to simulate some kind of partial failure
             let mut doit = false;
@@ -1392,6 +1413,8 @@ mod integration_tests {
         } else {
             sink.run(events).await.expect("Sending events failed");
         }
+
+        assert_eq!(receiver.try_recv(), Ok(batch_status));
 
         // make sure writes all all visible
         flush(common).await.expect("Flushing writes failed");
