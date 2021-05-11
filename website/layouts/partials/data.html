@@ -1,10 +1,7 @@
-{{/* Used by several shortcodes to display config-style info (CLI, API, component configs/output/telemetry, etc.) */}}
-{{ $componentType := .type }}
-{{ $tag := .tag }}
-{{ $here := .File }}
+{{/* This partial is for pretty much all structured data (VRL stuff, CLI, API, component configs/output/telemetry, etc.) */}}
 <div class="relative no-prose w-full border dark:border-gray-700 rounded-md">
   {{/* Source/transform/sink config */}}
-  {{ with .config }}
+  {{ with .component_config }}
   <div class="flex flex-col divide-y dark:divide-gray-700">
     {{ range $k, $v := . }}
     {{ if ne $k "type" }}
@@ -193,7 +190,7 @@
   {{ end }}
 
   {{/* Source/transform/sink requirements */}}
-  {{ with .requirements }}
+  {{ with .component_requirements }}
   <div class="py-4 px-6 flex items-center">
     <div class="mr-8 flex-shrink-0">
       {{/* Heroicon: outline/exclamation */}}
@@ -212,7 +209,7 @@
   {{ end }}
 
   {{/* Source/transform/sink output */}}
-  {{ with .output }}
+  {{ with .component_output }}
   <div class="py-3 px-5">
     {{ with .metrics }}
     <span class="flex items-center justify-between">
@@ -253,7 +250,7 @@
   {{ end }}
 
   {{/* Source/transform/sink examples */}}
-  {{ with .examples }}
+  {{ with .commponent_examples }}
   {{ $multiple := gt (len . ) 1 }}
   <div class="no-prose py-3.5 px-5">
     {{ if $multiple }}
@@ -281,7 +278,7 @@
   {{ end }}
 
   {{/* Source/transform/sink output */}}
-  {{ with .telemetry }}
+  {{ with .component_telemetry }}
   <div class="py-4 px-6">
     {{ with .metrics }}
     <span class="flex items-center justify-between">
@@ -303,7 +300,7 @@
 
     {{ with .logs }}
     <span class="flex items-center justify-between">
-      <h3 class="hover:text-secondary" id="telemetry-logs">
+            <h3 class="hover:text-secondary" id="telemetry-logs">
         <a href="#telemetry-logs">
           Logs
         </a>
@@ -322,7 +319,7 @@
   {{ end }}
 
   {{/* Source/transform/sink warnings */}}
-  {{ with .warnings }}
+  {{ with .component_warnings }}
   <div class="no-prose py-4 px-6 flex items-center">
     <div class="mr-8 flex-shrink-0">
       <svg xmlns="http://www.w3.org/2000/svg" class="text-red-400 h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -340,7 +337,7 @@
   {{ end }}
 
   {{/* Source/transform/sink environment variables */}}
-  {{ with .env_vars }}
+  {{ with .component_env_vars }}
   <div class="no-prose flex flex-col divide-y dark:divide-gray-700">
     {{ range $k, $v := . }}
     <div class="py-4 px-6">
@@ -412,7 +409,7 @@
   {{ end }}
 
   {{/* VRL function info (/vrl/functions) */}}
-  {{ with .functions }}
+  {{ with .vrl_functions }}
   {{ range . }}
   {{ $name := .name }}
   {{ $func := index site.Data.docs.remap.functions .name }}
@@ -475,7 +472,7 @@
       </div>
 
       <div class="mt-6 flex flex-row-reverse">
-        {{ template "legend" }}
+        {{ template "vrl-function-legend" }}
       </div>
 
       {{ with $func.notices }}
@@ -512,7 +509,7 @@
   {{ end }}
 
   {{/* Real-world examples */}}
-  {{ with .real_world_examples }}
+  {{ with .vrl_real_world_examples }}
   {{ range . }}
   {{ $input := dict "message" .input.log.message | jsonify }}
   {{ $vrlSourceCode := highlight .source "toml" "" }}
@@ -577,7 +574,7 @@
   {{ end }}
 
   {{/* Compile-time errors */}}
-  {{ with .compile_time_errors }}
+  {{ with .vrl_compile_time_errors }}
   {{ range $code, $error := . }}
   {{ $id := printf "%s %s" $code $error.title | urlize }}
   <div class="dark:border-gray-700 py-4 px-6">
@@ -803,6 +800,8 @@
           </span>
 
           <div>
+            {{ template "code" . }}
+
             {{ if or (reflect.IsMap .) (reflect.IsSlice .) }}
             {{ $json := . | jsonify (dict "indent" "  ") }}
             {{ highlight $json "json" "" }}
@@ -1013,7 +1012,7 @@
 {{ end }}
 {{ end }}
 
-{{ define "legend" }}
+{{ define "vrl-function-legend" }}
 {{/* Heroicon: outline/map */}}
 <div class="flex items-center space-x-2">
   <svg xmlns="http://www.w3.org/2000/svg" class="text-gray-400 dark:text-gray-300 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

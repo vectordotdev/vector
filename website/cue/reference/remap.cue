@@ -35,6 +35,7 @@ package metadata
 	examples: [#Example, ...#Example]
 	expressions:  _
 	functions:    _
+	function_categories: [string, ...string]
 	how_it_works: #HowItWorks
 	literals:     _
 	principles:   _
