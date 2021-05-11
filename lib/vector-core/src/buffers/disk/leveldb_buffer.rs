@@ -339,16 +339,42 @@ pub struct Buffer;
 /// at the jump in conditions where the disk buffer has filled up. This'll OOM
 /// vector, meaning we're trapped in a catch 22.
 ///
-/// This function does not solve the problem -- leveldb will still map 1000
-/// files if it wants -- but we at least avoid forcing this to happen at the
-/// start of vector.
+/// This function solves the problem by iterating over a small number of keys
+/// per DB handle. This is _slow_ but does limit the overall size of vector's
+/// memory consumption.
 fn db_initial_size(path: &Path) -> Result<usize, DataDirError> {
-    let mut options = Options::new();
-    options.create_if_missing = true;
-    let db: Database<Key> = Database::open(&path, options).with_context(|| Open {
-        data_dir: path.parent().expect("always a parent"),
-    })?;
-    Ok(db.value_iter(ReadOptions::new()).map(|v| v.len()).sum())
+    let mut initial_size = 0;
+    let mut key_checkpoint: Key = Key(usize::MIN);
+
+    loop {
+        let mut options = Options::new();
+        options.create_if_missing = true;
+        let db: Database<Key> =
+            Database::open(&path, options).with_context(|| DataDirOpenError {
+                data_dir: path.parent().expect("always a parent"),
+            })?;
+
+        let iter = db.iter(ReadOptions::new()).from(&key_checkpoint);
+
+        let mut chunk_size = 0;
+        let mut had_values = false;
+        for (k, v) in iter {
+            had_values = true;
+            chunk_size += 1;
+            if chunk_size > 100_000 {
+                key_checkpoint = k;
+                break;
+            }
+            initial_size += v.len();
+        }
+
+        if !had_values {
+            break;
+        }
+    }
+
+    Ok(initial_size)
+>>>>>>> 33ad198c3 (Use Jean's method for computing `initial_size`)
 }
 
 impl super::DiskBuffer for Buffer {
