@@ -8,6 +8,5 @@ license = "MIT"
 
 [dependencies]
 data-encoding = "2.2"
-getset = "0.1.1"
 snafu = "0.6.10"
 trust-dns-proto = { version = "0.20", features = ["dnssec"] }

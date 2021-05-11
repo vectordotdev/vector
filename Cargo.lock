@@ -1839,7 +1839,6 @@ name = "dnsmsg-parser"
 version = "0.1.0"
 dependencies = [
  "data-encoding",
- "getset",
  "snafu",
  "trust-dns-proto",
 ]

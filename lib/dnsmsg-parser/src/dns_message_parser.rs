@@ -23,6 +23,7 @@ use trust_dns_proto::{
     serialize::binary::{BinDecodable, BinDecoder},
 };
 
+/// Error type for DNS message parsing
 #[derive(Debug, Snafu)]
 pub enum DnsMessageParserError {
     #[snafu(display("Encountered error : {}", cause))]
@@ -33,6 +34,11 @@ pub enum DnsMessageParserError {
     Utf8ParsingError { source: Utf8Error },
 }
 
+/// Result alias for parsing
+pub type DnsParserResult<T> = Result<T, DnsMessageParserError>;
+
+/// A DNS message parser
+#[derive(Debug)]
 pub struct DnsMessageParser {
     raw_message: Vec<u8>,
     // This field is used to facilitate parsing of compressed domain names contained
@@ -52,19 +58,15 @@ impl DnsMessageParser {
         }
     }
 
-    pub fn raw_message(&self) -> &Vec<u8> {
+    pub fn raw_message(&self) -> &[u8] {
         &self.raw_message
     }
 
-    pub fn parse_as_query_message(&mut self) -> Result<DnsQueryMessage, DnsMessageParserError> {
+    pub fn parse_as_query_message(&mut self) -> DnsParserResult<DnsQueryMessage> {
         let msg = TrustDnsMessage::from_vec(&self.raw_message).context(TrustDnsError)?;
         let header = parse_dns_query_message_header(&msg);
         let edns_section = parse_edns(&msg);
-        let rcode_high = if let Some(edns) = edns_section.clone() {
-            edns.extended_rcode
-        } else {
-            0
-        };
+        let rcode_high = edns_section.as_ref().map_or(0, |edns| edns.extended_rcode);
         let response_code = (u16::from(rcode_high) << 4) | ((u16::from(header.rcode)) & 0x000F);
 
         Ok(DnsQueryMessage {
@@ -79,7 +81,7 @@ impl DnsMessageParser {
         })
     }
 
-    pub fn parse_as_update_message(&mut self) -> Result<DnsUpdateMessage, DnsMessageParserError> {
+    pub fn parse_as_update_message(&mut self) -> DnsParserResult<DnsUpdateMessage> {
         let msg = TrustDnsMessage::from_vec(&self.raw_message).context(TrustDnsError)?;
         let header = parse_dns_update_message_header(&msg);
         let response_code = (u16::from(header.rcode)) & 0x000F;
@@ -117,37 +119,32 @@ impl DnsMessageParser {
     fn parse_dns_update_message_zone_section(
         &self,
         dns_message: &TrustDnsMessage,
-    ) -> Result<ZoneInfo, DnsMessageParserError> {
-        let mut zones: Vec<ZoneInfo> = Vec::new();
+    ) -> DnsParserResult<ZoneInfo> {
+        let zones = dns_message
+            .queries()
+            .iter()
+            .map(|query| self.parse_dns_query_question(query).into())
+            .collect::<Vec<ZoneInfo>>();
 
-        for query in dns_message.queries().iter() {
-            zones.push(self.parse_dns_query_question(query).into());
-        }
-
-        if zones.len() != 1 {
-            Err(DnsMessageParserError::SimpleError {
+        zones
+            .get(0)
+            .cloned()
+            .ok_or_else(|| DnsMessageParserError::SimpleError {
                 cause: format!(
                     "Unexpected number of records in update section: {}",
                     zones.len()
                 ),
             })
-        } else {
-            Ok(zones.get(0).unwrap().to_owned())
-        }
     }
 
-    fn parse_dns_message_section(
-        &mut self,
-        records: &[Record],
-    ) -> Result<Vec<DnsRecord>, DnsMessageParserError> {
-        let mut answers: Vec<DnsRecord> = Vec::new();
-        for record in records.iter() {
-            answers.push(self.parse_dns_record(record)?);
-        }
-        Ok(answers)
+    fn parse_dns_message_section(&mut self, records: &[Record]) -> DnsParserResult<Vec<DnsRecord>> {
+        records
+            .iter()
+            .map(|record| self.parse_dns_record(record))
+            .collect::<Result<Vec<_>, _>>()
     }
 
-    fn parse_dns_record(&mut self, record: &Record) -> Result<DnsRecord, DnsMessageParserError> {
+    fn parse_dns_record(&mut self, record: &Record) -> DnsParserResult<DnsRecord> {
         let record_data = match record.rdata() {
             RData::Unknown { code, rdata } => self.format_unknown_rdata(*code, rdata)?,
             _ => format_rdata(record.rdata())?,
@@ -164,17 +161,20 @@ impl DnsMessageParser {
         })
     }
 
-    fn get_rdata_decoder_with_raw_message(&mut self, raw_rdata: &[u8]) -> BinDecoder {
+    fn get_rdata_decoder_with_raw_message(&mut self, raw_rdata: &[u8]) -> BinDecoder<'_> {
         let (index, raw_message_for_rdata_parsing_data) =
-            if let Some(mut buf) = self.raw_message_for_rdata_parsing.take() {
-                let index = buf.len();
-                buf.extend_from_slice(raw_rdata);
-                (index, buf)
-            } else {
-                let mut buf = Vec::<u8>::with_capacity(self.raw_message.len() * 2);
-                buf.extend(&self.raw_message);
-                buf.extend_from_slice(raw_rdata);
-                (self.raw_message.len(), buf)
+            match self.raw_message_for_rdata_parsing.take() {
+                Some(mut buf) => {
+                    let index = buf.len();
+                    buf.extend_from_slice(raw_rdata);
+                    (index, buf)
+                }
+                None => {
+                    let mut buf = Vec::<u8>::with_capacity(self.raw_message.len() * 2);
+                    buf.extend(&self.raw_message);
+                    buf.extend_from_slice(raw_rdata);
+                    (self.raw_message.len(), buf)
+                }
             };
         self.raw_message_for_rdata_parsing = Some(raw_message_for_rdata_parsing_data);
 
@@ -184,7 +184,7 @@ impl DnsMessageParser {
     fn parse_wks_rdata(
         &mut self,
         raw_rdata: &[u8],
-    ) -> Result<(Option<String>, Option<Vec<u8>>), DnsMessageParserError> {
+    ) -> DnsParserResult<(Option<String>, Option<Vec<u8>>)> {
         let mut decoder = BinDecoder::new(raw_rdata);
         let address = parse_ipv4_address(&mut decoder)?;
         let protocol = parse_u8(&mut decoder)?;
@@ -199,8 +199,7 @@ impl DnsMessageParser {
                 }
                 for _i in 0..8 {
                     if current_byte & 0b1000_0000 == 0b1000_0000 {
-                        port_string.push_str(&current_bit.to_string());
-                        port_string.push(' ');
+                        port_string.push_str(&format!("{} ", current_bit));
                     }
                     current_byte <<= 1;
                     current_bit += 1;
@@ -217,7 +216,7 @@ impl DnsMessageParser {
     fn parse_a6_rdata(
         &mut self,
         raw_rdata: &[u8],
-    ) -> Result<(Option<String>, Option<Vec<u8>>), DnsMessageParserError> {
+    ) -> DnsParserResult<(Option<String>, Option<Vec<u8>>)> {
         let mut decoder = BinDecoder::new(raw_rdata);
         let prefix = parse_u8(&mut decoder)?;
         let ipv6_address = {
@@ -247,7 +246,7 @@ impl DnsMessageParser {
     fn parse_loc_rdata(
         &mut self,
         raw_rdata: &[u8],
-    ) -> Result<(Option<String>, Option<Vec<u8>>), DnsMessageParserError> {
+    ) -> DnsParserResult<(Option<String>, Option<Vec<u8>>)> {
         let mut decoder = BinDecoder::new(raw_rdata);
         let _max_latitude: u32 = 0x8000_0000 + 90 * 3_600_000;
         let _min_latitude: u32 = 0x8000_0000 - 90 * 3_600_000;
@@ -298,7 +297,7 @@ impl DnsMessageParser {
     fn parse_apl_rdata(
         &mut self,
         raw_rdata: &[u8],
-    ) -> Result<(Option<String>, Option<Vec<u8>>), DnsMessageParserError> {
+    ) -> DnsParserResult<(Option<String>, Option<Vec<u8>>)> {
         let mut decoder = BinDecoder::new(raw_rdata);
         let mut apl_rdata = "".to_string();
         while !decoder.is_empty() {
@@ -341,7 +340,7 @@ impl DnsMessageParser {
         &mut self,
         code: u16,
         rdata: &NULL,
-    ) -> Result<(Option<String>, Option<Vec<u8>>), DnsMessageParserError> {
+    ) -> DnsParserResult<(Option<String>, Option<Vec<u8>>)> {
         match code {
             dns_message::RTYPE_MB => match rdata.anything() {
                 Some(raw_rdata) => {
@@ -657,7 +656,7 @@ impl DnsMessageParser {
     }
 }
 
-fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsMessageParserError> {
+fn format_rdata(rdata: &RData) -> DnsParserResult<(Option<String>, Option<Vec<u8>>)> {
     match rdata {
         RData::A(ip) => Ok((Some(ip.to_string()), None)),
         RData::AAAA(ip) => Ok((Some(ip.to_string()), None)),
@@ -1011,7 +1010,7 @@ fn parse_edns_opt(opt_code: EdnsCode, opt_data: &[u8]) -> EdnsOptionEntry {
     }
 }
 
-fn parse_loc_rdata_size(data: u8) -> Result<f64, DnsMessageParserError> {
+fn parse_loc_rdata_size(data: u8) -> DnsParserResult<f64> {
     let base = (data & 0xF0) >> 4;
     if base > 9 {
         return Err(DnsMessageParserError::SimpleError {
@@ -1048,7 +1047,7 @@ fn parse_loc_rdata_coordinates(coordinates: u32, dir: &str) -> String {
     )
 }
 
-fn parse_character_string(decoder: &mut BinDecoder) -> Result<String, DnsMessageParserError> {
+fn parse_character_string(decoder: &mut BinDecoder<'_>) -> DnsParserResult<String> {
     let raw_len = decoder.read_u8().context(TrustDnsError)?;
     let len = raw_len.unverified() as usize;
     let raw_text = decoder.read_slice(len).context(TrustDnsError)?;
@@ -1065,19 +1064,19 @@ fn parse_character_string(decoder: &mut BinDecoder) -> Result<String, DnsMessage
     }
 }
 
-fn parse_u8(decoder: &mut BinDecoder) -> Result<u8, DnsMessageParserError> {
+fn parse_u8(decoder: &mut BinDecoder<'_>) -> DnsParserResult<u8> {
     Ok(decoder.read_u8().context(TrustDnsError)?.unverified())
 }
 
-fn parse_u16(decoder: &mut BinDecoder) -> Result<u16, DnsMessageParserError> {
+fn parse_u16(decoder: &mut BinDecoder<'_>) -> DnsParserResult<u16> {
     Ok(decoder.read_u16().context(TrustDnsError)?.unverified())
 }
 
-fn parse_u32(decoder: &mut BinDecoder) -> Result<u32, DnsMessageParserError> {
+fn parse_u32(decoder: &mut BinDecoder<'_>) -> DnsParserResult<u32> {
     Ok(decoder.read_u32().context(TrustDnsError)?.unverified())
 }
 
-fn parse_vec(decoder: &mut BinDecoder, buffer_len: u8) -> Result<Vec<u8>, DnsMessageParserError> {
+fn parse_vec(decoder: &mut BinDecoder<'_>, buffer_len: u8) -> DnsParserResult<Vec<u8>> {
     Ok(decoder
         .read_vec(buffer_len as usize)
         .context(TrustDnsError)?
@@ -1085,24 +1084,24 @@ fn parse_vec(decoder: &mut BinDecoder, buffer_len: u8) -> Result<Vec<u8>, DnsMes
 }
 
 fn parse_vec_with_u16_len(
-    decoder: &mut BinDecoder,
+    decoder: &mut BinDecoder<'_>,
     buffer_len: u16,
-) -> Result<Vec<u8>, DnsMessageParserError> {
+) -> DnsParserResult<Vec<u8>> {
     Ok(decoder
         .read_vec(buffer_len as usize)
         .context(TrustDnsError)?
         .unverified())
 }
 
-fn parse_ipv6_address(decoder: &mut BinDecoder) -> Result<String, DnsMessageParserError> {
+fn parse_ipv6_address(decoder: &mut BinDecoder<'_>) -> DnsParserResult<String> {
     Ok(aaaa::read(decoder).context(TrustDnsError)?.to_string())
 }
 
-fn parse_ipv4_address(decoder: &mut BinDecoder) -> Result<String, DnsMessageParserError> {
+fn parse_ipv4_address(decoder: &mut BinDecoder<'_>) -> DnsParserResult<String> {
     Ok(a::read(decoder).context(TrustDnsError)?.to_string())
 }
 
-fn parse_domain_name(decoder: &mut BinDecoder) -> Result<Name, DnsMessageParserError> {
+fn parse_domain_name(decoder: &mut BinDecoder<'_>) -> DnsParserResult<Name> {
     Name::read(decoder).context(TrustDnsError)
 }
 
