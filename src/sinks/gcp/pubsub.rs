@@ -259,7 +259,7 @@ mod integration_tests {
 
         healthcheck.await.expect("Health check failed");
 
-        let (input, events) = random_events_with_stream(100, 100);
+        let (input, events) = random_events_with_stream(100, 100, None);
         sink.run(events).await.expect("Sending events failed");
 
         let response = pull_messages(&subscription, 1000).await;

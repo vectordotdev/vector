@@ -134,7 +134,7 @@ mod tests {
         };
         let mut sink = BlackholeSink::new(config, Acker::Null);
 
-        let (_input_lines, events) = random_events_with_stream(100, 10);
+        let (_input_lines, events) = random_events_with_stream(100, 10, None);
         let _ = sink.run(Box::pin(events)).await.unwrap();
     }
 }
