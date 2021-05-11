@@ -15,12 +15,20 @@ see which components support specific guarantees.
 
 ### At-least-once
 
-The **at-least-once** delivery guarantee ensures that an [event] received by a Vector component is
-ultimately delivered at least once. While rare, it is possible for an event to be delivered more
-than once. See the [Does Vector support exactly-once delivery?](#faq-at-least-once) FAQ below).
+The **at-least-once** delivery guarantee ensures that an [event]
+received by a Vector component is ultimately delivered at least
+once. For a source, this indicates that it will wait for _all_ connected
+sinks to mark the event as delivered before acknowledging receipt of the
+event. For a sink, this indicates that it will attempt to retry the
+delivery until the events are either accepted or rejected and then
+signal the source with the results of that delivery.
+
+While rare, it is possible for an event to be delivered more than
+once. See the [Does Vector support exactly-once
+delivery?](#faq-at-least-once) FAQ below).
 
 {{< warning >}}
-In order to achieve at-least-once delivery between restarts your source must be configured to use
+In order to achieve at-least-once delivery between restarts your sink must be configured to use
 disk-based buffers:
 
 ```toml title="vector.toml"
@@ -36,7 +44,7 @@ Refer to each [sink's][sinks] documentation for further guidance on its buffer o
 [sinks]: /docs/reference/configuration/sinks
 {{< /warning >}}
 
-### Best effort
+### Best-effort
 
 A **best-effort** delivery guarantee means that a Vector component makes a best effort to deliver
 each event but it can't _guarantee_ delivery. This is usually due to limitations of the underlying
