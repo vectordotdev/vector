@@ -108,10 +108,14 @@ pub fn encode_event(
             Ok(bytes)
         }
     };
+    let (_fields, metadata) = log.into_parts();
 
     b.map(|mut b| {
         b.push(b'\n');
-        EncodedEvent::new(Bytes::from(b))
+        EncodedEvent {
+            item: Bytes::from(b),
+            metadata: Some(metadata),
+        }
     })
     .map_err(|error| error!(message = "Unable to encode.", %error))
     .ok()
