@@ -99,6 +99,11 @@ extraVolumes: []
 # managed by `DaemonSet`.
 extraVolumeMounts: []
 
+# Vector will store it's data here.
+dataVolume:
+  hostPath:
+    path: /var/lib/vector/
+
 rbac:
   # Whether to create rbac resources or not. Disable for non-rbac clusters.
   enabled: true

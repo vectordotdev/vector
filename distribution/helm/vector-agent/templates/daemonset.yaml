@@ -129,8 +129,7 @@ spec:
             path: /var/lib/
         # Vector will store it's data here.
         - name: data-dir
-          hostPath:
-            path: /var/lib/vector/
+          {{- toYaml .Values.dataVolume | nindent 10 }}
         # Vector config dir.
         - name: config-dir
           projected:
