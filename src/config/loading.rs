@@ -1,4 +1,5 @@
-use super::{builder::ConfigBuilder, format, vars, Config, Format, FormatHint};
+use super::{builder::ConfigBuilder, format, validation, vars, Config, Format, FormatHint};
+use crate::signal;
 use glob::glob;
 use lazy_static::lazy_static;
 use std::{
@@ -87,6 +88,31 @@ pub fn load_from_paths(config_paths: &[(PathBuf, FormatHint)]) -> Result<Config,
     Ok(config)
 }
 
+/// Loads a configuration from paths. If a provider is present in the builder, the config is
+/// used as bootstrapping for a remote source. Otherwise, provider instantiation is skipped.
+pub async fn load_from_paths_with_provider(
+    config_paths: &[(PathBuf, FormatHint)],
+    signal_handler: &mut signal::SignalHandler,
+) -> Result<Config, Vec<String>> {
+    let (mut builder, load_warnings) = load_builder_from_paths(config_paths)?;
+    validation::check_provider(&builder)?;
+    signal_handler.clear();
+
+    // If there's a provider, overwrite the existing config builder with the remote variant.
+    if let Some(mut provider) = builder.provider {
+        builder = provider.build(signal_handler).await?;
+        debug!(message = "Provider configured.", provider = ?provider.provider_type());
+    }
+
+    let (new_config, build_warnings) = builder.build_with_warnings()?;
+
+    for warning in load_warnings.into_iter().chain(build_warnings) {
+        warn!("{}", warning);
+    }
+
+    Ok(new_config)
+}
+
 pub fn load_builder_from_paths(
     config_paths: &[(PathBuf, FormatHint)],
 ) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {
@@ -158,7 +184,7 @@ fn open_config(path: &Path) -> Option<File> {
     }
 }
 
-fn load(
+pub fn load(
     mut input: impl std::io::Read,
     format: FormatHint,
 ) -> Result<(ConfigBuilder, Vec<String>), Vec<String>> {

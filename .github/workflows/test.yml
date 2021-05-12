@@ -41,7 +41,7 @@ jobs:
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
       steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - uses: dorny/paths-filter@v2
         id: filter
         with:
@@ -89,7 +89,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - uses: actions/cache@v2.1.5
         name: Cache Cargo registry + index
         with:
@@ -112,7 +112,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
       - uses: actions/cache@v2.1.5
         name: Cache Cargo registry + index
@@ -150,7 +150,7 @@ jobs:
     # This helps us avoid adopting dependencies that aren't compatible with other architectures.
     if: ${{ needs.changes.outputs.dependencies == 'true' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
       - uses: actions/cache@v2.1.5
         name: Cache Cargo registry + index
@@ -181,7 +181,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - uses: actions/cache@v2.1.5
         name: Cache Cargo registry + index
         with:
@@ -207,7 +207,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - run: choco install llvm
       - run: make test
 
@@ -218,7 +218,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - run: |
           TEMP=$(mktemp -d)
           curl \
@@ -236,7 +236,7 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
@@ -252,7 +252,7 @@ jobs:
     container: timberio/ci_image
     needs: changes
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
@@ -302,12 +302,12 @@ jobs:
         run: make check-events
       - name: Check cargo deny advisories
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1
+        uses: EmbarkStudios/cargo-deny-action@v1.2.6
         with:
           command: check advisories
       - name: Check cargo deny licenses
         if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1
+        uses: EmbarkStudios/cargo-deny-action@v1.2.6
         with:
           command: check licenses
 
