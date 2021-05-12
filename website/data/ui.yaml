@@ -5,7 +5,7 @@ defaults:
   dockerDistro: debian
 platforms:
 - name: Linux
-  interfaces: ["Docker CLI"]
+  interfaces: ["Docker CLI", "Something else"]
 - name: Windows
   interfaces: ["Docker CLI"]
 - name: macOS

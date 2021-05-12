@@ -1,21 +1,40 @@
+{{ $ctx := . }}
+{{ $docker_cli := index site.Data.ui.interfaces "Docker CLI" }}
+
 {{ $platforms := slice }}
 {{ range site.Data.ui.platforms }}
 {{ $platforms = $platforms | append .name }}
 {{ end }}
 
-<div class="no-prose border rounded-md shadow py-3 px-4 dark:border-gray-700">
-  <div class="flex flex-col space-y-2">
-    {{ partial "ui/selector.html" (dict "name" "Platform" "items" $platforms "var" "platform") }}
+<div class="no-prose flex flex-col space-y-2">
+  {{ partial "ui/selector.html" (dict "name" "Platform" "items" $platforms "var" "platform") }}
 
-    {{ range $platforms }}
-    {{ $platform := index (where site.Data.ui.platforms ".name" .) 0 }}
-    <div x-show="$store.ui.platform === '{{ . }}'">
-      {{ partial "ui/selector.html" (dict "name" "Interface" "items" $platform.interfaces "var" "interface") }}
-    </div>
-    {{ end }}
+  {{ range $platforms }}
+  {{ $platform := index (where site.Data.ui.platforms ".name" .) 0 }}
+  <div x-show="$store.ui.platform === '{{ . }}'">
+    {{ partial "ui/selector.html" (dict "name" "Interface" "items" $platform.interfaces "var" "interface") }}
+  </div>
+  {{ end }}
 
-    <div x-show="$store.ui.interface === 'Docker CLI'">
-      {{ partial "ui/docker-cli.html" . }}
-    </div>
+  <div x-show="$store.ui.interface === 'Docker CLI'">
+    {{ partial "ui/selector.html" (dict "name" "Docker version" "items" $docker_cli.versions "var" "dockerVersion") }}
+    {{ partial "ui/selector.html" (dict "name" "Image distro" "items" $docker_cli.distros "var" "dockerDistro") }}
   </div>
 </div>
+
+<div class="no-prose">
+  {{ partial "heading.html" (dict "text" "Start" "level" 3) }}
+
+  <div x-show="$store.ui.interface === 'Docker CLI'">
+    {{ partial "ui/docker-cli/run.html" . }}
+  </div>
+
+  {{ template "snippet" (dict "tag" "start" "ctx" $ctx) }}
+</div>
+
+{{ define "snippet" }}
+{{ $path := printf "snippets/ui/%s.md" .tag }}
+<div class="prose">
+  {{ readFile $path | .ctx.Page.RenderString }}
+</div>
+{{ end }}
