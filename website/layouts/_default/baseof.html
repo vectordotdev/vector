@@ -9,6 +9,9 @@
   class="h-screen">
 
   <head>
+    {{/* Ensure smooth page loading */}}
+    {{ partial "page-load.html" . }}
+
     {{ partial "meta.html" . }}
 
     <title>
@@ -37,9 +40,6 @@
     {{/* For the mobile nav footer */}}
     {{ block "subfooter" . }}
     {{ end }}
-
-    {{/* Ensure smooth page loading */}}
-    {{ partial "page-load.html" . }}
 
     {{ partial "javascript.html" . }}
   </body>
