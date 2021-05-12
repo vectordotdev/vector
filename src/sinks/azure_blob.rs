@@ -1,17 +1,19 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext},
+    event::Event,
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
             retries::RetryLogic,
             sink::Response,
-            BatchConfig, BatchSettings, Buffer, Compression, Concurrency, PartitionBatchSink,
-            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
+            BatchConfig, BatchSettings, Buffer, Compression, Concurrency, EncodedEvent,
+            PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt,
+            TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
     template::Template,
-    Event, Result,
+    Result,
 };
 use azure_sdk_core::{
     errors::AzureError, BlobNameSupport, BodySupport, ContainerNameSupport, ContentEncodingSupport,
@@ -271,7 +273,7 @@ fn encode_event(
     mut event: Event,
     blob_prefix: &Template,
     encoding: &EncodingConfig<Encoding>,
-) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
+) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8>, Bytes>>> {
     let key = blob_prefix
         .render_string(&event)
         .map_err(|missing_keys| {
@@ -303,7 +305,10 @@ fn encode_event(
         }
     };
 
-    Some(PartitionInnerBuffer::new(bytes, key.into()))
+    Some(EncodedEvent::new(PartitionInnerBuffer::new(
+        bytes,
+        key.into(),
+    )))
 }
 
 fn build_request(
@@ -520,7 +525,7 @@ mod integration_tests {
     use azure_sdk_storage_blob::{
         blob::Blob as BlobState, container::PublicAccess, container::PublicAccessSupport, Blob,
     };
-    use bytes::{buf::BufExt, BytesMut};
+    use bytes::{Buf, BytesMut};
     use flate2::read::GzDecoder;
     use futures::Stream;
     use std::io::{BufRead, BufReader};
@@ -560,7 +565,7 @@ mod integration_tests {
             ..config
         };
         let sink = config.to_sink();
-        let (lines, input) = random_lines_with_stream(100, 10);
+        let (lines, input) = random_lines_with_stream(100, 10, None);
 
         sink.run(input).await.expect("Failed to run sink");
 
@@ -608,7 +613,7 @@ mod integration_tests {
             ..config
         };
         let sink = config.to_sink();
-        let (lines, events) = random_lines_with_stream(100, 10);
+        let (lines, events) = random_lines_with_stream(100, 10, None);
 
         sink.run(events).await.expect("Failed to run sink");
 
