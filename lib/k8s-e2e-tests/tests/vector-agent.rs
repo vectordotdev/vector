@@ -57,20 +57,25 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
+    let override_name = get_override_name("vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_STDOUT_SINK,
+                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
                 ..Default::default()
             },
         )
         .await?;
 
     framework
-        .wait_for_rollout(&namespace, "daemonset/vector-agent", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
@@ -94,7 +99,7 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, "daemonset/vector-agent")?;
+    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -141,19 +146,27 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
+    let override_name = get_override_name("vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_STDOUT_SINK_RAW_CONFIG,
+                custom_helm_values: &config_override_name(
+                    HELM_VALUES_STDOUT_SINK_RAW_CONFIG,
+                    &override_name,
+                ),
                 ..Default::default()
             },
         )
         .await?;
     framework
-        .wait_for_rollout(&namespace, "daemonset/vector-agent", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
@@ -176,7 +189,7 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, "daemonset/vector-agent")?;
+    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -221,13 +234,14 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
+    let override_name = get_override_name("vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_STDOUT_SINK,
+                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
                 ..Default::default()
             },
         )
@@ -257,7 +271,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, "daemonset/vector-agent")?;
+    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -302,7 +316,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     let framework = make_framework();
 
     let pod_namespace = get_namespace_appended("test-pod");
-
+    let override_name = get_override_name("vector-agent");
     let test_namespace = framework.namespace(&pod_namespace).await?;
 
     let test_pod = framework
@@ -333,16 +347,20 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_STDOUT_SINK,
+                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
                 ..Default::default()
             },
         )
         .await?;
     framework
-        .wait_for_rollout(&namespace, "daemonset/vector-agent", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, "daemonset/vector-agent")?;
+    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -386,6 +404,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
+    let override_name = get_override_name("vector-agent");
 
     let framework = make_framework();
 
@@ -394,13 +413,17 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_STDOUT_SINK,
+                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
                 ..Default::default()
             },
         )
         .await?;
     framework
-        .wait_for_rollout(&namespace, "daemonset/vector-agent", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
@@ -424,7 +447,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, "daemonset/vector-agent")?;
+    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -469,6 +492,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
+    let override_name = get_override_name("vector-agent");
     let framework = make_framework();
 
     let vector = framework
@@ -476,13 +500,17 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_STDOUT_SINK,
+                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
                 ..Default::default()
             },
         )
         .await?;
     framework
-        .wait_for_rollout(&namespace, "daemonset/vector-agent", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
@@ -505,7 +533,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, "daemonset/vector-agent")?;
+    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
     smoke_check_first_line(&mut log_reader).await;
     let k8s_version = framework.kubernetes_version().await?;
     let minor = u8::from_str(&k8s_version.minor()).expect("Couldn't get u8 from String!");
@@ -582,19 +610,24 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
+    let override_name = get_override_name("vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_STDOUT_SINK,
+                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
                 ..Default::default()
             },
         )
         .await?;
     framework
-        .wait_for_rollout(&namespace, "daemonset/vector-agent", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
@@ -635,7 +668,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, "daemonset/vector-agent")?;
+    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the log lines until the reasonable amount of time passes for us
@@ -735,6 +768,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
+    let override_name = get_override_name("vector-agent");
 
     const CONFIG: &str = indoc! {r#"
         kubernetesLogsSource:
@@ -748,13 +782,20 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &format!("{}\n{}", CONFIG, HELM_VALUES_STDOUT_SINK),
+                custom_helm_values: &config_override_name(
+                    &format!("{}\n{}", CONFIG, HELM_VALUES_STDOUT_SINK),
+                    &override_name,
+                ),
                 ..Default::default()
             },
         )
         .await?;
     framework
-        .wait_for_rollout(&namespace, "daemonset/vector-agent", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
@@ -813,7 +854,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, "daemonset/vector-agent")?;
+    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the log lines until the reasonable amount of time passes for us
@@ -914,19 +955,24 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
+    let override_name = get_override_name("vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_STDOUT_SINK,
+                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
                 ..Default::default()
             },
         )
         .await?;
     framework
-        .wait_for_rollout(&namespace, "daemonset/vector-agent", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
@@ -953,7 +999,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, "daemonset/vector-agent")?;
+    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the log lines until the reasonable amount of time passes for us
@@ -1057,6 +1103,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
+    let override_name = get_override_name("vector-agent");
 
     let config: &str = &format!(
         indoc! {r#"
@@ -1072,7 +1119,10 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: &format!("{}\n{}", config, HELM_VALUES_STDOUT_SINK),
+                custom_helm_values: &config_override_name(
+                    &format!("{}\n{}", config, HELM_VALUES_STDOUT_SINK),
+                    &override_name,
+                ),
                 ..Default::default()
             },
         )
@@ -1104,7 +1154,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, "daemonset/vector-agent")?;
+    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the log lines until the reasonable amount of time passes for us
@@ -1206,19 +1256,24 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
+    let override_name = get_override_name("vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_STDOUT_SINK,
+                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
                 ..Default::default()
             },
         )
         .await?;
     framework
-        .wait_for_rollout(&namespace, "daemonset/vector-agent", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let mut test_namespaces = vec![];
@@ -1251,7 +1306,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
         test_pods.push(test_pod);
     }
 
-    let mut log_reader = framework.logs(&namespace, "daemonset/vector-agent")?;
+    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -1301,19 +1356,27 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
+    let override_name = get_override_name("vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_ADDITIONAL_CONFIGMAP,
+                custom_helm_values: &config_override_name(
+                    HELM_VALUES_ADDITIONAL_CONFIGMAP,
+                    &override_name,
+                ),
                 custom_resource: CUSTOM_RESOURCE_VECTOR_CONFIG,
             },
         )
         .await?;
     framework
-        .wait_for_rollout(&namespace, "daemonset/vector-agent", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
@@ -1336,7 +1399,7 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, "daemonset/vector-agent")?;
+    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -1381,23 +1444,32 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
+    let override_name = get_override_name("vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_STDOUT_SINK,
+                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
                 ..Default::default()
             },
         )
         .await?;
     framework
-        .wait_for_rollout(&namespace, "daemonset/vector-agent", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
         .await?;
 
-    let mut vector_metrics_port_forward =
-        framework.port_forward(&namespace, "daemonset/vector-agent", 9090, 9090)?;
+    let mut vector_metrics_port_forward = framework.port_forward(
+        &namespace,
+        &format!("daemonset/{}", override_name),
+        9090,
+        9090,
+    )?;
     vector_metrics_port_forward.wait_until_ready().await?;
     let vector_metrics_url = format!(
         "http://{}/metrics",
@@ -1446,7 +1518,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, "daemonset/vector-agent")?;
+    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -1508,16 +1580,32 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let namespace = get_namespace();
     let framework = make_framework();
+    let override_name = get_override_name("vector-agent");
 
     let vector = framework
-        .vector(&namespace, HELM_CHART_VECTOR_AGENT, VectorConfig::default())
+        .vector(
+            &namespace,
+            HELM_CHART_VECTOR_AGENT,
+            VectorConfig {
+                custom_helm_values: &config_override_name("", &override_name),
+                ..Default::default()
+            },
+        )
         .await?;
     framework
-        .wait_for_rollout(&namespace, "daemonset/vector-agent", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
         .await?;
 
-    let mut vector_metrics_port_forward =
-        framework.port_forward(&namespace, "daemonset/vector-agent", 9090, 9090)?;
+    let mut vector_metrics_port_forward = framework.port_forward(
+        &namespace,
+        &format!("daemonset/{}", override_name),
+        9090,
+        9090,
+    )?;
     vector_metrics_port_forward.wait_until_ready().await?;
     let vector_metrics_url = format!(
         "http://{}/metrics",
