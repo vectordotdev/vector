@@ -12,10 +12,14 @@ use shared::EventDataEq;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
+use std::sync::Arc;
 use tracing::field::{Field, Visit};
 pub use util::log::PathComponent;
 pub use util::log::PathIter;
 pub use value::Value;
+
+#[cfg(feature = "vrl")]
+pub use vrl_target::VrlTarget;
 
 pub mod discriminant;
 pub mod error;
@@ -29,6 +33,8 @@ mod metadata;
 pub mod metric;
 pub mod util;
 mod value;
+#[cfg(feature = "vrl")]
+mod vrl_target;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
@@ -131,6 +137,14 @@ impl Event {
         match self {
             Self::Log(log) => log.metadata_mut(),
             Self::Metric(metric) => metric.metadata_mut(),
+        }
+    }
+
+    pub fn add_batch_notifier(&mut self, batch: Arc<BatchNotifier>) {
+        let finalizer = EventFinalizer::new(batch);
+        match self {
+            Self::Log(log) => log.add_finalizer(finalizer),
+            Self::Metric(metric) => metric.add_finalizer(finalizer),
         }
     }
 }

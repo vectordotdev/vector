@@ -55,7 +55,7 @@ struct LogplexSource {
 }
 
 impl HttpSource for LogplexSource {
-    fn build_event(
+    fn build_events(
         &self,
         body: Bytes,
         header_map: HeaderMap,

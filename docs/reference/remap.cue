@@ -19,11 +19,14 @@ package metadata
 		source:  string
 		diff?:   string
 		return?: _
-		output?: #Event
+		output?: #Event | [#Event, ...#Event]
 		raises?: _
 
 		notes?: [string, ...string]
 		warnings?: [string, ...string]
+
+		// whether to skip in doc tests
+		skip_test?: bool
 	}
 
 	#Type: "any" | "array" | "boolean" | "float" | "integer" | "object" | "null" | "path" | "string" | "regex" | "timestamp"
@@ -175,6 +178,36 @@ remap: #Remap & {
 					instance_id: "abcd1234"
 				}
 			}
+		},
+		{
+			title: "Emitting multiple logs from JSON"
+			input: log: message: #"[{"message": "first_log"}, {"message": "second_log"}]"#
+			source: """
+				. = parse_json!(.message) # sets `.` to an array of objects
+				"""
+			output: [
+				{log: {message: "first_log"}},
+				{log: {message: "second_log"}},
+			]
+			notes: [
+				"Setting `.` to an array will emit one event per element",
+			]
+		},
+		{
+			title: "Emitting multiple non-object logs from JSON"
+			input: log: message: #"[5, true, "hello"]"#
+			source: """
+				. = parse_json!(.message) # sets `.` to an array
+				"""
+			output: [
+				{log: {message: 5}},
+				{log: {message: true}},
+				{log: {message: "hello"}},
+			]
+			notes: [
+				"Setting `.` to an array will emit one event per element. Any non-object elements will be set to the `message` key of the output event.",
+			]
+			skip_test: true
 		},
 		{
 			title: "Invalid argument type"

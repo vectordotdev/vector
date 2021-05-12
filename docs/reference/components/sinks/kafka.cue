@@ -19,8 +19,8 @@ components: sinks: kafka: {
 			batch: {
 				enabled:      true
 				common:       true
-				max_bytes:    null
 				max_events:   null
+				max_bytes:    null
 				timeout_secs: null
 			}
 			compression: {

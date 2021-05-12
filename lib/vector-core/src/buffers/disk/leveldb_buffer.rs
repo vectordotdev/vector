@@ -14,7 +14,7 @@ use std::{
     collections::VecDeque,
     convert::TryInto,
     mem::size_of,
-    path::PathBuf,
+    path::{Path, PathBuf},
     pin::Pin,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -27,8 +27,7 @@ use super::{DataDirOpenError, Error};
 use crate::buffers::Acker;
 
 /// How much of disk buffer needs to be deleted before we trigger compaction.
-/// <0,1>
-const MAX_UNCOMPACTED: f64 = 0.1;
+const MAX_UNCOMPACTED_DENOMINATOR: usize = 10;
 
 #[derive(Copy, Clone, Debug)]
 struct Key(pub usize);
@@ -327,15 +326,44 @@ impl Reader {
 
 pub struct Buffer;
 
+/// Read the byte size of the database
+///
+/// There is a mismatch between leveldb's mechanism and vector's. While vector
+/// would prefer to keep as little in-memory as possible leveldb, being a
+/// database, has the opposite consideration. As such it may mmap 1000 of its
+/// LDB files into vector's address space at a time with no ability for us to
+/// change this number. See [leveldb issue
+/// 866](https://github.com/google/leveldb/issues/866). Because we do need to
+/// know the byte size of our store we are forced to iterate through all the LDB
+/// files on disk, meaning we impose a huge memory burden on our end users right
+/// at the jump in conditions where the disk buffer has filled up. This'll OOM
+/// vector, meaning we're trapped in a catch 22.
+///
+/// This function does not solve the problem -- leveldb will still map 1000
+/// files if it wants -- but we at least avoid forcing this to happen at the
+/// start of vector.
+fn db_initial_size(path: &Path) -> Result<usize, Error> {
+    let mut options = Options::new();
+    options.create_if_missing = true;
+    let db: Database<Key> = Database::open(&path, options).with_context(|| DataDirOpenError {
+        data_dir: path.parent().expect("always a parent"),
+    })?;
+    Ok(db.value_iter(ReadOptions::new()).map(|v| v.len()).sum())
+}
+
 impl super::DiskBuffer for Buffer {
     type Writer = Writer;
     type Reader = Reader;
 
+    // We convert `max_size` into an f64 at
+    #[allow(clippy::cast_precision_loss)]
     fn build(path: PathBuf, max_size: usize) -> Result<(Self::Writer, Self::Reader, Acker), Error> {
         // New `max_size` of the buffer is used for storing the unacked events.
         // The rest is used as a buffer which when filled triggers compaction.
-        let max_uncompacted_size = (max_size as f64 * MAX_UNCOMPACTED) as usize;
+        let max_uncompacted_size = max_size / MAX_UNCOMPACTED_DENOMINATOR;
         let max_size = max_size - max_uncompacted_size;
+
+        let initial_size = db_initial_size(&path)?;
 
         let mut options = Options::new();
         options.create_if_missing = true;
@@ -350,12 +378,11 @@ impl super::DiskBuffer for Buffer {
         let tail;
         {
             let mut iter = db.keys_iter(ReadOptions::new());
-            head = iter.next().map(|k| k.0).unwrap_or(0);
+            head = iter.next().map_or(0, |k| k.0);
             iter.seek_to_last();
             tail = if iter.valid() { iter.key().0 + 1 } else { 0 };
         }
 
-        let initial_size = db.value_iter(ReadOptions::new()).map(|v| v.len()).sum();
         let current_size = Arc::new(AtomicUsize::new(initial_size));
 
         let write_notifier = Arc::new(AtomicWaker::new());
