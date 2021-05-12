@@ -1,4 +1,4 @@
-use super::{EventFinalizer, EventMetadata};
+use super::EventMetadata;
 use crate::metrics::Handle;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
@@ -273,10 +273,6 @@ impl Metric {
     pub fn with_timestamp(mut self, timestamp: Option<DateTime<Utc>>) -> Self {
         self.data.timestamp = timestamp;
         self
-    }
-
-    pub fn add_finalizer(&mut self, finalizer: EventFinalizer) {
-        self.metadata.add_finalizer(finalizer);
     }
 
     pub fn with_tags(mut self, tags: Option<MetricTags>) -> Self {

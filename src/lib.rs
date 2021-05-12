@@ -43,6 +43,7 @@ pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
 pub(crate) mod pipeline;
+pub mod providers;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod serde;

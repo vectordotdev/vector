@@ -76,10 +76,6 @@ impl LogEvent {
         Self::from_parts(fields, metadata.with_finalizer(finalizer))
     }
 
-    pub fn add_finalizer(&mut self, finalizer: EventFinalizer) {
-        self.metadata.add_finalizer(finalizer);
-    }
-
     #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
         util::log::get(self.as_map(), key.as_ref())

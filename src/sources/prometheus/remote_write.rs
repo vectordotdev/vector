@@ -91,7 +91,7 @@ impl RemoteWriteSource {
 }
 
 impl HttpSource for RemoteWriteSource {
-    fn build_events(
+    fn build_event(
         &self,
         mut body: Bytes,
         header_map: HeaderMap,
@@ -107,10 +107,10 @@ impl HttpSource for RemoteWriteSource {
         {
             body = decode(&Some("snappy".to_string()), body)?;
         }
-        let events = self.decode_body(body)?;
-        let count = events.len();
+        let result = self.decode_body(body)?;
+        let count = result.len();
         emit!(PrometheusRemoteWriteReceived { count });
-        Ok(events)
+        Ok(result)
     }
 }
 
