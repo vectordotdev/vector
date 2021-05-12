@@ -745,21 +745,6 @@ Vector:
 - [`minikube`](https://minikube.sigs.k8s.io/)-powered or other k8s cluster
 - [`cargo watch`](https://github.com/passcod/cargo-watch)
 
-
-#### Installing on mac
-Note, it currently doesn't work properly on the mac. These are just some 
-preliminary notes.
-
-Install docker for mac
-In docker for mac enable Kubernetes
-
-Run this to ensure our kubectl points to docker destop
-❯ kubectl config get-contexts
-CURRENT   NAME             CLUSTER          AUTHINFO         NAMESPACE
-*         docker-desktop   docker-desktop   docker-desktop
-
-
-
 ##### The dev flow
 
 Once you have the requirements, use the `scripts/skaffold.sh dev` command.
@@ -835,7 +820,7 @@ E2E (end-to-end) tests.
 - `kubectl`
 - `bash`
 - `cross` - `cargo install cross`
-- [`helm`](https://helm.sh/) 
+- [`helm`](https://helm.sh/)
 
 Vector release artifacts are prepared for E2E tests, so the ability to do that
 is required too, see Vector [docs](https://vector.dev) for more details.
@@ -893,7 +878,7 @@ You can also pass additional parameters to adjust the behavior of the test:
 - `SCOPE` - pass a filter to the `cargo test` command to filter out the tests,
   effectively equivalent to `cargo test -- $SCOPE`.
 
-- `NAMESPACE` - specifies the k8s namespace to run the tests in. Some tests are 
+- `NAMESPACE` - specifies the k8s namespace to run the tests in. Some tests are
   run in another namespace with this one prepended: `<NAMESPACE>-test-pod`.
 
 Passing additional commands is done like so:
