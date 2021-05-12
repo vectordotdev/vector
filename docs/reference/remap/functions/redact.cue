@@ -3,7 +3,14 @@ package metadata
 remap: functions: redact: {
 	category: "String"
 	description: """
-		Redact sensitive data in `value`.
+		Redact potentially sensitive data in `value` such as:
+
+		- credit card numbers
+		- custom patterns
+		- (more to come!)
+
+		This can act as a last resort in the case your applications log sensitive data by accident to ensure you do not
+		leak this information into your log storage.
 		"""
 
 	arguments: [
@@ -15,7 +22,7 @@ remap: functions: redact: {
 				Its behavior differs depending on the type of `value`:
 				- For strings, it simply redacts the sensitive data and returns a new string
 				- For arrays, it redacts the sensitive data in each string element
-				- For objects, it masks the sensitive data in each value, but not keys
+				- For objects, it masks the sensitive data in each string value, but not keys
 
 				For arrays and objects it will recurse into any nested arrays or objects. Any non-string elements will
 				be skipped.
