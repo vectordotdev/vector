@@ -4,13 +4,85 @@ pub mod disk;
 
 use crate::event::Event;
 pub use acker::Acker;
-use futures::{channel::mpsc, Sink, SinkExt};
+use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
+#[cfg(feature = "disk-buffer")]
+use std::path::Path;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+// NOTE unfortunately because we can't edit out a lifetime based on a feature
+// flag we need two copies of `Variant` else the liftime being unused when
+// 'disk-buffers' is flagged off will ding the build.
+
+#[derive(Debug, Clone, Copy)]
+#[cfg(not(feature = "disk-buffer"))]
+pub enum Variant {
+    Memory {
+        max_events: usize,
+        when_full: WhenFull,
+    },
+}
+
+#[derive(Debug, Clone, Copy)]
+#[cfg(feature = "disk-buffer")]
+pub enum Variant<'a> {
+    Memory {
+        max_events: usize,
+        when_full: WhenFull,
+    },
+    Disk {
+        max_size: usize,
+        when_full: WhenFull,
+        data_dir: &'a Path,
+        name: &'a str,
+    },
+}
+
+/// Build a new buffer based on the passed `Variant`
+///
+/// # Errors
+///
+/// This function will fail only when creating a new disk buffer. Because of
+/// legacy reasons the error is not a type but a `String`.
+pub fn build(
+    variant: Variant,
+) -> Result<
+    (
+        BufferInputCloner,
+        Box<dyn Stream<Item = Event> + Send>,
+        Acker,
+    ),
+    String,
+> {
+    match variant {
+        #[cfg(feature = "disk-buffer")]
+        Variant::Disk {
+            max_size,
+            when_full,
+            data_dir,
+            name,
+        } => {
+            let buffer_dir = format!("{}_buffer", name);
+
+            let (tx, rx, acker) =
+                disk::open(data_dir, &buffer_dir, max_size).map_err(|error| error.to_string())?;
+
+            let tx = BufferInputCloner::Disk(tx, when_full);
+            Ok((tx, rx, acker))
+        }
+        Variant::Memory {
+            max_events,
+            when_full,
+        } => {
+            let (tx, rx) = mpsc::channel(max_events);
+            let tx = BufferInputCloner::Memory(tx, when_full);
+            let rx = Box::new(rx);
+            Ok((tx, rx, Acker::Null))
+        }
+    }
+}
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]

@@ -1,6 +1,5 @@
 use crate::config::Resource;
 use crate::event::Event;
-use futures::channel::mpsc;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -52,33 +51,28 @@ impl BufferConfig {
         ),
         String,
     > {
-        match &self {
+        let variant = match &self {
             BufferConfig::Memory {
                 max_events,
                 when_full,
-            } => {
-                let (tx, rx) = mpsc::channel(*max_events);
-                let tx = BufferInputCloner::Memory(tx, *when_full);
-                let rx = Box::new(rx);
-                Ok((tx, rx, Acker::Null))
-            }
-
+            } => Variant::Memory {
+                max_events: *max_events,
+                when_full: *when_full,
+            },
             #[cfg(feature = "disk-buffer")]
             BufferConfig::Disk {
                 max_size,
                 when_full,
-            } => {
-                let data_dir = data_dir
+            } => Variant::Disk {
+                max_size: *max_size,
+                when_full: *when_full,
+                data_dir: data_dir
                     .as_ref()
-                    .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?;
-                let buffer_dir = format!("{}_buffer", sink_name);
-
-                let (tx, rx, acker) = disk::open(&data_dir, buffer_dir.as_ref(), *max_size)
-                    .map_err(|error| error.to_string())?;
-                let tx = BufferInputCloner::Disk(tx, *when_full);
-                Ok((tx, rx, acker))
-            }
-        }
+                    .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?,
+                name: sink_name,
+            },
+        };
+        build(variant)
     }
 
     /// Resources that the sink is using.
