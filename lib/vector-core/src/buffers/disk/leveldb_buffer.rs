@@ -21,6 +21,7 @@ use std::{
         Arc, Mutex,
     },
     task::{Context, Poll, Waker},
+    time::{Duration, Instant},
 };
 
 use super::{DataDirOpenError, Error};
@@ -29,8 +30,8 @@ use crate::buffers::Acker;
 /// How much of disk buffer needs to be deleted before we trigger compaction.
 const MAX_UNCOMPACTED_DENOMINATOR: usize = 10;
 
-/// How many bytes need to be deleted before we can trigger early compaction.
-const MIN_UNCOMPACTED_SIZE: usize = 1024 * 1024;
+/// How much time needs to pass between compaction to trigger new one.
+const MIN_TIME_UNCOMPACTED: Duration = Duration::from_secs(60);
 
 #[derive(Copy, Clone, Debug)]
 struct Key(pub usize);
@@ -265,6 +266,8 @@ pub struct Reader {
     buffer: Vec<Vec<u8>>,
     /// Limit on uncompacted_size after which we trigger compaction.
     max_uncompacted_size: usize,
+    /// Last time that compaction was triggered.
+    last_compaction: Instant,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to share across threads
@@ -322,8 +325,6 @@ impl Stream for Reader {
 impl Drop for Reader {
     fn drop(&mut self) {
         self.delete_acked();
-        // Compact on every shutdown
-        self.compact();
     }
 }
 
@@ -359,12 +360,16 @@ impl Reader {
             //     under configured max size.
             let max_trigger = self.uncompacted_size > self.max_uncompacted_size;
             //  2. When the size of uncompacted buffer is larger than unread buffer.
-            //     Managed partially by MIN_UNCOMPACTED_SIZE. This is to keep the size
-            //     of the disk buffer to be proportional to the unread part of the buffer.
-            let proportional_trigger = self.uncompacted_size > unread_size
-                && self.uncompacted_size >= MIN_UNCOMPACTED_SIZE;
+            //     If the sink is able to keep up with the sources, this will trigger
+            //     with MIN_TIME_UNCOMPACTED interval. And if it's not keeping up,
+            //     this won't trigger hence it won't slow it down, which will allow it
+            //     to grow until it either hits max_uncompacted_size or manages to catch up.
+            //     This is to keep the size of the disk buffer low in idle and up to date
+            //     cases.
+            let timed_trigger = self.last_compaction.elapsed() >= MIN_TIME_UNCOMPACTED
+                && self.uncompacted_size > unread_size;
 
-            if max_trigger || proportional_trigger {
+            if max_trigger || timed_trigger {
                 self.compact();
             }
         }
@@ -384,6 +389,7 @@ impl Reader {
 
             self.compacted_offset = self.delete_offset;
         }
+        self.last_compaction = Instant::now();
     }
 }
 
@@ -477,9 +483,10 @@ impl super::DiskBuffer for Buffer {
             current_size,
             ack_counter,
             max_uncompacted_size,
-            uncompacted_size: 1,
+            uncompacted_size: 0,
             unacked_sizes: VecDeque::new(),
             buffer: Vec::new(),
+            last_compaction: Instant::now(),
         };
         // Compact on every start
         reader.compact();
