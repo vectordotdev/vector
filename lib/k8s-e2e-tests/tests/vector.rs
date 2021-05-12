@@ -27,24 +27,29 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
+    let override_name = get_override_name("vector-aggregator");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_STDOUT_SINK,
+                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
                 ..Default::default()
             },
         )
         .await?;
     framework
-        .wait_for_rollout(&namespace, "daemonset/vector-agent", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
         .await?;
     framework
         .wait_for_rollout(
             &namespace,
-            "statefulset/vector-aggregator",
+            &format!("statefulset/{}", override_name),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -69,7 +74,7 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, "statefulset/vector-aggregator")?;
+    let mut log_reader = framework.logs(&namespace, &format!("statefulset/{}", override_name))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.

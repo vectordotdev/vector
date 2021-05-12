@@ -27,13 +27,17 @@ async fn dummy_topology() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let namespace = get_namespace();
     let framework = make_framework();
+    let override_name = get_override_name("vector-aggregator");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGGREGATOR,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_DUMMY_TOPOLOGY,
+                custom_helm_values: &config_override_name(
+                    HELM_VALUES_DUMMY_TOPOLOGY,
+                    &override_name,
+                ),
                 ..Default::default()
             },
         )
@@ -41,7 +45,7 @@ async fn dummy_topology() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            "statefulset/vector-aggregator",
+            &format!("statefulset/{}", override_name),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -57,24 +61,32 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let namespace = get_namespace();
     let framework = make_framework();
+    let override_name = get_override_name("vector-aggregator");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGGREGATOR,
-            VectorConfig::default(),
+            VectorConfig {
+                custom_helm_values: &config_override_name("", &override_name),
+                ..Default::default()
+            },
         )
         .await?;
     framework
         .wait_for_rollout(
             &namespace,
-            "statefulset/vector-aggregator",
+            &format!("statefulset/{}", override_name),
             vec!["--timeout=60s"],
         )
         .await?;
 
-    let mut vector_metrics_port_forward =
-        framework.port_forward(&namespace, "statefulset/vector-aggregator", 9090, 9090)?;
+    let mut vector_metrics_port_forward = framework.port_forward(
+        &namespace,
+        &format!("statefulset/{}", override_name),
+        9090,
+        9090,
+    )?;
     vector_metrics_port_forward.wait_until_ready().await?;
     let vector_metrics_url = format!(
         "http://{}/metrics",
