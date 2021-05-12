@@ -6,7 +6,7 @@ Serialize the passed Vector component configuration bits as TOML.
 {{- define "libvector.vectorComponentConfig" -}}
 {{- $componentGroup := index . 0 -}}
 {{- $componentId := index . 1 -}}
-{{- $value := index . 2 -}}
+{{- $value := deepCopy (index . 2) -}}
 
 {{- $rawConfig := $value.rawConfig -}}
 {{- $value = unset $value "rawConfig" -}}
