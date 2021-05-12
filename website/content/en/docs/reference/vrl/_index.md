@@ -81,6 +81,10 @@ Conditions can also be more multifaceted. This condition would filter out all ev
 condition = '.severity != "info" && .status_code < 400 && exists(.host)
 ```
 
+{{< info title="More VRL examples" >}}
+You can find more VRL examples further down [on this page](#other-examples) or in the [VRL example reference](/docs/reference/vrl/examples).
+{{< /info >}}
+
 ## Reference
 
 All language constructs are contained in the following reference pages. Use these references as you write your VRL programs:
@@ -95,6 +99,8 @@ VRL is designed to minimize the learning curve. These resources can help you get
 {{< jump "/guides/level-up/transformation" >}}
 
 ## Concepts
+
+{{< vrl/concepts >}}
 
 VRL is built by the Vector team and its development is guided by two core goals, [safety](#safety) and [performance](#performance), without compromising on flexibility. This makes VRL ideal for critical, performance-sensitive infrastructure, like observabiity pipelines. To illustrate how we achieve these, below is a VRL feature matrix across these principles:
 
@@ -245,6 +251,10 @@ VRL is a safe language in several senses: VRL scripts have access only to the ev
 ### Performance
 
 VRL is implemented in the very fast and efficient [Rust] language and VRL scripts are compiled into Rust code when Vector is started. This means that you can use VRL to transform observability data with a minimal per-event performance penalty vis-à-vis pure Rust. In addition, ergonomic features such as compile-time correctness checks and the lack of language constructs like loops make it difficult to write scripts that are slow or buggy or require optimization.
+
+## Other examples
+
+{{< vrl/real-world-examples >}}
 
 ## Pages in this section
 

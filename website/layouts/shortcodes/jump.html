@@ -7,7 +7,7 @@
 {{ if not $page }}
 {{ errorf "Error in link shortcode at content/%s. No page found at %s." $.Page.File $link }}
 {{ end }}
-<div class="jump border dark:border-gray-700 rounded-md px-3.5 py-2 dark:hover:bg-gray-700 hover:bg-gray-50">
+<div class="jump border dark:border-gray-700 rounded-md px-3.5 py-2 dark:hover:bg-black hover:bg-gray-50">
   <a href="{{ $link }}" class="flex justify-between items-center">
     <span class="dark:text-gray-300 text-gray-700 tracking-tight text-base">
       {{ $page.Title }}
