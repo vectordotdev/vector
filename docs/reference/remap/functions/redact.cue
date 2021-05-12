@@ -3,14 +3,13 @@ package metadata
 remap: functions: redact: {
 	category: "String"
 	description: """
-		Redact potentially sensitive data in `value` such as:
+		Redact sensitive data in `value` such as:
 
 		- credit card numbers
-		- custom patterns
+		- and other forms of personally identifiable information via custom patterns
 		- (more to come!)
 
-		This can act as a last resort in the case your applications log sensitive data by accident to ensure you do not
-		leak this information into your log storage.
+		This can help achieve compliance by ensuring sensitive data never leaves your network.
 		"""
 
 	arguments: [
@@ -20,6 +19,7 @@ remap: functions: redact: {
 				The value to redact sensitive data from.
 
 				Its behavior differs depending on the type of `value`:
+
 				- For strings, it simply redacts the sensitive data and returns a new string
 				- For arrays, it redacts the sensitive data in each string element
 				- For objects, it masks the sensitive data in each string value, but not keys
@@ -37,26 +37,26 @@ remap: functions: redact: {
 			description: #"""
 					List of filters to be applied to the `value`.
 
-					If none, the default set of filters is applied: ["credit_card"].
-
 					Each filter can be specified in one of three ways:
+
 					- As a regular expression directly, which will be used to redact text matching it
 					- As an object with a `type` key that corresponds to a named filter and additional keys for customizing that filter
 					- As a named filter, if it has no required parameters
 
 					Named filters are:
+
 					- `pattern`: Redact text matching any regular expressions specified in the, required, `patterns`
 					   key. This is the expanded form of just passing a regular expression as a filter.
 					- `credit_card`: Redact credit card numbers.
 
 					See examples for more details.
 
-					Note: This parameter must be a static expression. You cannot use variables or other dynamic
-					expressions with it. This allows us to validate the argument at compile-time to avoid runtime
-					errors.
+					This parameter must be a static expression. You cannot use variables or other dynamic expressions
+					with it. This allows us to validate the argument at compile-time to avoid runtime errors.
 				"""#
 			required: false
 			type: ["array"]
+			default: ["credit_card"]
 		},
 	]
 	internal_failure_reasons: []
