@@ -545,19 +545,3 @@ pub async fn start_topology(
         .await
         .unwrap()
 }
-
-/// Collect the first `n` events from a stream while a future is spawned
-/// in the background. This is used for tests where the collect has to
-/// happen concurrent with the sending process (ie the stream is
-/// handling finalization, which is required for the future to receive
-/// an acknowledgement).
-pub async fn spawn_collect_n<F, S>(future: F, stream: S, n: usize) -> Vec<Event>
-where
-    F: Future<Output = ()> + Send + 'static,
-    S: Stream<Item = Event> + Unpin,
-{
-    let sender = tokio::spawn(future);
-    let events = collect_n(stream, n).await;
-    sender.await.expect("Failed to send data");
-    events
-}
