@@ -1129,10 +1129,10 @@ bench_function! {
         want: Ok("hello [REDACTED] world"),
     }
 
-    credit_card {
+    us_social_security_number {
         args: func_args![
-            value: "hello 4916155524184782 world",
-            filters: vec!["credit_card"],
+            value: "hello 123-12-1234 world",
+            filters: vec!["us_social_security_number"],
         ],
         want: Ok("hello [REDACTED] world"),
     }

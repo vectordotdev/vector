@@ -5,11 +5,18 @@ use std::str::FromStr;
 use vrl::prelude::*;
 
 lazy_static! {
-    // Matches Visa, Mastercard, American Express, Diner's Club, Discover Card, and JCB
-    static ref CREDIT_CARD_REGEX: regex::Regex = regex::Regex::new(r"(?:4[0-9]{12}(?:[0-9]{3})?|[25][1-7][0-9]{14}|6(?:011|5[0-9][0-9])[0-9]{12}|3[47][0-9]{13}|3(?:0[0-5]|[68][0-9])[0-9]{11}|(?:2131|1800|35\d{3})\d{11})").unwrap();
+    // https://www.oreilly.com/library/view/regular-expressions-cookbook/9781449327453/ch04s12.html
+    // (converted to non-lookaround version given `regex` does not support lookarounds)
+    // See also: https://www.ssa.gov/history/ssn/geocard.html
+    static ref US_SOCIAL_SECURITY_NUMBER : regex::Regex = regex::Regex::new(
+    r#"(?x)                                                               # Ignore whitespace and comments in the regex expression.
+    (?:00[1-9]|0[1-9][0-9]|[1-578][0-9]{2}|6[0-57-9][0-9]|66[0-57-9])-    # Area number: 001-899 except 666
+    (?:0[1-9]|[1-9]0|[1-9][1-9])-                                         # Group number: 01-99
+    (?:000[1-9]|00[1-9]0|0[1-9]00|[1-9]000|[1-9]{4})                      # Serial number: 0001-9999
+    "#).unwrap();
 }
 
-const DEFAULT_FILTERS: [Filter; 1] = [Filter::CreditCard];
+const DEFAULT_FILTERS: [Filter; 1] = [Filter::UsSocialSecurityNumber];
 
 #[derive(Clone, Copy, Debug)]
 pub struct Redact;
@@ -42,9 +49,9 @@ impl Function for Redact {
                 result: Ok(r#"my id is [REDACTED]"#),
             },
             Example {
-                title: "credit_card",
-                source: r#"redact({ "name": "John Doe", "card_number": "4916155524184782"}, filters: ["credit_card"])"#,
-                result: Ok(r#"{ "name": "John Doe", "card_number": "[REDACTED]" }"#),
+                title: "us_social_security_number",
+                source: r#"redact({ "name": "John Doe", "ssn": "123-12-1234"}, filters: ["us_social_security_number"])"#,
+                result: Ok(r#"{ "name": "John Doe", "ssn": "[REDACTED]" }"#),
             },
         ]
     }
@@ -143,7 +150,7 @@ impl Expression for RedactFn {
 #[derive(Debug, Clone)]
 enum Filter {
     Pattern(Vec<Pattern>),
-    CreditCard,
+    UsSocialSecurityNumber,
 }
 
 #[derive(Debug, Clone)]
@@ -167,7 +174,7 @@ impl TryFrom<Value> for Filter {
                 }?;
 
                 match r#type.as_ref() {
-                    b"credit_card" => Ok(Filter::CreditCard),
+                    b"us_social_security_number" => Ok(Filter::UsSocialSecurityNumber),
                     b"pattern" => {
                         let patterns = match object
                             .get("patterns")
@@ -192,7 +199,7 @@ impl TryFrom<Value> for Filter {
             }
             Value::Bytes(bytes) => match bytes.as_ref() {
                 b"pattern" => Err("pattern cannot be used without arguments"),
-                b"credit_card" => Ok(Filter::CreditCard),
+                b"us_social_security_number" => Ok(Filter::UsSocialSecurityNumber),
                 _ => Err("unknown filter name"),
             },
             Value::Regex(regex) => Ok(Filter::Pattern(vec![Pattern::Regex((*regex).clone())])),
@@ -216,7 +223,7 @@ impl Filter {
                     }
                 }
             }),
-            Filter::CreditCard => CREDIT_CARD_REGEX
+            Filter::UsSocialSecurityNumber => US_SOCIAL_SECURITY_NUMBER
                 .replace_all(&input, redactor.pattern())
                 .into_owned()
                 .into(),
@@ -290,10 +297,10 @@ mod test {
              tdef: TypeDef::new().infallible().bytes(),
         }
 
-        credit_card {
+        us_social_security_number{
              args: func_args![
-                 value: "hello 4916155524184782 world",
-                 filters: vec!["credit_card"],
+                 value: "hello 123-12-1234 world",
+                 filters: vec!["us_social_security_number"],
              ],
              want: Ok("hello [REDACTED] world"),
              tdef: TypeDef::new().infallible().bytes(),

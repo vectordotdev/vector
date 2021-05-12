@@ -1,11 +1,11 @@
 package metadata
 
 remap: functions: redact: {
-	category: "String"
+	category:    "String"
 	description: """
 		Redact sensitive data in `value` such as:
 
-		- credit card numbers
+		- [US social security card numbers](\(urls.us_social_security_number))
 		- and other forms of personally identifiable information via custom patterns
 		- (more to come!)
 
@@ -47,7 +47,7 @@ remap: functions: redact: {
 
 					- `pattern`: Redact text matching any regular expressions specified in the, required, `patterns`
 					   key. This is the expanded form of just passing a regular expression as a filter.
-					- `credit_card`: Redact credit card numbers.
+					- `us_social_security_number`: Redact US social security card numbers.
 
 					See examples for more details.
 
@@ -56,7 +56,7 @@ remap: functions: redact: {
 				"""#
 			required: false
 			type: ["array"]
-			default: ["credit_card"]
+			default: ["us_social_security_number"]
 		},
 	]
 	internal_failure_reasons: []
@@ -81,13 +81,13 @@ remap: functions: redact: {
 			return: "my id is [REDACTED]"
 		},
 		{
-			title: "Replace credit card numbers in any field"
+			title: "Replace us social security numbers in any field"
 			source: #"""
-				redact({ "name": "John Doe", "card_number": "4916155524184782"}, filters: ["credit_card"])
+				redact({ "name": "John Doe", "ssn": "123-12-1234"}, filters: ["us_social_security_number"])
 				"""#
 			return: {
-				name:        "John Doe"
-				card_number: "[REDACTED]"
+				name: "John Doe"
+				ssn:  "[REDACTED]"
 			}
 		},
 	]
