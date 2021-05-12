@@ -42,6 +42,8 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: {{ include "libvector.image" . | quote }}
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          command:
+            {{- toYaml .Values.command | nindent 12 }}
           args:
             - --config
             - /etc/vector/*.toml

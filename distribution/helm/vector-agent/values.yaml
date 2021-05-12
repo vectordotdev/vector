@@ -14,6 +14,9 @@ image:
 # Image pull secrets to use at the `Pod`s managed by `DaemonSet`.
 imagePullSecrets: []
 
+# Command to use at the pods managed by DaemonSet
+command: []
+
 # Override the chart name used in templates.
 nameOverride: ""
 # Override the full chart name (name prefixed with release name) used in
