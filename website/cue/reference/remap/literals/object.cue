@@ -20,19 +20,19 @@ remap: literals: object: {
 
 	examples: [
 		"""
-			{
-				"field1": "value1",
-				"field2": [ "value2", "value3", "value4" ],
-				"field3": { "field4": "value5" }
-			}
-			""",
+		{
+			"field1": "value1",
+			"field2": [ "value2", "value3", "value4" ],
+			"field3": { "field4": "value5" }
+		}
+		""",
 		"""
-			{
-				"field1": .some_path,
-				"field2": some_variable,
-				"field3": { "subfield": "some value" }
-			}
-			""",
+		{
+			"field1": .some_path,
+			"field2": some_variable,
+			"field3": { "subfield": "some value" }
+		}
+		""",
 
 	]
 }

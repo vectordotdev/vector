@@ -3,7 +3,7 @@ package metadata
 remap: errors: "103": {
 	title:       "Unhandled fallible assignment"
 	description: """
-		The right-hand side of this [assignment](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor))
+		The right-hand side of this [assignment](\(urls.vrl_expressions)#regular-expression)
 		is fallible (that is, it can produce a [runtime error](\(urls.vrl_runtime_errors))), but the error isn't
 		[handled](\(urls.vrl_error_handling)).
 		"""

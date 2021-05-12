@@ -3,7 +3,7 @@ package metadata
 remap: errors: "107": {
 	title:       "Required function argument missing"
 	description: """
-		A [function call expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor)) fails to pass
+		A [function call expression](\(urls.vrl_expressions)#regular-expression) fails to pass
 		a required argument.
 		"""
 	resolution: """

@@ -9,8 +9,19 @@
   class="h-screen">
 
   <head>
+    {{/* Make the page is always visible if JS is disabled */}}
+    <noscript>
+      <style>
+        body {
+          visibility: visible;
+        }
+      </style>
+    </noscript>
+
     {{/* Ensure smooth page loading */}}
-    {{ partial "page-load.html" . }}
+    <script>
+      function showBody() { document.body.style.visibility = 'visible'; }
+    </script>
 
     {{ partial "meta.html" . }}
 
@@ -22,7 +33,7 @@
 
     {{ partial "css.html" . }}
   </head>
-  <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}" onload="showBody()">
+  <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}" onload="showBody()" style="visibility: hidden;">
     <div class="flex-1 z-1">
       {{ partial "banner.html" . }}
       {{ partial "navbar.html" . }}

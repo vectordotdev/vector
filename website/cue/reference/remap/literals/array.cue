@@ -13,10 +13,10 @@ remap: literals: array: {
 		#"[.field1, .field2, to_int!("2"), variable_1]"#,
 		#"""
 			[
-				"expressions",
-				1 + 2,
-				2 == 5,
-				true || false
+			  "expressions",
+			  1 + 2,
+			  2 == 5,
+			  true || false
 			]
 			"""#,
 	]

@@ -3,7 +3,7 @@ package metadata
 remap: errors: "102": {
 	title:       "Non-boolean if expression predicate"
 	description: """
-		An [if expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor)) predicate doesn't
+		An [if expression](\(urls.vrl_expressions)#regular-expression) predicate doesn't
 		evaluate to a Boolean.
 		"""
 	rationale:   """

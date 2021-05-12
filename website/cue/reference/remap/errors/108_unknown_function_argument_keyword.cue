@@ -3,7 +3,7 @@ package metadata
 remap: errors: "108": {
 	title:       "Unknown function argument keyword"
 	description: """
-		A [function call expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor)) passes an
+		A [function call expression](\(urls.vrl_expressions)#regular-expression) passes an
 		unknown named argument.
 		"""
 	resolution: """

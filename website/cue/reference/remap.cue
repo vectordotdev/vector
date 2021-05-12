@@ -39,6 +39,7 @@ package metadata
 	how_it_works: #HowItWorks
 	literals:     _
 	principles:   _
+	syntax:       _
 }
 
 remap: #Remap & {

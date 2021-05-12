@@ -3,7 +3,7 @@ package metadata
 remap: errors: "110": {
 	title:       "Invalid argument type"
 	description: """
-		An argument passed to a [function call expression](\(urls.vrl_expressions)#\(remap.literals.regular_expression.anchor))
+		An argument passed to a [function call expression](\(urls.vrl_expressions)#regular-expression)
 		isn't a supported type.
 		"""
 	rationale:   remap._fail_safe_blurb
