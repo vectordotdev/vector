@@ -22,6 +22,8 @@ mod aws_kinesis_streams;
 pub(crate) mod aws_s3;
 #[cfg(feature = "sinks-aws_sqs")]
 mod aws_sqs;
+#[cfg(feature = "sinks-azure_blob")]
+pub(crate) mod azure_blob;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;

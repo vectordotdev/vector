@@ -1,6 +1,10 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext},
     event::Event,
+    internal_events::{
+        azure_blob::{AzureBlobErrorResponse, AzureBlobHttpError},
+        TemplateRenderingFailed,
+    },
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
@@ -23,11 +27,11 @@ use azure_sdk_storage_blob::{blob::responses::PutBlockBlobResponse, Blob, Contai
 use azure_sdk_storage_core::{
     key_client::KeyClient,
     prelude::client::{from_connection_string, with_emulator},
-    ConnectionString,
+    Client, ConnectionString,
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
+use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use http::StatusCode;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -238,7 +242,18 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
                 None => blob,
             };
 
-            blob.finalize().instrument(info_span!("request")).await
+            blob.finalize()
+                .inspect_err(|error| {
+                    match error {
+                        AzureError::UnexpectedHTTPResult(result) => emit!(AzureBlobErrorResponse {
+                            url: client.blob_uri().into(),
+                            code: result.status_code()
+                        }),
+                        other => emit!(AzureBlobHttpError { error: other }),
+                    };
+                })
+                .instrument(info_span!("request"))
+                .await
         })
     }
 }
@@ -276,12 +291,12 @@ fn encode_event(
 ) -> Option<EncodedEvent<PartitionInnerBuffer<Vec<u8>, Bytes>>> {
     let key = blob_prefix
         .render_string(&event)
-        .map_err(|missing_keys| {
-            warn!(
-                message = "Keys do not exist on the event; dropping event.",
-                ?missing_keys,
-                internal_log_rate_secs = 30,
-            );
+        .map_err(|error| {
+            emit!(TemplateRenderingFailed {
+                error,
+                field: Some("blob_prefix"),
+                drop_event: true,
+            });
         })
         .ok()?;
 
