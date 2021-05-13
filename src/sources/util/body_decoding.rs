@@ -1,4 +1,8 @@
-use crate::{config::log_schema, event::Event, sources::util::http::ErrorMessage};
+use crate::{
+    config::log_schema,
+    event::{Event, LogEvent},
+    sources::util::http::ErrorMessage,
+};
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use codec::BytesDelimitedCodec;
@@ -44,13 +48,13 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>
 pub fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
     match enc {
         Encoding::Text => body_to_lines(body)
-            .map(|r| Ok(Event::from(r?)))
+            .map(|r| Ok(LogEvent::from(r?).into()))
             .collect::<Result<_, _>>(),
         Encoding::Ndjson => body_to_lines(body)
             .map(|j| {
                 let parsed_json = serde_json::from_slice(&j?)
                     .map_err(|error| json_error(format!("Error parsing Ndjson: {:?}", error)))?;
-                json_parse_object(parsed_json)
+                json_parse_object(parsed_json).map(Into::into)
             })
             .collect::<Result<_, _>>(),
         Encoding::Json => {
@@ -62,16 +66,15 @@ pub fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessag
 }
 
 #[cfg(any(feature = "sources-http", feature = "sources-datadog"))]
-fn json_parse_object(value: JsonValue) -> Result<Event, ErrorMessage> {
-    let mut event = Event::new_empty_log();
-    let log = event.as_mut_log();
-    log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
+fn json_parse_object(value: JsonValue) -> Result<LogEvent, ErrorMessage> {
     match value {
         JsonValue::Object(map) => {
+            let mut log = LogEvent::default();
+            log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
             for (k, v) in map {
                 log.insert_flat(k, v);
             }
-            Ok(event)
+            Ok(log)
         }
         _ => Err(json_error(format!(
             "Expected Object, got {}",
@@ -85,11 +88,11 @@ fn json_parse_array_of_object(value: JsonValue) -> Result<Vec<Event>, ErrorMessa
     match value {
         JsonValue::Array(v) => v
             .into_iter()
-            .map(json_parse_object)
+            .map(|object| json_parse_object(object).map(Into::into))
             .collect::<Result<_, _>>(),
         JsonValue::Object(map) => {
             //treat like an array of one object
-            Ok(vec![json_parse_object(JsonValue::Object(map))?])
+            Ok(vec![json_parse_object(JsonValue::Object(map))?.into()])
         }
         _ => Err(json_error(format!(
             "Expected Array or Object, got {}.",
