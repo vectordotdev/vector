@@ -35,8 +35,10 @@
 
           {{/* Component configuration */}}
           {{ with $config.configuration }}
+          {{ if gt (len .) 1 }} {{/* Don't display if only the "type" config is present */}}
           {{ partial "heading.html" (dict "text" "Configuration" "level" 2) }}
           {{ partial "data.html" (dict "component_config" . ) }}
+          {{ end }}
           {{ end }}
 
           {{/* Component environment variables */}}

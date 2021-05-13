@@ -1,6 +1,6 @@
 {{/* This partial is for pretty much all structured data (VRL stuff, CLI, API, component configs/output/telemetry, etc.) */}}
 {{ $ctx := . }}
-<div class="relative no-prose w-full border dark:border-gray-700 rounded-md">
+<div class="relative no-prose w-full border dark:border-gray-700 rounded-md shadow-md">
   {{/* Source/transform/sink config */}}
   {{ with .component_config }}
   <div class="flex flex-col divide-y dark:divide-gray-700">
@@ -10,8 +10,9 @@
     <div class="py-4 px-6">
       <span class="flex justify-between items-center">
         {{/* Config name */}}
-        <span class="text-black hover:text-secondary font-bold font-mono tracking-snug text-base">
-          {{ partial "heading.html" (dict "text" $name "level" 3) }}
+        <span class="font-mono">
+          {{ $href := printf "#%s" $name }}
+          {{ partial "heading.html" (dict "text" $name "level" 3 "href" $href "icon" false) }}
         </span>
 
         {{/* Config labels */}}
@@ -502,7 +503,7 @@
       {{ $json := . | jsonify (dict "indent" "  ") }}
       {{ $code := highlight $json "json" "" }}
       <span>
-        Given the following <a href="/docs/about/under-the-hood/architecture/data-model/log">Vector log event</a>...
+        Given this <a href="/docs/about/under-the-hood/architecture/data-model/log">Vector log event</a>...
       </span>
       {{ $code }}
       {{ end }}
@@ -511,7 +512,7 @@
       {{ $json := . | jsonify (dict "indent" "  ") }}
       {{ $code := highlight $json "json" "" }}
       <span>
-        Given the following <a href="/docs/about/under-the-hood/architecture/data-model/metric">Vector metric event</a>...
+        Given this <a href="/docs/about/under-the-hood/architecture/data-model/metric">Vector metric event</a>...
       </span>
       {{ $code }}
       {{ end }}
