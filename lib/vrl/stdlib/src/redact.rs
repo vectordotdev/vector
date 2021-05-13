@@ -16,8 +16,6 @@ lazy_static! {
     "#).unwrap();
 }
 
-const DEFAULT_FILTERS: [Filter; 1] = [Filter::UsSocialSecurityNumber];
-
 #[derive(Clone, Copy, Debug)]
 pub struct Redact;
 
@@ -36,7 +34,7 @@ impl Function for Redact {
             Parameter {
                 keyword: "filters",
                 kind: kind::ARRAY,
-                required: false,
+                required: true,
             },
         ]
     }
@@ -60,31 +58,27 @@ impl Function for Redact {
         let value = arguments.required("value");
 
         let filters = arguments
-            .optional_array("filters")?
-            .map(|filters| {
-                filters
-                    .into_iter()
-                    .map(|expr| {
-                        expr.as_value()
-                            .ok_or(vrl::function::Error::ExpectedStaticExpression {
-                                keyword: "filters",
-                                expr,
-                            })
+            .required_array("filters")?
+            .into_iter()
+            .map(|expr| {
+                expr.as_value()
+                    .ok_or(vrl::function::Error::ExpectedStaticExpression {
+                        keyword: "filters",
+                        expr,
                     })
-                    .map(|value| {
-                        value.and_then(|value| {
-                            value.clone().try_into().map_err(|error| {
-                                vrl::function::Error::InvalidArgument {
-                                    keyword: "filters",
-                                    value,
-                                    error,
-                                }
-                            })
-                        })
-                    })
-                    .collect::<std::result::Result<Vec<Filter>, _>>()
             })
-            .unwrap_or_else(|| Ok(DEFAULT_FILTERS.to_vec()))?;
+            .map(|value| {
+                value.and_then(|value| {
+                    value.clone().try_into().map_err(|error| {
+                        vrl::function::Error::InvalidArgument {
+                            keyword: "filters",
+                            value,
+                            error,
+                        }
+                    })
+                })
+            })
+            .collect::<std::result::Result<Vec<Filter>, _>>()?;
 
         let redactor = Redactor::Full;
 

@@ -56,23 +56,12 @@ remap: functions: redact: {
 				"""#
 			required: false
 			type: ["array"]
-			default: ["us_social_security_number"]
 		},
 	]
 	internal_failure_reasons: []
 	return: types: ["string", "object", "array"]
 
 	examples: [
-		{
-			title: "Replace sensitive data with default filters."
-			source: #"""
-				redact({ "name": "John Doe", "card_number": "4916155524184782"})
-				"""#
-			return: {
-				name:        "John Doe"
-				card_number: "[REDACTED]"
-			}
-		},
 		{
 			title: "Replace text using a regex"
 			source: #"""
