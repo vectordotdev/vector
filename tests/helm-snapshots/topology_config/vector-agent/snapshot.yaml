@@ -205,6 +205,8 @@ spec:
             {}
           image: "timberio/vector:0.0.0-debian"
           imagePullPolicy: "IfNotPresent"
+          command:
+            []
           args:
             - --config
             - /etc/vector/*.toml

@@ -9,7 +9,7 @@ license = "MPL-2.0"
 [dependencies]
 
 # Serde
-serde = { version = "1.0.125", features = ["derive"] }
+serde = { version = "1.0.126", features = ["derive"] }
 serde_json = { version = "1.0.64", features = ["raw_value"] }
 
 # Error handling

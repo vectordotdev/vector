@@ -1,6 +1,19 @@
 use super::{builder::ConfigBuilder, DataType, Resource};
 use std::collections::HashMap;
 
+/// Check that provide + topology config aren't present in the same builder, which is an error.
+pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+    if config.provider.is_some()
+        && (!config.sources.is_empty() || !config.transforms.is_empty() || !config.sinks.is_empty())
+    {
+        Err(vec![
+            "No sources/transforms/sinks are allowed if provider config is present.".to_owned(),
+        ])
+    } else {
+        Ok(())
+    }
+}
+
 pub fn check_shape(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = vec![];
 

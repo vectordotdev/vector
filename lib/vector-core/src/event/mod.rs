@@ -12,7 +12,6 @@ use shared::EventDataEq;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
-use std::sync::Arc;
 use tracing::field::{Field, Visit};
 pub use util::log::PathComponent;
 pub use util::log::PathIter;
@@ -137,14 +136,6 @@ impl Event {
         match self {
             Self::Log(log) => log.metadata_mut(),
             Self::Metric(metric) => metric.metadata_mut(),
-        }
-    }
-
-    pub fn add_batch_notifier(&mut self, batch: Arc<BatchNotifier>) {
-        let finalizer = EventFinalizer::new(batch);
-        match self {
-            Self::Log(log) => log.add_finalizer(finalizer),
-            Self::Metric(metric) => metric.add_finalizer(finalizer),
         }
     }
 }

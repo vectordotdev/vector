@@ -17,7 +17,7 @@ jobs:
   build-x86_64-unknown-linux-musl-packages:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.3.4
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: make ci-sweep
       - env:
@@ -31,7 +31,7 @@ jobs:
   build-x86_64-unknown-linux-gnu-packages:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - env:
@@ -53,7 +53,7 @@ jobs:
   build-aarch64-unknown-linux-musl-packages:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - env:
@@ -68,7 +68,7 @@ jobs:
   build-aarch64-unknown-linux-gnu-packages:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - env:
@@ -91,7 +91,7 @@ jobs:
   build-armv7-unknown-linux-gnueabihf-packages:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - env:
@@ -113,7 +113,7 @@ jobs:
   build-armv7-unknown-linux-musleabihf-packages:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.3.4
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: make ci-sweep
       - env:
@@ -127,7 +127,7 @@ jobs:
   build-x86_64-apple-darwin-packages:
     runs-on: macos-10.15
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.3.4
       - name: "Upgrade bash"
         run: brew install bash
       - name: "Install realpath dependency"
@@ -150,7 +150,7 @@ jobs:
   build-x86_64-pc-windows-msvc-packages:
     runs-on: windows-2019
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.3.4
       - name: "Add Vector version"
         run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
         shell: bash
@@ -222,7 +222,7 @@ jobs:
       image: ${{ matrix.container }}
     steps:
       - name: checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2.3.4
       - run: |
           apt-get update && \
           apt-get install -y \
@@ -254,7 +254,7 @@ jobs:
       image: ${{ matrix.container }}
     steps:
       - name: checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2.3.4
       - run: |
           yum update -y && \
           yum install -y \
@@ -282,7 +282,7 @@ jobs:
       - build-x86_64-apple-darwin-packages
     steps:
       - name: checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2.3.4
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -302,20 +302,20 @@ jobs:
       - build-armv7-unknown-linux-gnueabihf-packages
       - deb-verify
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.3.4
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v1.9.0
         with:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v1.1.0
         with:
           platforms: all
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v1.3.0
         with:
           version: latest
           install: true
@@ -363,7 +363,7 @@ jobs:
       - rpm-verify
       - osx-verify
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.3.4
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -445,7 +445,7 @@ jobs:
       - rpm-verify
       - osx-verify
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.3.4
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -519,7 +519,7 @@ jobs:
     needs:
       - release-s3
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.3.4
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -536,7 +536,7 @@ jobs:
       - deb-verify
       - rpm-verify
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.3.4
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -648,7 +648,7 @@ jobs:
       # appear before the image it refers to.
       - release-docker
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2.3.4
       - name: Install Helm
         run: scripts/environment/setup-helm.sh
       - name: Release Helm Chart

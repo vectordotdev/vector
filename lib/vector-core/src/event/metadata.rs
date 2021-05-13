@@ -33,11 +33,6 @@ impl EventMetadata {
     pub fn update_sources(&mut self) {
         self.finalizers.update_sources();
     }
-
-    /// Add a new finalizer to the array
-    pub fn add_finalizer(&mut self, finalizer: EventFinalizer) {
-        self.finalizers.add(finalizer);
-    }
 }
 
 impl EventDataEq for EventMetadata {
