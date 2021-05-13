@@ -41,6 +41,7 @@ package metadata
 	literals:     _
 	principles:   _
 	syntax:       _
+	features:     _
 }
 
 remap: #Remap & {
