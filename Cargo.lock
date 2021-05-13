@@ -1182,9 +1182,9 @@ dependencies = [
 
 [[package]]
 name = "cpufeatures"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dec1028182c380cc45a2e2c5ec841134f2dfd0f8f5f0a5bcd68004f81b5efdf4"
+checksum = "4f508f5ff4df34cfd12172af9f98f5c307db8b36ceb0c63264eccb43be5ed635"
 dependencies = [
  "libc",
 ]
