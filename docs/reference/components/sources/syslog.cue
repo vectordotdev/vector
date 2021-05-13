@@ -120,7 +120,7 @@ components: sources: syslog: {
 			}
 			timestamp: {
 				description: "The time extracted from the Syslog formatted line. If parsing fails, then the exact time the event was ingested into Vector is used."
-				required:	true
+				required:    true
 				type: timestamp: {}
 			}
 			version: {
