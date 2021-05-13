@@ -561,3 +561,20 @@ where
     sender.await.expect("Failed to send data");
     events
 }
+
+/// Collect all the ready events from a stream after spawning a future
+/// in the background and letting it run for a given interval. This is
+/// used for tests where the collect has to happen concurrent with the
+/// sending process (ie the stream is handling finalization, which is
+/// required for the future to receive an acknowledgement).
+pub async fn spawn_collect_ready<F, S>(future: F, stream: S, sleep: u64) -> Vec<Event>
+where
+    F: Future<Output = ()> + Send + 'static,
+    S: Stream<Item = Event> + Unpin,
+{
+    let sender = tokio::spawn(future);
+    tokio::time::sleep(Duration::from_secs(sleep)).await;
+    let events = collect_ready(stream).await;
+    sender.await.expect("Failed to send data");
+    events
+}

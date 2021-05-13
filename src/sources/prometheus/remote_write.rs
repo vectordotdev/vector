@@ -119,12 +119,12 @@ mod test {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        event::{Metric, MetricKind, MetricValue},
         sinks::prometheus::remote_write::RemoteWriteConfig,
         test_util, Pipeline,
     };
     use chrono::{SubsecRound as _, Utc};
     use futures::stream;
+    use vector_core::event::{EventStatus, Metric, MetricKind, MetricValue};
 
     #[test]
     fn genreate_config() {
@@ -143,7 +143,7 @@ mod test {
 
     async fn receives_metrics(tls: Option<TlsConfig>) {
         let address = test_util::next_addr();
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test_finalize(EventStatus::Delivered);
 
         let proto = if tls.is_none() { "http" } else { "https" };
         let source = PrometheusRemoteWriteConfig {
@@ -165,9 +165,16 @@ mod test {
             .expect("Error building config.");
 
         let events = make_events();
-        sink.run(stream::iter(events.clone())).await.unwrap();
+        let events_copy = events.clone();
+        let mut output = test_util::spawn_collect_ready(
+            async move {
+                sink.run(stream::iter(events_copy)).await.unwrap();
+            },
+            rx,
+            1,
+        )
+        .await;
 
-        let mut output = test_util::collect_ready(rx).await;
         // The MetricBuffer used by the sink may reorder the metrics, so
         // put them back into order before comparing.
         output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
