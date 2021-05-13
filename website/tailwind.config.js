@@ -70,6 +70,10 @@ module.exports = {
             'table th, table td': {
               color: theme('colors.gray.200'),
             },
+            'table tr, table th, table thead, table tbody': {
+              'border-top-color': theme('colors.gray.700'),
+              'border-bottom-color': theme('colors.gray.700'),
+            },
             code: {
               color: theme('colors.primary', 'currentColor'),
             },
@@ -90,7 +94,6 @@ module.exports = {
           }
         }
       }),
-      //
     },
     screens: {
       sm: '640px',

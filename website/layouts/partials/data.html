@@ -7,12 +7,11 @@
     {{ range $k, $v := . }}
     {{ if ne $k "type" }}
     {{ $name := $k }}
-    <div class="py-4 px-6">
+    <div class="p-4">
       <span class="flex justify-between items-center">
         {{/* Config name */}}
         <span class="font-mono">
-          {{ $href := printf "#%s" $name }}
-          {{ partial "heading.html" (dict "text" $name "level" 3 "href" $href "icon" false) }}
+          {{ partial "heading.html" (dict "text" $name "level" 3 "anchor" true "icon" false) }}
         </span>
 
         {{/* Config labels */}}
@@ -45,7 +44,7 @@
         </span>
       </span>
 
-      <div class="mt-4 prose dark:prose-dark leading-snug text-gray-600 dark:text-gray-300">
+      <div class="mt-6 prose dark:prose-dark leading-snug text-gray-600 dark:text-gray-300">
         {{ $v.description | markdownify }}
       </div>
 
@@ -57,7 +56,7 @@
           <span class="flex justify-between items-center">
             <span class="font-mono font-semibold">
               {{ $text := printf "%s.%s" $name $k }}
-              {{ partial "heading.html" (dict "text" $text "level" 4 "id" $k) }}
+              {{ partial "heading.html" (dict "text" $text "level" 4 "anchor" true "icon" false "id" $k) }}
             </span>
 
             <span class="flex space-x-1">
@@ -99,7 +98,7 @@
       <div class="mt-3 border rounded py-2 px-3 dark:border-gray-700">
         <span class="flex justify-between items-center">
           <span class="font-semibold">
-            Enum
+            Enum options
           </span>
 
           <span class="flex items-center space-x-1">
@@ -108,24 +107,8 @@
           </span>
         </span>
 
-        <div class="mt-2 border rounded py-2.5 px-4 dark:border-gray-700">
-          <span class="tracking-tight font-semibold">
-            Options
-          </span>
-
-          <div class="mt-1 flex flex-col space-y-1.5">
-            {{ range $k, $v := . }}
-            <div>
-              <span class="font-mono text-primary-dark dark:text-primary text-sm">
-                {{ $k }}
-              </span>
-
-              <div class="ml-3 mt-1 prose prose-sm dark:prose-dark leading-snug">
-                {{ $v | markdownify }}
-              </div>
-            </div>
-            {{ end }}
-          </div>
+        <div class="mt-4 prose dark:prose-dark">
+          {{ template "enum-options-table" . }}
         </div>
       </div>
       {{ end }}
@@ -205,7 +188,7 @@
 
   {{/* Source/transform/sink output */}}
   {{ with .component_output }}
-  <div class="py-3 px-5">
+  <div class="p-4">
     {{ with .metrics }}
     <span class="flex items-center justify-between">
       {{ partial "heading.html" (dict "text" "Metrics" "level" 3 "id" "output-metrics" "href" "#output-metrics") }}
@@ -413,12 +396,12 @@
       </span>
 
       {{/* Function description */}}
-      <div class="mt-4 text-md">
+      <div class="mt-4 text-md prose dark:prose-dark leading-snug">
         {{ $func.description | markdownify }}
       </div>
 
       {{/* Function spec, etc. */}}
-      <div class="mt-2.5 border rounded-md py-3 px-4 dark:border-gray-700">
+      <div class="mt-3 border rounded-md py-3 px-4 dark:border-gray-700">
         <span class="font-semibold text-md">
           Function spec
         </span>
@@ -427,7 +410,7 @@
           <span class="text-primary dark:text-primary font-semibold">{{ $name }}</span>(
             {{- range $idx, $arg := $args -}}
             {{ $isLast := eq $idx $lastArg -}}
-            <span class="{{ if .required }} font-bold text-orange-400{{ else }} font-semibold text-purple-400{{ end }}">
+            <span class="{{ if .required }} font-bold text-secondary dark:text-primary{{ else }} text-indigo-500 dark:text-indigo-300{{ end }}">
               {{- .name -}}
             </span>:
             <span class="text-gray-200"><{{ delimit .type `<span class="text-grey-500"> | </span>` }}></span>{{ if not $isLast }}, {{ end -}}
@@ -441,13 +424,13 @@
         </div>
 
         {{/* Function arguments */}}
-        <div class="flex flex-col space-y-2">
-          {{ range $args }}
-          {{ template "arg" . }}
-          {{ end }}
+        {{ with $args }}
+        <div class="mt-2 prose">
+          {{ template "vrl-function-args" . }}
         </div>
+        {{ end }}
 
-        <div class="mt-6 flex flex-row-reverse">
+        <div class="mt-3 flex flex-row-reverse">
           {{ template "vrl-function-legend" }}
         </div>
 
@@ -457,7 +440,7 @@
             Notices
           </span>
 
-          <span class="my-1.5 block">
+          <span class="my-2 block font-sm">
             This function has special behavior that you should be aware of.
           </span>
 
@@ -471,7 +454,7 @@
                 </svg>
               </div>
 
-              <div class="prose dark:prose-dark prose-sm">
+              <div class="prose dark:prose-dark prose-sm leading-snug">
                 {{ . | markdownify }}
               </div>
             </div>
@@ -691,62 +674,81 @@
 
   {{/* VRL expressions */}}
   {{ with .vrl_expressions }}
-  {{ range $k, $v := . }}
-  {{ $id := $v.title | urlize }}
-  <div class="py-4 px-6">
-    <span>
-      {{ partial "heading.html" (dict "text" $v.title "level" 3) }}
-    </span>
-
-    <div class="mt-3 prose dark:prose-dark leading-snug">
-      {{ $v.description | markdownify }}
-    </div>
-
-    {{ with $v.grammar }}
-    {{ $id := printf "%s-grammar" $k }}
-    <div class="mt-3">
+  <div class="divide-y dark:divide-gray-700">
+    {{ range $k, $v := . }}
+    {{ $id := $v.title | urlize }}
+    <div class="py-4 px-6">
       <span>
-        {{ partial "heading.html" (dict "text" "Grammar" "level" 4 "id" $id) }}
+        {{ partial "heading.html" (dict "text" $v.title "level" 3 "anchor" true "icon" false) }}
       </span>
 
-      <div class="mt-2">
-        {{ highlight .source "ruby" "" }}
+      <div class="mt-6 prose dark:prose-dark leading-snug">
+        {{ $v.description | markdownify }}
       </div>
 
-      {{ with .definitions }}
-      <div class="mt-3 ml-4 flex flex-col space-y-2">
-        {{ range $k, $v := . }}
-        <div>
-          <span class="font-mono font-semibold text-sm">
-            {{ $k }}
-          </span>
+      {{ with $v.grammar }}
+      {{ $id := printf "%s-grammar" $k }}
+      <div class="mt-4">
+        <span>
+          {{ partial "heading.html" (dict "text" "Grammar" "level" 4 "anchor" true "icon" false) }}
+        </span>
+      </div>
 
-          <div class="mt-1 ml-4 prose dark:prose-dark leading-snug prose-sm">
-            {{ $v.description | markdownify }}
-          </div>
+      <div class="mt-2 border rounded p-4 dark:border-gray-700">
+        <div>
+          {{ highlight .source "ruby" "" }}
+        </div>
+
+        {{ with .definitions }}
+        <div class="mt-3 prose">
+          <table>
+            <thead>
+              <tr>
+                <th>
+                  Argument
+                </th>
+                <th>
+                  Meaning
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {{ range $k, $v := . }}
+              <tr>
+                <td>
+                  <code>
+                    {{ $k }}
+                  </code>
+                </td>
+                <td>
+                  {{ $v.description | markdownify }}
+                </td>
+              </tr>
+              {{ end }}
+            </tbody>
+          </table>
         </div>
         {{ end }}
       </div>
       {{ end }}
-    </div>
-    {{ end }}
 
-    {{ with $v.examples }}
-    {{ $id := printf "%s-examples" $k }}
-    <div class="mt-4">
-      <span>
-        {{ partial "heading.html" (dict "text" "Examples" "level" 4 "id" $id) }}
-      </span>
+      {{ with $v.examples }}
+      {{ $id := printf "%s-examples" $k }}
+      <div class="mt-6">
+        <span>
+          {{ partial "heading.html" (dict "text" "Examples" "level" 4 "anchor" true "icon" false) }}
+        </span>
 
-      <div class="mt-3 no-prose border rounded-md flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700">
-        {{ range . }}
-        {{ template "vrl-data-example" . }}
-        {{ end }}
+        <div class="mt-3 no-prose border rounded-md flex flex-col divide-y dark:border-gray-700 dark:divide-gray-700">
+          {{ range . }}
+          {{ template "vrl-data-example" . }}
+          {{ end }}
+        </div>
       </div>
+      {{ end }}
     </div>
     {{ end }}
   </div>
-  {{ end }}
   {{ end }}
 
   {{/* VRL examples */}}
@@ -896,20 +898,8 @@
                 Enum options
               </span>
 
-              <div class="flex flex-col">
-                {{ range $k, $v := . }}
-                <div class="flex space-x-3 prose dark:prose-dark">
-                  <span>
-                    <code>
-                      {{ $k | markdownify }}
-                    </code>
-                  </span>
-
-                  <span>
-                    {{ $v }}
-                  </span>
-                </div>
-                {{ end }}
+              <div class="prose dark:prose-dark">
+                {{ template "enum-options-table" . }}
               </div>
             </div>
             {{ end }}
@@ -1102,6 +1092,33 @@
   {{ end }}
 </div>
 
+{{ define "enum-options-table" }}
+<table class="table-auto">
+  <thead>
+    <tr>
+      <th>
+        Option
+      </th>
+      <th>
+        Description
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    {{ range $k, $v := . }}
+    <tr>
+      <td>
+        <code>{{ $k }}</code>
+      </td>
+      <td>
+        {{ $v | markdownify }}
+      </td>
+    </tr>
+    {{ end }}
+  </tbody>
+</table>
+{{ end }}
+
 {{ define "example" }}
 {{ $event := .input | jsonify (dict "indent" "  ") }}
 <span>
@@ -1285,11 +1302,11 @@
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
   </svg>
 
-  <span class="font-mono text-xs text-orange-400 font-semibold">
+  <span class="font-mono text-xs text-secondary dark:text-primary font-semibold">
     required
   </span>
 
-  <span class="font-mono text-xs text-purple-400 font-semibold">
+  <span class="font-mono text-xs text-indigo-500 dark:text-indigo-300 font-semibold">
     optional
   </span>
 
@@ -1299,22 +1316,44 @@
 </div>
 {{ end }}
 
-{{ define "arg" }}
-<div class="flex flex-col space-y-0.5">
-  <span class="flex justify-between items-center">
-    <span class="font-mono tracking-tight{{ if .required }} font-extrabold text-orange-400{{ else }} font-semibold text-purple-400{{ end }}">
-      {{ .name }}
-    </span>
-
-    <span class="font-mono text-gray-500 dark:text-gray-300 text-sm">
-      {{ delimit .type " | " }}
-    </span>
-  </span>
-
-  <div class="leading-snug ml-4">
-    {{ .description | markdownify }}
-  </div>
-</div>
+{{ define "vrl-function-args" }}
+<table class="table-fixed">
+  <thead>
+    <tr>
+      <th class="w-1/5">
+        Argument
+      </th>
+      <th class="w-1/5">
+        Type
+      </th>
+      <th class="w-3/5">
+        Description
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    {{ range . }}
+    {{ $color := cond .required "text-secondary dark:text-primary" "text-indigo-500 dark:text-indigo-300" }}
+    <tr>
+      <td>
+        <span class="font-mono {{ $color }}{{ if .required }} font-bold{{ end }}">
+          {{ .name }}
+        </span>
+      </td>
+      <td>
+        <span class="font-mono">
+          {{ range .type }}
+          {{ . }}<br />
+          {{ end }}
+        </span>
+      </td>
+      <td class="leading-snug">
+        {{ .description | markdownify }}
+      </td>
+    </tr>
+    {{ end }}
+  </tbody>
+</table>
 {{ end }}
 
 {{ define "vrl-toggler" }}
@@ -1334,7 +1373,7 @@
 {{ define "vrl-data-example" }}
 <div class="py-3 px-5">
   {{ with .title }}
-  <span class="font-bold">
+  <span class="font-bold text-base">
     {{ . }}
   </span>
   {{ end }}
