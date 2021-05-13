@@ -14,7 +14,7 @@ use std::{
     collections::VecDeque,
     convert::TryInto,
     mem::size_of,
-    path::{Path, PathBuf},
+    path::PathBuf,
     pin::Pin,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -326,57 +326,6 @@ impl Reader {
 
 pub struct Buffer;
 
-/// Read the byte size of the database
-///
-/// There is a mismatch between leveldb's mechanism and vector's. While vector
-/// would prefer to keep as little in-memory as possible leveldb, being a
-/// database, has the opposite consideration. As such it may mmap 1000 of its
-/// LDB files into vector's address space at a time with no ability for us to
-/// change this number. See [leveldb issue
-/// 866](https://github.com/google/leveldb/issues/866). Because we do need to
-/// know the byte size of our store we are forced to iterate through all the LDB
-/// files on disk, meaning we impose a huge memory burden on our end users right
-/// at the jump in conditions where the disk buffer has filled up. This'll OOM
-/// vector, meaning we're trapped in a catch 22.
-///
-/// This function solves the problem by iterating over a small number of keys
-/// per DB handle. This is _slow_ but does limit the overall size of vector's
-/// memory consumption.
-fn db_initial_size(path: &Path) -> Result<usize, DataDirError> {
-    let mut initial_size = 0;
-    let mut key_checkpoint: Key = Key(usize::MIN);
-
-    loop {
-        let mut options = Options::new();
-        options.create_if_missing = true;
-        let db: Database<Key> =
-            Database::open(&path, options).with_context(|| DataDirOpenError {
-                data_dir: path.parent().expect("always a parent"),
-            })?;
-
-        let iter = db.iter(ReadOptions::new()).from(&key_checkpoint);
-
-        let mut chunk_size = 0;
-        let mut had_values = false;
-        for (k, v) in iter {
-            had_values = true;
-            chunk_size += 1;
-            if chunk_size > 100_000 {
-                key_checkpoint = k;
-                break;
-            }
-            initial_size += v.len();
-        }
-
-        if !had_values {
-            break;
-        }
-    }
-
-    Ok(initial_size)
->>>>>>> 33ad198c3 (Use Jean's method for computing `initial_size`)
-}
-
 impl super::DiskBuffer for Buffer {
     type Writer = Writer;
     type Reader = Reader;
@@ -391,8 +340,6 @@ impl super::DiskBuffer for Buffer {
         // The rest is used as a buffer which when filled triggers compaction.
         let max_uncompacted_size = max_size / MAX_UNCOMPACTED_DENOMINATOR;
         let max_size = max_size - max_uncompacted_size;
-
-        let initial_size = db_initial_size(&path)?;
 
         let mut options = Options::new();
         options.create_if_missing = true;
@@ -411,7 +358,7 @@ impl super::DiskBuffer for Buffer {
             tail = if iter.valid() { iter.key().0 + 1 } else { 0 };
         }
 
-        let current_size = Arc::new(AtomicUsize::new(initial_size));
+        let current_size = Arc::new(AtomicUsize::new(0));
 
         let write_notifier = Arc::new(AtomicWaker::new());
 
