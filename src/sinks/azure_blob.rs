@@ -389,7 +389,7 @@ mod tests {
         let bytes = encode_event(event, &blob_prefix, &encoding).unwrap();
 
         let encoded_message = message + "\n";
-        let (bytes, _) = bytes.into_parts();
+        let (bytes, _) = bytes.item.into_parts();
         assert_eq!(&bytes[..], encoded_message.as_bytes());
     }
 
@@ -409,7 +409,7 @@ mod tests {
 
         let bytes = encode_event(event, &blob_prefix, &encoding).unwrap();
 
-        let (bytes, _) = bytes.into_parts();
+        let (bytes, _) = bytes.item.into_parts();
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
         assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
@@ -431,7 +431,7 @@ mod tests {
 
         let bytes = encode_event(event, &blob_prefix, &encoding).unwrap();
 
-        let (bytes, _) = bytes.into_parts();
+        let (bytes, _) = bytes.item.into_parts();
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
         assert_eq!(map[&log_schema().message_key().to_string()], message);
     }
