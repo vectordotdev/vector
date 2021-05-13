@@ -41,6 +41,9 @@ assets = [
 license-file = ["target/debian-license.txt"]
 extended-description-file = "target/debian-extended-description.txt"
 
+[package.metadata.deb.systemd-units]
+unit-scripts = "distribution/systemd/"
+
 # libc requirements are defined by `cross`
 # https://github.com/rust-embedded/cross#supported-targets
 # Though, it seems like aarch64 libc is actually 2.18 and not 2.19
