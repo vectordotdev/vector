@@ -1,5 +1,5 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
@@ -8,6 +8,7 @@ pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
 pub use metadata::EventMetadata;
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
+use prost::{DecodeError, EncodeError, Message};
 use shared::EventDataEq;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::{TryFrom, TryInto};
@@ -426,6 +427,33 @@ fn encode_map(fields: BTreeMap<String, Value>) -> proto::ValueMap {
 fn encode_array(items: Vec<Value>) -> proto::ValueArray {
     proto::ValueArray {
         items: items.into_iter().map(encode_value).collect(),
+    }
+}
+
+impl TryInto<Bytes> for Event {
+    type Error = EncodeError;
+
+    fn try_into(self) -> Result<Bytes, Self::Error> {
+        let mut buf = BytesMut::with_capacity(64);
+        proto::EventWrapper::from(self)
+            .encode(&mut buf)
+            .map(|_| buf.freeze())
+    }
+}
+
+impl TryFrom<&[u8]> for proto::EventWrapper {
+    type Error = DecodeError;
+
+    fn try_from(buffer: &[u8]) -> Result<Self, Self::Error> {
+        proto::EventWrapper::decode(buffer)
+    }
+}
+
+impl TryFrom<&[u8]> for Event {
+    type Error = DecodeError;
+
+    fn try_from(buffer: &[u8]) -> Result<Self, Self::Error> {
+        proto::EventWrapper::decode(buffer).map(|x| x.into())
     }
 }
 
