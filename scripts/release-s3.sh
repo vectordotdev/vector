@@ -101,7 +101,6 @@ elif [[ "$CHANNEL" == "latest" ]]; then
       file=$(basename "$file")
       # vector-$version-amd64.deb -> vector-amd64.deb
       echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/$i/${file/-$VERSION_EXACT/}" --website-redirect "/vector/$i/$file" --acl public-read
-      echo -n "" | aws s3 cp - "s3://packages.timber.io/vector/latest/${file/-$VERSION_EXACT/}" --website-redirect "/vector/latest/$file" --acl public-read
     done
     echo "Redirected old artifact names"
   done
