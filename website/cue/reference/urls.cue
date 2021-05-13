@@ -372,6 +372,7 @@ urls: {
 	sha1:                                                     "https://en.wikipedia.org/wiki/SHA-1"
 	sha2:                                                     "https://en.wikipedia.org/wiki/SHA-2"
 	sha3:                                                     "https://en.wikipedia.org/wiki/SHA-3"
+	signal:                                                   "\(wikipedia)/wiki/Signal_(IPC)"
 	snake_case:                                               "\(wikipedia)/wiki/Snake_case"
 	snappy:                                                   "https://google.github.io/snappy/"
 	socket:                                                   "\(wikipedia)/wiki/Network_socket"

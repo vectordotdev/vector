@@ -4,8 +4,12 @@
 {{ $iconSizes := dict "1" "7" "2" "6" "3" "5" "4" "4" "5" "3" "6" "3" }}
 {{ $n := index $iconSizes ($level | string) }}
 <h{{ $level }} x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $id }}" class="flex items-center">
-  {{ with .href }}
+  {{ if .href }}
   <a href="{{ . }}">
+    {{ $text }}
+  </a>
+  {{ else if .anchor }}
+  <a href="#{{ $id }}">
     {{ $text }}
   </a>
   {{ else }}

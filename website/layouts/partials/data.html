@@ -1019,6 +1019,87 @@
     {{ end }}
   </div>
   {{ end }}
+
+  {{/* Vector process */}}
+  {{ with .process }}
+  <div class="flex flex-col divide-y dark:divide-gray-700">
+    {{/* Signals */}}
+    <div class="py-3 px-5">
+      <span>
+        {{ partial "heading.html" (dict "text" "Signals" "level" 3 "anchor" true "icon" false) }}
+      </span>
+
+      <div class="my-4 prose dark:prose-dark leading-snug">
+        {{ .process_signals.description | markdownify }}
+      </div>
+
+      <div class="mt-2 prose dark:prose-dark">
+        <table>
+          <thead>
+            <tr>
+              <th>
+                Signal
+              </th>
+              <th>
+                Description
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {{ range .process_signals.signals }}
+            <tr>
+              <td>
+                <code>{{ .name }}</code>
+              </td>
+              <td>
+                {{ .description | markdownify }}
+              </td>
+            </tr>
+            {{ end }}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {{/* Exit codes */}}
+    <div class="py-3 px-5">
+      <span>
+        {{ partial "heading.html" (dict "text" "Exit codes" "level" 3 "anchor" true "icon" false) }}
+      </span>
+
+      <div class="my-4 prose dark:prose-dark leading-snug">
+        {{ .exit_codes.description | markdownify }}
+      </div>
+
+      <div class="prose dark:prose-dark">
+        <table>
+          <thead>
+            <tr>
+              <th>
+                Code
+              </th>
+              <th>
+                Description
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {{ range .exit_codes.codes }}
+            <tr>
+              <td>
+                <code>{{ .code }}</code>
+              </td>
+              <td>
+                {{ .description | markdownify }}
+              </td>
+            </tr>
+            {{ end }}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {{ end }}
 </div>
 
 {{ define "example" }}

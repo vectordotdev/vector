@@ -79,24 +79,8 @@ vector top
 
 ## How it works
 
-### Signals
-
-Signal | Description
-:------|:-----------
-`SIGTERM` | Initiates a graceful shutdown process
-`SIGHUP` | Reloads configuration on the fly
-
-### Exit codes
-
-A full list of exit codes can be found in the [`exitcodes` Rust crate][exitcodes]. The codes that Vector uses:
-
-Code | Description
-:----|:-----------
-`0` | No error
-`1` | Exited with error
-`78` | Bad [configuration]
+{{< process >}}
 
 [bug]: https://github.com/timberio/vector/issues/new?labels=type%3A+bug
 [configuration]: /docs/reference/configuration
-[exitcodes]: https://docs.rs/exitcode/latest/exitcode/#constants
 [sources]: /docs/reference/configuration/sources
