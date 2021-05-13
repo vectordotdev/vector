@@ -201,7 +201,7 @@ impl HttpSink for HecSinkConfig {
         let log = event.into_log();
 
         let event = match self.encoding.codec() {
-            Encoding::Json => json!(&log.all_fields()),
+            Encoding::Json => json!(&log),
             Encoding::Text => json!(log
                 .get(log_schema().message_key())
                 .map(|v| v.to_string_lossy())

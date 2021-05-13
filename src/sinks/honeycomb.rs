@@ -102,7 +102,7 @@ impl HttpSink for HoneycombConfig {
 
         let data = json!({
             "timestamp": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
-            "data": &log,
+            "data": log.all_fields(),
         });
 
         Some(EncodedEvent::new(data).with_metadata(log))
