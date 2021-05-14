@@ -161,6 +161,6 @@ mod test {
             message_key = "message"
             timestamp_key = "timestamp"
         "#;
-        let _ = toml::from_str::<LogSchema>(toml).unwrap();
+        toml::from_str::<LogSchema>(toml).unwrap();
     }
 }

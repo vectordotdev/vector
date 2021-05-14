@@ -1694,7 +1694,7 @@ mod test {
                             _ => unreachable!("You need to add a new type handler here."),
                         }, "Typecheck failure. Wanted {}, got {:?}.", expected_type, vector_value);
 
-                        let _: serde_json::Value = vector_value.try_into().unwrap();
+                        let _value: serde_json::Value = vector_value.try_into().unwrap();
                     },
                     _ => panic!("This test should never read Err'ing test fixtures."),
                 });
