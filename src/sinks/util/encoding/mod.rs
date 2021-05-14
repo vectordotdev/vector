@@ -56,7 +56,7 @@ pub trait EncodingConfiguration<E> {
         if let Some(only_fields) = &self.only_fields() {
             match event {
                 Event::Log(log_event) => {
-                    let to_remove = log_event
+                    let mut to_remove = log_event
                         .keys()
                         .filter(|field| {
                             let field_path = PathIter::new(field).collect::<Vec<_>>();
@@ -66,6 +66,12 @@ pub trait EncodingConfiguration<E> {
                             })
                         })
                         .collect::<VecDeque<_>>();
+
+                    // reverse sort so that we delete array elements at the end first rather than
+                    // the start so that any `nulls` at the end are dropped and empty arrays are
+                    // pruned
+                    to_remove.make_contiguous().sort_by(|a, b| b.cmp(a));
+
                     for removal in to_remove {
                         log_event.remove_prune(removal, true);
                     }
@@ -261,7 +267,9 @@ mod tests {
             log.insert("c[0].x", 1);
             log.insert("c[0].y", 1);
             log.insert("d.y", 1);
+            log.insert("d.z", 1);
             log.insert("e[0]", 1);
+            log.insert("e[1]", 1);
         }
         config.encoding.apply_rules(&mut event);
         assert!(event.as_mut_log().contains("a.b.c"));
