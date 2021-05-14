@@ -1,0 +1,18 @@
+[package]
+name = "datadog-search-syntax"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+build = "build.rs"
+
+[dependencies]
+lalrpop-util = "0.19.5"
+regex = "1.5.4"
+lazy_static = "1.4.0"
+vrl = { path = "../../vrl/core" }
+vrl-parser = { path = "../../vrl/parser" }
+vrl-compiler = { path = "../../vrl/compiler" }
+vrl-diagnostic = { path = "../../vrl/diagnostic" }
+
+[build-dependencies]
+lalrpop = "0.19.5"

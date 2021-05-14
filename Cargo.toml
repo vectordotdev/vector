@@ -84,6 +84,7 @@ members = [
   "lib/vrl/stdlib",
   "lib/vrl/tests",
   "lib/vrl/proptests",
+  "lib/datadog/search-syntax"
 ]
 
 [dependencies]

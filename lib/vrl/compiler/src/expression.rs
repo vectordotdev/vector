@@ -46,7 +46,7 @@ pub use variable::Variable;
 
 pub type Resolved = Result<Value, ExpressionError>;
 
-pub trait Expression: Send + Sync + fmt::Debug + DynClone {
+pub trait Expression: Send + Sync + fmt::Display + fmt::Debug + DynClone {
     /// Resolve an expression to a concrete [`Value`].
     ///
     /// This method is executed at runtime.

@@ -1,0 +1,30 @@
+use crate::ast::{Expr, Opcode, TAG_REGEX};
+
+grammar;
+
+pub Expr: Box<Expr> = {
+	Expr Opcode Value => Box::new(Expr::Op(<>)),
+	Term
+};
+
+Opcode: Opcode = {
+	":" => Opcode::Eq
+};
+
+Term: Box<Expr> = {
+	Tag,
+	Value,
+	"(" <Expr> ")"
+};
+
+Tag: Box<Expr> = {
+	r"@(([a-zA-Z0-9]+.?)[a-zA-Z0-9]+)" => {
+		let c = TAG_REGEX.captures(<>).unwrap();
+		Box::new(Expr::Tag(c.get(1).unwrap().as_str().to_string()))
+	}
+};
+
+Value: Box<Expr> = {
+	r"[a-zA-Z0-9]+" => Box::new(Expr::Value(<>.to_string())),
+	"\"" <Value> "\"",
+};
