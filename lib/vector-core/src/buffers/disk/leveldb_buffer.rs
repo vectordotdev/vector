@@ -233,9 +233,9 @@ impl Drop for Writer {
 /// |--Compacted--|--Deleted--|--Read--|--Unread
 ///  ^             ^           ^        ^
 ///  |             |           |        |
-///  0  compacted_offset       |        |
-///                      delete_offset  |
-///                                 read_offset
+///  0   `compacted_offset`    |        |
+///                     `delete_offset` |
+///                                `read_offset`
 pub struct Reader {
     /// Leveldb database.
     /// Shared with Writers.
