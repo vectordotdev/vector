@@ -242,7 +242,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
 
     let test_namespace = framework.namespace("test-vector-test-pod").await?;
 
-    let test_message = generate_long_string(8, 8 * 1024); // 64 KiB
+    let test_message = generate_long_string(7, 16 * 1024); // 112 KiB
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
             "test-vector-test-pod",

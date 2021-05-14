@@ -432,16 +432,14 @@ fn default_max_read_bytes() -> usize {
 }
 
 fn default_max_line_bytes() -> usize {
-    // NOTE: The below comment documents an incorrect assumption, see
-    // https://github.com/timberio/vector/issues/6967
-    //
     // The 16KB is the maximum size of the payload at single line for both
     // docker and CRI log formats.
-    // We take a double of that to account for metadata and padding, and to
-    // have a power of two rounding. Line splitting is countered at the
-    // parsers, see the `partial_events_merger` logic.
+    //
+    // Per https://github.com/timberio/vector/issues/6966#issuecomment-830772097
+    // The limit seems to be in the characters at the UTF-8 encoding.
+    // Line splitting is countered at theparsers, see the `partial_events_merger` logic.
 
-    32 * 1024 // 32 KiB
+    6 * 16 * 1024 // 96 KiB
 }
 
 fn default_glob_minimum_cooldown_ms() -> usize {
