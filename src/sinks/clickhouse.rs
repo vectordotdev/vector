@@ -544,7 +544,7 @@ timestamp_format = "unix""#,
         .unwrap()
         .unwrap();
 
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
     }
 
     fn make_event() -> (Event, BatchStatusReceiver) {
