@@ -1,6 +1,8 @@
 use crate::{
     event::Event,
-    internal_events::{SocketEventReceived, SocketMode, UnixSocketError},
+    internal_events::{
+        SocketEventReceived, SocketMode, UnixSocketError, UnixSocketFileDeleteFailed,
+    },
     shutdown::ShutdownSignal,
     sources::Source,
     Pipeline,
@@ -536,6 +538,15 @@ pub fn build_framestream_unix_source(
                 tokio::spawn(handler.instrument(span));
             }
         }
+
+        // Cleanup
+        drop(stream);
+
+        // Delete socket file
+        if let Err(error) = fs::remove_file(&path) {
+            emit!(UnixSocketFileDeleteFailed { path: &path, error });
+        }
+
         Ok(())
     };
 
