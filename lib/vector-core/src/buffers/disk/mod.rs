@@ -29,22 +29,6 @@ pub enum DataDirError {
     },
 }
 
-pub trait DiskBuffer {
-    type Writer: Sink<Event, Error = ()>;
-    type Reader: Stream<Item = Event> + Send;
-
-    /// Build a new `DiskBuffer` rooted at `path`
-    ///
-    /// # Errors
-    ///
-    /// Function will fail if the permissions of `path` are not correct, if
-    /// there is no space available on disk etc.
-    fn build(
-        path: PathBuf,
-        max_size: usize,
-    ) -> Result<(Self::Writer, Self::Reader, super::Acker), DataDirError>;
-}
-
 #[pin_project]
 #[derive(Clone)]
 pub struct Writer {

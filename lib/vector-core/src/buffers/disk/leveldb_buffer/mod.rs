@@ -51,16 +51,18 @@ fn db_initial_size(path: &Path) -> Result<usize, DataDirError> {
     Ok(db.value_iter(ReadOptions::new()).map(|v| v.len()).sum())
 }
 
-impl super::DiskBuffer for Buffer {
-    type Writer = Writer;
-    type Reader = Reader;
-
-    // We convert `max_size` into an f64 at
+impl Buffer {
+    /// Build a new `DiskBuffer` rooted at `path`
+    ///
+    /// # Errors
+    ///
+    /// Function will fail if the permissions of `path` are not correct, if
+    /// there is no space available on disk etc.
     #[allow(clippy::cast_precision_loss)]
-    fn build(
+    pub(crate) fn build(
         path: PathBuf,
         max_size: usize,
-    ) -> Result<(Self::Writer, Self::Reader, Acker), DataDirError> {
+    ) -> Result<(Writer, Reader, Acker), DataDirError> {
         // New `max_size` of the buffer is used for storing the unacked events.
         // The rest is used as a buffer which when filled triggers compaction.
         let max_uncompacted_size = max_size / MAX_UNCOMPACTED_DENOMINATOR;
