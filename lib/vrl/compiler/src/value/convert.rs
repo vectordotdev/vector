@@ -225,8 +225,8 @@ impl Value {
         match self.as_bytes() {
             Some(bytes) => Ok(String::from_utf8_lossy(&bytes)),
             None => Err(Error::Expected {
-                got: Kind::Bytes,
-                expected: self.kind(),
+                got: self.kind(),
+                expected: Kind::Bytes,
             }),
         }
     }
