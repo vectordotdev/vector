@@ -67,7 +67,7 @@ pub trait EncodingConfiguration<E> {
                         })
                         .collect::<VecDeque<_>>();
                     for removal in to_remove {
-                        log_event.remove(removal);
+                        log_event.remove_prune(removal, true);
                     }
                 }
                 Event::Metric(_) => {
@@ -260,6 +260,8 @@ mod tests {
             log.insert("b[1].x", 1);
             log.insert("c[0].x", 1);
             log.insert("c[0].y", 1);
+            log.insert("d.y", 1);
+            log.insert("e[0]", 1);
         }
         config.encoding.apply_rules(&mut event);
         assert!(event.as_mut_log().contains("a.b.c"));
@@ -269,6 +271,8 @@ mod tests {
 
         assert!(!event.as_mut_log().contains("a.b.d"));
         assert!(!event.as_mut_log().contains("c[0].x"));
+        assert!(!event.as_mut_log().contains("d"));
+        assert!(!event.as_mut_log().contains("e"));
     }
 
     const TOML_TIMESTAMP_FORMAT: &str = indoc! {r#"
