@@ -1,6 +1,6 @@
 package metadata
 
-installation: _interfaces: yum: {
+installation: interfaces: yum: {
 	title:       "YUM"
 	description: """
 		The [Yellowdog Updater](\(urls.yum)), Modified (YUM) is a free and

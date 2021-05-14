@@ -1,6 +1,6 @@
 package metadata
 
-installation: _interfaces: "vector-installer": {
+installation: interfaces: vector_installer: {
 	title:       "Vector Installer"
 	description: """
 		The [Vector installer](\(urls.vector_installer)) is a simple shell
@@ -48,7 +48,6 @@ installation: _interfaces: "vector-installer": {
 	}
 
 	role_implementations: {
-		agent: {}
 		sidecar:    role_implementations._file_sidecar
 		aggregator: role_implementations._vector_aggregator
 	}

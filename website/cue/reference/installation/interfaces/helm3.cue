@@ -1,6 +1,6 @@
 package metadata
 
-installation: _interfaces: "helm3": {
+installation: interfaces: "helm3": {
 	title:       "Helm 3"
 	description: """
 		[Helm](\(urls.helm)) is a package manager for Kubernetes that

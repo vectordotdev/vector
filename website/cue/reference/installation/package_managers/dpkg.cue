@@ -2,5 +2,5 @@ package metadata
 
 installation: package_managers: dpkg: {
 	title:       "DPKG"
-	description: installation._interfaces.dpkg.description
+	description: installation.interfaces.dpkg.description
 }

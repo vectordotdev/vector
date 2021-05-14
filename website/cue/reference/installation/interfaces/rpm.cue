@@ -1,16 +1,16 @@
 package metadata
 
-installation: _interfaces: dpkg: {
-	title:       "DPKG"
+installation: interfaces: rpm: {
+	title:       "RPM"
 	description: """
-		[Dpkg](\(urls.dpkg)) is the software that powers the package management
-		system in the Debian operating system and its derivatives. Dpkg is used
-		to install and manage software via `.deb` packages.
+		[RPM Package Manager](\(urls.rpm)) is a free and open-source package
+		management system for installing and managing software on Fedra, CentOS,
+		OpenSUSE, OpenMandriva, Red Hat Enterprise Linux, and other
+		related Linux-based systems.
 		"""
 
 	archs: ["x86_64", "ARM64", "ARMv7"]
-	package_manager_name: installation.package_managers.dpkg.name
-
+	package_manager_name: installation.package_managers.rpm.name
 	paths: {
 		bin:         "/usr/bin/vector"
 		bin_in_path: true
@@ -20,15 +20,12 @@ installation: _interfaces: dpkg: {
 	role_implementations: [Name=string]: {
 		commands: role_implementations._systemd_commands & {
 			_config_path: paths.config
-			install: #"""
-				curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/{version}/vector-{version}-{arch}.deb && \
-					sudo dpkg -i vector-{version}-{arch}.deb
-				"""#
-			uninstall: "sudo dpkg -r vector"
-			upgrade:   null
+			install:      "sudo rpm -i https://packages.timber.io/vector/{version}/vector-{version}-1.{arch}.rpm"
+			uninstall:    "sudo rpm -e vector"
+			upgrade:      null
 		}
+
 		tutorials: {
-			_commands: _
 			installation: [
 				{
 					title:   "Install Vector"
@@ -44,8 +41,9 @@ installation: _interfaces: dpkg: {
 				},
 			]
 		}
+
 		variables: {
-			arch: ["amd64", "arm64", "armhf"]
+			arch: ["x86_64", "aarch64", "armv7"]
 			version: true
 		}
 	}

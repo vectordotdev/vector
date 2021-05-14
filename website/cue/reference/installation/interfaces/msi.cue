@@ -1,6 +1,6 @@
 package metadata
 
-installation: _interfaces: msi: {
+installation: interfaces: msi: {
 	title:       "MSI (Windows Installer)"
 	description: """
 		MSI refers to the file format and command line utility for
@@ -21,10 +21,10 @@ installation: _interfaces: msi: {
 	role_implementations: [Name=string]: {
 		commands: {
 			configure: #"""
-						cat <<-VECTORCFG > \#(paths.config)
-						{config}
-						VECTORCFG
-						"""#
+				cat <<-VECTORCFG > \#(paths.config)
+				{config}
+				VECTORCFG
+				"""#
 			install: #"""
 				powershell Invoke-WebRequest https://packages.timber.io/vector/{version}/vector-{arch}.msi -OutFile vector-{version}-{arch}.msi && \
 					msiexec /i vector-{version}-{arch}.msi /quiet

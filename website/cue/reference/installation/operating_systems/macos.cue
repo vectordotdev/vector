@@ -9,11 +9,11 @@ installation: operating_systems: macos: {
 		"""
 
 	interfaces: [
-		installation._interfaces.homebrew,
-		installation._interfaces."vector-installer" & {
+		installation.interfaces.homebrew,
+		installation.interfaces.vector_installer & {
 			role_implementations: agent: role_implementations._file_agent
 		},
-		installation._interfaces."docker-cli",
+		installation.interfaces.docker_cli,
 	]
 
 	family:                    "macOS"

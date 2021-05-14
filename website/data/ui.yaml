@@ -1,5 +1,5 @@
 defaults:
-  platform: Linux
+  family: Linux
   interface: Docker CLI
   dockerVersion: latest
   dockerDistro: debian

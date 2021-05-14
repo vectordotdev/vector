@@ -1,6 +1,6 @@
 package metadata
 
-installation: _interfaces: kubectl: {
+installation: interfaces: kubectl: {
 	title:       "kubectl"
 	description: """
 		The [Kubernetes command-line tool](\(urls.kubectl)), kubectl, allows

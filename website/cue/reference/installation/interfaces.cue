@@ -123,5 +123,5 @@ installation: {
 		version: bool | *false
 	}
 
-	_interfaces: #Interfaces
+	interfaces: #Interfaces
 }

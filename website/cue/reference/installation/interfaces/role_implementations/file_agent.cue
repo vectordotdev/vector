@@ -1,6 +1,6 @@
 package metadata
 
-installation: _interfaces: [string]: role_implementations: _file_agent: {
+installation: interfaces: [string]: role_implementations: _file_agent: {
 	variables: config: {
 		sources: {
 			logs: {

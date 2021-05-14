@@ -2,5 +2,5 @@ package metadata
 
 installation: package_managers: msi: {
 	title:       "MSI"
-	description: installation._interfaces.msi.description
+	description: installation.interfaces.msi.description
 }

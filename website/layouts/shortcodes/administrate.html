@@ -1,40 +1,82 @@
-{{ $ctx := . }}
-{{ $docker_cli := index site.Data.ui.interfaces "Docker CLI" }}
-
-{{ $platforms := slice }}
-{{ range site.Data.ui.platforms }}
-{{ $platforms = $platforms | append .name }}
+{{ $systems := slice }}
+{{ range $k, $v := site.Data.docs.installation.operating_systems }}
+{{ $systems = $systems | append $v }}
 {{ end }}
 
-<div class="no-prose flex flex-col space-y-2">
-  {{ partial "ui/selector.html" (dict "name" "Platform" "items" $platforms "var" "platform") }}
+{{ $families := slice }}
+{{ range $systems }}
+{{ $families = $families | append .family }}
+{{ end }}
+{{ $families = uniq $families }}
 
-  {{ range $platforms }}
-  {{ $platform := index (where site.Data.ui.platforms ".name" .) 0 }}
-  <div x-show="$store.ui.platform === '{{ . }}'">
-    {{ partial "ui/selector.html" (dict "name" "Interface" "items" $platform.interfaces "var" "interface") }}
+<div class="no-prose flex flex-col space-y-2">
+  {{ partial "ui/selector.html" (dict "name" "Platform" "items" $families "var" "family") }}
+
+  {{ range $families }}
+  {{ $ints := slice }}
+
+  {{ $this := where $systems ".family" . }}
+  {{ range $this }}
+  {{ $ints = $ints | append .interfaces }}
+  {{ end }}
+  {{ $ints = uniq $ints }}
+  {{ $intNames := slice }}
+  {{ range $ints }}
+  {{ $intNames = $intNames | append .title }}
+  {{ end }}
+
+  <div x-show="$store.ui.family === '{{ . }}'">
+    {{ partial "ui/selector.html" (dict "name" "Interface" "items" $intNames "var" "interface") }}
   </div>
   {{ end }}
 
-  <div x-show="$store.ui.interface === 'Docker CLI'">
-    {{ partial "ui/selector.html" (dict "name" "Docker version" "items" $docker_cli.versions "var" "dockerVersion") }}
-    {{ partial "ui/selector.html" (dict "name" "Image distro" "items" $docker_cli.distros "var" "dockerDistro") }}
+  {{ range site.Data.docs.installation.interfaces }}
+  {{ $roles := slice }}
+  {{ range $k, $v := .role_implementations }}
+  {{ $roles = $roles | append $v }}
+  {{ end }}
+  {{ $defaultRole := (index $roles 0).name }}
+  {{ $commands := slice "Start" "Stop" "Reload" "Restart" "Observe" }}
+
+  <div x-show="$store.ui.interface === '{{ .title }}'" x-data="{ role: '{{ $defaultRole }}' }" class="border p-4 rounded dark:border-gray-700">
+    <div class="prose dark:prose-dark">
+      {{ .description | markdownify }}
+    </div>
+
+    <div class="mt-4">
+      <span class="text-2xl font-light">
+        Roles
+      </span>
+
+      <span class="mt-2 flex space-x-2">
+        {{ range $roles }}
+        <button @click="role = '{{ .name }}'" :class="{ 'bg-gray-100 dark:bg-gray-700 dark:text-gray-200 shadow': role === '{{ .name }}' }" class="text-sm rounded-sm py-1 px-2.5">
+          {{ .title }}
+        </button>
+        {{ end }}
+      </span>
+
+      {{ range $roles }}
+      {{ $cmds := .commands }}
+      <div x-show="role === '{{ .name }}'" class="mt-2 flex flex-col space-y-2">
+        {{ range $commands }}
+        {{ $name := . }}
+        {{ $cmd := index $cmds (. | lower) }}
+        {{ with $cmd }}
+        <div>
+          <span class="font-semibold">
+            {{ $name }}
+          </span>
+
+          <div class="mt-2">
+            {{ highlight $cmd "shell" "" }}
+          </div>
+        </div>
+        {{ end }}
+        {{ end }}
+      </div>
+      {{ end }}
+    </div>
   </div>
+  {{ end }}
 </div>
-
-<div class="no-prose">
-  {{ partial "heading.html" (dict "text" "Start" "level" 3) }}
-
-  <div x-show="$store.ui.interface === 'Docker CLI'">
-    {{ partial "ui/docker-cli/run.html" . }}
-  </div>
-
-  {{ template "snippet" (dict "tag" "start" "ctx" $ctx) }}
-</div>
-
-{{ define "snippet" }}
-{{ $path := printf "snippets/ui/%s.md" .tag }}
-<div class="prose">
-  {{ readFile $path | .ctx.Page.RenderString }}
-</div>
-{{ end }}

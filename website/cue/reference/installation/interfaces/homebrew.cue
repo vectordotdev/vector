@@ -1,6 +1,6 @@
 package metadata
 
-installation: _interfaces: homebrew: {
+installation: interfaces: homebrew: {
 	title:       "Homebrew"
 	description: """
 		[Homebrew](\(urls.homebrew)) is a free and open-source package

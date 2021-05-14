@@ -8,11 +8,11 @@ installation: operating_systems: windows: {
 		"""
 
 	interfaces: [
-		installation._interfaces.msi,
-		installation._interfaces."vector-installer" & {
+		installation.interfaces.msi,
+		installation.interfaces.vector_installer & {
 			role_implementations: agent: role_implementations._file_agent
 		},
-		installation._interfaces."docker-cli",
+		installation.interfaces.docker_cli,
 	]
 
 	family:                    "Windows"

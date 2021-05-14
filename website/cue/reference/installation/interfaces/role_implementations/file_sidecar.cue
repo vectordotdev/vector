@@ -1,6 +1,6 @@
 package metadata
 
-installation: _interfaces: [string]: role_implementations: _file_sidecar: {
+installation: interfaces: [string]: role_implementations: _file_sidecar: {
 	variables: config: {
 		sources: {
 			logs: {

@@ -9,14 +9,14 @@ installation: operating_systems: centos: {
 		"""
 
 	interfaces: [
-		installation._interfaces.yum,
-		installation._interfaces.rpm,
-		installation._interfaces."vector-installer" & {
+		installation.interfaces.yum,
+		installation.interfaces.rpm,
+		installation.interfaces.vector_installer & {
 			role_implementations: agent: role_implementations._journald_agent
 		},
-		installation._interfaces."docker-cli",
-		installation._interfaces."helm3",
-		installation._interfaces.kubectl,
+		installation.interfaces.docker_cli,
+		installation.interfaces.helm3,
+		installation.interfaces.kubectl,
 	]
 
 	family:                    "Linux"

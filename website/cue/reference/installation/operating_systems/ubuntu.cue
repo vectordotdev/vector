@@ -7,14 +7,14 @@ installation: operating_systems: ubuntu: {
 		"""
 
 	interfaces: [
-		installation._interfaces.apt,
-		installation._interfaces.dpkg,
-		installation._interfaces."vector-installer" & {
+		installation.interfaces.apt,
+		installation.interfaces.dpkg,
+		installation.interfaces.vector_installer & {
 			role_implementations: agent: role_implementations._journald_agent
 		},
-		installation._interfaces."docker-cli",
-		installation._interfaces."helm3",
-		installation._interfaces.kubectl,
+		installation.interfaces.docker_cli,
+		installation.interfaces.helm3,
+		installation.interfaces.kubectl,
 	]
 
 	family:                    "Linux"

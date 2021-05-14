@@ -1,6 +1,6 @@
 package metadata
 
-installation: _interfaces: [string]: role_implementations: _journald_agent: {
+installation: interfaces: [string]: role_implementations: _journald_agent: {
 	variables: config: {
 		sources: {
 			logs: type:             components.sources.journald.type

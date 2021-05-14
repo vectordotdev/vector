@@ -1,6 +1,6 @@
 package metadata
 
-installation: _interfaces: nix: {
+installation: interfaces: nix: {
 	title:       "Nix"
 	description: """
 				[Nix](\(urls.nix)) is a cross-platform package manager

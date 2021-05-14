@@ -1,6 +1,6 @@
 package metadata
 
-installation: _interfaces: [string]: role_implementations: _vector_aggregator: {
+installation: interfaces: [string]: role_implementations: _vector_aggregator: {
 	variables: config: {
 		sources: {
 			vector: type:           components.sources.vector.type

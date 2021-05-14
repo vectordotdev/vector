@@ -2,5 +2,5 @@ package metadata
 
 installation: package_managers: rpm: {
 	title:       "RPM"
-	description: installation._interfaces.rpm.description
+	description: installation.interfaces.rpm.description
 }

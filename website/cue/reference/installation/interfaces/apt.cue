@@ -1,6 +1,6 @@
 package metadata
 
-installation: _interfaces: apt: {
+installation: interfaces: apt: {
 	title:       "Apt"
 	description: """
 		[Advanced Package Tool](\(urls.apt)), or APT, is a free package manager
@@ -26,10 +26,10 @@ installation: _interfaces: apt: {
 			_config_path: paths.config
 			add_repo:
 				#"""
-					curl -1sLf \
-					  'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' \
-					  | sudo -E bash
-					"""#
+				curl -1sLf \
+					'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' \
+					| sudo -E bash
+				"""#
 			install:   "sudo apt-get install vector"
 			uninstall: "sudo apt remove vector"
 			upgrade:   "sudo apt-get upgrade vector"

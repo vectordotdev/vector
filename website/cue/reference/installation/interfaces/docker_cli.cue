@@ -1,10 +1,10 @@
 package metadata
 
-installation: _interfaces: "docker-cli": {
+installation: interfaces: docker_cli: {
 	title:       "Docker CLI"
 	description: """
 		The [Docker CLI](\(urls.docker_cli)) is the command line interface to
-		the Docker platform. It is used to download, start, and manage Docker
+		the Docker platform. It's used to download, start, and manage Docker
 		images.
 		"""
 
@@ -29,12 +29,12 @@ installation: _interfaces: "docker-cli": {
 			reload:       "docker kill --signal=HUP timberio/vector"
 			restart:      "docker restart -f $(docker ps -aqf \"name=vector\")"
 			start:        #"""
-								docker run \
-								  -d \
-								  -v \#(paths.config):/etc/vector/vector.toml:ro \
-								  -p \#(_api_port):\#(_api_port) \{flags}
-								  timberio/vector:{version}-{variant}
-								"""#
+				docker run \
+				  -d \
+				  -v \#(paths.config):/etc/vector/vector.toml:ro \
+				  -p \#(_api_port):\#(_api_port) \{flags}
+				  timberio/vector:{version}-{variant}
+				"""#
 			stop:         "docker stop timberio/vector"
 			uninstall:    "docker rm timberio/vector timberio/vector"
 			upgrade:      null

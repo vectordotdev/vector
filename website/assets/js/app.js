@@ -87,7 +87,7 @@ const manageState = () => {
 
   window.Spruce.store('ui', {
     // Management UI data
-    platform: '{{ site.Data.ui.defaults.platform }}',
+    family: '{{ site.Data.ui.defaults.family }}',
     interface: '{{ site.Data.ui.defaults.interface }}',
     dockerVersion: '{{ site.Data.ui.default.dockerVersion }}',
     dockerDistro: '{{ site.Data.ui.default.dockerDistro }}',
