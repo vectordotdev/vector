@@ -7,6 +7,7 @@ use leveldb::database::{
     Database,
 };
 use std::convert::{TryFrom, TryInto};
+use std::fmt::Debug;
 use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -16,7 +17,8 @@ use std::task::{Context, Poll, Waker};
 
 pub struct Writer<T>
 where
-    T: Send + Sync + Unpin,
+    T: Send + Sync + Unpin + TryInto<Bytes>,
+    <T as TryInto<bytes::Bytes>>::Error: Debug,
 {
     pub(crate) db: Option<Arc<Database<Key>>>,
     pub(crate) offset: Arc<AtomicUsize>,
@@ -31,12 +33,23 @@ where
 
 // Writebatch isn't Send + Send, but the leveldb docs explicitly say that it's
 // okay to share across threads
-unsafe impl<T> Send for Writer<T> where T: Send + Sync + Unpin {}
-unsafe impl<T> Sync for Writer<T> where T: Send + Sync + Unpin {}
+unsafe impl<T> Send for Writer<T>
+where
+    T: Send + Sync + Unpin + TryInto<Bytes>,
+    <T as TryInto<bytes::Bytes>>::Error: Debug,
+{
+}
+unsafe impl<T> Sync for Writer<T>
+where
+    T: Send + Sync + Unpin + TryInto<Bytes>,
+    <T as TryInto<bytes::Bytes>>::Error: Debug,
+{
+}
 
 impl<T> Clone for Writer<T>
 where
-    T: Send + Sync + Unpin,
+    T: Send + Sync + Unpin + TryInto<Bytes>,
+    <T as TryInto<bytes::Bytes>>::Error: Debug,
 {
     fn clone(&self) -> Self {
         Self {
@@ -55,7 +68,8 @@ where
 
 impl<T> Sink<T> for Writer<T>
 where
-    T: Send + Sync + Unpin,
+    T: Send + Sync + Unpin + TryInto<Bytes>,
+    <T as TryInto<bytes::Bytes>>::Error: Debug,
 {
     type Error = ();
 
@@ -114,35 +128,35 @@ where
 
 impl<T> Writer<T>
 where
-    T: Send + Sync + Unpin,
+    T: Send + Sync + Unpin + TryInto<Bytes>,
+    <T as TryInto<bytes::Bytes>>::Error: Debug,
 {
     fn try_send(&mut self, event: T) -> Option<T> {
-        unimplemented!()
-        // let value: Bytes = event.try_into().unwrap();
+        let value: Bytes = event.try_into().unwrap();
+        let event_size = value.len();
 
-        // let event_size = value.len();
+        if self.current_size.fetch_add(event_size, Ordering::Relaxed) + (event_size / 2)
+            > self.max_size
+        {
+            self.current_size.fetch_sub(event_size, Ordering::Relaxed);
 
-        // if self.current_size.fetch_add(event_size, Ordering::Relaxed) + (event_size / 2)
-        //     > self.max_size
-        // {
-        //     self.current_size.fetch_sub(event_size, Ordering::Relaxed);
+            self.flush();
 
-        //     self.flush();
+            unimplemented!()
+            // let event: T = T::try_from(value).unwrap();
+            // return Some(event);
+        }
 
-        //     let event: T = T::try_from(value.as_ref()).unwrap();
-        //     return Some(event);
-        // }
+        let key = self.offset.fetch_add(1, Ordering::Relaxed);
 
-        // let key = self.offset.fetch_add(1, Ordering::Relaxed);
+        self.writebatch.put(Key(key), &value);
+        self.batch_size += 1;
 
-        // self.writebatch.put(Key(key), &value);
-        // self.batch_size += 1;
+        if self.batch_size >= 100 {
+            self.flush();
+        }
 
-        // if self.batch_size >= 100 {
-        //     self.flush();
-        // }
-
-        // None
+        None
     }
 
     fn flush(&mut self) {
@@ -168,7 +182,8 @@ where
 
 impl<T> Drop for Writer<T>
 where
-    T: Send + Sync + Unpin,
+    T: Send + Sync + Unpin + TryInto<Bytes>,
+    <T as TryInto<bytes::Bytes>>::Error: Debug,
 {
     fn drop(&mut self) {
         if let Some(event) = self.slot.take() {

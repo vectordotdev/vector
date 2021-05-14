@@ -73,10 +73,7 @@ where
 
             unimplemented!()
             // match T::try_from(value.as_slice()) {
-            //     Ok(event) => {
-            //         let event = Event::from(event);
-            //         Poll::Ready(Some(event))
-            //     }
+            //     Ok(event) => Poll::Ready(Some(event)),
             //     Err(error) => {
             //         error!(message = "Error deserializing event.", %error);
             //         debug_assert!(false);

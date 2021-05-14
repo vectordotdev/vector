@@ -1,7 +1,9 @@
-use crate::event::Event;
+use bytes::Bytes;
 use futures::{Sink, Stream};
 use pin_project::pin_project;
 use snafu::Snafu;
+use std::convert::TryInto;
+use std::fmt::Debug;
 use std::{
     io,
     marker::PhantomData,
@@ -34,7 +36,8 @@ pub enum DataDirError {
 #[derive(Clone)]
 pub struct Writer<T>
 where
-    T: Send + Sync + Unpin + Clone,
+    T: Send + Sync + Unpin + Clone + TryInto<Bytes>,
+    <T as TryInto<bytes::Bytes>>::Error: Debug,
 {
     #[pin]
     inner: leveldb_buffer::Writer<T>,
@@ -42,7 +45,8 @@ where
 
 impl<T> Sink<T> for Writer<T>
 where
-    T: Send + Sync + Unpin + Clone,
+    T: Send + Sync + Unpin + Clone + TryInto<Bytes>,
+    <T as TryInto<bytes::Bytes>>::Error: Debug,
 {
     type Error = ();
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -75,7 +79,8 @@ pub fn open<T>(
     max_size: usize,
 ) -> Result<(Writer<T>, Box<dyn Stream<Item = T> + Send>, super::Acker), DataDirError>
 where
-    T: Send + Sync + Unpin + Clone,
+    T: Send + Sync + Unpin + Clone + TryInto<Bytes>,
+    <T as TryInto<bytes::Bytes>>::Error: Debug,
 {
     unimplemented!()
     // let path = data_dir.join(name);
