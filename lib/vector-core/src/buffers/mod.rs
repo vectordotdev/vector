@@ -7,7 +7,7 @@ use bytes::Bytes;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 #[cfg(feature = "disk-buffer")]
 use std::path::Path;
@@ -59,8 +59,9 @@ pub fn build<'a, T>(
     String,
 >
 where
-    T: 'a + Send + Sync + Unpin + Clone + TryInto<Bytes>,
+    T: 'a + Send + Sync + Unpin + Clone + TryInto<Bytes> + TryFrom<Bytes>,
     <T as TryInto<bytes::Bytes>>::Error: Debug,
+    <T as TryFrom<bytes::Bytes>>::Error: Debug,
 {
     match variant {
         #[cfg(feature = "disk-buffer")]
@@ -110,8 +111,9 @@ impl Default for WhenFull {
 #[derive(Clone)]
 pub enum BufferInputCloner<T>
 where
-    T: Send + Sync + Unpin + Clone + TryInto<Bytes>,
+    T: Send + Sync + Unpin + Clone + TryInto<Bytes> + TryFrom<Bytes>,
     <T as TryInto<bytes::Bytes>>::Error: Debug,
+    <T as TryFrom<bytes::Bytes>>::Error: Debug,
 {
     Memory(mpsc::Sender<T>, WhenFull),
     #[cfg(feature = "disk-buffer")]
@@ -120,8 +122,9 @@ where
 
 impl<'a, T> BufferInputCloner<T>
 where
-    T: 'a + Send + Sync + Unpin + Clone + TryInto<Bytes>,
+    T: 'a + Send + Sync + Unpin + Clone + TryInto<Bytes> + TryFrom<Bytes>,
     <T as TryInto<bytes::Bytes>>::Error: Debug,
+    <T as TryFrom<bytes::Bytes>>::Error: Debug,
 {
     pub fn get(&self) -> Box<dyn Sink<T, Error = ()> + 'a + Send> {
         match self {

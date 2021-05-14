@@ -17,8 +17,9 @@ use std::task::{Context, Poll, Waker};
 
 pub struct Writer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes>,
+    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
     <T as TryInto<bytes::Bytes>>::Error: Debug,
+    <T as std::convert::TryFrom<bytes::Bytes>>::Error: Debug,
 {
     pub(crate) db: Option<Arc<Database<Key>>>,
     pub(crate) offset: Arc<AtomicUsize>,
@@ -35,21 +36,24 @@ where
 // okay to share across threads
 unsafe impl<T> Send for Writer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes>,
+    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
     <T as TryInto<bytes::Bytes>>::Error: Debug,
+    <T as TryFrom<bytes::Bytes>>::Error: Debug,
 {
 }
 unsafe impl<T> Sync for Writer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes>,
+    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
     <T as TryInto<bytes::Bytes>>::Error: Debug,
+    <T as TryFrom<bytes::Bytes>>::Error: Debug,
 {
 }
 
 impl<T> Clone for Writer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes>,
+    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
     <T as TryInto<bytes::Bytes>>::Error: Debug,
+    <T as TryFrom<bytes::Bytes>>::Error: Debug,
 {
     fn clone(&self) -> Self {
         Self {
@@ -68,8 +72,9 @@ where
 
 impl<T> Sink<T> for Writer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes>,
+    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
     <T as TryInto<bytes::Bytes>>::Error: Debug,
+    <T as TryFrom<bytes::Bytes>>::Error: Debug,
 {
     type Error = ();
 
@@ -128,8 +133,9 @@ where
 
 impl<T> Writer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes>,
+    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
     <T as TryInto<bytes::Bytes>>::Error: Debug,
+    <T as TryFrom<bytes::Bytes>>::Error: Debug,
 {
     fn try_send(&mut self, event: T) -> Option<T> {
         let value: Bytes = event.try_into().unwrap();
@@ -142,8 +148,8 @@ where
 
             self.flush();
 
+            let event: T = T::try_from(value).unwrap();
             unimplemented!()
-            // let event: T = T::try_from(value).unwrap();
             // return Some(event);
         }
 
@@ -182,8 +188,9 @@ where
 
 impl<T> Drop for Writer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes>,
+    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
     <T as TryInto<bytes::Bytes>>::Error: Debug,
+    <T as std::convert::TryFrom<bytes::Bytes>>::Error: Debug,
 {
     fn drop(&mut self) {
         if let Some(event) = self.slot.take() {

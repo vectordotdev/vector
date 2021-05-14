@@ -15,7 +15,7 @@ use leveldb::database::{
 };
 use reader::Reader;
 use snafu::ResultExt;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 use std::{
     collections::VecDeque,
@@ -60,8 +60,9 @@ fn db_initial_size(path: &Path) -> Result<usize, DataDirError> {
 
 impl<T> Buffer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes>,
+    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
     <T as TryInto<bytes::Bytes>>::Error: Debug,
+    <T as std::convert::TryFrom<bytes::Bytes>>::Error: Debug,
 {
     /// Build a new `DiskBuffer` rooted at `path`
     ///
