@@ -19,16 +19,11 @@ use crate::{
     template::Template,
     Result,
 };
-use azure_sdk_core::{
-    errors::AzureError, BlobNameSupport, BodySupport, ContainerNameSupport, ContentEncodingSupport,
-    ContentTypeSupport,
-};
-use azure_sdk_storage_blob::{blob::responses::PutBlockBlobResponse, Blob, Container};
-use azure_sdk_storage_core::{
-    key_client::KeyClient,
-    prelude::client::{from_connection_string, with_emulator},
-    Client, ConnectionString,
-};
+use azure_core::errors::AzureError;
+use azure_core::prelude::*;
+use azure_storage::blob::blob::responses::PutBlockBlobResponse;
+use azure_storage::blob::prelude::*;
+use azure_storage::core::prelude::*;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
@@ -39,16 +34,16 @@ use snafu::Snafu;
 use std::{
     convert::TryFrom,
     result::Result as StdResult,
+    sync::Arc,
     task::{Context, Poll},
 };
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
-use url::Url;
 use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct AzureBlobSink {
-    client: KeyClient,
+    client: Arc<ContainerClient>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -142,7 +137,7 @@ impl SinkConfig for AzureBlobSinkConfig {
 }
 
 impl AzureBlobSinkConfig {
-    pub fn new(&self, client: KeyClient, cx: SinkContext) -> Result<VectorSink> {
+    pub fn new(&self, client: Arc<ContainerClient>, cx: SinkContext) -> Result<VectorSink> {
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let batch = BatchSettings::default()
             .bytes(10 * 1024 * 1024)
@@ -179,17 +174,14 @@ impl AzureBlobSinkConfig {
         Ok(super::VectorSink::Sink(Box::new(sink)))
     }
 
-    pub async fn healthcheck(self, client: KeyClient) -> Result<()> {
+    pub async fn healthcheck(self, client: Arc<ContainerClient>) -> Result<()> {
         let container_name = self.container_name.clone();
-        let request = client
-            .get_container_properties()
-            .with_container_name(container_name.as_str())
-            .finalize();
+        let request = client.get_properties().execute().await;
 
-        match request.await {
+        match request {
             Ok(_) => Ok(()),
-            Err(reason) => Err(match reason {
-                AzureError::UnexpectedHTTPResult(result) => match result.status_code() {
+            Err(reason) => Err(match reason.downcast_ref::<AzureError>() {
+                Some(AzureError::UnexpectedHTTPResult(result)) => match result.status_code() {
                     StatusCode::FORBIDDEN => HealthcheckError::InvalidCredentials.into(),
                     StatusCode::NOT_FOUND => HealthcheckError::UnknownContainer {
                         container: container_name,
@@ -197,22 +189,20 @@ impl AzureBlobSinkConfig {
                     .into(),
                     status => HealthcheckError::Unknown { status }.into(),
                 },
-                error => error.into(),
+                _ => reason.into(),
             }),
         }
     }
 
-    pub fn create_client(&self) -> Result<KeyClient> {
-        let connection_string = self.connection_string.clone();
-        let client = match ConnectionString::new(connection_string.as_str()) {
-            Ok(ConnectionString {
-                use_development_storage: Some(true),
-                blob_endpoint: Some(blob_endpoint),
-                table_endpoint: Some(table_endpoint),
-                ..
-            }) => with_emulator(&Url::parse(blob_endpoint)?, &Url::parse(table_endpoint)?),
-            _ => from_connection_string(connection_string.as_str())?,
-        };
+    pub fn create_client(&self) -> Result<Arc<ContainerClient>> {
+        // todo: emulator support
+        let connection_string = self.connection_string.as_str();
+        let container_name = self.container_name.as_str();
+        let http_client: Arc<Box<dyn HttpClient>> = Arc::new(Box::new(reqwest::Client::new()));
+        let client =
+            StorageAccountClient::new_connection_string(http_client.clone(), connection_string)?
+                .as_storage_client()
+                .as_container_client(container_name);
 
         Ok(client)
     }
@@ -220,7 +210,7 @@ impl AzureBlobSinkConfig {
 
 impl Service<AzureBlobSinkRequest> for AzureBlobSink {
     type Response = PutBlockBlobResponse;
-    type Error = AzureError;
+    type Error = Box<dyn std::error::Error + std::marker::Send + std::marker::Sync>;
     type Future = BoxFuture<'static, StdResult<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<StdResult<(), Self::Error>> {
@@ -228,28 +218,32 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
     }
 
     fn call(&mut self, request: AzureBlobSinkRequest) -> Self::Future {
-        let client = self.client.clone();
+        let client = self
+            .client
+            .clone()
+            .as_blob_client(request.blob_name.as_str());
 
         Box::pin(async move {
             let blob = client
-                .put_block_blob()
-                .with_container_name(request.container_name.as_str())
-                .with_blob_name(request.blob_name.as_str())
-                .with_content_type(request.content_type.unwrap())
-                .with_body(request.blob_data.as_slice());
+                .put_block_blob(Bytes::from(request.blob_data))
+                .content_type(request.content_type.unwrap());
             let blob = match request.content_encoding {
-                Some(encoding) => blob.with_content_encoding(encoding),
+                Some(encoding) => blob.content_encoding(encoding),
                 None => blob,
             };
 
-            blob.finalize()
-                .inspect_err(|error| {
-                    match error {
-                        AzureError::UnexpectedHTTPResult(result) => emit!(AzureBlobErrorResponse {
-                            url: client.blob_uri().into(),
-                            code: result.status_code()
+            blob.execute()
+                .inspect_err(|reason| {
+                    match reason.downcast_ref::<AzureError>() {
+                        Some(AzureError::UnexpectedHTTPResult(result)) => {
+                            emit!(AzureBlobErrorResponse {
+                                url: "".to_string(), // todo: url ??
+                                code: result.status_code()
+                            })
+                        }
+                        _ => emit!(AzureBlobHttpError {
+                            error: reason.to_string()
                         }),
-                        other => emit!(AzureBlobHttpError { error: other }),
                     };
                 })
                 .instrument(info_span!("request"))
@@ -536,14 +530,12 @@ mod integration_tests {
         assert_downcast_matches,
         test_util::{random_events_with_stream, random_lines, random_lines_with_stream},
     };
-    use azure_sdk_core::MaxResultsSupport;
-    use azure_sdk_storage_blob::{
-        blob::Blob as BlobState, container::PublicAccess, container::PublicAccessSupport, Blob,
-    };
+    use azure_core::errors::AzureError;
     use bytes::{Buf, BytesMut};
     use flate2::read::GzDecoder;
     use futures::Stream;
     use std::io::{BufRead, BufReader};
+    use std::num::NonZeroU32;
 
     #[tokio::test]
     async fn azure_blob_healthcheck_passed() {
@@ -588,7 +580,7 @@ mod integration_tests {
         assert_eq!(blobs.len(), 1);
         assert!(blobs[0].clone().ends_with(".log"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
-        assert_eq!(blob.content_type, Some(String::from("text/plain")));
+        assert_eq!(blob.properties.content_type, String::from("text/plain"));
         assert_eq!(lines, blob_lines);
     }
 
@@ -610,7 +602,7 @@ mod integration_tests {
         assert_eq!(blobs.len(), 1);
         assert!(blobs[0].clone().ends_with(".log"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
-        assert_eq!(blob.content_type, Some(String::from("text/plain")));
+        assert_eq!(blob.properties.content_type, String::from("text/plain"));
         let expected = events
             .iter()
             .map(|event| serde_json::to_string(&event.as_log().all_fields()).unwrap())
@@ -637,8 +629,8 @@ mod integration_tests {
         assert!(blobs[0].clone().ends_with(".log.gz"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
         assert_eq!(
-            blob.content_type,
-            Some(String::from("application/octet-stream"))
+            blob.properties.content_type,
+            String::from("application/octet-stream")
         );
         assert_eq!(lines, blob_lines);
     }
@@ -663,8 +655,8 @@ mod integration_tests {
         assert!(blobs[0].clone().ends_with(".log.gz"));
         let (blob, blob_lines) = config.get_blob(blobs[0].clone()).await;
         assert_eq!(
-            blob.content_type,
-            Some(String::from("application/octet-stream"))
+            blob.properties.content_type,
+            String::from("application/octet-stream")
         );
         let expected = events
             .iter()
@@ -739,35 +731,32 @@ mod integration_tests {
             let mut stream = Box::pin(
                 client
                     .list_blobs()
-                    .with_container_name(self.container_name.as_str())
-                    .with_max_results(5)
+                    .prefix(prefix)
+                    .max_results(NonZeroU32::new(5).unwrap())
                     .stream(),
             );
 
             while let Some(items) = stream.next().await {
-                let items = items.expect("Failed to fetch blobs").incomplete_vector;
+                let items = items.expect("Failed to fetch blobs").blobs.blobs;
 
                 for item in items.iter() {
-                    if item.name.starts_with(prefix) {
-                        blobs.push(item.name.clone());
-                    }
+                    blobs.push(item.name.clone());
                 }
             }
 
             blobs
         }
 
-        pub async fn get_blob(&self, blob: String) -> (BlobState, Vec<String>) {
+        pub async fn get_blob(&self, blob: String) -> (Blob, Vec<String>) {
             let client = self.create_client().unwrap();
             let response = client
-                .get_blob()
-                .with_container_name(self.container_name.as_str())
-                .with_blob_name(blob.as_str())
-                .finalize()
+                .as_blob_client(blob.as_str())
+                .get()
+                .execute()
                 .await
                 .expect("Failed to get blob");
 
-            (response.blob, self.get_blob_content(response.data))
+            (response.blob, self.get_blob_content(response.data.to_vec()))
         }
 
         fn get_blob_content(&self, data: Vec<u8>) -> Vec<String> {
@@ -785,21 +774,16 @@ mod integration_tests {
 
         async fn ensure_container(&self) {
             let client = self.create_client().unwrap();
-            let container_name = self.container_name.clone();
-            let request = client
-                .create_container()
-                .with_container_name(container_name.as_str())
-                .with_public_access(PublicAccess::None)
-                .finalize();
+            let request = client.create().public_access(PublicAccess::None).execute();
 
             let response = match request.await {
                 Ok(_) => Ok(()),
-                Err(reason) => match reason {
-                    AzureError::UnexpectedHTTPResult(result) => match result.status_code() {
+                Err(reason) => match reason.downcast_ref::<AzureError>() {
+                    Some(AzureError::UnexpectedHTTPResult(result)) => match result.status_code() {
                         StatusCode::CONFLICT => Ok(()),
                         status => Err(format!("Unexpected status code {}", status)),
                     },
-                    error => Err(format!("Unexpected error {}", error)),
+                    _ => Err(format!("Unexpected error {}", reason.to_string())),
                 },
             };
 

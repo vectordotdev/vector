@@ -1,5 +1,4 @@
 use super::InternalEvent;
-use azure_sdk_core::errors::AzureError;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -19,11 +18,11 @@ impl InternalEvent for AzureBlobErrorResponse {
 }
 
 #[derive(Debug)]
-pub(crate) struct AzureBlobHttpError<'a> {
-    pub error: &'a AzureError,
+pub(crate) struct AzureBlobHttpError {
+    pub error: String,
 }
 
-impl InternalEvent for AzureBlobHttpError<'_> {
+impl InternalEvent for AzureBlobHttpError {
     fn emit_logs(&self) {
         error!(
             message = "Error processing request.",
