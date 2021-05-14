@@ -1,5 +1,4 @@
 use super::Key;
-use crate::event::Event;
 use bytes::Bytes;
 use futures::{task::AtomicWaker, Sink};
 use leveldb::database::{
@@ -7,18 +6,18 @@ use leveldb::database::{
     options::WriteOptions,
     Database,
 };
-use std::convert::TryFrom;
-use std::{
-    convert::TryInto,
-    pin::Pin,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, Mutex,
-    },
-    task::{Context, Poll, Waker},
+use std::convert::{TryFrom, TryInto};
+use std::pin::Pin;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
 };
+use std::task::{Context, Poll, Waker};
 
-pub struct Writer {
+pub struct Writer<T>
+where
+    T: Send + Sync + Unpin,
+{
     pub(crate) db: Option<Arc<Database<Key>>>,
     pub(crate) offset: Arc<AtomicUsize>,
     pub(crate) write_notifier: Arc<AtomicWaker>,
@@ -27,14 +26,18 @@ pub struct Writer {
     pub(crate) batch_size: usize,
     pub(crate) max_size: usize,
     pub(crate) current_size: Arc<AtomicUsize>,
-    pub(crate) slot: Option<Event>,
+    pub(crate) slot: Option<T>,
 }
 
-// Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to
-// share across threads
-unsafe impl Send for Writer {}
+// Writebatch isn't Send + Send, but the leveldb docs explicitly say that it's
+// okay to share across threads
+unsafe impl<T> Send for Writer<T> where T: Send + Sync + Unpin {}
+unsafe impl<T> Sync for Writer<T> where T: Send + Sync + Unpin {}
 
-impl Clone for Writer {
+impl<T> Clone for Writer<T>
+where
+    T: Send + Sync + Unpin,
+{
     fn clone(&self) -> Self {
         Self {
             db: self.db.as_ref().map(Arc::clone),
@@ -50,7 +53,10 @@ impl Clone for Writer {
     }
 }
 
-impl Sink<Event> for Writer {
+impl<T> Sink<T> for Writer<T>
+where
+    T: Send + Sync + Unpin,
+{
     type Error = ();
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -63,7 +69,7 @@ impl Sink<Event> for Writer {
         }
     }
 
-    fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
+    fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         if let Some(event) = self.try_send(item) {
             debug_assert!(self.slot.is_none());
             self.slot = Some(event);
@@ -106,33 +112,37 @@ impl Sink<Event> for Writer {
     }
 }
 
-impl Writer {
-    fn try_send(&mut self, event: Event) -> Option<Event> {
-        let value: Bytes = event.try_into().unwrap();
+impl<T> Writer<T>
+where
+    T: Send + Sync + Unpin,
+{
+    fn try_send(&mut self, event: T) -> Option<T> {
+        unimplemented!()
+        // let value: Bytes = event.try_into().unwrap();
 
-        let event_size = value.len();
+        // let event_size = value.len();
 
-        if self.current_size.fetch_add(event_size, Ordering::Relaxed) + (event_size / 2)
-            > self.max_size
-        {
-            self.current_size.fetch_sub(event_size, Ordering::Relaxed);
+        // if self.current_size.fetch_add(event_size, Ordering::Relaxed) + (event_size / 2)
+        //     > self.max_size
+        // {
+        //     self.current_size.fetch_sub(event_size, Ordering::Relaxed);
 
-            self.flush();
+        //     self.flush();
 
-            let event: Event = Event::try_from(value.as_ref()).unwrap();
-            return Some(event);
-        }
+        //     let event: T = T::try_from(value.as_ref()).unwrap();
+        //     return Some(event);
+        // }
 
-        let key = self.offset.fetch_add(1, Ordering::Relaxed);
+        // let key = self.offset.fetch_add(1, Ordering::Relaxed);
 
-        self.writebatch.put(Key(key), &value);
-        self.batch_size += 1;
+        // self.writebatch.put(Key(key), &value);
+        // self.batch_size += 1;
 
-        if self.batch_size >= 100 {
-            self.flush();
-        }
+        // if self.batch_size >= 100 {
+        //     self.flush();
+        // }
 
-        None
+        // None
     }
 
     fn flush(&mut self) {
@@ -156,7 +166,10 @@ impl Writer {
     }
 }
 
-impl Drop for Writer {
+impl<T> Drop for Writer<T>
+where
+    T: Send + Sync + Unpin,
+{
     fn drop(&mut self) {
         if let Some(event) = self.slot.take() {
             // This can happen if poll_close wasn't called which is a bug

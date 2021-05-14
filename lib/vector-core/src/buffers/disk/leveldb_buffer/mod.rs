@@ -16,6 +16,7 @@ use reader::Reader;
 use snafu::ResultExt;
 use std::{
     collections::VecDeque,
+    marker::PhantomData,
     path::{Path, PathBuf},
     sync::{atomic::AtomicUsize, Arc, Mutex},
 };
@@ -24,7 +25,10 @@ pub use writer::Writer;
 /// How much of disk buffer needs to be deleted before we trigger compaction.
 const MAX_UNCOMPACTED_DENOMINATOR: usize = 10;
 
-pub struct Buffer;
+#[derive(Default)]
+pub struct Buffer<T> {
+    phantom: PhantomData<T>,
+}
 
 /// Read the byte size of the database
 ///
@@ -51,7 +55,10 @@ fn db_initial_size(path: &Path) -> Result<usize, DataDirError> {
     Ok(db.value_iter(ReadOptions::new()).map(|v| v.len()).sum())
 }
 
-impl Buffer {
+impl<T> Buffer<T>
+where
+    T: Send + Sync + Unpin,
+{
     /// Build a new `DiskBuffer` rooted at `path`
     ///
     /// # Errors
@@ -62,7 +69,7 @@ impl Buffer {
     pub(crate) fn build(
         path: PathBuf,
         max_size: usize,
-    ) -> Result<(Writer, Reader, Acker), DataDirError> {
+    ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError> {
         // New `max_size` of the buffer is used for storing the unacked events.
         // The rest is used as a buffer which when filled triggers compaction.
         let max_uncompacted_size = max_size / MAX_UNCOMPACTED_DENOMINATOR;
@@ -120,6 +127,7 @@ impl Buffer {
             uncompacted_size: 1,
             unacked_sizes: VecDeque::new(),
             buffer: Vec::new(),
+            phantom: PhantomData,
         };
         // Compact on every start
         reader.compact();

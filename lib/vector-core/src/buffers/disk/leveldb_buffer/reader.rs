@@ -1,5 +1,4 @@
 use super::Key;
-use crate::event::Event;
 use futures::{task::AtomicWaker, Stream};
 use leveldb::database::{
     batch::{Batch, Writebatch},
@@ -9,17 +8,18 @@ use leveldb::database::{
     Database,
 };
 use std::convert::TryFrom;
-use std::{
-    collections::VecDeque,
-    pin::Pin,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, Mutex,
-    },
-    task::{Context, Poll, Waker},
+use std::pin::Pin;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
 };
+use std::task::{Context, Poll, Waker};
+use std::{collections::VecDeque, marker::PhantomData};
 
-pub struct Reader {
+pub struct Reader<T>
+where
+    T: Send + Sync + Unpin,
+{
     pub(crate) db: Arc<Database<Key>>,
     pub(crate) read_offset: usize,
     pub(crate) delete_offset: usize,
@@ -31,14 +31,18 @@ pub struct Reader {
     pub(crate) unacked_sizes: VecDeque<usize>,
     pub(crate) buffer: Vec<Vec<u8>>,
     pub(crate) max_uncompacted_size: usize,
+    pub(crate) phantom: PhantomData<T>,
 }
 
 // Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to
 // share across threads
-unsafe impl Send for Reader {}
+unsafe impl<T> Send for Reader<T> where T: Send + Sync + Unpin {}
 
-impl Stream for Reader {
-    type Item = Event;
+impl<T> Stream for Reader<T>
+where
+    T: Send + Sync + Unpin,
+{
+    type Item = T;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // If there's no value at read_offset, we return NotReady and rely on
@@ -67,17 +71,18 @@ impl Stream for Reader {
             self.unacked_sizes.push_back(value.len());
             self.read_offset += 1;
 
-            match Event::try_from(value.as_slice()) {
-                Ok(event) => {
-                    let event = Event::from(event);
-                    Poll::Ready(Some(event))
-                }
-                Err(error) => {
-                    error!(message = "Error deserializing event.", %error);
-                    debug_assert!(false);
-                    self.poll_next(cx)
-                }
-            }
+            unimplemented!()
+            // match T::try_from(value.as_slice()) {
+            //     Ok(event) => {
+            //         let event = Event::from(event);
+            //         Poll::Ready(Some(event))
+            //     }
+            //     Err(error) => {
+            //         error!(message = "Error deserializing event.", %error);
+            //         debug_assert!(false);
+            //         self.poll_next(cx)
+            //     }
+            // }
         } else if Arc::strong_count(&self.db) == 1 {
             // There are no writers left
             Poll::Ready(None)
@@ -87,7 +92,10 @@ impl Stream for Reader {
     }
 }
 
-impl Drop for Reader {
+impl<T> Drop for Reader<T>
+where
+    T: Send + Sync + Unpin,
+{
     fn drop(&mut self) {
         self.delete_acked();
         // Compact on every shutdown
@@ -95,7 +103,10 @@ impl Drop for Reader {
     }
 }
 
-impl Reader {
+impl<T> Reader<T>
+where
+    T: Send + Sync + Unpin,
+{
     fn delete_acked(&mut self) {
         let num_to_delete = self.ack_counter.swap(0, Ordering::Relaxed);
 
