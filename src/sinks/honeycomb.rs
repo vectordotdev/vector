@@ -100,10 +100,12 @@ impl HttpSink for HoneycombConfig {
             chrono::Utc::now()
         };
 
-        Some(EncodedEvent::new(json!({
+        let data = json!({
             "timestamp": timestamp.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
             "data": log.all_fields(),
-        })))
+        });
+
+        Some(EncodedEvent::new(data).with_metadata(log))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {

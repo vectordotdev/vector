@@ -183,40 +183,42 @@ pub fn temp_dir() -> PathBuf {
     path.join(dir_name)
 }
 
+fn map_batch_stream(
+    stream: impl Stream<Item = LogEvent>,
+    batch: Option<Arc<BatchNotifier>>,
+) -> impl Stream<Item = Event> {
+    stream.map(move |log| {
+        match &batch {
+            None => log,
+            Some(batch) => log.with_batch_notifier(batch),
+        }
+        .into()
+    })
+}
+
 pub fn random_lines_with_stream(
     len: usize,
     count: usize,
     batch: Option<Arc<BatchNotifier>>,
 ) -> (Vec<String>, impl Stream<Item = Event>) {
     let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
-    let stream = stream::iter(lines.clone()).map(move |line| {
-        let log = LogEvent::from(line);
-        match &batch {
-            None => log,
-            Some(batch) => log.with_batch_notifier(Arc::clone(batch)),
-        }
-        .into()
-    });
+    let stream = map_batch_stream(stream::iter(lines.clone()).map(LogEvent::from), batch);
     (lines, stream)
-}
-
-fn random_events_with_stream_generic<F>(
-    count: usize,
-    generator: F,
-) -> (Vec<Event>, impl Stream<Item = Event>)
-where
-    F: Fn() -> Event,
-{
-    let events = (0..count).map(|_| generator()).collect::<Vec<_>>();
-    let stream = stream::iter(events.clone());
-    (events, stream)
 }
 
 pub fn random_events_with_stream(
     len: usize,
     count: usize,
+    batch: Option<Arc<BatchNotifier>>,
 ) -> (Vec<Event>, impl Stream<Item = Event>) {
-    random_events_with_stream_generic(count, move || Event::from(random_string(len)))
+    let events = (0..count)
+        .map(|_| Event::from(random_string(len)))
+        .collect::<Vec<_>>();
+    let stream = map_batch_stream(
+        stream::iter(events.clone()).map(|event| event.into_log()),
+        batch,
+    );
+    (events, stream)
 }
 
 pub fn random_string(len: usize) -> String {

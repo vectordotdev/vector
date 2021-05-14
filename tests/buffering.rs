@@ -61,7 +61,7 @@ fn test_buffering() {
     let (topology, input_events) = rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
         let (input_events, input_events_stream) =
-            random_events_with_stream(line_length, num_events);
+            random_events_with_stream(line_length, num_events, None);
         let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
@@ -111,7 +111,7 @@ fn test_buffering() {
         let (topology, _crash) = start_topology(config, false).await;
 
         let (input_events2, input_events_stream) =
-            random_events_with_stream(line_length, num_events);
+            random_events_with_stream(line_length, num_events, None);
         let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
