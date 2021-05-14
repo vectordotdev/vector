@@ -2,11 +2,13 @@ use bytes::Bytes;
 use futures::{Sink, Stream};
 use pin_project::pin_project;
 use snafu::Snafu;
-use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Display,
+};
+use std::{
     io,
-    marker::PhantomData,
     path::{Path, PathBuf},
     pin::Pin,
     task::{Context, Poll},
@@ -56,8 +58,7 @@ where
     }
 
     fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        unimplemented!()
-        // self.project().inner.start_send(item)
+        self.project().inner.start_send(item)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -75,43 +76,49 @@ where
 ///
 /// This function will fail with [`Error`] if the directory does not exist at
 /// `data_dir`, if permissions are not sufficient etc.
-pub fn open<T>(
+pub fn open<'a, T>(
     data_dir: &Path,
     name: &str,
     max_size: usize,
-) -> Result<(Writer<T>, Box<dyn Stream<Item = T> + Send>, super::Acker), DataDirError>
+) -> Result<
+    (
+        Writer<T>,
+        Box<dyn Stream<Item = T> + 'a + Send>,
+        super::Acker,
+    ),
+    DataDirError,
+>
 where
-    T: Send + Sync + Unpin + Clone + TryInto<Bytes> + TryFrom<Bytes>,
+    T: 'a + Send + Sync + Unpin + Clone + TryInto<Bytes> + TryFrom<Bytes>,
     <T as TryInto<bytes::Bytes>>::Error: Debug,
-    <T as TryFrom<bytes::Bytes>>::Error: Debug,
+    <T as TryFrom<bytes::Bytes>>::Error: Debug + Display,
 {
-    unimplemented!()
-    // let path = data_dir.join(name);
+    let path = data_dir.join(name);
 
-    // // Check data dir
-    // std::fs::metadata(&data_dir)
-    //     .map_err(|e| match e.kind() {
-    //         io::ErrorKind::PermissionDenied => DataDirError::NotWritable {
-    //             data_dir: data_dir.into(),
-    //         },
-    //         io::ErrorKind::NotFound => DataDirError::NotFound {
-    //             data_dir: data_dir.into(),
-    //         },
-    //         _ => DataDirError::Metadata {
-    //             data_dir: data_dir.into(),
-    //             source: e,
-    //         },
-    //     })
-    //     .and_then(|m| {
-    //         if m.permissions().readonly() {
-    //             Err(DataDirError::NotWritable {
-    //                 data_dir: data_dir.into(),
-    //             })
-    //         } else {
-    //             Ok(())
-    //         }
-    //     })?;
+    // Check data dir
+    std::fs::metadata(&data_dir)
+        .map_err(|e| match e.kind() {
+            io::ErrorKind::PermissionDenied => DataDirError::NotWritable {
+                data_dir: data_dir.into(),
+            },
+            io::ErrorKind::NotFound => DataDirError::NotFound {
+                data_dir: data_dir.into(),
+            },
+            _ => DataDirError::Metadata {
+                data_dir: data_dir.into(),
+                source: e,
+            },
+        })
+        .and_then(|m| {
+            if m.permissions().readonly() {
+                Err(DataDirError::NotWritable {
+                    data_dir: data_dir.into(),
+                })
+            } else {
+                Ok(())
+            }
+        })?;
 
-    // let (writer, reader, acker) = leveldb_buffer::Buffer::build(path, max_size)?;
-    // Ok((Writer { inner: writer }, Box::new(reader), acker))
+    let (writer, reader, acker) = leveldb_buffer::Buffer::build(path, max_size)?;
+    Ok((Writer { inner: writer }, Box::new(reader), acker))
 }

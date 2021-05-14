@@ -7,12 +7,15 @@ use bytes::Bytes;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
-use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 #[cfg(feature = "disk-buffer")]
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Display,
+};
 
 // NOTE unfortunately because we can't edit out a lifetime based on a feature
 // flag we need two copies of `Variant` else the liftime being unused when
@@ -61,7 +64,7 @@ pub fn build<'a, T>(
 where
     T: 'a + Send + Sync + Unpin + Clone + TryInto<Bytes> + TryFrom<Bytes>,
     <T as TryInto<bytes::Bytes>>::Error: Debug,
-    <T as TryFrom<bytes::Bytes>>::Error: Debug,
+    <T as TryFrom<bytes::Bytes>>::Error: Debug + Display,
 {
     match variant {
         #[cfg(feature = "disk-buffer")]

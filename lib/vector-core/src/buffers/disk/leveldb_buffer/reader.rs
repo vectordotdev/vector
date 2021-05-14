@@ -1,4 +1,5 @@
 use super::Key;
+use bytes::Bytes;
 use futures::{task::AtomicWaker, Stream};
 use leveldb::database::{
     batch::{Batch, Writebatch},
@@ -7,7 +8,7 @@ use leveldb::database::{
     options::{ReadOptions, WriteOptions},
     Database,
 };
-use std::convert::TryFrom;
+use std::fmt::Debug;
 use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -15,6 +16,7 @@ use std::sync::{
 };
 use std::task::{Context, Poll, Waker};
 use std::{collections::VecDeque, marker::PhantomData};
+use std::{convert::TryFrom, fmt::Display};
 
 pub struct Reader<T>
 where
@@ -40,7 +42,8 @@ unsafe impl<T> Send for Reader<T> where T: Send + Sync + Unpin {}
 
 impl<T> Stream for Reader<T>
 where
-    T: Send + Sync + Unpin,
+    T: Send + Sync + Unpin + TryFrom<Bytes>,
+    <T as TryFrom<bytes::Bytes>>::Error: Debug + Display,
 {
     type Item = T;
 
@@ -71,15 +74,15 @@ where
             self.unacked_sizes.push_back(value.len());
             self.read_offset += 1;
 
-            unimplemented!()
-            // match T::try_from(value.as_slice()) {
-            //     Ok(event) => Poll::Ready(Some(event)),
-            //     Err(error) => {
-            //         error!(message = "Error deserializing event.", %error);
-            //         debug_assert!(false);
-            //         self.poll_next(cx)
-            //     }
-            // }
+            let buffer: Bytes = Bytes::from(value);
+            match T::try_from(buffer) {
+                Ok(event) => Poll::Ready(Some(event)),
+                Err(error) => {
+                    error!(message = "Error deserializing event.", %error);
+                    debug_assert!(false);
+                    self.poll_next(cx)
+                }
+            }
         } else if Arc::strong_count(&self.db) == 1 {
             // There are no writers left
             Poll::Ready(None)

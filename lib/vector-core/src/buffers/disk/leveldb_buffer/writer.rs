@@ -149,8 +149,7 @@ where
             self.flush();
 
             let event: T = T::try_from(value).unwrap();
-            unimplemented!()
-            // return Some(event);
+            return Some(event);
         }
 
         let key = self.offset.fetch_add(1, Ordering::Relaxed);
@@ -190,7 +189,7 @@ impl<T> Drop for Writer<T>
 where
     T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
     <T as TryInto<bytes::Bytes>>::Error: Debug,
-    <T as std::convert::TryFrom<bytes::Bytes>>::Error: Debug,
+    <T as TryFrom<bytes::Bytes>>::Error: Debug,
 {
     fn drop(&mut self) {
         if let Some(event) = self.slot.take() {
