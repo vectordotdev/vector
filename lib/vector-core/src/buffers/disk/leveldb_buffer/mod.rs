@@ -20,7 +20,7 @@ use std::fmt::Debug;
 use std::{
     collections::VecDeque,
     marker::PhantomData,
-    path::{Path, PathBuf},
+    path::Path,
     sync::{atomic::AtomicUsize, Arc, Mutex},
 };
 pub use writer::Writer;
@@ -72,7 +72,7 @@ where
     /// there is no space available on disk etc.
     #[allow(clippy::cast_precision_loss)]
     pub(crate) fn build(
-        path: PathBuf,
+        path: &Path,
         max_size: usize,
     ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError> {
         // New `max_size` of the buffer is used for storing the unacked events.

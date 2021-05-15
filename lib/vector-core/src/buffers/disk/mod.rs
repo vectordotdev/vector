@@ -119,6 +119,6 @@ where
             }
         })?;
 
-    let (writer, reader, acker) = leveldb_buffer::Buffer::build(path, max_size)?;
+    let (writer, reader, acker) = leveldb_buffer::Buffer::build(&path, max_size)?;
     Ok((Writer { inner: writer }, Box::new(reader), acker))
 }

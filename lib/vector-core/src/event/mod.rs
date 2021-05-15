@@ -441,11 +441,11 @@ impl TryInto<Bytes> for Event {
     }
 }
 
-impl TryFrom<&[u8]> for proto::EventWrapper {
+impl TryFrom<Bytes> for proto::EventWrapper {
     type Error = DecodeError;
 
-    fn try_from(buffer: &[u8]) -> Result<Self, Self::Error> {
-        proto::EventWrapper::decode(buffer)
+    fn try_from(buffer: Bytes) -> Result<Self, Self::Error> {
+        proto::EventWrapper::decode(buffer.as_ref())
     }
 }
 

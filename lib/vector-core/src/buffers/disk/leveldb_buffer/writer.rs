@@ -148,8 +148,7 @@ where
 
             self.flush();
 
-            let event: T = T::try_from(value).unwrap();
-            return Some(event);
+            return Some(T::try_from(value).unwrap());
         }
 
         let key = self.offset.fetch_add(1, Ordering::Relaxed);
