@@ -71,7 +71,7 @@ where
     /// Function will fail if the permissions of `path` are not correct, if
     /// there is no space available on disk etc.
     #[allow(clippy::cast_precision_loss)]
-    pub(crate) fn build(
+    pub fn build(
         path: &Path,
         max_size: usize,
     ) -> Result<(Writer<T>, Reader<T>, Acker), DataDirError> {
