@@ -220,8 +220,6 @@ jobs:
     container:
       image: ${{ matrix.container }}
     steps:
-      - name: checkout
-        uses: actions/checkout@v2.3.4
       - run: |
           apt-get update && \
           apt-get install -y \
@@ -230,6 +228,8 @@ jobs:
           git \
           systemd \
           make
+      - name: checkout
+        uses: actions/checkout@v2.3.4
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
@@ -252,8 +252,6 @@ jobs:
     container:
       image: ${{ matrix.container }}
     steps:
-      - name: checkout
-        uses: actions/checkout@v2.3.4
       - run: |
           yum update -y && \
           yum install -y \
@@ -263,6 +261,8 @@ jobs:
           systemd \
           tar \
           make
+      - name: checkout
+        uses: actions/checkout@v2.3.4
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
