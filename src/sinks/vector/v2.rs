@@ -255,7 +255,7 @@ mod tests {
         test_util::{next_addr, random_lines_with_stream},
     };
     use bytes::Bytes;
-    use futures::{channel::mpsc, stream, StreamExt};
+    use futures::{channel::mpsc, StreamExt};
     use http::request::Parts;
     use hyper::Method;
 
@@ -270,10 +270,7 @@ mod tests {
 
         let in_addr = next_addr();
 
-        let config = r#"
-        address = "http://$IN_ADDR/"
-    "#
-        .replace("$IN_ADDR", &format!("{}", in_addr));
+        let config = format!(r#"address = "http://{}/""#, in_addr);
         let config: VectorConfig = toml::from_str(&config).unwrap();
 
         let cx = SinkContext::new_test();
@@ -281,7 +278,7 @@ mod tests {
         let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
-        let (_input_lines, events) = random_lines_with_stream(1, num_lines, None);
+        let (input_lines, events) = random_lines_with_stream(8, num_lines);
         let pump = sink.run(events);
 
         tokio::spawn(server);
@@ -289,7 +286,7 @@ mod tests {
         pump.await.unwrap();
         drop(trigger);
 
-        let _output_lines = get_received(rx, |parts| {
+        let output_lines = get_received(rx, |parts| {
             assert_eq!(Method::POST, parts.method);
             assert_eq!("/vector.Vector/PushEvents", parts.uri.path());
             assert_eq!(
@@ -299,24 +296,26 @@ mod tests {
         })
         .await;
 
-        // TODO: decode messages and compare...
-        // assert_eq!(num_lines, output_lines.len());
-        // assert_eq!(input_lines, output_lines);
+        assert_eq!(num_lines, output_lines.len());
+        assert_eq!(input_lines, output_lines);
     }
 
     async fn get_received(
         rx: mpsc::Receiver<(Parts, Bytes)>,
         assert_parts: impl Fn(Parts),
     ) -> Vec<String> {
-        rx.flat_map(|(parts, body)| {
+        rx.map(|(parts, body)| {
             assert_parts(parts);
 
-            // TODO: decode message and compare...
-            let _req = crate::event::proto::EventWrapper::decode(body);
-
-            stream::iter("".lines())
+            // Remove the grpc header, which is:
+            // 1 bytes for compressed/not compressed, plus a new line
+            // 4 bytes for the message len, plus a new line
+            // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
+            let proto_body = body.slice(7..);
+            let req = crate::event::proto::EventWrapper::decode(proto_body).unwrap();
+            let event: Event = req.into();
+            event.as_log().get("message").unwrap().to_string_lossy()
         })
-        .map(ToOwned::to_owned)
         .collect::<Vec<_>>()
         .await
     }
