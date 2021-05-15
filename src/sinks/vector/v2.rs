@@ -278,7 +278,7 @@ mod tests {
         let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
-        let (input_lines, events) = random_lines_with_stream(8, num_lines);
+        let (input_lines, events) = random_lines_with_stream(8, num_lines, None);
         let pump = sink.run(events);
 
         tokio::spawn(server);
