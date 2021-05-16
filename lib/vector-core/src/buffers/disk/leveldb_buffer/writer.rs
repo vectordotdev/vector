@@ -32,7 +32,7 @@ where
     pub(crate) slot: Option<T>,
 }
 
-// Writebatch isn't Send + Send, but the leveldb docs explicitly say that it's
+// Writebatch isn't Send + Sync, but the leveldb docs explicitly say that it's
 // okay to share across threads
 unsafe impl<T> Send for Writer<T>
 where
