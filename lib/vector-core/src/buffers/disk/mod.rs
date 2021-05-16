@@ -1,12 +1,9 @@
-use bytes::Bytes;
+use crate::bytes::{DecodeBytes, EncodeBytes};
 use futures::{Sink, Stream};
 use pin_project::pin_project;
 use snafu::Snafu;
 use std::fmt::Debug;
-use std::{
-    convert::{TryFrom, TryInto},
-    fmt::Display,
-};
+use std::fmt::Display;
 use std::{
     io,
     path::{Path, PathBuf},
@@ -38,9 +35,9 @@ pub enum DataDirError {
 #[derive(Clone)]
 pub struct Writer<T>
 where
-    T: Send + Sync + Unpin + Clone + TryInto<Bytes> + TryFrom<Bytes>,
-    <T as TryInto<bytes::Bytes>>::Error: Debug,
-    <T as TryFrom<bytes::Bytes>>::Error: Debug,
+    T: Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug,
 {
     #[pin]
     inner: leveldb_buffer::Writer<T>,
@@ -48,9 +45,9 @@ where
 
 impl<T> Sink<T> for Writer<T>
 where
-    T: Send + Sync + Unpin + Clone + TryInto<Bytes> + TryFrom<Bytes>,
-    <T as TryInto<bytes::Bytes>>::Error: Debug,
-    <T as TryFrom<bytes::Bytes>>::Error: Debug,
+    T: Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug + Display,
 {
     type Error = ();
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -89,9 +86,9 @@ pub fn open<'a, T>(
     DataDirError,
 >
 where
-    T: 'a + Send + Sync + Unpin + Clone + TryInto<Bytes> + TryFrom<Bytes>,
-    <T as TryInto<bytes::Bytes>>::Error: Debug,
-    <T as TryFrom<bytes::Bytes>>::Error: Debug + Display,
+    T: 'a + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug + Display,
 {
     let path = data_dir.join(name);
 

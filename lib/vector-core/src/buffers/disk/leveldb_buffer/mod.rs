@@ -4,7 +4,7 @@ mod writer;
 
 use super::{DataDirError, Open};
 use crate::buffers::Acker;
-use bytes::Bytes;
+use crate::bytes::{DecodeBytes, EncodeBytes};
 use futures::task::AtomicWaker;
 use key::Key;
 use leveldb::database::{
@@ -15,7 +15,6 @@ use leveldb::database::{
 };
 use reader::Reader;
 use snafu::ResultExt;
-use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 use std::{
     collections::VecDeque,
@@ -60,9 +59,9 @@ fn db_initial_size(path: &Path) -> Result<usize, DataDirError> {
 
 impl<T> Buffer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
-    <T as TryInto<bytes::Bytes>>::Error: Debug,
-    <T as std::convert::TryFrom<bytes::Bytes>>::Error: Debug,
+    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug,
 {
     /// Build a new `DiskBuffer` rooted at `path`
     ///

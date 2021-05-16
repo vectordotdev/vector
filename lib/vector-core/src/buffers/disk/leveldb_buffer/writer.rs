@@ -1,12 +1,12 @@
 use super::Key;
-use bytes::Bytes;
+use crate::bytes::{DecodeBytes, EncodeBytes};
+use bytes::BytesMut;
 use futures::{task::AtomicWaker, Sink};
 use leveldb::database::{
     batch::{Batch, Writebatch},
     options::WriteOptions,
     Database,
 };
-use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 use std::pin::Pin;
 use std::sync::{
@@ -17,9 +17,9 @@ use std::task::{Context, Poll, Waker};
 
 pub struct Writer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
-    <T as TryInto<bytes::Bytes>>::Error: Debug,
-    <T as std::convert::TryFrom<bytes::Bytes>>::Error: Debug,
+    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug,
 {
     pub(crate) db: Option<Arc<Database<Key>>>,
     pub(crate) offset: Arc<AtomicUsize>,
@@ -36,24 +36,24 @@ where
 // okay to share across threads
 unsafe impl<T> Send for Writer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
-    <T as TryInto<bytes::Bytes>>::Error: Debug,
-    <T as TryFrom<bytes::Bytes>>::Error: Debug,
+    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug,
 {
 }
 unsafe impl<T> Sync for Writer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
-    <T as TryInto<bytes::Bytes>>::Error: Debug,
-    <T as TryFrom<bytes::Bytes>>::Error: Debug,
+    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug,
 {
 }
 
 impl<T> Clone for Writer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
-    <T as TryInto<bytes::Bytes>>::Error: Debug,
-    <T as TryFrom<bytes::Bytes>>::Error: Debug,
+    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug,
 {
     fn clone(&self) -> Self {
         Self {
@@ -72,9 +72,9 @@ where
 
 impl<T> Sink<T> for Writer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
-    <T as TryInto<bytes::Bytes>>::Error: Debug,
-    <T as TryFrom<bytes::Bytes>>::Error: Debug,
+    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug,
 {
     type Error = ();
 
@@ -133,13 +133,14 @@ where
 
 impl<T> Writer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
-    <T as TryInto<bytes::Bytes>>::Error: Debug,
-    <T as TryFrom<bytes::Bytes>>::Error: Debug,
+    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug,
 {
     fn try_send(&mut self, event: T) -> Option<T> {
-        let value: Bytes = event.try_into().unwrap();
-        let event_size = value.len();
+        let mut buffer: BytesMut = BytesMut::with_capacity(64);
+        T::encode(event, &mut buffer).unwrap();
+        let event_size = buffer.len();
 
         if self.current_size.fetch_add(event_size, Ordering::Relaxed) + (event_size / 2)
             > self.max_size
@@ -148,12 +149,12 @@ where
 
             self.flush();
 
-            return Some(T::try_from(value).unwrap());
+            return Some(T::decode(buffer).unwrap());
         }
 
         let key = self.offset.fetch_add(1, Ordering::Relaxed);
 
-        self.writebatch.put(Key(key), &value);
+        self.writebatch.put(Key(key), &buffer);
         self.batch_size += 1;
 
         if self.batch_size >= 100 {
@@ -186,9 +187,9 @@ where
 
 impl<T> Drop for Writer<T>
 where
-    T: Send + Sync + Unpin + TryInto<Bytes> + TryFrom<Bytes>,
-    <T as TryInto<bytes::Bytes>>::Error: Debug,
-    <T as TryFrom<bytes::Bytes>>::Error: Debug,
+    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug,
 {
     fn drop(&mut self) {
         if let Some(event) = self.slot.take() {

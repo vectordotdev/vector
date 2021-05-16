@@ -1,4 +1,5 @@
 use super::Key;
+use crate::bytes::DecodeBytes;
 use bytes::Bytes;
 use futures::{task::AtomicWaker, Stream};
 use leveldb::database::{
@@ -8,15 +9,15 @@ use leveldb::database::{
     options::{ReadOptions, WriteOptions},
     Database,
 };
-use std::fmt::Debug;
+use std::collections::VecDeque;
+use std::fmt::Display;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
 };
 use std::task::{Context, Poll, Waker};
-use std::{collections::VecDeque, marker::PhantomData};
-use std::{convert::TryFrom, fmt::Display};
 
 pub struct Reader<T>
 where
@@ -42,8 +43,8 @@ unsafe impl<T> Send for Reader<T> where T: Send + Sync + Unpin {}
 
 impl<T> Stream for Reader<T>
 where
-    T: Send + Sync + Unpin + TryFrom<Bytes>,
-    <T as TryFrom<bytes::Bytes>>::Error: Debug + Display,
+    T: Send + Sync + Unpin + DecodeBytes<T>,
+    <T as DecodeBytes<T>>::Error: Display,
 {
     type Item = T;
 
@@ -75,7 +76,7 @@ where
             self.read_offset += 1;
 
             let buffer: Bytes = Bytes::from(value);
-            match T::try_from(buffer) {
+            match T::decode(buffer) {
                 Ok(event) => Poll::Ready(Some(event)),
                 Err(error) => {
                     error!(message = "Error deserializing event.", %error);
