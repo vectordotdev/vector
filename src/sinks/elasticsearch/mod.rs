@@ -10,7 +10,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink, RequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
+        sink, BatchConfig, BatchSettings, Buffer, Compression, EncodedEvent, TowerRequestConfig,
         UriSerde,
     },
     template::{Template, TemplateParseError},
@@ -384,7 +384,7 @@ impl SinkConfig for ElasticSearchConfig {
             .parse_config(self.batch)?;
         let request = self.request.tower.unwrap_with(&REQUEST_DEFAULTS);
 
-        let sink = BatchedHttpSink::with_retry_logic(
+        let sink = BatchedHttpSink::with_logic(
             common,
             Buffer::new(batch.size, compression),
             ElasticSearchRetryLogic,
@@ -392,6 +392,7 @@ impl SinkConfig for ElasticSearchConfig {
             batch.timeout,
             client,
             cx.acker(),
+            sink::StdServiceLogic::default(),
         )
         .sink_map_err(|error| error!(message = "Fatal elasticsearch sink error.", %error));
 
