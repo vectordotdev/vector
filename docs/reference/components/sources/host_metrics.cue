@@ -48,6 +48,7 @@ components: sources: host_metrics: {
 				```filesystem.devices.excludes = ["binfmt_misc"]```,
 				```filesystem.filesystems.excludes = ["binfmt_misc"]```, or
 				```filesystem.mountpoints.excludes = ["*/proc/sys/fs/binfmt_misc"]```.
+				This workaround is included by default in the Helm chart distributed with Vector.
 				""",
 		]
 	}
