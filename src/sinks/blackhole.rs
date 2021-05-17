@@ -2,9 +2,9 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
+    event::Event,
     internal_events::BlackholeEventReceived,
     sinks::util::StreamSink,
-    Event,
 };
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
@@ -134,7 +134,7 @@ mod tests {
         };
         let mut sink = BlackholeSink::new(config, Acker::Null);
 
-        let (_input_lines, events) = random_events_with_stream(100, 10);
+        let (_input_lines, events) = random_events_with_stream(100, 10, None);
         let _ = sink.run(Box::pin(events)).await.unwrap();
     }
 }

@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::Event;
+use crate::event::Event;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -18,7 +18,6 @@ impl InternalEvent for KubernetesLogsEventReceived<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processed_events_total", 1);
         match self.pod_name {
             Some(name) => {
                 counter!("events_in_total", 1, "pod_name" => name.to_owned());

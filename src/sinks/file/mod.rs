@@ -371,7 +371,7 @@ mod tests {
         };
 
         let mut sink = FileSink::new(&config, Acker::Null);
-        let (input, _events) = random_lines_with_stream(100, 64);
+        let (input, _events) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
         sink.run(events).await.unwrap();
@@ -396,7 +396,7 @@ mod tests {
         };
 
         let mut sink = FileSink::new(&config, Acker::Null);
-        let (input, _) = random_lines_with_stream(100, 64);
+        let (input, _) = random_lines_with_stream(100, 64, None);
 
         let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
         sink.run(events).await.unwrap();
@@ -427,7 +427,7 @@ mod tests {
 
         let mut sink = FileSink::new(&config, Acker::Null);
 
-        let (mut input, _events) = random_events_with_stream(32, 8);
+        let (mut input, _events) = random_events_with_stream(32, 8, None);
         input[0].as_mut_log().insert("date", "2019-26-07");
         input[0].as_mut_log().insert("level", "warning");
         input[1].as_mut_log().insert("date", "2019-26-07");
@@ -507,7 +507,7 @@ mod tests {
         };
 
         let mut sink = FileSink::new(&config, Acker::Null);
-        let (mut input, _events) = random_lines_with_stream(10, 64);
+        let (mut input, _events) = random_lines_with_stream(10, 64, None);
 
         let (mut tx, rx) = futures::channel::mpsc::channel(0);
 

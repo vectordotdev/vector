@@ -7,8 +7,8 @@ use crate::{
     metrics::{self, capture_metrics, get_controller},
     sinks::{
         util::{
-            retries::RetryLogic, BatchSettings, Concurrency, EncodedLength, TowerRequestConfig,
-            VecBuffer,
+            retries::RetryLogic, BatchSettings, Concurrency, EncodedEvent, EncodedLength,
+            TowerRequestConfig, VecBuffer,
         },
         Healthcheck, VectorSink,
     },
@@ -21,7 +21,7 @@ use crate::{
 use core::task::Context;
 use futures::{
     future::{self, BoxFuture},
-    FutureExt, SinkExt,
+    stream, FutureExt, SinkExt,
 };
 use rand::{thread_rng, Rng};
 use rand_distr::Exp1;
@@ -155,12 +155,14 @@ impl SinkConfig for TestConfig {
                 batch.timeout,
                 cx.acker(),
             )
+            .with_flat_map(|event| stream::iter(Some(Ok(EncodedEvent::new(event)))))
             .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
         let healthcheck = future::ok(()).boxed();
 
         // Dig deep to get at the internal controller statistics
         let stats = Arc::clone(
             &sink
+                .get_ref()
                 .get_ref()
                 .get_ref()
                 .get_ref()
@@ -411,7 +413,7 @@ async fn run_test(params: TestParams) -> TestResults {
             .unwrap()
             .data
             .value,
-        MetricValue::Distribution { .. }
+        MetricValue::AggregatedHistogram { .. }
     ));
     assert!(matches!(
         metrics
@@ -419,7 +421,7 @@ async fn run_test(params: TestParams) -> TestResults {
             .unwrap()
             .data
             .value,
-        MetricValue::Distribution { .. }
+        MetricValue::AggregatedHistogram { .. }
     ));
     if params.concurrency == Concurrency::Adaptive {
         assert!(matches!(
@@ -428,7 +430,7 @@ async fn run_test(params: TestParams) -> TestResults {
                 .unwrap()
                 .data
                 .value,
-            MetricValue::Distribution { .. }
+            MetricValue::AggregatedHistogram { .. }
         ));
     }
     assert!(matches!(
@@ -437,7 +439,7 @@ async fn run_test(params: TestParams) -> TestResults {
             .unwrap()
             .data
             .value,
-        MetricValue::Distribution { .. }
+        MetricValue::AggregatedHistogram { .. }
     ));
 
     TestResults { stats, cstats }

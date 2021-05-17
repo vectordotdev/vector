@@ -7,9 +7,10 @@ use crate::{
     sinks::{
         self,
         util::{
+            batch::{BatchConfig, BatchSettings},
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             http::HttpRetryLogic,
-            BatchConfig, BatchSettings, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+            EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
             TowerRequestConfig,
         },
     },
@@ -119,7 +120,7 @@ impl SinkConfig for RemoteWriteConfig {
                                 .ok()
                         });
                         let key = PartitionKey { tenant_id };
-                        Ok(PartitionInnerBuffer::new(event, key))
+                        Ok(EncodedEvent::new(PartitionInnerBuffer::new(event, key)))
                     }))
                 })
                 .sink_map_err(
@@ -444,9 +445,9 @@ mod integration_tests {
     use crate::{
         config::{SinkConfig, SinkContext},
         event::metric::MetricValue,
+        event::Event,
         sinks::influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
         tls::{self, TlsOptions},
-        Event,
     };
     use futures::stream;
     use serde_json::Value;

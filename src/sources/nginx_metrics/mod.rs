@@ -1,13 +1,13 @@
 use crate::{
     config::{DataType, SourceConfig, SourceContext, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
+    event::Event,
     http::{Auth, HttpClient},
     internal_events::{
         NginxMetricsCollectCompleted, NginxMetricsEventsReceived, NginxMetricsRequestError,
         NginxMetricsStubStatusParseError,
     },
     tls::{TlsOptions, TlsSettings},
-    Event,
 };
 use bytes::Bytes;
 use chrono::Utc;

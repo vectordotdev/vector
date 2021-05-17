@@ -5,8 +5,8 @@ use indoc::indoc;
 use serde_json::Value;
 use std::{collections::HashMap, fs, io::Read, path::Path, pin::Pin};
 use vector::{
+    event::Event,
     transforms::{wasm::Wasm, TaskTransform, Transform},
-    Event,
 };
 
 fn parse_event_artifact(path: impl AsRef<Path>) -> vector::Result<Event> {

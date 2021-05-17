@@ -5,8 +5,7 @@ pub use compiler::{expression, state, value::kind};
 
 // commonly used top-level crate types
 pub use compiler::{
-    value::Kind, Context, Expression, ExpressionError, Function, Path, Resolved, Target, TypeDef,
-    Value,
+    value::Kind, Context, Expression, ExpressionError, Function, Resolved, Target, TypeDef, Value,
 };
 
 pub type Result<T> = std::result::Result<T, ExpressionError>;

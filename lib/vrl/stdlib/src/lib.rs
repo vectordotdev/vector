@@ -24,6 +24,8 @@ mod downcase;
 mod encode_base64;
 #[cfg(feature = "encode_json")]
 mod encode_json;
+#[cfg(feature = "encode_logfmt")]
+mod encode_logfmt;
 #[cfg(feature = "ends_with")]
 mod ends_with;
 #[cfg(feature = "exists")]
@@ -120,6 +122,8 @@ mod parse_grok;
 mod parse_json;
 #[cfg(feature = "parse_key_value")]
 mod parse_key_value;
+#[cfg(feature = "parse_klog")]
+mod parse_klog;
 #[cfg(feature = "parse_linux_authorization")]
 mod parse_linux_authorization;
 #[cfg(feature = "parse_logfmt")]
@@ -176,6 +180,8 @@ mod to_bool;
 mod to_float;
 #[cfg(feature = "to_int")]
 mod to_int;
+#[cfg(feature = "to_regex")]
+mod to_regex;
 #[cfg(feature = "to_string")]
 mod to_string;
 #[cfg(feature = "to_syslog_facility")]
@@ -225,6 +231,8 @@ pub use downcase::Downcase;
 pub use encode_base64::EncodeBase64;
 #[cfg(feature = "encode_json")]
 pub use encode_json::EncodeJson;
+#[cfg(feature = "encode_logfmt")]
+pub use encode_logfmt::EncodeLogfmt;
 #[cfg(feature = "ends_with")]
 pub use ends_with::EndsWith;
 #[cfg(feature = "exists")]
@@ -311,6 +319,8 @@ pub use parse_grok::ParseGrok;
 pub use parse_json::ParseJson;
 #[cfg(feature = "parse_key_value")]
 pub use parse_key_value::ParseKeyValue;
+#[cfg(feature = "parse_klog")]
+pub use parse_klog::ParseKlog;
 #[cfg(feature = "parse_linux_authorization")]
 pub use parse_linux_authorization::ParseLinuxAuthorization;
 #[cfg(feature = "parse_logfmt")]
@@ -367,6 +377,8 @@ pub use to_bool::ToBool;
 pub use to_float::ToFloat;
 #[cfg(feature = "to_int")]
 pub use to_int::ToInt;
+#[cfg(feature = "to_regex")]
+pub use to_regex::ToRegex;
 #[cfg(feature = "to_string")]
 pub use to_string::ToString;
 #[cfg(feature = "to_syslog_facility")]
@@ -412,6 +424,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(EncodeBase64),
         #[cfg(feature = "encode_json")]
         Box::new(EncodeJson),
+        #[cfg(feature = "encode_logfmt")]
+        Box::new(EncodeLogfmt),
         #[cfg(feature = "ends_with")]
         Box::new(EndsWith),
         #[cfg(feature = "exists")]
@@ -504,6 +518,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseCsv),
         #[cfg(feature = "parse_key_value")]
         Box::new(ParseKeyValue),
+        #[cfg(feature = "parse_klog")]
+        Box::new(ParseKlog),
         #[cfg(feature = "parse_linux_authorization")]
         Box::new(ParseLinuxAuthorization),
         #[cfg(feature = "parse_logfmt")]
@@ -562,6 +578,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ToFloat),
         #[cfg(feature = "to_int")]
         Box::new(ToInt),
+        #[cfg(feature = "to_regex")]
+        Box::new(ToRegex),
         #[cfg(feature = "to_string")]
         Box::new(ToString),
         #[cfg(feature = "to_syslog_facility")]

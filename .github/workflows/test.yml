@@ -25,9 +25,10 @@ jobs:
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.8.0
+      - uses: styfle/cancel-workflow-action@0.9.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
+          all_but_latest: true # can cancel workflows scheduled later
 
   changes:
       runs-on: ubuntu-20.04
@@ -40,7 +41,7 @@ jobs:
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
       steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - uses: dorny/paths-filter@v2
         id: filter
         with:
@@ -60,6 +61,8 @@ jobs:
               - "Cargo.toml"
               - "Makefile"
               - "rust-toolchain"
+            deny:
+              - 'deny.toml'
             docs:
               - 'docs/**'
             markdown:
@@ -86,19 +89,22 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2.1.4
+      - uses: actions/checkout@v2.3.4
+      - uses: actions/cache@v2.1.5
+        name: Cache Cargo registry + index
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make test-components
+      - run: make test
 
   test-misc:
     name: Miscellaneous - Linux
@@ -106,14 +112,17 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.4
+      - uses: actions/cache@v2.1.5
+        name: Cache Cargo registry + index
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
@@ -141,14 +150,17 @@ jobs:
     # This helps us avoid adopting dependencies that aren't compatible with other architectures.
     if: ${{ needs.changes.outputs.dependencies == 'true' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - run: make ci-sweep
-      - uses: actions/cache@v2.1.4
+      - uses: actions/cache@v2.1.5
+        name: Cache Cargo registry + index
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       # Why is this build, not check? Because we need to make sure the linking phase works.
@@ -169,13 +181,16 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2.1.4
+      - uses: actions/checkout@v2.3.4
+      - uses: actions/cache@v2.1.5
+        name: Cache Cargo registry + index
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - run: bash scripts/environment/bootstrap-macos-10.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
@@ -192,10 +207,9 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
-      - env:
-          RUSTFLAGS: "-D warnings"
-        run: cargo test --no-fail-fast --no-default-features --features default-msvc
+      - uses: actions/checkout@v2.3.4
+      - run: choco install llvm
+      - run: make test
 
   test-vrl:
     name: VRL - Linux
@@ -204,29 +218,30 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
       - run: |
           TEMP=$(mktemp -d)
           curl \
-              -L https://github.com/cuelang/cue/releases/download/v0.3.0/cue_v0.3.0_linux_amd64.tar.gz \
-              -o "${TEMP}/cue_v0.3.0_linux_amd64.tar.gz"
+              -L https://github.com/cuelang/cue/releases/download/v0.3.2/cue_v0.3.2_linux_amd64.tar.gz \
+              -o "${TEMP}/cue_v0.3.2_linux_amd64.tar.gz"
           tar \
-              -xvf "${TEMP}/cue_v0.3.0_linux_amd64.tar.gz" \
+              -xvf "${TEMP}/cue_v0.3.2_linux_amd64.tar.gz" \
               -C "${TEMP}"
           sudo cp "${TEMP}/cue" /usr/bin/cue
       - run: make test-vrl
 
   check-component-features:
     name: Component Features - Linux
+    runs-on: [self-hosted, linux, x64, general]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
-    runs-on: ubuntu-20.04
-    container: timberio/ci_image
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: echo "home/runner/.local/bin" >> "$GITHUB_PATH"
+      - run: cargo install cargo-hack
       - run: make check-component-features
         env:
           RUSTFLAGS: "-D warnings"
@@ -237,16 +252,19 @@ jobs:
     container: timberio/ci_image
     needs: changes
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
-      - uses: actions/cache@v2.1.4
+      - uses: actions/cache@v2.1.5
+        name: Cache Cargo registry + index
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - name: Make slim-builds
@@ -283,13 +301,13 @@ jobs:
         if: needs.changes.outputs.source == 'true'
         run: make check-events
       - name: Check cargo deny advisories
-        if: needs.changes.outputs.dependencies == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1
+        if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
+        uses: EmbarkStudios/cargo-deny-action@v1.2.6
         with:
           command: check advisories
       - name: Check cargo deny licenses
-        if: needs.changes.outputs.dependencies == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1
+        if: needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.deny == 'true'
+        uses: EmbarkStudios/cargo-deny-action@v1.2.6
         with:
           command: check licenses
 

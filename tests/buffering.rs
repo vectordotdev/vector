@@ -1,6 +1,7 @@
 #![cfg(feature = "leveldb")]
 
 use futures::{SinkExt, StreamExt};
+use shared::assert_event_data_eq;
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
 use tracing::trace;
@@ -60,7 +61,7 @@ fn test_buffering() {
     let (topology, input_events) = rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
         let (input_events, input_events_stream) =
-            random_events_with_stream(line_length, num_events);
+            random_events_with_stream(line_length, num_events, None);
         let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
@@ -110,7 +111,7 @@ fn test_buffering() {
         let (topology, _crash) = start_topology(config, false).await;
 
         let (input_events2, input_events_stream) =
-            random_events_with_stream(line_length, num_events);
+            random_events_with_stream(line_length, num_events, None);
         let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
@@ -132,7 +133,7 @@ fn test_buffering() {
             input_events2,
             output_events
         );
-        assert_eq!(input_events, &output_events[..num_events]);
-        assert_eq!(input_events2, &output_events[num_events..]);
+        assert_event_data_eq!(&input_events[..], &output_events[..num_events]);
+        assert_event_data_eq!(&input_events2[..], &output_events[num_events..]);
     });
 }

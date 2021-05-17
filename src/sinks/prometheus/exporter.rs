@@ -2,13 +2,13 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
     event::metric::MetricKind,
+    event::Event,
     internal_events::PrometheusServerRequestComplete,
     sinks::{
         util::{statistic::validate_quantiles, MetricEntry, StreamSink},
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsConfig},
-    Event,
 };
 use async_trait::async_trait;
 use chrono::Utc;

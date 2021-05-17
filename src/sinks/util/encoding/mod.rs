@@ -35,8 +35,8 @@ mod with_default;
 pub use with_default::EncodingConfigWithDefault;
 
 use crate::{
-    event::{PathComponent, PathIter, Value},
-    Event, Result,
+    event::{Event, PathComponent, PathIter, Value},
+    Result,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, fmt::Debug};

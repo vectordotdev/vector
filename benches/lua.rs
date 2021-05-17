@@ -6,9 +6,9 @@ use std::pin::Pin;
 use transforms::lua::v2::LuaConfig;
 use vector::{
     config::{GlobalOptions, TransformConfig},
+    event::Event,
     test_util::{collect_ready, runtime},
     transforms::{self, Transform},
-    Event,
 };
 
 fn bench_add_fields(c: &mut Criterion) {

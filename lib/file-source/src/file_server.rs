@@ -392,22 +392,27 @@ where
         // Determine the initial _requested_ starting point in the file. This can be overridden
         // once the file is actually opened and we determine it is compressed, older than we're
         // configured to read, etc.
-        let read_from = if startup {
-            // If we are starting up, use the stored checkpoint unless the user has opted out. If
-            // they have opted out or there is no checkpoint present, fall back to `read_from`.
-            if self.ignore_checkpoints {
-                self.read_from
-            } else {
-                checkpoints
-                    .get(file_id)
-                    .map(ReadFrom::Checkpoint)
-                    .unwrap_or(self.read_from)
-            }
+        let fallback = if startup {
+            self.read_from
         } else {
             // Always read new files that show up while we're running from the beginning. There's
             // not a good way to determine if they were moved or just created and written very
             // quickly, so just make sure we're not missing any data.
             ReadFrom::Beginning
+        };
+
+        // Always prefer the stored checkpoint unless the user has opted out.  Previously, the
+        // checkpoint was only loaded for new files when Vector was started up, but the
+        // `kubernetes_logs` source returns the files well after start-up, once it has populated
+        // them from the k8s metadata, so we now just always use the checkpoints unless opted out.
+        // https://github.com/timberio/vector/issues/7139
+        let read_from = if !self.ignore_checkpoints {
+            checkpoints
+                .get(file_id)
+                .map(ReadFrom::Checkpoint)
+                .unwrap_or(fallback)
+        } else {
+            fallback
         };
 
         match FileWatcher::new(

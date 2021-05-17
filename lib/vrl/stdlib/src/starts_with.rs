@@ -31,18 +31,18 @@ impl Function for StartsWith {
     fn examples(&self) -> &'static [Example] {
         &[
             Example {
-                title: "match",
-                source: r#"starts_with("foobar", "foo")"#,
+                title: "case sensitive",
+                source: r#"starts_with("foobar", "F")"#,
+                result: Ok("false"),
+            },
+            Example {
+                title: "case insensitive",
+                source: r#"starts_with("foobar", "F", false)"#,
                 result: Ok("true"),
             },
             Example {
                 title: "mismatch",
-                source: r#"starts_with("foobar", "baz")"#,
-                result: Ok("false"),
-            },
-            Example {
-                title: "case sensitive",
-                source: r#"starts_with("foobar", "F", true)"#,
+                source: r#"starts_with("foobar", "bar")"#,
                 result: Ok("false"),
             },
         ]
@@ -51,7 +51,7 @@ impl Function for StartsWith {
     fn compile(&self, mut arguments: ArgumentList) -> Compiled {
         let value = arguments.required("value");
         let substring = arguments.required("substring");
-        let case_sensitive = arguments.optional("case_sensitive").unwrap_or(expr!(false));
+        let case_sensitive = arguments.optional("case_sensitive").unwrap_or(expr!(true));
 
         Ok(Box::new(StartsWithFn {
             value,
@@ -158,8 +158,7 @@ mod tests {
 
         case_sensitive_same_case {
             args: func_args![value: "FOObar",
-                             substring: "FOO",
-                             case_sensitive: true
+                             substring: "FOO"
             ],
             want: Ok(true),
             tdef: TypeDef::new().infallible().boolean(),
@@ -167,8 +166,7 @@ mod tests {
 
         case_sensitive_different_case {
             args: func_args![value: "foobar",
-                             substring: "FOO",
-                             case_sensitive: true
+                             substring: "FOO"
             ],
             want: Ok(false),
             tdef: TypeDef::new().infallible().boolean(),

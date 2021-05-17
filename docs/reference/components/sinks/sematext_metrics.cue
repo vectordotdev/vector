@@ -20,7 +20,6 @@ components: sinks: sematext_metrics: {
 				enabled:      true
 				common:       false
 				max_bytes:    30000000
-				max_events:   null
 				timeout_secs: 1
 			}
 			compression: enabled: false

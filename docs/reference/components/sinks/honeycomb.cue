@@ -20,7 +20,6 @@ components: sinks: honeycomb: {
 				enabled:      true
 				common:       false
 				max_bytes:    5242880
-				max_events:   null
 				timeout_secs: 1
 			}
 			compression: enabled: false

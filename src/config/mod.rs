@@ -26,7 +26,7 @@ pub mod component;
 mod diff;
 pub mod format;
 mod loading;
-mod log_schema;
+pub mod provider;
 mod unit_test;
 mod validation;
 mod vars;
@@ -36,12 +36,29 @@ pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use format::{Format, FormatHint};
 pub use loading::{
-    load_builder_from_paths, load_from_paths, load_from_str, merge_path_lists, process_paths,
-    CONFIG_PATHS,
+    load, load_builder_from_paths, load_from_paths, load_from_paths_with_provider, load_from_str,
+    merge_path_lists, process_paths, CONFIG_PATHS,
 };
-pub use log_schema::{init_log_schema, log_schema, LogSchema};
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
+pub use vector_core::config::{log_schema, LogSchema};
+
+/// Loads Log Schema from configurations and sets global schema.
+/// Once this is done, configurations can be correctly loaded using
+/// configured log schema defaults.
+/// If deny is set, will panic if schema has already been set.
+pub fn init_log_schema(
+    config_paths: &[(PathBuf, FormatHint)],
+    deny_if_set: bool,
+) -> Result<(), Vec<String>> {
+    vector_core::config::init_log_schema(
+        || {
+            let (builder, _) = load_builder_from_paths(config_paths)?;
+            Ok(builder.global.log_schema)
+        },
+        deny_if_set,
+    )
+}
 
 #[derive(Debug, Default)]
 pub struct Config {
@@ -188,7 +205,6 @@ macro_rules! impl_generate_config_from_default {
     };
 }
 
-#[async_trait::async_trait]
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {

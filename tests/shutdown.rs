@@ -7,6 +7,7 @@ use nix::{
 };
 use serde_json::{json, Value};
 use std::{
+    fs::read_dir,
     io::Write,
     net::SocketAddr,
     path::PathBuf,
@@ -255,6 +256,46 @@ fn configuration_path_recomputed() {
 
     // Output
     assert_eq!(output.stdout.as_slice(), "42\n".as_bytes());
+}
+
+#[test]
+fn remove_unix_socket_stream() {
+    let dir = support::create_directory();
+    let mut path = dir.clone();
+    path.push("tmp");
+    path.set_extension("sock");
+
+    test_timely_shutdown(source_vector(&format!(
+        r#"
+        type = "socket"
+        path = "{}"
+        mode = "unix"
+        "#,
+        path.to_string_lossy()
+    )));
+
+    // Assert that data folder is empty
+    assert!(read_dir(dir).unwrap().next().is_none());
+}
+
+#[test]
+fn remove_unix_socket_datagram() {
+    let dir = support::create_directory();
+    let mut path = dir.clone();
+    path.push("tmp");
+    path.set_extension("sock");
+
+    test_timely_shutdown(source_vector(&format!(
+        r#"
+        type = "socket"
+        path = "{}"
+        mode = "unix_datagram"
+        "#,
+        path.to_string_lossy()
+    )));
+
+    // Assert that data folder is empty
+    assert!(read_dir(dir).unwrap().next().is_none());
 }
 
 #[test]

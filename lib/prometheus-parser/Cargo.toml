@@ -14,10 +14,8 @@ nom = "6.0.1"
 num_enum = "0.5.1"
 prost = "0.7.0"
 prost-types = "0.7.0"
+shared = { path = "../shared", features = ["btreemap"] }
 snafu = { version = "0.6" }
 
 [build-dependencies]
 prost-build = "0.7.0"
-
-[dev-dependencies]
-shared = { path = "../shared", features = ["btreemap"] }

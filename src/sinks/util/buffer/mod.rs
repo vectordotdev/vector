@@ -141,7 +141,7 @@ mod test {
     use super::{Buffer, Compression};
     use crate::{
         buffers::Acker,
-        sinks::util::{BatchSettings, BatchSink},
+        sinks::util::{BatchSettings, BatchSink, EncodedEvent},
     };
     use futures::{future, stream, SinkExt, StreamExt};
     use std::{
@@ -152,7 +152,7 @@ mod test {
 
     #[tokio::test]
     async fn gzip() {
-        use flate2::read::GzDecoder;
+        use flate2::read::MultiGzDecoder;
 
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
@@ -179,7 +179,7 @@ mod test {
 
         let _ = buffered
             .sink_map_err(drop)
-            .send_all(&mut stream::iter(input).map(Ok))
+            .send_all(&mut stream::iter(input).map(|item| Ok(EncodedEvent::new(item))))
             .await
             .unwrap();
 
@@ -195,7 +195,7 @@ mod test {
 
         let decompressed = output.into_iter().flat_map(|batch| {
             let mut decompressed = vec![];
-            GzDecoder::new(batch.as_slice())
+            MultiGzDecoder::new(batch.as_slice())
                 .read_to_end(&mut decompressed)
                 .unwrap();
             decompressed

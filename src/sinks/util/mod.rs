@@ -16,7 +16,7 @@ pub mod udp;
 pub mod unix;
 pub mod uri;
 
-use crate::event::Event;
+use crate::event::{Event, EventMetadata, LogEvent};
 use bytes::Bytes;
 use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};
@@ -44,6 +44,47 @@ enum SinkBuildError {
     MissingPort,
 }
 
+#[derive(Debug)]
+pub struct EncodedEvent<I> {
+    pub item: I,
+    pub metadata: Option<EventMetadata>,
+}
+
+impl<I> EncodedEvent<I> {
+    /// Create a trivial input with no metadata. This method will be
+    /// removed when all sinks are converted.
+    pub fn new(item: I) -> Self {
+        Self {
+            item,
+            metadata: None,
+        }
+    }
+
+    /// Helper function to set up the metadata.
+    pub fn with_metadata(self, log: LogEvent) -> Self {
+        let (_fields, metadata) = log.into_parts();
+        Self {
+            item: self.item,
+            metadata: Some(metadata),
+        }
+    }
+
+    // This should be:
+    // ```impl<F, I: From<F>> From<EncodedEvent<F>> for EncodedEvent<I>```
+    // however, the compiler rejects that due to conflicting
+    // implementations of `From` due to the generic
+    // ```impl<T> From<T> for T```
+    pub fn from<F>(that: EncodedEvent<F>) -> Self
+    where
+        I: From<F>,
+    {
+        Self {
+            item: I::from(that.item),
+            metadata: that.metadata,
+        }
+    }
+}
+
 /**
  * Enum representing different ways to encode events as they are sent into a Sink.
  */
@@ -59,7 +100,10 @@ pub enum Encoding {
 * the given encoding. If there are any errors encoding the event, logs a warning
 * and returns None.
 **/
-pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
+pub fn encode_event(
+    mut event: Event,
+    encoding: &EncodingConfig<Encoding>,
+) -> Option<EncodedEvent<Bytes>> {
     encoding.apply_rules(&mut event);
     let log = event.into_log();
 
@@ -73,10 +117,14 @@ pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Op
             Ok(bytes)
         }
     };
+    let (_fields, metadata) = log.into_parts();
 
     b.map(|mut b| {
         b.push(b'\n');
-        Bytes::from(b)
+        EncodedEvent {
+            item: Bytes::from(b),
+            metadata: Some(metadata),
+        }
     })
     .map_err(|error| error!(message = "Unable to encode.", %error))
     .ok()

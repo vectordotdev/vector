@@ -85,7 +85,8 @@ impl FunctionTransform for MetricToLog {
             .ok()
             .and_then(|value| match value {
                 Value::Object(object) => {
-                    let mut log = LogEvent::default();
+                    // TODO: Avoid a clone here
+                    let mut log = LogEvent::new_with_metadata(metric.metadata().clone());
 
                     for (key, value) in object {
                         log.insert_flat(key, value);
@@ -160,6 +161,7 @@ mod tests {
         )
         .with_tags(Some(tags()))
         .with_timestamp(Some(ts()));
+        let metadata = counter.metadata().clone();
 
         let log = do_transform(counter).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -175,6 +177,7 @@ mod tests {
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
+        assert_eq!(log.metadata(), &metadata);
     }
 
     #[test]
@@ -185,6 +188,7 @@ mod tests {
             MetricValue::Gauge { value: 1.0 },
         )
         .with_timestamp(Some(ts()));
+        let metadata = gauge.metadata().clone();
 
         let log = do_transform(gauge).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -198,6 +202,7 @@ mod tests {
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
+        assert_eq!(log.metadata(), &metadata);
     }
 
     #[test]
@@ -210,6 +215,7 @@ mod tests {
             },
         )
         .with_timestamp(Some(ts()));
+        let metadata = set.metadata().clone();
 
         let log = do_transform(set).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -224,6 +230,7 @@ mod tests {
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
+        assert_eq!(log.metadata(), &metadata);
     }
 
     #[test]
@@ -232,11 +239,12 @@ mod tests {
             "distro",
             MetricKind::Absolute,
             MetricValue::Distribution {
-                samples: crate::samples![1.0 => 10, 2.0 => 20],
+                samples: vector_core::samples![1.0 => 10, 2.0 => 20],
                 statistic: StatisticKind::Histogram,
             },
         )
         .with_timestamp(Some(ts()));
+        let metadata = distro.metadata().clone();
 
         let log = do_transform(distro).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -269,6 +277,7 @@ mod tests {
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
+        assert_eq!(log.metadata(), &metadata);
     }
 
     #[test]
@@ -277,12 +286,13 @@ mod tests {
             "histo",
             MetricKind::Absolute,
             MetricValue::AggregatedHistogram {
-                buckets: crate::buckets![1.0 => 10, 2.0 => 20],
+                buckets: vector_core::buckets![1.0 => 10, 2.0 => 20],
                 count: 30,
                 sum: 50.0,
             },
         )
         .with_timestamp(Some(ts()));
+        let metadata = histo.metadata().clone();
 
         let log = do_transform(histo).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -313,6 +323,7 @@ mod tests {
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
+        assert_eq!(log.metadata(), &metadata);
     }
 
     #[test]
@@ -321,12 +332,13 @@ mod tests {
             "summary",
             MetricKind::Absolute,
             MetricValue::AggregatedSummary {
-                quantiles: crate::quantiles![50.0 => 10.0, 90.0 => 20.0],
+                quantiles: vector_core::quantiles![50.0 => 10.0, 90.0 => 20.0],
                 count: 30,
                 sum: 50.0,
             },
         )
         .with_timestamp(Some(ts()));
+        let metadata = summary.metadata().clone();
 
         let log = do_transform(summary).unwrap();
         let collected: Vec<_> = log.all_fields().collect();
@@ -357,5 +369,6 @@ mod tests {
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
+        assert_eq!(log.metadata(), &metadata);
     }
 }

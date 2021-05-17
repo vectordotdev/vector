@@ -13,7 +13,6 @@ components: sinks: datadog_logs: {
 				enabled:      true
 				common:       false
 				max_bytes:    1049000
-				max_events:   null
 				timeout_secs: 1
 			}
 			compression: {
@@ -61,6 +60,8 @@ components: sinks: datadog_logs: {
 	configuration: {
 		api_key:  sinks._datadog.configuration.api_key
 		endpoint: sinks._datadog.configuration.endpoint
+		region:   sinks._datadog.configuration.region
+		site:     sinks._datadog.configuration.site
 	}
 
 	input: {

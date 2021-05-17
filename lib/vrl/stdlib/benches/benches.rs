@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Local, TimeZone, Utc};
 use criterion::{criterion_group, criterion_main, Criterion};
 use regex::Regex;
 use shared::btreemap;
@@ -19,6 +19,7 @@ criterion_group!(
               downcase,
               encode_base64,
               encode_json,
+              encode_logfmt,
               ends_with,
               // TODO: Cannot pass a Path to bench_function
               //exists
@@ -61,6 +62,7 @@ criterion_group!(
               parse_glog,
               parse_grok,
               parse_key_value,
+              parse_klog,
               parse_json,
               parse_nginx_log,
               parse_query_string,
@@ -86,6 +88,7 @@ criterion_group!(
               to_bool,
               to_float,
               to_int,
+              to_regex,
               to_string,
               to_syslog_facility,
               to_syslog_level,
@@ -191,6 +194,31 @@ bench_function! {
     map {
         args: func_args![value: value![{"field": "value"}]],
         want: Ok(r#"{"field":"value"}"#),
+    }
+}
+
+bench_function! {
+    encode_logfmt => vrl_stdlib::EncodeLogfmt;
+
+    string_with_characters_to_escape {
+        args: func_args![value:
+            btreemap! {
+                "lvl" => "info",
+                "msg" => r#"payload: {"code": 200}\n"#
+            }],
+        want: Ok(r#"lvl=info msg="payload: {\"code\": 200}\\n""#),
+    }
+
+    fields_ordering {
+        args: func_args![value:
+            btreemap! {
+                "lvl" => "info",
+                "msg" => "This is a log message",
+                "log_id" => 12345,
+            },
+            fields_ordering: value!(["lvl", "msg"])
+        ],
+        want: Ok(r#"lvl=info msg="This is a log message" log_id=12345"#),
     }
 }
 
@@ -901,6 +929,22 @@ bench_function! {
 }
 
 bench_function! {
+    parse_klog  => vrl_stdlib::ParseKlog;
+
+    literal {
+        args: func_args![value: "I0505 17:59:40.692994   28133 klog.go:70] hello from klog"],
+        want: Ok(btreemap! {
+            "level" => "info",
+            "timestamp" => Value::Timestamp(DateTime::parse_from_rfc3339(&format!("{}-05-05T17:59:40.692994Z", Utc::now().year())).unwrap().into()),
+            "id" => 28133,
+            "file" => "klog.go",
+            "line" => 70,
+            "message" => "hello from klog",
+        }),
+    }
+}
+
+bench_function! {
     parse_nginx_log => vrl_stdlib::ParseNginxLog;
 
     combined {
@@ -962,7 +1006,8 @@ bench_function! {
         args: func_args! [
             value: "5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] \"GET /embrace/supply-chains/dynamic/vertical\" 201 20574",
             pattern: Regex::new(r#"^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$"#)
-                .unwrap()
+                .unwrap(),
+            numeric_groups: true
         ],
         want: Ok(value!({
             "bytes_in": "5667",
@@ -992,8 +1037,6 @@ bench_function! {
         ],
         want: Ok(value!({
             "number": "first",
-            "0": "first group",
-            "1": "first"
         }))
     }
 }
@@ -1004,7 +1047,8 @@ bench_function! {
     matches {
         args: func_args![
             value: "apples and carrots, peaches and peas",
-            pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap()
+            pattern: Regex::new(r#"(?P<fruit>[\w\.]+) and (?P<veg>[\w]+)"#).unwrap(),
+            numeric_groups: true
         ],
         want: Ok(value!([
                 {
@@ -1394,6 +1438,15 @@ bench_function! {
     null {
         args: func_args![value: value!(null)],
         want: Ok(0)
+    }
+}
+
+bench_function! {
+    to_regex => vrl_stdlib::ToRegex;
+
+    regex {
+        args: func_args![value: "^foo.*bar.*baz"],
+        want: Ok(Regex::new("^foo.*bar.*baz").expect("regex is valid"))
     }
 }
 

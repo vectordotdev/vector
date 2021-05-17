@@ -121,6 +121,17 @@ components: sources: kafka: {
 				syntax: "literal"
 			}
 		}
+		headers_key: {
+			common:      false
+			description: "The log field name to use for the Kafka headers."
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["headers"]
+				syntax: "literal"
+			}
+		}
 		librdkafka_options: components._kafka.configuration.librdkafka_options
 		sasl: {
 			common:      false
@@ -243,6 +254,16 @@ components: sources: kafka: {
 		events_failed_total:                  components.sources.internal_metrics.output.metrics.events_failed_total
 		processed_bytes_total:                components.sources.internal_metrics.output.metrics.processed_bytes_total
 		processed_events_total:               components.sources.internal_metrics.output.metrics.processed_events_total
+		kafka_queue_messages:                 components.sources.internal_metrics.output.metrics.kafka_queue_messages
+		kafka_queue_messages_bytes:           components.sources.internal_metrics.output.metrics.kafka_queue_messages_bytes
+		kafka_requests_total:                 components.sources.internal_metrics.output.metrics.kafka_requests_total
+		kafka_requests_bytes_total:           components.sources.internal_metrics.output.metrics.kafka_requests_bytes_total
+		kafka_responses_total:                components.sources.internal_metrics.output.metrics.kafka_responses_total
+		kafka_responses_bytes_total:          components.sources.internal_metrics.output.metrics.kafka_responses_bytes_total
+		kafka_produced_messages_total:        components.sources.internal_metrics.output.metrics.kafka_produced_messages_total
+		kafka_produced_messages_bytes_total:  components.sources.internal_metrics.output.metrics.kafka_produced_messages_bytes_total
+		kafka_consumed_messages_total:        components.sources.internal_metrics.output.metrics.kafka_consumed_messages_total
+		kafka_consumed_messages_bytes_total:  components.sources.internal_metrics.output.metrics.kafka_consumed_messages_bytes_total
 	}
 
 	how_it_works: components._kafka.how_it_works

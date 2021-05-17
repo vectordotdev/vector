@@ -146,10 +146,12 @@ mod test {
         let mut parser = JsonParser::from(JsonParserConfig::default());
 
         let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
+        let metadata = event.metadata().clone();
 
         let event = parser.transform_one(event).unwrap();
 
         assert!(event.as_log().get(log_schema().message_key()).is_none());
+        assert_eq!(event.metadata(), &metadata);
     }
 
     #[test]
@@ -160,10 +162,12 @@ mod test {
         });
 
         let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
+        let metadata = event.metadata().clone();
 
         let event = parser.transform_one(event).unwrap();
 
         assert!(event.as_log().get(log_schema().message_key()).is_some());
+        assert_eq!(event.metadata(), &metadata);
     }
 
     #[test]
@@ -174,6 +178,7 @@ mod test {
         });
 
         let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
+        let metadata = event.metadata().clone();
 
         let event = parser.transform_one(event).unwrap();
 
@@ -183,6 +188,7 @@ mod test {
             event.as_log()[log_schema().message_key()],
             r#"{"greeting": "hello", "name": "bob"}"#.into()
         );
+        assert_eq!(event.metadata(), &metadata);
     }
 
     // Ensure the JSON parser doesn't take strings as toml paths.
@@ -200,6 +206,7 @@ mod test {
         });
 
         let event = Event::from(test_json.to_string());
+        let metadata = event.metadata().clone();
 
         let event = parser.transform_one(event).unwrap();
 
@@ -211,6 +218,7 @@ mod test {
             event.as_log().get_flat("sub.field"),
             Some(&crate::event::Value::from(json!({ "another.one": "bob", }))),
         );
+        assert_eq!(event.metadata(), &metadata);
     }
 
     #[test]
@@ -221,6 +229,7 @@ mod test {
         });
 
         let event = Event::from(r#" {"greeting": "hello", "name": "bob"}    "#);
+        let metadata = event.metadata().clone();
 
         let event = parser.transform_one(event).unwrap();
 
@@ -230,6 +239,7 @@ mod test {
             event.as_log()[log_schema().message_key()],
             r#" {"greeting": "hello", "name": "bob"}    "#.into()
         );
+        assert_eq!(event.metadata(), &metadata);
     }
 
     #[test]
@@ -246,6 +256,7 @@ mod test {
         event
             .as_mut_log()
             .insert("data", r#"{"greeting": "hello", "name": "bob"}"#);
+        let metadata = event.metadata().clone();
 
         let event = parser.transform_one(event).unwrap();
 
@@ -255,13 +266,16 @@ mod test {
             event.as_log()["data"],
             r#"{"greeting": "hello", "name": "bob"}"#.into()
         );
+        assert_eq!(event.metadata(), &metadata);
 
         // Field missing
         let event = Event::from("message");
+        let metadata = event.metadata().clone();
 
         let parsed = parser.transform_one(event.clone()).unwrap();
 
         assert_eq!(event, parsed);
+        assert_eq!(event.metadata(), &metadata);
     }
 
     #[test]
@@ -278,16 +292,19 @@ mod test {
         let event = Event::from(
             r#"{"log":"{\"type\":\"response\",\"@timestamp\":\"2018-10-04T21:12:33Z\",\"tags\":[],\"pid\":1,\"method\":\"post\",\"statusCode\":200,\"req\":{\"url\":\"/elasticsearch/_msearch\",\"method\":\"post\",\"headers\":{\"host\":\"logs.com\",\"connection\":\"close\",\"x-real-ip\":\"120.21.3.1\",\"x-forwarded-for\":\"121.91.2.2\",\"x-forwarded-host\":\"logs.com\",\"x-forwarded-port\":\"443\",\"x-forwarded-proto\":\"https\",\"x-original-uri\":\"/elasticsearch/_msearch\",\"x-scheme\":\"https\",\"content-length\":\"1026\",\"accept\":\"application/json, text/plain, */*\",\"origin\":\"https://logs.com\",\"kbn-version\":\"5.2.3\",\"user-agent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/532.30 (KHTML, like Gecko) Chrome/62.0.3361.210 Safari/533.21\",\"content-type\":\"application/x-ndjson\",\"referer\":\"https://domain.com/app/kibana\",\"accept-encoding\":\"gzip, deflate, br\",\"accept-language\":\"en-US,en;q=0.8\"},\"remoteAddress\":\"122.211.22.11\",\"userAgent\":\"22.322.32.22\",\"referer\":\"https://domain.com/app/kibana\"},\"res\":{\"statusCode\":200,\"responseTime\":417,\"contentLength\":9},\"message\":\"POST /elasticsearch/_msearch 200 225ms - 8.0B\"}\n","stream":"stdout","time":"2018-10-02T21:14:48.2233245241Z"}"#,
         );
+        let metadata = event.metadata().clone();
 
         let parsed_event = parser_outer.transform_one(event).unwrap();
 
         assert_eq!(parsed_event.as_log()["stream"], "stdout".into());
+        assert_eq!(parsed_event.metadata(), &metadata);
 
         let parsed_inner_event = parser_inner.transform_one(parsed_event).unwrap();
         let log = parsed_inner_event.into_log();
 
         assert_eq!(log["type"], "response".into());
         assert_eq!(log["statusCode"], 200.into());
+        assert_eq!(log.metadata(), &metadata);
     }
 
     #[test]
@@ -301,11 +318,13 @@ mod test {
         });
 
         let event = Event::from(invalid);
+        let metadata = event.metadata().clone();
 
         let parsed = parser.transform_one(event.clone()).unwrap();
 
         assert_eq!(event, parsed);
         assert_eq!(event.as_log()[log_schema().message_key()], invalid.into());
+        assert_eq!(event.metadata(), &metadata);
 
         // Field
         let mut parser = JsonParser::from(JsonParserConfig {
@@ -381,6 +400,7 @@ mod test {
         let event = Event::from(
             r#"{"greeting": "hello", "name": "bob", "nested": "{\"message\": \"help i'm trapped under many layers of json\"}"}"#,
         );
+        let metadata = event.metadata().clone();
         let event = parser1.transform_one(event).unwrap();
         let event = parser2.transform_one(event).unwrap();
 
@@ -390,6 +410,7 @@ mod test {
             event.as_log()["message"],
             "help i'm trapped under many layers of json".into()
         );
+        assert_eq!(event.metadata(), &metadata);
     }
 
     #[test]
@@ -411,6 +432,7 @@ mod test {
               "deep": [[[{"a": { "b": { "c": [[[1234]]]}}}]]]
             }"#,
         );
+        let metadata = event.metadata().clone();
         let event = parser.transform_one(event).unwrap();
 
         assert_eq!(event.as_log()["string"], "this is text".into());
@@ -424,6 +446,7 @@ mod test {
         assert_eq!(event.as_log()["object.nested"], "data".into());
         assert_eq!(event.as_log()["object.more"], "values".into());
         assert_eq!(event.as_log()["deep[0][0][0].a.b.c[0][0][0]"], 1234.into());
+        assert_eq!(event.metadata(), &metadata);
     }
 
     #[test]
@@ -439,11 +462,13 @@ mod test {
                 "message": "inner"
             }"#,
         );
+        let metadata = event.metadata().clone();
 
         let event = parser.transform_one(event).unwrap();
 
         assert_eq!(event.as_log()["key"], "data".into());
         assert_eq!(event.as_log()["message"], "inner".into());
+        assert_eq!(event.metadata(), &metadata);
     }
 
     #[test]
@@ -454,10 +479,12 @@ mod test {
         });
 
         let event = Event::from(r#"invalid json"#);
+        let metadata = event.metadata().clone();
 
         let event = parser.transform_one(event).unwrap();
 
         assert_eq!(event.as_log()["message"], "invalid json".into());
+        assert_eq!(event.metadata(), &metadata);
     }
 
     #[test]
@@ -469,11 +496,13 @@ mod test {
         });
 
         let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
+        let metadata = event.metadata().clone();
         let event = parser.transform_one(event).unwrap();
         let event = event.as_log();
 
         assert_eq!(event["that.greeting"], "hello".into());
         assert_eq!(event["that.name"], "bob".into());
+        assert_eq!(event.metadata(), &metadata);
     }
 
     #[test]
@@ -486,12 +515,14 @@ mod test {
 
         let message = r#"{"greeting": "hello", "name": "bob"}"#;
         let event = Event::from(message);
+        let metadata = event.metadata().clone();
         let event = parser.transform_one(event).unwrap();
         let event = event.as_log();
 
         assert_eq!(event["message"], message.into());
         assert_eq!(event.get("message.greeting"), None);
         assert_eq!(event.get("message.name"), None);
+        assert_eq!(event.metadata(), &metadata);
     }
 
     #[test]
@@ -505,6 +536,7 @@ mod test {
 
         let message = r#"{"greeting": "hello", "name": "bob"}"#;
         let event = Event::from(message);
+        let metadata = event.metadata().clone();
         let event = parser.transform_one(event).unwrap();
         let event = event.as_log();
 
@@ -514,5 +546,6 @@ mod test {
         }
         assert_eq!(event["message.greeting"], "hello".into());
         assert_eq!(event["message.name"], "bob".into());
+        assert_eq!(event.metadata(), &metadata);
     }
 }

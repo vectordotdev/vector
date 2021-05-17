@@ -481,7 +481,7 @@ mod test {
     use crate::event::metric::{Metric, MetricKind, MetricValue};
     use chrono::{DateTime, Utc};
     use pretty_assertions::assert_eq;
-    use shared::btreemap;
+    use shared::{assert_event_data_eq, btreemap};
 
     // Test ExtendedStatus: Off
     // https://httpd.apache.org/docs/2.4/mod/core.html#extendedstatus
@@ -528,7 +528,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         );
         metrics.sort_by(|a, b| (a.name(), a.tags()).cmp(&(b.name(), b.tags())));
 
-        assert_eq!(
+        assert_event_data_eq!(
             metrics,
             vec![
                 Metric::new(
@@ -737,7 +737,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         );
         metrics.sort_by(|a, b| (a.name(), a.tags()).cmp(&(b.name(), b.tags())));
 
-        assert_eq!(
+        assert_event_data_eq!(
             metrics,
             vec![
                 Metric::new(
@@ -969,7 +969,7 @@ ConnsTotal: 1
         );
         metrics.sort_by(|a, b| (a.name(), a.tags()).cmp(&(b.name(), b.tags())));
 
-        assert_eq!(
+        assert_event_data_eq!(
             metrics,
             vec![Metric::new(
                 "connections",

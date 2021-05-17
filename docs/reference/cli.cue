@@ -229,7 +229,7 @@ cli: {
 			description: """
 				Run Vector config unit tests, then exit. This command is experimental and
 				therefore subject to change. For guidance on how to write unit tests check
-				out: https://vector.dev/docs/setup/guides/unit-testing/
+				out: \(urls.vector_unit_testing)
 				"""
 
 			options: {
@@ -265,6 +265,54 @@ cli: {
 						Any number of Vector config files to test. If none are specified
 						the default config path `/etc/vector/vector.toml` will be targeted
 						"""
+				}
+			}
+		}
+
+		"tap": {
+			description: """
+				Observe log events from topology components.
+				"""
+
+			flags: _default_flags
+
+			options: {
+				"interval": {
+					_short:      "i"
+					description: "Interval to sample metrics at, in milliseconds"
+					type:        "integer"
+					default:     500
+				}
+				"url": {
+					_short:      "u"
+					description: "Vector GraphQL API server endpoint"
+					type:        "string"
+				}
+				"limit": {
+					_short:      "l"
+					description: "Sample log events to the provided limit"
+					type:        "integer"
+					default:     100
+				}
+				"format": {
+					_short:      "f"
+					description: "Encoding format for logs printed to screen"
+					type:        "enum"
+					default:     "json"
+					enum: {
+						json: "Output events as JSON"
+						yaml: "Output events as YAML"
+					}
+				}
+			}
+
+			args: {
+				components: {
+					type: "list"
+					description: """
+						    Components to observe (comma-separated; accepts glob patterns).
+						"""
+					default: "*"
 				}
 			}
 		}

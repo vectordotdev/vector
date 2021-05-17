@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::config;
+use crate::{built_info, config};
 use metrics::counter;
 use std::path::PathBuf;
 
@@ -120,9 +120,4 @@ impl InternalEvent for VectorRecoveryFailed {
     fn emit_metrics(&self) {
         counter!("recover_errors_total", 1);
     }
-}
-
-#[allow(unused)]
-mod built_info {
-    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }

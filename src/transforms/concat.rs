@@ -223,6 +223,8 @@ mod tests {
         let mut event = Event::from("message");
         event.as_mut_log().insert("first", "Hello vector users");
         event.as_mut_log().insert("second", "World");
+        let mut expected = event.clone();
+        expected.as_mut_log().insert("out", "Hello users");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -234,7 +236,7 @@ mod tests {
         );
 
         let new_event = transform.transform_one(event).unwrap();
-        assert_eq!(new_event.as_log()["out"], "Hello users".into());
+        assert_eq!(new_event, expected);
     }
 
     #[test]
@@ -242,6 +244,8 @@ mod tests {
         let mut event = Event::from("message");
         event.as_mut_log().insert("first", "Hello vector users");
         event.as_mut_log().insert("second", "World");
+        let mut expected = event.clone();
+        expected.as_mut_log().insert("out", "Hello World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -253,13 +257,15 @@ mod tests {
         );
 
         let new_event = transform.transform_one(event).unwrap();
-        assert_eq!(new_event.as_log()["out"], "Hello World".into());
+        assert_eq!(new_event, expected);
     }
     #[test]
     fn concat_mixed() {
         let mut event = Event::from("message");
         event.as_mut_log().insert("first", "Hello vector users");
         event.as_mut_log().insert("second", "World");
+        let mut expected = event.clone();
+        expected.as_mut_log().insert("out", "W o r l d");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -274,7 +280,7 @@ mod tests {
         );
 
         let new_event = transform.transform_one(event).unwrap();
-        assert_eq!(new_event.as_log()["out"], "W o r l d".into());
+        assert_eq!(new_event, expected);
     }
 
     #[test]

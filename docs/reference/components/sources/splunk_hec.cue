@@ -90,7 +90,7 @@ components: sources: splunk_hec: {
 		fields: {
 			message: fields._raw_line
 			splunk_channel: {
-				description: "The Splunk channel, value of the `X-Splunk-Request-Channel` header."
+				description: "The Splunk channel, value of the `X-Splunk-Request-Channel` header or `channel` query parameter, in that order of precedence."
 				required:    true
 				type: timestamp: {}
 			}

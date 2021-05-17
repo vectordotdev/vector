@@ -937,7 +937,7 @@ docs at https://vector.dev/docs are built using structured data written in
 [CUE], a language designed for data templating and validation. All of Vector's
 CUE sources are in the `/docs` folder.
 
-> Vector is currently using CUE version **0.3.0**. Be sure to use
+> Vector is currently using CUE version **0.3.2**. Be sure to use
 > precisely this version, as CUE is evolving quickly and you can expect breaking
 > changes in each release.
 

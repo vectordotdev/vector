@@ -71,7 +71,7 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
-    use crate::event::metric::{Metric, MetricValue, StatisticKind};
+    use crate::event::metric::{Metric, MetricValue};
     use crate::metrics::{capture_metrics, get_controller};
     use metrics::{counter, gauge, histogram};
     use std::collections::BTreeMap;
@@ -94,8 +94,8 @@ mod tests {
         counter!("bar", 4);
         histogram!("baz", 5.0);
         histogram!("baz", 6.0);
-        histogram!("quux", 7.0, "host" => "foo");
         histogram!("quux", 8.0, "host" => "foo");
+        histogram!("quux", 8.1, "host" => "foo");
 
         let controller = get_controller().expect("no controller");
 
@@ -114,20 +114,41 @@ mod tests {
             MetricValue::Counter { value: 7.0 },
             output["bar"].data.value
         );
-        assert_eq!(
-            MetricValue::Distribution {
-                samples: crate::samples![5.0 => 1, 6.0 => 1],
-                statistic: StatisticKind::Histogram
-            },
-            output["baz"].data.value
-        );
-        assert_eq!(
-            MetricValue::Distribution {
-                samples: crate::samples![7.0 => 1, 8.0 => 1],
-                statistic: StatisticKind::Histogram
-            },
-            output["quux"].data.value
-        );
+
+        match &output["baz"].data.value {
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => {
+                // This index is _only_ stable so long as the offsets in
+                // [`metrics::handle::Histogram::new`] are hard-coded. If this
+                // check fails you might look there and see if we've allowed
+                // users to set their own bucket widths.
+                assert_eq!(buckets[11].count, 2);
+                assert_eq!(*count, 2);
+                assert_eq!(*sum, 11.0);
+            }
+            _ => panic!("wrong type"),
+        }
+
+        match &output["quux"].data.value {
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => {
+                // This index is _only_ stable so long as the offsets in
+                // [`metrics::handle::Histogram::new`] are hard-coded. If this
+                // check fails you might look there and see if we've allowed
+                // users to set their own bucket widths.
+                assert_eq!(buckets[11].count, 1);
+                assert_eq!(buckets[12].count, 1);
+                assert_eq!(*count, 2);
+                assert_eq!(*sum, 16.1);
+            }
+            _ => panic!("wrong type"),
+        }
 
         let mut labels = BTreeMap::new();
         labels.insert(String::from("host"), String::from("foo"));

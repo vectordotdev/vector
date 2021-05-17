@@ -70,6 +70,9 @@ pub struct Config {
     #[serde(default = "crate::serde::default_true")]
     auto_partial_merge: bool,
 
+    /// Override global data_dir
+    data_dir: Option<PathBuf>,
+
     /// Specifies the field names for metadata annotation.
     annotation_fields: pod_metadata_annotator::FieldsSpec,
 
@@ -82,6 +85,11 @@ pub struct Config {
     /// the files.
     #[serde(default = "default_max_read_bytes")]
     max_read_bytes: usize,
+
+    /// The maximum number of a bytes a line can contain before being discarded. This protects
+    /// against malformed lines or tailing incorrect files.
+    #[serde(default = "default_max_line_bytes")]
+    max_line_bytes: usize,
 
     /// This value specifies not exactly the globbing, but interval
     /// between the polling the files to watch from the `paths_provider`.
@@ -154,6 +162,7 @@ struct Source {
     label_selector: String,
     exclude_paths: Vec<glob::Pattern>,
     max_read_bytes: usize,
+    max_line_bytes: usize,
     glob_minimum_cooldown: Duration,
     ingestion_timestamp_field: Option<String>,
     timezone: TimeZone,
@@ -170,7 +179,7 @@ impl Source {
         };
         let client = k8s::client::Client::new(k8s_config)?;
 
-        let data_dir = globals.resolve_and_make_data_subdir(None, name)?;
+        let data_dir = globals.resolve_and_make_data_subdir(config.data_dir.as_ref(), name)?;
         let timezone = config.timezone.unwrap_or(globals.timezone);
 
         let exclude_paths = config
@@ -198,6 +207,7 @@ impl Source {
             label_selector,
             exclude_paths,
             max_read_bytes: config.max_read_bytes,
+            max_line_bytes: config.max_line_bytes,
             glob_minimum_cooldown,
             ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
             timezone,
@@ -218,6 +228,7 @@ impl Source {
             label_selector,
             exclude_paths,
             max_read_bytes,
+            max_line_bytes,
             glob_minimum_cooldown,
             ingestion_timestamp_field,
             timezone,
@@ -246,12 +257,6 @@ impl Source {
 
         // TODO: maybe more of the parameters have to be configurable.
 
-        // The 16KB is the maximum size of the payload at single line for both
-        // docker and CRI log formats.
-        // We take a double of that to account for metadata and padding, and to
-        // have a power of two rounding. Line splitting is countered at the
-        // parsers, see the `partial_events_merger` logic.
-        let max_line_bytes = 32 * 1024; // 32 KiB
         let file_server = FileServer {
             // Use our special paths provider.
             paths_provider,
@@ -271,8 +276,8 @@ impl Source {
             // be other, more sound ways for users considering the use of this
             // option to solve their use case, so take consideration.
             ignore_before: None,
-            // Max line length to expect during regular log reads, see the
-            // explanation above.
+            // The maximum number of a bytes a line can contain before being discarded. This
+            // protects against malformed lines or tailing incorrect files.
             max_line_bytes,
             // Delimiter bytes that is used to read the file line-by-line
             line_delimiter: Bytes::from("\n"),
@@ -424,6 +429,19 @@ fn default_self_node_name_env_template() -> String {
 
 fn default_max_read_bytes() -> usize {
     2048
+}
+
+fn default_max_line_bytes() -> usize {
+    // NOTE: The below comment documents an incorrect assumption, see
+    // https://github.com/timberio/vector/issues/6967
+    //
+    // The 16KB is the maximum size of the payload at single line for both
+    // docker and CRI log formats.
+    // We take a double of that to account for metadata and padding, and to
+    // have a power of two rounding. Line splitting is countered at the
+    // parsers, see the `partial_events_merger` logic.
+
+    32 * 1024 // 32 KiB
 }
 
 fn default_glob_minimum_cooldown_ms() -> usize {

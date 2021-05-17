@@ -162,13 +162,14 @@ mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
         config::{log_schema, GlobalOptions, SinkContext, SourceConfig, SourceContext},
+        event::Event,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
-        sinks::util::tcp::TcpSinkConfig,
+        sinks::util::{tcp::TcpSinkConfig, EncodedEvent},
         test_util::{
             collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
         tls::{self, TlsConfig, TlsOptions},
-        Event, Pipeline,
+        Pipeline,
     };
     use bytes::Bytes;
     use futures::{stream, StreamExt};
@@ -428,7 +429,7 @@ mod test {
         let message_bytes = Bytes::from(message.clone() + "\n");
 
         let cx = SinkContext::new_test();
-        let encode_event = move |_event| Some(message_bytes.clone());
+        let encode_event = move |_event| Some(EncodedEvent::new(message_bytes.clone()));
         let sink_config = TcpSinkConfig::from_address(format!("localhost:{}", addr.port()));
         let (sink, _healthcheck) = sink_config.build(cx, encode_event).unwrap();
 

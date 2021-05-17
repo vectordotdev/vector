@@ -138,7 +138,8 @@ impl FunctionTransform for AddFields {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{iter::FromIterator, string::ToString};
+    use crate::event::LogEvent;
+    use std::iter::FromIterator;
 
     #[test]
     fn generate_config() {
@@ -147,55 +148,64 @@ mod tests {
 
     #[test]
     fn add_fields_event() {
-        let event = Event::from("augment me");
+        let log = LogEvent::from("augment me");
+        let mut expected = log.clone();
+        expected.insert("some_key", "some_val");
+
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_val".into());
         let mut augment = AddFields::new(fields, true).unwrap();
 
-        let new_event = augment.transform_one(event).unwrap();
+        let new_event = augment.transform_one(log.into()).unwrap();
 
-        let key = "some_key".to_string();
-        let kv = new_event.as_log().get_flat(&key);
-
-        let val = "some_val".to_string();
-        assert_eq!(kv, Some(&val.into()));
+        assert_eq!(new_event, expected.into());
     }
 
     #[test]
     fn add_fields_templating() {
-        let event = Event::from("augment me");
+        let log = LogEvent::from("augment me");
+        let mut expected = log.clone();
+        expected.insert("some_key", "augment me augment me");
+
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "{{message}} {{message}}".into());
         let mut augment = AddFields::new(fields, true).unwrap();
 
-        let new_event = augment.transform_one(event).unwrap();
+        let new_event = augment.transform_one(log.into()).unwrap();
 
-        let key = "some_key".to_string();
-        let kv = new_event.as_log().get_flat(&key);
-
-        let val = "augment me augment me".to_string();
-        assert_eq!(kv, Some(&val.into()));
+        assert_eq!(new_event, expected.into());
     }
 
     #[test]
     fn add_fields_overwrite() {
-        let mut event = Event::from("");
-        event.as_mut_log().insert("some_key", "some_message");
+        let mut log = LogEvent::from("");
+        log.insert("some_key", "some_message");
+        let expected = log.clone();
 
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_overwritten_message".into());
 
         let mut augment = AddFields::new(fields, false).unwrap();
 
-        let new_event = augment.transform_one(event.clone()).unwrap();
+        let new_event = augment.transform_one(log.into()).unwrap();
 
-        assert_eq!(new_event, event);
+        assert_eq!(new_event, expected.into());
     }
 
     #[test]
     fn add_fields_preserves_types() {
         crate::test_util::trace_init();
-        let event = Event::from("hello world");
+        let log = LogEvent::from("hello world");
+        let mut expected = log.clone();
+        expected.insert("float", 4.5);
+        expected.insert("int", 4);
+        expected.insert("string", "thisisastring");
+        expected.insert("bool", true);
+        expected.insert("array", Value::Array(vec![1.into(), 2.into(), 3.into()]));
+        expected.insert(
+            "table",
+            Value::Map(vec![("key".into(), "value".into())].into_iter().collect()),
+        );
 
         let mut fields = IndexMap::new();
         fields.insert(String::from("float"), Value::from(4.5));
@@ -211,16 +221,8 @@ mod tests {
 
         let mut transform = AddFields::new(fields, false).unwrap();
 
-        let event = transform.transform_one(event).unwrap().into_log();
+        let event = transform.transform_one(log.into()).unwrap().into_log();
 
-        tracing::error!(?event);
-        assert_eq!(event["float"], 4.5.into());
-        assert_eq!(event["int"], 4.into());
-        assert_eq!(event["string"], "thisisastring".into());
-        assert_eq!(event["bool"], true.into());
-        assert_eq!(event["array[0]"], 1.into());
-        assert_eq!(event["array[1]"], 2.into());
-        assert_eq!(event["array[2]"], 3.into());
-        assert_eq!(event["table.key"], "value".into());
+        assert_eq!(event, expected);
     }
 }
