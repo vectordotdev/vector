@@ -56,6 +56,7 @@ criterion_group!(
               parse_aws_alb_log,
               parse_aws_cloudwatch_log_subscription_message,
               parse_aws_vpc_flow_log,
+              parse_aws_cloudtrail_logs,
               parse_common_log,
               parse_csv,
               parse_duration,
@@ -694,6 +695,15 @@ bench_function! {
             "type": "http",
             "user_agent": "curl/7.46.0"
         })),
+    }
+}
+
+bench_function! {
+    parse_aws_cloudtrail_logs => vrl_stdlib::ParseAwsCloudTrailLogs;
+
+    empty {
+        args: func_args![value: r#"{ "Records": [] }"#],
+        want: Ok(value!([])),
     }
 }
 

@@ -8050,6 +8050,8 @@ dependencies = [
  "nom 6.1.2",
  "regex",
  "rust_decimal",
+ "semver 0.11.0",
+ "serde",
  "serde_json",
  "sha-1 0.9.6",
  "sha2",

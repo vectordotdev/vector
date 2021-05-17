@@ -104,6 +104,8 @@ mod only_fields;
 mod parse_apache_log;
 #[cfg(feature = "parse_aws_alb_log")]
 mod parse_aws_alb_log;
+#[cfg(feature = "parse_aws_cloudtrail_logs")]
+mod parse_aws_cloudtrail_logs;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
 mod parse_aws_cloudwatch_log_subscription_message;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
@@ -301,6 +303,8 @@ pub use only_fields::OnlyFields;
 pub use parse_apache_log::ParseApacheLog;
 #[cfg(feature = "parse_aws_alb_log")]
 pub use parse_aws_alb_log::ParseAwsAlbLog;
+#[cfg(feature = "parse_aws_cloudtrail_logs")]
+pub use parse_aws_cloudtrail_logs::ParseAwsCloudTrailLogs;
 #[cfg(feature = "parse_aws_cloudwatch_log_subscription_message")]
 pub use parse_aws_cloudwatch_log_subscription_message::ParseAwsCloudWatchLogSubscriptionMessage;
 #[cfg(feature = "parse_aws_vpc_flow_log")]
@@ -512,6 +516,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(ParseJson),
         #[cfg(feature = "parse_apache_log")]
         Box::new(ParseApacheLog),
+        #[cfg(feature = "parse_aws_cloudtrail_logs")]
+        Box::new(ParseAwsCloudTrailLogs),
         #[cfg(feature = "parse_common_log")]
         Box::new(ParseCommonLog),
         #[cfg(feature = "parse_csv")]
