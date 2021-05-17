@@ -437,7 +437,7 @@ fn default_max_line_bytes() -> usize {
     //
     // Per https://github.com/timberio/vector/issues/6966#issuecomment-830772097
     // The limit seems to be in the characters at the UTF-8 encoding.
-    // Line splitting is countered at theparsers, see the `partial_events_merger` logic.
+    // Line splitting is countered at the parsers, see the `partial_events_merger` logic.
 
     6 * 16 * 1024 // 96 KiB
 }
