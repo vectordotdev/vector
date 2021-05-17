@@ -132,12 +132,12 @@ mod integration_tests {
     use crate::{test_util, Pipeline};
     use tokio::time::Duration;
 
-    const PROMETHEUS_SCRAP_ADDRESS: &str = "http://localhost:2113/";
+    const EVENTSTOREDB_SCRAP_ADDRESS: &str = "http://localhost:2113/";
 
     #[tokio::test]
     async fn scrap_something() {
         let config = EventStoreDbConfig {
-            address: PROMETHEUS_SCRAP_ADDRESS.to_owned(),
+            endpoint: EVENTSTOREDB_SCRAP_ADDRESS.to_owned(),
             scrape_interval_secs: 1,
             default_namespace: None,
         };
