@@ -376,6 +376,7 @@ sources-logs = [
 sources-metrics = [
   "sources-apache_metrics",
   "sources-aws_ecs_metrics",
+  "sources-eventstoredb_metrics",
   "sources-host_metrics",
   "sources-internal_metrics",
   "sources-mongodb_metrics",
@@ -384,7 +385,6 @@ sources-metrics = [
   "sources-prometheus",
   "sources-statsd",
   "sources-vector",
-  "sources-eventstoredb_metrics"
 ]
 
 sources-apache_metrics = []
@@ -393,6 +393,7 @@ sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
 sources-datadog = ["sources-utils-http"]
 sources-docker_logs = ["bollard", "dirs-next"]
+sources-eventstoredb_metrics = []
 sources-file = ["bytesize", "file-source"]
 sources-generator = ["fakedata"]
 sources-heroku_logs = ["sources-utils-http"]
@@ -419,7 +420,6 @@ sources-utils-tls = []
 sources-utils-udp = []
 sources-utils-unix = []
 sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls"]
-sources-eventstoredb_metrics = []
 
 # Transforms
 transforms = ["transforms-logs", "transforms-metrics"]

@@ -21,7 +21,7 @@ ACTION=$1
 start () {
   "${CONTAINER_TOOL}" run -d --name vector_eventstoredb_metric --net=host \
 	 --volume "$(pwd)"/tests/data:/etc/vector:ro \
-	 eventstore/eventstore --insecure --run-projections=All
+	 eventstore/eventstore --insecure --stats-period-sec=1
 }
 
 stop () {

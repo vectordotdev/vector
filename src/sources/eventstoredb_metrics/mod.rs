@@ -106,12 +106,13 @@ fn eventstoredb(
 
                             Ok(stats) => {
                                 let metrics = stats.metrics(namespace.clone());
-                                let mut metrics = stream::iter(metrics).map(Event::Metric).map(Ok);
 
                                 emit!(EventStoreDbMetricsReceived {
+                                    events: metrics.len(),
                                     byte_size: bytes.len(),
                                 });
 
+                                let mut metrics = stream::iter(metrics).map(Event::Metric).map(Ok);
                                 if out.send_all(&mut metrics).await.is_err() {
                                     break;
                                 }
@@ -136,6 +137,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn scrap_something() {
+        test_util::trace_init();
         let config = EventStoreDbConfig {
             endpoint: EVENTSTOREDB_SCRAP_ADDRESS.to_owned(),
             scrape_interval_secs: 1,
@@ -147,7 +149,7 @@ mod integration_tests {
 
         tokio::spawn(source);
 
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_secs(5)).await;
 
         let events = test_util::collect_ready(rx).await;
         assert!(!events.is_empty());
