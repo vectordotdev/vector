@@ -23,8 +23,10 @@ pub mod api;
 mod builder;
 mod compiler;
 pub mod component;
+pub mod decoding;
 mod diff;
 pub mod format;
+mod framing;
 mod loading;
 pub mod provider;
 mod unit_test;
@@ -66,7 +68,7 @@ pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
     pub healthchecks: HealthcheckOptions,
-    pub sources: IndexMap<String, Box<dyn SourceConfig>>,
+    pub sources: IndexMap<String, SourceOuter>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
     tests: Vec<TestDefinition>,
@@ -205,6 +207,44 @@ macro_rules! impl_generate_config_from_default {
     };
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+pub struct SourceOuter {
+    pub framing: framing::SourceFramers,
+    pub decoding: decoding::DecodingsConfig,
+    #[serde(flatten)]
+    pub inner: Box<dyn SourceConfig>,
+}
+
+impl SourceOuter {
+    pub fn new(
+        framing: framing::SourceFramers,
+        decoding: decoding::DecodingsConfig,
+        inner: Box<dyn SourceConfig>,
+    ) -> Self {
+        Self {
+            framing,
+            decoding,
+            inner,
+        }
+    }
+
+    pub async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
+        self.inner.build(cx).await
+    }
+
+    pub fn output_type(&self) -> DataType {
+        self.inner.output_type()
+    }
+
+    pub fn source_type(&self) -> &'static str {
+        self.inner.source_type()
+    }
+
+    pub fn resources(&self) -> Vec<Resource> {
+        self.inner.resources()
+    }
+}
+
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
@@ -222,6 +262,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 
 pub struct SourceContext {
     pub name: String,
+    pub framing: framing::SourceFramers,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
@@ -238,6 +279,7 @@ impl SourceContext {
         (
             Self {
                 name: name.into(),
+                framing: Default::default(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
@@ -250,6 +292,7 @@ impl SourceContext {
     pub fn new_test(out: Pipeline) -> Self {
         Self {
             name: "default".into(),
+            framing: Default::default(),
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,

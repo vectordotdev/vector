@@ -512,6 +512,7 @@ mod test {
         let server = SocketConfig::from(UdpConfig::from_address(address))
             .build(SourceContext {
                 name: source_name.into(),
+                framing: Default::default(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out: sender,
