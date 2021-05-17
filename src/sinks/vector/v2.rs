@@ -70,9 +70,26 @@ lazy_static! {
     };
 }
 
+/// grpc doesn't like an address without a scheme, so we default to http if one isn't specified in
+/// the address.
+fn default_http(address: &str) -> crate::Result<Uri> {
+    let uri: Uri = address.parse()?;
+    if uri.scheme().is_none() {
+        // Default the scheme to http.
+        let mut parts = uri.into_parts();
+        parts.scheme = Some("http".parse().expect("http should be valid"));
+        if parts.path_and_query.is_none() {
+            parts.path_and_query = Some("/".parse().expect("root should be valid"));
+        }
+        Ok(Uri::from_parts(parts)?)
+    } else {
+        Ok(uri)
+    }
+}
+
 impl VectorConfig {
     pub(crate) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = Endpoint::from_shared(self.address.clone())?;
+        let endpoint = Endpoint::from(default_http(&self.address)?);
         let endpoint = match &self.tls {
             Some(tls) => {
                 let host = get_authority(&self.address)?;
