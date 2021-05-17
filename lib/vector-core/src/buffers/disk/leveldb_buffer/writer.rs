@@ -32,16 +32,9 @@ where
     pub(crate) slot: Option<T>,
 }
 
-// Writebatch isn't Send + Sync, but the leveldb docs explicitly say that it's
-// okay to share across threads
+// Writebatch isn't Send, but the leveldb docs explicitly say that it's okay to
+// share across threads
 unsafe impl<T> Send for Writer<T>
-where
-    T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
-    <T as EncodeBytes<T>>::Error: Debug,
-    <T as DecodeBytes<T>>::Error: Debug,
-{
-}
-unsafe impl<T> Sync for Writer<T>
 where
     T: Send + Sync + Unpin + EncodeBytes<T> + DecodeBytes<T>,
     <T as EncodeBytes<T>>::Error: Debug,
