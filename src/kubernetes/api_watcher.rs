@@ -101,9 +101,9 @@ where
                 Err(watcher::stream::Error::desync(stream::Error::Desync))
             }
             Ok(val) => Ok(val),
-            Err(err) => Err(watcher::stream::Error::other(stream::Error::K8sStream {
-                source: err,
-            })),
+            Err(err) => Err(watcher::stream::Error::recoverable(
+                stream::Error::K8sStream { source: err },
+            )),
         }))
     }
 }

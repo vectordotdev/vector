@@ -132,14 +132,9 @@ where
                             self.state_writer.resync().await;
                             continue 'outer;
                         }
-                        // Any other streaming error means the protocol is in
-                        // an unxpected state.
-                        // This is considered a fatal error, do not attempt
-                        // to retry and just quit.
-                        // TODO: retry these errors
-                        // https://github.com/timberio/vector/issues/7149
-                        Err(watcher::stream::Error::Other { source }) => {
-                            return Err(Error::Streaming { source });
+                        Err(watcher::stream::Error::Recoverable { source }) => {
+                            emit!(internal_events::InvocationHttpErrorReceived { error: source });
+                            continue 'outer;
                         }
                         // A fine watch respose arrived, we just pass it down.
                         Ok(val) => val,
