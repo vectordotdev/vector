@@ -13,11 +13,12 @@ Download | {{ site.Title }}
     {{ partial "hero.html" . }}
 
     <div class="mt-10 mb-8">
-      <div>
+      <div class="flex items-center space-x-6">
         {{ partial "download/release-toggle.html" . }}
-      </div>
-      <div class="mt-6">
+
         {{ partial "download/version-selector.html" . }}
+
+        {{ template "latest-toggler" }}
       </div>
     </div>
 
@@ -117,4 +118,10 @@ Download | {{ site.Title }}
 <p class="text-2xl lg:text-2.5xl tracking-tight text-dark dark:text-gray-300 font-semibold mb-3">
   {{ .text }}
 </p>
+{{ end }}
+
+{{ define "latest-toggler" }}
+<button type="button" x-show="$store.global.notLatest()" @click="$store.global.setToLatest()" class="inline-flex items-center px-3.5 py-2 border-3 text-sm leading-4 font-semibold rounded-full shadow-sm text-dark dark:text-gray-200 border-primary dark:border-secondary hover:bg-primary dark:hover:bg-secondary">
+  Set to latest
+</button>
 {{ end }}

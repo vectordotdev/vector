@@ -55,6 +55,12 @@ const manageState = () => {
         this.versionBackup = v;
       }
     },
+    notLatest() {
+      return this.version != '{{ $latest }}';
+    },
+    setToLatest() {
+      this.setVersion('{{ $latest }}');
+    },
     // Switch dark mode on and off
     toggleDarkMode() {
       this.dark = !this.dark;
