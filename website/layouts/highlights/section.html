@@ -4,7 +4,7 @@
 
 {{ define "main" }}
 {{ $highlights := .RegularPages }}
-{{ $versions := site.Params.vector_versions }}
+{{ $versions := site.Data.docs.versions }}
 {{ $latest := index $versions }}
 {{ $highlights := .RegularPages }}
 {{ $numVersions := len $versions }}

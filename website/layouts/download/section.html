@@ -6,7 +6,7 @@ Download | {{ site.Title }}
 
 {{ define "main" }}
 {{ $releases := site.Data.docs.releases }}
-{{ $versions := site.Params.vector_versions }}
+{{ $versions := site.Data.docs.versions }}
 {{ $latest := index $versions 0 }}
 <div class="relative max-w-3xl lg:max-w-7xl px-6 lg:px-8 mx-auto">
   <div class="my-16">

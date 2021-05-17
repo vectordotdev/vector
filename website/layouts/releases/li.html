@@ -1,5 +1,5 @@
 {{ $version := .File.BaseFileName }}
-{{ $latest := index site.Params.vector_versions 0 }}
+{{ $latest := index site.Data.docs.versions 0 }}
 {{ $isLatest := eq $version $latest }}
 {{ $release := index site.Data.docs.releases $version }}
 <a href="{{ .RelPermalink }}">

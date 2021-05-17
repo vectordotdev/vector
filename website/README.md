@@ -13,6 +13,12 @@ This directory houses the assets used to build Vector's website and documentatio
 make serve
 ```
 
+## Tasks
+
+### Add a new version of Vector
+
+1. Add the new version to the `versions` list in [`cue/reference/versions.cue`][./cue/reference/versions.cue]
+
 [esbuild]: https://github.com/evanw/esbuild
 [hugo]: https://gohugo.io
 [netlify_toml]: ../netlify.toml

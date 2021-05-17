@@ -1,4 +1,4 @@
-{{ $latest := index site.Params.vector_versions 0 }}
+{{ $latest := index site.Data.docs.versions 0 }}
 import '@ryangjchandler/spruce';
 import 'alpinejs';
 import 'tocbot/dist/tocbot';

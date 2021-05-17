@@ -18,7 +18,8 @@ releases: {
 	#CommitSha: =~"^[a-z0-9]{40}$"
 
 	#Release: {
-		codename?:     string
+		version:      string
+		codename?:    string
 		date:         string
 		description?: string
 
@@ -26,5 +27,5 @@ releases: {
 		whats_next: #Any
 	}
 
-	{[Name=string]: #Release}
+	{[Version=string]: #Release & { version: Version }}
 }

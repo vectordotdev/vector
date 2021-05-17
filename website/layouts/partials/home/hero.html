@@ -1,7 +1,7 @@
 {{ $tagline := site.Params.tagline }}
 {{ $undertagline := site.Params.undertagline }}
 {{ $subtagline := site.Params.subtagline }}
-{{ $latest := index site.Params.vector_versions 0 }}
+{{ $latest := index site.Data.docs.versions 0 }}
 {{ $link := printf "releases/%s" $latest | relURL }}
 <div class="relative overflow-hidden">
   <div class="relative pt-6 pb-16 sm:pb-24">

@@ -1,5 +1,5 @@
 {{/* Dropdown version selector */}}
-{{ $versions := site.Params.vector_versions }}
+{{ $versions := site.Data.docs.versions }}
 {{ $latest := index $versions 0 }}
 <div x-data="{ open: false }" @click.away="open = false" class="relative inline-block text-left">
   <div>
