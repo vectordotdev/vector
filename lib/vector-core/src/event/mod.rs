@@ -45,7 +45,7 @@ pub mod proto {
 
 pub const PARTIAL: &str = "_partial";
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, PartialOrd, Debug, Clone)]
 pub enum Event {
     Log(LogEvent),
     Metric(Metric),

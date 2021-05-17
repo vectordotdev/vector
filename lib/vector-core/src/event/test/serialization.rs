@@ -5,6 +5,7 @@ use pretty_assertions::assert_eq;
 use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
 
+// Ser/De the Event type through EncodeBytes -> DecodeBytes
 #[test]
 fn back_and_forth_through_bytes() {
     fn inner(event: Event) -> TestResult {
@@ -17,15 +18,18 @@ fn back_and_forth_through_bytes() {
         }
         {
             let res = Event::decode(buffer);
-            assert!(res.is_ok());
-            assert_eq!(expected, res.unwrap());
+            let actual: Event = res.unwrap();
+            // While Event does implement PartialEq we prefer to use PartialOrd
+            // instead
+            assert!(!(expected > actual));
+            assert!(!(expected < actual));
         }
         TestResult::passed()
     }
 
     QuickCheck::new()
-        .tests(100)
-        .max_tests(1000)
+        .tests(1_000)
+        .max_tests(10_000)
         .quickcheck(inner as fn(Event) -> TestResult);
 }
 

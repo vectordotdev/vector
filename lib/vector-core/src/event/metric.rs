@@ -12,7 +12,7 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
-#[derive(Clone, Debug, Deserialize, Getters, MutGetters, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Getters, MutGetters, PartialEq, PartialOrd, Serialize)]
 pub struct Metric {
     #[serde(flatten)]
     pub series: MetricSeries,
@@ -23,7 +23,7 @@ pub struct Metric {
     metadata: EventMetadata,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Serialize)]
 pub struct MetricSeries {
     #[serde(flatten)]
     pub name: MetricName,
@@ -33,14 +33,14 @@ pub struct MetricSeries {
 
 pub type MetricTags = BTreeMap<String, String>;
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Serialize)]
 pub struct MetricName {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct MetricData {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<DateTime<Utc>>,
@@ -49,7 +49,9 @@ pub struct MetricData {
     pub value: MetricValue,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize, is_enum_variant)]
+#[derive(
+    Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Serialize, is_enum_variant,
+)]
 #[serde(rename_all = "snake_case")]
 /// A metric may be an incremental value, updating the previous value of
 /// the metric, or absolute, which sets the reference for future
@@ -86,7 +88,7 @@ impl From<MetricKind> for vrl_core::Value {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, is_enum_variant)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Deserialize, Serialize, is_enum_variant)]
 #[serde(rename_all = "snake_case")]
 /// A `MetricValue` is the container for the actual value of a metric.
 pub enum MetricValue {
@@ -124,7 +126,7 @@ pub enum MetricValue {
 
 /// A single sample from a `MetricValue::Distribution`, containing the
 /// sampled value paired with the rate at which it was observed.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct Sample {
     pub value: f64,
     pub rate: u32,
@@ -134,14 +136,14 @@ pub struct Sample {
 /// of the bucket is the upper bound on the range of values within the
 /// bucket. The lower bound on the range is just higher than the
 /// previous bucket, or zero for the first bucket.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct Bucket {
     pub upper_limit: f64,
     pub count: u32,
 }
 
 /// A single value from a `MetricValue::AggregatedSummary`.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct Quantile {
     pub upper_limit: f64,
     pub value: f64,
@@ -223,7 +225,7 @@ impl From<MetricValue> for vrl_core::Value {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize, is_enum_variant)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Deserialize, Serialize, is_enum_variant)]
 #[serde(rename_all = "snake_case")]
 pub enum StatisticKind {
     Histogram,

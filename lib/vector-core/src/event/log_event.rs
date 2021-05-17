@@ -19,7 +19,7 @@ use std::{
     iter::FromIterator,
 };
 
-#[derive(Clone, Debug, Getters, MutGetters, PartialEq, Derivative, Deserialize)]
+#[derive(Clone, Debug, Getters, MutGetters, PartialEq, PartialOrd, Derivative, Deserialize)]
 pub struct LogEvent {
     // **IMPORTANT:** Due to numerous legacy reasons this **must** be a Map variant.
     #[derivative(Default(value = "Value::from(BTreeMap::default())"))]

@@ -10,7 +10,7 @@ use std::fmt::Debug;
 use std::iter::FromIterator;
 use toml::value::Value as TomlValue;
 
-#[derive(PartialEq, Debug, Clone, Deserialize, is_enum_variant)]
+#[derive(PartialEq, PartialOrd, Debug, Clone, Deserialize, is_enum_variant)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
