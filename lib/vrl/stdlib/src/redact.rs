@@ -103,9 +103,9 @@ fn redact(value: Value, filters: &[Filter], redactor: &Redactor) -> Value {
     match value {
         Value::Bytes(bytes) => {
             let input = String::from_utf8_lossy(&bytes);
-            let output = filters
-                .iter()
-                .fold(input, |input, filter| filter.redact(input, redactor));
+            let output = filters.iter().fold(input, |input, filter| {
+                filter.redact(&input, redactor).into_owned().into()
+            });
             Value::Bytes(output.into_owned().into())
         }
         Value::Array(values) => {
@@ -203,24 +203,24 @@ impl TryFrom<Value> for Filter {
 }
 
 impl Filter {
-    fn redact<'t>(&self, input: Cow<'t, str>, redactor: &Redactor) -> Cow<'t, str> {
+    fn redact<'t>(&self, input: &'t str, redactor: &Redactor) -> Cow<'t, str> {
         match &self {
-            Filter::Pattern(patterns) => patterns.iter().fold(input, |input, pattern| {
-                // TODO see if we can avoid cloning here
-                match pattern {
-                    Pattern::Regex(regex) => regex
-                        .replace_all(&input, redactor.pattern())
-                        .into_owned()
-                        .into(),
-                    Pattern::String(pattern) => {
-                        input.to_owned().replace(pattern, redactor.pattern()).into()
-                    }
-                }
-            }),
-            Filter::UsSocialSecurityNumber => US_SOCIAL_SECURITY_NUMBER
-                .replace_all(&input, redactor.pattern())
-                .into_owned()
-                .into(),
+            Filter::Pattern(patterns) => {
+                patterns
+                    .iter()
+                    .fold(Cow::Borrowed(input), |input, pattern| match pattern {
+                        Pattern::Regex(regex) => regex
+                            .replace_all(&input, redactor.pattern())
+                            .into_owned()
+                            .into(),
+                        Pattern::String(pattern) => {
+                            input.replace(pattern, redactor.pattern()).into()
+                        }
+                    })
+            }
+            Filter::UsSocialSecurityNumber => {
+                US_SOCIAL_SECURITY_NUMBER.replace_all(&input, redactor.pattern())
+            }
         }
     }
 }
