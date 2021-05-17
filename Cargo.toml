@@ -384,7 +384,7 @@ sources-metrics = [
   "sources-prometheus",
   "sources-statsd",
   "sources-vector",
-  "sources-eventstoredb"
+  "sources-eventstoredb_metrics"
 ]
 
 sources-apache_metrics = []
@@ -419,7 +419,7 @@ sources-utils-tls = []
 sources-utils-udp = []
 sources-utils-unix = []
 sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls"]
-sources-eventstoredb = []
+sources-eventstoredb_metrics = []
 
 # Transforms
 transforms = ["transforms-logs", "transforms-metrics"]
@@ -583,6 +583,7 @@ all-integration-tests = [
   "clickhouse-integration-tests",
   "docker-logs-integration-tests",
   "es-integration-tests",
+  "eventstoredb_metrics-integration-tests",
   "gcp-cloud-storage-integration-tests",
   "gcp-integration-tests",
   "gcp-pubsub-integration-tests",
@@ -621,6 +622,7 @@ aws-sqs-integration-tests = ["sinks-aws_sqs"]
 clickhouse-integration-tests = ["sinks-clickhouse", "warp"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
+eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp"]

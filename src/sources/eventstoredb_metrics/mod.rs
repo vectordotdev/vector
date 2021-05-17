@@ -125,3 +125,31 @@ fn eventstoredb(
         .boxed(),
     ))
 }
+
+#[cfg(all(test, feature = "eventstoredb_metrics-integration-tests"))]
+mod integration_tests {
+    use super::*;
+    use crate::{test_util, Pipeline};
+    use tokio::time::Duration;
+
+    const PROMETHEUS_SCRAP_ADDRESS: &str = "http://localhost:2113/";
+
+    #[tokio::test]
+    async fn scrap_something() {
+        let config = EventStoreDbConfig {
+            address: PROMETHEUS_SCRAP_ADDRESS.to_owned(),
+            scrape_interval_secs: 1,
+            default_namespace: None,
+        };
+
+        let (tx, rx) = Pipeline::new_test();
+        let source = config.build(SourceContext::new_test(tx)).await.unwrap();
+
+        tokio::spawn(source);
+
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        let events = test_util::collect_ready(rx).await;
+        assert!(!events.is_empty());
+    }
+}
