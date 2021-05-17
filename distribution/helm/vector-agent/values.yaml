@@ -198,8 +198,12 @@ hostMetricsSource:
   # Additional config to embed at the host metrics source.
   config:
     filesystem:
+      devices:
+        excludes: [binfmt_misc]
       filesystems:
         excludes: [binfmt_misc]
+      mountpoints:
+        excludes: ["*/proc/sys/fs/binfmt_misc"]
     # option: "value"
   # Raw TOML config to embed at the host metrics source (deprecated).
   rawConfig: null
