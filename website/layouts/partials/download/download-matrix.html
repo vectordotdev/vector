@@ -1,7 +1,7 @@
 {{ $version := .version }}
 {{ $v1 := cond (eq $version "nightly") "latest" (printf "vector-%s" $version) }}
 {{ $host := site.Data.matrix.host }}
-{{ $matrix := site.Data.matrix.releases }}
+{{ $matrix := site.Data.docs.management.downloads }}
 <div class="flex flex-col space-y-1.5">
   {{ range $matrix }}
   {{ $file := .file }}
@@ -10,24 +10,27 @@
     <div class="col-span-2">
       {{/* Platform */}}
       <span class="text-gray-700 dark:text-gray-300 text-lg font-semibold tracking-tight">
-        {{ .name }}
+        {{ .title }}
       </span>
     </div>
 
     <div class="col-span-1">
       {{/* File type */}}
       <span class="font-mono text-xs text-dark dark:text-gray-300">
-        {{ $file }}
+        {{ .file_type }}
       </span>
     </div>
 
     <div class="col-span-5">
       {{/* Targets (ARM, x86_64, etc.) */}}
       <div class="flex space-x-1.5">
-        {{ range .releases }}
+        {{ range .options }}
+
+        {{ $url := .download_url | replaceRE "{version}" $version }}
+
         <a
           type="button"
-          href="{{ $host }}/vector/{{ $version }}/{{ $v1 }}-{{ with $prefix }}{{ . }}.{{ end }}{{ .tag }}.{{ $file }}"
+          href="{{ $url }}"
           class="flex items-center space-x-1 py-1.5 px-2.5 border dark:border-gray-700 rounded-md dark:bg-dark hover:bg-gray-50 dark:hover:bg-black"
           download>
 
@@ -38,7 +41,7 @@
             </svg>
           </span>
           <span class="text-dark dark:text-primary font-semibold">
-            {{ .name }}
+            {{ .arch }}
           </span>
         </a>
         {{ end }}

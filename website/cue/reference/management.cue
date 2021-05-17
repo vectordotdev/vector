@@ -24,7 +24,7 @@ management: {
 				filename: "\(tag)-\(extra).\(_file_type)"
 			}
 
-			download_url: "\(_root_url)/vector/{version}/vector-{version}\(_version_postfix)-\(filename)"
+			download_url: "\(_root_url)/vector/{version}/vector-{version}-\(_version_postfix)\(filename)"
 		}
 
 		os: #OS
@@ -49,6 +49,7 @@ management: {
 				},
 				{
 					arch: "x86_64"
+					extra: "unknown-linux-gnu"
 				}
 			]
 		},
@@ -74,7 +75,7 @@ management: {
 			os: "Linux"
 			title: "Linux (rpm)"
 			file_type: "rpm"
-			version_postfix: "-1"
+			version_postfix: "1."
 			options: [
 				{
 					arch: "ARM64"
