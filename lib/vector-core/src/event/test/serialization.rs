@@ -1,26 +1,32 @@
 use super::*;
 use crate::config::log_schema;
 use bytes::BytesMut;
+use pretty_assertions::assert_eq;
+use quickcheck::{QuickCheck, TestResult};
 use regex::Regex;
 
 #[test]
 fn back_and_forth_through_bytes() {
-    let mut event = Event::from("raw log line");
-    event.as_mut_log().insert("foo", "bar");
-    event.as_mut_log().insert("bar", "baz");
+    fn inner(event: Event) -> TestResult {
+        let expected = event.clone();
 
-    let expected = event.clone();
+        let mut buffer = BytesMut::with_capacity(64);
+        {
+            let res = Event::encode(event, &mut buffer);
+            assert!(res.is_ok());
+        }
+        {
+            let res = Event::decode(buffer);
+            assert!(res.is_ok());
+            assert_eq!(expected, res.unwrap());
+        }
+        TestResult::passed()
+    }
 
-    let mut buffer = BytesMut::with_capacity(64);
-    {
-        let res = Event::encode(event, &mut buffer);
-        assert!(res.is_ok());
-    }
-    {
-        let res = Event::decode(buffer);
-        assert!(res.is_ok());
-        assert_eq!(expected, res.unwrap());
-    }
+    QuickCheck::new()
+        .tests(100)
+        .max_tests(1000)
+        .quickcheck(inner as fn(Event) -> TestResult);
 }
 
 #[test]
