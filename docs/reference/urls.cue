@@ -295,6 +295,8 @@ urls: {
 	mongodb:                                                  "https://www.mongodb.com"
 	mongodb_command_server_status:                            "https://docs.mongodb.com/manual/reference/command/serverStatus/"
 	mongodb_connection_string_uri_format:                     "https://docs.mongodb.com/manual/reference/connection-string/"
+	moogsoft:                                                 "https://www.moogsoft.com/"
+	moogsoft_api:                                             "https://api.docs.moogsoft.com/reference/overview"
 	musl_builder_docker_image:                                "\(vector_repo)/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile"
 	nats:                                                     "https://nats.io/"
 	new_bug_report:                                           "\(vector_repo)/issues/new?labels=type%3A+bug"

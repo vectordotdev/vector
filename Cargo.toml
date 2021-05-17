@@ -524,6 +524,7 @@ sinks-logs = [
   "sinks-kafka",
   "sinks-logdna",
   "sinks-loki",
+  "sinks-moogsoft",
   "sinks-nats",
   "sinks-new_relic_logs",
   "sinks-papertrail",
@@ -541,6 +542,7 @@ sinks-metrics = [
   "sinks-humio",
   "sinks-influxdb",
   "sinks-kafka",
+  "sinks-moogsoft",
   "sinks-prometheus",
   "sinks-sematext",
   "sinks-statsd",
@@ -568,6 +570,7 @@ sinks-influxdb = ["bytesize"]
 sinks-kafka = ["rdkafka"]
 sinks-logdna = ["bytesize"]
 sinks-loki = ["bytesize", "uuid"]
+sinks-moogsoft = []
 sinks-nats = ["async-nats"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-papertrail = ["syslog"]
