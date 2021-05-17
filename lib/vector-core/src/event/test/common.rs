@@ -43,8 +43,8 @@ fn datetime(g: &mut Gen) -> DateTime<Utc> {
     // nanosecond values but doesn't actually document what the valid ranges
     // are. We just sort of arbitrarily restrict things.
     let secs = i64::arbitrary(g) % 32_000;
-    let nsecs = u32::arbitrary(g) % 32_000;
-    DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(secs, nsecs), Utc)
+    let nanosecs = u32::arbitrary(g) % 32_000;
+    DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(secs, nanosecs), Utc)
 }
 
 impl Arbitrary for Event {
@@ -61,8 +61,8 @@ impl Arbitrary for Event {
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         match self {
-            Event::Log(log_event) => Box::new(log_event.shrink().map(|x| Event::Log(x))),
-            Event::Metric(metric) => Box::new(metric.shrink().map(|x| Event::Metric(x))),
+            Event::Log(log_event) => Box::new(log_event.shrink().map(Event::Log)),
+            Event::Metric(metric) => Box::new(metric.shrink().map(Event::Metric)),
         }
     }
 }
@@ -178,6 +178,7 @@ impl Arbitrary for MetricValue {
         }
     }
 
+    #[allow(clippy::too_many_lines)] // no real way to make this shorter
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         match self {
             MetricValue::Counter { value } => {
@@ -190,14 +191,11 @@ impl Arbitrary for MetricValue {
                 Box::new(values.shrink().map(|values| MetricValue::Set { values }))
             }
             MetricValue::Distribution { samples, statistic } => {
-                let statistic = statistic.clone();
+                let statistic = *statistic;
                 Box::new(
                     samples
                         .shrink()
-                        .map(move |samples| MetricValue::Distribution {
-                            samples,
-                            statistic: statistic.clone(),
-                        })
+                        .map(move |samples| MetricValue::Distribution { samples, statistic })
                         .flat_map(|metric_value| match metric_value {
                             MetricValue::Distribution { samples, statistic } => statistic
                                 .shrink()
@@ -215,16 +213,16 @@ impl Arbitrary for MetricValue {
                 sum,
             } => {
                 let buckets = buckets.clone();
-                let count = count.clone();
-                let sum = sum.clone();
+                let count = *count;
+                let sum = *sum;
 
                 Box::new(
                     buckets
                         .shrink()
                         .map(move |buckets| MetricValue::AggregatedHistogram {
                             buckets,
-                            count: count.clone(),
-                            sum: sum.clone(),
+                            count,
+                            sum,
                         })
                         .flat_map(move |hist| match hist {
                             MetricValue::AggregatedHistogram {
@@ -237,7 +235,7 @@ impl Arbitrary for MetricValue {
                                     .map(move |count| MetricValue::AggregatedHistogram {
                                         buckets: buckets.clone(),
                                         count,
-                                        sum: sum.clone(),
+                                        sum,
                                     })
                             }
                             _ => unreachable!(),
@@ -251,7 +249,7 @@ impl Arbitrary for MetricValue {
                                 .shrink()
                                 .map(move |sum| MetricValue::AggregatedHistogram {
                                     buckets: buckets.clone(),
-                                    count: count.clone(),
+                                    count,
                                     sum,
                                 }),
                             _ => unreachable!(),
@@ -264,16 +262,16 @@ impl Arbitrary for MetricValue {
                 sum,
             } => {
                 let quantiles = quantiles.clone();
-                let count = count.clone();
-                let sum = sum.clone();
+                let count = *count;
+                let sum = *sum;
 
                 Box::new(
                     quantiles
                         .shrink()
                         .map(move |quantiles| MetricValue::AggregatedSummary {
                             quantiles,
-                            count: count.clone(),
-                            sum: sum.clone(),
+                            count,
+                            sum,
                         })
                         .flat_map(move |hist| match hist {
                             MetricValue::AggregatedSummary {
@@ -285,7 +283,7 @@ impl Arbitrary for MetricValue {
                                 .map(move |count| MetricValue::AggregatedSummary {
                                     quantiles: quantiles.clone(),
                                     count,
-                                    sum: sum.clone(),
+                                    sum,
                                 }),
                             _ => unreachable!(),
                         })
@@ -296,7 +294,7 @@ impl Arbitrary for MetricValue {
                                 sum,
                             } => sum.shrink().map(move |sum| MetricValue::AggregatedSummary {
                                 quantiles: quantiles.clone(),
-                                count: count.clone(),
+                                count,
                                 sum,
                             }),
                             _ => unreachable!(),
@@ -316,22 +314,21 @@ impl Arbitrary for Sample {
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        let sample = self.clone();
+        let base = *self;
 
         Box::new(
-            sample
-                .value
+            base.value
                 .shrink()
                 .map(move |value| {
-                    let mut sample = sample.clone();
+                    let mut sample = base;
                     sample.value = value;
                     sample
                 })
                 .flat_map(|sample| {
                     sample.rate.shrink().map(move |rate| {
-                        let mut sample = sample.clone();
-                        sample.rate = rate;
-                        sample
+                        let mut ns = sample;
+                        ns.rate = rate;
+                        ns
                     })
                 }),
         )
@@ -347,22 +344,21 @@ impl Arbitrary for Quantile {
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        let quantile = self.clone();
+        let base = *self;
 
         Box::new(
-            quantile
-                .upper_limit
+            base.upper_limit
                 .shrink()
                 .map(move |upper_limit| {
-                    let mut quantile = quantile.clone();
+                    let mut quantile = base;
                     quantile.upper_limit = upper_limit;
                     quantile
                 })
                 .flat_map(|quantile| {
                     quantile.value.shrink().map(move |value| {
-                        let mut quantile = quantile.clone();
-                        quantile.value = value;
-                        quantile
+                        let mut nq = quantile;
+                        nq.value = value;
+                        nq
                     })
                 }),
         )
@@ -378,22 +374,21 @@ impl Arbitrary for Bucket {
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
-        let bucket = self.clone();
+        let base = *self;
 
         Box::new(
-            bucket
-                .upper_limit
+            base.upper_limit
                 .shrink()
                 .map(move |upper_limit| {
-                    let mut bucket = bucket.clone();
-                    bucket.upper_limit = upper_limit;
-                    bucket
+                    let mut nb = base;
+                    nb.upper_limit = upper_limit;
+                    nb
                 })
                 .flat_map(|bucket| {
                     bucket.count.shrink().map(move |count| {
-                        let mut bucket = bucket.clone();
-                        bucket.count = count;
-                        bucket
+                        let mut nb = bucket;
+                        nb.count = count;
+                        nb
                     })
                 }),
         )

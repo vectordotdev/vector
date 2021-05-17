@@ -7,6 +7,8 @@ use regex::Regex;
 
 // Ser/De the Event type through EncodeBytes -> DecodeBytes
 #[test]
+#[allow(clippy::neg_cmp_op_on_partial_ord)] // satisfying clippy leads to less
+                                            // clear expression
 fn back_and_forth_through_bytes() {
     fn inner(event: Event) -> TestResult {
         let expected = event.clone();
