@@ -144,6 +144,7 @@ tower-layer = { version = "0.3.1", default-features = false }
 serde = { version = "1.0.126", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.64", default-features = false, features = ["raw_value"] }
 serde_yaml = { version = "0.8.17", default-features = false }
+rmp-serde = { version = "0.15.4", default-features = false, optional = true }
 
 # Prost
 prost = { version = "0.7.0", default-features = false }
@@ -373,6 +374,7 @@ sources-logs = [
   "sources-docker_logs",
   "sources-exec",
   "sources-file",
+  "sources-fluent",
   "sources-generator",
   "sources-heroku_logs",
   "sources-http",
@@ -407,6 +409,7 @@ sources-datadog = ["sources-utils-http"]
 sources-docker_logs = ["bollard", "dirs-next"]
 sources-exec = []
 sources-file = ["bytesize", "file-source"]
+sources-fluent = ["bytesize", "listenfd", "tokio-util/net", "rmp-serde", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls"]
 sources-generator = ["fakedata"]
 sources-heroku_logs = ["sources-utils-http"]
 sources-host_metrics = ["heim"]
