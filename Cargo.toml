@@ -109,7 +109,7 @@ futures = { version = "0.3.15", default-features = false, features = ["compat", 
 tokio = { version = "1.5.0", default-features = false, features = ["full"] }
 tokio-openssl = { version = "0.6.1", default-features = false }
 tokio-stream = { version = "0.1.5", default-features = false, features = ["net", "sync"] }
-tokio-util = { version = "0.6.6", default-features = false, features = ["codec", "time"] }
+tokio-util = { version = "0.6.7", default-features = false, features = ["codec", "time"] }
 
 # Tracing
 tracing = { version = "0.1.26", default-features = false }
