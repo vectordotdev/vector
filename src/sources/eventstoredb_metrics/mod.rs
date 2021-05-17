@@ -4,9 +4,13 @@ use crate::internal_events::{
 };
 use crate::{
     config::{self, SourceConfig, SourceContext, SourceDescription},
-    Event,
+    event::Event,
+    http::HttpClient,
+    tls::TlsSettings,
 };
 use futures::{stream, FutureExt, SinkExt, StreamExt};
+use http::Uri;
+use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio_stream::wrappers::IntervalStream;
@@ -68,18 +72,19 @@ fn eventstoredb(
         .sink_map_err(|error| error!(message = "Error sending metric.", %error));
     let mut ticks = IntervalStream::new(tokio::time::interval(Duration::from_secs(interval)))
         .take_until(cx.shutdown);
-    let client = hyper::Client::builder().build(hyper_openssl::HttpsConnector::new()?);
-    let url: http::Uri = format!("{}/stats", endpoint).parse()?;
+    let tls_settings = TlsSettings::from_options(&None)?;
+    let client = HttpClient::new(tls_settings)?;
+    let url: Uri = format!("{}/stats", endpoint).parse()?;
 
     Ok(Box::pin(
         async move {
             while ticks.next().await.is_some() {
-                let req = hyper::Request::get(&url)
+                let req = Request::get(&url)
                     .header("content-type", "application/json")
-                    .body(hyper::Body::empty())
+                    .body(Body::empty())
                     .unwrap();
 
-                match client.request(req).await {
+                match client.send(req).await {
                     Err(error) => {
                         emit!(EventStoreDbMetricsHttpError {
                             error: error.into(),
