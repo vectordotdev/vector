@@ -53,10 +53,10 @@ components: sources: aws_kinesis_firehose: {
 		}
 		requirements: [
 			"""
-			AWS Kinesis Firehose can only deliver data over HTTP. You will need
-			to solve TLS termination by fronting Vector with a load balaner or
-			configuring the `tls.*` options.
-			""",
+				AWS Kinesis Firehose can only deliver data over HTTP. You will need
+				to solve TLS termination by fronting Vector with a load balaner or
+				configuring the `tls.*` options.
+				""",
 		]
 
 		warnings: []
@@ -160,7 +160,7 @@ components: sources: aws_kinesis_firehose: {
 	how_it_works: {
 		structured_events: {
 			title: "Forwarding CloudWatch Log events"
-			body: """
+			body:  """
 				This source is the recommended way to ingest logs from AWS
 				CloudWatch logs via [AWS CloudWatch Log
 				subscriptions][aws_cloudwatch_logs_subscriptions]. To

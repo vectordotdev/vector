@@ -93,13 +93,13 @@ components: sources: docker_logs: {
 			drivers.
 			""",
 			"""
-			To avoid collecting logs from itself when deployed as a container,
-			the Docker source uses current hostname to find out which container
-			it is inside. If a container's ID matches the hostname, that container
-			will be excluded.
-			If you change container's hostname, consider manually excluding Vector
-			container using [`exclude_containers`](#exclude_containers).
-			""",
+				To avoid collecting logs from itself when deployed as a container,
+				the Docker source uses current hostname to find out which container
+				it is inside. If a container's ID matches the hostname, that container
+				will be excluded.
+				If you change container's hostname, consider manually excluding Vector
+				container using [`exclude_containers`](#exclude_containers).
+				""",
 		]
 		notices: []
 	}

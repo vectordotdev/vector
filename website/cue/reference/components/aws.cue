@@ -155,7 +155,7 @@ components: _aws: {
 	how_it_works: {
 		aws_authentication: {
 			title: "AWS authentication"
-			body: """
+			body:  """
 				Vector checks for AWS credentials in the following order:
 
 				1. The [`access_key_id`](#access_key_id) and [`secret_access_key`](#secret_access_key) options.

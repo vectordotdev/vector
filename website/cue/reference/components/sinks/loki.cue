@@ -98,7 +98,7 @@ components: sinks: loki: {
 				this can cause drastic performance issues with Loki. To ensure this doesn't happen, you should try to
 				reduce the number of unique label values.
 				"""
-			required:    true
+			required: true
 			warnings: []
 			type: object: {
 				examples: [

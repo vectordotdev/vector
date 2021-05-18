@@ -27,5 +27,5 @@ releases: {
 		whats_next: #Any
 	}
 
-	{[Version=string]: #Release & { version: Version }}
+	{[Version=string]: #Release & {version: Version}}
 }

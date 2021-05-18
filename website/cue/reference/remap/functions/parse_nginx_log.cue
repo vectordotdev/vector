@@ -19,15 +19,15 @@ remap: functions: parse_nginx_log: {
 			type: ["string"]
 		},
 		{
-			name: "timestamp_format"
+			name:        "timestamp_format"
 			description: """
 
 				The [date/time format](\(urls.chrono_time_formats)) to use for encoding the timestamp. The time is parsed
 				in local time if the timestamp doesn't specify a timezone. The default format is `%d/%b/%Y:%T %z` for
 				combined logs and `%Y/%m/%d %H:%M:%S` for error logs.
 				"""
-			required: false
-			default:  "%d/%b/%Y:%T %z"
+			required:    false
+			default:     "%d/%b/%Y:%T %z"
 			type: ["string"]
 		},
 		{

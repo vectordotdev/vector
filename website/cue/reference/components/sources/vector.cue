@@ -68,7 +68,7 @@ components: sources: vector: {
 				The TCP address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd
 				socket activation. If an address is used it _must_ include a port.
 				"""
-			required:    true
+			required: true
 			warnings: []
 			type: string: {
 				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#1"]

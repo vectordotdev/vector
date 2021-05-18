@@ -12,7 +12,7 @@ remap: features: type_safety: {
 
 	characteristics: {
 		progressive: {
-			title: "Progressive type safety"
+			title:       "Progressive type safety"
 			description: """
 				VRL's type-safety is _progressive_, meaning it will implement type-safety for any value for which it
 				knows the type. Because observability data can be quite unpredictable, it's not always known which

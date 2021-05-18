@@ -97,14 +97,14 @@ components: sinks: _humio: {
 			}
 		}
 		event_type: {
-			common:      false
+			common: false
 			description: """
 				The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the
 				data.
 
 				If unset, Humio will default it to none.
 				"""
-			required:    false
+			required: false
 			warnings: []
 			type: string: {
 				default: null
@@ -127,12 +127,12 @@ components: sinks: _humio: {
 			}
 		}
 		source: {
-			common:      false
+			common: false
 			description: """
 				The source of events sent to this sink. Typically the filename the logs originated from. Maps to
 				`@source` in Humio.
 				"""
-			required:    false
+			required: false
 			warnings: []
 			type: string: {
 				default: null

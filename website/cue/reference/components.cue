@@ -68,8 +68,8 @@ components: {
 		// `examples` demonstrates various ways to use the component using an
 		// input, output, and example configuration.
 		#ExampleConfig: {
-			title:    string
-			context?: string
+			title:           string
+			context?:        string
 			"configuration": {
 				...
 				for k, v in configuration {

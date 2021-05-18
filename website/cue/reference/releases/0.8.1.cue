@@ -1,7 +1,7 @@
 package metadata
 
 releases: "0.8.1": {
-	date:     "2020-03-04"
+	date: "2020-03-04"
 
 	whats_next: [
 	]

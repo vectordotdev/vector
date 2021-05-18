@@ -408,7 +408,7 @@ components: sinks: [Name=string]: {
 					if features.send.batch.enabled {
 						buffers_batches: {
 							title: "Buffers and batches"
-							svg: "/img/buffers-and-batches-serial.svg"
+							svg:   "/img/buffers-and-batches-serial.svg"
 							body: #"""
 								This component buffers & batches data as shown in the diagram above. You'll notice that
 								Vector treats these concepts differently, instead of treating them as global concepts,
@@ -430,7 +430,7 @@ components: sinks: [Name=string]: {
 			if features.send == _|_ {
 				buffers: {
 					title: "Buffers"
-					svg: "/img/buffers.svg"
+					svg:   "/img/buffers.svg"
 					body: """
 						This component buffers events as shown in
 						the diagram above. This helps to smooth out data processing if the downstream

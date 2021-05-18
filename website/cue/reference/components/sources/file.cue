@@ -394,7 +394,6 @@ components: sources: file: {
 				"""
 		}
 
-
 		globbing: {
 			title: "Globbing"
 			body:  """

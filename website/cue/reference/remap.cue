@@ -34,8 +34,8 @@ package metadata
 	concepts: _
 	errors:   _
 	examples: [#Example, ...#Example]
-	expressions:  _
-	functions:    _
+	expressions: _
+	functions:   _
 	function_categories: [string, ...string]
 	how_it_works: #HowItWorks
 	literals:     _

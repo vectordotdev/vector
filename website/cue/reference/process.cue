@@ -17,12 +17,12 @@ process: {
 
 	exit_codes: {
 		description: string
-		codes: #ExitCodes
+		codes:       #ExitCodes
 	}
 
 	process_signals: {
 		description: string
-		signals: #Signals
+		signals:     #Signals
 	}
 
 	exit_codes: {

@@ -218,7 +218,7 @@ components: sinks: gcp_cloud_storage: {
 		}
 		object_naming: {
 			title: "Object naming"
-			body: """
+			body:  """
 				By default, Vector names your GCS objects in accordance with one of two formats.
 
 				If compression *is* enabled, this format is used:

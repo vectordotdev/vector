@@ -97,8 +97,8 @@ components: sources: postgresql_metrics: {
 				all databases. Specifying `""` will include metrics where `datname` is `NULL`. This can be used in
 				conjunction with [`exclude_databases`](#exclude_databases).
 				"""
-			common:   false
-			required: false
+			common:      false
+			required:    false
 			type: array: {
 				default: null
 				items: type: string: {
@@ -114,8 +114,8 @@ components: sources: postgresql_metrics: {
 				Specifying `""` will include metrics where `datname` is `NULL`.
 				This can be used in conjunction with [`include_databases`](#include_databases).
 				"""
-			common:   false
-			required: false
+			common:      false
+			required:    false
 			type: array: {
 				default: null
 				items: type: string: {

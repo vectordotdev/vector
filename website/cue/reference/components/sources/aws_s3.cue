@@ -167,7 +167,7 @@ components: sources: aws_s3: components._aws & {
 	how_it_works: {
 		events: {
 			title: "Handling events from the `aws_s3` source"
-			body: """
+			body:  """
 				This source behaves very similarly to the `file` source in that
 				it will output one event per line (unless the `multiline`
 				configuration option is used).

@@ -464,6 +464,7 @@ urls: {
 	vector_msi_source_files:                                  "\(vector_repo)/tree/master/distribution/msi"
 	vector_nightly_builds:                                    "https://packages.timber.io/vector/nightly/latest/"
 	vector_nix_package:                                       "\(github)/NixOS/nixpkgs/blob/master/pkgs/tools/misc/vector/default.nix"
+	vector_packages_root:                                     "https://packages.timber.io"
 	vector_parsing_transforms:                                "/components/?functions%5B%5D=parse"
 	vector_performance:                                       "\(vector_repo)/#performance"
 	vector_privacy_policy:                                    "\(vector_repo)/blob/master/PRIVACY.md"

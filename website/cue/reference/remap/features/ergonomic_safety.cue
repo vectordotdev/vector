@@ -51,14 +51,14 @@ remap: features: ergonomic_safety: {
 				"""
 		}
 		rate_limited_logging: {
-			title: "Rate-limited logging"
+			title:       "Rate-limited logging"
 			description: """
 				The VRL [`log`](\(urls.vrl_functions)#log) function implements rate limiting by default. This ensures
 				that VRL programs invoking the `log` method don't accidentally saturate I/O.
 				"""
 		}
 		purpose_built: {
-			title: "Purpose built for observability"
+			title:       "Purpose built for observability"
 			description: """
 				VRL is laser focused on observability use cases and *only* those use cases. This makes many
 				frustration- and complexity-producing constructs you find in other languages completely superfluous.

@@ -1,7 +1,7 @@
 {{ $version := .version }}
-{{ $v1 := cond (eq $version "nightly") "latest" (printf "vector-%s" $version) }}
+{{ $v1 := cond (eq $version "nightly") "nightly/latest" $version }}
 {{ $host := site.Data.matrix.host }}
-{{ $matrix := site.Data.docs.management.downloads }}
+{{ $matrix := site.Data.docs.installation.downloads }}
 <div class="flex flex-col space-y-1.5">
   {{ range $matrix }}
   {{ $file := .file }}
@@ -25,8 +25,8 @@
       {{/* Targets (ARM, x86_64, etc.) */}}
       <div class="flex space-x-1.5">
         {{ range .options }}
-
-        {{ $url := .download_url | replaceRE "{version}" $version }}
+        {{ $vector := cond (eq $version "nightly") "vector/nightly" "vector" }}
+        {{ $url := .download_url | replaceRE "{v1}" $v1 | replaceRE "{v2}" $version }}
 
         <a
           type="button"

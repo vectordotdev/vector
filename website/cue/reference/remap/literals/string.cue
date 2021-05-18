@@ -16,17 +16,17 @@ remap: literals: string: {
 
 	examples: [
 		#"""
-		"Hello, world! 🌎"
-		"""#,
+			"Hello, world! 🌎"
+			"""#,
 		#"""
-		"Hello, world! \\u1F30E"
-		"""#,
+			"Hello, world! \\u1F30E"
+			"""#,
 		#"""
-		s'Hello, world!'
-		"""#,
+			s'Hello, world!'
+			"""#,
 		#"""
-		s'{ "foo": "bar" }'
-		"""#,
+			s'{ "foo": "bar" }'
+			"""#,
 	]
 
 	characteristics: {
