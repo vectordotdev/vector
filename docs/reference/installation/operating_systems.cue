@@ -4,7 +4,7 @@ installation: {
 	#OperatingSystem: {
 		description: string
 		family:      #OperatingSystemFamily
-		interfaces: [...installation.#Interface & {_shell: shell}]
+		interfaces: [installation.#Interface & {_shell: shell}, ...installation.#Interface & {_shell: shell}]
 		minimum_supported_version: string | null
 		name:                      string
 		shell:                     string
