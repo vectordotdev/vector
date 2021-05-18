@@ -8,17 +8,17 @@
 {{ $postCssOpts  := dict "inlineImports" true }}
 {{ $css          := resources.Get $sass | resources.ExecuteAsTemplate $sass . | toCSS $cssOpts | postCSS $postCssOpts }}
 
-{{/* The Sass for the TOC needs to be handled separately, as PurgeCSS will eliminate all of these
+{{/* Some Sass needs to be handled separately, as PurgeCSS will eliminate all of these
   classes since they're created at page load time by JavaScript */}}
-{{ $tocCss := resources.Get "sass/toc.sass" | toCSS (dict "targetPath" "css/toc.css" "outputStyle" "compressed") }}
+{{ $unpurgedCss := resources.Get "sass/unpurged.sass" | toCSS (dict "targetPath" "css/unpurged.css" "outputStyle" "compressed") }}
 
 {{/* Run CSS post-processing for production and preview builds */}}
 {{ if $serverMode }}
 <link rel="stylesheet" href="{{ $css.RelPermalink }}">
-<link rel="stylesheet" href="{{ $tocCss.RelPermalink }}">
+<link rel="stylesheet" href="{{ $unpurgedCss.RelPermalink }}">
 {{ else }}
-{{ $css := $css | fingerprint | resources.PostProcess }}
-{{ $tocCss := $tocCss | fingerprint }}
+{{ $css = $css | fingerprint | resources.PostProcess }}
+{{ $unpurgedCss = $unpurgedCss | fingerprint }}
 <link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
-<link rel="stylesheet" href="{{ $tocCss.RelPermalink }}" integrity="{{ $tocCss.Data.Integrity }}">
+<link rel="stylesheet" href="{{ $unpurgedCss.RelPermalink }}" integrity="{{ $unpurgedCss.Data.Integrity }}">
 {{ end }}
