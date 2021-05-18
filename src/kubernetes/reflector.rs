@@ -132,6 +132,7 @@ where
                             self.state_writer.resync().await;
                             continue 'outer;
                         }
+                        // We have an error, attempt to recover from this error and continue the outer loop.
                         Err(watcher::stream::Error::Recoverable { source }) => {
                             emit!(internal_events::InvocationHttpErrorReceived { error: source });
                             continue 'outer;
