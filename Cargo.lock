@@ -5685,6 +5685,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rmpv"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c760afe11955e16121e36485b6b828326c3f0eaff1c31758d96dbeb5cf09fd5"
+dependencies = [
+ "num-traits",
+ "rmp",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
 name = "rpassword"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7863,6 +7875,7 @@ dependencies = [
  "reqwest",
  "rlua",
  "rmp-serde",
+ "rmpv",
  "rusoto_cloudwatch",
  "rusoto_core",
  "rusoto_credential",
@@ -7879,6 +7892,7 @@ dependencies = [
  "security-framework",
  "semver 0.11.0",
  "serde",
+ "serde_bytes",
  "serde_json",
  "serde_yaml",
  "shared",

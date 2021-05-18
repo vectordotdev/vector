@@ -81,6 +81,13 @@ where
 
     fn build_event(&self, frame: <Self::Decoder as Decoder>::Item, host: Bytes) -> Option<Event>;
 
+    fn build_events(&self, frame: <Self::Decoder as Decoder>::Item, host: Bytes) -> Vec<Event> {
+        match self.build_event(frame, host) {
+            Some(event) => vec![event],
+            None => vec![],
+        }
+    }
+
     fn run(
         self,
         addr: SocketListenAddr,
@@ -263,13 +270,14 @@ async fn handle_stream<T>(
     .filter_map(move |frame| ready(match frame {
         Ok(frame) => {
             let host = host.clone();
-            source.build_event(frame, host).map(Ok)
+            Some(futures::stream::iter(source.build_events(frame, host).into_iter().map(Ok)))
         }
         Err(error) => {
             warn!(message = "Failed to read data from TCP source.", %error);
             None
         }
     }))
+    .flatten()
     .forward(out)
     .map_err(|_| warn!(message = "Error received while processing TCP source."))
     .map(|_| debug!("Connection closed."))

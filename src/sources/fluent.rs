@@ -1,18 +1,26 @@
 use super::util::{SocketListenAddr, TcpIsErrorFatal, TcpSource};
 use crate::{
     config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
-    event::Event,
+    event::{Event, Value},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
 };
-use bytes::{Bytes, BytesMut};
+use bytes::{Buf, Bytes, BytesMut};
+use chrono::{serde::ts_seconds, DateTime, TimeZone, Utc};
 use rmp_serde::{decode, Deserializer};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, io};
+use std::{collections::BTreeMap, convert::TryInto, io};
 use tokio_util::codec::Decoder;
 
 // TODO
 // * internal events
+// * consider using serde_tuple
+// * authentication
+// * packed format
+// * packed compressed format
+// * chunking/acking
+// * support tag and tag prefix overrides
+// * integration testing
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct FluentConfig {
@@ -20,10 +28,6 @@ pub struct FluentConfig {
     tls: Option<TlsConfig>,
     keepalive: Option<TcpKeepaliveConfig>,
     receive_buffer_bytes: Option<usize>,
-    // TODO
-    //tag: Option<String>,
-    //add_tag_prefix: Option<String>,
-    // TODO authentication, compression, acking
 }
 
 inventory::submit! {
@@ -85,7 +89,30 @@ impl TcpSource for FluentSource {
     }
 
     fn build_event(&self, _fluent_message: FluentMessage, _host: Bytes) -> Option<Event> {
+        // TODO transition all to build_events
         None
+    }
+
+    fn build_events(&self, fluent_message: FluentMessage, _host: Bytes) -> Vec<Event> {
+        match fluent_message {
+            FluentMessage::Message(tag, timestamp, record)
+            | FluentMessage::MessageWithOptions(tag, timestamp, record, ..) => vec![],
+            FluentMessage::Forward(tag, entries)
+            | FluentMessage::ForwardWithOptions(tag, entries, ..) => entries
+                .into_iter()
+                .map(|FluentEntry(timestamp, record)| {
+                    let fields = record
+                        .into_iter()
+                        .map(|(key, value)| (key, Value::from(value)))
+                        .collect::<BTreeMap<String, Value>>();
+                    let mut event = Event::from(fields);
+                    let log = event.as_mut_log();
+                    log.insert("timestamp", timestamp.clone());
+                    log.insert("fluent_tag", tag.clone());
+                    event
+                })
+                .collect(),
+        }
     }
 }
 
@@ -108,7 +135,7 @@ impl TcpIsErrorFatal for DecodeError {
     fn is_error_fatal(&self) -> bool {
         match self {
             DecodeError::IO(_) => true,
-            DecodeError::Decode(_) => false, // TODO is this right?
+            DecodeError::Decode(_) => false,
         }
     }
 }
@@ -125,15 +152,6 @@ impl From<decode::Error> for DecodeError {
     }
 }
 
-#[derive(Debug, Deserialize)]
-struct FluentMessage(String, Vec<FluentRecord>);
-
-#[derive(Debug, Deserialize)]
-struct FluentRecord {
-    timestamp: String,
-    fields: BTreeMap<String, String>,
-}
-
 #[derive(Clone, Debug)]
 struct FluentDecoder;
 
@@ -146,19 +164,198 @@ impl Decoder for FluentDecoder {
             return Ok(None);
         }
         dbg!(&src);
-        let (pos, rv) = {
+        let (pos, res) = {
             let mut des = Deserializer::new(io::Cursor::new(&src[..]));
-            let rv = Deserialize::deserialize(&mut des).map_err(|e| DecodeError::Decode(e));
-            if let Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) = rv {
+
+            // attempt to parse, if we get unexpected EOF, we need more data
+            let res = Deserialize::deserialize(&mut des).map_err(|e| DecodeError::Decode(e));
+            dbg!(&res);
+            if let Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) = res {
                 if custom.kind() == io::ErrorKind::UnexpectedEof {
                     return Ok(None);
                 }
             }
-            let pos = des.position() as usize;
-            (pos, rv)
+
+            (des.position() as usize, res)
         };
-        src.split_to(pos);
-        rv
+
+        src.advance(pos);
+
+        res
+    }
+}
+
+/// A fluent msgpack entries messages can be encoded in one of three ways, each with and without
+/// options, all using arrays to encode the top-level fields.
+///
+/// The spec refers to 4 ways, but really CompressedPackedForward is encoded the same as
+/// PackedForward, it just has an additional decompression step.
+///
+/// Not yet handled are the handshake messages.
+///
+/// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#event-modes
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum FluentMessage {
+    Message(FluentTag, FluentTimestamp, FluentRecord),
+    MessageWithOptions(
+        FluentTag,
+        FluentTimestamp,
+        FluentRecord,
+        FluentMessageOptions,
+    ),
+    Forward(FluentTag, Vec<FluentEntry>),
+    ForwardWithOptions(FluentTag, Vec<FluentEntry>, FluentMessageOptions),
+}
+
+/// Server options sent by client.
+///
+/// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#option
+#[derive(Debug, Deserialize)]
+struct FluentMessageOptions {
+    size: u64,
+    chunk: String,
+    compressed: String,
+}
+
+/// Fluent entry consisting of timestamp and record.
+///
+/// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#forward-mode
+#[derive(Debug, Deserialize)]
+struct FluentEntry(FluentTimestamp, FluentRecord);
+
+/// Fluent record is just key/value pairs.
+type FluentRecord = BTreeMap<String, FluentValue>;
+
+/// Fluent message tag.
+type FluentTag = String;
+
+/// Value for fluent record key.
+///
+/// Used mostly just to implement value conversion.
+#[derive(Debug, Deserialize)]
+struct FluentValue(rmpv::Value);
+
+impl From<FluentValue> for Value {
+    fn from(value: FluentValue) -> Self {
+        match value.0 {
+            rmpv::Value::Nil => Value::Null,
+            rmpv::Value::Boolean(b) => Value::Boolean(b),
+            // TODO what to do with large numbers?
+            rmpv::Value::Integer(i) => Value::Integer(i.as_i64().unwrap()),
+            rmpv::Value::F32(f) => Value::Float(f.into()),
+            rmpv::Value::F64(f) => Value::Float(f),
+            rmpv::Value::String(s) => Value::Bytes(s.into_bytes().into()),
+            rmpv::Value::Binary(bytes) => Value::Bytes(bytes.into()),
+            rmpv::Value::Array(values) => Value::Array(
+                values
+                    .into_iter()
+                    .map(|value| Value::from(FluentValue(value)))
+                    .collect(),
+            ),
+            rmpv::Value::Map(values) => Value::Map(
+                values
+                    .into_iter()
+                    .map(|(key, value)| (format!("{}", key), Value::from(FluentValue(value))))
+                    .collect(),
+            ),
+            rmpv::Value::Ext(code, bytes) => {
+                let mut fields = BTreeMap::new();
+                fields.insert(
+                    String::from("msgpack_extension_code"),
+                    Value::Integer(code.into()),
+                );
+                fields.insert(String::from("bytes"), Value::Bytes(bytes.into()));
+                Value::Map(fields)
+            }
+        }
+    }
+}
+
+/// Fluent message timestamp.
+///
+/// Message timestamps can be a unix timestamp or EventTime messagepack ext.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(untagged)]
+enum FluentTimestamp {
+    #[serde(with = "ts_seconds")]
+    Unix(DateTime<Utc>),
+    Ext(FluentEventTime),
+}
+
+impl From<FluentTimestamp> for Value {
+    fn from(timestamp: FluentTimestamp) -> Self {
+        match timestamp {
+            FluentTimestamp::Unix(timestamp) | FluentTimestamp::Ext(FluentEventTime(timestamp)) => {
+                Value::Timestamp(timestamp)
+            }
+        }
+    }
+}
+
+/// Custom decoder for Fluent's EventTime msgpack extension.
+///
+/// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#eventtime-ext-format
+#[derive(Clone, Debug)]
+struct FluentEventTime(DateTime<Utc>);
+
+impl<'de> serde::de::Deserialize<'de> for FluentEventTime {
+    fn deserialize<D>(deserializer: D) -> Result<FluentEventTime, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct FluentEventTimeVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for FluentEventTimeVisitor {
+            type Value = FluentEventTime;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("fluent timestamp extension")
+            }
+
+            fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+            where
+                D: serde::de::Deserializer<'de>,
+            {
+                deserializer.deserialize_tuple(2, self)
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let tag: u32 = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
+
+                if tag != 0 {
+                    return Err(serde::de::Error::custom(format!(
+                        "expected extension type 0 for fluent timestamp, got got {}",
+                        tag
+                    )));
+                }
+
+                let bytes: serde_bytes::ByteBuf = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
+
+                if bytes.len() != 8 {
+                    return Err(serde::de::Error::custom(format!(
+                        "expected exactly 8 bytes for binary encoded fluent timestamp, got {}",
+                        bytes.len()
+                    )));
+                }
+
+                // length checked right above
+                let seconds = u32::from_be_bytes(bytes[..4].try_into().expect("exactly 4 bytes"));
+                let nanoseconds =
+                    u32::from_be_bytes(bytes[4..].try_into().expect("exactly 4 bytes"));
+
+                Ok(FluentEventTime(Utc.timestamp(seconds.into(), nanoseconds)))
+            }
+        }
+
+        deserializer.deserialize_any(FluentEventTimeVisitor)
     }
 }
 
