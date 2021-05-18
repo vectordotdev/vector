@@ -837,15 +837,16 @@ dependencies = [
 
 [[package]]
 name = "bson"
-version = "1.2.2"
+version = "2.0.0-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38b6553abdb9d2d8f262f0b5bccf807321d5b7d1a12796bcede8e1f150e85f2e"
+checksum = "441bd9b15699ed6fd29a3546ed614a943a9dbab851b799e2344f3f11b3230bdc"
 dependencies = [
+ "ahash",
  "base64 0.13.0",
  "chrono",
  "hex",
+ "indexmap",
  "lazy_static",
- "linked-hash-map",
  "rand 0.7.3",
  "serde",
  "serde_json",
@@ -3977,9 +3978,9 @@ checksum = "717e29a243b81f8130e31e24e04fb151b04a44b5a7d05370935f7d937e9de06d"
 
 [[package]]
 name = "mongodb"
-version = "2.0.0-alpha.1"
+version = "2.0.0-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1264c64d5469f05c0201b939f971138bd385e7eb87eacdfd79f0c18b9eae7940"
+checksum = "e7bf6da4c15a6eea66750989ff2f3319d6ca9fdc8f903d4dc1c0ef72541af905"
 dependencies = [
  "async-trait",
  "base64 0.13.0",
@@ -3987,7 +3988,10 @@ dependencies = [
  "bson",
  "chrono",
  "derivative 2.2.0",
- "futures 0.3.15",
+ "futures-core",
+ "futures-executor",
+ "futures-io",
+ "futures-util",
  "hex",
  "hmac",
  "lazy_static",
@@ -4013,7 +4017,7 @@ dependencies = [
  "tokio-util",
  "trust-dns-proto",
  "trust-dns-resolver",
- "typed-builder 0.4.1",
+ "typed-builder 0.9.0",
  "uuid 0.8.2",
  "version_check 0.9.3",
  "webpki",
@@ -7443,9 +7447,9 @@ dependencies = [
 
 [[package]]
 name = "typed-builder"
-version = "0.4.1"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfc955f27acc7a547f328f52f4a5a568986a31efec2fc6de865279f3995787b9"
+checksum = "78cea224ddd4282dfc40d1edabbd0c020a12e946e3a48e2c2b8f6ff167ad29fe"
 dependencies = [
  "proc-macro2 1.0.26",
  "quote 1.0.9",
@@ -7454,9 +7458,9 @@ dependencies = [
 
 [[package]]
 name = "typed-builder"
-version = "0.5.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78cea224ddd4282dfc40d1edabbd0c020a12e946e3a48e2c2b8f6ff167ad29fe"
+checksum = "345426c7406aa355b60c5007c79a2d1f5b605540072795222f17f6443e6a9c6f"
 dependencies = [
  "proc-macro2 1.0.26",
  "quote 1.0.9",
