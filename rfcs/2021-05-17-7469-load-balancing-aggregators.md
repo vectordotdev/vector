@@ -58,6 +58,7 @@ backend vector_template
 
 - [Logstash: Scaling TCP, UDP, and HTTP](https://www.elastic.co/guide/en/logstash/current/deploying-and-scaling.html#_tcp_udp_and_http_protocols)
 - [Fluentd: Aggregator behind Network Load Balancer](https://aws.amazon.com/blogs/compute/building-a-scalable-log-solution-aggregator-with-aws-fargate-fluentd-and-amazon-kinesis-data-firehose/)
+- [Cribl: Bring your own load balancer](https://docs.cribl.io/docs/deploy-distributed#architecture)
 
 ## Drawbacks
 
@@ -73,11 +74,15 @@ The Vector aggregator can currently function as a single instance and be scaled 
 
 ### Only Client-side Load Balancing
 
-The only client we actively control is Vector running as an agent, thus this leaves us with two options: users must use Vector agents to enable horizontal scaling and load balancing or use clients that natively support client-side load balancing.
+The library powering the v2 Vector `sink`/`source` does provide the capabilities to do client-side load balancing, however that just covers a single `sink` to `source` pairing. For certain clients like Beats and Logstash we could implement an Elasticsearch compatible API and allow those clients to use their native load balancing and integrations, this would generally be per source and not available for all sources.
 
 ### Require a Service Mesh
 
 Users already leveraging a service mesh could offload the load balancing to the mesh, however, requiring a service mesh to run and scale Vector aggregators horizontally is a large barrier to adoption.
+
+### Distributed hashring
+
+Project like Thanos and Loki have used hashrings to enable multi-tenancy, we could likely do something similar to ensure events are forwarded to the correct aggregator. I don't think anyone wants to turn Vector into a distributed system though.
 
 ## Outstanding Questions
 
