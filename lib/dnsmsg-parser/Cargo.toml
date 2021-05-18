@@ -10,3 +10,13 @@ license = "MIT"
 data-encoding = "2.2"
 snafu = "0.6.10"
 trust-dns-proto = { version = "0.20", features = ["dnssec"] }
+
+[dev-dependencies]
+criterion = "0.3"
+
+[lib]
+bench = false
+
+[[bench]]
+name = "benches"
+harness = false

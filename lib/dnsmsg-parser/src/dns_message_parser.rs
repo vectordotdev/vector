@@ -336,7 +336,7 @@ impl DnsMessageParser {
         Ok((Some(apl_rdata.trim_end().to_string()), None))
     }
 
-    fn format_unknown_rdata(
+    pub fn format_unknown_rdata(
         &mut self,
         code: u16,
         rdata: &NULL,
@@ -964,17 +964,13 @@ fn parse_dns_update_message_header(dns_message: &TrustDnsMessage) -> UpdateHeade
 }
 
 fn parse_edns(dns_message: &TrustDnsMessage) -> Option<OptPseudoSection> {
-    match dns_message.edns() {
-        Some(edns) => Some(OptPseudoSection {
-            extended_rcode: edns.rcode_high(),
-            version: edns.version(),
-            dnssec_ok: edns.dnssec_ok(),
-            udp_max_payload_size: edns.max_payload(),
-            options: parse_edns_options(edns),
-        }),
-
-        None => None,
-    }
+    dns_message.edns().map(|edns| OptPseudoSection {
+        extended_rcode: edns.rcode_high(),
+        version: edns.version(),
+        dnssec_ok: edns.dnssec_ok(),
+        udp_max_payload_size: edns.max_payload(),
+        options: parse_edns_options(edns),
+    })
 }
 
 fn parse_edns_options(edns: &Edns) -> Vec<EdnsOptionEntry> {
@@ -1217,7 +1213,6 @@ mod tests {
     use std::{
         net::{Ipv4Addr, Ipv6Addr},
         str::FromStr,
-        time::Instant,
     };
     use trust_dns_proto::{
         rr::{
@@ -1920,26 +1915,5 @@ mod tests {
                     .len()
             );
         }
-    }
-
-    #[test]
-    #[ignore]
-    fn benchmark_parse_as_query_message() {
-        let raw_dns_message = "szgAAAABAAAAAAAAAmg1B2V4YW1wbGUDY29tAAAGAAE=";
-        let raw_query_message = BASE64
-            .decode(raw_dns_message.as_bytes())
-            .expect("Invalid base64 encoded data.");
-        let start = Instant::now();
-        let num = 10_000;
-        for _ in 0..num {
-            let parse_result =
-                DnsMessageParser::new(raw_query_message.clone()).parse_as_query_message();
-            assert!(parse_result.is_ok());
-        }
-        let time_taken = Instant::now().duration_since(start);
-        println!(
-            "Time taken to parse {} DNS query messages: {:#?}.",
-            num, time_taken
-        );
     }
 }

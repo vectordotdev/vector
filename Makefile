@@ -547,6 +547,11 @@ bench: ## Run benchmarks in /benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
+.PHONY: bench-dnsmsg-parser
+bench-dnsmsg-parser: ## Run dnsmsg-parser benches
+	${MAYBE_ENVIRONMENT_EXEC} CRITERION_HOME="$(CRITERION_HOME)" cargo bench --manifest-path lib/dnsmsg-parser/Cargo.toml ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
 .PHONY: bench-remap-functions
 bench-remap-functions: ## Run remap-functions benches
 	${MAYBE_ENVIRONMENT_EXEC} CRITERION_HOME="$(CRITERION_HOME)" cargo bench --manifest-path lib/vrl/stdlib/Cargo.toml ${CARGO_BENCH_FLAGS}
