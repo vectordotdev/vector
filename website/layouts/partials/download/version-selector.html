@@ -11,6 +11,9 @@
 
         {{ $show := printf `$store.global.version === '%s'` $latest }}
         {{ partial "badge.html" (dict "word" "latest" "color" "green" "show" $show) }}
+
+        {{ $show := `$store.global.isNightly()` }}
+        {{ partial "badge.html" (dict "word" "unstable" "color" "yellow" "show" $show) }}
       </span>
 
       {{/* Heroicon name: solid/chevron-down  */}}
