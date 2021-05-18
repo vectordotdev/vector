@@ -17,15 +17,18 @@ This RFC describes the need for a tooling and environment agnostic load balancin
 
 ## Scope
 
-Load balancing will be a concern for any `sink` or `source` supported by Vector; some of which can use a general solution (ex: load balancing for our HTTP based `sinks`) and some of which are specific to the component (ex: Kafka or Elasticsearch `sinks`). Due to the breadth of the topic, this RFC will focus on three specific cases for load balancing while also giving consideration to future adoption for other components.
+Load balancing will be a concern for any `sink` or `source` supported by Vector; some of which can use a general solution (ex: load balancing for our HTTP based `sinks`) and some of which are specific to the component (ex: Kafka `source`/`sink`). Due to the breadth of the topic, this RFC will focus on three specific cases for load balancing while also giving consideration to future adoption for other components.
 
 * Vector agent to Vector aggregator
 * Datadog agent to Vector aggregator
 * Syslog agent to Vector aggregator
 
+## Out Of Scope
+
+Any component that requires 
 ## Motivation
 
-Today Vector lacks the capacity to scale horizontally (by increasing replicas) when deployed as an aggregator. This limits Vector aggregators in both reliability and performance, causing adoption concerns for users. A single aggregator will be limited in performance by the resources that can be dedicated to it, presumably with some (currently) unknown upper bounds. Vector aims to be vendor neutral, and as such we should provide the capacity to scale and load balance across Vector aggregators regardless of environment or upstream event collectors.
+Today, scaling Vector horizontally (by increasing replicas) is a manual process when deployed as an aggregator. This limits Vector aggregators in both reliability and performance, causing adoption concerns for users. A single aggregator will be limited in performance by the resources that can be dedicated to it, presumably with some (currently) unknown upper bounds. Vector aims to be vendor neutral, and as such we should provide the capacity to scale and load balance across Vector aggregators regardless of environment or upstream event collectors.
 
 ## Internal Proposal
 
@@ -53,7 +56,7 @@ backend vector_template
 * Using a dedicated reverse proxy to load balance requests for Vector aggregators should support the largest spread of `sources` with the smallest amount of engineering effort.
 * A solution outside of Vector itself ensures that users can reliably adopt Vector as an aggregator without replacing their existing infrastructure.
 * Most organizations are likely familiar with operating _some_ class of reverse proxy.
-* Dedicated reverse proxy can be specialized and optimized for its task, and the same can be said for Vector itself.
+* A dedicated reverse proxy will be specialized and optimized for its task, and the same can be said for Vector itself.
 
 ## Prior Art
 
@@ -88,7 +91,7 @@ Project like Thanos and Loki have used hashrings to enable multi-tenancy, we cou
 
 * [ ] Which reverse proxy to use? HAProxy, NGINX, Envoy, Traefik, etc. It should be widely used, battle-tested, support most/all protocols Vector uses, and preferably well understood by mutliple members of our team.
 * [ ] Should built-in load balancing capabilities be explored (where possible)? Internal load balancing options would simplify operations for end users who are all-in on Vector.
-* [ ] Do we always need to ensure requests are made to the same downstream aggregator, or only a specific subset of requests?
+* [x] Do we always need to ensure requests are made to the same downstream aggregator, or only a specific subset of requests? - Default to consistent connections
 * [ ] Is a generic reverse proxy "context aware" enough to ensure data is always routed as required?
 * [ ] Each `source` needs its unique port; what defaults and/or templating do we provide to the load balancer?
 
