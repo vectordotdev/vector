@@ -23,9 +23,6 @@ Load balancing will be a concern for any `sink` or `source` supported by Vector;
 * Datadog agent to Vector aggregator
 * Syslog agent to Vector aggregator
 
-## Out Of Scope
-
-Any component that requires 
 ## Motivation
 
 Today, scaling Vector horizontally (by increasing replicas) is a manual process when deployed as an aggregator. This limits Vector aggregators in both reliability and performance, causing adoption concerns for users. A single aggregator will be limited in performance by the resources that can be dedicated to it, presumably with some (currently) unknown upper bounds. Vector aims to be vendor neutral, and as such we should provide the capacity to scale and load balance across Vector aggregators regardless of environment or upstream event collectors.
