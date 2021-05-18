@@ -37,7 +37,7 @@ use tracing_futures::Instrument;
 type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
 type BuiltBuffer = (
-    buffers::BufferInputCloner,
+    buffers::BufferInputCloner<Event>,
     Arc<Mutex<Option<Pin<Box<dyn Stream<Item = Event> + Send>>>>>,
     buffers::Acker,
 );
@@ -52,7 +52,7 @@ pub type WatchRx = watch::Receiver<Outputs>;
 
 #[allow(dead_code)]
 pub struct RunningTopology {
-    inputs: HashMap<String, buffers::BufferInputCloner>,
+    inputs: HashMap<String, buffers::BufferInputCloner<Event>>,
     outputs: HashMap<String, fanout::ControlChannel>,
     source_tasks: HashMap<String, TaskHandle>,
     tasks: HashMap<String, TaskHandle>,

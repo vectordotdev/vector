@@ -7,10 +7,7 @@ use futures::{
 use tempfile::tempdir;
 use tokio_stream::wrappers::ReceiverStream;
 use vector::{
-    buffers::{
-        disk::{leveldb_buffer, DiskBuffer},
-        Acker,
-    },
+    buffers::{disk::leveldb_buffer, Acker},
     event::Event,
     sinks::util::StreamSink,
     test_util::{random_lines, runtime},
@@ -99,8 +96,7 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                 let plenty_of_room = num_lines * line_size * 2;
                 let (writer, _reader, _acker) =
-                    leveldb_buffer::Buffer::build(data_dir.path().to_path_buf(), plenty_of_room)
-                        .unwrap();
+                    leveldb_buffer::Buffer::build(data_dir.path(), plenty_of_room).unwrap();
 
                 (rt, writer)
             },
@@ -121,8 +117,7 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                 let plenty_of_room = num_lines * line_size * 2;
                 let (writer, reader, acker) =
-                    leveldb_buffer::Buffer::build(data_dir.path().to_path_buf(), plenty_of_room)
-                        .unwrap();
+                    leveldb_buffer::Buffer::build(data_dir.path(), plenty_of_room).unwrap();
 
                 let write_handle = rt.spawn(send_random(line_size, num_lines, writer));
                 rt.block_on(write_handle).unwrap();
@@ -148,8 +143,7 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                 let plenty_of_room = num_lines * line_size * 2;
                 let (writer, reader, acker) =
-                    leveldb_buffer::Buffer::build(data_dir.path().to_path_buf(), plenty_of_room)
-                        .unwrap();
+                    leveldb_buffer::Buffer::build(data_dir.path(), plenty_of_room).unwrap();
 
                 let read_loop = async move { NullSink::new(acker).run(Box::pin(reader)).await };
 

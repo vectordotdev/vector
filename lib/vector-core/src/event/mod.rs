@@ -1,5 +1,6 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
-use bytes::Bytes;
+use crate::bytes::{DecodeBytes, EncodeBytes};
+use bytes::{Buf, BufMut, Bytes};
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
@@ -8,6 +9,7 @@ pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
 pub use metadata::EventMetadata;
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
+use prost::{DecodeError, EncodeError, Message};
 use shared::EventDataEq;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::{TryFrom, TryInto};
@@ -17,7 +19,6 @@ use tracing::field::{Field, Visit};
 pub use util::log::PathComponent;
 pub use util::log::PathIter;
 pub use value::Value;
-
 #[cfg(feature = "vrl")]
 pub use vrl_target::VrlTarget;
 
@@ -31,6 +32,8 @@ pub mod lua;
 pub mod merge_state;
 mod metadata;
 pub mod metric;
+#[cfg(test)]
+mod test;
 pub mod util;
 mod value;
 #[cfg(feature = "vrl")]
@@ -42,7 +45,7 @@ pub mod proto {
 
 pub const PARTIAL: &str = "_partial";
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, PartialOrd, Debug, Clone)]
 pub enum Event {
     Log(LogEvent),
     Metric(Metric),
@@ -635,99 +638,24 @@ impl<'a> From<&'a Metric> for EventRef<'a> {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::config::log_schema;
-    use regex::Regex;
-    use std::collections::HashSet;
+impl EncodeBytes<Event> for Event {
+    type Error = EncodeError;
 
-    #[test]
-    fn serialization() {
-        let mut event = Event::from("raw log line");
-        event.as_mut_log().insert("foo", "bar");
-        event.as_mut_log().insert("bar", "baz");
-
-        let expected_all = serde_json::json!({
-            "message": "raw log line",
-            "foo": "bar",
-            "bar": "baz",
-            "timestamp": event.as_log().get(log_schema().timestamp_key()),
-        });
-
-        let actual_all = serde_json::to_value(event.as_log().all_fields()).unwrap();
-        assert_eq!(expected_all, actual_all);
-
-        let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
-        assert!(rfc3339_re.is_match(actual_all.pointer("/timestamp").unwrap().as_str().unwrap()));
+    fn encode<B>(self, buffer: &mut B) -> Result<(), Self::Error>
+    where
+        B: BufMut,
+    {
+        proto::EventWrapper::from(self).encode(buffer)
     }
+}
 
-    #[test]
-    fn type_serialization() {
-        use serde_json::json;
+impl DecodeBytes<Event> for Event {
+    type Error = DecodeError;
 
-        let mut event = Event::from("hello world");
-        event.as_mut_log().insert("int", 4);
-        event.as_mut_log().insert("float", 5.5);
-        event.as_mut_log().insert("bool", true);
-        event.as_mut_log().insert("string", "thisisastring");
-
-        let map = serde_json::to_value(event.as_log().all_fields()).unwrap();
-        assert_eq!(map["float"], json!(5.5));
-        assert_eq!(map["int"], json!(4));
-        assert_eq!(map["bool"], json!(true));
-        assert_eq!(map["string"], json!("thisisastring"));
-    }
-
-    #[test]
-    fn event_iteration() {
-        let mut event = Event::new_empty_log();
-
-        event
-            .as_mut_log()
-            .insert("Ke$ha", "It's going down, I'm yelling timber");
-        event
-            .as_mut_log()
-            .insert("Pitbull", "The bigger they are, the harder they fall");
-
-        let all = event
-            .as_log()
-            .all_fields()
-            .map(|(k, v)| (k, v.to_string_lossy()))
-            .collect::<HashSet<_>>();
-        assert_eq!(
-            all,
-            vec![
-                (
-                    String::from("Ke$ha"),
-                    "It's going down, I'm yelling timber".to_string()
-                ),
-                (
-                    String::from("Pitbull"),
-                    "The bigger they are, the harder they fall".to_string()
-                ),
-            ]
-            .into_iter()
-            .collect::<HashSet<_>>()
-        );
-    }
-
-    #[test]
-    fn event_iteration_order() {
-        let mut event = Event::new_empty_log();
-        let log = event.as_mut_log();
-        log.insert("lZDfzKIL", Value::from("tOVrjveM"));
-        log.insert("o9amkaRY", Value::from("pGsfG7Nr"));
-        log.insert("YRjhxXcg", Value::from("nw8iM5Jr"));
-
-        let collected: Vec<_> = log.all_fields().collect();
-        assert_eq!(
-            collected,
-            vec![
-                (String::from("YRjhxXcg"), &Value::from("nw8iM5Jr")),
-                (String::from("lZDfzKIL"), &Value::from("tOVrjveM")),
-                (String::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
-            ]
-        );
+    fn decode<B>(buffer: B) -> Result<Event, Self::Error>
+    where
+        B: Buf,
+    {
+        proto::EventWrapper::decode(buffer).map(|wrp| wrp.into())
     }
 }

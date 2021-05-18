@@ -22,7 +22,7 @@ use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::time::{timeout, Duration};
 
 pub struct Pieces {
-    pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,
+    pub inputs: HashMap<String, (buffers::BufferInputCloner<Event>, Vec<String>)>,
     pub outputs: HashMap<String, fanout::ControlChannel>,
     pub tasks: HashMap<String, Task>,
     pub source_tasks: HashMap<String, Task>,

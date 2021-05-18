@@ -1,7 +1,9 @@
-use crate::event::Event;
+use crate::bytes::{DecodeBytes, EncodeBytes};
 use futures::{Sink, Stream};
 use pin_project::pin_project;
 use snafu::Snafu;
+use std::fmt::Debug;
+use std::fmt::Display;
 use std::{
     io,
     path::{Path, PathBuf},
@@ -29,36 +31,30 @@ pub enum DataDirError {
     },
 }
 
-pub trait DiskBuffer {
-    type Writer: Sink<Event, Error = ()>;
-    type Reader: Stream<Item = Event> + Send;
-
-    /// Build a new `DiskBuffer` rooted at `path`
-    ///
-    /// # Errors
-    ///
-    /// Function will fail if the permissions of `path` are not correct, if
-    /// there is no space available on disk etc.
-    fn build(
-        path: PathBuf,
-        max_size: usize,
-    ) -> Result<(Self::Writer, Self::Reader, super::Acker), DataDirError>;
-}
-
 #[pin_project]
 #[derive(Clone)]
-pub struct Writer {
+pub struct Writer<T>
+where
+    T: Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug,
+{
     #[pin]
-    inner: leveldb_buffer::Writer,
+    inner: leveldb_buffer::Writer<T>,
 }
 
-impl Sink<Event> for Writer {
+impl<T> Sink<T> for Writer<T>
+where
+    T: Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug + Display,
+{
     type Error = ();
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.project().inner.poll_ready(cx)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
         self.project().inner.start_send(item)
     }
 
@@ -77,11 +73,23 @@ impl Sink<Event> for Writer {
 ///
 /// This function will fail with [`Error`] if the directory does not exist at
 /// `data_dir`, if permissions are not sufficient etc.
-pub fn open(
+pub fn open<'a, T>(
     data_dir: &Path,
     name: &str,
     max_size: usize,
-) -> Result<(Writer, Box<dyn Stream<Item = Event> + Send>, super::Acker), DataDirError> {
+) -> Result<
+    (
+        Writer<T>,
+        Box<dyn Stream<Item = T> + 'a + Send>,
+        super::Acker,
+    ),
+    DataDirError,
+>
+where
+    T: 'a + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug + Display,
+{
     let path = data_dir.join(name);
 
     // Check data dir
@@ -108,6 +116,6 @@ pub fn open(
             }
         })?;
 
-    let (writer, reader, acker) = leveldb_buffer::Buffer::build(path, max_size)?;
+    let (writer, reader, acker) = leveldb_buffer::Buffer::build(&path, max_size)?;
     Ok((Writer { inner: writer }, Box::new(reader), acker))
 }

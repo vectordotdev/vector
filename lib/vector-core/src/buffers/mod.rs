@@ -2,11 +2,12 @@ mod acker;
 #[cfg(feature = "disk-buffer")]
 pub mod disk;
 
-use crate::event::Event;
+use crate::bytes::{DecodeBytes, EncodeBytes};
 pub use acker::Acker;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Debug, Display};
 #[cfg(feature = "disk-buffer")]
 use std::path::Path;
 use std::pin::Pin;
@@ -46,16 +47,21 @@ pub enum Variant<'a> {
 ///
 /// This function will fail only when creating a new disk buffer. Because of
 /// legacy reasons the error is not a type but a `String`.
-pub fn build(
+pub fn build<'a, T>(
     variant: Variant,
 ) -> Result<
     (
-        BufferInputCloner,
-        Box<dyn Stream<Item = Event> + Send>,
+        BufferInputCloner<T>,
+        Box<dyn Stream<Item = T> + 'a + Send>,
         Acker,
     ),
     String,
-> {
+>
+where
+    T: 'a + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug + Display,
+{
     match variant {
         #[cfg(feature = "disk-buffer")]
         Variant::Disk {
@@ -102,14 +108,24 @@ impl Default for WhenFull {
 // the large fields to reduce the total size.
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
-pub enum BufferInputCloner {
-    Memory(mpsc::Sender<Event>, WhenFull),
+pub enum BufferInputCloner<T>
+where
+    T: Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug,
+{
+    Memory(mpsc::Sender<T>, WhenFull),
     #[cfg(feature = "disk-buffer")]
-    Disk(disk::Writer, WhenFull),
+    Disk(disk::Writer<T>, WhenFull),
 }
 
-impl BufferInputCloner {
-    pub fn get(&self) -> Box<dyn Sink<Event, Error = ()> + Send> {
+impl<'a, T> BufferInputCloner<T>
+where
+    T: 'a + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug + Display,
+{
+    pub fn get(&self) -> Box<dyn Sink<T, Error = ()> + 'a + Send> {
         match self {
             BufferInputCloner::Memory(tx, when_full) => {
                 let inner = tx
@@ -124,7 +140,7 @@ impl BufferInputCloner {
 
             #[cfg(feature = "disk-buffer")]
             BufferInputCloner::Disk(writer, when_full) => {
-                let inner = writer.clone();
+                let inner: disk::Writer<T> = (*writer).clone();
                 if when_full == &WhenFull::DropNewest {
                     Box::new(DropWhenFull::new(inner))
                 } else {

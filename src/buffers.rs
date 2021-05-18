@@ -45,7 +45,7 @@ impl BufferConfig {
         sink_name: &str,
     ) -> Result<
         (
-            BufferInputCloner,
+            BufferInputCloner<Event>,
             Box<dyn Stream<Item = Event> + Send>,
             Acker,
         ),
