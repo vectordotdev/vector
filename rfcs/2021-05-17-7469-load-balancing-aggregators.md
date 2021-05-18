@@ -59,7 +59,6 @@ backend vector_template
 
 * [Logstash: Scaling TCP, UDP, and HTTP](https://www.elastic.co/guide/en/logstash/current/deploying-and-scaling.html#_tcp_udp_and_http_protocols)
 * [Fluentd: Aggregator behind Network Load Balancer](https://aws.amazon.com/blogs/compute/building-a-scalable-log-solution-aggregator-with-aws-fargate-fluentd-and-amazon-kinesis-data-firehose/)
-* [Cribl: Bring your own load balancer](https://docs.cribl.io/docs/deploy-distributed#architecture)
 
 ## Drawbacks
 
