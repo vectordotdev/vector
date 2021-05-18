@@ -918,7 +918,20 @@ mod tests {
 
             // Send an error to the stream.
             watch_stream_tx
-                .send(mock_watcher::ScenarioActionStream::ErrOther)
+                .send(mock_watcher::ScenarioActionStream::ErrRecoverable)
+                .await
+                .unwrap();
+
+            // Wait for watcher to request next item from the stream.
+            assert!(matches!(
+                watcher_events_rx.next().await.unwrap(),
+                mock_watcher::ScenarioEvent::Invocation(_)
+            ));
+
+            // We're done with the test, send the error to terminate the
+            // reflector.
+            watcher_invocations_tx
+                .send(mock_watcher::ScenarioActionInvocation::ErrOther)
                 .await
                 .unwrap();
         });
@@ -931,12 +944,7 @@ mod tests {
         logic.await.unwrap();
 
         // Assert that the reflector properly passed the error.
-        assert!(matches!(
-            result.unwrap_err(),
-            Error::Streaming {
-                source: mock_watcher::StreamError
-            }
-        ));
+        assert!(matches!(result.unwrap_err(), Error::Invocation { .. }));
 
         // Explicitly drop the reflector at the very end.
         drop(reflector);

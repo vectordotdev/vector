@@ -558,7 +558,7 @@ mod tests {
                 }),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
-                    assert_matches!(error, watcher::stream::Error::Other {
+                    assert_matches!(error, watcher::stream::Error::Recoverable {
                             source:
                                 api_watcher::stream::Error::K8sStream {
                                     source: crate::kubernetes::stream::Error::Parsing { source },
@@ -577,7 +577,7 @@ mod tests {
                 }),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
-                    assert_matches!(error, watcher::stream::Error::Other {
+                    assert_matches!(error, watcher::stream::Error::Recoverable {
                             source:
                                 api_watcher::stream::Error::K8sStream {
                                     source: crate::kubernetes::stream::Error::Parsing { source },
@@ -607,7 +607,7 @@ mod tests {
                 }),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
-                    assert_matches!(error, watcher::stream::Error::Other {
+                    assert_matches!(error, watcher::stream::Error::Recoverable {
                             source:
                                 api_watcher::stream::Error::K8sStream {
                                     source: crate::kubernetes::stream::Error::Parsing { source },
@@ -637,7 +637,7 @@ mod tests {
                 }),
                 vec![Box::new(|item| {
                     let error = item.unwrap_err();
-                    assert_matches!(error, watcher::stream::Error::Other {
+                    assert_matches!(error, watcher::stream::Error::Recoverable {
                             source:
                                 api_watcher::stream::Error::K8sStream {
                                     source: crate::kubernetes::stream::Error::Parsing { source },
