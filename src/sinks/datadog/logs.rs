@@ -244,7 +244,11 @@ impl HttpSink for DatadogLogsJsonService {
 
         self.config.encoding.apply_rules(&mut event);
 
-        Some(EncodedEvent::new(json!(event.into_log())))
+        let (fields, metadata) = event.into_log().into_parts();
+        Some(EncodedEvent {
+            item: json!(fields),
+            metadata: Some(metadata),
+        })
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -272,7 +276,7 @@ impl HttpSink for DatadogLogsTextService {
                 byte_size: e.item.len(),
                 count: 1,
             });
-            EncodedEvent::new(e.item)
+            e
         })
     }
 
@@ -326,12 +330,17 @@ mod tests {
     use super::*;
     use crate::{
         config::SinkConfig,
-        sinks::util::test::{build_test_server, load_sink},
+        sinks::util::test::{build_test_server_status, load_sink},
         test_util::{next_addr, random_lines_with_stream},
     };
-    use futures::StreamExt;
+    use futures::{
+        channel::mpsc::{Receiver, TryRecvError},
+        StreamExt,
+    };
+    use hyper::StatusCode;
     use indoc::indoc;
     use pretty_assertions::assert_eq;
+    use vector_core::event::{BatchNotifier, BatchStatus};
 
     #[test]
     fn generate_config() {
@@ -340,30 +349,7 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_text() {
-        let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
-            api_key = "atoken"
-            encoding = "text"
-            compression = "none"
-            batch.max_events = 1
-        "#})
-        .unwrap();
-
-        let addr = next_addr();
-        // Swap out the endpoint so we can force send it
-        // to our local server
-        let endpoint = format!("http://{}", addr);
-        config.endpoint = Some(endpoint.clone());
-
-        let (sink, _) = config.build(cx).await.unwrap();
-
-        let (rx, _trigger, server) = build_test_server(addr);
-        tokio::spawn(server);
-
-        let (expected, events) = random_lines_with_stream(100, 10, None);
-
-        let _ = sink.run(events).await.unwrap();
-
-        let output = rx.take(expected.len()).collect::<Vec<_>>().await;
+        let (expected, output) = smoke_test("text").await;
 
         for (i, val) in output.iter().enumerate() {
             assert_eq!(val.0.headers.get("Content-Type").unwrap(), "text/plain");
@@ -373,30 +359,7 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_json() {
-        let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
-            api_key = "atoken"
-            encoding = "json"
-            compression = "none"
-            batch.max_events = 1
-        "#})
-        .unwrap();
-
-        let addr = next_addr();
-        // Swap out the endpoint so we can force send it
-        // to our local server
-        let endpoint = format!("http://{}", addr);
-        config.endpoint = Some(endpoint.clone());
-
-        let (sink, _) = config.build(cx).await.unwrap();
-
-        let (rx, _trigger, server) = build_test_server(addr);
-        tokio::spawn(server);
-
-        let (expected, events) = random_lines_with_stream(100, 10, None);
-
-        let _ = sink.run(events).await.unwrap();
-
-        let output = rx.take(expected.len()).collect::<Vec<_>>().await;
+        let (expected, output) = smoke_test("json").await;
 
         for (i, val) in output.iter().enumerate() {
             assert_eq!(
@@ -422,5 +385,67 @@ mod tests {
                 .unwrap();
             assert_eq!(message, expected[i]);
         }
+    }
+
+    async fn smoke_test(encoding: &str) -> (Vec<String>, Vec<(http::request::Parts, Bytes)>) {
+        let (expected, rx) = start_test(encoding, StatusCode::OK, BatchStatus::Delivered).await;
+
+        let output = rx.take(expected.len()).collect::<Vec<_>>().await;
+
+        (expected, output)
+    }
+
+    #[tokio::test]
+    async fn handles_failure_text() {
+        handles_failure("text").await;
+    }
+
+    #[tokio::test]
+    async fn handles_failure_json() {
+        handles_failure("json").await;
+    }
+
+    async fn handles_failure(encoding: &str) {
+        let (_expected, mut rx) =
+            start_test(encoding, StatusCode::FORBIDDEN, BatchStatus::Failed).await;
+
+        assert!(matches!(rx.try_next(), Err(TryRecvError { .. })));
+    }
+
+    async fn start_test(
+        encoding: &str,
+        http_status: StatusCode,
+        batch_status: BatchStatus,
+    ) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
+        let config = format!(
+            indoc! {r#"
+            api_key = "atoken"
+            encoding = "{}"
+            compression = "none"
+            batch.max_events = 1
+        "#},
+            encoding
+        );
+        let (mut config, cx) = load_sink::<DatadogLogsConfig>(&config).unwrap();
+
+        let addr = next_addr();
+        // Swap out the endpoint so we can force send it
+        // to our local server
+        let endpoint = format!("http://{}", addr);
+        config.endpoint = Some(endpoint.clone());
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        let (rx, _trigger, server) = build_test_server_status(addr, http_status);
+        tokio::spawn(server);
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (expected, events) = random_lines_with_stream(100, 10, Some(batch));
+
+        let _ = sink.run(events).await.unwrap();
+
+        assert_eq!(receiver.try_recv(), Ok(batch_status));
+
+        (expected, rx)
     }
 }

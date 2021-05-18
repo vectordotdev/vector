@@ -6,9 +6,10 @@ use bytes::Bytes;
 use futures::{channel::mpsc, FutureExt, SinkExt, TryFutureExt};
 use hyper::{
     service::{make_service_fn, service_fn},
-    Body, Request, Response, Server,
+    Body, Request, Response, Server, StatusCode,
 };
 use serde::Deserialize;
+use std::net::SocketAddr;
 use stream_cancel::{Trigger, Tripwire};
 
 pub fn load_sink<T>(config: &str) -> crate::Result<(T, SinkContext)>
@@ -22,7 +23,7 @@ where
 }
 
 pub fn build_test_server(
-    addr: std::net::SocketAddr,
+    addr: SocketAddr,
 ) -> (
     mpsc::Receiver<(http::request::Parts, Bytes)>,
     Trigger,
@@ -31,8 +32,24 @@ pub fn build_test_server(
     build_test_server_generic(addr, || Response::new(Body::empty()))
 }
 
+pub fn build_test_server_status(
+    addr: SocketAddr,
+    status: StatusCode,
+) -> (
+    mpsc::Receiver<(http::request::Parts, Bytes)>,
+    Trigger,
+    impl std::future::Future<Output = Result<(), ()>>,
+) {
+    build_test_server_generic(addr, move || {
+        Response::builder()
+            .status(status)
+            .body(Body::empty())
+            .unwrap_or_else(|_| unreachable!())
+    })
+}
+
 pub fn build_test_server_generic(
-    addr: std::net::SocketAddr,
+    addr: SocketAddr,
     responder: impl Fn() -> Response<Body> + Clone + Send + Sync + 'static,
 ) -> (
     mpsc::Receiver<(http::request::Parts, Bytes)>,

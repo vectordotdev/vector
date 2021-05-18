@@ -153,7 +153,7 @@ urls: {
 	endler_dev:                                               "https://endler.dev/"
 	eof:                                                      "\(wikipedia)/wiki/End-of-file#EOF_character"
 	etsy:                                                     "https://www.etsy.com"
-	event_proto:                                              "\(vector_repo)/blob/master/proto/event.proto"
+	event_proto:                                              "\(vector_repo)/blob/master/lib/vector-core/proto/event.proto"
 	exit_codes:                                               "https://docs.rs/exitcode/latest/exitcode/#constants"
 	externally_tagged_representation:                         "https://serde.rs/enum-representations.html#externally-tagged"
 	fail_safe:                                                "https://en.wikipedia.org/wiki/Fail-safe"

@@ -170,8 +170,7 @@ impl vrl_core::Target for VrlTarget {
                         ["kind"] => return Ok(Some(metric.data.kind.clone().into())),
                         ["tags"] => {
                             return Ok(metric.tags().map(|map| {
-                                let iter =
-                                    map.iter().map(|(k, v)| (k.to_owned(), v.to_owned().into()));
+                                let iter = map.iter().map(|(k, v)| (k.clone(), v.clone().into()));
                                 vrl_core::Value::from_iter(iter)
                             }))
                         }

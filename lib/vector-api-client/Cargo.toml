@@ -9,7 +9,7 @@ license = "MPL-2.0"
 [dependencies]
 
 # Serde
-serde = { version = "1.0.125", features = ["derive"] }
+serde = { version = "1.0.126", features = ["derive"] }
 serde_json = { version = "1.0.64", features = ["raw_value"] }
 
 # Error handling
@@ -20,7 +20,7 @@ async-stream = "0.3.1"
 async-trait = "0.1"
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
 tokio = { version = "1.5.0", features = ["full"] }
-tokio-stream = { version = "0.1.5", features = ["sync"] }
+tokio-stream = { version = "0.1.6", features = ["sync"] }
 
 # GraphQL
 graphql_client = "0.9.0"
@@ -31,7 +31,7 @@ tokio-tungstenite = { version = "0.13.0", features = ["tls"] }
 
 # External libs
 chrono = { version = "0.4.6", features = ["serde"] }
-url = "2.2.1"
+url = "2.2.2"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 weak-table = "0.3.0"
 indoc = "1.0.3"

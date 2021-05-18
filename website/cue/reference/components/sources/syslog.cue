@@ -118,7 +118,11 @@ components: sources: syslog: {
 					syntax: "literal"
 				}
 			}
-			timestamp: fields._current_timestamp
+			timestamp: {
+				description: "The time extracted from the Syslog formatted line. If parsing fails, then the exact time the event was ingested into Vector is used."
+				required:    true
+				type: timestamp: {}
+			}
 			version: {
 				description: "The version extracted from the Syslog line. If a version is not found, then the key will not be added."
 				required:    true

@@ -216,11 +216,7 @@ impl HttpSink for HttpSinkConfig {
             byte_size: body.len(),
         });
 
-        let (_, metadata) = event.into_parts();
-        Some(EncodedEvent {
-            item: body,
-            metadata: Some(metadata),
-        })
+        Some(EncodedEvent::new(body).with_metadata(event))
     }
 
     async fn build_request(&self, mut body: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -318,7 +314,7 @@ mod tests {
             http::HttpSinkConfig,
             util::{
                 http::HttpSink,
-                test::{build_test_server, build_test_server_generic},
+                test::{build_test_server, build_test_server_generic, build_test_server_status},
             },
         },
         test_util::{next_addr, random_lines_with_stream},
@@ -577,12 +573,7 @@ mod tests {
 
         let (in_addr, sink) = build_sink("").await;
 
-        let (rx, trigger, server) = build_test_server_generic(in_addr, move || {
-            Response::builder()
-                .status(StatusCode::FORBIDDEN)
-                .body(Body::empty())
-                .unwrap_or_else(|_| unreachable!())
-        });
+        let (rx, trigger, server) = build_test_server_status(in_addr, StatusCode::FORBIDDEN);
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let (_input_lines, events) = random_lines_with_stream(100, num_lines, Some(batch));

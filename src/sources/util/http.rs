@@ -1,5 +1,5 @@
 use crate::{
-    event::Event,
+    event::{BatchNotifier, BatchStatus, Event},
     internal_events::{HttpBadRequest, HttpDecompressError, HttpEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -12,7 +12,9 @@ use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use headers::{Authorization, HeaderMapExt};
 use serde::{Deserialize, Serialize};
 use snap::raw::Decoder as SnappyDecoder;
-use std::{collections::HashMap, convert::TryFrom, error::Error, fmt, io::Read, net::SocketAddr};
+use std::{
+    collections::HashMap, convert::TryFrom, error::Error, fmt, io::Read, net::SocketAddr, sync::Arc,
+};
 use tracing_futures::Instrument;
 use warp::{
     filters::{path::FullPath, path::Tail, BoxedFilter},
@@ -175,7 +177,7 @@ fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMe
 
 #[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
-    fn build_event(
+    fn build_events(
         &self,
         body: Bytes,
         header_map: HeaderMap,
@@ -236,18 +238,25 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             .is_valid(&auth_header)
                             .and_then(|()| decode(&encoding_header, body))
                             .and_then(|body| {
-                                let body_len=body.len();
-                                self.build_event(body, headers, query_parameters, path.as_str())
+                                let body_len = body.len();
+                                self.build_events(body, headers, query_parameters, path.as_str())
                                     .map(|events| (events, body_len))
                             });
 
                         async move {
                             match events {
-                                Ok((events,body_size)) => {
+                                Ok((mut events, body_size)) => {
                                     emit!(HttpEventsReceived {
                                         events_count: events.len(),
                                         byte_size: body_size,
                                     });
+
+                                    let (batch, receiver) = BatchNotifier::new_with_receiver();
+                                    for event in &mut events {
+                                        event.add_batch_notifier(Arc::clone(&batch));
+                                    }
+                                    drop(batch);
+
                                     out.send_all(&mut futures::stream::iter(events).map(Ok))
                                         .map_err(move |error: crate::pipeline::ClosedError| {
                                             // can only fail if receiving end disconnected, so we are shutting down,
@@ -256,7 +265,23 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                             error!(message = "Tried to send the following event.", %error);
                                             warp::reject::custom(RejectShuttingDown)
                                         })
-                                        .map_ok(|_| warp::reply())
+                                        .and_then(|_| async move {
+                                            match receiver.await.unwrap_or(BatchStatus::Delivered) {
+                                                BatchStatus::Delivered => Ok(warp::reply()),
+                                                BatchStatus::Errored => Err(warp::reject::custom(
+                                                    ErrorMessage::new(
+                                                        StatusCode::INTERNAL_SERVER_ERROR,
+                                                        "Error delivering contents to sink".into(),
+                                                    ),
+                                                )),
+                                                BatchStatus::Failed => Err(warp::reject::custom(
+                                                    ErrorMessage::new(
+                                                        StatusCode::BAD_REQUEST,
+                                                        "Contents failed to deliver to sink".into(),
+                                                    ),
+                                                )),
+                                            }
+                                        })
                                         .await
                                 }
                                 Err(error) => {

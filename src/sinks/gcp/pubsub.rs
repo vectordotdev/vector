@@ -167,8 +167,9 @@ impl HttpSink for PubsubSink {
         self.encoding.apply_rules(&mut event);
         // Each event needs to be base64 encoded, and put into a JSON object
         // as the `data` item.
-        let json = serde_json::to_string(&event.into_log()).unwrap();
-        Some(EncodedEvent::new(json!({ "data": base64::encode(&json) })))
+        let log = event.into_log();
+        let json = serde_json::to_string(&log).unwrap();
+        Some(EncodedEvent::new(json!({ "data": base64::encode(&json) })).with_metadata(log))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
@@ -231,6 +232,7 @@ mod integration_tests {
     use crate::test_util::{random_events_with_stream, random_string, trace_init};
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
+    use vector_core::event::{BatchNotifier, BatchStatus};
 
     const EMULATOR_HOST: &str = "http://localhost:8681";
     const PROJECT: &str = "testproject";
@@ -259,8 +261,10 @@ mod integration_tests {
 
         healthcheck.await.expect("Health check failed");
 
-        let (input, events) = random_events_with_stream(100, 100);
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (input, events) = random_events_with_stream(100, 100, Some(batch));
         sink.run(events).await.expect("Sending events failed");
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let response = pull_messages(&subscription, 1000).await;
         let messages = response
@@ -274,6 +278,20 @@ mod integration_tests {
             let expected = serde_json::to_value(input[i].as_log().all_fields()).unwrap();
             assert_eq!(data, expected);
         }
+    }
+
+    #[tokio::test]
+    async fn publish_events_broken_topic() {
+        trace_init();
+
+        let (topic, _subscription) = create_topic_subscription().await;
+        let (sink, _healthcheck) = config_build(&format!("BREAK{}BREAK", topic)).await;
+        // Explicitly skip healthcheck
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (_input, events) = random_events_with_stream(100, 100, Some(batch));
+        sink.run(events).await.expect("Sending events failed");
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
     }
 
     #[tokio::test]
