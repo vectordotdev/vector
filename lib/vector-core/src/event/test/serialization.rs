@@ -22,7 +22,10 @@ fn back_and_forth_through_bytes() {
             let res = Event::decode(buffer);
             let actual: Event = res.unwrap();
             // While Event does implement PartialEq we prefer to use PartialOrd
-            // instead
+            // instead. This is done because Event is populated with a number
+            // f64 instances, meaning two Event instances might differ by less
+            // than f64::EPSILON -- and are equal enough -- but are not
+            // partially equal.
             assert!(!(expected > actual));
             assert!(!(expected < actual));
         }

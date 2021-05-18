@@ -1,4 +1,4 @@
-//! This module defines traits that allow conversion two and from `bytes`
+//! This module defines traits that allow conversion to and from `bytes`
 //! buffers. The vector project needs ser/de that is defined by the type being
 //! serialized. That is, while it's typical in the ecosystem to define ser/de in
 //! terms of `serde` we have protobuf ser/de in places that are not suitable for
