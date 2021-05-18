@@ -2,7 +2,7 @@
 {{ $var := .var }}
 <div x-data="{ open: false }" @click.away="open = false" class="relative inline-block text-left">
   <div>
-    <button @click="open = !open" type="button" class="flex items-center space-x-3 justify-center rounded-sm border dark:text-gray-200 text:gray-700 border-gray-300 dark:border-gray-700 shadow-sm px-3 py-1.5 bg-white dark:bg-dark text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-primary dark:hover:bg-black" id="menu-button" aria-expanded="true" aria-haspopup="true">
+    <button @click="open = !open" type="button" class="flex items-center space-x-3 justify-center rounded-sm border dark:text-gray-200 text:gray-700 border-gray-300 dark:border-gray-700 shadow px-3 py-1.5 bg-white dark:bg-dark text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-primary dark:hover:bg-black" id="menu-button" aria-expanded="true" aria-haspopup="true">
       <span class="flex space-x-2">
         <span>
           {{ .name }}

@@ -503,10 +503,10 @@ _values: {
 
 #Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds"
 
-components:    _
-configuration: _
-data_model:    _
-installation:  _
-process:       _
-releases:      _
-remap:         _
+administration: _
+components:     _
+configuration:  _
+data_model:     _
+process:        _
+releases:       _
+remap:          _

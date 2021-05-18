@@ -384,7 +384,7 @@ components: sources: kubernetes_logs: {
 	]
 
 	// Note that these sections are also copied over the
-	// `installation.platforms.kubernetes.how_it_works` key. Therefore, full
+	// `administration.platforms.kubernetes.how_it_works` key. Therefore, full
 	// URLs should be used in links and language should be used that works in
 	// both contexts.
 	how_it_works: {
