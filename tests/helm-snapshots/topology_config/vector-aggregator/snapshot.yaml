@@ -197,7 +197,7 @@ spec:
         app.kubernetes.io/name: vector-aggregator
         app.kubernetes.io/instance: vector
         vector.dev/exclude: "true"
-    spec:
+    spec:      
       serviceAccountName: vector-aggregator
       securityContext:
         {}
