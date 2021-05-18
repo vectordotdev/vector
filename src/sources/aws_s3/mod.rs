@@ -282,6 +282,14 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    async fn s3_process_message_special_characters() {
+        let key = format!("special:{}", uuid::Uuid::new_v4().to_string());
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        test_event(key, None, None, None, logs.join("\n").into_bytes(), logs).await;
+    }
+
+    #[tokio::test]
     async fn s3_process_message_gzip() {
         use std::io::Read;
 
