@@ -115,13 +115,16 @@ enum AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuerType {
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[allow(clippy::enum_variant_names)] // Keep the `AWS` prefix
 enum AwsCloudTrailLogsRecordEventType {
     AwsApiCall,
     AwsServiceEvent,
-    AwsConsoleSignin,
+    #[serde(rename(deserialize = "AwsConsoleSignin"))]
+    AwsConsoleSignIn,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[allow(clippy::enum_variant_names)] // Keep the `AWS` prefix
 enum AwsCloudTrailLogsRecordManagementEvent {
     AwsApiCall,
     AwsConsoleAction,
