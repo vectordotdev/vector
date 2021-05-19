@@ -85,7 +85,7 @@ impl TcpSource for RawTcpSource {
         BytesDelimitedCodec::new_with_max_length(b'\n', self.config.max_length)
     }
 
-    fn build_event(&self, frame: Bytes, host: Bytes) -> Option<Event> {
+    fn build_events(&self, frame: Bytes, host: Bytes) -> Option<Vec<Event>> {
         let byte_size = frame.len();
         let mut event = Event::from(frame);
 
@@ -104,7 +104,7 @@ impl TcpSource for RawTcpSource {
             mode: SocketMode::Tcp
         });
 
-        Some(event)
+        Some(vec![event])
     }
 }
 
