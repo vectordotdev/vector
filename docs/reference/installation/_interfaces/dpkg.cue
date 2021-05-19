@@ -19,7 +19,6 @@ installation: _interfaces: dpkg: {
 
 	role_implementations: [Name=string]: {
 		commands: role_implementations._systemd_commands & {
-			_config_path: paths.config
 			install: #"""
 				curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/{version}/vector-{version}-{arch}.deb && \
 					sudo dpkg -i vector-{version}-{arch}.deb

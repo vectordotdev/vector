@@ -21,15 +21,14 @@ installation: _interfaces: nix: {
 
 	role_implementations: [Name=string]: {
 		commands: {
-			_config_path: paths.config
-			install:      "nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --install --attr vector"
-			logs:         null
-			reload:       "killall -s SIGHUP vector"
-			restart:      null
-			start:        #"vector --config \#(paths.config)"#
-			stop:         null
-			uninstall:    "nix-env --uninstall vector"
-			upgrade:      "nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --upgrade vector"
+			install:   "nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --install --attr vector"
+			logs:      null
+			reload:    "killall -s SIGHUP vector"
+			restart:   null
+			start:     #"vector --config \#(paths.config)"#
+			stop:      null
+			uninstall: "nix-env --uninstall vector"
+			upgrade:   "nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --upgrade vector"
 		}
 
 		tutorials: {
