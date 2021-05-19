@@ -141,6 +141,8 @@ spec:
         app.kubernetes.io/instance: vector
         vector.dev/exclude: "true"
     spec:      
+      imagePullSecrets:
+      - name: myRegistryCredentialSecretName
       serviceAccountName: vector-agent
       securityContext:
         {}

@@ -48,19 +48,19 @@ imagePullSecrets:
       {{- range .Values.global.vector.imagePullSecrets }}
 - name: {{ . }}
       {{- end }}
-    {{- else if .Values.imagePullSecrets }}
+    {{- else }}
 imagePullSecrets:
       {{- range .Values.imagePullSecrets }}
 - name: {{ . }}
       {{- end }}
     {{- end -}}
-  {{- else if .Values.imagePullSecrets }}
+  {{- else }}
 imagePullSecrets:
     {{- range .Values.imagePullSecrets }}
 - name: {{ . }}
     {{- end }}
   {{- end -}}
-{{- else if .Values.imagePullSecrets }}
+{{- else }}
 imagePullSecrets:
   {{- range .Values.imagePullSecrets }}
 - name: {{ . }}

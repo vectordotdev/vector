@@ -198,6 +198,7 @@ spec:
         app.kubernetes.io/instance: vector
         vector.dev/exclude: "true"
     spec:      
+      imagePullSecrets:
       serviceAccountName: vector-aggregator
       securityContext:
         {}
