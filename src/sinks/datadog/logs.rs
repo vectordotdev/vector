@@ -259,9 +259,7 @@ impl HttpSink for DatadogLogsJsonService {
         let json_event = json!(fields);
 
         Some(EncodedEvent {
-            item: PartitionInnerBuffer::new(
-                json_event, api_key,
-            ),
+            item: PartitionInnerBuffer::new(json_event, api_key),
             metadata: Some(metadata),
         })
     }
@@ -304,7 +302,7 @@ impl HttpSink for DatadogLogsTextService {
                 count: 1,
             });
 
-            EncodedEvent{
+            EncodedEvent {
                 item: PartitionInnerBuffer::new(e.item, api_key),
                 metadata: e.metadata,
             }

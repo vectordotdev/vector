@@ -164,7 +164,7 @@ mod tests {
                 address,
                 tls: None,
                 auth: None,
-                save_api_key: save_api_key,
+                save_api_key,
             }
             .build(SourceContext::new_test(sender))
             .await
