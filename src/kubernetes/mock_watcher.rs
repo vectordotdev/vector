@@ -44,7 +44,7 @@ where
     Ok(WatchEvent<T>),
     /// Return a desync error.
     ErrDesync,
-    /// Return an recoverable error.
+    /// Return a recoverable error.
     ErrRecoverable,
     /// Complete the stream (return `None`).
     Done,
