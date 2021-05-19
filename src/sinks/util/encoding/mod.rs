@@ -39,7 +39,7 @@ use crate::{
     Result,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, fmt::Debug};
+use std::fmt::Debug;
 
 /// The behavior of a encoding configuration.
 pub trait EncodingConfiguration<E> {
@@ -65,12 +65,12 @@ pub trait EncodingConfiguration<E> {
                                 field_path.starts_with(&only[..])
                             })
                         })
-                        .collect::<VecDeque<_>>();
+                        .collect::<Vec<_>>();
 
                     // reverse sort so that we delete array elements at the end first rather than
                     // the start so that any `nulls` at the end are dropped and empty arrays are
                     // pruned
-                    to_remove.make_contiguous().sort_by(|a, b| b.cmp(a));
+                    to_remove.sort_by(|a, b| b.cmp(a));
 
                     for removal in to_remove {
                         log_event.remove_prune(removal, true);
