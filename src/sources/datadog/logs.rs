@@ -153,7 +153,10 @@ mod tests {
         crate::test_util::test_generate_config::<DatadogLogsConfig>();
     }
 
-    async fn source(status: EventStatus, save_api_key: bool) -> (impl Stream<Item = Event>, SocketAddr) {
+    async fn source(
+        status: EventStatus,
+        save_api_key: bool,
+    ) -> (impl Stream<Item = Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
         tokio::spawn(async move {
@@ -322,6 +325,9 @@ mod tests {
             1,
         )
         .await;
+    }
+
+    #[tokio::test]
     async fn ignore_api_key() {
         trace_init();
         let (rx, addr) = source(EventStatus::Delivered, false).await;
@@ -332,18 +338,24 @@ mod tests {
             "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
         );
 
-        assert_eq!(
-            200,
-            send_with_path(
-                addr,
-                r#"[{"message":"baz", "timestamp": 789}]"#,
-                headers,
-                "/v1/input/12345678abcdefgh12345678abcdefgh"
-            )
-            .await
-        );
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        r#"[{"message":"baz", "timestamp": 789}]"#,
+                        headers,
+                        "/v1/input/12345678abcdefgh12345678abcdefgh"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
 
-        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();

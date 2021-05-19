@@ -254,11 +254,16 @@ impl HttpSink for DatadogLogsJsonService {
             .datadog_api_key
             .take()
             .unwrap_or_else(|| self.config.api_key.clone());
-        let json_event = json!(event.into_log());
 
-        Some(EncodedEvent::new(PartitionInnerBuffer::new(
-            json_event, api_key,
-        )))
+        let (fields, metadata) = event.into_log().into_parts();
+        let json_event = json!(fields);
+
+        Some(EncodedEvent {
+            item: PartitionInnerBuffer::new(
+                json_event, api_key,
+            ),
+            metadata: Some(metadata),
+        })
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
@@ -298,7 +303,12 @@ impl HttpSink for DatadogLogsTextService {
                 byte_size: e.item.len(),
                 count: 1,
             });
-            EncodedEvent::new(PartitionInnerBuffer::new(e.item, api_key))
+
+            EncodedEvent{
+                item: PartitionInnerBuffer::new(e.item, api_key),
+                metadata: e.metadata,
+            }
+            //}::new(PartitionInnerBuffer::new(e.item, api_key)).with_metadata(e.metadata)
         })
     }
 
@@ -503,7 +513,7 @@ mod tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr);
+        let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
         tokio::spawn(server);
 
         let (expected, events) = random_lines_with_stream(100, 10, None);
@@ -566,7 +576,7 @@ mod tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr);
+        let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
         tokio::spawn(server);
 
         let events = vec![

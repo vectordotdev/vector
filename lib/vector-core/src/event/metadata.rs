@@ -6,7 +6,7 @@ use shared::EventDataEq;
 
 /// The top-level metadata structure contained by both `struct Metric`
 /// and `struct LogEvent` types.
-#[derive(Clone, Debug, Default, Deserialize, Getters, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct EventMetadata {
     /// Used to store the datadog API from sources to sinks
     #[serde(default, skip)]
