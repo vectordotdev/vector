@@ -13,6 +13,7 @@ image:
 
 # Image pull secrets to use at the `Pod`s managed by `StatefulSet`.
 imagePullSecrets: []
+#  - myRegistryCredentialSecretName
 
 # Override the chart name used in templates.
 nameOverride: ""
