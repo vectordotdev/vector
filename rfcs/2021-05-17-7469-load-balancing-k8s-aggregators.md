@@ -1,8 +1,9 @@
-# RFC 7469 - 2021-05-16 - Scaling and load balancing for Vector aggregators
+# RFC 7469 - 2021-05-16 - Scaling and load balancing for Vector aggregators in Kubernetes
 
-This RFC describes the need for a tooling and environment agnostic load balancing solution to be bundled with Vector aggregator deployments.
+This RFC describes the need for a tooling and environment agnostic load balancing solution to be bundled with the Vector aggregator Helm chart.
 
 * [Scope](#scope)
+* [Out of Scope](#out-of-scope)
 * [Motivation](#motivation)
 * [Internal Proposal](#internal-proposal)
 * [Rationale](#rationale)
@@ -17,11 +18,16 @@ This RFC describes the need for a tooling and environment agnostic load balancin
 
 ## Scope
 
-Load balancing will be a concern for any `sink` or `source` supported by Vector; some of which can use a general solution (ex: load balancing for our HTTP based `sinks`) and some of which are specific to the component (ex: Kafka `source`/`sink`). Due to the breadth of the topic, this RFC will focus on three specific cases for load balancing while also giving consideration to future adoption for other components.
+Load balancing will be a concern for any `sink` or `source` supported by Vector; some of which can use a general solution (ex: load balancing for our HTTP based `sinks`) and some of which are specific to the component (ex: Kafka `source`/`sink`). Due to the breadth of the topic, this RFC will focus on three specific cases for load balancing to Vector aggregators in Kubernetes, while also giving consideration to future adoption for other components.
 
 * Vector agent to Vector aggregator
 * Datadog agent to Vector aggregator
 * Syslog agent to Vector aggregator
+
+## Out of Scope
+
+* Scaling the Kafka `source`
+* Scaling and load balancing on platforms other than Kubernetes
 
 ## Motivation
 
@@ -87,13 +93,15 @@ Project like Thanos and Loki have used hashrings to enable multi-tenancy, we cou
 ## Outstanding Questions
 
 * [ ] Which reverse proxy to use? HAProxy, NGINX, Envoy, Traefik, etc. It should be widely used, battle-tested, support most/all protocols Vector uses, and preferably well understood by mutliple members of our team.
-* [ ] Should built-in load balancing capabilities be explored (where possible)? Internal load balancing options would simplify operations for end users who are all-in on Vector.
+* [x] Should built-in load balancing capabilities be explored (where possible)? Internal load balancing options would simplify operations for end users who are all-in on Vector. - This is probably more appropriate on a different RFC, or per component.
 * [x] Do we always need to ensure requests are made to the same downstream aggregator, or only a specific subset of requests? - Default to consistent connections
-* [ ] Is a generic reverse proxy "context aware" enough to ensure data is always routed as required?
-* [ ] Each `source` needs its unique port; what defaults and/or templating do we provide to the load balancer?
+* [x] Each `source` needs its unique port; what defaults and/or templating do we provide to the load balancer? - Out of the box configurations for Datadog agents and Vector agents
+* [x] How will users monitor the load balancer? Logs, metrics, and health. - We will provide out of the box configurations for Datadog agents and Vector to collect and process the proxy's logs and metrics, allowing the user to route them with the rest of their data.
 
 ## Plan Of Attack
 
-* [ ] ...
+* [ ] Manually confirm functionality for Vector, Datadog agents, and syslog over the proxy
+* [ ] Include the (optional) proxy deployment in the vector-aggregator chart, add to e2e kubernetes test suite
+* [ ] Include out-of-the box configuration for Datadog agents to load balance across Vector aggregators, add to e2e kubernetes test suite
+* [ ] Provide out-of-the box configuration to collect and process the proxy observability data for Datadog agents and Vector
 
-Note: This can be filled out during the review process.
