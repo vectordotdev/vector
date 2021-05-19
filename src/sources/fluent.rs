@@ -104,7 +104,7 @@ impl TcpSource for FluentSource {
                 let mut event = Event::from(fields);
                 let log = event.as_mut_log();
                 log.insert("host", host.clone());
-                log.insert("timestamp", timestamp.clone());
+                log.insert("timestamp", timestamp);
                 log.insert("fluent_tag", tag.clone());
                 event
             })
@@ -163,7 +163,7 @@ impl Decoder for FluentDecoder {
     type Error = DecodeError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if src.len() == 0 {
+        if src.is_empty() {
             return Ok(None);
         }
         dbg!(&src);
@@ -172,7 +172,7 @@ impl Decoder for FluentDecoder {
             let mut des = Deserializer::new(io::Cursor::new(&src[..]));
 
             // attempt to parse, if we get unexpected EOF, we need more data
-            let res = Deserialize::deserialize(&mut des).map_err(|e| DecodeError::Decode(e));
+            let res = Deserialize::deserialize(&mut des).map_err(DecodeError::Decode);
             dbg!(&res);
             if let Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) = res {
                 if custom.kind() == io::ErrorKind::UnexpectedEof {
@@ -250,7 +250,7 @@ impl Decoder for FluentEntryStreamDecoder {
     type Error = DecodeError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if src.len() == 0 {
+        if src.is_empty() {
             return Ok(None);
         }
         dbg!(&src);
@@ -259,7 +259,7 @@ impl Decoder for FluentEntryStreamDecoder {
             let mut des = Deserializer::new(io::Cursor::new(&src[..]));
 
             // attempt to parse, if we get unexpected EOF, we need more data
-            let res = Deserialize::deserialize(&mut des).map_err(|e| DecodeError::Decode(e));
+            let res = Deserialize::deserialize(&mut des).map_err(DecodeError::Decode);
             dbg!(&res);
             if let Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) = res {
                 if custom.kind() == io::ErrorKind::UnexpectedEof {
@@ -345,7 +345,7 @@ impl From<FluentValue> for Value {
             rmpv::Value::Boolean(b) => Value::Boolean(b),
             rmpv::Value::Integer(i) => i
                 .as_i64()
-                .map(|i| Value::Integer(i))
+                .map(Value::Integer)
                 // unwrap large numbers to string similar to how `From<serde_json::Value> for Value` handles it
                 .unwrap_or_else(|| Value::Bytes(i.to_string().into())),
             rmpv::Value::F32(f) => Value::Float(f.into()),
