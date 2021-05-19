@@ -24,38 +24,41 @@ const HELM_VALUES_STDOUT_SINK: &str = indoc! {r#"
 #[tokio::test]
 async fn logs() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    let namespace = get_namespace();
+    let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
+    let override_name = get_override_name("vector-aggregator");
 
     let vector = framework
         .vector(
-            "test-vector",
+            &namespace,
             HELM_CHART_VECTOR,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_STDOUT_SINK,
+                custom_helm_values: &config_override_name(HELM_VALUES_STDOUT_SINK, &override_name),
                 ..Default::default()
             },
         )
         .await?;
     framework
         .wait_for_rollout(
-            "test-vector",
-            "daemonset/vector-agent",
+            &namespace,
+            &format!("daemonset/{}", override_name),
             vec!["--timeout=60s"],
         )
         .await?;
     framework
         .wait_for_rollout(
-            "test-vector",
-            "statefulset/vector-aggregator",
+            &namespace,
+            &format!("statefulset/{}", override_name),
             vec!["--timeout=60s"],
         )
         .await?;
 
-    let test_namespace = framework.namespace("test-vector-test-pod").await?;
+    let test_namespace = framework.namespace(&pod_namespace).await?;
 
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
-            "test-vector-test-pod",
+            &pod_namespace,
             "test-pod",
             "echo MARKER",
             vec![],
@@ -64,20 +67,20 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     framework
         .wait(
-            "test-vector-test-pod",
+            &pod_namespace,
             vec!["pods/test-pod"],
             WaitFor::Condition("initialized"),
             vec!["--timeout=60s"],
         )
         .await?;
 
-    let mut log_reader = framework.logs("test-vector", "statefulset/vector-aggregator")?;
+    let mut log_reader = framework.logs(&namespace, &format!("statefulset/{}", override_name))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
     let mut got_marker = false;
     look_for_log_line(&mut log_reader, |val| {
-        if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
+        if val["kubernetes"]["pod_namespace"] != pod_namespace {
             // A log from something other than our test pod, pretend we don't
             // see it.
             return FlowControlCommand::GoOn;
