@@ -18,15 +18,14 @@ installation: _interfaces: "vector-installer": {
 
 	role_implementations: [Name=string]: {
 		commands: {
-			_config_path: paths.config
-			install:      "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh"
-			logs:         null
-			reload:       "killall -s SIGHUP vector"
-			restart:      null
-			start:        "vector --config \(paths.config)"
-			stop:         null
-			uninstall:    "rm -rf ./vector"
-			upgrade:      null
+			install:   "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh"
+			logs:      null
+			reload:    "killall -s SIGHUP vector"
+			restart:   null
+			start:     "vector --config \(paths.config)"
+			stop:      null
+			uninstall: "rm -rf ./vector"
+			upgrade:   null
 		}
 
 		tutorials: {
