@@ -35,7 +35,7 @@ Today, scaling Vector horizontally (by increasing replicas) is a manual process 
 
 ## Internal Proposal
 
-Include a configuration for a dedicated reverse proxy that will be deployed as part of the vector-aggregator Helm chart, as well as documented configuration and installation instructions for users that run outside of Kubernetes. We should provide basic, but functional, configurations out-of-the box to enable users to "one click" install Vector as an aggregator. The proxy should dynamically resolve downsteam Vector instances but allow for consistent targets in situations that require it (aggregation transforms).
+Include a configuration for a dedicated reverse proxy that will be deployed as part of the vector-aggregator Helm chart, as well as documented configuration and installation instructions for users that run outside of Kubernetes. We should provide basic, but functional, configurations out-of-the box to enable users to "one click" install Vector as an aggregator. The proxy should dynamically resolve downsteam Vector instances but allow for consistent targets in situations that require it (aggregation transforms). I propose our initially supported proxy should be HAProxy, with the next second being NGINX or Envoy. HAProxy, compared to NGINX, provides more metrics (exposed as JSON or in Prometheus format) and has native service discovery to dynamically populate its configuration. Lua can be used with NGINX to provide service discovery, for example the [nginx-ingress-controller](https://kubernetes.github.io/ingress-nginx/).
 
 Below is a basic HAProxy configuration configured to leverage service discovery in a Kubernetes cluster:
 
@@ -48,7 +48,7 @@ frontend vector
     bind *:9000
     default_backend vector_template
 backend vector_template
-    balance roundrobin
+    balance source
     option tcp-check         
     server-template srv 10 _vector._tcp.vector-aggregator-headless.vector.svc.cluster.local resolvers coredns check
 ```
