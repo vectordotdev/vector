@@ -247,7 +247,11 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     framework
-        .wait_for_rollout(&namespace, "daemonset/vector-agent", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
@@ -977,7 +981,6 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
 
-    println!("Doin da groove");
     let test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod_with_containers(
             &pod_namespace,
@@ -1128,7 +1131,11 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     framework
-        .wait_for_rollout(&namespace, "daemonset/vector-agent", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            &namespace,
+            &format!("daemonset/{}", override_name),
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
