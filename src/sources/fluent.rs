@@ -1,7 +1,7 @@
 use super::util::{SocketListenAddr, TcpIsErrorFatal, TcpSource};
 use crate::{
     config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
-    event::{Event, Value},
+    event::{Event, LogEvent, Value},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
 };
@@ -18,6 +18,7 @@ use std::{
 use tokio_util::codec::Decoder;
 
 // TODO
+// * insert flat event keys
 // * internal events
 // * consider using serde_tuple
 // * authentication
@@ -97,16 +98,16 @@ impl TcpSource for FluentSource {
         let events = entries
             .into_iter()
             .map(|FluentEntry(timestamp, record)| {
-                let fields = record
-                    .into_iter()
-                    .map(|(key, value)| (key, Value::from(value)))
-                    .collect::<BTreeMap<String, Value>>();
-                let mut event = Event::from(fields);
-                let log = event.as_mut_log();
+                let mut log = LogEvent::default();
                 log.insert("host", host.clone());
                 log.insert("timestamp", timestamp);
                 log.insert("fluent_tag", tag.clone());
-                event
+                log.extend(
+                    record
+                        .into_iter()
+                        .map(|(key, value)| (key, Value::from(value))),
+                );
+                log.into()
             })
             .collect();
 
