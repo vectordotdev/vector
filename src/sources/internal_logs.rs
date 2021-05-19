@@ -76,11 +76,11 @@ mod tests {
     async fn receives_logs() {
         let start = chrono::Utc::now();
         trace::init(false, false, "debug");
-        error!(message = "before source started");
+        error!(message = "Before source started.");
 
         let rx = start_source().await;
 
-        error!(message = "after source started");
+        error!(message = "After source started.");
 
         sleep(Duration::from_millis(1)).await;
         let events = collect_ready(rx).await;
@@ -91,9 +91,12 @@ mod tests {
 
         assert_eq!(
             events[0].as_log()["message"],
-            "before source started".into()
+            "Before source started.".into()
         );
-        assert_eq!(events[1].as_log()["message"], "after source started".into());
+        assert_eq!(
+            events[1].as_log()["message"],
+            "After source started.".into()
+        );
 
         for event in events {
             let log = event.as_log();
