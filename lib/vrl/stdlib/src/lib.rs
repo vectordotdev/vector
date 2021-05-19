@@ -90,7 +90,7 @@ mod log;
 mod log_util;
 #[cfg(feature = "match")]
 mod r#match;
-#[cfg(feature = "match")]
+#[cfg(feature = "match_any")]
 mod match_any;
 #[cfg(feature = "md5")]
 mod md5;
@@ -291,7 +291,7 @@ pub use join::Join;
 pub use length::Length;
 #[cfg(feature = "log")]
 pub use log::Log;
-#[cfg(feature = "match")]
+#[cfg(feature = "match_any")]
 pub use match_any::MatchAny;
 #[cfg(feature = "merge")]
 pub use merge::Merge;

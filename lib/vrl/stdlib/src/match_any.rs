@@ -52,8 +52,9 @@ impl Function for MatchAny {
                     expr,
                 })?;
 
-            // TODO: Why does `?` not work here?
-            let re = value.try_regex().unwrap();
+            let re = value
+                .try_regex()
+                .map_err(|e| Box::new(e) as Box<dyn DiagnosticError>)?;
             re_strings.push(re.to_string());
         }
 
