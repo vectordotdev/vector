@@ -8,11 +8,11 @@ This document shows you how to manage the Vector process using various platforms
 
 ## Administrate
 
-{{< administrate >}}
+{{< administration/manage >}}
 
 ## How it works
 
-{{< process >}}
+{{< administration/process >}}
 
 [bug]: https://github.com/timberio/vector/issues/new?labels=type%3A+bug
 [configuration]: /docs/reference/configuration

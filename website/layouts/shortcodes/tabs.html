@@ -4,12 +4,12 @@
 
 {{ $default := .Params.default | urlize }}
 <div x-data="{ selected: '{{ $default }}' }" class="tabs no-prose border rounded-md p-4 shadow dark:border-gray-700">
-  <div class="flex space-x-2.5 mb-3">
+  <div class="flex space-x-2.5">
     {{ .Inner }}
   </div>
 
   {{ range $k, $v := $.Page.Scratch.Get "tabs" }}
-  <div x-show="selected === '{{ $k }}'">
+  <div x-show="selected === '{{ $k }}'" class="mt-4 prose dark:prose-dark">
     {{ $v | $.Page.RenderString }}
   </div>
   {{ end }}

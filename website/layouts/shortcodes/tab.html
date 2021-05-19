@@ -1,7 +1,7 @@
 {{ $title := .Params.title }}
 {{ $slug := .Params.title | urlize }}
 {{ $.Page.Scratch.SetInMap "tabs" $slug .Inner }}
-<div :class="{ 'text-gray-100 bg-dark dark:bg-gray-300 dark:text-dark shadow-md': selected === '{{ $slug }}' }" class="font-mono text-sm cursor-pointer py-1 px-2.5 rounded tracking-snug dark:text-gray-100">
+<div :class="{ 'text-gray-100 bg-dark dark:bg-gray-300 dark:text-dark shadow font-bold': selected === '{{ $slug }}' }" class="font-mono text-sm cursor-pointer py-1 px-2.5 rounded tracking-snug">
   <span @click="selected = '{{ $slug }}'">
 {{ $title }}
   </span>

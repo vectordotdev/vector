@@ -42,7 +42,7 @@ module.exports = {
               },
             },
             // Spacing between certain shortcode combinations
-            '.admonition + .tabs, .svg + .admonition': {
+            '.admonition + .tabs, .svg + .admonition, .highlight + p': {
               'margin-top': '1rem',
             },
             '.no-prose': {

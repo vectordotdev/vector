@@ -9,7 +9,7 @@
 {{ $css          := resources.Get $sass | resources.ExecuteAsTemplate $sass . | toCSS $cssOpts | postCSS $postCssOpts }}
 
 {{/* Some Sass needs to be handled separately, as PurgeCSS will eliminate all of these
-  classes since they're created at page load time by JavaScript */}}
+     classes since they're created at page load time by JavaScript */}}
 {{ $unpurgedCss := resources.Get "sass/unpurged.sass" | toCSS (dict "targetPath" "css/unpurged.css" "outputStyle" "compressed") }}
 
 {{/* Run CSS post-processing for production and preview builds */}}

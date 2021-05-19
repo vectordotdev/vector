@@ -6,8 +6,50 @@
 {{ $desc := .Description }}
 {{ $numSections := len .Sections }}
 {{ $isRoot := eq .FirstSection .CurrentSection }}
-<div class="relative max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-6 lg:px-8 xl:gap-x-12 space-y-8 xl:space-y-0 my-16">
-  {{ partial "hero.html" . }}
+<div class="relative max-w-3xl md:max-w-5xl lg:max-w-7xl mx-auto px-6 lg:px-8 my-16">
+  <div>
+    {{ partial "hero.html" . }}
+  </div>
+
+
+  <div class="mt-8 md:grid grid-cols-2 gap-8">
+    {{/* Pages with sub-sections (/guides, /guides/integrate, etc.) */}}
+    {{ with .Sections }}
+    {{ range . }}
+    <div>
+      <span class="prose">
+        {{ partial "heading.html" (dict "text" .Title "level" 2 "href" .RelPermalink) }}
+      </span>
+
+      {{ with .Description }}
+      <h3 class="mt-2 dark:text-gray-300 text-lg">
+        {{ . | markdownify }}
+      </h3>
+      {{ end }}
+
+      {{ with .Sections }}
+      <div class="mt-4 flex flex-col space-y-8">
+        {{ range . }}
+        <div>
+          <span class="prose">
+            {{ partial "heading.html" (dict "text" .Title "level" 3 "href" .RelPermalink) }}
+          </span>
+
+          {{ .Render "list" }}
+        </div>
+        {{ end }}
+      </div>
+      {{ else }}
+      <div class="mt-3">
+        {{ .Render "list" }}
+      </div>
+      {{ end }}
+    </div>
+    {{ end }}
+    {{ else }} {{/* No sub-sections, only pages */}}
+    {{ .Render "list" }}
+    {{ end }}
+  </div>
 </div>
 {{ end }}
 

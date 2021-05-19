@@ -470,63 +470,65 @@
 
   {{/* Real-world examples */}}
   {{ with .vrl_real_world_examples }}
-  {{ range . }}
-  {{ $input := dict "message" .input.log.message | jsonify }}
-  {{ $vrlSourceCode := highlight .source "toml" "" }}
-  {{ $output := .output | jsonify (dict "indent" "  ") }}
-  {{ $outputCode := highlight $output "json" "" }}
-  <div class="py-3 px-5">
-    <span class="font-semibold tracking-tight">
-      {{ $href := printf "#%s" (.title | urlize) }}
-      {{ partial "heading.html" (dict "text" .title "level" 3) }}
-    </span>
-
-    <div class="mt-3 flex flex-col space-y-2">
-      {{ with .input.log }}
-      {{ $json := . | jsonify (dict "indent" "  ") }}
-      {{ $code := highlight $json "json" "" }}
-      <span>
-        Given this <a href="/docs/about/under-the-hood/architecture/data-model/log">Vector log event</a>...
-      </span>
-      {{ $code }}
-      {{ end }}
-
-      {{ with .input.metric }}
-      {{ $json := . | jsonify (dict "indent" "  ") }}
-      {{ $code := highlight $json "json" "" }}
-      <span>
-        Given this <a href="/docs/about/under-the-hood/architecture/data-model/metric">Vector metric event</a>...
-      </span>
-      {{ $code }}
-      {{ end }}
-
-      <span>
-        ...and this VRL program...
+  <div class="flex flex-col divide-y dark:divide-gray-700">
+    {{ range . }}
+    {{ $input := dict "message" .input.log.message | jsonify }}
+    {{ $vrlSourceCode := highlight .source "toml" "" }}
+    {{ $output := .output | jsonify (dict "indent" "  ") }}
+    {{ $outputCode := highlight $output "json" "" }}
+    <div class="py-3 px-5">
+      <span class="font-semibold tracking-tight">
+        {{ $href := printf "#%s" (.title | urlize) }}
+        {{ partial "heading.html" (dict "text" .title "level" 3) }}
       </span>
 
-      {{ $vrlSourceCode }}
+      <div class="mt-3 flex flex-col space-y-2">
+        {{ with .input.log }}
+        {{ $json := . | jsonify (dict "indent" "  ") }}
+        {{ $code := highlight $json "json" "" }}
+        <span>
+          Given this <a href="/docs/about/under-the-hood/architecture/data-model/log">Vector log event</a>...
+        </span>
+        {{ $code }}
+        {{ end }}
 
-      {{ if .raises }}
-      {{ $errorCode := highlight .raises.compiletime "ruby" "" }}
-      <span>
-        ...you should see this error:
-      </span>
+        {{ with .input.metric }}
+        {{ $json := . | jsonify (dict "indent" "  ") }}
+        {{ $code := highlight $json "json" "" }}
+        <span>
+          Given this <a href="/docs/about/under-the-hood/architecture/data-model/metric">Vector metric event</a>...
+        </span>
+        {{ $code }}
+        {{ end }}
 
-      {{ $errorCode }}
-      {{ else }}
-      {{ with .input.log }}
-      <span>...the following log event is output:</span>
-      {{ end }}
+        <span>
+          ...and this VRL program...
+        </span>
 
-      {{ with .input.metric }}
-      <span>...the following metric event is output:</span>
-      {{ end }}
+        {{ $vrlSourceCode }}
 
-      {{ $outputCode }}
-      {{ end }}
+        {{ if .raises }}
+        {{ $errorCode := highlight .raises.compiletime "ruby" "" }}
+        <span>
+          ...you should see this error:
+        </span>
+
+        {{ $errorCode }}
+        {{ else }}
+        {{ with .input.log }}
+        <span>...the following log event is output:</span>
+        {{ end }}
+
+        {{ with .input.metric }}
+        <span>...the following metric event is output:</span>
+        {{ end }}
+
+        {{ $outputCode }}
+        {{ end }}
+      </div>
     </div>
+    {{ end }}
   </div>
-  {{ end }}
   {{ end }}
 
   {{/* Compile-time errors */}}
