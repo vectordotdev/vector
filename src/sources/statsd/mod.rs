@@ -204,9 +204,9 @@ impl TcpSource for StatsdTcpSource {
         BytesDelimitedCodec::new(b'\n')
     }
 
-    fn build_event(&self, line: Bytes, _host: Bytes) -> Option<Event> {
+    fn build_events(&self, line: Bytes, _host: Bytes) -> Option<Vec<Event>> {
         let line = String::from_utf8_lossy(line.as_ref());
-        parse_event(&line)
+        parse_event(&line).map(|event| vec![event])
     }
 }
 

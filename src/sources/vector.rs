@@ -94,12 +94,12 @@ impl TcpSource for VectorSource {
         LengthDelimitedCodec::new()
     }
 
-    fn build_event(&self, frame: BytesMut, _host: Bytes) -> Option<Event> {
+    fn build_events(&self, frame: BytesMut, _host: Bytes) -> Option<Vec<Event>> {
         let byte_size = frame.len();
         match proto::EventWrapper::decode(frame).map(Event::from) {
             Ok(event) => {
                 emit!(VectorEventReceived { byte_size });
-                Some(event)
+                Some(vec![event])
             }
             Err(error) => {
                 emit!(VectorProtoDecodeError { error });

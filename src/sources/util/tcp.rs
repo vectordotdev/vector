@@ -79,14 +79,11 @@ where
 
     fn decoder(&self) -> Self::Decoder;
 
-    fn build_event(&self, frame: <Self::Decoder as Decoder>::Item, host: Bytes) -> Option<Event>;
-
-    fn build_events(&self, frame: <Self::Decoder as Decoder>::Item, host: Bytes) -> Vec<Event> {
-        match self.build_event(frame, host) {
-            Some(event) => vec![event],
-            None => vec![],
-        }
-    }
+    fn build_events(
+        &self,
+        frame: <Self::Decoder as Decoder>::Item,
+        host: Bytes,
+    ) -> Option<Vec<Event>>;
 
     fn run(
         self,
@@ -270,7 +267,7 @@ async fn handle_stream<T>(
     .filter_map(move |frame| ready(match frame {
         Ok(frame) => {
             let host = host.clone();
-            Some(futures::stream::iter(source.build_events(frame, host).into_iter().map(Ok)))
+            source.build_events(frame, host).map(|events| futures::stream::iter(events.into_iter().map(Ok)))
         }
         Err(error) => {
             warn!(message = "Failed to read data from TCP source.", %error);
