@@ -5,7 +5,7 @@
 {{ $n := index $iconSizes ($level | string) }}
 <h{{ $level }} x-data="{ show: false }" x-on:mouseover="show = true" x-on:mouseleave="show = false" id="{{ $id }}" class="flex items-center">
   {{ if .href }}
-  <a href="{{ . }}">
+  <a href="{{ .href }}">
     {{ $text }}
   </a>
   {{ else if .anchor }}

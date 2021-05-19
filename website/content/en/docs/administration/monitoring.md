@@ -14,70 +14,7 @@ Vector is built to provide clear, informative, well-structured logs. In this sec
 
 The preferred way to access Vector's logs is based on your [installation method][install].
 
-#### APT
-
-The Vector package from the APT repository installs Vector as a Systemd service. Logs can be accessed through the `journalctl` utility:
-
-```bash
-sudo journalctl -fu vector
-```
-
-#### dpkg
-
-The Vector DEB package installs Vector as a Systemd service. Logs can be accessed through the `journalctl` utility:
-
-```bash
-sudo journalctl -fu vector
-```
-
-#### Docker
-
-If you've started Vector through the `docker` CLI you can access Vector's logs via the `docker logs` command. First, find the Vector container ID:
-
-```bash
-docker ps | grep vector
-```
-
-Copy Vector's container ID and use it to tail the logs:
-
-```bash
-docker logs -f <container-id>
-```
-
-#### Docker Compose
-
-If you started Vector through Docker compose you can use the following command to access Vector's logs:
-
-```bash
-docker-compose logs -f vector
-```
-
-Replace `vector` with the name of Vector's service if it isn't named `vector`.
-
-#### Homebrew
-
-When Vector is started through Homebrew the logs are automatically routed to `/usr/local/var/log/vector.log`. You can tail them with the `tail` utility:
-
-```bash
-tail -f /usr/local/var/log/vector.log
-```
-
-#### MSI
-
-The Vector MSI package doesn't install Vector into a proces manager. Therefore, Vector must be started by executing the Vector binary directly. Vector's logs are written to `STDOUT`. You are in charge of routing `STDOUT`, and this determines how you access Vector's logs.
-
-#### Nix
-
-The Vector Nix package doesn't install Vector into a proces manager. Therefore, Vector must be started by executing the Vector binary directly. Vector's logs are written to `STDOUT`. You are in charge of routing `STDOUT`, and this determines how you access Vector's logs.
-
-#### RPM
-
-The Vector RPM package installs Vector as a Systemd service. Logs can be
-accessed through the `journalctl` utility:
-
-```bash
-sudo journalctl -fu vector
-```
+{{< administration/logs >}}
 
 ### Routing logs
 
@@ -110,7 +47,7 @@ You can enable full error backtraces by setting the `RUST_BACKTRACE=full` enviro
 
 ## Metrics
 
-
+You can monitor metrics produced by Vector using the [`internal_metrics`][internal_metrics] source.
 
 ## Troubleshooting
 
@@ -129,6 +66,7 @@ Vector employs an event-driven observability strategy that ensures consistent an
 Vector rate limits log events in the hot path. This enables you to get granular insight without the risk of saturating IO and disrupting the service. The trade-off is that repetitive logs aren't logged.
 
 [install]: /docs/setup/installation
+[internal_metrics]: /docs/reference/configuration/sources/internal_metrics
 [journald]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html
 [journald_source]: /docs/reference/configuration/sources/journald
 [rfc_2064]: https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md

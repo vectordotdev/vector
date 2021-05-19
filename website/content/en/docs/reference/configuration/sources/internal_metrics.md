@@ -1,5 +1,6 @@
 ---
 title: Internal metrics
+description: Access to the metrics produced by Vector itself and process them in your Vector pipeline
 kind: source
 layout: component
 ---
