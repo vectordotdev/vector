@@ -3813,7 +3813,18 @@ version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c53c23fff9a59f261498953cf41dc9ffc2522fd79723bdf283c1e88dc1633624"
 dependencies = [
- "metrics-macros",
+ "metrics-macros 0.3.0",
+ "proc-macro-hack",
+ "t1ha",
+]
+
+[[package]]
+name = "metrics"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c0a7fa53d812d26e59d2baf7a6f77442041454ab32908eb304447f00f0dd4de"
+dependencies = [
+ "metrics-macros 0.4.0",
  "proc-macro-hack",
  "t1ha",
 ]
@@ -3833,14 +3844,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "metrics-tracing-context"
+name = "metrics-macros"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9cdacbcb8c51682ff85744e8511bb454574adda00f4104ae6215b1b6eb71788"
+checksum = "caa72e4a3d157986dd2565c82ecbddcc23941513669a3766b938f6b72eb87f3f"
+dependencies = [
+ "lazy_static",
+ "proc-macro-hack",
+ "proc-macro2 1.0.26",
+ "quote 1.0.9",
+ "regex",
+ "syn 1.0.72",
+]
+
+[[package]]
+name = "metrics-tracing-context"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e5011e0144cd019cafd0b5326837383d081582ea588d6c04ac5b88f2a18b096"
 dependencies = [
  "itoa",
- "metrics",
- "metrics-util",
+ "metrics 0.16.0",
+ "metrics-util 0.8.0",
  "tracing 0.1.26",
  "tracing-core 0.1.18",
  "tracing-subscriber",
@@ -3852,6 +3877,19 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6586f4c52af81a3f7832cf0bc86141d2fca7207bedd09fdd3f7da60c8dcd0c4a"
 dependencies = [
+ "hashbrown 0.11.2",
+ "metrics 0.15.1",
+ "num_cpus",
+ "ordered-float",
+ "t1ha",
+]
+
+[[package]]
+name = "metrics-util"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0c93306cf63ff153c57963151a011194af0f33c91fe30ec30faf98732350a1a"
+dependencies = [
  "aho-corasick",
  "atomic-shim",
  "crossbeam-epoch 0.9.3",
@@ -3859,11 +3897,12 @@ dependencies = [
  "dashmap",
  "hashbrown 0.11.2",
  "indexmap",
- "metrics",
+ "metrics 0.16.0",
  "num_cpus",
  "ordered-float",
  "parking_lot",
  "quanta",
+ "radix_trie",
  "sketches-ddsketch",
  "t1ha",
 ]
@@ -7762,7 +7801,7 @@ dependencies = [
  "lucetc",
  "matches",
  "maxminddb",
- "metrics",
+ "metrics 0.15.1",
  "metrics-tracing-context",
  "mongodb",
  "nix 0.20.0",
@@ -7906,9 +7945,9 @@ dependencies = [
  "lazy_static",
  "leveldb",
  "lookup",
- "metrics",
+ "metrics 0.15.1",
  "metrics-tracing-context",
- "metrics-util",
+ "metrics-util 0.7.0",
  "once_cell",
  "pest",
  "pest_derive",
