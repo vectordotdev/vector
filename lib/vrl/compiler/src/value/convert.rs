@@ -494,3 +494,25 @@ impl From<DateTime<Utc>> for Value {
         Value::Timestamp(v)
     }
 }
+
+impl From<serde_json::Value> for Value {
+    fn from(value: serde_json::Value) -> Self {
+        match value {
+            serde_json::Value::Null => Value::Null,
+            serde_json::Value::Bool(bool) => bool.into(),
+            serde_json::Value::Number(number) => {
+                if number.is_f64() {
+                    number.as_f64().into()
+                } else {
+                    number.as_i64().into()
+                }
+            }
+            serde_json::Value::String(string) => string.into(),
+            serde_json::Value::Array(array) => array.into(),
+            serde_json::Value::Object(map) => map
+                .into_iter()
+                .map(|(key, value)| (key, value.into()))
+                .collect(),
+        }
+    }
+}

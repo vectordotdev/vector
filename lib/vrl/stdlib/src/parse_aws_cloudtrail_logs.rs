@@ -13,11 +13,17 @@ struct AwsCloudTrailLogs {
     records: Vec<AwsCloudTrailLogsRecord>,
 }
 
+impl From<AwsCloudTrailLogs> for Value {
+    fn from(logs: AwsCloudTrailLogs) -> Self {
+        logs.records.into()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecord {
     event_time: DateTime<Utc>,
-    event_version: semver::VersionReq,
+    event_version: String,
     user_identity: AwsCloudTrailLogsRecordUserIdentity,
     event_source: String,
     event_name: String,
@@ -28,14 +34,14 @@ struct AwsCloudTrailLogsRecord {
     error_code: Option<String>,
     error_message: Option<String>,
     request_parameters: serde_json::Map<String, serde_json::Value>,
-    response_elements: serde_json::Value,
+    response_elements: serde_json::Map<String, serde_json::Value>,
     additional_event_data: Option<String>,
     #[serde(rename(deserialize = "requestID"))]
     request_id: Option<String>,
     #[serde(rename(deserialize = "eventID"))]
     event_id: Option<String>,
     event_type: Option<AwsCloudTrailLogsRecordEventType>,
-    api_version: Option<semver::VersionReq>,
+    api_version: Option<String>,
     management_event: Option<AwsCloudTrailLogsRecordManagementEvent>,
     read_only: Option<bool>,
     resources: Option<Vec<AwsCloudTrailLogsRecordResources>>,
@@ -50,6 +56,119 @@ struct AwsCloudTrailLogsRecord {
     edge_device_details: Option<String>,
     tls_details: Option<AwsCloudTrailLogsRecordTlsDetails>,
     insight_details: Option<AwsCloudTrailLogsRecordInsightDetails>,
+}
+
+impl From<AwsCloudTrailLogsRecord> for Value {
+    fn from(record: AwsCloudTrailLogsRecord) -> Self {
+        let mut value = BTreeMap::<String, Value>::new();
+
+        value.insert("event_time".to_owned(), record.event_time.into());
+        value.insert(
+            "event_version".to_owned(),
+            record.event_version.to_string().into(),
+        );
+        value.insert("user_identity".to_owned(), record.user_identity.into());
+        value.insert("event_source".to_owned(), record.event_source.into());
+        value.insert("event_name".to_owned(), record.event_name.into());
+        value.insert("aws_region".to_owned(), record.aws_region.into());
+        value.insert(
+            "source_ip_address".to_owned(),
+            record.source_ip_address.to_string().into(),
+        );
+        value.insert("user_agent".to_owned(), record.user_agent.into());
+        if let Some(error_code) = record.error_code {
+            value.insert("error_code".to_owned(), error_code.into());
+        }
+        if let Some(error_message) = record.error_message {
+            value.insert("error_message".to_owned(), error_message.into());
+        }
+        value.insert(
+            "request_parameters".to_owned(),
+            record
+                .request_parameters
+                .into_iter()
+                .map(|(key, value)| (key, value.into()))
+                .collect::<BTreeMap<_, Value>>()
+                .into(),
+        );
+        value.insert(
+            "response_elements".to_owned(),
+            record
+                .response_elements
+                .into_iter()
+                .map(|(key, value)| (key, value.into()))
+                .collect::<BTreeMap<_, Value>>()
+                .into(),
+        );
+        if let Some(additional_event_data) = record.additional_event_data {
+            value.insert(
+                "additional_event_data".to_owned(),
+                additional_event_data.into(),
+            );
+        }
+        if let Some(request_id) = record.request_id {
+            value.insert("request_id".to_owned(), request_id.into());
+        }
+        if let Some(event_id) = record.event_id {
+            value.insert("event_id".to_owned(), event_id.into());
+        }
+        if let Some(event_type) = record.event_type {
+            value.insert("event_type".to_owned(), event_type.into());
+        }
+        if let Some(api_version) = record.api_version {
+            value.insert("api_version".to_owned(), api_version.to_string().into());
+        }
+        if let Some(management_event) = record.management_event {
+            value.insert("management_event".to_owned(), management_event.into());
+        }
+        if let Some(read_only) = record.read_only {
+            value.insert("read_only".to_owned(), read_only.into());
+        }
+        if let Some(resources) = record.resources {
+            value.insert("resources".to_owned(), resources.into());
+        }
+        if let Some(recipient_account_id) = record.recipient_account_id {
+            value.insert(
+                "recipient_account_id".to_owned(),
+                recipient_account_id.into(),
+            );
+        }
+        if let Some(service_event_details) = record.service_event_details {
+            value.insert(
+                "service_event_details".to_owned(),
+                service_event_details.into(),
+            );
+        }
+        if let Some(shared_event_id) = record.shared_event_id {
+            value.insert("shared_event_id".to_owned(), shared_event_id.into());
+        }
+        if let Some(vpc_endpoint_id) = record.vpc_endpoint_id {
+            value.insert("vpc_endpoint_id".to_owned(), vpc_endpoint_id.into());
+        }
+        if let Some(event_category) = record.event_category {
+            value.insert("event_category".to_owned(), event_category.into());
+        }
+        if let Some(addendum) = record.addendum {
+            value.insert("addendum".to_owned(), addendum.into());
+        }
+        if let Some(session_credentials_from_console) = record.session_credentials_from_console {
+            value.insert(
+                "session_credentials_from_console".to_owned(),
+                session_credentials_from_console.into(),
+            );
+        }
+        if let Some(edge_device_details) = record.edge_device_details {
+            value.insert("edge_device_details".to_owned(), edge_device_details.into());
+        }
+        if let Some(tls_details) = record.tls_details {
+            value.insert("tls_details".to_owned(), tls_details.into());
+        }
+        if let Some(insight_details) = record.insight_details {
+            value.insert("insight_details".to_owned(), insight_details.into());
+        }
+
+        value.into()
+    }
 }
 
 // Reference: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-user-identity.html.
@@ -67,6 +186,35 @@ struct AwsCloudTrailLogsRecordUserIdentity {
     identity_provider: Option<String>,
 }
 
+impl From<AwsCloudTrailLogsRecordUserIdentity> for Value {
+    fn from(user_identity: AwsCloudTrailLogsRecordUserIdentity) -> Self {
+        let mut value = BTreeMap::<String, Value>::new();
+
+        value.insert("type".to_owned(), user_identity.r#type.into());
+        if let Some(user_name) = user_identity.user_name {
+            value.insert("user_name".to_owned(), user_name.into());
+        }
+        value.insert("principal_id".to_owned(), user_identity.principal_id.into());
+        value.insert("arn".to_owned(), user_identity.arn.into());
+        value.insert("account_id".to_owned(), user_identity.account_id.into());
+        value.insert(
+            "access_key_id".to_owned(),
+            user_identity.access_key_id.into(),
+        );
+        if let Some(session_context) = user_identity.session_context {
+            value.insert("session_context".to_owned(), session_context.into());
+        }
+        if let Some(invoked_by) = user_identity.invoked_by {
+            value.insert("invoked_by".to_owned(), invoked_by.into());
+        }
+        if let Some(identity_provider) = user_identity.identity_provider {
+            value.insert("identity_provider".to_owned(), identity_provider.into());
+        }
+
+        value.into()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 enum AwsCloudTrailLogsRecordUserIdentityType {
     Root,
@@ -80,6 +228,12 @@ enum AwsCloudTrailLogsRecordUserIdentityType {
     AwsService,
 }
 
+impl From<AwsCloudTrailLogsRecordUserIdentityType> for Value {
+    fn from(identity_type: AwsCloudTrailLogsRecordUserIdentityType) -> Self {
+        format!("{:?}", identity_type).into()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordUserIdentitySessionContext {
@@ -87,6 +241,27 @@ struct AwsCloudTrailLogsRecordUserIdentitySessionContext {
     web_id_federation_data:
         Option<AwsCloudTrailLogsRecordUserIdentitySessionContextWebIdFederationData>,
     attributes: Option<Value>,
+}
+
+impl From<AwsCloudTrailLogsRecordUserIdentitySessionContext> for Value {
+    fn from(session_context: AwsCloudTrailLogsRecordUserIdentitySessionContext) -> Self {
+        let mut value = BTreeMap::<String, Value>::new();
+
+        if let Some(session_issuer) = session_context.session_issuer {
+            value.insert("session_issuer".to_owned(), session_issuer.into());
+        }
+        if let Some(web_id_federation_data) = session_context.web_id_federation_data {
+            value.insert(
+                "web_id_federation_data".to_owned(),
+                web_id_federation_data.into(),
+            );
+        }
+        if let Some(attributes) = session_context.attributes {
+            value.insert("attributes".to_owned(), attributes.into());
+        }
+
+        value.into()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -99,11 +274,46 @@ struct AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuer {
     account_id: String,
 }
 
+impl From<AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuer> for Value {
+    fn from(
+        session_issuer: AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuer,
+    ) -> Self {
+        let mut value = BTreeMap::<String, Value>::new();
+
+        value.insert("type".to_owned(), session_issuer.r#type.into());
+        value.insert("user_name".to_owned(), session_issuer.user_name.into());
+        value.insert(
+            "principal_id".to_owned(),
+            session_issuer.principal_id.into(),
+        );
+        value.insert("arn".to_owned(), session_issuer.arn.into());
+        value.insert("account_id".to_owned(), session_issuer.account_id.into());
+
+        value.into()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordUserIdentitySessionContextWebIdFederationData {
     federated_provider: String,
     attributes: Value,
+}
+
+impl From<AwsCloudTrailLogsRecordUserIdentitySessionContextWebIdFederationData> for Value {
+    fn from(
+        federation_data: AwsCloudTrailLogsRecordUserIdentitySessionContextWebIdFederationData,
+    ) -> Self {
+        let mut value = BTreeMap::<String, Value>::new();
+
+        value.insert(
+            "federated_provider".to_owned(),
+            federation_data.federated_provider.into(),
+        );
+        value.insert("attributes".to_owned(), federation_data.attributes.into());
+
+        value.into()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -112,6 +322,14 @@ enum AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuerType {
     #[serde(rename(deserialize = "IAMUser"))]
     IamUser,
     Role,
+}
+
+impl From<AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuerType> for Value {
+    fn from(
+        issuer_type: AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuerType,
+    ) -> Self {
+        format!("{:?}", issuer_type).into()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -123,6 +341,12 @@ enum AwsCloudTrailLogsRecordEventType {
     AwsConsoleSignIn,
 }
 
+impl From<AwsCloudTrailLogsRecordEventType> for Value {
+    fn from(event_type: AwsCloudTrailLogsRecordEventType) -> Self {
+        format!("{:?}", event_type).into()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[allow(clippy::enum_variant_names)] // Keep the `AWS` prefix
 enum AwsCloudTrailLogsRecordManagementEvent {
@@ -130,6 +354,12 @@ enum AwsCloudTrailLogsRecordManagementEvent {
     AwsConsoleAction,
     AwsConsoleSignIn,
     AwsServiceEvent,
+}
+
+impl From<AwsCloudTrailLogsRecordManagementEvent> for Value {
+    fn from(management_event: AwsCloudTrailLogsRecordManagementEvent) -> Self {
+        format!("{:?}", management_event).into()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -141,11 +371,29 @@ struct AwsCloudTrailLogsRecordResources {
     r#type: String,
 }
 
+impl From<AwsCloudTrailLogsRecordResources> for Value {
+    fn from(resources: AwsCloudTrailLogsRecordResources) -> Self {
+        let mut value = BTreeMap::<String, Value>::new();
+
+        value.insert("arn".to_owned(), resources.arn.into());
+        value.insert("account_id".to_owned(), resources.account_id.into());
+        value.insert("type".to_owned(), resources.r#type.into());
+
+        value.into()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 enum AwsCloudTrailLogsRecordEventCategory {
     Management,
     Data,
     Insight,
+}
+
+impl From<AwsCloudTrailLogsRecordEventCategory> for Value {
+    fn from(event_category: AwsCloudTrailLogsRecordEventCategory) -> Self {
+        format!("{:?}", event_category).into()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -157,6 +405,25 @@ struct AwsCloudTrailLogsRecordAddendum {
     original_event_id: Option<String>,
 }
 
+impl From<AwsCloudTrailLogsRecordAddendum> for Value {
+    fn from(addendum: AwsCloudTrailLogsRecordAddendum) -> Self {
+        let mut value = BTreeMap::<String, Value>::new();
+
+        value.insert("reason".to_owned(), addendum.reason.into());
+        if let Some(updated_fields) = addendum.updated_fields {
+            value.insert("updated_fields".to_owned(), updated_fields.into());
+        }
+        if let Some(original_request_id) = addendum.original_request_id {
+            value.insert("original_request_id".to_owned(), original_request_id.into());
+        }
+        if let Some(original_event_id) = addendum.original_event_id {
+            value.insert("original_event_id".to_owned(), original_event_id.into());
+        }
+
+        value.into()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(rename_all(deserialize = "SCREAMING_SNAKE_CASE"))]
 enum AwsCloudTrailLogsRecordAddendumReason {
@@ -165,12 +432,33 @@ enum AwsCloudTrailLogsRecordAddendumReason {
     ServiceOutage,
 }
 
+impl From<AwsCloudTrailLogsRecordAddendumReason> for Value {
+    fn from(addendum_reason: AwsCloudTrailLogsRecordAddendumReason) -> Self {
+        format!("{:?}", addendum_reason).into()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordTlsDetails {
     tls_version: String,
     cipher_suite: String,
     client_provided_host_header: String,
+}
+
+impl From<AwsCloudTrailLogsRecordTlsDetails> for Value {
+    fn from(tls_details: AwsCloudTrailLogsRecordTlsDetails) -> Self {
+        let mut value = BTreeMap::<String, Value>::new();
+
+        value.insert("tls_version".to_owned(), tls_details.tls_version.into());
+        value.insert("cipher_suite".to_owned(), tls_details.cipher_suite.into());
+        value.insert(
+            "client_provided_host_header".to_owned(),
+            tls_details.client_provided_host_header.into(),
+        );
+
+        value.into()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -183,10 +471,39 @@ struct AwsCloudTrailLogsRecordInsightDetails {
     insight_context: AwsCloudTrailLogsRecordInsightDetailsInsightContext,
 }
 
+impl From<AwsCloudTrailLogsRecordInsightDetails> for Value {
+    fn from(insight_details: AwsCloudTrailLogsRecordInsightDetails) -> Self {
+        let mut value = BTreeMap::<String, Value>::new();
+
+        value.insert("state".to_owned(), insight_details.state.into());
+        value.insert(
+            "event_source".to_owned(),
+            insight_details.event_source.into(),
+        );
+        value.insert("event_name".to_owned(), insight_details.event_name.into());
+        value.insert(
+            "insight_type".to_owned(),
+            insight_details.insight_type.into(),
+        );
+        value.insert(
+            "insight_context".to_owned(),
+            insight_details.insight_context.into(),
+        );
+
+        value.into()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 enum AwsCloudTrailLogsRecordInsightDetailsState {
     Start,
     End,
+}
+
+impl From<AwsCloudTrailLogsRecordInsightDetailsState> for Value {
+    fn from(details_state: AwsCloudTrailLogsRecordInsightDetailsState) -> Self {
+        format!("{:?}", details_state).into()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -194,11 +511,30 @@ enum AwsCloudTrailLogsRecordInsightDetailsInsightType {
     ApiCallRateInsight,
 }
 
+impl From<AwsCloudTrailLogsRecordInsightDetailsInsightType> for Value {
+    fn from(insight_type: AwsCloudTrailLogsRecordInsightDetailsInsightType) -> Self {
+        format!("{:?}", insight_type).into()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordInsightDetailsInsightContext {
     statistics: AwsCloudTrailLogsRecordInsightDetailsInsightContextStatistics,
     attributions: Option<Vec<AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributions>>,
+}
+
+impl From<AwsCloudTrailLogsRecordInsightDetailsInsightContext> for Value {
+    fn from(insight_context: AwsCloudTrailLogsRecordInsightDetailsInsightContext) -> Self {
+        let mut value = BTreeMap::<String, Value>::new();
+
+        value.insert("statistics".to_owned(), insight_context.statistics.into());
+        if let Some(attributions) = insight_context.attributions {
+            value.insert("attributions".to_owned(), attributions.into());
+        }
+
+        value.into()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -210,10 +546,41 @@ struct AwsCloudTrailLogsRecordInsightDetailsInsightContextStatistics {
     baseline_duration: u64,
 }
 
+impl From<AwsCloudTrailLogsRecordInsightDetailsInsightContextStatistics> for Value {
+    fn from(statistics: AwsCloudTrailLogsRecordInsightDetailsInsightContextStatistics) -> Self {
+        let mut value = BTreeMap::<String, Value>::new();
+
+        value.insert("baseline".to_owned(), statistics.baseline.into());
+        value.insert("insight".to_owned(), statistics.insight.into());
+        value.insert(
+            "insight_duration".to_owned(),
+            statistics.insight_duration.into(),
+        );
+        value.insert(
+            "baseline_duration".to_owned(),
+            statistics.baseline_duration.into(),
+        );
+
+        value.into()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordInsightDetailsInsightContextStatisticsValue {
     average: f64,
+}
+
+impl From<AwsCloudTrailLogsRecordInsightDetailsInsightContextStatisticsValue> for Value {
+    fn from(
+        statistics: AwsCloudTrailLogsRecordInsightDetailsInsightContextStatisticsValue,
+    ) -> Self {
+        let mut value = BTreeMap::<String, Value>::new();
+
+        value.insert("average".to_owned(), statistics.average.into());
+
+        value.into()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -224,12 +591,32 @@ struct AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributions {
     baseline: Vec<AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsBaseline>,
 }
 
+impl From<AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributions> for Value {
+    fn from(attributions: AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributions) -> Self {
+        let mut value = BTreeMap::<String, Value>::new();
+
+        value.insert("attribute".to_owned(), attributions.attribute.into());
+        value.insert("insight".to_owned(), attributions.insight.into());
+        value.insert("baseline".to_owned(), attributions.baseline.into());
+
+        value.into()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 enum AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsAttribute {
     UserIdentityArn,
     UserAgent,
     ErrorCode,
+}
+
+impl From<AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsAttribute> for Value {
+    fn from(
+        attribute: AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsAttribute,
+    ) -> Self {
+        format!("{:?}", attribute).into()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -239,11 +626,37 @@ struct AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsInsight {
     average: f64,
 }
 
+impl From<AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsInsight> for Value {
+    fn from(
+        insight: AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsInsight,
+    ) -> Self {
+        let mut value = BTreeMap::<String, Value>::new();
+
+        value.insert("value".to_owned(), insight.value.into());
+        value.insert("average".to_owned(), insight.average.into());
+
+        value.into()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsBaseline {
     value: String,
     average: f64,
+}
+
+impl From<AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsBaseline> for Value {
+    fn from(
+        baseline: AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsBaseline,
+    ) -> Self {
+        let mut value = BTreeMap::<String, Value>::new();
+
+        value.insert("value".to_owned(), baseline.value.into());
+        value.insert("average".to_owned(), baseline.average.into());
+
+        value.into()
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -328,11 +741,10 @@ impl Expression for ParseAwsCloudTrailLogsFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let bytes = self.value.resolve(ctx)?.try_bytes()?;
 
-        // TODO
-        let _value = serde_json::from_slice::<AwsCloudTrailLogs>(&bytes)
+        let logs = serde_json::from_slice::<AwsCloudTrailLogs>(&bytes)
             .map_err(|error| format!("unable to parse AWS CloudTrail logs: {}", error))?;
 
-        Ok(Value::Array(vec![]))
+        Ok(logs.into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -586,7 +998,53 @@ mod tests {
                     ]
                 }
             "#}],
-            want: Ok(Value::Array(vec![])),
+            want: Ok(vec![
+                map!(
+                    "event_version": "1.0",
+                    "user_identity": map!(
+                        "type": "IamUser",
+                        "principal_id": "EX_PRINCIPAL_ID",
+                        "arn": "arn:aws:iam::123456789012:user/Alice",
+                        "access_key_id": "EXAMPLE_KEY_ID",
+                        "account_id": "123456789012",
+                        "user_name": "Alice"
+                    ),
+                    "event_time": DateTime::parse_from_rfc3339("2014-03-06T21:22:54Z")
+                        .unwrap()
+                        .with_timezone(&Utc),
+                    "event_source": "ec2.amazonaws.com",
+                    "event_name": "StartInstances",
+                    "aws_region": "us-east-2",
+                    "source_ip_address": "205.251.233.176",
+                    "user_agent": "ec2-api-tools 1.6.12.2",
+                    "request_parameters": map!(
+                        "instancesSet": map!(
+                            "items": vec![
+                                map!(
+                                    "instanceId": "i-ebeaf9e2"
+                                )
+                            ]
+                        )
+                    ),
+                    "response_elements": map!(
+                        "instancesSet": map!(
+                            "items": vec![
+                                map!(
+                                    "instanceId": "i-ebeaf9e2",
+                                    "currentState": map!(
+                                        "code": 0,
+                                        "name": "pending"
+                                    ),
+                                    "previousState": map!(
+                                        "code": 80,
+                                        "name": "stopped"
+                                    )
+                                )
+                            ]
+                        )
+                    )
+                )
+            ]),
             tdef: TypeDef::new().fallible().array_mapped::<(), TypeDef>(map! { (): TypeDef::new().object(inner_type_def()) }),
         }
 

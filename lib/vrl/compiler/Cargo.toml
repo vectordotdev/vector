@@ -19,6 +19,7 @@ ordered-float = "2"
 paste = "1"
 regex = "1"
 serde = "1"
+serde_json = "1"
 thiserror = "1"
 tracing = "0.1"
 
