@@ -1,7 +1,6 @@
 use crate::{event::error::EventError, event::timestamp_to_string, Result};
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
-use derive_is_enum_variant::is_enum_variant;
 use lookup::{Field, FieldBuf, Lookup, LookupBuf, Segment, SegmentBuf};
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::BTreeMap;
@@ -10,7 +9,7 @@ use std::fmt::Debug;
 use std::iter::FromIterator;
 use toml::value::Value as TomlValue;
 
-#[derive(PartialEq, PartialOrd, Debug, Clone, Deserialize, is_enum_variant)]
+#[derive(PartialEq, PartialOrd, Debug, Clone, Deserialize)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
@@ -1671,35 +1670,49 @@ mod test {
     fn json_value_to_vector_value_to_json_value() {
         const FIXTURE_ROOT: &str = "tests/data/fixtures/value";
 
-        std::fs::read_dir(FIXTURE_ROOT).unwrap().for_each(|type_dir| match type_dir {
-            Ok(type_name) => {
-                let path = type_name.path();
-                std::fs::read_dir(path).unwrap().for_each(|fixture_file| match fixture_file {
-                    Ok(fixture_file) => {
-                        let path = fixture_file.path();
-                        let buf = parse_artifact(&path).unwrap();
+        std::fs::read_dir(FIXTURE_ROOT)
+            .unwrap()
+            .for_each(|type_dir| match type_dir {
+                Ok(type_name) => {
+                    let path = type_name.path();
+                    std::fs::read_dir(path)
+                        .unwrap()
+                        .for_each(|fixture_file| match fixture_file {
+                            Ok(fixture_file) => {
+                                let path = fixture_file.path();
+                                let buf = parse_artifact(&path).unwrap();
 
-                        let serde_value: serde_json::Value = serde_json::from_slice(&*buf).unwrap();
-                        let vector_value = Value::from(serde_value);
+                                let serde_value: serde_json::Value =
+                                    serde_json::from_slice(&*buf).unwrap();
+                                let vector_value = Value::from(serde_value);
 
-                        // Validate type
-                        let expected_type = type_name.path().file_name().unwrap().to_string_lossy().to_string();
-                        assert!(match &*expected_type {
-                            "boolean" => vector_value.is_boolean(),
-                            "integer" => vector_value.is_integer(),
-                            "bytes" => vector_value.is_bytes(),
-                            "array" => vector_value.is_array(),
-                            "map" => vector_value.is_map(),
-                            "null" => vector_value.is_null(),
-                            _ => unreachable!("You need to add a new type handler here."),
-                        }, "Typecheck failure. Wanted {}, got {:?}.", expected_type, vector_value);
-
-                        let _value: serde_json::Value = vector_value.try_into().unwrap();
-                    },
-                    _ => panic!("This test should never read Err'ing test fixtures."),
-                });
-            },
-            _ => panic!("This test should never read Err'ing type folders."),
-        })
+                                // Validate type
+                                let expected_type = type_name
+                                    .path()
+                                    .file_name()
+                                    .unwrap()
+                                    .to_string_lossy()
+                                    .to_string();
+                                let is_match = match vector_value {
+                                    Value::Boolean(_) => expected_type.eq("boolean"),
+                                    Value::Integer(_) => expected_type.eq("integer"),
+                                    Value::Bytes(_) => expected_type.eq("bytes"),
+                                    Value::Array { .. } => expected_type.eq("array"),
+                                    Value::Map(_) => expected_type.eq("map"),
+                                    Value::Null => expected_type.eq("null"),
+                                    _ => unreachable!("You need to add a new type handler here."),
+                                };
+                                assert!(
+                                    is_match,
+                                    "Typecheck failure. Wanted {}, got {:?}.",
+                                    expected_type, vector_value
+                                );
+                                let _value: serde_json::Value = vector_value.try_into().unwrap();
+                            }
+                            _ => panic!("This test should never read Err'ing test fixtures."),
+                        });
+                }
+                _ => panic!("This test should never read Err'ing type folders."),
+            })
     }
 }

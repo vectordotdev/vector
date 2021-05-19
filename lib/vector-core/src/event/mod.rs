@@ -1,5 +1,5 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
-use crate::bytes::{DecodeBytes, EncodeBytes};
+use buffers::bytes::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut, Bytes};
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 pub use finalization::{

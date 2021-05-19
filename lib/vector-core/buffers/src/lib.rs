@@ -1,4 +1,18 @@
+//! The Vector Core buffer
+//!
+//! This library implements a channel like functionality, one variant which is
+//! solely in-memory and the other that is on-disk. Both variants are bounded.
+
+#![deny(clippy::all)]
+#![deny(clippy::pedantic)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::type_complexity)] // long-types happen, especially in async code
+
+#[macro_use]
+extern crate tracing;
+
 mod acker;
+pub mod bytes;
 #[cfg(feature = "disk-buffer")]
 pub mod disk;
 
@@ -125,6 +139,7 @@ where
     <T as EncodeBytes<T>>::Error: Debug,
     <T as DecodeBytes<T>>::Error: Debug + Display,
 {
+    #[must_use]
     pub fn get(&self) -> Box<dyn Sink<T, Error = ()> + 'a + Send> {
         match self {
             BufferInputCloner::Memory(tx, when_full) => {
@@ -178,7 +193,7 @@ impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
                 *this.drop = true;
                 Poll::Ready(Ok(()))
             }
-            error => error,
+            error @ std::task::Poll::Ready(..) => error,
         }
     }
 

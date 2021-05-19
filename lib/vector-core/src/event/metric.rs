@@ -1,7 +1,6 @@
 use super::{EventFinalizer, EventMetadata};
 use crate::metrics::Handle;
 use chrono::{DateTime, Utc};
-use derive_is_enum_variant::is_enum_variant;
 use getset::{Getters, MutGetters};
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
@@ -49,9 +48,7 @@ pub struct MetricData {
     pub value: MetricValue,
 }
 
-#[derive(
-    Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Serialize, is_enum_variant,
-)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
 /// A metric may be an incremental value, updating the previous value of
 /// the metric, or absolute, which sets the reference for future
@@ -88,7 +85,7 @@ impl From<MetricKind> for vrl_core::Value {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Deserialize, Serialize, is_enum_variant)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 /// A `MetricValue` is the container for the actual value of a metric.
 pub enum MetricValue {
@@ -225,7 +222,7 @@ impl From<MetricValue> for vrl_core::Value {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Deserialize, Serialize, is_enum_variant)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StatisticKind {
     Histogram,
@@ -442,7 +439,7 @@ impl MetricData {
     /// Add the data from the other metric to this one. The `other` must
     /// be relative and contain the same value type as this one.
     pub fn add(&mut self, other: &Self) {
-        if other.kind.is_incremental() {
+        if other.kind == MetricKind::Incremental {
             self.update(other);
         }
     }

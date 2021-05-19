@@ -67,6 +67,7 @@ members = [
   ".",
   "lib/codec",
   "lib/vector-core",
+  "lib/vector-core/buffers",
   "lib/derive_is_enum_variant",
   "lib/fakedata",
   "lib/file-source",

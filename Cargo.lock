@@ -866,6 +866,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "buffers"
+version = "0.1.0"
+dependencies = [
+ "bytes 1.0.1",
+ "db-key",
+ "futures 0.3.15",
+ "leveldb",
+ "metrics",
+ "pin-project 1.0.7",
+ "serde",
+ "snafu",
+ "tokio",
+ "tokio-test",
+ "tracing 0.1.26",
+]
+
+[[package]]
 name = "build_const"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7893,18 +7910,17 @@ version = "0.1.0"
 dependencies = [
  "async-graphql",
  "atomig",
+ "buffers",
  "bytes 1.0.1",
  "chrono",
  "criterion",
  "dashmap",
  "db-key",
  "derivative 2.2.0",
- "derive_is_enum_variant",
  "futures 0.3.15",
  "getset",
  "indexmap",
  "lazy_static",
- "leveldb",
  "lookup",
  "metrics",
  "metrics-tracing-context",
@@ -7922,7 +7938,6 @@ dependencies = [
  "rlua",
  "serde",
  "serde_json",
- "serde_yaml",
  "shared",
  "snafu",
  "tokio",
@@ -7930,10 +7945,8 @@ dependencies = [
  "toml",
  "tracing 0.1.26",
  "tracing-core 0.1.18",
- "tracing-futures 0.2.5",
  "tracing-log",
  "tracing-subscriber",
- "tracing-tower",
  "twox-hash",
  "vrl",
 ]
