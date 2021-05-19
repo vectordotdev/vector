@@ -23,14 +23,14 @@
 
 #[cfg(feature = "api")]
 pub mod api;
-pub mod buffers;
-pub mod bytes;
 pub mod config;
 pub mod event;
 pub mod mapping;
 pub mod metrics;
 #[cfg(test)]
 mod test_util;
+
+pub use buffers;
 
 #[macro_use]
 extern crate derivative;

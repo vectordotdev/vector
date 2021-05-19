@@ -1,5 +1,5 @@
 use crate::{
-    event::metric::{Metric, MetricValue, StatisticKind},
+    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     sinks::util::{encode_namespace, statistic::DistributionStatistic},
 };
 use chrono::Utc;
@@ -39,7 +39,7 @@ pub(super) trait MetricCollector {
         let name = &name;
         let timestamp = metric.data.timestamp.map(|t| t.timestamp_millis());
 
-        if metric.data.kind.is_absolute() {
+        if metric.data.kind == MetricKind::Absolute {
             let tags = metric.tags();
             self.emit_metadata(metric.name(), &name, &metric.data.value);
 

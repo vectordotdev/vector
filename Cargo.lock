@@ -866,6 +866,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "buffers"
+version = "0.1.0"
+dependencies = [
+ "bytes 1.0.1",
+ "db-key",
+ "futures 0.3.15",
+ "leveldb",
+ "metrics",
+ "pin-project 1.0.7",
+ "pretty_assertions",
+ "serde",
+ "snafu",
+ "tokio",
+ "tokio-test",
+ "tracing 0.1.26",
+]
+
+[[package]]
 name = "build_const"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1731,16 +1749,6 @@ version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
 dependencies = [
- "proc-macro2 1.0.26",
- "quote 1.0.9",
- "syn 1.0.72",
-]
-
-[[package]]
-name = "derive_is_enum_variant"
-version = "1.0.0"
-dependencies = [
- "heck",
  "proc-macro2 1.0.26",
  "quote 1.0.9",
  "syn 1.0.72",
@@ -7752,7 +7760,6 @@ dependencies = [
  "crossterm",
  "dashmap",
  "derivative 2.2.0",
- "derive_is_enum_variant",
  "dirs-next",
  "dyn-clone",
  "encoding_rs",
@@ -7922,18 +7929,17 @@ version = "0.1.0"
 dependencies = [
  "async-graphql",
  "atomig",
+ "buffers",
  "bytes 1.0.1",
  "chrono",
  "criterion",
  "dashmap",
  "db-key",
  "derivative 2.2.0",
- "derive_is_enum_variant",
  "futures 0.3.15",
  "getset",
  "indexmap",
  "lazy_static",
- "leveldb",
  "lookup",
  "metrics",
  "metrics-tracing-context",
@@ -7951,7 +7957,6 @@ dependencies = [
  "rlua",
  "serde",
  "serde_json",
- "serde_yaml",
  "shared",
  "snafu",
  "tokio",
@@ -7959,10 +7964,8 @@ dependencies = [
  "toml",
  "tracing 0.1.26",
  "tracing-core 0.1.18",
- "tracing-futures 0.2.5",
  "tracing-log",
  "tracing-subscriber",
- "tracing-tower",
  "twox-hash",
  "vrl",
 ]

@@ -67,7 +67,7 @@ members = [
   ".",
   "lib/codec",
   "lib/vector-core",
-  "lib/derive_is_enum_variant",
+  "lib/vector-core/buffers",
   "lib/fakedata",
   "lib/file-source",
   "lib/k8s-e2e-tests",
@@ -92,7 +92,6 @@ members = [
 [dependencies]
 # Internal libs
 codec = { path = "lib/codec" }
-derive_is_enum_variant = { path = "lib/derive_is_enum_variant" }
 fakedata = { path = "lib/fakedata", optional = true }
 file-source = { path = "lib/file-source", optional = true }
 portpicker = { path = "lib/portpicker" }

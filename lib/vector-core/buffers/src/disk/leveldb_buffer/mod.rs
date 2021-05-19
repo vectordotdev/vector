@@ -3,8 +3,8 @@ mod reader;
 mod writer;
 
 use super::{DataDirError, Open};
-use crate::buffers::Acker;
 use crate::bytes::{DecodeBytes, EncodeBytes};
+use crate::Acker;
 use futures::task::AtomicWaker;
 use key::Key;
 use leveldb::database::{
