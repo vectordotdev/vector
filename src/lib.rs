@@ -23,6 +23,8 @@ pub mod config;
 pub mod cli;
 pub mod conditions;
 pub mod dns;
+#[cfg(feature = "docker")]
+pub mod docker;
 pub mod expiring_hash_map;
 pub mod generate;
 #[cfg(feature = "wasm")]
@@ -76,7 +78,6 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use pipeline::Pipeline;
-
 pub use vector_core::{event, mapping, metrics, Error, Result};
 
 pub fn vector_version() -> impl std::fmt::Display {
