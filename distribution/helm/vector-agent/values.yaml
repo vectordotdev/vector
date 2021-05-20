@@ -13,6 +13,7 @@ image:
 
 # Image pull secrets to use at the `Pod`s managed by `DaemonSet`.
 imagePullSecrets: []
+#  - myRegistryCredentialSecretName
 
 # Command to use at the pods managed by DaemonSet
 command: []

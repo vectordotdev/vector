@@ -17,6 +17,9 @@
 #       version: <version>
 #       # Overrides the image flavor, the default is `debian`.
 #       base: <base>
+#     # Overrides the imagePullSecrets
+#     imagePullSecrets:
+#       - myRegistryCredentialSecretName
 #     # Sets common environment variables for use in all `Pod`s.
 #     commonEnvKV:
 #       LOG: info
