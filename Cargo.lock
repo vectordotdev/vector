@@ -7935,7 +7935,6 @@ dependencies = [
  "bytes 1.0.1",
  "chrono",
  "criterion",
- "dashmap",
  "db-key",
  "derivative 2.2.0",
  "futures 0.3.15",
