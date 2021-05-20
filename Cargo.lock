@@ -3371,7 +3371,7 @@ dependencies = [
 [[package]]
 name = "leveldb-sys"
 version = "2.0.9"
-source = "git+https://github.com/blt/leveldb-sys.git?branch=master#ecd3e5ca9881879058318ee22bcc7bf858d64103"
+source = "git+https://github.com/timberio/leveldb-sys.git?branch=leveldb_mmap_limit#deca67b91b32c77bb5bcd122e306877468520a97"
 dependencies = [
  "cmake",
  "ffi-opaque",
