@@ -28,6 +28,8 @@ pub struct DatadogLogsConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
+    #[serde(default = "super::super::default_acknowledgements")]
+    acknowledgements: bool,
 }
 
 inventory::submit! {
@@ -40,6 +42,7 @@ impl GenerateConfig for DatadogLogsConfig {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
             auth: None,
+            acknowledgements: true,
         })
         .unwrap()
     }
@@ -59,6 +62,7 @@ impl SourceConfig for DatadogLogsConfig {
             &self.auth,
             cx.out,
             cx.shutdown,
+            self.acknowledgements,
         )
     }
 
@@ -142,7 +146,10 @@ mod tests {
         crate::test_util::test_generate_config::<DatadogLogsConfig>();
     }
 
-    async fn source(status: EventStatus) -> (impl Stream<Item = Event>, SocketAddr) {
+    async fn source(
+        status: EventStatus,
+        acknowledgements: bool,
+    ) -> (impl Stream<Item = Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
         tokio::spawn(async move {
@@ -150,6 +157,7 @@ mod tests {
                 address,
                 tls: None,
                 auth: None,
+                acknowledgements,
             }
             .build(SourceContext::new_test(sender))
             .await
@@ -181,7 +189,7 @@ mod tests {
     #[tokio::test]
     async fn no_api_key() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered).await;
+        let (rx, addr) = source(EventStatus::Delivered, true).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -214,7 +222,7 @@ mod tests {
     #[tokio::test]
     async fn api_key_in_url() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered).await;
+        let (rx, addr) = source(EventStatus::Delivered, true).await;
 
         let mut events = spawn_collect_n(
             async move {
@@ -247,7 +255,7 @@ mod tests {
     #[tokio::test]
     async fn api_key_in_header() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Delivered).await;
+        let (rx, addr) = source(EventStatus::Delivered, true).await;
 
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -286,7 +294,7 @@ mod tests {
     #[tokio::test]
     async fn delivery_failure() {
         trace_init();
-        let (rx, addr) = source(EventStatus::Failed).await;
+        let (rx, addr) = source(EventStatus::Failed, true).await;
 
         spawn_collect_n(
             async move {
@@ -305,5 +313,31 @@ mod tests {
             1,
         )
         .await;
+    }
+
+    #[tokio::test]
+    async fn ignores_disabled_acknowledgements() {
+        trace_init();
+        let (rx, addr) = source(EventStatus::Failed, false).await;
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        r#"[{"message":"foo", "timestamp": 123}]"#,
+                        HeaderMap::new(),
+                        "/v1/input/"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
+
+        assert_eq!(events.len(), 1);
     }
 }

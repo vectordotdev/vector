@@ -194,6 +194,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         auth: &Option<HttpSourceAuthConfig>,
         out: Pipeline,
         shutdown: ShutdownSignal,
+        acknowledgements: bool,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
@@ -251,11 +252,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                         byte_size: body_size,
                                     });
 
-                                    let (batch, receiver) = BatchNotifier::new_with_receiver();
-                                    for event in &mut events {
-                                        event.add_batch_notifier(Arc::clone(&batch));
-                                    }
-                                    drop(batch);
+                                    let receiver = acknowledgements.then(|| {
+                                        let (batch, receiver) = BatchNotifier::new_with_receiver();
+                                        for event in &mut events {
+                                            event.add_batch_notifier(Arc::clone(&batch));
+                                        }
+                                        receiver
+                                    });
 
                                     out.send_all(&mut futures::stream::iter(events).map(Ok))
                                         .map_err(move |error: crate::pipeline::ClosedError| {
@@ -266,20 +269,25 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                             warp::reject::custom(RejectShuttingDown)
                                         })
                                         .and_then(|_| async move {
-                                            match receiver.await.unwrap_or(BatchStatus::Delivered) {
-                                                BatchStatus::Delivered => Ok(warp::reply()),
-                                                BatchStatus::Errored => Err(warp::reject::custom(
-                                                    ErrorMessage::new(
-                                                        StatusCode::INTERNAL_SERVER_ERROR,
-                                                        "Error delivering contents to sink".into(),
-                                                    ),
-                                                )),
-                                                BatchStatus::Failed => Err(warp::reject::custom(
-                                                    ErrorMessage::new(
-                                                        StatusCode::BAD_REQUEST,
-                                                        "Contents failed to deliver to sink".into(),
-                                                    ),
-                                                )),
+                                            match receiver {
+                                                None => Ok(warp::reply()),
+                                                Some(receiver) => {
+                                                    match receiver.await.unwrap_or(BatchStatus::Delivered) {
+                                                        BatchStatus::Delivered => Ok(warp::reply()),
+                                                        BatchStatus::Errored => Err(warp::reject::custom(
+                                                            ErrorMessage::new(
+                                                                StatusCode::INTERNAL_SERVER_ERROR,
+                                                                "Error delivering contents to sink".into(),
+                                                            ),
+                                                        )),
+                                                        BatchStatus::Failed => Err(warp::reject::custom(
+                                                            ErrorMessage::new(
+                                                                StatusCode::BAD_REQUEST,
+                                                                "Contents failed to deliver to sink".into(),
+                                                            ),
+                                                        )),
+                                                    }
+                                                }
                                             }
                                         })
                                         .await

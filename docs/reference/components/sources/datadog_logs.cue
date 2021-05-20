@@ -62,7 +62,8 @@ components: sources: datadog_logs: {
 	}
 
 	configuration: {
-		address: sources.http.configuration.address
+		acknowledgements: configuration._acknowledgements
+		address:          sources.http.configuration.address
 	}
 
 	output: logs: line: {

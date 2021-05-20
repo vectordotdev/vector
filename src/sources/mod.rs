@@ -66,3 +66,7 @@ enum BuildError {
     #[snafu(display("URI parse error: {}", source))]
     UriParseError { source: ::http::uri::InvalidUri },
 }
+
+pub(self) fn default_acknowledgements() -> bool {
+    true
+}

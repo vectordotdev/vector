@@ -25,6 +25,9 @@ struct PrometheusRemoteWriteConfig {
     tls: Option<TlsConfig>,
 
     auth: Option<HttpSourceAuthConfig>,
+
+    #[serde(default = "super::super::default_acknowledgements")]
+    acknowledgements: bool,
 }
 
 inventory::submit! {
@@ -37,6 +40,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
             address: "127.0.0.1:9090".parse().unwrap(),
             tls: None,
             auth: None,
+            acknowledgements: true,
         })
         .unwrap()
     }
@@ -55,6 +59,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
             &self.auth,
             cx.out,
             cx.shutdown,
+            self.acknowledgements,
         )
     }
 
@@ -150,6 +155,7 @@ mod test {
             address,
             auth: None,
             tls: tls.clone(),
+            acknowledgements: true,
         };
         let source = source.build(SourceContext::new_test(tx)).await.unwrap();
         tokio::spawn(source);
