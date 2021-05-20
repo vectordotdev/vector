@@ -1,7 +1,11 @@
 use super::util::{SocketListenAddr, TcpIsErrorFatal, TcpSource};
 use crate::{
-    config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, Resource, SourceConfig, SourceContext,
+        SourceDescription,
+    },
     event::{Event, LogEvent, Value},
+    internal_events::{FluentMessageDecodeError, FluentMessageReceived},
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
 };
@@ -18,12 +22,8 @@ use std::{
 use tokio_util::codec::Decoder;
 
 // TODO
-// * insert flat event keys
-// * internal events
-// * consider using serde_tuple
 // * authentication
 // * chunking/acking
-// * support tag and tag prefix overrides
 // * integration testing
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -99,15 +99,13 @@ impl TcpSource for FluentSource {
             .into_iter()
             .map(|FluentEntry(timestamp, record)| {
                 let mut log = LogEvent::default();
-                log.insert("host", host.clone());
-                log.insert("timestamp", timestamp);
+                log.insert(log_schema().host_key(), host.clone());
+                log.insert(log_schema().timestamp_key(), timestamp);
                 log.insert("fluent_tag", tag.clone());
-                log.extend(
-                    record
-                        .into_iter()
-                        .map(|(key, value)| (key, Value::from(value))),
-                );
-                log.into()
+                for (key, value) in record.into_iter() {
+                    log.insert_flat(key, value)
+                }
+                Event::from(log)
             })
             .collect();
 
@@ -167,18 +165,27 @@ impl Decoder for FluentDecoder {
         if src.is_empty() {
             return Ok(None);
         }
-        dbg!(&src);
-        dbg!(base64::encode(&src));
+
         let (pos, res) = {
             let mut des = Deserializer::new(io::Cursor::new(&src[..]));
 
-            // attempt to parse, if we get unexpected EOF, we need more data
             let res = Deserialize::deserialize(&mut des).map_err(DecodeError::Decode);
-            dbg!(&res);
-            if let Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) = res {
-                if custom.kind() == io::ErrorKind::UnexpectedEof {
-                    return Ok(None);
+
+            // check for unexpected EOF to indicate that we need more data
+            match res {
+                // can use or-patterns in 1.53
+                // https://github.com/rust-lang/rust/pull/79278
+                Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) => {
+                    if custom.kind() == io::ErrorKind::UnexpectedEof {
+                        return Ok(None);
+                    }
                 }
+                Err(DecodeError::Decode(decode::Error::InvalidMarkerRead(ref custom))) => {
+                    if custom.kind() == io::ErrorKind::UnexpectedEof {
+                        return Ok(None);
+                    }
+                }
+                _ => {}
             }
 
             (des.position() as usize, res)
@@ -186,63 +193,66 @@ impl Decoder for FluentDecoder {
 
         src.advance(pos);
 
-        let message = res?;
-
-        let res = match message {
-            FluentMessage::Message(tag, timestamp, record)
-            | FluentMessage::MessageWithOptions(tag, timestamp, record, ..) => Ok(FluentFrame {
-                tag,
-                entries: vec![FluentEntry(timestamp, record)],
-            }),
-            FluentMessage::Forward(tag, entries)
-            | FluentMessage::ForwardWithOptions(tag, entries, ..) => {
-                Ok(FluentFrame { tag, entries })
-            }
-            FluentMessage::PackedForward(tag, bin) => {
-                let mut buf = BytesMut::from(&bin[..]);
-
-                dbg!(base64::encode(&buf));
-
-                let mut decoder = FluentEntryStreamDecoder;
-
-                let mut entries = Vec::new();
-                while let Some(entry) = decoder.decode(&mut buf)? {
-                    entries.push(entry);
-                }
-                Ok(FluentFrame { tag, entries })
-            }
-            FluentMessage::PackedForwardWithOptions(tag, bin, options) => {
-                let buf = match options.compressed.as_str() {
-                    "gzip" => {
-                        let mut buf = Vec::new();
-                        MultiGzDecoder::new(io::Cursor::new(bin.into_vec()))
-                            .read_to_end(&mut buf)
-                            .map(|_| buf)
-                            .map_err(Into::into)
-                    }
-                    "text" => Ok(bin.into_vec()),
-                    s => Err(DecodeError::UnknownCompression(s.to_owned())),
-                }?;
-
-                let mut buf = BytesMut::from(&buf[..]);
-
-                dbg!(base64::encode(&buf));
-
-                let mut decoder = FluentEntryStreamDecoder;
-
-                let mut entries = Vec::new();
-                while let Some(entry) = decoder.decode(&mut buf)? {
-                    entries.push(entry);
-                }
-                Ok(FluentFrame { tag, entries })
-            }
-        };
-
-        res.map(Option::Some)
+        res.and_then(normalize_message)
+            .map(Option::Some)
+            .map_err(|error| {
+                let base64_encoded_message = base64::encode(&src);
+                emit!(FluentMessageDecodeError {
+                    error: &error,
+                    base64_encoded_message
+                });
+                error
+            })
     }
 }
 
-/// Decoder for decoding MessagePackEventStream which are just a stream of entries
+fn normalize_message(message: FluentMessage) -> Result<FluentFrame, DecodeError> {
+    match message {
+        FluentMessage::Message(tag, timestamp, record)
+        | FluentMessage::MessageWithOptions(tag, timestamp, record, ..) => Ok(FluentFrame {
+            tag,
+            entries: vec![FluentEntry(timestamp, record)],
+        }),
+        FluentMessage::Forward(tag, entries)
+        | FluentMessage::ForwardWithOptions(tag, entries, ..) => Ok(FluentFrame { tag, entries }),
+        FluentMessage::PackedForward(tag, bin) => {
+            let mut buf = BytesMut::from(&bin[..]);
+
+            let mut decoder = FluentEntryStreamDecoder;
+
+            let mut entries = Vec::new();
+            while let Some(entry) = decoder.decode(&mut buf)? {
+                entries.push(entry);
+            }
+            Ok(FluentFrame { tag, entries })
+        }
+        FluentMessage::PackedForwardWithOptions(tag, bin, options) => {
+            let buf = match options.compressed.as_str() {
+                "gzip" => {
+                    let mut buf = Vec::new();
+                    MultiGzDecoder::new(io::Cursor::new(bin.into_vec()))
+                        .read_to_end(&mut buf)
+                        .map(|_| buf)
+                        .map_err(Into::into)
+                }
+                "text" => Ok(bin.into_vec()),
+                s => Err(DecodeError::UnknownCompression(s.to_owned())),
+            }?;
+
+            let mut buf = BytesMut::from(&buf[..]);
+
+            let mut decoder = FluentEntryStreamDecoder;
+
+            let mut entries = Vec::new();
+            while let Some(entry) = decoder.decode(&mut buf)? {
+                entries.push(entry);
+            }
+            Ok(FluentFrame { tag, entries })
+        }
+    }
+}
+
+/// Decoder for decoding MessagePackEventStream which are just a stream of Entries
 #[derive(Clone, Debug)]
 struct FluentEntryStreamDecoder;
 
@@ -254,21 +264,23 @@ impl Decoder for FluentEntryStreamDecoder {
         if src.is_empty() {
             return Ok(None);
         }
-        dbg!(&src);
-        dbg!(base64::encode(&src));
         let (pos, res) = {
             let mut des = Deserializer::new(io::Cursor::new(&src[..]));
 
             // attempt to parse, if we get unexpected EOF, we need more data
             let res = Deserialize::deserialize(&mut des).map_err(DecodeError::Decode);
-            dbg!(&res);
+
             if let Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) = res {
                 if custom.kind() == io::ErrorKind::UnexpectedEof {
                     return Ok(None);
                 }
             }
 
-            (des.position() as usize, res)
+            let byte_size = des.position();
+
+            emit!(FluentMessageReceived { byte_size });
+
+            (byte_size as usize, res)
         };
 
         src.advance(pos);
@@ -316,9 +328,9 @@ enum FluentMessage {
 /// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#option
 #[derive(Debug, Deserialize)]
 struct FluentMessageOptions {
-    size: Option<u64>,
-    chunk: Option<String>,
-    compressed: String, // this one is required if present
+    size: Option<u64>,     // client provided hint for the number of entries
+    chunk: Option<String>, // unused right now, would be used for acks
+    compressed: String,    // this one is required if present
 }
 
 /// Fluent entry consisting of timestamp and record.
