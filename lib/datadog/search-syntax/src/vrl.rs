@@ -29,9 +29,7 @@ impl From<QueryNode> for ast::Expr {
     fn from(q: QueryNode) -> Self {
         match q {
             QueryNode::AttributeTerm { attr, value } => Self::Op(make_node(ast::Op(
-                Box::new(make_node(ast::Expr::Variable(make_node(ast::Ident::new(
-                    attr,
-                ))))),
+                Box::new(variable(attr)),
                 make_node(ast::Opcode::Eq),
                 Box::new(make_node(ast::Expr::Literal(make_node(
                     ast::Literal::String(value),
@@ -42,9 +40,7 @@ impl From<QueryNode> for ast::Expr {
                 comparator,
                 value,
             } => Self::Op(make_node(ast::Op(
-                Box::new(make_node(ast::Expr::Variable(make_node(ast::Ident::new(
-                    attr,
-                ))))),
+                Box::new(variable(attr)),
                 make_node(comparator.into()),
                 Box::new(make_node(ast::Expr::Literal(make_node(value.into())))),
             ))),
@@ -56,4 +52,14 @@ impl From<QueryNode> for ast::Expr {
 /// Helper function to make a VRL node
 fn make_node<T>(node: T) -> ast::Node<T> {
     ast::Node::new(Span::default(), node)
+}
+
+fn variable(value: String) -> ast::Node<ast::Expr> {
+    make_node(ast::Expr::Variable(make_node(ast::Ident::new(
+        if value.starts_with("@") {
+            format!(".custom.{}", &value[1..])
+        } else {
+            format!(".{}", &value)
+        },
+    ))))
 }
