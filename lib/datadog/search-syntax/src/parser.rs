@@ -31,7 +31,7 @@ mod tests {
     fn parses_whitespace() {
         let cases = [" ", "    ", "\t"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).expect(&format!("Unable to parse query {:?}", &query));
             assert!(
                 matches!(res, QueryNode::MatchAllDocs),
                 "Failed to parse MatchAllDocs query out of empty input"
