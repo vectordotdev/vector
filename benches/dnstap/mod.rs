@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use criterion::{criterion_group, BatchSize, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion, Throughput};
 use vector::event::Event;
 use vector::sources::dnstap::{schema::DnstapEventSchema, DnstapParser};
 
@@ -60,3 +60,7 @@ criterion_group!(
     config = Criterion::default().noise_threshold(0.05);
     targets = benchmark_query_parsing,benchmark_update_parsing
 );
+
+criterion_main! {
+    benches,
+}

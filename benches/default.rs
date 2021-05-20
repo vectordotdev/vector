@@ -2,7 +2,6 @@ use criterion::criterion_main;
 
 mod batch;
 mod buffer;
-mod dnstap;
 mod event;
 mod files;
 mod http;
@@ -16,7 +15,6 @@ mod topology;
 criterion_main!(
     batch::benches,
     buffer::benches,
-    dnstap::benches,
     event::benches,
     files::benches,
     http::benches,

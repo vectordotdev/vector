@@ -9,10 +9,12 @@ ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
 	export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
     export DEFAULT_FEATURES = default-msvc
+	undefine DNSTAP_BENCHES
 else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
 	export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
     export DEFAULT_FEATURES = default
+	export DNSTAP_BENCHES := dnstap-benches
 endif
 
 # Override this with any scopes for testing/benching.
@@ -278,7 +280,7 @@ cross-image-%:
 
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --quiet --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES} metrics-benches remap-benches statistic-benches benches" ${SCOPE}
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --quiet --workspace --no-fail-fast --no-default-features --features "${DEFAULT_FEATURES} metrics-benches remap-benches statistic-benches ${DNSTAP_BENCHES} benches" ${SCOPE}
 
 .PHONY: test-all
 test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
@@ -547,6 +549,11 @@ bench: ## Run benchmarks in /benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
+.PHONY: bench-dnstap
+bench-dnstap: ## Run dnstap benches
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "dnstap-benches" --bench dnstap ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
 .PHONY: bench-dnsmsg-parser
 bench-dnsmsg-parser: ## Run dnsmsg-parser benches
 	${MAYBE_ENVIRONMENT_EXEC} CRITERION_HOME="$(CRITERION_HOME)" cargo bench --manifest-path lib/dnsmsg-parser/Cargo.toml ${CARGO_BENCH_FLAGS}
@@ -580,7 +587,7 @@ bench-metrics: ## Run metrics benches
 .PHONY: bench-all
 bench-all: ### Run all benches
 bench-all: $(WASM_MODULE_OUTPUTS) bench-remap-functions
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches metrics-benches language-benches" ${CARGO_BENCH_FLAGS}
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches remap-benches wasm-benches metrics-benches language-benches ${DNSTAP_BENCHES}" ${CARGO_BENCH_FLAGS}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 ##@ Checking
