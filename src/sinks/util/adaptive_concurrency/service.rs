@@ -275,10 +275,10 @@ mod tests {
 
         let in_flight = stats.in_flight.stats().unwrap();
         assert_eq!(in_flight.max, 1);
-        assert_eq!(in_flight.mean, 1.0);
+        approx::assert_relative_eq!(in_flight.mean, 1.0);
 
         let observed_rtt = stats.observed_rtt.stats().unwrap();
-        assert_eq!(observed_rtt.mean, 1.0);
+        approx::assert_relative_eq!(observed_rtt.mean, 1.0);
     }
 
     #[tokio::test]
