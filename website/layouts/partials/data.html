@@ -1092,6 +1092,68 @@
     </div>
   </div>
   {{ end }}
+
+  {{ with .component_permissions }}
+  <div class="flex flex-col divide-y dark:divide-gray-700">
+    {{ range . }} {{/* TODO: remove the need for this double loop in the CUE sources */}}
+    {{ range . }}
+    <div class="py-3 px-5">
+      <span class="text-lg">
+        Platform:
+        <a href="{{ .platform_link }}">
+          <strong>
+            {{ .platform_title }}
+          </strong>
+        </a>
+      </span>
+
+      <div class="mt-2">
+        <span class="text-md">
+          Relevant policies
+        </span>
+
+        <div class="p-3 prose dark:prose-dark">
+          <table>
+            <thead>
+              <tr>
+                <th>
+                  Policy
+                </th>
+                <th>
+                  Required for
+                </th>
+                <th>
+                  Required when
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {{ range .policies }}
+              <tr>
+                <td>
+                  <a href="{{ .docs_url }}">
+                    <code>
+                      {{ .action }}
+                    </code>
+                  </a>
+                </td>
+                <td>
+                  {{ range .required_for }}<code>{{ . }}</code>{{ end }}
+                </td>
+                <td>
+                  {{ .required_when | markdownify }}
+                </td>
+              </tr>
+              {{ end }}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {{ end }}
+    {{ end }}
+  </div>
+  {{ end }}
 </div>
 
 {{ define "enum-options-table" }}

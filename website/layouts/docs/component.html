@@ -65,6 +65,12 @@
           {{ partial "data.html" (dict "component_examples" . ) }}
           {{ end }}
 
+          {{/* Cloud platform permissions */}}
+          {{ with $config.permissions }}
+          {{ partial "heading.html" (dict "text" "Permissions" "level" 2) }}
+          {{ partial "data.html" (dict "component_permissions" .) }}
+          {{ end }}
+
           {{/* How it works */}}
           {{ with $config.how_it_works }}
           {{ partial "heading.html" (dict "text" "How it works" "level" 2) }}
