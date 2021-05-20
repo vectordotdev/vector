@@ -3838,9 +3838,9 @@ dependencies = [
 
 [[package]]
 name = "metrics"
-version = "0.15.1"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c53c23fff9a59f261498953cf41dc9ffc2522fd79723bdf283c1e88dc1633624"
+checksum = "9c0a7fa53d812d26e59d2baf7a6f77442041454ab32908eb304447f00f0dd4de"
 dependencies = [
  "metrics-macros",
  "proc-macro-hack",
@@ -3849,9 +3849,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-macros"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b22572ba9964744e261d34553568683b76db277bcd309ebf7215e28e0982505d"
+checksum = "caa72e4a3d157986dd2565c82ecbddcc23941513669a3766b938f6b72eb87f3f"
 dependencies = [
  "lazy_static",
  "proc-macro-hack",
@@ -3863,9 +3863,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-tracing-context"
-version = "0.4.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9cdacbcb8c51682ff85744e8511bb454574adda00f4104ae6215b1b6eb71788"
+checksum = "c2b0900f96236eaa964bb4b94d5cf300b1455ca3a9f28a5c9ba7dbc7deb633a3"
 dependencies = [
  "itoa",
  "metrics",
@@ -3877,9 +3877,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-util"
-version = "0.7.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6586f4c52af81a3f7832cf0bc86141d2fca7207bedd09fdd3f7da60c8dcd0c4a"
+checksum = "cecf26ece19337ebd5fb5634d8baee3cf51c002527c02bcc456ba07db6cbebff"
 dependencies = [
  "aho-corasick",
  "atomic-shim",
@@ -3893,6 +3893,7 @@ dependencies = [
  "ordered-float",
  "parking_lot",
  "quanta",
+ "radix_trie",
  "sketches-ddsketch",
  "t1ha",
 ]
@@ -7800,6 +7801,7 @@ dependencies = [
  "maxminddb",
  "metrics",
  "metrics-tracing-context",
+ "metrics-util",
  "mongodb",
  "nix 0.20.0",
  "nom 6.1.2",
@@ -7933,7 +7935,6 @@ dependencies = [
  "bytes 1.0.1",
  "chrono",
  "criterion",
- "dashmap",
  "db-key",
  "derivative 2.2.0",
  "futures 0.3.15",
