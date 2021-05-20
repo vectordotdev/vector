@@ -6,7 +6,7 @@ components: sinks: redis: {
 		commonly_used: false
 		delivery:      "best_effort"
 		development:   "beta"
-		egress_method: "stream"
+		egress_method: "batch"
 		service_providers: []
 		stateful: false
 	}
@@ -15,6 +15,13 @@ components: sinks: redis: {
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
+			batch: {
+				enabled:      true
+				common:       true
+				max_bytes:    null
+				max_events:   1
+				timeout_secs: 1
+			}
 			encoding: {
 				enabled: true
 				codec: {
@@ -80,13 +87,6 @@ components: sinks: redis: {
 				examples: ["syslog:{{ app }}", "vector"]
 				syntax: "template"
 			}
-		}
-		safe: {
-			common:      false
-			description: "If this is set to `true` the messages would be serially inserted in-of-order into Redis,If this is set to `false` the messages would be written to Redis in parallel,it can improve throughput but messages may be inserted out-of-order into Redis in a complex network environment."
-			required:    false
-			warnings: []
-			type: bool: default: true
 		}
 		data_type: {
 			common:      false

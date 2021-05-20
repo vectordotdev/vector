@@ -12,8 +12,6 @@ impl InternalEvent for RedisEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_in_total", 1);
-        counter!("processed_events_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
@@ -48,15 +46,13 @@ impl InternalEvent for RedisEventSent {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_out_total", 1);
-        counter!("processed_events_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
 #[derive(Debug)]
 pub struct RedisSendEventFailed {
-    pub error: redis::RedisError,
+    pub error: String,
 }
 
 impl InternalEvent for RedisSendEventFailed {

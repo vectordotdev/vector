@@ -1,27 +1,36 @@
 use crate::{
-    buffers::Acker,
     config::{self, log_schema, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::{RedisEventSent, RedisSendEventFailed, TemplateRenderingFailed},
-    sinks::util::encoding::{EncodingConfig, EncodingConfiguration},
+    sinks::util::{
+        batch::{BatchConfig, BatchSettings},
+        encoding::{EncodingConfig, EncodingConfiguration},
+        retries::{RetryAction, RetryLogic},
+        sink::Response,
+        BatchSink, EncodedEvent, EncodedLength, ServiceBuilderExt, TowerRequestConfig, VecBuffer,
+    },
     template::{Template, TemplateParseError},
 };
-use futures::{future::BoxFuture, ready, stream::FuturesOrdered, FutureExt, Sink, Stream};
-use redis::{aio::ConnectionManager, AsyncCommands, RedisError, RedisResult};
+use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
+use lazy_static::lazy_static;
+use redis::{aio::ConnectionManager, RedisError, RedisResult};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
-    collections::HashSet,
     convert::TryFrom,
-    pin::Pin,
     task::{Context, Poll},
 };
+use tower::{Service, ServiceBuilder};
+
+inventory::submit! {
+    SinkDescription::new::<RedisSinkConfig>("redis")
+}
 
 #[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("creating Redis producer failed: {}", source))]
+enum RedisSinkError {
+    #[snafu(display("Creating Redis producer failed: {}", source))]
     RedisCreateFailed { source: RedisError },
-    #[snafu(display("invalid key template: {}", source))]
+    #[snafu(display("Invalid key template: {}", source))]
     KeyTemplate { source: TemplateParseError },
 }
 
@@ -45,21 +54,8 @@ pub enum Method {
 
 #[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
-pub struct ListConfig {
+pub struct ListOption {
     method: Method,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct RedisSinkConfig {
-    encoding: EncodingConfig<Encoding>,
-    #[serde(default)]
-    data_type: DataType,
-    list: Option<ListConfig>,
-    url: String,
-    key: String,
-    #[serde(default = "crate::serde::default_true")]
-    safe: bool,
 }
 
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
@@ -69,42 +65,41 @@ pub enum Encoding {
     Json,
 }
 
-enum RedisSinkState {
-    None,
-    Ready(ConnectionManager),
-    Sending(BoxFuture<'static, (ConnectionManager, Result<i32, RedisError>)>),
+lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig<Option<usize>> = TowerRequestConfig {
+        rate_limit_num: Option::from(u64::MAX),
+        ..Default::default()
+    };
 }
 
-pub struct RedisSink {
-    safe: bool,
-    key: Template,
-    data_type: DataType,
-    method: Option<Method>,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RedisSinkConfig {
     encoding: EncodingConfig<Encoding>,
-    state: RedisSinkState,
-    in_flight: FuturesOrdered<BoxFuture<'static, (usize, Result<i32, RedisError>)>>,
-    acker: Acker,
-    seq_head: usize,
-    seq_tail: usize,
-    pending_acks: HashSet<usize>,
-}
-
-inventory::submit! {
-    SinkDescription::new::<RedisSinkConfig>("redis")
+    #[serde(default)]
+    data_type: DataType,
+    #[serde(alias = "list")]
+    list_option: Option<ListOption>,
+    url: String,
+    key: String,
+    #[serde(default)]
+    batch: BatchConfig,
+    #[serde(default)]
+    request: TowerRequestConfig<Option<usize>>,
 }
 
 impl GenerateConfig for RedisSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self {
-            url: "redis://127.0.0.1:6379/0".to_owned(),
-            key: "vector".to_owned(),
-            encoding: Encoding::Json.into(),
-            data_type: DataType::List,
-            list: Some(ListConfig {
-                method: Method::LPush,
-            }),
-            safe: true,
-        })
+        toml::from_str(
+            r#"
+            url = "redis://127.0.0.1:6379/0"
+            key = "vector"
+            data_type = "list"
+            list.method = "lpush"
+            encoding.codec = "json"
+            batch.max_events = 1
+            "#,
+        )
         .unwrap()
     }
 }
@@ -119,16 +114,10 @@ impl SinkConfig for RedisSinkConfig {
         if self.key.is_empty() {
             return Err("`key` cannot be empty.".into());
         }
-
-        let sink = RedisSink::new(self.clone(), cx.acker()).await?;
-        let conn = match &sink.state {
-            RedisSinkState::Ready(conn) => conn.clone(),
-            _ => unreachable!(),
-        };
-
-        let healthcheck = healthcheck(conn).boxed();
-
-        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
+        let conn = self.build_client().await.context(RedisCreateFailed)?;
+        let healthcheck = RedisSinkConfig::healthcheck(conn.clone()).boxed();
+        let sink = self.new(conn, cx)?;
+        Ok((sink, healthcheck))
     }
 
     fn input_type(&self) -> config::DataType {
@@ -141,6 +130,47 @@ impl SinkConfig for RedisSinkConfig {
 }
 
 impl RedisSinkConfig {
+    pub fn new(
+        &self,
+        conn: ConnectionManager,
+        cx: SinkContext,
+    ) -> crate::Result<super::VectorSink> {
+        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
+
+        let key = Template::try_from(self.key.clone()).context(KeyTemplate)?;
+        let encoding = self.encoding.clone();
+
+        let mut method: Option<Method> = None;
+        if self.list_option.is_some() {
+            method = Option::from(self.list_option.unwrap().method)
+        }
+
+        let data_type = self.data_type;
+
+        let batch = BatchSettings::default()
+            .events(1)
+            .timeout(1)
+            .parse_config(self.batch)?;
+
+        let buffer = VecBuffer::new(batch.size);
+
+        let redis = RedisSink {
+            conn,
+            data_type,
+            method,
+        };
+
+        let svc = ServiceBuilder::new()
+            .settings(request, RedisRetryLogic)
+            .service(redis);
+
+        let sink = BatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .with_flat_map(move |e| stream::iter(encode_event(e, &key, &encoding)).map(Ok))
+            .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
+
+        Ok(super::VectorSink::Sink(Box::new(sink)))
+    }
+
     async fn build_client(&self) -> RedisResult<ConnectionManager> {
         trace!("Open Redis client.");
         let client = redis::Client::open(self.url.as_str())?;
@@ -150,189 +180,152 @@ impl RedisSinkConfig {
         trace!("Get Redis connection success.");
         conn
     }
-}
-
-impl RedisSink {
-    async fn new(config: RedisSinkConfig, acker: Acker) -> crate::Result<Self> {
-        let res = config.build_client().await.context(RedisCreateFailed);
-        let key_tmpl = Template::try_from(config.key).context(KeyTemplate)?;
-
-        match res {
-            Ok(conn) => {
-                let mut method: Option<Method> = None;
-                if config.list.is_some() {
-                    method = Option::from(config.list.unwrap().method)
-                }
-                Ok(RedisSink {
-                    safe: config.safe,
-                    data_type: config.data_type,
-                    method,
-                    key: key_tmpl,
-                    encoding: config.encoding,
-                    acker,
-                    seq_head: 0,
-                    seq_tail: 0,
-                    pending_acks: HashSet::new(),
-                    in_flight: FuturesOrdered::new(),
-                    state: RedisSinkState::Ready(conn),
-                })
-            }
-            Err(error) => {
-                error!(message = "Redis sink init generated an error.", %error);
-                Err(error.to_string().into())
-            }
-        }
-    }
-
-    fn poll_in_flight_prepare(&mut self, cx: &mut Context<'_>) -> Poll<()> {
-        if let RedisSinkState::Sending(fut) = &mut self.state {
-            let (conn, result) = ready!(fut.as_mut().poll(cx));
-
-            let seqno = self.seq_head;
-            self.seq_head += 1;
-
-            self.state = RedisSinkState::Ready(conn);
-
-            self.in_flight
-                .push(Box::pin(async move { (seqno, result) }));
-        }
-        Poll::Ready(())
+    async fn healthcheck(mut conn: ConnectionManager) -> crate::Result<()> {
+        redis::cmd("PING")
+            .query_async(&mut conn)
+            .await
+            .map_err(Into::into)
     }
 }
 
-impl Sink<Event> for RedisSink {
-    type Error = ();
+#[derive(Debug, Clone)]
+struct RedisKvEntry {
+    key: String,
+    value: Vec<u8>,
+}
 
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        ready!(self.poll_in_flight_prepare(cx));
-
-        if self.safe {
-            let this = Pin::into_inner(self);
-            while !this.in_flight.is_empty() {
-                match ready!(Pin::new(&mut this.in_flight).poll_next(cx)) {
-                    Some((seqno, Ok(result))) => {
-                        trace!(
-                            message = "Redis sink produced message.",
-                            length = %result,
-                        );
-                        this.pending_acks.insert(seqno);
-                        let mut num_to_ack = 0;
-
-                        while this.pending_acks.remove(&this.seq_tail) {
-                            num_to_ack += 1;
-                            this.seq_tail += 1
-                        }
-                        this.acker.ack(num_to_ack);
-                    }
-                    Some((_, Err(error))) => {
-                        error!(message = "Redis sink generated an error.", %error);
-                        emit!(RedisSendEventFailed { error });
-                        return Poll::Ready(Err(()));
-                    }
-                    None => break,
-                }
-            }
-        }
-
-        Poll::Ready(Ok(()))
+impl EncodedLength for RedisKvEntry {
+    fn encoded_length(&self) -> usize {
+        self.value.len()
     }
+}
 
-    fn start_send(mut self: Pin<&mut Self>, event: Event) -> Result<(), Self::Error> {
-        let mut conn = match std::mem::replace(&mut self.state, RedisSinkState::None) {
-            RedisSinkState::Ready(conn) => conn,
-            _ => panic!("Expected `poll_ready` to be called first."),
-        };
-
-        let key = self.key.render_string(&event).map_err(|error| {
+fn encode_event(
+    mut event: Event,
+    key: &Template,
+    encoding: &EncodingConfig<Encoding>,
+) -> Option<EncodedEvent<RedisKvEntry>> {
+    let key = key
+        .render_string(&event)
+        .map_err(|error| {
             emit!(TemplateRenderingFailed {
                 error,
                 field: Some("key"),
                 drop_event: true,
             });
-        })?;
+        })
+        .ok()?;
 
-        let encoded = encode_event(event, &self.encoding);
-        let message_len = encoded.len();
-
-        let data_type = self.data_type;
-        let method = self.method;
-
-        self.state = RedisSinkState::Sending(Box::pin(async move {
-            let send = match (data_type, method) {
-                (DataType::List, Some(Method::LPush)) => ConnectionManager::lpush,
-                (DataType::List, Some(Method::RPush)) => ConnectionManager::rpush,
-                (DataType::Channel, None) => ConnectionManager::publish,
-                _ => {
-                    panic!("The `data_type` can't be empty, when `data_type` is `list`, `method` cannot be empty.")
-                }
-            };
-            let result = send(&mut conn, key.clone(), encoded.clone()).await;
-            if result.is_ok() {
-                emit!(RedisEventSent {
-                    byte_size: message_len,
-                });
-            }
-
-            (conn, result)
-        }));
-
-        Ok(())
-    }
-
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        ready!(self.poll_in_flight_prepare(cx));
-        let this = Pin::into_inner(self);
-        while !this.in_flight.is_empty() {
-            match ready!(Pin::new(&mut this.in_flight).poll_next(cx)) {
-                Some((seqno, Ok(result))) => {
-                    trace!(
-                        message = "Redis sink produced message.",
-                        length = %result,
-                    );
-                    this.pending_acks.insert(seqno);
-                    let mut num_to_ack = 0;
-
-                    while this.pending_acks.remove(&this.seq_tail) {
-                        num_to_ack += 1;
-                        this.seq_tail += 1
-                    }
-                    this.acker.ack(num_to_ack);
-                }
-                Some((_, Err(error))) => {
-                    error!(message = "Redis sink generated an error.", %error);
-                    emit!(RedisSendEventFailed { error });
-                    return Poll::Ready(Err(()));
-                }
-                None => break,
-            }
-        }
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.poll_flush(cx)
-    }
-}
-
-async fn healthcheck(mut conn: ConnectionManager) -> crate::Result<()> {
-    redis::cmd("PING")
-        .query_async(&mut conn)
-        .await
-        .map_err(Into::into)
-}
-
-fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> String {
     encoding.apply_rules(&mut event);
 
-    match encoding.codec() {
-        Encoding::Json => serde_json::to_string(event.as_log())
+    let value = match encoding.codec() {
+        Encoding::Json => serde_json::to_vec(event.as_log())
             .map_err(|error| panic!("Unable to encode into JSON: {}", error))
             .unwrap_or_default(),
         Encoding::Text => event
             .as_log()
             .get(log_schema().message_key())
-            .map(|v| v.to_string_lossy())
+            .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
+    };
+
+    let event = EncodedEvent::new(RedisKvEntry { key, value });
+    Some(event)
+}
+
+type RedisPipeResult = RedisResult<Vec<bool>>;
+
+impl Response for Vec<bool> {
+    fn is_successful(&self) -> bool {
+        let mut flag = true;
+        for r in self {
+            if !r {
+                flag = false;
+                break;
+            }
+        }
+        flag
+    }
+}
+
+#[derive(Debug, Clone)]
+struct RedisRetryLogic;
+
+impl RetryLogic for RedisRetryLogic {
+    type Error = RedisError;
+    type Response = Vec<bool>;
+
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
+    }
+
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+        if response.is_successful() {
+            return RetryAction::Successful;
+        }
+        RetryAction::Retry("Sent data to redis failed.".into())
+    }
+}
+
+#[derive(Clone)]
+pub struct RedisSink {
+    conn: ConnectionManager,
+    data_type: DataType,
+    method: Option<Method>,
+}
+
+impl Service<Vec<RedisKvEntry>> for RedisSink {
+    type Response = Vec<bool>;
+    type Error = RedisError;
+    type Future = BoxFuture<'static, RedisPipeResult>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, kvs: Vec<RedisKvEntry>) -> Self::Future {
+        let mut byte_size = 0;
+
+        let data_type = self.data_type;
+        let method = self.method;
+
+        let mut conn = self.conn.clone();
+        let mut pipe = redis::pipe();
+
+        for kv in kvs {
+            byte_size += kv.encoded_length();
+            match (data_type, method) {
+                (DataType::List, Some(Method::LPush)) => {
+                    pipe.atomic().lpush(kv.key, kv.value);
+                }
+                (DataType::List, Some(Method::RPush)) => {
+                    pipe.atomic().rpush(kv.key, kv.value);
+                }
+                (DataType::Channel, None) => {
+                    pipe.atomic().publish(kv.key, kv.value);
+                }
+                _ => {
+                    panic!("The `data_type` can't be empty, when `data_type` is `list`, `method` cannot be empty.")
+                }
+            }
+        }
+        Box::pin(async move {
+            let result: RedisPipeResult = pipe.query_async(&mut conn).await;
+            match result {
+                Ok(res) => {
+                    if res.is_successful() {
+                        emit!(RedisEventSent { byte_size });
+                    }
+                    Ok(res)
+                }
+                Err(error) => {
+                    emit!(RedisSendEventFailed {
+                        error: error.to_string()
+                    });
+                    Err(error)
+                }
+            }
+        })
     }
 }
 
@@ -340,6 +333,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> String
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    use std::convert::TryFrom;
 
     #[test]
     fn generate_config() {
@@ -351,8 +345,15 @@ mod tests {
         let msg = "hello_world".to_owned();
         let mut evt = Event::from(msg.clone());
         evt.as_mut_log().insert("key", "value");
-        let result = encode_event(evt, &EncodingConfig::from(Encoding::Json));
-        let map: HashMap<String, String> = serde_json::from_str(result.as_str()).unwrap();
+        let result = encode_event(
+            evt,
+            &Template::try_from("key").unwrap(),
+            &EncodingConfig::from(Encoding::Json),
+        )
+        .unwrap()
+        .item
+        .value;
+        let map: HashMap<String, String> = serde_json::from_slice(&result[..]).unwrap();
         assert_eq!(msg, map[&log_schema().message_key().to_string()]);
     }
 
@@ -360,8 +361,15 @@ mod tests {
     fn redis_event_text() {
         let msg = "hello_world".to_owned();
         let evt = Event::from(msg.clone());
-        let event = encode_event(evt, &EncodingConfig::from(Encoding::Text));
-        assert_eq!(event, msg);
+        let event = encode_event(
+            evt,
+            &Template::try_from("key").unwrap(),
+            &EncodingConfig::from(Encoding::Text),
+        )
+        .unwrap()
+        .item
+        .value;
+        assert_eq!(event, Vec::from(msg));
     }
 
     #[test]
@@ -370,8 +378,9 @@ mod tests {
         let mut evt = Event::from(msg);
         evt.as_mut_log().insert("key", "value");
 
-        let event = encode_event(
+        let result = encode_event(
             evt,
+            &Template::try_from("key").unwrap(),
             &EncodingConfig {
                 codec: Encoding::Json,
                 schema: None,
@@ -379,9 +388,12 @@ mod tests {
                 except_fields: Some(vec!["key".into()]),
                 timestamp_format: None,
             },
-        );
+        )
+        .unwrap()
+        .item
+        .value;
 
-        let map: HashMap<String, String> = serde_json::from_str(event.as_str()).unwrap();
+        let map: HashMap<String, String> = serde_json::from_slice(&result[..]).unwrap();
         assert!(!map.contains_key("key"));
     }
 }
@@ -391,8 +403,8 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
-    use futures::{stream, StreamExt};
     use rand::Rng;
+    use redis::AsyncCommands;
 
     const REDIS_SERVER: &str = "redis://127.0.0.1:6379/0";
 
@@ -411,15 +423,21 @@ mod integration_tests {
             key: key.clone(),
             encoding: Encoding::Json.into(),
             data_type: DataType::List,
-            list: Some(ListConfig {
+            list_option: Some(ListOption {
                 method: Method::LPush,
             }),
-            safe: true,
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig {
+                rate_limit_num: Option::from(u64::MAX),
+                ..Default::default()
+            },
         };
 
         // Publish events.
-        let (acker, ack_counter) = Acker::new_for_testing();
-        let sink = RedisSink::new(cnf.clone(), acker).await.unwrap();
+        let conn = cnf.build_client().await.unwrap();
+        let cx = SinkContext::new_test();
+
+        let sink = cnf.new(conn, cx).unwrap();
 
         let mut events: Vec<Event> = Vec::new();
         for i in 0..num_events {
@@ -429,12 +447,7 @@ mod integration_tests {
         }
 
         let stream = stream::iter(events.clone());
-        stream.map(Ok).forward(sink).await.unwrap();
-
-        assert_eq!(
-            ack_counter.load(std::sync::atomic::Ordering::Relaxed),
-            num_events
-        );
+        sink.run(stream).await.unwrap();
 
         let mut conn = cnf.build_client().await.unwrap();
 
@@ -469,15 +482,21 @@ mod integration_tests {
             key: key.clone(),
             encoding: Encoding::Json.into(),
             data_type: DataType::List,
-            list: Some(ListConfig {
+            list_option: Some(ListOption {
                 method: Method::RPush,
             }),
-            safe: true,
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig {
+                rate_limit_num: Option::from(u64::MAX),
+                ..Default::default()
+            },
         };
 
         // Publish events.
-        let (acker, ack_counter) = Acker::new_for_testing();
-        let sink = RedisSink::new(cnf.clone(), acker).await.unwrap();
+        let conn = cnf.build_client().await.unwrap();
+        let cx = SinkContext::new_test();
+
+        let sink = cnf.new(conn, cx).unwrap();
         let mut events: Vec<Event> = Vec::new();
         for i in 0..num_events {
             let s: String = i.to_string();
@@ -486,12 +505,7 @@ mod integration_tests {
         }
 
         let stream = stream::iter(events.clone());
-        stream.map(Ok).forward(sink).await.unwrap();
-
-        assert_eq!(
-            ack_counter.load(std::sync::atomic::Ordering::Relaxed),
-            num_events
-        );
+        sink.run(stream).await.unwrap();
 
         let mut conn = cnf.build_client().await.unwrap();
 
@@ -518,7 +532,7 @@ mod integration_tests {
         let key = format!("test-{}", random_string(10));
         debug!("Test key name: {}.", key);
         let mut rng = rand::thread_rng();
-        let num_events = rng.gen_range(1000..2000);
+        let num_events = rng.gen_range(10000..20000);
         debug!("Test events num: {}.", num_events);
 
         let client = redis::Client::open(REDIS_SERVER).unwrap();
@@ -542,20 +556,21 @@ mod integration_tests {
             key: key.clone(),
             encoding: Encoding::Json.into(),
             data_type: DataType::Channel,
-            list: None,
-            safe: true,
+            list_option: None,
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig {
+                rate_limit_num: Option::from(u64::MAX),
+                ..Default::default()
+            },
         };
 
         // Publish events.
-        let (acker, ack_counter) = Acker::new_for_testing();
-        let sink = RedisSink::new(cnf.clone(), acker).await.unwrap();
-        let (_input, events) = random_lines_with_stream(100, num_events, None);
-        events.map(Ok).forward(sink).await.unwrap();
+        let conn = cnf.build_client().await.unwrap();
+        let cx = SinkContext::new_test();
 
-        assert_eq!(
-            ack_counter.load(std::sync::atomic::Ordering::Relaxed),
-            num_events
-        );
+        let sink = cnf.new(conn, cx).unwrap();
+        let (_input, events) = random_lines_with_stream(100, num_events, None);
+        sink.run(events).await.unwrap();
 
         // Receive events.
         let mut received_msg_num = 0;

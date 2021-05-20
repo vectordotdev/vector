@@ -259,13 +259,10 @@ uuid = { version = "0.8.2", default-features = false, features = ["serde", "v4"]
 warp = { version = "0.3.1", default-features = false, optional = true }
 zstd = { version = "0.6", default-features = false }
 cfg-if = { version = "1.0.0", default-features = false }
-<<<<<<< HEAD
 tonic = { version = "0.4", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
 data-encoding = { version = "2.2", default-features = false, features = ["std"], optional = true }
 trust-dns-proto = { version = "0.20", features = ["dnssec"], optional = true }
 redis = { version = "0.20.0", features = ["connection-manager","async-std-comp"], optional = true }
-=======
->>>>>>> 6f7684361 (Fix formatting)
 
 # For WASM
 async-stream = "0.3.2"
@@ -610,7 +607,6 @@ sinks-splunk_hec = ["bytesize"]
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "tonic", "tonic-build", "prost-build"]
-sinks-redis = ["redis"]
 
 # Identifies that the build is a nightly build
 nightly = []
