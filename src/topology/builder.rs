@@ -65,6 +65,7 @@ pub async fn build_pieces(
             globals: config.global.clone(),
             shutdown: shutdown_signal,
             out: pipeline,
+            acknowledgements: source.acknowledgements,
         };
         let server = match source.inner.build(context).await {
             Err(error) => {

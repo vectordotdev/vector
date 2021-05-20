@@ -27,8 +27,6 @@ pub struct LogplexConfig {
     query_parameters: Vec<String>,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
-    #[serde(default = "super::default_acknowledgements")]
-    acknowledgements: bool,
 }
 
 inventory::submit! {
@@ -46,7 +44,6 @@ impl GenerateConfig for LogplexConfig {
             query_parameters: Vec::new(),
             tls: None,
             auth: None,
-            acknowledgements: true,
         })
         .unwrap()
     }
@@ -85,7 +82,7 @@ impl SourceConfig for LogplexConfig {
             &self.auth,
             cx.out,
             cx.shutdown,
-            self.acknowledgements,
+            cx.acknowledgements,
         )
     }
 
@@ -256,15 +253,16 @@ mod tests {
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
+        let mut context = SourceContext::new_test(sender);
+        context.acknowledgements = acknowledgements;
         tokio::spawn(async move {
             LogplexConfig {
                 address,
                 query_parameters,
                 tls: None,
                 auth,
-                acknowledgements,
             }
-            .build(SourceContext::new_test(sender))
+            .build(context)
             .await
             .unwrap()
             .await

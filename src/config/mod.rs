@@ -207,14 +207,22 @@ macro_rules! impl_generate_config_from_default {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SourceOuter {
+    #[serde(default = "default_acknowledgements")]
+    pub acknowledgements: bool,
     #[serde(flatten)]
-    pub inner: Box<dyn SourceConfig>,
+    pub(super) inner: Box<dyn SourceConfig>,
+}
+
+fn default_acknowledgements() -> bool {
+    true
 }
 
 impl SourceOuter {
     pub(crate) fn new(source: impl SourceConfig + 'static) -> Self {
-        let inner = Box::new(source);
-        Self { inner }
+        Self {
+            acknowledgements: default_acknowledgements(),
+            inner: Box::new(source),
+        }
     }
 }
 
@@ -238,6 +246,7 @@ pub struct SourceContext {
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
+    pub acknowledgements: bool,
 }
 
 impl SourceContext {
@@ -254,6 +263,7 @@ impl SourceContext {
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
+                acknowledgements: default_acknowledgements(),
             },
             shutdown,
         )
@@ -266,6 +276,7 @@ impl SourceContext {
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
+            acknowledgements: default_acknowledgements(),
         }
     }
 }

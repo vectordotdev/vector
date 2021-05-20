@@ -32,8 +32,6 @@ pub struct SimpleHttpConfig {
     path: String,
     #[serde(default = "default_path_key")]
     path_key: String,
-    #[serde(default = "super::default_acknowledgements")]
-    acknowledgements: bool,
 }
 
 inventory::submit! {
@@ -52,7 +50,6 @@ impl GenerateConfig for SimpleHttpConfig {
             path_key: "path".to_string(),
             path: "/".to_string(),
             strict_path: true,
-            acknowledgements: true,
         })
         .unwrap()
     }
@@ -115,7 +112,7 @@ impl SourceConfig for SimpleHttpConfig {
             &self.auth,
             cx.out,
             cx.shutdown,
-            self.acknowledgements,
+            cx.acknowledgements,
         )
     }
 
@@ -200,6 +197,8 @@ mod tests {
         let address = next_addr();
         let path = path.to_owned();
         let path_key = path_key.to_owned();
+        let mut context = SourceContext::new_test(sender);
+        context.acknowledgements = acknowledgements;
         tokio::spawn(async move {
             SimpleHttpConfig {
                 address,
@@ -211,9 +210,8 @@ mod tests {
                 strict_path,
                 path_key,
                 path,
-                acknowledgements,
             }
-            .build(SourceContext::new_test(sender))
+            .build(context)
             .await
             .unwrap()
             .await

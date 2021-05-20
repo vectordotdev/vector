@@ -28,8 +28,6 @@ pub struct DatadogLogsConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
-    #[serde(default = "super::super::default_acknowledgements")]
-    acknowledgements: bool,
 }
 
 inventory::submit! {
@@ -42,7 +40,6 @@ impl GenerateConfig for DatadogLogsConfig {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
             auth: None,
-            acknowledgements: true,
         })
         .unwrap()
     }
@@ -62,7 +59,7 @@ impl SourceConfig for DatadogLogsConfig {
             &self.auth,
             cx.out,
             cx.shutdown,
-            self.acknowledgements,
+            cx.acknowledgements,
         )
     }
 
@@ -152,14 +149,15 @@ mod tests {
     ) -> (impl Stream<Item = Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
+        let mut context = SourceContext::new_test(sender);
+        context.acknowledgements = acknowledgements;
         tokio::spawn(async move {
             DatadogLogsConfig {
                 address,
                 tls: None,
                 auth: None,
-                acknowledgements,
             }
-            .build(SourceContext::new_test(sender))
+            .build(context)
             .await
             .unwrap()
             .await
