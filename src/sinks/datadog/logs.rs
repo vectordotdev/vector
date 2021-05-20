@@ -24,7 +24,7 @@ use hyper::body::Body;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{io::Write, time::Duration};
+use std::{io::Write, sync::Arc, time::Duration};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -47,11 +47,14 @@ pub struct DatadogLogsConfig {
     request: TowerRequestConfig,
 }
 
+type ApiKey = Arc<str>;
+
 #[derive(Clone)]
 struct DatadogLogsJsonService {
     config: DatadogLogsConfig,
     // Used to store the complete URI and avoid calling `get_uri` for each request
     uri: String,
+    api_key: ApiKey,
 }
 
 #[derive(Clone)]
@@ -59,6 +62,7 @@ struct DatadogLogsTextService {
     config: DatadogLogsConfig,
     // Used to store the complete URI and avoid calling `get_uri` for each request
     uri: String,
+    api_key: ApiKey,
 }
 
 inventory::submit! {
@@ -118,8 +122,8 @@ impl DatadogLogsConfig {
         B::Output: std::marker::Send + Clone,
         B::Input: std::marker::Send,
         T: HttpSink<
-                Input = PartitionInnerBuffer<B::Input, String>,
-                Output = PartitionInnerBuffer<B::Output, String>,
+                Input = PartitionInnerBuffer<B::Input, ApiKey>,
+                Output = PartitionInnerBuffer<B::Output, ApiKey>,
             > + Clone,
     {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
@@ -198,6 +202,7 @@ impl SinkConfig for DatadogLogsConfig {
                     DatadogLogsJsonService {
                         config: self.clone(),
                         uri: self.get_uri(),
+                        api_key: Arc::from(self.api_key.clone()),
                     },
                     JsonArrayBuffer::new(batch_settings.size),
                     batch_settings.timeout,
@@ -210,6 +215,7 @@ impl SinkConfig for DatadogLogsConfig {
                     DatadogLogsTextService {
                         config: self.clone(),
                         uri: self.get_uri(),
+                        api_key: Arc::from(self.api_key.clone()),
                     },
                     VecBuffer::new(batch_settings.size),
                     batch_settings.timeout,
@@ -229,8 +235,8 @@ impl SinkConfig for DatadogLogsConfig {
 
 #[async_trait::async_trait]
 impl HttpSink for DatadogLogsJsonService {
-    type Input = PartitionInnerBuffer<serde_json::Value, String>;
-    type Output = PartitionInnerBuffer<Vec<BoxedRawValue>, String>;
+    type Input = PartitionInnerBuffer<serde_json::Value, ApiKey>;
+    type Output = PartitionInnerBuffer<Vec<BoxedRawValue>, ApiKey>;
 
     fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
         let log = event.as_mut_log();
@@ -249,17 +255,15 @@ impl HttpSink for DatadogLogsJsonService {
 
         self.config.encoding.apply_rules(&mut event);
 
-        let api_key = event
-            .metadata_mut()
-            .datadog_api_key
-            .take()
-            .unwrap_or_else(|| self.config.api_key.clone());
-
         let (fields, metadata) = event.into_log().into_parts();
         let json_event = json!(fields);
+        let api_key = metadata
+            .datadog_api_key()
+            .as_ref()
+            .unwrap_or_else(|| &self.api_key);
 
         Some(EncodedEvent {
-            item: PartitionInnerBuffer::new(json_event, api_key),
+            item: PartitionInnerBuffer::new(json_event, Arc::clone(api_key)),
             metadata: Some(metadata),
         })
     }
@@ -275,26 +279,22 @@ impl HttpSink for DatadogLogsJsonService {
                 count: events.len(),
             });
         }
-        self.config.build_request(
-            self.uri.as_str(),
-            api_key.as_str(),
-            "application/json",
-            body,
-        )
+        self.config
+            .build_request(self.uri.as_str(), &api_key[..], "application/json", body)
     }
 }
 
 #[async_trait::async_trait]
 impl HttpSink for DatadogLogsTextService {
-    type Input = PartitionInnerBuffer<Bytes, String>;
-    type Output = PartitionInnerBuffer<Vec<Bytes>, String>;
+    type Input = PartitionInnerBuffer<Bytes, ApiKey>;
+    type Output = PartitionInnerBuffer<Vec<Bytes>, ApiKey>;
 
-    fn encode_event(&self, mut event: Event) -> Option<EncodedEvent<Self::Input>> {
-        let api_key = event
-            .metadata_mut()
-            .datadog_api_key
-            .take()
-            .unwrap_or_else(|| self.config.api_key.clone());
+    fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
+        let api_key = Arc::clone(event
+            .metadata()
+            .datadog_api_key()
+            .as_ref()
+            .unwrap_or_else(|| &self.api_key));
 
         encode_event(event, &self.config.encoding).map(|e| {
             emit!(DatadogLogEventProcessed {
@@ -306,7 +306,6 @@ impl HttpSink for DatadogLogsTextService {
                 item: PartitionInnerBuffer::new(e.item, api_key),
                 metadata: e.metadata,
             }
-            //}::new(PartitionInnerBuffer::new(e.item, api_key)).with_metadata(e.metadata)
         })
     }
 
@@ -315,7 +314,7 @@ impl HttpSink for DatadogLogsTextService {
         let body: Vec<u8> = events.into_iter().flat_map(Bytes::into_iter).collect();
 
         self.config
-            .build_request(self.uri.as_str(), api_key.as_str(), "text/plain", body)
+            .build_request(self.uri.as_str(), &api_key[..], "text/plain", body)
     }
 }
 
@@ -323,10 +322,13 @@ impl HttpSink for DatadogLogsTextService {
 /// the return.
 async fn healthcheck<T, O>(sink: T, client: HttpClient, api_key: String) -> crate::Result<()>
 where
-    T: HttpSink<Output = PartitionInnerBuffer<Vec<O>, std::string::String>>,
+    T: HttpSink<Output = PartitionInnerBuffer<Vec<O>, ApiKey>>,
 {
     let req = sink
-        .build_request(PartitionInnerBuffer::new(Vec::new(), api_key.clone()))
+        .build_request(PartitionInnerBuffer::new(
+            Vec::with_capacity(0),
+            Arc::from(api_key),
+        ))
         .await?
         .map(Body::from);
 
@@ -365,7 +367,6 @@ mod tests {
     use super::*;
     use crate::{
         config::SinkConfig,
-        event::EventMetadata,
         sinks::util::test::{build_test_server_status, load_sink},
         test_util::{next_addr, random_lines_with_stream},
     };
@@ -387,7 +388,7 @@ mod tests {
         let mut e = Event::from(msg);
         e.as_mut_log()
             .metadata_mut()
-            .merge(EventMetadata::new_with_datadog_api_key(key.to_string()));
+            .set_datadog_api_key(Some(Arc::from(key)));
         e
     }
 
@@ -519,9 +520,7 @@ mod tests {
         let mut events = events.map(|mut e| {
             e.as_mut_log()
                 .metadata_mut()
-                .merge(EventMetadata::new_with_datadog_api_key(
-                    "from_metadata".to_string(),
-                ));
+                .set_datadog_api_key(Some(Arc::from("from_metadata")));
             Ok(e)
         });
 

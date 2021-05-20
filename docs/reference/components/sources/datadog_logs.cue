@@ -63,7 +63,7 @@ components: sources: datadog_logs: {
 
 	configuration: {
 		address: sources.http.configuration.address
-		save_api_key: {
+		store_api_key: {
 			common:      false
 			description: "When incoming events contain a Datadog API key, if this setting is set to `true` the key will kept in the event metadata and will be used if the event is sent to a Datadog sink."
 			required:    false
