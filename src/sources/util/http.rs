@@ -1,9 +1,8 @@
 use crate::{
+    config::SourceContext,
     event::{BatchNotifier, BatchStatus, Event},
     internal_events::{HttpBadRequest, HttpDecompressError, HttpEventsReceived},
-    shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
-    Pipeline,
 };
 use async_trait::async_trait;
 use bytes::{Buf, Bytes};
@@ -192,13 +191,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         strict_path: bool,
         tls: &Option<TlsConfig>,
         auth: &Option<HttpSourceAuthConfig>,
-        out: Pipeline,
-        shutdown: ShutdownSignal,
-        acknowledgements: bool,
+        cx: SourceContext,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
+        let out = cx.out;
+        let shutdown = cx.shutdown;
+        let acknowledgements = cx.acknowledgements;
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
             let mut filter: BoxedFilter<()> = warp::post().boxed();

@@ -51,16 +51,7 @@ impl SourceConfig for DatadogLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = DatadogLogsSource {};
         // We accept /v1/input & /v1/input/<API_KEY>
-        source.run(
-            self.address,
-            "/v1/input",
-            false,
-            &self.tls,
-            &self.auth,
-            cx.out,
-            cx.shutdown,
-            cx.acknowledgements,
-        )
+        source.run(self.address, "/v1/input", false, &self.tls, &self.auth, cx)
     }
 
     fn output_type(&self) -> DataType {

@@ -110,9 +110,7 @@ impl SourceConfig for SimpleHttpConfig {
             self.strict_path,
             &self.tls,
             &self.auth,
-            cx.out,
-            cx.shutdown,
-            cx.acknowledgements,
+            cx,
         )
     }
 
