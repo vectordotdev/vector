@@ -16,7 +16,7 @@ mod tests {
 
     #[test]
     fn to_vrl() {
-        let query_string = "@a:*tes*t";
+        let query_string = r#"a:"this is a test""#;
 
         match parse(query_string) {
             Err(e) => println!("Unable to parse query: {}", e),

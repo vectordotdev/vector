@@ -35,7 +35,11 @@ impl From<QueryNode> for ast::Expr {
     fn from(q: QueryNode) -> Self {
         match q {
             // Equality
-            QueryNode::AttributeTerm { attr, value } => Self::Op(make_node(ast::Op(
+            QueryNode::AttributeTerm { attr, value }
+            | QueryNode::QuotedAttribute {
+                attr,
+                phrase: value,
+            } => Self::Op(make_node(ast::Op(
                 Box::new(make_variable(attr)),
                 make_node(ast::Opcode::Eq),
                 Box::new(make_value(value)),
@@ -52,18 +56,11 @@ impl From<QueryNode> for ast::Expr {
             ))),
             // Wildcard suffix
             QueryNode::AttributePrefix { attr, prefix } => {
-                make_function_call("starts_with", vec![make_variable(attr), make_value(prefix)])
+                make_function_call("starts_with", vec![make_variable(attr), make_regex(prefix)])
             }
             // Arbitrary wildcard
             QueryNode::AttributeWildcard { attr, wildcard } => {
-                Self::FunctionCall(make_node(ast::FunctionCall {
-                    ident: make_node(ast::Ident::new("match".to_string())),
-                    abort_on_error: true,
-                    arguments: vec![make_variable(attr), make_regex(wildcard)]
-                        .into_iter()
-                        .map(|expr| make_node(ast::FunctionArgument { ident: None, expr }))
-                        .collect(),
-                }))
+                make_function_call("match", vec![make_variable(attr), make_regex(wildcard)])
             }
             _ => panic!("at the disco"),
         }
