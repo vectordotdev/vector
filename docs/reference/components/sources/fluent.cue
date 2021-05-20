@@ -78,7 +78,7 @@ components: sources: fluent: {
 				description: "The IP address the fluent message was sent from."
 				required:    true
 				type: string: {
-					examples: ["my.host.com"]
+					examples: ["127.0.0.1"]
 					syntax: "literal"
 				}
 			}
@@ -155,15 +155,9 @@ components: sources: fluent: {
 		fluentd_configuartion: {
 			title: "Fluentd configuration"
 			body: """
-				To configure Fluentd to forward to a Vector instance, you can use the following configuration:
+				To configure Fluentd to forward to a Vector instance, you can use the following output configuration:
 
 				```text
-					<source>
-					  @type dummy
-					  dummy {"hello":"world"}
-					  tag dummy
-					</source>
-
 					<match *>
 					  @type forward
 					  <server>
@@ -181,23 +175,15 @@ components: sources: fluent: {
 		fluentbit_configuration: {
 			title: "Fluent Bit configuration"
 			body: """
-				To configure Fluent Bit to forward to a Vector instance, you can use the following configuration:
+				To configure Fluent Bit to forward to a Vector instance, you can use the following output configuration:
 
 				```text
-					[SERVICE]
-						Flush      5
-						Daemon     off
-						Log_Level  info
-
-					[INPUT]
-						Name       dummy
-
 					[OUTPUT]
 						Name          forward
 						Match         *
 						# update these to point to your vector instance
 						Host          127.0.0.1
-						Port 		  24224
+						Port          24224
 				```
 				"""
 		}

@@ -113,6 +113,7 @@ pub enum DecodeError {
     IO(io::Error),
     Decode(decode::Error),
     UnknownCompression(String),
+    UnexpectedValue(rmpv::Value),
 }
 
 impl std::fmt::Display for DecodeError {
@@ -122,6 +123,9 @@ impl std::fmt::Display for DecodeError {
             DecodeError::Decode(err) => write!(f, "{}", err),
             DecodeError::UnknownCompression(compression) => {
                 write!(f, "unknown compression: {}", compression)
+            }
+            DecodeError::UnexpectedValue(value) => {
+                write!(f, "unexpected msgpack value, ignoring: {}", value)
             }
         }
     }
@@ -133,6 +137,7 @@ impl TcpIsErrorFatal for DecodeError {
             DecodeError::IO(_) => true,
             DecodeError::Decode(_) => false,
             DecodeError::UnknownCompression(_) => false,
+            DecodeError::UnexpectedValue(_) => false,
         }
     }
 }
@@ -188,28 +193,28 @@ impl Decoder for FluentDecoder {
 
         src.advance(pos);
 
-        res.and_then(normalize_message)
-            .map(Option::Some)
-            .map_err(|error| {
-                let base64_encoded_message = base64::encode(&src);
-                emit!(FluentMessageDecodeError {
-                    error: &error,
-                    base64_encoded_message
-                });
-                error
-            })
+        res.and_then(normalize_message).map_err(|error| {
+            let base64_encoded_message = base64::encode(&src);
+            emit!(FluentMessageDecodeError {
+                error: &error,
+                base64_encoded_message
+            });
+            error
+        })
     }
 }
 
-fn normalize_message(message: FluentMessage) -> Result<FluentFrame, DecodeError> {
+fn normalize_message(message: FluentMessage) -> Result<Option<FluentFrame>, DecodeError> {
     match message {
         FluentMessage::Message(tag, timestamp, record)
-        | FluentMessage::MessageWithOptions(tag, timestamp, record, ..) => Ok(FluentFrame {
+        | FluentMessage::MessageWithOptions(tag, timestamp, record, ..) => Ok(Some(FluentFrame {
             tag,
             entries: vec![FluentEntry(timestamp, record)],
-        }),
+        })),
         FluentMessage::Forward(tag, entries)
-        | FluentMessage::ForwardWithOptions(tag, entries, ..) => Ok(FluentFrame { tag, entries }),
+        | FluentMessage::ForwardWithOptions(tag, entries, ..) => {
+            Ok(Some(FluentFrame { tag, entries }))
+        }
         FluentMessage::PackedForward(tag, bin) => {
             let mut buf = BytesMut::from(&bin[..]);
 
@@ -219,7 +224,7 @@ fn normalize_message(message: FluentMessage) -> Result<FluentFrame, DecodeError>
             while let Some(entry) = decoder.decode(&mut buf)? {
                 entries.push(entry);
             }
-            Ok(FluentFrame { tag, entries })
+            Ok(Some(FluentFrame { tag, entries }))
         }
         FluentMessage::PackedForwardWithOptions(tag, bin, options) => {
             let buf = match options.compressed.as_str() {
@@ -242,8 +247,10 @@ fn normalize_message(message: FluentMessage) -> Result<FluentFrame, DecodeError>
             while let Some(entry) = decoder.decode(&mut buf)? {
                 entries.push(entry);
             }
-            Ok(FluentFrame { tag, entries })
+            Ok(Some(FluentFrame { tag, entries }))
         }
+        FluentMessage::Heartbeat(rmpv::Value::Nil) => Ok(None),
+        FluentMessage::Heartbeat(value) => Err(DecodeError::UnexpectedValue(value)),
     }
 }
 
@@ -316,6 +323,7 @@ enum FluentMessage {
     ForwardWithOptions(FluentTag, Vec<FluentEntry>, FluentMessageOptions),
     PackedForward(FluentTag, serde_bytes::ByteBuf),
     PackedForwardWithOptions(FluentTag, serde_bytes::ByteBuf, FluentMessageOptions),
+    Heartbeat(rmpv::Value), // should be Nil if heartbeat
 }
 
 /// Server options sent by client.
