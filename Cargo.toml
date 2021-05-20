@@ -290,6 +290,11 @@ walkdir = "2.3.2"
 quickcheck = "1.0.3"
 lookup = { path = "lib/lookup", features = ["arbitrary"] }
 
+
+[patch.crates-io]
+# A patch for lib/vector-core/buffers, addresses Issue 7514
+leveldb-sys = { git = "https://github.com/timberio/leveldb-sys.git", branch = "leveldb_mmap_limit" }
+
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
 default = ["api", "api-client", "disk-buffer", "rdkafka-plain", "sinks", "sources", "transforms", "unix", "vendor-all", "vrl-cli"]

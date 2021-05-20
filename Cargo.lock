@@ -2111,6 +2111,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ffi-opaque"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "534be3985e262585e2a8bb8322969e2115f0eff293b5bf522bef397fff54c9bc"
+
+[[package]]
 name = "file-source"
 version = "0.1.0"
 dependencies = [
@@ -3367,11 +3373,11 @@ dependencies = [
 
 [[package]]
 name = "leveldb-sys"
-version = "2.0.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "618aee5ba3d32cb8456420a9a454aa71c1af5b3e9c7a2ec20a0f3cbbe47246cb"
+version = "2.0.9"
+source = "git+https://github.com/timberio/leveldb-sys.git?branch=leveldb_mmap_limit#deca67b91b32c77bb5bcd122e306877468520a97"
 dependencies = [
  "cmake",
+ "ffi-opaque",
  "libc",
  "num_cpus",
 ]
