@@ -388,7 +388,7 @@ impl RunningTopology {
         let add_source = diff
             .sources
             .changed_and_added()
-            .map(|name| (name, new_config.sources[name].resources()));
+            .map(|name| (name, new_config.sources[name].inner.resources()));
         let add_sink = diff
             .sinks
             .changed_and_added()

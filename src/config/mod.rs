@@ -66,7 +66,7 @@ pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
     pub healthchecks: HealthcheckOptions,
-    pub sources: IndexMap<String, Box<dyn SourceConfig>>,
+    pub sources: IndexMap<String, SourceOuter>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
     tests: Vec<TestDefinition>,
@@ -203,6 +203,19 @@ macro_rules! impl_generate_config_from_default {
             }
         }
     };
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SourceOuter {
+    #[serde(flatten)]
+    pub inner: Box<dyn SourceConfig>,
+}
+
+impl SourceOuter {
+    pub(crate) fn new(source: impl SourceConfig + 'static) -> Self {
+        let inner = Box::new(source);
+        Self { inner }
+    }
 }
 
 #[async_trait]
