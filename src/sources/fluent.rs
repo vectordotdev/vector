@@ -96,7 +96,7 @@ impl TcpSource for FluentSource {
                 let mut log = LogEvent::default();
                 log.insert(log_schema().host_key(), host.clone());
                 log.insert(log_schema().timestamp_key(), timestamp);
-                log.insert("fluent_tag", tag.clone());
+                log.insert("tag", tag.clone());
                 for (key, value) in record.into_iter() {
                     log.insert_flat(key, value)
                 }
@@ -569,7 +569,7 @@ mod integration_tests {
         remove_container(&docker, &container.id).await;
 
         assert!(!events.is_empty());
-        assert_eq!(events[0].as_log()["fluent_tag"], "dummy.0".into());
+        assert_eq!(events[0].as_log()["tag"], "dummy.0".into());
         assert_eq!(events[0].as_log()["message"], "dummy".into());
         assert!(events[0].as_log().get("timestamp").is_some());
         assert!(events[0].as_log().get("host").is_some());
@@ -673,7 +673,7 @@ mod integration_tests {
         remove_container(&docker, &container.id).await;
 
         assert!(!events.is_empty());
-        assert_eq!(events[0].as_log()["fluent_tag"], "dummy".into());
+        assert_eq!(events[0].as_log()["tag"], "dummy".into());
         assert_eq!(events[0].as_log()["message"], "dummy".into());
         assert!(events[0].as_log().get("timestamp").is_some());
         assert!(events[0].as_log().get("host").is_some());

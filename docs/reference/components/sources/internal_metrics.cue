@@ -272,6 +272,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		decode_errors_total: {
+			description:       "The total number of decode errors seen when decoding data in a source component."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		k8s_format_picker_edge_cases_total: {
 			description:       "The total number of edge cases encountered while picking format of the Kubernetes log message."
 			type:              "counter"
