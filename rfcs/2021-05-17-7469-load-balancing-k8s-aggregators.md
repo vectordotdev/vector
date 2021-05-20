@@ -28,6 +28,7 @@ Load balancing will be a concern for any `sink` or `source` supported by Vector;
 
 * Scaling the Kafka `source`
 * Scaling and load balancing on platforms other than Kubernetes
+* Load balancing UDP based `sources`
 
 ## Motivation
 
@@ -36,6 +37,8 @@ Today, scaling Vector horizontally (by increasing replicas) is a manual process 
 ## Internal Proposal
 
 Include a configuration for a dedicated reverse proxy that will be deployed as part of the vector-aggregator Helm chart, as well as documented configuration and installation instructions for users that run outside of Kubernetes. We should provide basic, but functional, configurations out-of-the box to enable users to "one click" install Vector as an aggregator. The proxy should dynamically resolve downsteam Vector instances but allow for consistent targets in situations that require it (aggregation transforms). I propose our initially supported proxy should be HAProxy, with the next second being NGINX or Envoy. HAProxy, compared to NGINX, provides more metrics (exposed as JSON or in Prometheus format) and has native service discovery to dynamically populate its configuration. Lua can be used with NGINX to provide service discovery, for example the [nginx-ingress-controller](https://kubernetes.github.io/ingress-nginx/).
+
+HAProxy intentionally has little support for proxying UDP, as of 2.3 there is support for forwarding syslog traffic however it doesn't allow for dynamic backend configuration greatly limiting the usability for us.
 
 Below is a basic HAProxy configuration configured to leverage service discovery in a Kubernetes cluster:
 
