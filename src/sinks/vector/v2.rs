@@ -77,9 +77,16 @@ fn default_http(address: &str) -> crate::Result<Uri> {
     if uri.scheme().is_none() {
         // Default the scheme to http.
         let mut parts = uri.into_parts();
-        parts.scheme = Some("http".parse().expect("http should be valid"));
+        parts.scheme = Some(
+            "http"
+                .parse()
+                .unwrap_or_else(|_| unreachable!("http should be valid")),
+        );
         if parts.path_and_query.is_none() {
-            parts.path_and_query = Some("/".parse().expect("root should be valid"));
+            parts.path_and_query = Some(
+                "/".parse()
+                    .unwrap_or_else(|_| unreachable!("root should be valid")),
+            );
         }
         Ok(Uri::from_parts(parts)?)
     } else {
@@ -121,7 +128,7 @@ impl VectorConfig {
 
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let batch = BatchSettings::default()
-            .bytes(1300)
+            .bytes(bytesize::mib(10u64))
             .events(1000)
             .timeout(1)
             .parse_config(self.batch)?;
@@ -138,15 +145,15 @@ impl VectorConfig {
         Ok((VectorSink::Sink(Box::new(sink)), Box::pin(healthcheck)))
     }
 
-    pub(crate) fn input_type(&self) -> DataType {
+    pub(super) fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    pub(crate) fn sink_type(&self) -> &'static str {
+    pub(super) fn sink_type(&self) -> &'static str {
         "vector"
     }
 
-    pub(crate) fn resources(&self) -> Vec<Resource> {
+    pub(super) fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
 }
@@ -253,13 +260,10 @@ impl RetryLogic for VectorGrpcRetryLogic {
     type Response = ();
 
     fn is_retriable_error(&self, err: &Self::Error) -> bool {
-        if let Error::Request { source } = err {
-            if let tonic::Code::Unknown = source.code() {
-                return false;
-            }
+        match err {
+            Error::Request { source } => !matches!(source.code(), tonic::Code::Unknown),
+            _ => true,
         }
-
-        true
     }
 }
 

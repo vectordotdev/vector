@@ -68,15 +68,15 @@ impl VectorConfig {
         sink_config.build(cx, |event| Some(encode_event(event)))
     }
 
-    pub(crate) fn input_type(&self) -> DataType {
+    pub(super) fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    pub(crate) fn sink_type(&self) -> &'static str {
+    pub(super) fn sink_type(&self) -> &'static str {
         "vector"
     }
 
-    pub(crate) fn resources(&self) -> Vec<Resource> {
+    pub(super) fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
 }
