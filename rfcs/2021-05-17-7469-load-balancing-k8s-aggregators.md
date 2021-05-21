@@ -22,7 +22,7 @@ Load balancing will be a concern for any `sink` or `source` supported by Vector;
 
 * Vector agent to Vector aggregator
 * Datadog agent to Vector aggregator
-* Syslog agent to Vector aggregator
+* Syslog (TCP) agent to Vector aggregator
 
 ## Out of Scope
 
