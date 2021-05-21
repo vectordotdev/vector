@@ -713,7 +713,49 @@ impl Function for ParseAwsCloudTrailLogs {
                     }]
                 }')
             "#},
-            result: Ok(indoc! {r#"{}"#}),
+            result: Ok(indoc! {r#"{
+                "aws_region": "us-east-2",
+                "event_name": "StartInstances",
+                "event_source": "ec2.amazonaws.com",
+                "event_time": "2014-03-06T21:22:54Z",
+                "event_version": "1.0",
+                "request_parameters": {
+                    "instancesSet": {
+                        "items": [
+                            {
+                                "instanceId": "i-ebeaf9e2"
+                            }
+                        ]
+                    }
+                },
+                "response_elements": {
+                    "instancesSet": {
+                        "items": [
+                            {
+                                "currentState": {
+                                    "code": 0,
+                                    "name": "pending"
+                                },
+                                "instanceId": "i-ebeaf9e2",
+                                "previousState": {
+                                    "code": 80,
+                                    "name": "stopped"
+                                }
+                            }
+                        ]
+                    }
+                },
+                "source_ip_address": "205.251.233.176",
+                "user_agent": "ec2-api-tools 1.6.12.2",
+                "user_identity": {
+                    "access_key_id": "EXAMPLE_KEY_ID",
+                    "account_id": "123456789012",
+                    "arn": "arn:aws:iam::123456789012:user/Alice",
+                    "principal_id": "EX_PRINCIPAL_ID",
+                    "type": "IamUser",
+                    "user_name": "Alice"
+                }
+            }"#}),
         }]
     }
 
