@@ -1694,6 +1694,7 @@ dependencies = [
  "ordered-float",
  "pest",
  "pest_derive",
+ "regex",
  "vrl",
  "vrl-compiler",
  "vrl-diagnostic",

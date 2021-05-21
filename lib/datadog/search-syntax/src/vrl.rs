@@ -1,4 +1,7 @@
-use super::node::{Comparison, ComparisonValue, QueryNode};
+use super::{
+    grammar,
+    node::{Comparison, ComparisonValue, QueryNode},
+};
 use ordered_float::NotNan;
 use vrl_parser::{ast, Span};
 
@@ -39,11 +42,7 @@ impl From<QueryNode> for ast::Expr {
             | QueryNode::QuotedAttribute {
                 attr,
                 phrase: value,
-            } => Self::Op(make_node(ast::Op(
-                Box::new(make_variable(attr)),
-                make_node(ast::Opcode::Eq),
-                Box::new(make_value(value)),
-            ))),
+            } => make_function_call("match", vec![make_variable(attr), make_regex(value)]),
             // Comparison
             QueryNode::AttributeComparison {
                 attr,
@@ -55,9 +54,10 @@ impl From<QueryNode> for ast::Expr {
                 Box::new(value.into()),
             ))),
             // Wildcard suffix
-            QueryNode::AttributePrefix { attr, prefix } => {
-                make_function_call("starts_with", vec![make_variable(attr), make_regex(prefix)])
-            }
+            QueryNode::AttributePrefix { attr, prefix } => make_function_call(
+                "match",
+                vec![make_variable(attr), make_regex(format!("{}*", prefix))],
+            ),
             // Arbitrary wildcard
             QueryNode::AttributeWildcard { attr, wildcard } => {
                 make_function_call("match", vec![make_variable(attr), make_regex(wildcard)])
@@ -74,6 +74,14 @@ fn make_node<T>(node: T) -> ast::Node<T> {
 
 /// Transforms a "tag" or "@tag" to the equivalent VRL field.
 fn format_tag(value: String) -> String {
+    // If the value matches the default, tagless field, this should be mapped to
+    // `.message`, which is the VRL equivalent
+    if value == grammar::DEFAULT_FIELD {
+        return ".message".to_string();
+    }
+
+    // If the value starts with an "@", it's a Datadog facet type that's hosted on the
+    // `.custom.*` field
     if value.starts_with("@") {
         format!(".custom.{}", &value[1..])
     } else {
@@ -91,16 +99,11 @@ fn make_variable(value: String) -> ast::Node<ast::Expr> {
     make_node(ast::Expr::Variable(make_tag(value)))
 }
 
-/// A `Expr::Literal` string literal value.
-fn make_value(value: String) -> ast::Node<ast::Expr> {
-    make_node(ast::Expr::Literal(make_node(ast::Literal::String(value))))
-}
-
 /// Makes a Regex string to be used with the `match`
 fn make_regex(value: String) -> ast::Node<ast::Expr> {
     make_node(ast::Expr::Literal(make_node(ast::Literal::Regex(format!(
-        "^{}$",
-        value.replace("*", ".*")
+        "\\b{}\\b",
+        regex::escape(&value).replace("\\*", ".*")
     )))))
 }
 
@@ -117,4 +120,52 @@ fn make_function_call<T: IntoIterator<Item = ast::Node<ast::Expr>>>(
             .map(|expr| make_node(ast::FunctionArgument { ident: None, expr }))
             .collect(),
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    // Datadog search syntax -> VRL
+    static TESTS: &[(&str, &str)] = &[
+        // Vanilla keyword
+        ("bla", r#"match(.message, r'\bbla\b')"#),
+        // Quoted vanilla keyword
+        (r#""bla""#, r#"match(.message, r'\bbla\b')"#),
+        // Tag match
+        ("a:bla", r#"match(.a, r'\bbla\b')"#),
+        // Quoted tag match
+        (r#"a:"bla""#, r#"match(.a, r'\bbla\b')"#),
+        // Facet match
+        ("@a:bla", r#"match(.custom.a, r'\bbla\b')"#),
+        // Quoted facet match
+        (r#"@a:"bla""#, r#"match(.custom.a, r'\bbla\b')"#),
+        // Wildcard prefix
+        ("*bla", r#"match(.message, r'\b.*bla\b')"#),
+        // Wildcard suffix
+        ("bla*", r#"match(.message, r'\bbla.*\b')"#),
+        // Multiple wildcards
+        ("*b*la*", r#"match(.message, r'\b.*b.*la.*\b')"#),
+        // Wildcard prefix - tag
+        ("a:*bla", r#"match(.a, r'\b.*bla\b')"#),
+        // Wildcard suffix - tag
+        ("b:bla*", r#"match(.b, r'\bbla.*\b')"#),
+        // Multiple wildcards - tag
+        ("c:*b*la*", r#"match(.c, r'\b.*b.*la.*\b')"#),
+        // Wildcard prefix - facet
+        ("@a:*bla", r#"match(.custom.a, r'\b.*bla\b')"#),
+        // Wildcard suffix - facet
+        ("@b:bla*", r#"match(.custom.b, r'\bbla.*\b')"#),
+        // Multiple wildcards - facet
+        ("@c:*b*la*", r#"match(.custom.c, r'\b.*b.*la.*\b')"#),
+    ];
+
+    use crate::parse;
+    use vrl_parser::ast;
+
+    #[test]
+    fn to_vrl() {
+        for (dd, vrl) in TESTS.iter() {
+            let node = parse(dd).expect(&format!("failed to compile: {}", dd));
+            assert_eq!(*vrl, ast::Expr::from(node).to_string())
+        }
+    }
 }

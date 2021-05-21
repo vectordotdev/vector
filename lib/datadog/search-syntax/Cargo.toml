@@ -8,6 +8,7 @@ edition = "2018"
 pest = "2.1.3"
 pest_derive = "2.1.0"
 ordered-float = "2"
+regex = "1"
 
 vrl = { path = "../../vrl/core" }
 vrl-parser = { path = "../../vrl/parser" }
