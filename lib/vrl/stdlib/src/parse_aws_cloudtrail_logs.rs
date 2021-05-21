@@ -1,12 +1,12 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::{collections::BTreeMap, net::IpAddr};
 use vrl::prelude::*;
 
 // References:
 // - https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-record-contents.html
 // - https://github.com/aws/aws-cloudtrail-processing-library
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogs {
     #[serde(rename(deserialize = "Records"))]
@@ -19,7 +19,7 @@ impl From<AwsCloudTrailLogs> for Value {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecord {
     event_time: DateTime<Utc>,
@@ -172,7 +172,7 @@ impl From<AwsCloudTrailLogsRecord> for Value {
 }
 
 // Reference: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-user-identity.html.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordUserIdentity {
     r#type: AwsCloudTrailLogsRecordUserIdentityType,
@@ -215,7 +215,7 @@ impl From<AwsCloudTrailLogsRecordUserIdentity> for Value {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 enum AwsCloudTrailLogsRecordUserIdentityType {
     Root,
     #[serde(rename(deserialize = "IAMUser"))]
@@ -234,7 +234,7 @@ impl From<AwsCloudTrailLogsRecordUserIdentityType> for Value {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordUserIdentitySessionContext {
     session_issuer: Option<AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuer>,
@@ -264,7 +264,7 @@ impl From<AwsCloudTrailLogsRecordUserIdentitySessionContext> for Value {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuer {
     r#type: AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuerType,
@@ -293,7 +293,7 @@ impl From<AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuer> for Va
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordUserIdentitySessionContextWebIdFederationData {
     federated_provider: String,
@@ -316,7 +316,7 @@ impl From<AwsCloudTrailLogsRecordUserIdentitySessionContextWebIdFederationData> 
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 enum AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuerType {
     Root,
     #[serde(rename(deserialize = "IAMUser"))]
@@ -332,7 +332,7 @@ impl From<AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuerType> fo
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 #[allow(clippy::enum_variant_names)] // Keep the `AWS` prefix
 enum AwsCloudTrailLogsRecordEventType {
     AwsApiCall,
@@ -347,7 +347,7 @@ impl From<AwsCloudTrailLogsRecordEventType> for Value {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 #[allow(clippy::enum_variant_names)] // Keep the `AWS` prefix
 enum AwsCloudTrailLogsRecordManagementEvent {
     AwsApiCall,
@@ -362,7 +362,7 @@ impl From<AwsCloudTrailLogsRecordManagementEvent> for Value {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordResources {
     #[serde(rename(deserialize = "ARN"))]
@@ -383,7 +383,7 @@ impl From<AwsCloudTrailLogsRecordResources> for Value {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 enum AwsCloudTrailLogsRecordEventCategory {
     Management,
     Data,
@@ -396,7 +396,7 @@ impl From<AwsCloudTrailLogsRecordEventCategory> for Value {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordAddendum {
     reason: AwsCloudTrailLogsRecordAddendumReason,
@@ -424,7 +424,7 @@ impl From<AwsCloudTrailLogsRecordAddendum> for Value {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "SCREAMING_SNAKE_CASE"))]
 enum AwsCloudTrailLogsRecordAddendumReason {
     DeliveryDelay,
@@ -438,7 +438,7 @@ impl From<AwsCloudTrailLogsRecordAddendumReason> for Value {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordTlsDetails {
     tls_version: String,
@@ -461,7 +461,7 @@ impl From<AwsCloudTrailLogsRecordTlsDetails> for Value {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordInsightDetails {
     state: AwsCloudTrailLogsRecordInsightDetailsState,
@@ -494,7 +494,7 @@ impl From<AwsCloudTrailLogsRecordInsightDetails> for Value {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 enum AwsCloudTrailLogsRecordInsightDetailsState {
     Start,
     End,
@@ -506,7 +506,7 @@ impl From<AwsCloudTrailLogsRecordInsightDetailsState> for Value {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 enum AwsCloudTrailLogsRecordInsightDetailsInsightType {
     ApiCallRateInsight,
 }
@@ -517,7 +517,7 @@ impl From<AwsCloudTrailLogsRecordInsightDetailsInsightType> for Value {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordInsightDetailsInsightContext {
     statistics: AwsCloudTrailLogsRecordInsightDetailsInsightContextStatistics,
@@ -537,7 +537,7 @@ impl From<AwsCloudTrailLogsRecordInsightDetailsInsightContext> for Value {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordInsightDetailsInsightContextStatistics {
     baseline: AwsCloudTrailLogsRecordInsightDetailsInsightContextStatisticsValue,
@@ -565,7 +565,7 @@ impl From<AwsCloudTrailLogsRecordInsightDetailsInsightContextStatistics> for Val
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordInsightDetailsInsightContextStatisticsValue {
     average: f64,
@@ -583,7 +583,7 @@ impl From<AwsCloudTrailLogsRecordInsightDetailsInsightContextStatisticsValue> fo
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributions {
     attribute: AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsAttribute,
@@ -603,7 +603,7 @@ impl From<AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributions> for V
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 enum AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsAttribute {
     UserIdentityArn,
@@ -619,7 +619,7 @@ impl From<AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsAttribu
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsInsight {
     value: String,
@@ -639,7 +639,7 @@ impl From<AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsInsight
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsBaseline {
     value: String,
