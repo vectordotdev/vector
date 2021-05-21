@@ -15,7 +15,7 @@ use flate2::read::MultiGzDecoder;
 use rmp_serde::{decode, Deserializer};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, VecDeque},
     convert::TryInto,
     io::{self, Read},
 };
@@ -84,27 +84,24 @@ impl TcpSource for FluentSource {
     type Decoder = FluentDecoder;
 
     fn decoder(&self) -> Self::Decoder {
-        FluentDecoder
+        FluentDecoder::new()
     }
 
-    fn build_events(&self, frame: FluentFrame, host: Bytes) -> Option<Vec<Event>> {
-        let FluentFrame { tag, entries } = frame;
+    fn build_event(&self, frame: FluentFrame, host: Bytes) -> Option<Event> {
+        let FluentFrame {
+            tag,
+            timestamp,
+            record,
+        } = frame;
 
-        let events = entries
-            .into_iter()
-            .map(|FluentEntry(timestamp, record)| {
-                let mut log = LogEvent::default();
-                log.insert(log_schema().host_key(), host.clone());
-                log.insert(log_schema().timestamp_key(), timestamp);
-                log.insert("tag", tag.clone());
-                for (key, value) in record.into_iter() {
-                    log.insert_flat(key, value)
-                }
-                Event::from(log)
-            })
-            .collect();
-
-        Some(events)
+        let mut log = LogEvent::default();
+        log.insert(log_schema().host_key(), host.clone());
+        log.insert(log_schema().timestamp_key(), timestamp);
+        log.insert("tag", tag);
+        for (key, value) in record.into_iter() {
+            log.insert_flat(key, value)
+        }
+        Some(Event::from(log))
     }
 }
 
@@ -154,14 +151,96 @@ impl From<decode::Error> for DecodeError {
     }
 }
 
-#[derive(Clone, Debug)]
-struct FluentDecoder;
+#[derive(Debug)]
+struct FluentDecoder {
+    // unread frames from previous fluent message
+    unread_frames: VecDeque<FluentFrame>,
+}
+
+impl FluentDecoder {
+    fn new() -> Self {
+        FluentDecoder {
+            unread_frames: VecDeque::new(),
+        }
+    }
+
+    fn handle_message(&mut self, message: FluentMessage) -> Result<(), DecodeError> {
+        match message {
+            FluentMessage::Message(tag, timestamp, record)
+            | FluentMessage::MessageWithOptions(tag, timestamp, record, ..) => {
+                self.unread_frames.push_back(FluentFrame {
+                    tag: tag.clone(),
+                    timestamp,
+                    record,
+                });
+                Ok(())
+            }
+            FluentMessage::Forward(tag, entries)
+            | FluentMessage::ForwardWithOptions(tag, entries, ..) => {
+                self.unread_frames.extend(entries.into_iter().map(
+                    |FluentEntry(timestamp, record)| FluentFrame {
+                        tag: tag.clone(),
+                        timestamp,
+                        record,
+                    },
+                ));
+                Ok(())
+            }
+            FluentMessage::PackedForward(tag, bin) => {
+                let mut buf = BytesMut::from(&bin[..]);
+
+                let mut decoder = FluentEntryStreamDecoder;
+
+                while let Some(FluentEntry(timestamp, record)) = decoder.decode(&mut buf)? {
+                    self.unread_frames.push_back(FluentFrame {
+                        tag: tag.clone(),
+                        timestamp,
+                        record,
+                    });
+                }
+                Ok(())
+            }
+            FluentMessage::PackedForwardWithOptions(tag, bin, options) => {
+                let buf = match options.compressed.as_str() {
+                    "gzip" => {
+                        let mut buf = Vec::new();
+                        MultiGzDecoder::new(io::Cursor::new(bin.into_vec()))
+                            .read_to_end(&mut buf)
+                            .map(|_| buf)
+                            .map_err(Into::into)
+                    }
+                    "text" => Ok(bin.into_vec()),
+                    s => Err(DecodeError::UnknownCompression(s.to_owned())),
+                }?;
+
+                let mut buf = BytesMut::from(&buf[..]);
+
+                let mut decoder = FluentEntryStreamDecoder;
+
+                while let Some(FluentEntry(timestamp, record)) = decoder.decode(&mut buf)? {
+                    self.unread_frames.push_back(FluentFrame {
+                        tag: tag.clone(),
+                        timestamp,
+                        record,
+                    });
+                }
+                Ok(())
+            }
+            FluentMessage::Heartbeat(rmpv::Value::Nil) => Ok(()),
+            FluentMessage::Heartbeat(value) => Err(DecodeError::UnexpectedValue(value)),
+        }
+    }
+}
 
 impl Decoder for FluentDecoder {
     type Item = FluentFrame;
     type Error = DecodeError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        if !self.unread_frames.is_empty() {
+            return Ok(self.unread_frames.pop_front());
+        }
+
         if src.is_empty() {
             return Ok(None);
         }
@@ -193,7 +272,11 @@ impl Decoder for FluentDecoder {
 
         src.advance(pos);
 
-        res.and_then(normalize_message).map_err(|error| {
+        res.and_then(|message| {
+            self.handle_message(message)
+                .map(|_| self.unread_frames.pop_front())
+        })
+        .map_err(|error| {
             let base64_encoded_message = base64::encode(&src);
             emit!(FluentMessageDecodeError {
                 error: &error,
@@ -201,56 +284,6 @@ impl Decoder for FluentDecoder {
             });
             error
         })
-    }
-}
-
-fn normalize_message(message: FluentMessage) -> Result<Option<FluentFrame>, DecodeError> {
-    match message {
-        FluentMessage::Message(tag, timestamp, record)
-        | FluentMessage::MessageWithOptions(tag, timestamp, record, ..) => Ok(Some(FluentFrame {
-            tag,
-            entries: vec![FluentEntry(timestamp, record)],
-        })),
-        FluentMessage::Forward(tag, entries)
-        | FluentMessage::ForwardWithOptions(tag, entries, ..) => {
-            Ok(Some(FluentFrame { tag, entries }))
-        }
-        FluentMessage::PackedForward(tag, bin) => {
-            let mut buf = BytesMut::from(&bin[..]);
-
-            let mut decoder = FluentEntryStreamDecoder;
-
-            let mut entries = Vec::new();
-            while let Some(entry) = decoder.decode(&mut buf)? {
-                entries.push(entry);
-            }
-            Ok(Some(FluentFrame { tag, entries }))
-        }
-        FluentMessage::PackedForwardWithOptions(tag, bin, options) => {
-            let buf = match options.compressed.as_str() {
-                "gzip" => {
-                    let mut buf = Vec::new();
-                    MultiGzDecoder::new(io::Cursor::new(bin.into_vec()))
-                        .read_to_end(&mut buf)
-                        .map(|_| buf)
-                        .map_err(Into::into)
-                }
-                "text" => Ok(bin.into_vec()),
-                s => Err(DecodeError::UnknownCompression(s.to_owned())),
-            }?;
-
-            let mut buf = BytesMut::from(&buf[..]);
-
-            let mut decoder = FluentEntryStreamDecoder;
-
-            let mut entries = Vec::new();
-            while let Some(entry) = decoder.decode(&mut buf)? {
-                entries.push(entry);
-            }
-            Ok(Some(FluentFrame { tag, entries }))
-        }
-        FluentMessage::Heartbeat(rmpv::Value::Nil) => Ok(None),
-        FluentMessage::Heartbeat(value) => Err(DecodeError::UnexpectedValue(value)),
     }
 }
 
@@ -292,9 +325,11 @@ impl Decoder for FluentEntryStreamDecoder {
 }
 
 /// Normalized fluent message.
+#[derive(Debug)]
 struct FluentFrame {
     tag: FluentTag,
-    entries: Vec<FluentEntry>,
+    timestamp: FluentTimestamp,
+    record: FluentRecord,
 }
 
 /// Fluent msgpack messages can be encoded in one of three ways, each with and without

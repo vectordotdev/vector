@@ -179,8 +179,8 @@ impl TcpSource for SyslogTcpSource {
         SyslogDecoder::new(self.max_length)
     }
 
-    fn build_events(&self, frame: String, host: Bytes) -> Option<Vec<Event>> {
-        Some(vec![event_from_str(&self.host_key, Some(host), &frame)])
+    fn build_event(&self, frame: String, host: Bytes) -> Option<Event> {
+        Some(event_from_str(&self.host_key, Some(host), &frame))
     }
 }
 
