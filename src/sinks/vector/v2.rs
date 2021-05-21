@@ -128,7 +128,6 @@ impl VectorConfig {
 
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let batch = BatchSettings::default()
-            .bytes(bytesize::mib(10u64))
             .events(1000)
             .timeout(1)
             .parse_config(self.batch)?;

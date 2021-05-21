@@ -145,6 +145,7 @@ impl SinkConfig for HttpSinkConfig {
         validate_headers(&config.request.headers, &config.auth)?;
 
         let batch = BatchSettings::default()
+            .bytes(bytesize::mib(10u64))
             .timeout(1)
             .parse_config(config.batch)?;
         let request = config.request.tower.unwrap_with(&REQUEST_DEFAULTS);
