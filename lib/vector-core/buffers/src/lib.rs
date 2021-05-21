@@ -140,7 +140,7 @@ where
     <T as DecodeBytes<T>>::Error: Debug + Display,
 {
     #[must_use]
-    pub fn get(&self) -> Box<dyn Sink<T, Error = ()> + 'a + Send> {
+    pub fn get(&self) -> Box<dyn Sink<T, Error = ()> + 'a + Send + Unpin> {
         match self {
             BufferInputCloner::Memory(tx, when_full) => {
                 let inner = tx

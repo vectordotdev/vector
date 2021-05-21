@@ -870,6 +870,7 @@ name = "buffers"
 version = "0.1.0"
 dependencies = [
  "bytes 1.0.1",
+ "criterion",
  "db-key",
  "futures 0.3.15",
  "leveldb",
