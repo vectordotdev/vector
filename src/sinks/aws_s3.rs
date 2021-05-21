@@ -699,18 +699,18 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let mut config = config(1).await;
+        // Break the bucket name
+        config.bucket = format!("BREAK{}IT", config.bucket);
         let prefix = config.key_prefix.clone();
         let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
-        // Break the bucket name
-        config.bucket = format!("BREAK{}IT", config.bucket);
 
-        let (_lines, events, mut receiver) = make_events_batch(100, 10);
+        let (_lines, events, mut receiver) = make_events_batch(1, 1);
         sink.run(events).await.unwrap();
-        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Failed));
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Errored));
 
-        let keys = get_keys(prefix.unwrap()).await;
-        assert!(keys.is_empty());
+        let objects = list_objects(prefix.unwrap()).await;
+        assert_eq!(objects, None);
     }
 
     #[tokio::test]
@@ -805,20 +805,23 @@ mod integration_tests {
         }
     }
 
-    async fn get_keys(prefix: String) -> Vec<String> {
+    async fn list_objects(prefix: String) -> Option<Vec<rusoto_s3::Object>> {
         let prefix = prefix.split('/').next().unwrap().to_string();
 
-        let list_res = client()
+        client()
             .list_objects_v2(rusoto_s3::ListObjectsV2Request {
                 bucket: BUCKET.to_string(),
                 prefix: Some(prefix),
                 ..Default::default()
             })
             .await
-            .unwrap();
-
-        list_res
+            .unwrap()
             .contents
+    }
+
+    async fn get_keys(prefix: String) -> Vec<String> {
+        list_objects(prefix)
+            .await
             .unwrap()
             .into_iter()
             .map(|obj| obj.key.unwrap())
