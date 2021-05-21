@@ -34,8 +34,8 @@ struct AwsCloudTrailLogsRecord {
     user_agent: String,
     error_code: Option<String>,
     error_message: Option<String>,
-    request_parameters: serde_json::Map<String, serde_json::Value>,
-    response_elements: serde_json::Map<String, serde_json::Value>,
+    request_parameters: BTreeMap<String, Value>,
+    response_elements: BTreeMap<String, Value>,
     additional_event_data: Option<String>,
     #[serde(rename(deserialize = "requestID"))]
     request_id: Option<String>,
@@ -85,21 +85,11 @@ impl From<AwsCloudTrailLogsRecord> for Value {
         }
         value.insert(
             "request_parameters".to_owned(),
-            record
-                .request_parameters
-                .into_iter()
-                .map(|(key, value)| (key, value.into()))
-                .collect::<BTreeMap<_, Value>>()
-                .into(),
+            record.request_parameters.into(),
         );
         value.insert(
             "response_elements".to_owned(),
-            record
-                .response_elements
-                .into_iter()
-                .map(|(key, value)| (key, value.into()))
-                .collect::<BTreeMap<_, Value>>()
-                .into(),
+            record.response_elements.into(),
         );
         if let Some(additional_event_data) = record.additional_event_data {
             value.insert(
@@ -241,7 +231,7 @@ struct AwsCloudTrailLogsRecordUserIdentitySessionContext {
     session_issuer: Option<AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuer>,
     web_id_federation_data:
         Option<AwsCloudTrailLogsRecordUserIdentitySessionContextWebIdFederationData>,
-    attributes: Option<Value>,
+    attributes: Option<BTreeMap<String, Value>>,
 }
 
 impl From<AwsCloudTrailLogsRecordUserIdentitySessionContext> for Value {
@@ -258,7 +248,7 @@ impl From<AwsCloudTrailLogsRecordUserIdentitySessionContext> for Value {
             );
         }
         if let Some(attributes) = session_context.attributes {
-            value.insert("attributes".to_owned(), attributes);
+            value.insert("attributes".to_owned(), attributes.into());
         }
 
         value.into()
@@ -298,7 +288,7 @@ impl From<AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuer> for Va
 #[serde(rename_all(deserialize = "camelCase"))]
 struct AwsCloudTrailLogsRecordUserIdentitySessionContextWebIdFederationData {
     federated_provider: String,
-    attributes: Value,
+    attributes: BTreeMap<String, Value>,
 }
 
 impl From<AwsCloudTrailLogsRecordUserIdentitySessionContextWebIdFederationData> for Value {
@@ -311,7 +301,7 @@ impl From<AwsCloudTrailLogsRecordUserIdentitySessionContextWebIdFederationData> 
             "federated_provider".to_owned(),
             federation_data.federated_provider.into(),
         );
-        value.insert("attributes".to_owned(), federation_data.attributes);
+        value.insert("attributes".to_owned(), federation_data.attributes.into());
 
         value.into()
     }
