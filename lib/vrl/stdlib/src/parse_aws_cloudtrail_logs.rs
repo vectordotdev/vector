@@ -788,7 +788,110 @@ impl Expression for ParseAwsCloudTrailLogsFn {
 }
 
 fn inner_type_def() -> BTreeMap<&'static str, TypeDef> {
-    map! {}
+    map! {
+        "event_time": Kind::Timestamp,
+        "event_version": Kind::Bytes,
+        "user_identity": TypeDef::new().object::<&str, TypeDef>(map! {
+            "type": Kind::Bytes,
+            "user_name": Kind::Bytes | Kind::Null,
+            "principal_id": Kind::Bytes,
+            "arn": Kind::Bytes,
+            "account_id": Kind::Bytes,
+            "access_key_id": Kind::Bytes,
+            "session_context": TypeDef::new().object::<&str, TypeDef>(map! {
+                "session_issuer": TypeDef::new().object::<&str, TypeDef>(map! {
+                    "type": Kind::Bytes,
+                    "user_name": Kind::Bytes,
+                    "principal_id": Kind::Bytes,
+                    "arn": Kind::Bytes,
+                    "account_id": Kind::Bytes,
+                }).add_null(),
+                "web_id_federation_data": TypeDef::new().object::<&str, TypeDef>(map! {
+                    "federated_provider": Kind::Bytes,
+                    "attributes": TypeDef::new().object::<(), Kind>(map! {
+                        (): Kind::all()
+                    })
+                }).add_null(),
+                "attributes": TypeDef::new().object::<(), Kind>(map! {
+                    (): Kind::all()
+                }),
+            }).add_null(),
+            "invoked_by": Kind::Bytes | Kind::Null,
+            "identity_provider": Kind::Bytes | Kind::Null,
+        }),
+        "event_source": Kind::Bytes,
+        "event_name": Kind::Bytes,
+        "aws_region": Kind::Bytes,
+        "source_ip_address": Kind::Bytes,
+        "user_agent": Kind::Bytes,
+        "error_code": Kind::Bytes | Kind::Null,
+        "error_message": Kind::Bytes | Kind::Null,
+        "request_parameters": TypeDef::new().object::<(), Kind>(map! {
+            (): Kind::all()
+        }),
+        "response_elements": TypeDef::new().object::<(), Kind>(map! {
+            (): Kind::all()
+        }),
+        "additional_event_data": Kind::Bytes | Kind::Null,
+        "request_id": Kind::Bytes | Kind::Null,
+        "event_id": Kind::Bytes | Kind::Null,
+        "event_type": Kind::Bytes | Kind::Null,
+        "api_version": Kind::Bytes | Kind::Null,
+        "management_event": Kind::Bytes | Kind::Null,
+        "read_only": Kind::Boolean | Kind::Null,
+        "resources": TypeDef::new().array_mapped::<(), TypeDef>(map! { (): TypeDef::new().object::<&str, TypeDef>(map! {
+            "arn": Kind::Bytes,
+            "account_id": Kind::Bytes,
+            "type": Kind::Bytes,
+        })}).add_null(),
+        "recipient_account_id": Kind::Bytes | Kind::Null,
+        "service_event_details": Kind::Bytes | Kind::Null,
+        "shared_event_id": Kind::Bytes | Kind::Null,
+        "vpc_endpoint_id": Kind::Bytes | Kind::Null,
+        "event_category": Kind::Bytes | Kind::Null,
+        "addendum": TypeDef::new().object::<&str, TypeDef>(map! {
+            "reason": Kind::Bytes,
+            "updated_fields": Kind::Bytes | Kind::Null,
+            "original_request_id": Kind::Bytes | Kind::Null,
+            "original_event_id": Kind::Bytes | Kind::Null,
+        }).add_null(),
+        "session_credentials_from_console": Kind::Boolean | Kind::Null,
+        "edge_device_details": Kind::Bytes | Kind::Null,
+        "tls_details": TypeDef::new().object::<&str, TypeDef>(map! {
+            "tls_version": Kind::Bytes,
+            "cipher_suite": Kind::Bytes,
+            "client_provided_host_header": Kind::Bytes,
+        }).add_null(),
+        "insight_details": TypeDef::new().object::<&str, TypeDef>(map! {
+            "state": Kind::Bytes,
+            "event_source": Kind::Bytes,
+            "event_name": Kind::Bytes,
+            "insight_type": Kind::Bytes,
+            "insight_context": TypeDef::new().object::<&str, TypeDef>(map! {
+                "statistics": TypeDef::new().object::<&str, TypeDef>(map! {
+                    "baseline": TypeDef::new().object::<&str, TypeDef>(map! {
+                        "average": Kind::Float,
+                    }),
+                    "insight": TypeDef::new().object::<&str, TypeDef>(map! {
+                        "average": Kind::Float,
+                    }),
+                    "insight_duration": Kind::Integer,
+                    "baseline_duration": Kind::Integer,
+                }),
+                "attributions": TypeDef::new().array_mapped::<(), TypeDef>(map! { (): TypeDef::new().object::<&str, TypeDef>(map! {
+                    "attribute": Kind::Bytes,
+                    "insight": TypeDef::new().array_mapped::<(), TypeDef>(map! { (): TypeDef::new().object::<&str, TypeDef>(map! {
+                        "value": Kind::Bytes,
+                        "average": Kind::Float,
+                    })}),
+                    "baseline": TypeDef::new().array_mapped::<(), TypeDef>(map! { (): TypeDef::new().object::<&str, TypeDef>(map! {
+                        "value": Kind::Bytes,
+                        "average": Kind::Float,
+                    })}),
+                })}).add_null(),
+            }),
+        }).add_null(),
+    }
 }
 
 #[cfg(test)]
