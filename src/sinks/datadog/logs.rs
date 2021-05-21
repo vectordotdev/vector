@@ -136,8 +136,12 @@ impl DatadogLogsConfig {
         )?;
 
         let client = HttpClient::new(tls_settings)?;
-        let healthcheck =
-            healthcheck(service.clone(), client.clone(), self.default_api_key.clone()).boxed();
+        let healthcheck = healthcheck(
+            service.clone(),
+            client.clone(),
+            self.default_api_key.clone(),
+        )
+        .boxed();
         let sink = PartitionHttpSink::new(
             service,
             PartitionBuffer::new(batch),
@@ -262,7 +266,7 @@ impl HttpSink for DatadogLogsJsonService {
         let api_key = metadata
             .datadog_api_key()
             .as_ref()
-            .unwrap_or_else(|| &self.default_api_key);
+            .unwrap_or(&self.default_api_key);
 
         Some(EncodedEvent {
             item: PartitionInnerBuffer::new(json_event, Arc::clone(api_key)),
@@ -292,11 +296,13 @@ impl HttpSink for DatadogLogsTextService {
     type Output = PartitionInnerBuffer<Vec<Bytes>, ApiKey>;
 
     fn encode_event(&self, event: Event) -> Option<EncodedEvent<Self::Input>> {
-        let api_key = Arc::clone(event
-            .metadata()
-            .datadog_api_key()
-            .as_ref()
-            .unwrap_or_else(|| &self.default_api_key));
+        let api_key = Arc::clone(
+            event
+                .metadata()
+                .datadog_api_key()
+                .as_ref()
+                .unwrap_or(&self.default_api_key),
+        );
 
         encode_event(event, &self.config.encoding).map(|e| {
             emit!(DatadogLogEventProcessed {

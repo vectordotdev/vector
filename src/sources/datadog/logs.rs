@@ -105,7 +105,8 @@ impl HttpSource for DatadogLogsSource {
         let api_key = match self.store_api_key {
             true => extract_api_key(&header_map, request_path),
             false => None,
-        }.map(Arc::from);
+        }
+        .map(Arc::from);
 
         decode_body(body, Encoding::Json).map(|mut events| {
             // Datadog API key in metadata & source type field

@@ -8,7 +8,9 @@ use std::sync::Arc;
 
 /// The top-level metadata structure contained by both `struct Metric`
 /// and `struct LogEvent` types.
-#[derive(Clone, Debug, Default, Deserialize, Getters, PartialEq, PartialOrd, Serialize, Setters)]
+#[derive(
+    Clone, Debug, Default, Deserialize, Getters, PartialEq, PartialOrd, Serialize, Setters,
+)]
 pub struct EventMetadata {
     /// Used to store the datadog API from sources to sinks
     #[getset(get = "pub", set = "pub")]
