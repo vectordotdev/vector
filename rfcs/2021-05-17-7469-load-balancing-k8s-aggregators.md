@@ -28,7 +28,6 @@ Load balancing will be a concern for any `sink` or `source` supported by Vector;
 
 * Scaling the Kafka `source`
 * Scaling and load balancing on platforms other than Kubernetes
-* Load balancing UDP based `sources`
 
 ## Motivation
 
@@ -36,7 +35,7 @@ Today, scaling Vector horizontally (by increasing replicas) is a manual process 
 
 ## Internal Proposal
 
-Include a configuration for a dedicated reverse proxy that will be deployed as part of the vector-aggregator Helm chart, as well as documented configuration and installation instructions for users that run outside of Kubernetes. We should provide basic, but functional, configurations out-of-the box to enable users to "one click" install Vector as an aggregator. The proxy should dynamically resolve downsteam Vector instances and allow users to update the balance config to provide for more consistent targets in situations that require it (aggregation transforms). I propose our initially supported proxy should be HAProxy, with the next second being NGINX or Envoy. HAProxy, compared to NGINX, provides more metrics (exposed as JSON or in Prometheus format) and has native service discovery to dynamically populate its configuration. Lua can be used with NGINX to provide service discovery, for example the [nginx-ingress-controller](https://kubernetes.github.io/ingress-nginx/).
+Include a configuration for a dedicated reverse proxy that will be deployed as part of the vector-aggregator Helm chart. We should provide basic, but functional, configurations out-of-the box to enable users to "one click" install Vector as an aggregator. The proxy should dynamically resolve downsteam Vector instances and allow users to update the balance config to provide for more consistent targets in situations that require it (aggregation transforms). I propose our initially supported proxy should be HAProxy, with the next second being NGINX or Envoy. HAProxy, compared to NGINX, provides more metrics (exposed as JSON or in Prometheus format) and has native service discovery to dynamically populate its configuration. Lua can be used with NGINX to provide service discovery, for example the [nginx-ingress-controller](https://kubernetes.github.io/ingress-nginx/).
 
 HAProxy intentionally has little support for proxying UDP, as of 2.3 there is support for forwarding syslog traffic however it doesn't allow for dynamic backend configuration greatly limiting the usability for us.
 
@@ -74,6 +73,8 @@ backend vector_template
 * The team will need to maintain a configuration for a third-party application, as well as ensuring the application is kept up-to-date and free of any reported vulnerabilities.
 * We will also need to add the reverse proxy to new or existing integration tests to ensure there are no regressions with our provided configuration and proxy version.
 * Our deployment will be more complex and require an additional application for end users. This can create more misdirection while debugging and additional operational burden.
+* HAProxy has limited support for proxying UDP, and thus the initial implementation won't support load balancing for UDP `sources`.
+* HAProxy's forwarding for syslog doesn't allow for dynamic backend servers, because of this syslog over UDP isn't going to be supported by the initial implementation.
 
 ## Alternatives
 
@@ -104,7 +105,7 @@ Project like Thanos and Loki have used hashrings to enable multi-tenancy, we cou
 ## Plan Of Attack
 
 * [ ] Manually confirm functionality for Vector, Datadog agents, and syslog over the proxy
-* [ ] Include the (optional) proxy deployment in the vector-aggregator chart, add to e2e kubernetes test suite
-* [ ] Include out-of-the box configuration for Datadog agents to load balance across Vector aggregators, add to e2e kubernetes test suite
-* [ ] Provide out-of-the box configuration to collect and process the proxy observability data for Datadog agents and Vector
+* [ ] Include the (optional) proxy deployment in the vector-aggregator chart, add to e2e kubernetes test suite, add docs
+* [ ] Include out-of-the box configuration for Datadog agents to load balance across Vector aggregators, add to e2e kubernetes test suite, add docs
+* [ ] Provide out-of-the box configuration to collect and process the proxy observability data for Datadog agents and Vector, add docs
 
