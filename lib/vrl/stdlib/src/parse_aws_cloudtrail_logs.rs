@@ -1042,16 +1042,16 @@ mod tests {
                 }
             "#}],
             want: Ok(vec![
-                map!(
+                map! {
                     "event_version": "1.0",
-                    "user_identity": map!(
+                    "user_identity": map! {
                         "type": "IamUser",
                         "principal_id": "EX_PRINCIPAL_ID",
                         "arn": "arn:aws:iam::123456789012:user/Alice",
                         "access_key_id": "EXAMPLE_KEY_ID",
                         "account_id": "123456789012",
                         "user_name": "Alice"
-                    ),
+                    },
                     "event_time": DateTime::parse_from_rfc3339("2014-03-06T21:22:54Z")
                         .unwrap()
                         .with_timezone(&Utc),
@@ -1060,33 +1060,33 @@ mod tests {
                     "aws_region": "us-east-2",
                     "source_ip_address": "205.251.233.176",
                     "user_agent": "ec2-api-tools 1.6.12.2",
-                    "request_parameters": map!(
-                        "instancesSet": map!(
+                    "request_parameters": map! {
+                        "instancesSet": map! {
                             "items": vec![
-                                map!(
+                                map! {
                                     "instanceId": "i-ebeaf9e2"
-                                )
+                                }
                             ]
-                        )
-                    ),
-                    "response_elements": map!(
-                        "instancesSet": map!(
+                        }
+                    },
+                    "response_elements": map! {
+                        "instancesSet": map! {
                             "items": vec![
-                                map!(
+                                map! {
                                     "instanceId": "i-ebeaf9e2",
-                                    "currentState": map!(
+                                    "currentState": map! {
                                         "code": 0,
                                         "name": "pending"
-                                    ),
-                                    "previousState": map!(
+                                    },
+                                    "previousState": map! {
                                         "code": 80,
                                         "name": "stopped"
-                                    )
-                                )
+                                    }
+                                }
                             ]
-                        )
-                    )
-                )
+                        }
+                    }
+                }
             ]),
             tdef: TypeDef::new().fallible().array_mapped::<(), TypeDef>(map! { (): TypeDef::new().object(inner_type_def()) }),
         }
