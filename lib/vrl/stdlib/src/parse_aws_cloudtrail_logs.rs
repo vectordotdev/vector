@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use derive_more::Display;
 use serde::Deserialize;
 use std::{collections::BTreeMap, net::IpAddr};
 use vrl::prelude::*;
@@ -215,7 +216,7 @@ impl From<AwsCloudTrailLogsRecordUserIdentity> for Value {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Display)]
 enum AwsCloudTrailLogsRecordUserIdentityType {
     Root,
     #[serde(rename(deserialize = "IAMUser"))]
@@ -230,7 +231,7 @@ enum AwsCloudTrailLogsRecordUserIdentityType {
 
 impl From<AwsCloudTrailLogsRecordUserIdentityType> for Value {
     fn from(identity_type: AwsCloudTrailLogsRecordUserIdentityType) -> Self {
-        format!("{:?}", identity_type).into()
+        format!("{}", identity_type).into()
     }
 }
 
@@ -316,7 +317,7 @@ impl From<AwsCloudTrailLogsRecordUserIdentitySessionContextWebIdFederationData> 
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Display)]
 enum AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuerType {
     Root,
     #[serde(rename(deserialize = "IAMUser"))]
@@ -328,11 +329,11 @@ impl From<AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuerType> fo
     fn from(
         issuer_type: AwsCloudTrailLogsRecordUserIdentitySessionContextSessionIssuerType,
     ) -> Self {
-        format!("{:?}", issuer_type).into()
+        format!("{}", issuer_type).into()
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Display)]
 #[allow(clippy::enum_variant_names)] // Keep the `AWS` prefix
 enum AwsCloudTrailLogsRecordEventType {
     AwsApiCall,
@@ -343,11 +344,11 @@ enum AwsCloudTrailLogsRecordEventType {
 
 impl From<AwsCloudTrailLogsRecordEventType> for Value {
     fn from(event_type: AwsCloudTrailLogsRecordEventType) -> Self {
-        format!("{:?}", event_type).into()
+        format!("{}", event_type).into()
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Display)]
 #[allow(clippy::enum_variant_names)] // Keep the `AWS` prefix
 enum AwsCloudTrailLogsRecordManagementEvent {
     AwsApiCall,
@@ -358,7 +359,7 @@ enum AwsCloudTrailLogsRecordManagementEvent {
 
 impl From<AwsCloudTrailLogsRecordManagementEvent> for Value {
     fn from(management_event: AwsCloudTrailLogsRecordManagementEvent) -> Self {
-        format!("{:?}", management_event).into()
+        format!("{}", management_event).into()
     }
 }
 
@@ -383,7 +384,7 @@ impl From<AwsCloudTrailLogsRecordResources> for Value {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Display)]
 enum AwsCloudTrailLogsRecordEventCategory {
     Management,
     Data,
@@ -392,7 +393,7 @@ enum AwsCloudTrailLogsRecordEventCategory {
 
 impl From<AwsCloudTrailLogsRecordEventCategory> for Value {
     fn from(event_category: AwsCloudTrailLogsRecordEventCategory) -> Self {
-        format!("{:?}", event_category).into()
+        format!("{}", event_category).into()
     }
 }
 
@@ -424,7 +425,7 @@ impl From<AwsCloudTrailLogsRecordAddendum> for Value {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Display)]
 #[serde(rename_all(deserialize = "SCREAMING_SNAKE_CASE"))]
 enum AwsCloudTrailLogsRecordAddendumReason {
     DeliveryDelay,
@@ -434,7 +435,7 @@ enum AwsCloudTrailLogsRecordAddendumReason {
 
 impl From<AwsCloudTrailLogsRecordAddendumReason> for Value {
     fn from(addendum_reason: AwsCloudTrailLogsRecordAddendumReason) -> Self {
-        format!("{:?}", addendum_reason).into()
+        format!("{}", addendum_reason).into()
     }
 }
 
@@ -494,7 +495,7 @@ impl From<AwsCloudTrailLogsRecordInsightDetails> for Value {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Display)]
 enum AwsCloudTrailLogsRecordInsightDetailsState {
     Start,
     End,
@@ -502,18 +503,18 @@ enum AwsCloudTrailLogsRecordInsightDetailsState {
 
 impl From<AwsCloudTrailLogsRecordInsightDetailsState> for Value {
     fn from(details_state: AwsCloudTrailLogsRecordInsightDetailsState) -> Self {
-        format!("{:?}", details_state).into()
+        format!("{}", details_state).into()
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Display)]
 enum AwsCloudTrailLogsRecordInsightDetailsInsightType {
     ApiCallRateInsight,
 }
 
 impl From<AwsCloudTrailLogsRecordInsightDetailsInsightType> for Value {
     fn from(insight_type: AwsCloudTrailLogsRecordInsightDetailsInsightType) -> Self {
-        format!("{:?}", insight_type).into()
+        format!("{}", insight_type).into()
     }
 }
 
@@ -603,7 +604,7 @@ impl From<AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributions> for V
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Display)]
 #[serde(rename_all(deserialize = "camelCase"))]
 enum AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsAttribute {
     UserIdentityArn,
@@ -615,7 +616,7 @@ impl From<AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsAttribu
     fn from(
         attribute: AwsCloudTrailLogsRecordInsightDetailsInsightContextAttributionsAttribute,
     ) -> Self {
-        format!("{:?}", attribute).into()
+        format!("{}", attribute).into()
     }
 }
 

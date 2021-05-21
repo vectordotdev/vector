@@ -8042,6 +8042,7 @@ dependencies = [
  "cidr-utils",
  "criterion",
  "csv",
+ "derive_more",
  "grok",
  "hex",
  "hostname",
