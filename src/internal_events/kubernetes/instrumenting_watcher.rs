@@ -49,18 +49,3 @@ impl InternalEvent for WatchStreamItemObtained {
         counter!("k8s_watch_stream_items_obtained_total", 1);
     }
 }
-
-#[derive(Debug)]
-pub struct WatchStreamErrored<E> {
-    pub error: E,
-}
-
-impl<E: Debug> InternalEvent for WatchStreamErrored<E> {
-    fn emit_logs(&self) {
-        error!(message = "Watch stream errored.", error = ?self.error, internal_log_rate_secs = 5);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("k8s_watch_stream_errors_total", 1);
-    }
-}
