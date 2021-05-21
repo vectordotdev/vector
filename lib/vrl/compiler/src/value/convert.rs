@@ -501,10 +501,8 @@ impl From<serde_json::Value> for Value {
             serde_json::Value::Null => Value::Null,
             serde_json::Value::Bool(bool) => bool.into(),
             serde_json::Value::Number(number) => {
-                if let Some(unsigned) = number.as_u64() {
-                    unsigned.into()
-                } else if let Some(signed) = number.as_i64() {
-                    signed.into()
+                if let Some(integer) = number.as_i64() {
+                    integer.into()
                 } else if let Some(float) = number.as_f64() {
                     float.into()
                 } else {
