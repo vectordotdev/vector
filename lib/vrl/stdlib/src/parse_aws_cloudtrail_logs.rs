@@ -117,7 +117,7 @@ impl From<AwsCloudTrailLogsRecord> for Value {
             value.insert("event_type".to_owned(), event_type.into());
         }
         if let Some(api_version) = record.api_version {
-            value.insert("api_version".to_owned(), api_version.to_string().into());
+            value.insert("api_version".to_owned(), api_version.into());
         }
         if let Some(management_event) = record.management_event {
             value.insert("management_event".to_owned(), management_event.into());
@@ -258,7 +258,7 @@ impl From<AwsCloudTrailLogsRecordUserIdentitySessionContext> for Value {
             );
         }
         if let Some(attributes) = session_context.attributes {
-            value.insert("attributes".to_owned(), attributes.into());
+            value.insert("attributes".to_owned(), attributes);
         }
 
         value.into()
@@ -311,7 +311,7 @@ impl From<AwsCloudTrailLogsRecordUserIdentitySessionContextWebIdFederationData> 
             "federated_provider".to_owned(),
             federation_data.federated_provider.into(),
         );
-        value.insert("attributes".to_owned(), federation_data.attributes.into());
+        value.insert("attributes".to_owned(), federation_data.attributes);
 
         value.into()
     }
