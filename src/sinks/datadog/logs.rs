@@ -33,7 +33,9 @@ pub struct DatadogLogsConfig {
     // Deprecated, replaced by the site option
     region: Option<super::Region>,
     site: Option<String>,
-    api_key: String,
+    // Deprecated name
+    #[serde(alias = "api_key")]
+    default_api_key: String,
     encoding: EncodingConfig<Encoding>,
     tls: Option<TlsConfig>,
 
@@ -54,7 +56,7 @@ struct DatadogLogsJsonService {
     config: DatadogLogsConfig,
     // Used to store the complete URI and avoid calling `get_uri` for each request
     uri: String,
-    api_key: ApiKey,
+    default_api_key: ApiKey,
 }
 
 #[derive(Clone)]
@@ -62,7 +64,7 @@ struct DatadogLogsTextService {
     config: DatadogLogsConfig,
     // Used to store the complete URI and avoid calling `get_uri` for each request
     uri: String,
-    api_key: ApiKey,
+    default_api_key: ApiKey,
 }
 
 inventory::submit! {
@@ -72,7 +74,7 @@ inventory::submit! {
 impl GenerateConfig for DatadogLogsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(indoc! {r#"
-            api_key = "${DATADOG_API_KEY_ENV_VAR}"
+            default_api_key = "${DATADOG_API_KEY_ENV_VAR}"
             encoding.codec = "json"
         "#})
         .unwrap()
@@ -135,7 +137,7 @@ impl DatadogLogsConfig {
 
         let client = HttpClient::new(tls_settings)?;
         let healthcheck =
-            healthcheck(service.clone(), client.clone(), self.api_key.clone()).boxed();
+            healthcheck(service.clone(), client.clone(), self.default_api_key.clone()).boxed();
         let sink = PartitionHttpSink::new(
             service,
             PartitionBuffer::new(batch),
@@ -202,7 +204,7 @@ impl SinkConfig for DatadogLogsConfig {
                     DatadogLogsJsonService {
                         config: self.clone(),
                         uri: self.get_uri(),
-                        api_key: Arc::from(self.api_key.clone()),
+                        default_api_key: Arc::from(self.default_api_key.clone()),
                     },
                     JsonArrayBuffer::new(batch_settings.size),
                     batch_settings.timeout,
@@ -215,7 +217,7 @@ impl SinkConfig for DatadogLogsConfig {
                     DatadogLogsTextService {
                         config: self.clone(),
                         uri: self.get_uri(),
-                        api_key: Arc::from(self.api_key.clone()),
+                        default_api_key: Arc::from(self.default_api_key.clone()),
                     },
                     VecBuffer::new(batch_settings.size),
                     batch_settings.timeout,
@@ -260,7 +262,7 @@ impl HttpSink for DatadogLogsJsonService {
         let api_key = metadata
             .datadog_api_key()
             .as_ref()
-            .unwrap_or_else(|| &self.api_key);
+            .unwrap_or_else(|| &self.default_api_key);
 
         Some(EncodedEvent {
             item: PartitionInnerBuffer::new(json_event, Arc::clone(api_key)),
@@ -294,7 +296,7 @@ impl HttpSink for DatadogLogsTextService {
             .metadata()
             .datadog_api_key()
             .as_ref()
-            .unwrap_or_else(|| &self.api_key));
+            .unwrap_or_else(|| &self.default_api_key));
 
         encode_event(event, &self.config.encoding).map(|e| {
             emit!(DatadogLogEventProcessed {
@@ -464,7 +466,7 @@ mod tests {
     ) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
         let config = format!(
             indoc! {r#"
-            api_key = "atoken"
+            default_api_key = "atoken"
             encoding = "{}"
             compression = "none"
             batch.max_events = 1
@@ -497,7 +499,7 @@ mod tests {
     #[tokio::test]
     async fn api_key_in_metadata() {
         let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
-            api_key = "atoken"
+            default_api_key = "atoken"
             encoding = "json"
             compression = "none"
             batch.max_events = 1
@@ -558,7 +560,7 @@ mod tests {
     #[tokio::test]
     async fn multiple_api_keys() {
         let (mut config, cx) = load_sink::<DatadogLogsConfig>(indoc! {r#"
-            api_key = "atoken"
+            default_api_key = "atoken"
             encoding = "json"
             compression = "none"
             batch.max_events = 1
