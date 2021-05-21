@@ -714,7 +714,7 @@ impl Function for ParseAwsCloudTrailLogs {
                     }]
                 }')
             "#},
-            result: Ok(indoc! {r#"{
+            result: Ok(indoc! {r#"[{
                 "aws_region": "us-east-2",
                 "event_name": "StartInstances",
                 "event_source": "ec2.amazonaws.com",
@@ -756,7 +756,7 @@ impl Function for ParseAwsCloudTrailLogs {
                     "type": "IamUser",
                     "user_name": "Alice"
                 }
-            }"#}),
+            }]"#}),
         }]
     }
 
