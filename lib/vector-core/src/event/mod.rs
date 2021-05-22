@@ -40,7 +40,7 @@ mod value;
 mod vrl_target;
 
 pub mod proto {
-    include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
+    include!(concat!(env!("OUT_DIR"), "/event.rs"));
 }
 
 pub const PARTIAL: &str = "_partial";
