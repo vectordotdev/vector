@@ -877,6 +877,7 @@ dependencies = [
  "metrics",
  "pin-project 1.0.7",
  "pretty_assertions",
+ "quickcheck",
  "serde",
  "snafu",
  "tokio",
