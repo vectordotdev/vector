@@ -8,6 +8,7 @@ use criterion::{
 use futures::task::{noop_waker, Context, Poll};
 use futures::{Sink, Stream};
 use std::pin::Pin;
+use std::time::Duration;
 use std::{fmt, mem};
 
 #[derive(Clone, Copy)]
@@ -71,33 +72,23 @@ impl<const N: usize> DecodeBytes<Message<N>> for Message<N> {
     }
 }
 
-struct Setup {
-    max: usize,
-    preload: usize,
-}
-
 fn setup<const N: usize>(
-    input: Setup,
+    max_events: usize,
 ) -> (
     Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>,
     Box<dyn Stream<Item = Message<N>> + Unpin + Send>,
     Vec<Message<N>>,
 ) {
     let variant = Variant::Memory {
-        max_events: input.max,
+        max_events,
         when_full: WhenFull::DropNewest,
     };
-    let mut messages: Vec<Message<N>> = Vec::with_capacity(input.max);
-    for i in 0..input.preload {
-        messages.push(Message::new(i as u64));
-    }
-    for i in input.preload..input.max {
+    let mut messages: Vec<Message<N>> = Vec::with_capacity(max_events);
+    for i in 0..max_events {
         messages.push(Message::new(i as u64));
     }
 
     let (tx, rx, _) = buffers::build::<Message<N>>(variant).unwrap();
-    // Though `rx` will be unused we still need to pass it through
-    // to avoid the other side of `tx` hanging up.
     (tx.get(), rx, messages)
 }
 
@@ -109,42 +100,39 @@ fn measurement<const N: usize>(
         Vec<Message<N>>,
     ),
 ) {
-    let waker = noop_waker();
-    let mut context = Context::from_waker(&waker);
+    {
+        let waker = noop_waker();
+        let mut context = Context::from_waker(&waker);
 
-    let sink = input.0.as_mut();
-    for msg in input.2.into_iter() {
-        loop {
-            match Sink::poll_ready(Pin::new(sink), &mut context) {
-                Poll::Ready(Ok(())) => match Sink::start_send(Pin::new(sink), msg) {
-                    Ok(()) => match Sink::poll_flush(Pin::new(sink), &mut context) {
-                        Poll::Ready(Ok(())) => {
-                            break;
-                        }
+        let sink = input.0.as_mut();
+        for msg in input.2.into_iter() {
+            loop {
+                match Sink::poll_ready(Pin::new(sink), &mut context) {
+                    Poll::Ready(Ok(())) => match Sink::start_send(Pin::new(sink), msg) {
+                        Ok(()) => match Sink::poll_flush(Pin::new(sink), &mut context) {
+                            Poll::Ready(Ok(())) => {
+                                break;
+                            }
+                            _ => unreachable!(),
+                        },
                         _ => unreachable!(),
                     },
                     _ => unreachable!(),
-                },
-                _ => unreachable!(),
+                }
             }
         }
     }
 
-    let stream = input.1.as_mut();
-    loop {
-        match Stream::poll_next(Pin::new(stream), &mut context) {
-            Poll::Pending => {
-                println!("PENDING")
-            }
-            Poll::Ready(Some(_)) => {
-                println!("READY")
-            }
-            Poll::Ready(None) => break,
-        }
+    {
+        let waker = noop_waker();
+        let mut context = Context::from_waker(&waker);
+
+        let stream = input.1.as_mut();
+        while let Poll::Ready(Some(_)) = Stream::poll_next(Pin::new(stream), &mut context) {}
     }
 }
 
-macro_rules! write_only_memory {
+macro_rules! write_then_read_memory {
     ($criterion:expr, [$( $width:expr ),*]) => {
         let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group("buffer");
         group.sampling_mode(SamplingMode::Auto);
@@ -158,8 +146,8 @@ macro_rules! write_only_memory {
                 &max_events,
                 |b, max_events| {
                     b.iter_batched(
-                        || setup::<$width>(Setup { max: *max_events, preload: 0 }),
-                        write_only_measurement,
+                        || setup::<$width>(*max_events),
+                        measurement,
                         BatchSize::SmallInput,
                     )
                 },
@@ -168,13 +156,13 @@ macro_rules! write_only_memory {
     };
 }
 
-fn write_only_memory(c: &mut Criterion) {
-    write_only_memory!(c, [32, 64, 128, 256, 512, 1024]);
+fn write_then_read_memory(c: &mut Criterion) {
+    write_then_read_memory!(c, [32, 64, 128, 256, 512, 1024]);
 }
 
 criterion_group!(
     name = basic;
-    config = Criterion::default();
-    targets = write_only_memory
+    config = Criterion::default().measurement_time(Duration::from_secs(60)).confidence_level(0.99).nresamples(500_000).sample_size(250);
+    targets = write_then_read_memory
 );
 criterion_main!(basic);
