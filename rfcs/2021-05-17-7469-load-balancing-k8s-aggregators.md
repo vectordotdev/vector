@@ -45,13 +45,13 @@ Below is a basic HAProxy configuration configured to leverage service discovery 
 resolvers coredns
     nameserver dns1 kube-dns.kube-system.svc.cluster.local:53
     hold timeout         600s
-    hold refused         600s 
+    hold refused         600s
 frontend vector
     bind *:9000
     default_backend vector_template
 backend vector_template
     balance roundrobin
-    option tcp-check         
+    option tcp-check
     server-template srv 10 _vector._tcp.vector-aggregator-headless.vector.svc.cluster.local resolvers coredns check
 ```
 
@@ -108,4 +108,3 @@ Project like Thanos and Loki have used hashrings to enable multi-tenancy, we cou
 * [ ] Include the (optional) proxy deployment in the vector-aggregator chart, add to e2e kubernetes test suite, add docs
 * [ ] Include out-of-the box configuration for Datadog agents to load balance across Vector aggregators, add to e2e kubernetes test suite, add docs
 * [ ] Provide out-of-the box configuration to collect and process the proxy observability data for Datadog agents and Vector, add docs
-
