@@ -3,6 +3,7 @@ use super::{
     node::{Comparison, ComparisonValue, QueryNode},
 };
 use ordered_float::NotNan;
+use vrl_parser::ast::Opcode;
 use vrl_parser::{ast, Span};
 
 impl From<Comparison> for ast::Opcode {
@@ -23,7 +24,7 @@ impl From<ComparisonValue> for ast::Literal {
             ComparisonValue::Numeric(value) => {
                 ast::Literal::Float(NotNan::new(value).expect("should be float"))
             }
-            _ => panic!("at the disco"),
+            _ => panic!("unknown comparision value"),
         }
     }
 }
@@ -48,11 +49,7 @@ impl From<QueryNode> for ast::Expr {
                 attr,
                 comparator,
                 value,
-            } => Self::Op(make_node(ast::Op(
-                Box::new(make_variable(attr)),
-                make_node(comparator.into()),
-                Box::new(value.into()),
-            ))),
+            } => make_op(make_variable(attr), comparator.into(), value.into()),
             // Wildcard suffix
             QueryNode::AttributePrefix { attr, prefix } => make_function_call(
                 "match",
@@ -62,7 +59,34 @@ impl From<QueryNode> for ast::Expr {
             QueryNode::AttributeWildcard { attr, wildcard } => {
                 make_function_call("match", vec![make_variable(attr), make_regex(wildcard)])
             }
-            _ => panic!("at the disco"),
+            // Range
+            QueryNode::AttributeRange {
+                attr,
+                lower,
+                lower_inclusive,
+                upper,
+                upper_inclusive,
+            } => make_block(vec![
+                make_node(make_op(
+                    make_variable(attr.clone()),
+                    if lower_inclusive {
+                        Opcode::Ge
+                    } else {
+                        Opcode::Gt
+                    },
+                    lower.into(),
+                )),
+                make_node(make_op(
+                    make_variable(attr),
+                    if upper_inclusive {
+                        Opcode::Le
+                    } else {
+                        Opcode::Lt
+                    },
+                    upper.into(),
+                )),
+            ]),
+            _ => panic!("unsupported query"),
         }
     }
 }
@@ -94,16 +118,32 @@ fn make_tag(value: String) -> ast::Node<ast::Ident> {
     make_node(ast::Ident::new(format_tag(value)))
 }
 
+/// An `Expr::Op` from two expressions, and a separating operator
+fn make_op(expr1: ast::Node<ast::Expr>, op: Opcode, expr2: ast::Node<ast::Expr>) -> ast::Expr {
+    ast::Expr::Op(make_node(ast::Op(
+        Box::new(expr1),
+        make_node(op),
+        Box::new(expr2),
+    )))
+}
+
 /// An `Expr::Variable` formatted as a tag.
 fn make_variable(value: String) -> ast::Node<ast::Expr> {
     make_node(ast::Expr::Variable(make_tag(value)))
 }
 
-/// Makes a Regex string to be used with the `match`
+/// Makes a Regex string to be used with the `match`.
 fn make_regex(value: String) -> ast::Node<ast::Expr> {
     make_node(ast::Expr::Literal(make_node(ast::Literal::Regex(format!(
         "\\b{}\\b",
         regex::escape(&value).replace("\\*", ".*")
+    )))))
+}
+
+/// Makes a container block of expressions.
+fn make_block(exprs: Vec<ast::Node<ast::Expr>>) -> ast::Expr {
+    ast::Expr::Container(make_node(ast::Container::Block(make_node(ast::Block(
+        exprs,
     )))))
 }
 
@@ -156,6 +196,8 @@ mod tests {
         ("@b:bla*", r#"match(.custom.b, r'\bbla.*\b')"#),
         // Multiple wildcards - facet
         ("@c:*b*la*", r#"match(.custom.c, r'\b.*b.*la.*\b')"#),
+        // Range - numeric, exclusive
+        ("[1 TO 10]", ".message > 1 && .message < 10"),
     ];
 
     use crate::parse;
@@ -164,8 +206,10 @@ mod tests {
     #[test]
     fn to_vrl() {
         for (dd, vrl) in TESTS.iter() {
-            let node = parse(dd).expect(&format!("failed to compile: {}", dd));
-            assert_eq!(*vrl, ast::Expr::from(node).to_string())
+            let dd = parse(dd).expect(&format!("invalid Datadog search syntax: {}", dd));
+            let vrl = vrl_parser::parse(vrl).expect(&format!("invalid VRL: {}", vrl));
+
+            assert_eq!(ast::Expr::from(dd), *vrl);
         }
     }
 }
