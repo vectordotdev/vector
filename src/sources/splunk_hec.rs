@@ -20,7 +20,7 @@ use std::{
     collections::HashMap,
     future,
     io::Read,
-    net::{Ipv4Addr, SocketAddr},
+    net::{AddrParseError, IpAddr, Ipv4Addr, SocketAddr},
 };
 
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
@@ -30,6 +30,7 @@ pub const CHANNEL: &str = "splunk_channel";
 pub const INDEX: &str = "splunk_index";
 pub const SOURCE: &str = "splunk_source";
 pub const SOURCETYPE: &str = "splunk_sourcetype";
+pub const REMOTE_ADDR: &str = "splunk_remote_addr";
 
 /// Accepts HTTP requests.
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -163,6 +164,7 @@ impl SplunkSource {
             .and(self.authorization())
             .and(splunk_channel)
             .and(warp::addr::remote())
+            .and(warp::header::optional::<String>("X-Forwarded-For"))
             .and(self.gzip())
             .and(warp::body::bytes())
             .and_then(
@@ -170,6 +172,7 @@ impl SplunkSource {
                       _,
                       channel: Option<String>,
                       remote: Option<SocketAddr>,
+                      xff: Option<String>,
                       gzip: bool,
                       body: Bytes| {
                     let mut out = out
@@ -182,7 +185,19 @@ impl SplunkSource {
                             Box::new(body.reader())
                         };
 
-                        let events = stream::iter(EventIterator::new(reader, channel, remote));
+                        // Retain as Option<String>, but only return Some in case where we can parse to IpAddr
+                        let xff_address: Option<String> = match xff {
+                            Some(ref xff_header) => {
+                                let parsed_address: Result<IpAddr, AddrParseError> = xff_header.parse();
+                                match parsed_address {
+                                    Ok(_) => xff,
+                                    Err(_) => None
+                                }
+                            }
+                            None => None
+                        };
+
+                        let events = stream::iter(EventIterator::new(reader, channel, remote, xff_address));
 
                         // `fn send_all` can be used once https://github.com/rust-lang/futures-rs/issues/2402
                         // is resolved.
@@ -216,19 +231,14 @@ impl SplunkSource {
             .and(self.authorization())
             .and(splunk_channel)
             .and(warp::addr::remote())
+            .and(warp::header::optional::<String>("X-Forwarded-For"))
             .and(self.gzip())
             .and(warp::body::bytes())
             .and_then(
-                move |_,
-                      _,
-                      channel: String,
-                      remote: Option<SocketAddr>,
-                      gzip: bool,
-                      body: Bytes| {
+                move |_, _, channel: String, remote: Option<SocketAddr>, xff: Option<String>, gzip: bool, body: Bytes| {
                     let out = out.clone();
                     async move {
-                        // Construct event parser
-                        let event = future::ready(raw_event(body, gzip, channel, remote));
+                        let event = future::ready(raw_event(body, gzip, channel, remote, xff));
                         futures::stream::once(event)
                             .forward(
                                 out.sink_map_err(|_| Rejection::from(ApiError::ServerShutdown)),
@@ -315,7 +325,6 @@ impl SplunkSource {
             .boxed()
     }
 }
-
 /// Constructs one or more events from json-s coming from reader.
 /// If errors, it's done with input.
 struct EventIterator<R: Read> {
@@ -325,6 +334,8 @@ struct EventIterator<R: Read> {
     events: usize,
     /// Optional channel from headers
     channel: Option<Value>,
+    /// Optional remote address, extracted from X-Forwarded-For headers
+    remote_addr: Option<Value>,
     /// Default time
     time: Time,
     /// Remaining extracted default values
@@ -332,11 +343,12 @@ struct EventIterator<R: Read> {
 }
 
 impl<R: Read> EventIterator<R> {
-    fn new(data: R, channel: Option<String>, remote: Option<SocketAddr>) -> Self {
+    fn new(data: R, channel: Option<String>, remote: Option<SocketAddr>, remote_addr: Option<String>) -> Self {
         EventIterator {
             data,
             events: 0,
             channel: channel.map(Value::from),
+            remote_addr: remote_addr.map(Value::from),
             time: Time::Now(Utc::now()),
             extractors: [
                 DefaultExtractor::new_with(
@@ -414,6 +426,11 @@ impl<R: Read> EventIterator<R> {
             log.insert(CHANNEL, guid);
         } else if let Some(guid) = self.channel.as_ref() {
             log.insert(CHANNEL, guid.clone());
+        }
+
+        // Process remote_addr field from X-Forwarded-For header
+        if let Some(splunk_remote_addr) = self.remote_addr.as_ref() {
+            log.insert(REMOTE_ADDR, splunk_remote_addr.clone());
         }
 
         // Process fields field
@@ -580,6 +597,7 @@ fn raw_event(
     gzip: bool,
     channel: String,
     remote: Option<SocketAddr>,
+    xff: Option<String>
 ) -> Result<Event, Rejection> {
     // Process gzip
     let message: Value = if gzip {
@@ -609,6 +627,14 @@ fn raw_event(
     // Add host
     if let Some(remote) = remote {
         log.insert(log_schema().host_key(), remote.to_string());
+    }
+
+    // Add X-Forwarded-For header as remote_addr, only when it can be parsed to IpAddr
+    if let Some(remote_address) = xff {
+        let parsed_address: Result<IpAddr, AddrParseError> = remote_address.parse();
+        if let Ok(_) = parsed_address {
+            log.insert(REMOTE_ADDR, remote_address);
+        }
     }
 
     // Add timestamp
