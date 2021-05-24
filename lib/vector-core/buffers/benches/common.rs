@@ -1,18 +1,13 @@
 use buffers::bytes::{DecodeBytes, EncodeBytes};
-use buffers::{self, Variant, WhenFull};
+use buffers::{self, Variant};
 use bytes::{Buf, BufMut};
-use criterion::{
-    criterion_group, criterion_main, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
-    Criterion, SamplingMode, Throughput,
-};
 use futures::task::{noop_waker, Context, Poll};
 use futures::{Sink, Stream};
+use std::fmt;
 use std::pin::Pin;
-use std::time::Duration;
-use std::{fmt, mem};
 
 #[derive(Clone, Copy)]
-struct Message<const N: usize> {
+pub struct Message<const N: usize> {
     id: u64,
     _padding: [u64; N],
 }
@@ -27,10 +22,10 @@ impl<const N: usize> Message<N> {
 }
 
 #[derive(Debug)]
-enum EncodeError {}
+pub enum EncodeError {}
 
 #[derive(Debug)]
-enum DecodeError {}
+pub enum DecodeError {}
 
 impl fmt::Display for DecodeError {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -72,17 +67,14 @@ impl<const N: usize> DecodeBytes<Message<N>> for Message<N> {
     }
 }
 
-fn setup<const N: usize>(
+pub fn setup<const N: usize>(
     max_events: usize,
+    variant: Variant,
 ) -> (
     Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>,
     Box<dyn Stream<Item = Message<N>> + Unpin + Send>,
     Vec<Message<N>>,
 ) {
-    let variant = Variant::Memory {
-        max_events,
-        when_full: WhenFull::DropNewest,
-    };
     let mut messages: Vec<Message<N>> = Vec::with_capacity(max_events);
     for i in 0..max_events {
         messages.push(Message::new(i as u64));
@@ -92,7 +84,19 @@ fn setup<const N: usize>(
     (tx.get(), rx, messages)
 }
 
-fn measurement<const N: usize>(
+//
+// Measurements
+//
+// The nature of our buffer is such that the underlying representation is hidden
+// behind an abstract interface. As a happy consequence of this our benchmark
+// measurements are common. "Write Then Read" writes all messages into the
+// buffer and then reads them out. "Write And Read" writes a message and then
+// reads it from the buffer. Measurement is done without a runtime avoiding
+// conflating the overhead of the runtime with our buffer code. This,
+// admittedly, is tough to read.
+//
+
+pub fn wtr_measurement<const N: usize>(
     mut input: (
         Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>,
         Box<dyn Stream<Item = Message<N>> + Unpin + Send>,
@@ -131,37 +135,40 @@ fn measurement<const N: usize>(
     }
 }
 
-macro_rules! write_then_read_memory {
-    ($criterion:expr, [$( $width:expr ),*]) => {
-        let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group("buffer");
-        group.sampling_mode(SamplingMode::Auto);
+pub fn war_measurement<const N: usize>(
+    mut input: (
+        Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>,
+        Box<dyn Stream<Item = Message<N>> + Unpin + Send>,
+        Vec<Message<N>>,
+    ),
+) {
+    {
+        let snd_waker = noop_waker();
+        let mut snd_context = Context::from_waker(&snd_waker);
 
-        let max_events = 1_000;
-        $(
-            let bytes = mem::size_of::<Message<$width>>();
-            group.throughput(Throughput::Elements(max_events as u64));
-            group.bench_with_input(
-                BenchmarkId::new("memory/write-only-bytes", bytes),
-                &max_events,
-                |b, max_events| {
-                    b.iter_batched(
-                        || setup::<$width>(*max_events),
-                        measurement,
-                        BatchSize::SmallInput,
-                    )
-                },
-            );
-        )*
-    };
+        let sink = input.0.as_mut();
+        for msg in input.2.into_iter() {
+            loop {
+                match Sink::poll_ready(Pin::new(sink), &mut snd_context) {
+                    Poll::Ready(Ok(())) => match Sink::start_send(Pin::new(sink), msg) {
+                        Ok(()) => match Sink::poll_flush(Pin::new(sink), &mut snd_context) {
+                            Poll::Ready(Ok(())) => {
+                                break;
+                            }
+                            _ => unreachable!(),
+                        },
+                        _ => unreachable!(),
+                    },
+                    _ => unreachable!(),
+                }
+            }
+
+            let rcv_waker = noop_waker();
+            let mut rcv_context = Context::from_waker(&rcv_waker);
+
+            let stream = input.1.as_mut();
+            while let Poll::Ready(Some(_)) = Stream::poll_next(Pin::new(stream), &mut rcv_context) {
+            }
+        }
+    }
 }
-
-fn write_then_read_memory(c: &mut Criterion) {
-    write_then_read_memory!(c, [32, 64, 128, 256, 512, 1024]);
-}
-
-criterion_group!(
-    name = basic;
-    config = Criterion::default().measurement_time(Duration::from_secs(60)).confidence_level(0.99).nresamples(500_000).sample_size(250);
-    targets = write_then_read_memory
-);
-criterion_main!(basic);

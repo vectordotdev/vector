@@ -28,5 +28,10 @@ tokio-test = "0.4.2"
 disk-buffer = ["db-key", "snafu", "leveldb"]
 
 [[bench]]
-name = "basic"
+name = "on_disk"
+harness = false
+required-features = ["disk-buffer"]
+
+[[bench]]
+name = "in_memory"
 harness = false
