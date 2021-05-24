@@ -12,6 +12,7 @@ env:
   VERBOSE: true
   CI: true
   DEBIAN_FRONTEND: noninteractive
+  CONTAINER_TOOL: docker
 
 jobs:
   build-x86_64-unknown-linux-musl-packages:
