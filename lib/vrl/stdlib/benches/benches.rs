@@ -19,6 +19,7 @@ criterion_group!(
               downcase,
               encode_base64,
               encode_json,
+              encode_logfmt,
               ends_with,
               // TODO: Cannot pass a Path to bench_function
               //exists
@@ -193,6 +194,31 @@ bench_function! {
     map {
         args: func_args![value: value![{"field": "value"}]],
         want: Ok(r#"{"field":"value"}"#),
+    }
+}
+
+bench_function! {
+    encode_logfmt => vrl_stdlib::EncodeLogfmt;
+
+    string_with_characters_to_escape {
+        args: func_args![value:
+            btreemap! {
+                "lvl" => "info",
+                "msg" => r#"payload: {"code": 200}\n"#
+            }],
+        want: Ok(r#"lvl=info msg="payload: {\"code\": 200}\\n""#),
+    }
+
+    fields_ordering {
+        args: func_args![value:
+            btreemap! {
+                "lvl" => "info",
+                "msg" => "This is a log message",
+                "log_id" => 12345,
+            },
+            fields_ordering: value!(["lvl", "msg"])
+        ],
+        want: Ok(r#"lvl=info msg="This is a log message" log_id=12345"#),
     }
 }
 

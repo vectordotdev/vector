@@ -6,7 +6,7 @@ use shared::EventDataEq;
 
 /// The top-level metadata structure contained by both `struct Metric`
 /// and `struct LogEvent` types.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
 pub struct EventMetadata {
     #[serde(default, skip)]
     finalizers: EventFinalizers,
@@ -32,6 +32,11 @@ impl EventMetadata {
     /// Update the finalizers' sources.
     pub fn update_sources(&mut self) {
         self.finalizers.update_sources();
+    }
+
+    /// Add a new finalizer to the array
+    pub fn add_finalizer(&mut self, finalizer: EventFinalizer) {
+        self.finalizers.add(finalizer);
     }
 }
 

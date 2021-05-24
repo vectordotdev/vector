@@ -134,7 +134,7 @@ fn get_basic_auth(authority: &Authority) -> (Authority, Option<Auth>) {
         url.set_password(None).expect("unexpected empty authority");
 
         // We get a valid `Authority` as input, therefore cannot fail here.
-        let authority = Uri::from_maybe_shared(url.into_string())
+        let authority = Uri::from_maybe_shared(String::from(url))
             .expect("invalid url")
             .authority()
             .expect("unexpected empty authority")

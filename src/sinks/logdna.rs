@@ -180,10 +180,7 @@ impl HttpSink for LogdnaConfig {
             map.insert("meta".into(), json!(&log));
         }
 
-        Some(EncodedEvent::new(PartitionInnerBuffer::new(
-            map.into(),
-            key,
-        )))
+        Some(EncodedEvent::new(PartitionInnerBuffer::new(map.into(), key)).with_metadata(log))
     }
 
     async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -298,12 +295,13 @@ mod tests {
     use super::*;
     use crate::{
         config::SinkConfig,
-        event::Event,
-        sinks::util::test::{build_test_server, load_sink},
+        sinks::util::test::{build_test_server_status, load_sink},
         test_util::{next_addr, random_lines, trace_init},
     };
-    use futures::{stream, StreamExt};
+    use futures::{channel::mpsc, stream, StreamExt};
+    use http::{request::Parts, StatusCode};
     use serde_json::json;
+    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     #[test]
     fn generate_config() {
@@ -350,8 +348,14 @@ mod tests {
         assert_eq!(event4_out.get("env").unwrap(), &json!("staging"));
     }
 
-    #[tokio::test]
-    async fn smoke() {
+    async fn smoke_start(
+        status_code: StatusCode,
+        batch_status: BatchStatus,
+    ) -> (
+        Vec<&'static str>,
+        Vec<Vec<String>>,
+        mpsc::Receiver<(Parts, bytes::Bytes)>,
+    ) {
         trace_init();
 
         let (mut config, cx) = load_sink::<LogdnaConfig>(
@@ -376,26 +380,44 @@ mod tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
 
-        let (mut rx, _trigger, server) = build_test_server(addr);
+        let (rx, _trigger, server) = build_test_server_status(addr, status_code);
         tokio::spawn(server);
 
         let lines = random_lines(100).take(10).collect::<Vec<_>>();
         let mut events = Vec::new();
-        let hosts = ["host0", "host1"];
+        let hosts = vec!["host0", "host1"];
 
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let mut partitions = vec![Vec::new(), Vec::new()];
         // Create 10 events where the first one contains custom
         // fields that are not just `message`.
         for (i, line) in lines.iter().enumerate() {
-            let mut event = Event::from(line.as_str());
+            let mut event = LogEvent::from(line.as_str()).with_batch_notifier(&batch);
             let p = i % 2;
-            event.as_mut_log().insert("hostname", hosts[p]);
+            event.insert("hostname", hosts[p]);
 
-            partitions[p].push(line);
-            events.push(event);
+            partitions[p].push(line.into());
+            events.push(Event::Log(event));
         }
+        drop(batch);
 
         sink.run(stream::iter(events)).await.unwrap();
+
+        assert_eq!(receiver.try_recv(), Ok(batch_status));
+
+        (hosts, partitions, rx)
+    }
+
+    #[tokio::test]
+    async fn smoke_fails() {
+        let (_hosts, _partitions, mut rx) =
+            smoke_start(StatusCode::FORBIDDEN, BatchStatus::Failed).await;
+        assert!(matches!(rx.try_next(), Err(mpsc::TryRecvError { .. })));
+    }
+
+    #[tokio::test]
+    async fn smoke() {
+        let (hosts, partitions, mut rx) = smoke_start(StatusCode::OK, BatchStatus::Delivered).await;
 
         for _ in 0..partitions.len() {
             let output = rx.next().await.unwrap();

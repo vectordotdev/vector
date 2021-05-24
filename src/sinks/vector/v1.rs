@@ -1,7 +1,8 @@
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, Resource, SinkContext},
     event::{proto, Event},
     sinks::util::{tcp::TcpSinkConfig, EncodedEvent},
+    sinks::{Healthcheck, VectorSink},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
@@ -11,9 +12,9 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
-#[derive(Deserialize, Serialize, Debug, Setters)]
+#[derive(Deserialize, Serialize, Debug, Clone, Setters)]
 #[serde(deny_unknown_fields)]
-pub struct VectorSinkConfig {
+pub struct VectorConfig {
     address: String,
     keepalive: Option<TcpKeepaliveConfig>,
     #[set = "pub"]
@@ -21,7 +22,7 @@ pub struct VectorSinkConfig {
     send_buffer_bytes: Option<usize>,
 }
 
-impl VectorSinkConfig {
+impl VectorConfig {
     pub fn new(
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
@@ -49,23 +50,14 @@ enum BuildError {
     MissingPort,
 }
 
-inventory::submit! {
-    SinkDescription::new::<VectorSinkConfig>("vector")
-}
-
-impl GenerateConfig for VectorSinkConfig {
+impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self::new("127.0.0.1:5000".to_string(), None, None, None)).unwrap()
     }
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "vector")]
-impl SinkConfig for VectorSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+impl VectorConfig {
+    pub(crate) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink_config = TcpSinkConfig::new(
             self.address.clone(),
             self.keepalive,
@@ -76,12 +68,16 @@ impl SinkConfig for VectorSinkConfig {
         sink_config.build(cx, |event| Some(encode_event(event)))
     }
 
-    fn input_type(&self) -> DataType {
+    pub(super) fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    fn sink_type(&self) -> &'static str {
+    pub(super) fn sink_type(&self) -> &'static str {
         "vector"
+    }
+
+    pub(super) fn resources(&self) -> Vec<Resource> {
+        Vec::new()
     }
 }
 
@@ -107,6 +103,6 @@ fn encode_event(event: Event) -> EncodedEvent<Bytes> {
 mod test {
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<super::VectorSinkConfig>();
+        crate::test_util::test_generate_config::<super::VectorConfig>();
     }
 }

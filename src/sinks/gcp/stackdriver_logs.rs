@@ -181,7 +181,7 @@ impl HttpSink for StackdriverSink {
             entry.insert("timestamp".into(), json!(timestamp));
         }
 
-        Some(EncodedEvent::new(json!(entry)))
+        Some(EncodedEvent::new(json!(entry)).with_metadata(log))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
