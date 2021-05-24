@@ -15,3 +15,13 @@ pub fn run_command_blocking(mut command: std::process::Command) -> Result<()> {
     }
     Ok(())
 }
+
+pub async fn run_command_output(mut command: tokio::process::Command) -> Result<String> {
+    let output = command.spawn()?.wait_with_output().await?;
+    if !output.status.success() {
+        return Err(format!("exec failed: {:?}", command).into());
+    }
+
+    let output = String::from_utf8(output.stdout)?;
+    Ok(output)
+}

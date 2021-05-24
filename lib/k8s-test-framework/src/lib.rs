@@ -23,6 +23,7 @@ pub mod kubernetes_version;
 mod lock;
 mod log_lookup;
 pub mod namespace;
+mod pod;
 mod port_forward;
 mod reader;
 mod resource_file;

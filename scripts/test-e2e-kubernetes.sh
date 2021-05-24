@@ -23,6 +23,12 @@ is_kubectl_context_minikube() {
   [[ "$(kubectl config current-context || true)" == "minikube" ]]
 }
 
+# Detect if current kubectl context is `kind`.
+is_kubectl_context_kind() {
+  [[ "$(kubectl config current-context || true)" == "kind-kind" ]]
+}
+
+
 # Whether to use `minikube cache` to pass image to the k8s cluster.
 # After we build vector docker image, instead of pushing to the remote repo,
 # we'll be using `minikube cache` to make image available to the cluster.

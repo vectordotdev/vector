@@ -99,7 +99,19 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
+    let node = framework
+        .get_node_for_pod(&pod_namespace, "test-pod")
+        .await
+        .expect("need the node name");
+
+    let vector_pod = framework
+        .get_pod_on_node(&namespace, &node, &override_name)
+        .await
+        .expect("cant get the vector pod running on the test node");
+
+    println!("node {} pod {}", node, vector_pod);
+
+    let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.

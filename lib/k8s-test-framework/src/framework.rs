@@ -1,8 +1,8 @@
 //! The test framework main entry point.
 
 use super::{
-    exec_tail, kubernetes_version, log_lookup, namespace, port_forward, test_pod, up_down, vector,
-    wait_for_resource, wait_for_rollout, Interface, PortForwarder, Reader, Result,
+    exec_tail, kubernetes_version, log_lookup, namespace, pod, port_forward, test_pod, up_down,
+    vector, wait_for_resource, wait_for_rollout, Interface, PortForwarder, Reader, Result,
 };
 
 /// Framework wraps the interface to the system with an easy-to-use rust API
@@ -160,5 +160,20 @@ impl Framework {
         extra: impl IntoIterator<Item = &'a str>,
     ) -> Result<()> {
         wait_for_rollout::run(&self.interface.kubectl_command, namespace, resource, extra).await
+    }
+
+    /// Gets the node for a given pod.
+    pub async fn get_node_for_pod(&self, namespace: &str, pod: &str) -> Result<String> {
+        pod::get_node(&self.interface.kubectl_command, namespace, pod).await
+    }
+
+    /// Gets the name of the pod implementing the service on the given node.
+    pub async fn get_pod_on_node(
+        &self,
+        namespace: &str,
+        node: &str,
+        service: &str,
+    ) -> Result<String> {
+        pod::get_pod_on_node(&self.interface.kubectl_command, namespace, node, service).await
     }
 }
