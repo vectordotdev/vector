@@ -97,6 +97,8 @@ if ! [ -x "$(command -v docker)" ]; then
     # Install those new things
     apt update --yes
     apt install --yes docker-ce docker-ce-cli containerd.io
+
+    usermod --append --groups docker ubuntu
 fi
 
 # Apt cleanup
