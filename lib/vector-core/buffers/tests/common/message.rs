@@ -1,10 +1,11 @@
 use buffers;
 use buffers::bytes::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut};
-use std::fmt;
+use quickcheck::{Arbitrary, Gen};
+use std::{fmt, mem};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Message {
+pub struct Message {
     id: u64,
 }
 
@@ -14,11 +15,31 @@ impl Message {
     }
 }
 
-#[derive(Debug)]
-pub(crate) enum EncodeError {}
+//
+// QuickCheck support
+//
+
+impl Arbitrary for Message {
+    fn arbitrary(g: &mut Gen) -> Self {
+        Message {
+            id: u64::arbitrary(g),
+        }
+    }
+
+    fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
+        Box::new(self.id.shrink().map(|id| Message { id }))
+    }
+}
+
+//
+// Serialization and Deserialization
+//
 
 #[derive(Debug)]
-pub(crate) enum DecodeError {}
+pub enum EncodeError {}
+
+#[derive(Debug)]
+pub enum DecodeError {}
 
 impl fmt::Display for DecodeError {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -36,6 +57,10 @@ impl EncodeBytes<Message> for Message {
     {
         buffer.put_u64(self.id);
         Ok(())
+    }
+
+    fn encoded_size(&self) -> Option<usize> {
+        Some(mem::size_of::<u64>())
     }
 }
 

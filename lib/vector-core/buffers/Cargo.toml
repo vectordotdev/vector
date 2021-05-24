@@ -16,15 +16,16 @@ serde = { version = "1.0.126", default-features = false, features = ["derive"] }
 snafu = { version = "0.6.10", default-features = false, features = ["std"], optional = true }
 tokio = { version = "1.5.0", default-features = false, features = ["rt", "macros", "rt-multi-thread"] }
 tracing = { version = "0.1.26", default-features = false }
+quickcheck = { version = "1.0", default-features = false }
+tempdir = { version = "0.3", default-features = false, optional = true }
 
 [dev-dependencies]
 pretty_assertions = "0.7.2"
 tokio-test = "0.4.2"
 criterion = { version = "0.3", features = ["html_reports"] }
-quickcheck = "1.0"
 
 [features]
-disk-buffer = ["db-key", "snafu", "leveldb"]
+disk-buffer = ["db-key", "snafu", "leveldb", "tempdir"]
 
 [[bench]]
 name = "basic"

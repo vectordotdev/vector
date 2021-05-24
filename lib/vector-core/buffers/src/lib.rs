@@ -15,45 +15,18 @@ mod acker;
 pub mod bytes;
 #[cfg(feature = "disk-buffer")]
 pub mod disk;
+mod variant;
 
 use crate::bytes::{DecodeBytes, EncodeBytes};
 pub use acker::Acker;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use pin_project::pin_project;
+use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
-#[cfg(feature = "disk-buffer")]
-use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-
-// NOTE unfortunately because we can't edit out a lifetime based on a feature
-// flag we need two copies of `Variant` else the liftime being unused when
-// 'disk-buffers' is flagged off will ding the build.
-
-#[derive(Debug, Clone, Copy)]
-#[cfg(not(feature = "disk-buffer"))]
-pub enum Variant {
-    Memory {
-        max_events: usize,
-        when_full: WhenFull,
-    },
-}
-
-#[derive(Debug, Clone, Copy)]
-#[cfg(feature = "disk-buffer")]
-pub enum Variant<'a> {
-    Memory {
-        max_events: usize,
-        when_full: WhenFull,
-    },
-    Disk {
-        max_size: usize,
-        when_full: WhenFull,
-        data_dir: &'a Path,
-        name: &'a str,
-    },
-}
+pub use variant::*;
 
 /// Build a new buffer based on the passed `Variant`
 ///
@@ -83,11 +56,12 @@ where
             when_full,
             data_dir,
             name,
+            ..
         } => {
             let buffer_dir = format!("{}_buffer", name);
 
             let (tx, rx, acker) =
-                disk::open(data_dir, &buffer_dir, max_size).map_err(|error| error.to_string())?;
+                disk::open(&data_dir, &buffer_dir, max_size).map_err(|error| error.to_string())?;
 
             let tx = BufferInputCloner::Disk(tx, when_full);
             Ok((tx, rx, acker))
@@ -114,6 +88,16 @@ pub enum WhenFull {
 impl Default for WhenFull {
     fn default() -> Self {
         WhenFull::Block
+    }
+}
+
+impl Arbitrary for WhenFull {
+    fn arbitrary(g: &mut Gen) -> Self {
+        if bool::arbitrary(g) {
+            WhenFull::Block
+        } else {
+            WhenFull::DropNewest
+        }
     }
 }
 
