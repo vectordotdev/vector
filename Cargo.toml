@@ -252,7 +252,7 @@ cfg-if = { version = "1.0.0", default-features = false }
 tonic = { version = "0.4", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
 
 # For WASM
-async-stream = "0.3.1"
+async-stream = "0.3.2"
 lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
