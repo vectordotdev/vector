@@ -18,6 +18,7 @@ trait Model {
 }
 
 /// `OnDisk` is the `Model` for on-disk buffer
+#[cfg(feature = "disk-buffer")]
 struct OnDisk {
     inner: VecDeque<Message>,
     when_full: WhenFull,
@@ -25,6 +26,7 @@ struct OnDisk {
     capacity: usize,
 }
 
+#[cfg(feature = "disk-buffer")]
 impl OnDisk {
     fn new(variant: &Variant) -> Self {
         match variant {
@@ -44,6 +46,7 @@ impl OnDisk {
     }
 }
 
+#[cfg(feature = "disk-buffer")]
 impl Model for OnDisk {
     fn send(&mut self, item: Message) {
         let byte_size = EncodeBytes::encoded_size(&item).unwrap();
@@ -161,6 +164,7 @@ fn check(variant: &Variant) -> bool {
     }
 }
 
+/// VariantGuard wraps a `Variant`, allowing a convenient Drop implementation
 struct VariantGuard {
     inner: Variant,
 }
@@ -216,11 +220,10 @@ impl Drop for VariantGuard {
 }
 
 /// This test models a single sender and a single receiver pushing and pulling
-/// from a common buffer. The buffer itself may be either memory or disk. We
-/// have modeled entirely without reference to a runtime, using the raw
-/// `futures::sink::Sink` and `futures::stream::Stream` interface, to avoid
-/// needing to model the runtime in any way. This is, then, the buffer as a
-/// runtime will see it.
+/// from a common buffer. The buffer itself may be either memory or disk. We use
+/// the raw `futures::sink::Sink` and `futures::stream::Stream` interface,
+/// avoiding the need to model the runtime in any way. This is, then, the buffer
+/// as a runtime will see it.
 ///
 /// Acks are not modeled yet. I believe doing so would be a straightforward
 /// process.
@@ -251,15 +254,31 @@ fn model_check() {
 
         for action in actions.into_iter() {
             match action {
+                // For each send action we attempt to send into the buffer and
+                // if the buffer signals itself ready do the send, then
+                // flush. We might profitably model a distinct flush action but
+                // at the time this model was created there was no clear reason
+                // to do so.
                 Action::Send(msg) => match Sink::poll_ready(Pin::new(sink), &mut snd_context) {
                     Poll::Ready(Ok(())) => {
+                        // Once the buffer signals its ready we are allowed to
+                        // call `start_send`. The buffer may or may not make the
+                        // value immediately available to a receiver, something
+                        // we elide by immediately flushing.
                         assert_eq!(Ok(()), Sink::start_send(Pin::new(sink), msg.clone()));
                         model.send(msg.clone());
                         match Sink::poll_flush(Pin::new(sink), &mut snd_context) {
                             Poll::Ready(Ok(())) => {}
+                            // If the buffer signals Ready/Ok then we're good to
+                            // go. Both the model and the SUT will have received
+                            // their item. However, if the SUT signals Pending
+                            // then this is only valid so long as the model is
+                            // full.
                             Poll::Pending => {
-                                debug_assert!(model.is_empty() || model.is_full(), "{:?}", msg)
+                                debug_assert!(model.is_full(), "{:?}", msg)
                             }
+                            // The SUT must never signal an error when we
+                            // flush. There is no way to recover from an error.
                             Poll::Ready(Err(_)) => return TestResult::failed(),
                         }
                     }
