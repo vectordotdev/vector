@@ -43,21 +43,21 @@ impl From<QueryNode> for ast::Expr {
             | QueryNode::QuotedAttribute {
                 attr,
                 phrase: value,
-            } => make_function_call("match", vec![make_variable(attr), make_regex(value)]),
+            } => make_function_call("match", vec![make_query(attr), make_regex(value)]),
             // Comparison
             QueryNode::AttributeComparison {
                 attr,
                 comparator,
                 value,
-            } => make_op(make_variable(attr), comparator.into(), value.into()),
+            } => make_op(make_query(attr), comparator.into(), value.into()),
             // Wildcard suffix
             QueryNode::AttributePrefix { attr, prefix } => make_function_call(
                 "match",
-                vec![make_variable(attr), make_regex(format!("{}*", prefix))],
+                vec![make_query(attr), make_regex(format!("{}*", prefix))],
             ),
             // Arbitrary wildcard
             QueryNode::AttributeWildcard { attr, wildcard } => {
-                make_function_call("match", vec![make_variable(attr), make_regex(wildcard)])
+                make_function_call("match", vec![make_query(attr), make_regex(wildcard)])
             }
             // Range
             QueryNode::AttributeRange {
@@ -68,7 +68,7 @@ impl From<QueryNode> for ast::Expr {
                 upper_inclusive,
             } => make_block(vec![
                 make_node(make_op(
-                    make_variable(attr.clone()),
+                    make_query(attr.clone()),
                     if lower_inclusive {
                         Opcode::Ge
                     } else {
@@ -77,7 +77,7 @@ impl From<QueryNode> for ast::Expr {
                     lower.into(),
                 )),
                 make_node(make_op(
-                    make_variable(attr),
+                    make_query(attr),
                     if upper_inclusive {
                         Opcode::Le
                     } else {
@@ -96,26 +96,13 @@ fn make_node<T>(node: T) -> ast::Node<T> {
     ast::Node::new(Span::default(), node)
 }
 
-/// Transforms a "tag" or "@tag" to the equivalent VRL field.
-fn format_tag(value: String) -> String {
-    // If the value matches the default, tagless field, this should be mapped to
-    // `.message`, which is the VRL equivalent
-    if value == grammar::DEFAULT_FIELD {
-        return ".message".to_string();
+fn normalize_tag<T: AsRef<str>>(value: T) -> String {
+    let value = value.as_ref();
+    if value.eq(grammar::DEFAULT_FIELD) {
+        return "message".to_string();
     }
 
-    // If the value starts with an "@", it's a Datadog facet type that's hosted on the
-    // `.custom.*` field
-    if value.starts_with("@") {
-        format!(".custom.{}", &value[1..])
-    } else {
-        format!(".{}", value)
-    }
-}
-
-/// A tag is an `ast::Ident` formatted to point to a formatted VRL field.
-fn make_tag(value: String) -> ast::Node<ast::Ident> {
-    make_node(ast::Ident::new(format_tag(value)))
+    value.replace("@", "custom.")
 }
 
 /// An `Expr::Op` from two expressions, and a separating operator
@@ -127,9 +114,15 @@ fn make_op(expr1: ast::Node<ast::Expr>, op: Opcode, expr2: ast::Node<ast::Expr>)
     )))
 }
 
-/// An `Expr::Variable` formatted as a tag.
-fn make_variable(value: String) -> ast::Node<ast::Expr> {
-    make_node(ast::Expr::Variable(make_tag(value)))
+fn make_query(field: String) -> ast::Node<ast::Expr> {
+    make_node(ast::Expr::Query(make_node(ast::Query {
+        target: make_node(ast::QueryTarget::External),
+        path: make_node(
+            lookup::parser::parse_lookup(&normalize_tag(field))
+                .expect("should parse")
+                .into(),
+        ),
+    })))
 }
 
 /// Makes a Regex string to be used with the `match`.
@@ -197,19 +190,30 @@ mod tests {
         // Multiple wildcards - facet
         ("@c:*b*la*", r#"match(.custom.c, r'\b.*b.*la.*\b')"#),
         // Range - numeric, exclusive
-        ("[1 TO 10]", ".message > 1 && .message < 10"),
+        // ("[1 TO 10]", ".message > 1 && .message < 10"),
     ];
 
+    use super::make_node;
     use crate::parse;
     use vrl_parser::ast;
 
     #[test]
+    /// Compile each Datadog search query -> VRL, and do the same with the equivalent direct
+    /// VRL syntax, and then compare the results.
     fn to_vrl() {
         for (dd, vrl) in TESTS.iter() {
-            let dd = parse(dd).expect(&format!("invalid Datadog search syntax: {}", dd));
-            let vrl = vrl_parser::parse(vrl).expect(&format!("invalid VRL: {}", vrl));
+            let node = parse(dd).expect(&format!("invalid Datadog search syntax: {}", dd));
+            let root = ast::RootExpr::Expr(make_node(ast::Expr::from(node)));
 
-            assert_eq!(ast::Expr::from(dd), *vrl);
+            let program = vrl_parser::parse(vrl).expect(&format!("invalid VRL: {}", vrl));
+
+            assert_eq!(
+                format!("{:?}", vec![make_node(root)]),
+                format!("{:?}", program.0),
+                "Failed: DD= {}, VRL= {}",
+                dd,
+                vrl
+            );
         }
     }
 }
