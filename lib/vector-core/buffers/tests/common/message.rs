@@ -4,7 +4,7 @@ use bytes::{Buf, BufMut};
 use quickcheck::{Arbitrary, Gen};
 use std::{fmt, mem};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Message {
     id: u64,
 }

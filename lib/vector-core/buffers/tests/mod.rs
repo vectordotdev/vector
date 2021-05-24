@@ -6,7 +6,7 @@ use common::Message;
 use futures::task::{noop_waker, Context, Poll};
 use futures::{Sink, Stream};
 use quickcheck::{QuickCheck, TestResult};
-use std::{collections::VecDeque, pin::Pin};
+use std::{collections::VecDeque, env::temp_dir, path::PathBuf, pin::Pin};
 
 trait Model {
     fn send(&mut self, item: Message);
@@ -139,23 +139,85 @@ impl Model for InMemory {
     }
 }
 
-fn cleanup(variant: Variant) {
+fn check(variant: &Variant) -> bool {
     match variant {
-        Variant::Memory { .. } => { /* nothing to clean up */ }
+        Variant::Memory { .. } => {
+            // nothing to check
+            true
+        }
         #[cfg(feature = "disk-buffer")]
-        Variant::Disk { data_dir, .. } => {
-            let _ = std::fs::remove_dir_all(data_dir);
+        Variant::Disk { name, data_dir, .. } => {
+            // determine if data_dir is in temp_dir/name
+            let mut prefix = PathBuf::new();
+            prefix.push(std::env::temp_dir());
+            prefix.push(name);
+
+            data_dir.starts_with(prefix)
+        }
+    }
+}
+
+struct VariantGuard {
+    inner: Variant,
+}
+
+impl VariantGuard {
+    fn new(variant: Variant) -> Self {
+        match variant {
+            Variant::Memory { .. } => VariantGuard { inner: variant },
+            #[cfg(feature = "disk-buffer")]
+            Variant::Disk {
+                max_size,
+                when_full,
+                name,
+                ..
+            } => {
+                let data_dir = tempdir::TempDir::new_in(temp_dir(), &name)
+                    .unwrap()
+                    .into_path();
+                VariantGuard {
+                    inner: Variant::Disk {
+                        max_size,
+                        when_full,
+                        data_dir,
+                        name,
+                    },
+                }
+            }
+        }
+    }
+}
+
+impl AsRef<Variant> for VariantGuard {
+    fn as_ref(&self) -> &Variant {
+        &self.inner
+    }
+}
+
+impl Drop for VariantGuard {
+    fn drop(&mut self) {
+        match &self.inner {
+            Variant::Memory { .. } => { /* nothing to clean up */ }
+            #[cfg(feature = "disk-buffer")]
+            Variant::Disk { data_dir, .. } => {
+                std::fs::remove_dir_all(data_dir).unwrap();
+            }
         }
     }
 }
 
 #[test]
-fn in_memory_model() {
+fn model_check() {
     fn inner(variant: Variant, actions: Vec<Action>) -> TestResult {
-        let mut model: Box<dyn Model> = match variant {
-            Variant::Memory { .. } => Box::new(InMemory::new(&variant, 1)),
+        if !check(&variant) {
+            return TestResult::discard();
+        }
+
+        let guard = VariantGuard::new(variant);
+        let mut model: Box<dyn Model> = match guard.as_ref() {
+            Variant::Memory { .. } => Box::new(InMemory::new(guard.as_ref(), 1)),
             #[cfg(feature = "disk-buffer")]
-            Variant::Disk { .. } => Box::new(OnDisk::new(&variant)),
+            Variant::Disk { .. } => Box::new(OnDisk::new(guard.as_ref())),
         };
 
         let rcv_waker = noop_waker();
@@ -164,7 +226,7 @@ fn in_memory_model() {
         let snd_waker = noop_waker();
         let mut snd_context = Context::from_waker(&snd_waker);
 
-        let (tx, mut rx, _) = buffers::build::<Message>(variant.clone()).unwrap();
+        let (tx, mut rx, _) = buffers::build::<Message>(guard.as_ref().clone()).unwrap();
 
         let mut tx = tx.get();
         let sink = tx.as_mut();
@@ -173,8 +235,8 @@ fn in_memory_model() {
             match action {
                 Action::Send(msg) => match Sink::poll_ready(Pin::new(sink), &mut snd_context) {
                     Poll::Ready(Ok(())) => {
-                        assert_eq!(Ok(()), Sink::start_send(Pin::new(sink), msg));
-                        model.send(msg);
+                        assert_eq!(Ok(()), Sink::start_send(Pin::new(sink), msg.clone()));
+                        model.send(msg.clone());
                         match Sink::poll_flush(Pin::new(sink), &mut snd_context) {
                             Poll::Ready(Ok(())) => {}
                             Poll::Pending => {
@@ -196,11 +258,12 @@ fn in_memory_model() {
                 },
             }
         }
-        cleanup(variant);
+
+        drop(guard);
         TestResult::passed()
     }
     QuickCheck::new()
-        .tests(1_000)
-        .max_tests(10_000)
+        .tests(100_000)
+        .max_tests(1_000_000)
         .quickcheck(inner as fn(Variant, Vec<Action>) -> TestResult);
 }
