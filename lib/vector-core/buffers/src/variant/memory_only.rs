@@ -1,4 +1,5 @@
 use crate::WhenFull;
+#[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 
 #[derive(Debug, Clone, Copy)]
@@ -9,6 +10,7 @@ pub enum Variant {
     },
 }
 
+#[cfg(test)]
 impl Arbitrary for Variant {
     fn arbitrary(g: &mut Gen) -> Self {
         Variant::Memory {

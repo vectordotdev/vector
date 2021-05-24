@@ -15,12 +15,15 @@ mod acker;
 pub mod bytes;
 #[cfg(feature = "disk-buffer")]
 pub mod disk;
+#[cfg(test)]
+mod test;
 mod variant;
 
 use crate::bytes::{DecodeBytes, EncodeBytes};
 pub use acker::Acker;
 use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use pin_project::pin_project;
+#[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
@@ -91,6 +94,7 @@ impl Default for WhenFull {
     }
 }
 
+#[cfg(test)]
 impl Arbitrary for WhenFull {
     fn arbitrary(g: &mut Gen) -> Self {
         if bool::arbitrary(g) {
@@ -199,61 +203,5 @@ impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.project().inner.poll_close(cx)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::{Acker, DropWhenFull};
-    use futures::{channel::mpsc, future, task::AtomicWaker, Sink, Stream};
-    use std::{
-        sync::{atomic::AtomicUsize, Arc},
-        task::Poll,
-    };
-    use tokio_test::task::spawn;
-
-    #[tokio::test]
-    async fn drop_when_full() {
-        future::lazy(|cx| {
-            let (tx, rx) = mpsc::channel(2);
-
-            let mut tx = Box::pin(DropWhenFull::new(tx));
-
-            assert_eq!(tx.as_mut().poll_ready(cx), Poll::Ready(Ok(())));
-            assert_eq!(tx.as_mut().start_send(1), Ok(()));
-            assert_eq!(tx.as_mut().poll_ready(cx), Poll::Ready(Ok(())));
-            assert_eq!(tx.as_mut().start_send(2), Ok(()));
-            assert_eq!(tx.as_mut().poll_ready(cx), Poll::Ready(Ok(())));
-            assert_eq!(tx.as_mut().start_send(3), Ok(()));
-            assert_eq!(tx.as_mut().poll_ready(cx), Poll::Ready(Ok(())));
-            assert_eq!(tx.as_mut().start_send(4), Ok(()));
-
-            let mut rx = Box::pin(rx);
-
-            assert_eq!(rx.as_mut().poll_next(cx), Poll::Ready(Some(1)));
-            assert_eq!(rx.as_mut().poll_next(cx), Poll::Ready(Some(2)));
-            assert_eq!(rx.as_mut().poll_next(cx), Poll::Ready(Some(3)));
-            assert_eq!(rx.as_mut().poll_next(cx), Poll::Pending);
-        })
-        .await;
-    }
-
-    #[test]
-    fn ack_with_none() {
-        let counter = Arc::new(AtomicUsize::new(0));
-        let task = Arc::new(AtomicWaker::new());
-        let acker = Acker::Disk(counter, Arc::clone(&task));
-
-        let mut mock = spawn(future::poll_fn::<(), _>(|cx| {
-            task.register(cx.waker());
-            Poll::Pending
-        }));
-        let _ = mock.poll();
-
-        assert!(!mock.is_woken());
-        acker.ack(0);
-        assert!(!mock.is_woken());
-        acker.ack(1);
-        assert!(mock.is_woken());
     }
 }

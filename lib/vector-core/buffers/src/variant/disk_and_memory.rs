@@ -1,8 +1,11 @@
 use crate::WhenFull;
+#[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use std::path::PathBuf;
 
+#[cfg(test)]
 const MAX_STR_SIZE: usize = 128;
+#[cfg(test)]
 const ALPHABET: [&str; 27] = [
     "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s",
     "t", "u", "v", "w", "x", "y", "z", "_",
@@ -27,6 +30,7 @@ struct Name {
     inner: String,
 }
 
+#[cfg(test)]
 impl Arbitrary for Name {
     fn arbitrary(g: &mut Gen) -> Self {
         let mut name = String::with_capacity(MAX_STR_SIZE);
@@ -39,6 +43,7 @@ impl Arbitrary for Name {
     }
 }
 
+#[cfg(test)]
 impl Arbitrary for Variant {
     fn arbitrary(g: &mut Gen) -> Self {
         if bool::arbitrary(g) {

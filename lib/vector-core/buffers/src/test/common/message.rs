@@ -1,5 +1,4 @@
-use buffers;
-use buffers::bytes::{DecodeBytes, EncodeBytes};
+use crate::bytes::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut};
 use quickcheck::{Arbitrary, Gen};
 use std::{fmt, mem};

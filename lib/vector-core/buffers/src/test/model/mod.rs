@@ -1,12 +1,16 @@
-mod common;
+mod in_memory;
+#[cfg(feature = "disk-buffer")]
+mod on_disk;
 
-use crate::common::Action;
-use buffers::{self, bytes::EncodeBytes, Variant, WhenFull};
-use common::Message;
+use crate::test::common::{Action, Message};
+use crate::test::model::in_memory::InMemory;
+#[cfg(feature = "disk-buffer")]
+use crate::test::model::on_disk::OnDisk;
+use crate::Variant;
 use futures::task::{noop_waker, Context, Poll};
 use futures::{Sink, Stream};
 use quickcheck::{QuickCheck, TestResult};
-use std::{collections::VecDeque, env::temp_dir, path::PathBuf, pin::Pin};
+use std::pin::Pin;
 
 /// A common trait for our "model", the "obviously correct" counterpart to the
 /// system under test
@@ -15,135 +19,6 @@ trait Model {
     fn recv(&mut self) -> Option<Message>;
     fn is_full(&self) -> bool;
     fn is_empty(&self) -> bool;
-}
-
-/// `OnDisk` is the `Model` for on-disk buffer
-#[cfg(feature = "disk-buffer")]
-struct OnDisk {
-    inner: VecDeque<Message>,
-    when_full: WhenFull,
-    current_bytes: usize,
-    capacity: usize,
-}
-
-#[cfg(feature = "disk-buffer")]
-impl OnDisk {
-    fn new(variant: &Variant) -> Self {
-        match variant {
-            Variant::Memory { .. } => unreachable!(),
-            #[cfg(feature = "disk-buffer")]
-            Variant::Disk {
-                max_size,
-                when_full,
-                ..
-            } => OnDisk {
-                inner: VecDeque::with_capacity(*max_size),
-                current_bytes: 0,
-                capacity: *max_size,
-                when_full: *when_full,
-            },
-        }
-    }
-}
-
-#[cfg(feature = "disk-buffer")]
-impl Model for OnDisk {
-    fn send(&mut self, item: Message) {
-        let byte_size = EncodeBytes::encoded_size(&item).unwrap();
-        match self.when_full {
-            WhenFull::DropNewest => {
-                if !self.is_full() {
-                    self.current_bytes += byte_size;
-                    self.inner.push_back(item);
-                } else {
-                    // DropNewest never blocks, instead it silently drops the
-                    // item pushed in when the buffer is too full.
-                }
-            }
-            WhenFull::Block => {
-                if !self.is_full() {
-                    self.current_bytes += byte_size;
-                    self.inner.push_back(item);
-                }
-            }
-        }
-    }
-
-    fn recv(&mut self) -> Option<Message> {
-        if let Some(msg) = self.inner.pop_front() {
-            let byte_size = EncodeBytes::encoded_size(&msg).unwrap();
-            self.current_bytes -= byte_size;
-            Some(msg)
-        } else {
-            None
-        }
-    }
-
-    fn is_full(&self) -> bool {
-        self.current_bytes >= self.capacity
-    }
-
-    fn is_empty(&self) -> bool {
-        self.current_bytes == 0
-    }
-}
-
-/// `InMemory` is the `Model` for on-disk buffer
-struct InMemory {
-    inner: VecDeque<Message>,
-    when_full: WhenFull,
-    num_senders: usize,
-    capacity: usize,
-}
-
-impl InMemory {
-    fn new(variant: &Variant, num_senders: usize) -> Self {
-        match variant {
-            Variant::Memory {
-                max_events,
-                when_full,
-            } => InMemory {
-                inner: VecDeque::with_capacity(*max_events),
-                capacity: *max_events,
-                num_senders,
-                when_full: *when_full,
-            },
-            #[cfg(feature = "disk-buffer")]
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl Model for InMemory {
-    fn send(&mut self, item: Message) {
-        match self.when_full {
-            WhenFull::DropNewest => {
-                if self.inner.len() != (self.capacity + self.num_senders) {
-                    self.inner.push_back(item);
-                } else {
-                    // DropNewest never blocks, instead it silently drops the
-                    // item pushed in when the buffer is too full.
-                }
-            }
-            WhenFull::Block => {
-                if self.inner.len() != (self.capacity + self.num_senders) {
-                    self.inner.push_back(item);
-                }
-            }
-        }
-    }
-
-    fn recv(&mut self) -> Option<Message> {
-        self.inner.pop_front()
-    }
-
-    fn is_full(&self) -> bool {
-        self.inner.len() >= self.capacity
-    }
-
-    fn is_empty(&self) -> bool {
-        self.inner.is_empty()
-    }
 }
 
 fn check(variant: &Variant) -> bool {
@@ -155,7 +30,7 @@ fn check(variant: &Variant) -> bool {
         #[cfg(feature = "disk-buffer")]
         Variant::Disk { name, data_dir, .. } => {
             // determine if data_dir is in temp_dir/name
-            let mut prefix = PathBuf::new();
+            let mut prefix = std::path::PathBuf::new();
             prefix.push(std::env::temp_dir());
             prefix.push(name);
 
@@ -183,7 +58,7 @@ impl VariantGuard {
                 // SAFETY: We allow tempdir to create the directory but by
                 // calling `into_path` we obligate ourselves to delete it. This
                 // is done in the drop implementation for `VariantGuard`.
-                let data_dir = tempdir::TempDir::new_in(temp_dir(), &name)
+                let data_dir = tempdir::TempDir::new_in(std::env::temp_dir(), &name)
                     .unwrap()
                     .into_path();
                 VariantGuard {
@@ -247,7 +122,7 @@ fn model_check() {
         let snd_waker = noop_waker();
         let mut snd_context = Context::from_waker(&snd_waker);
 
-        let (tx, mut rx, _) = buffers::build::<Message>(guard.as_ref().clone()).unwrap();
+        let (tx, mut rx, _) = crate::build::<Message>(guard.as_ref().clone()).unwrap();
 
         let mut tx = tx.get();
         let sink = tx.as_mut();

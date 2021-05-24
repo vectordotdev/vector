@@ -92,7 +92,6 @@ fn setup<const N: usize>(
     (tx.get(), rx, messages)
 }
 
-// This function will be used in
 fn measurement<const N: usize>(
     mut input: (
         Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>,
