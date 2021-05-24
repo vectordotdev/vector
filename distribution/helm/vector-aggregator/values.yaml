@@ -27,7 +27,7 @@ fullnameOverride: ""
 
 podManagementPolicy: Parallel
 
-replicas: 1
+replicas: 2
 
 serviceAccount:
   # Specifies whether a service account should be created.
@@ -165,11 +165,16 @@ service:
   # Service type - defaults to `ClusterIP` (only relevant for the regular service).
   type: "ClusterIP"
   # Additional ports to expose.
-  ports: []
-    # - name: http
-    #   port: 1234
-    #   protocol: TCP
-    #   targetPort: 1234
+  ports:
+    - name: datadog
+      port: 80
+      protocol: TCP
+      targetPort: 80
+    #   nodePort: 1243  # (optional but useful with `service.type` is set to `NodePort`)
+    - name: syslog
+      port: 514
+      protocol: TCP
+      targetPort: 514
     #   nodePort: 1243  # (optional but useful with `service.type` is set to `NodePort`)
 
 # Set this to non-empty value to use existing `ConfigMap` for `vector`, instead
@@ -277,9 +282,14 @@ prometheusSink:
     extraRelabelings: []
 
 # Sources to add to the generated `vector` config
-sources: {}
-  # source_name:
-  #   type: "source_type"
+sources:
+  datadog:
+    type: "datadog_logs"
+    address: "0.0.0.0:80"
+  syslog:
+    type: "syslog"
+    address: "0.0.0.0:514"
+    mode: "tcp"
   #   rawConfig: |
   #     option = "value"
 
@@ -292,9 +302,11 @@ transforms: {}
   #     option = "value"
 
 # Sinks to add to the generated `vector` config.
-sinks: {}
-  # sink_name:
-  #   type: "sink_type"
-  #   inputs: ["input1", "input2"]
+sinks:
+  sink_name:
+    type: "console"
+    inputs: ["datadog", "syslog", "vector"]
+    encoding:
+      codec: "json"
   #   rawConfig: |
   #     option = "value"

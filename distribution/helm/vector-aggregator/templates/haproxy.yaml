@@ -1,0 +1,111 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vector-haproxy
+  labels:
+    app.kubernetes.io/component: load-balancer
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-haproxy
+  labels:
+    app.kubernetes.io/component: load-balancer
+data:
+  haproxy.cfg: |
+    resolvers coredns
+      nameserver dns1 kube-dns.kube-system.svc.cluster.local:53
+      hold timeout         600s
+      hold refused         600s
+
+    frontend datadog
+      bind *:8000
+      default_backend datadog_template
+
+    backend datadog_template
+      balance roundrobin
+      option tcp-check
+      server-template srv 5 _datadog._tcp.vector-aggregator-headless.vector.svc.cluster.local resolvers coredns check
+
+    frontend syslog
+      bind *:5140
+      default_backend syslog_template
+
+    backend syslog_template
+      balance roundrobin
+      option tcp-check
+      server-template srv 5 _syslog._tcp.vector-aggregator-headless.vector.svc.cluster.local resolvers coredns check
+
+    frontend vector
+      bind *:9000
+      default_backend vector_template
+
+    backend vector_template
+      balance roundrobin
+      option tcp-check
+      server-template srv 5 _vector._tcp.vector-aggregator-headless.vector.svc.cluster.local resolvers coredns check
+
+    frontend metrics
+      mode http
+      bind *:1024
+      http-request use-service prometheus-exporter if { path /metrics }
+      stats enable
+      stats uri /stats
+      stats refresh 10s
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vector-haproxy
+  labels:
+    app.kubernetes.io/component: load-balancer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: load-balancer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: load-balancer
+    spec:
+      serviceAccountName: vector-haproxy
+      containers:
+      - name: haproxy
+        image: haproxy:2.4.0-alpine
+        volumeMounts:
+        - name: config
+          mountPath: /usr/local/etc/haproxy/
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: vector-haproxy
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vector
+  labels:
+    app.kubernetes.io/component: load-balancer
+spec:
+  selector:
+    app.kubernetes.io/component: load-balancer
+  ports:
+  - name: datadog
+    port: 8000
+    protocol: TCP
+    targetPort: 8000
+  - name: metrics
+    port: 1024
+    protocol: TCP
+    targetPort: 1024
+  - name: syslog
+    port: 5140
+    protocol: TCP
+    targetPort: 5140
+  - name: vector
+    port: 9000
+    protocol: TCP
+    targetPort: 9000
