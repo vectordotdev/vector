@@ -18,7 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-      - run: make ci-sweep
       - env:
           PASS_FEATURES: "default-cmake"
         run: make package-x86_64-unknown-linux-musl-all
@@ -31,7 +30,6 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - env:
           PASS_FEATURES: "default"
@@ -53,7 +51,6 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - env:
           DOCKER_PRIVILEGED: "true"
@@ -68,7 +65,6 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - env:
           DOCKER_PRIVILEGED: "true"
@@ -91,7 +87,6 @@ jobs:
     runs-on: [self-hosted, linux, x64, general]
     steps:
       - uses: actions/checkout@v2.3.4
-      - run: make ci-sweep
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - env:
           DOCKER_PRIVILEGED: "true"
@@ -114,7 +109,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2.3.4
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
-      - run: make ci-sweep
       - env:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-musleabihf
