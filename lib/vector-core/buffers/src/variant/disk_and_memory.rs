@@ -62,7 +62,7 @@ impl Arbitrary for Variant {
                 max_events,
                 when_full,
             } => {
-                let when_full = when_full.clone();
+                let when_full = *when_full;
                 Box::new(max_events.shrink().map(move |me| Variant::Memory {
                     max_events: me,
                     when_full,
@@ -74,11 +74,8 @@ impl Arbitrary for Variant {
                 name,
                 data_dir,
             } => {
-                // Satisfying lifetimes when shrinking is tough. While there's
-                // surely a more tidy way of doing this I could find nothing
-                // more terse. -blt
-                let max_size = max_size.clone();
-                let when_full = when_full.clone();
+                let max_size = *max_size;
+                let when_full = *when_full;
                 let name = name.clone();
                 let data_dir = data_dir.clone();
                 Box::new(max_size.shrink().map(move |ms| Variant::Disk {

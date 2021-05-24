@@ -8,6 +8,8 @@ use futures::{Sink, Stream};
 use quickcheck::{QuickCheck, TestResult};
 use std::{collections::VecDeque, env::temp_dir, path::PathBuf, pin::Pin};
 
+/// A common trait for our "model", the "obviously correct" counterpart to the
+/// system under test
 trait Model {
     fn send(&mut self, item: Message);
     fn recv(&mut self) -> Option<Message>;
@@ -15,6 +17,7 @@ trait Model {
     fn is_empty(&self) -> bool;
 }
 
+/// `OnDisk` is the `Model` for on-disk buffer
 struct OnDisk {
     inner: VecDeque<Message>,
     when_full: WhenFull,
@@ -82,6 +85,7 @@ impl Model for OnDisk {
     }
 }
 
+/// `InMemory` is the `Model` for on-disk buffer
 struct InMemory {
     inner: VecDeque<Message>,
     when_full: WhenFull,
@@ -172,6 +176,9 @@ impl VariantGuard {
                 name,
                 ..
             } => {
+                // SAFETY: We allow tempdir to create the directory but by
+                // calling `into_path` we obligate ourselves to delete it. This
+                // is done in the drop implementation for `VariantGuard`.
                 let data_dir = tempdir::TempDir::new_in(temp_dir(), &name)
                     .unwrap()
                     .into_path();
@@ -200,12 +207,23 @@ impl Drop for VariantGuard {
             Variant::Memory { .. } => { /* nothing to clean up */ }
             #[cfg(feature = "disk-buffer")]
             Variant::Disk { data_dir, .. } => {
+                // SAFETY: Here we clean up the data_dir of the inner `Variant`,
+                // see note in the constructor for this type.
                 std::fs::remove_dir_all(data_dir).unwrap();
             }
         }
     }
 }
 
+/// This test models a single sender and a single receiver pushing and pulling
+/// from a common buffer. The buffer itself may be either memory or disk. We
+/// have modeled entirely without reference to a runtime, using the raw
+/// `futures::sink::Sink` and `futures::stream::Stream` interface, to avoid
+/// needing to model the runtime in any way. This is, then, the buffer as a
+/// runtime will see it.
+///
+/// Acks are not modeled yet. I believe doing so would be a straightforward
+/// process.
 #[test]
 fn model_check() {
     fn inner(variant: Variant, actions: Vec<Action>) -> TestResult {
@@ -263,7 +281,7 @@ fn model_check() {
         TestResult::passed()
     }
     QuickCheck::new()
-        .tests(100_000)
-        .max_tests(1_000_000)
+        .tests(10_000)
+        .max_tests(100_000)
         .quickcheck(inner as fn(Variant, Vec<Action>) -> TestResult);
 }
