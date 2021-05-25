@@ -17,7 +17,7 @@ pub struct Opts {
     #[structopt(name = "PROGRAM")]
     program: Option<String>,
 
-    /// The file containing the event object(s) to handle. The supported formats are JSON and jsonl.
+    /// The file containing the event object(s) to handle. JSON events should be one per line..
     #[structopt(short, long = "input", parse(from_os_str))]
     input_file: Option<PathBuf>,
 
@@ -93,7 +93,7 @@ fn execute(object: &mut impl Target, program: &Program) -> Result<Value, Error> 
 
     runtime
         .resolve(object, program)
-        .map_err(|err| Error::Runtime(err.to_string()))
+        .map_err(|err| Error::Runtime(err))
 }
 
 fn read_program(source: Option<&str>, file: Option<&PathBuf>) -> Result<String, Error> {
