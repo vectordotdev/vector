@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-use super::{EventFinalizer, EventFinalizers, EventStatus};
+use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
 use getset::{Getters, Setters};
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
@@ -25,6 +25,11 @@ impl EventMetadata {
     pub fn with_finalizer(mut self, finalizer: EventFinalizer) -> Self {
         self.finalizers = EventFinalizers::new(finalizer);
         self
+    }
+
+    /// Replace the finalizer with a new one created from the given batch notifier.
+    pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
+        self.with_finalizer(EventFinalizer::new(Arc::clone(batch)))
     }
 
     /// Merge the other `EventMetadata` into this.

@@ -1,4 +1,4 @@
-use super::{EventFinalizer, EventMetadata};
+use super::{BatchNotifier, EventFinalizer, EventMetadata};
 use crate::metrics::Handle;
 use chrono::{DateTime, Utc};
 use getset::{Getters, MutGetters};
@@ -9,6 +9,7 @@ use std::convert::TryFrom;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
+    sync::Arc,
 };
 
 #[derive(Clone, Debug, Deserialize, Getters, MutGetters, PartialEq, PartialOrd, Serialize)]
@@ -276,6 +277,11 @@ impl Metric {
 
     pub fn add_finalizer(&mut self, finalizer: EventFinalizer) {
         self.metadata.add_finalizer(finalizer);
+    }
+
+    pub fn with_batch_notifier(mut self, batch: &Arc<BatchNotifier>) -> Self {
+        self.metadata = self.metadata.with_batch_notifier(batch);
+        self
     }
 
     pub fn with_tags(mut self, tags: Option<MetricTags>) -> Self {
