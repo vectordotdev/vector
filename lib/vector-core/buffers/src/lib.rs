@@ -66,7 +66,7 @@ pub fn build<'a, T>(
 ) -> Result<
     (
         BufferInputCloner<T>,
-        Box<dyn Stream<Item = T> + 'a + Send>,
+        Box<dyn Stream<Item = T> + 'a + Unpin + Send>,
         Acker,
     ),
     String,
