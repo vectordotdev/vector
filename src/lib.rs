@@ -92,12 +92,15 @@ pub fn vector_version() -> impl std::fmt::Display {
 
 pub fn get_version() -> String {
     let pkg_version = vector_version();
-    let commit_hash = built_info::GIT_VERSION.and_then(|v| v.split('-').last());
-    let built_date = chrono::DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC)
-        .unwrap()
-        .format("%Y-%m-%d");
-    let built_string = if let Some(commit_hash) = commit_hash {
-        format!("{} {} {}", commit_hash, built_info::TARGET, built_date)
+    let commit_hash = built_info::get_commit_hash();
+    let built_date = built_info::get_built_date();
+    let built_string = if commit_hash.is_some() && built_date.is_some() {
+        format!(
+            "{} {} {}",
+            commit_hash.unwrap(),
+            built_info::TARGET,
+            built_date.unwrap()
+        )
     } else {
         built_info::TARGET.into()
     };
@@ -107,6 +110,32 @@ pub fn get_version() -> String {
 #[allow(unused)]
 pub mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
+
+    #[cfg(not(feature = "ci"))]
+    pub fn get_built_date() -> Option<String> {
+        chrono::DateTime::parse_from_rfc2822(self::BUILT_TIME_UTC)
+            .ok()
+            .map(|dt| dt.format("%Y-%m-%d").to_string())
+    }
+
+    #[cfg(feature = "ci")]
+    pub fn get_built_date() -> Option<String> {
+        None
+    }
+
+    #[cfg(not(feature = "ci"))]
+    pub fn get_git_version() -> Option<String> {
+        self::GIT_VERSION.map(|s| s.to_string())
+    }
+
+    #[cfg(feature = "ci")]
+    pub fn get_git_version() -> Option<String> {
+        None
+    }
+
+    pub fn get_commit_hash() -> Option<String> {
+        get_git_version().and_then(|v| v.split('-').last().map(|s| s.to_string()))
+    }
 }
 
 pub fn get_hostname() -> std::io::Result<String> {
