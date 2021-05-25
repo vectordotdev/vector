@@ -432,86 +432,94 @@ fn encode_array(items: Vec<Value>) -> proto::ValueArray {
     }
 }
 
+impl From<EventProto> for proto::EventWrapper {
+    fn from(event: EventProto) -> Self {
+        Self { event: Some(event) }
+    }
+}
+
+impl From<LogEvent> for EventProto {
+    fn from(log_event: LogEvent) -> Self {
+        let (fields, _metadata) = log_event.into_parts();
+        let fields = fields
+            .into_iter()
+            .map(|(k, v)| (k, encode_value(v)))
+            .collect::<BTreeMap<_, _>>();
+
+        Self::Log(Log { fields })
+    }
+}
+
+impl From<Metric> for EventProto {
+    fn from(metric: Metric) -> Self {
+        let name = metric.series.name.name;
+        let namespace = metric.series.name.namespace.unwrap_or_default();
+
+        let timestamp = metric.data.timestamp.map(|ts| prost_types::Timestamp {
+            seconds: ts.timestamp(),
+            nanos: ts.timestamp_subsec_nanos() as i32,
+        });
+
+        let tags = metric.series.tags.unwrap_or_default();
+
+        let kind = match metric.data.kind {
+            MetricKind::Incremental => proto::metric::Kind::Incremental,
+            MetricKind::Absolute => proto::metric::Kind::Absolute,
+        }
+        .into();
+
+        let metric = match metric.data.value {
+            MetricValue::Counter { value } => MetricProto::Counter(proto::Counter { value }),
+            MetricValue::Gauge { value } => MetricProto::Gauge(proto::Gauge { value }),
+            MetricValue::Set { values } => MetricProto::Set(proto::Set {
+                values: values.into_iter().collect(),
+            }),
+            MetricValue::Distribution { samples, statistic } => {
+                MetricProto::Distribution2(proto::Distribution2 {
+                    samples: samples.into_iter().map(Into::into).collect(),
+                    statistic: match statistic {
+                        StatisticKind::Histogram => proto::StatisticKind::Histogram,
+                        StatisticKind::Summary => proto::StatisticKind::Summary,
+                    }
+                    .into(),
+                })
+            }
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => MetricProto::AggregatedHistogram2(proto::AggregatedHistogram2 {
+                buckets: buckets.into_iter().map(Into::into).collect(),
+                count,
+                sum,
+            }),
+            MetricValue::AggregatedSummary {
+                quantiles,
+                count,
+                sum,
+            } => MetricProto::AggregatedSummary2(proto::AggregatedSummary2 {
+                quantiles: quantiles.into_iter().map(Into::into).collect(),
+                count,
+                sum,
+            }),
+        };
+
+        Self::Metric(proto::Metric {
+            name,
+            namespace,
+            timestamp,
+            tags,
+            kind,
+            value: Some(metric),
+        })
+    }
+}
+
 impl From<Event> for proto::EventWrapper {
     fn from(event: Event) -> Self {
         match event {
-            Event::Log(log_event) => {
-                let (fields, _metadata) = log_event.into_parts();
-                let fields = fields
-                    .into_iter()
-                    .map(|(k, v)| (k, encode_value(v)))
-                    .collect::<BTreeMap<_, _>>();
-
-                let event = EventProto::Log(Log { fields });
-
-                proto::EventWrapper { event: Some(event) }
-            }
-            Event::Metric(metric) => {
-                let name = metric.series.name.name;
-                let namespace = metric.series.name.namespace.unwrap_or_default();
-
-                let timestamp = metric.data.timestamp.map(|ts| prost_types::Timestamp {
-                    seconds: ts.timestamp(),
-                    nanos: ts.timestamp_subsec_nanos() as i32,
-                });
-
-                let tags = metric.series.tags.unwrap_or_default();
-
-                let kind = match metric.data.kind {
-                    MetricKind::Incremental => proto::metric::Kind::Incremental,
-                    MetricKind::Absolute => proto::metric::Kind::Absolute,
-                }
-                .into();
-
-                let metric = match metric.data.value {
-                    MetricValue::Counter { value } => {
-                        MetricProto::Counter(proto::Counter { value })
-                    }
-                    MetricValue::Gauge { value } => MetricProto::Gauge(proto::Gauge { value }),
-                    MetricValue::Set { values } => MetricProto::Set(proto::Set {
-                        values: values.into_iter().collect(),
-                    }),
-                    MetricValue::Distribution { samples, statistic } => {
-                        MetricProto::Distribution2(proto::Distribution2 {
-                            samples: samples.into_iter().map(Into::into).collect(),
-                            statistic: match statistic {
-                                StatisticKind::Histogram => proto::StatisticKind::Histogram,
-                                StatisticKind::Summary => proto::StatisticKind::Summary,
-                            }
-                            .into(),
-                        })
-                    }
-                    MetricValue::AggregatedHistogram {
-                        buckets,
-                        count,
-                        sum,
-                    } => MetricProto::AggregatedHistogram2(proto::AggregatedHistogram2 {
-                        buckets: buckets.into_iter().map(Into::into).collect(),
-                        count,
-                        sum,
-                    }),
-                    MetricValue::AggregatedSummary {
-                        quantiles,
-                        count,
-                        sum,
-                    } => MetricProto::AggregatedSummary2(proto::AggregatedSummary2 {
-                        quantiles: quantiles.into_iter().map(Into::into).collect(),
-                        count,
-                        sum,
-                    }),
-                };
-
-                let event = EventProto::Metric(proto::Metric {
-                    name,
-                    namespace,
-                    timestamp,
-                    tags,
-                    kind,
-                    value: Some(metric),
-                });
-
-                proto::EventWrapper { event: Some(event) }
-            }
+            Event::Log(log_event) => EventProto::from(log_event).into(),
+            Event::Metric(metric) => EventProto::from(metric).into(),
         }
     }
 }
