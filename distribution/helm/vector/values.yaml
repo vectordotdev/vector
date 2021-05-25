@@ -59,6 +59,8 @@ vector-agent:
     host: "vector"
     # Set the port to match the one used by `vector-aggregator`.
     port: "9000"
+    config:
+      version: "2"
 
 vector-aggregator:
   # See the possible settings at the `vector-aggregator` chart.
@@ -68,3 +70,5 @@ vector-aggregator:
   vectorSource:
     # Use the same port that's specified at `vector-agent`.
     listenPort: "9000"
+    config:
+      version: "2"

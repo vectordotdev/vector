@@ -38,13 +38,15 @@ data:
       server-template srv 5 _syslog._tcp.vector-aggregator-headless.vector.svc.cluster.local resolvers coredns check
 
     frontend vector
-      bind *:9000
+      mode http
+      bind *:9000 proto h2
       default_backend vector_template
 
     backend vector_template
+      mode http
       balance roundrobin
       option tcp-check
-      server-template srv 5 _vector._tcp.vector-aggregator-headless.vector.svc.cluster.local resolvers coredns check
+      server-template srv 5 _vector._tcp.vector-aggregator-headless.vector.svc.cluster.local resolvers coredns proto h2 check
 
     frontend metrics
       mode http
