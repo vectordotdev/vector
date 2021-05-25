@@ -1,7 +1,6 @@
-use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use buffers::bytes::{DecodeBytes, EncodeBytes};
 use bytes::{Buf, BufMut, Bytes};
-use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
 };
@@ -32,16 +31,13 @@ pub mod lua;
 pub mod merge_state;
 mod metadata;
 pub mod metric;
+pub mod proto;
 #[cfg(test)]
 mod test;
 pub mod util;
 mod value;
 #[cfg(feature = "vrl")]
 mod vrl_target;
-
-pub mod proto {
-    include!(concat!(env!("OUT_DIR"), "/event.rs"));
-}
 
 pub const PARTIAL: &str = "_partial";
 
@@ -166,49 +162,6 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
-fn decode_map(fields: BTreeMap<String, proto::Value>) -> Option<Value> {
-    let mut accum: BTreeMap<String, Value> = BTreeMap::new();
-    for (key, value) in fields {
-        match decode_value(value) {
-            Some(value) => {
-                accum.insert(key, value);
-            }
-            None => return None,
-        }
-    }
-    Some(Value::Map(accum))
-}
-
-fn decode_array(items: Vec<proto::Value>) -> Option<Value> {
-    let mut accum = Vec::with_capacity(items.len());
-    for value in items {
-        match decode_value(value) {
-            Some(value) => accum.push(value),
-            None => return None,
-        }
-    }
-    Some(Value::Array(accum))
-}
-
-fn decode_value(input: proto::Value) -> Option<Value> {
-    match input.kind {
-        Some(proto::value::Kind::RawBytes(data)) => Some(Value::Bytes(data.into())),
-        Some(proto::value::Kind::Timestamp(ts)) => Some(Value::Timestamp(
-            chrono::Utc.timestamp(ts.seconds, ts.nanos as u32),
-        )),
-        Some(proto::value::Kind::Integer(value)) => Some(Value::Integer(value)),
-        Some(proto::value::Kind::Float(value)) => Some(Value::Float(value)),
-        Some(proto::value::Kind::Boolean(value)) => Some(Value::Boolean(value)),
-        Some(proto::value::Kind::Map(map)) => decode_map(map.fields),
-        Some(proto::value::Kind::Array(array)) => decode_array(array.items),
-        Some(proto::value::Kind::Null(_)) => Some(Value::Null),
-        None => {
-            error!("Encoded event contains unknown value kind.");
-            None
-        }
-    }
-}
-
 impl From<&tracing::Event<'_>> for Event {
     fn from(event: &tracing::Event<'_>) -> Self {
         let now = chrono::Utc::now();
@@ -308,210 +261,6 @@ impl TryInto<serde_json::Value> for Event {
         match self {
             Event::Log(fields) => serde_json::to_value(fields),
             Event::Metric(metric) => serde_json::to_value(metric),
-        }
-    }
-}
-
-impl From<proto::EventWrapper> for Event {
-    fn from(proto: proto::EventWrapper) -> Self {
-        let event = proto.event.unwrap();
-
-        match event {
-            EventProto::Log(proto) => {
-                let fields = proto
-                    .fields
-                    .into_iter()
-                    .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
-                    .collect::<BTreeMap<_, _>>();
-
-                Event::Log(LogEvent::from(fields))
-            }
-            EventProto::Metric(proto) => {
-                let kind = match proto.kind() {
-                    proto::metric::Kind::Incremental => MetricKind::Incremental,
-                    proto::metric::Kind::Absolute => MetricKind::Absolute,
-                };
-
-                let name = proto.name;
-
-                let namespace = if proto.namespace.is_empty() {
-                    None
-                } else {
-                    Some(proto.namespace)
-                };
-
-                let timestamp = proto
-                    .timestamp
-                    .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
-
-                let tags = if proto.tags.is_empty() {
-                    None
-                } else {
-                    Some(proto.tags)
-                };
-
-                let value = match proto.value.unwrap() {
-                    MetricProto::Counter(counter) => MetricValue::Counter {
-                        value: counter.value,
-                    },
-                    MetricProto::Gauge(gauge) => MetricValue::Gauge { value: gauge.value },
-                    MetricProto::Set(set) => MetricValue::Set {
-                        values: set.values.into_iter().collect(),
-                    },
-                    MetricProto::Distribution1(dist) => MetricValue::Distribution {
-                        statistic: dist.statistic().into(),
-                        samples: metric::zip_samples(dist.values, dist.sample_rates),
-                    },
-                    MetricProto::Distribution2(dist) => MetricValue::Distribution {
-                        statistic: dist.statistic().into(),
-                        samples: dist.samples.into_iter().map(Into::into).collect(),
-                    },
-                    MetricProto::AggregatedHistogram1(hist) => MetricValue::AggregatedHistogram {
-                        buckets: metric::zip_buckets(hist.buckets, hist.counts),
-                        count: hist.count,
-                        sum: hist.sum,
-                    },
-                    MetricProto::AggregatedHistogram2(hist) => MetricValue::AggregatedHistogram {
-                        buckets: hist.buckets.into_iter().map(Into::into).collect(),
-                        count: hist.count,
-                        sum: hist.sum,
-                    },
-                    MetricProto::AggregatedSummary1(summary) => MetricValue::AggregatedSummary {
-                        quantiles: metric::zip_quantiles(summary.quantiles, summary.values),
-                        count: summary.count,
-                        sum: summary.sum,
-                    },
-                    MetricProto::AggregatedSummary2(summary) => MetricValue::AggregatedSummary {
-                        quantiles: summary.quantiles.into_iter().map(Into::into).collect(),
-                        count: summary.count,
-                        sum: summary.sum,
-                    },
-                };
-
-                Event::Metric(
-                    Metric::new(name, kind, value)
-                        .with_namespace(namespace)
-                        .with_tags(tags)
-                        .with_timestamp(timestamp),
-                )
-            }
-        }
-    }
-}
-
-fn encode_value(value: Value) -> proto::Value {
-    proto::Value {
-        kind: match value {
-            Value::Bytes(b) => Some(proto::value::Kind::RawBytes(b.to_vec())),
-            Value::Timestamp(ts) => Some(proto::value::Kind::Timestamp(prost_types::Timestamp {
-                seconds: ts.timestamp(),
-                nanos: ts.timestamp_subsec_nanos() as i32,
-            })),
-            Value::Integer(value) => Some(proto::value::Kind::Integer(value)),
-            Value::Float(value) => Some(proto::value::Kind::Float(value)),
-            Value::Boolean(value) => Some(proto::value::Kind::Boolean(value)),
-            Value::Map(fields) => Some(proto::value::Kind::Map(encode_map(fields))),
-            Value::Array(items) => Some(proto::value::Kind::Array(encode_array(items))),
-            Value::Null => Some(proto::value::Kind::Null(proto::ValueNull::NullValue as i32)),
-        },
-    }
-}
-
-fn encode_map(fields: BTreeMap<String, Value>) -> proto::ValueMap {
-    proto::ValueMap {
-        fields: fields
-            .into_iter()
-            .map(|(key, value)| (key, encode_value(value)))
-            .collect(),
-    }
-}
-
-fn encode_array(items: Vec<Value>) -> proto::ValueArray {
-    proto::ValueArray {
-        items: items.into_iter().map(encode_value).collect(),
-    }
-}
-
-impl From<Event> for proto::EventWrapper {
-    fn from(event: Event) -> Self {
-        match event {
-            Event::Log(log_event) => {
-                let (fields, _metadata) = log_event.into_parts();
-                let fields = fields
-                    .into_iter()
-                    .map(|(k, v)| (k, encode_value(v)))
-                    .collect::<BTreeMap<_, _>>();
-
-                let event = EventProto::Log(Log { fields });
-
-                proto::EventWrapper { event: Some(event) }
-            }
-            Event::Metric(metric) => {
-                let name = metric.series.name.name;
-                let namespace = metric.series.name.namespace.unwrap_or_default();
-
-                let timestamp = metric.data.timestamp.map(|ts| prost_types::Timestamp {
-                    seconds: ts.timestamp(),
-                    nanos: ts.timestamp_subsec_nanos() as i32,
-                });
-
-                let tags = metric.series.tags.unwrap_or_default();
-
-                let kind = match metric.data.kind {
-                    MetricKind::Incremental => proto::metric::Kind::Incremental,
-                    MetricKind::Absolute => proto::metric::Kind::Absolute,
-                }
-                .into();
-
-                let metric = match metric.data.value {
-                    MetricValue::Counter { value } => {
-                        MetricProto::Counter(proto::Counter { value })
-                    }
-                    MetricValue::Gauge { value } => MetricProto::Gauge(proto::Gauge { value }),
-                    MetricValue::Set { values } => MetricProto::Set(proto::Set {
-                        values: values.into_iter().collect(),
-                    }),
-                    MetricValue::Distribution { samples, statistic } => {
-                        MetricProto::Distribution2(proto::Distribution2 {
-                            samples: samples.into_iter().map(Into::into).collect(),
-                            statistic: match statistic {
-                                StatisticKind::Histogram => proto::StatisticKind::Histogram,
-                                StatisticKind::Summary => proto::StatisticKind::Summary,
-                            }
-                            .into(),
-                        })
-                    }
-                    MetricValue::AggregatedHistogram {
-                        buckets,
-                        count,
-                        sum,
-                    } => MetricProto::AggregatedHistogram2(proto::AggregatedHistogram2 {
-                        buckets: buckets.into_iter().map(Into::into).collect(),
-                        count,
-                        sum,
-                    }),
-                    MetricValue::AggregatedSummary {
-                        quantiles,
-                        count,
-                        sum,
-                    } => MetricProto::AggregatedSummary2(proto::AggregatedSummary2 {
-                        quantiles: quantiles.into_iter().map(Into::into).collect(),
-                        count,
-                        sum,
-                    }),
-                };
-
-                let event = EventProto::Metric(proto::Metric {
-                    name,
-                    namespace,
-                    timestamp,
-                    tags,
-                    kind,
-                    value: Some(metric),
-                });
-
-                proto::EventWrapper { event: Some(event) }
-            }
         }
     }
 }
