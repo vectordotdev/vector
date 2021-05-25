@@ -130,23 +130,24 @@ impl From<event::LogEvent> for Log {
 
 impl From<event::Metric> for Metric {
     fn from(metric: event::Metric) -> Self {
-        let name = metric.series.name.name;
-        let namespace = metric.series.name.namespace.unwrap_or_default();
+        let (series, data, _metadata) = metric.into_parts();
+        let name = series.name.name;
+        let namespace = series.name.namespace.unwrap_or_default();
 
-        let timestamp = metric.data.timestamp.map(|ts| prost_types::Timestamp {
+        let timestamp = data.timestamp.map(|ts| prost_types::Timestamp {
             seconds: ts.timestamp(),
             nanos: ts.timestamp_subsec_nanos() as i32,
         });
 
-        let tags = metric.series.tags.unwrap_or_default();
+        let tags = series.tags.unwrap_or_default();
 
-        let kind = match metric.data.kind {
+        let kind = match data.kind {
             event::MetricKind::Incremental => metric::Kind::Incremental,
             event::MetricKind::Absolute => metric::Kind::Absolute,
         }
         .into();
 
-        let metric = match metric.data.value {
+        let metric = match data.value {
             event::MetricValue::Counter { value } => MetricValue::Counter(Counter { value }),
             event::MetricValue::Gauge { value } => MetricValue::Gauge(Gauge { value }),
             event::MetricValue::Set { values } => MetricValue::Set(Set {
