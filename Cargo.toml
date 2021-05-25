@@ -119,8 +119,9 @@ tracing-subscriber = { version = "0.2.18", default-features = false }
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", default-features = false, rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
-metrics = { version = "0.15.1", default-features = false, features = ["std"]}
-metrics-tracing-context = { version = "0.4.0", default-features = false }
+metrics = { version = "0.16.0", default-features = false, features = ["std"] }
+metrics-tracing-context = { version = "0.6.0", default-features = false }
+metrics-util = { version = "0.9.1", default-features = false, features = ["std"] }
 
 # Aws
 rusoto_cloudwatch = { version = "0.46.0", optional = true }
@@ -181,7 +182,7 @@ bollard = { version = "0.10.1", default-features = false, features = ["ssl"], op
 bytes = { version = "1.0.1", default-features = false, features = ["serde"] }
 bytesize = { version = "1.0.1", default-features = false, optional = true }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-cidr-utils = { version = "0.5.3", default-features = false }
+cidr-utils = { version = "0.5.4", default-features = false }
 colored = { version = "2.0.0", default-features = false }
 dashmap = { version = "4.0.2", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
@@ -248,9 +249,10 @@ uuid = { version = "0.8.2", default-features = false, features = ["serde", "v4"]
 warp = { version = "0.3.1", default-features = false, optional = true }
 zstd = { version = "0.6", default-features = false }
 cfg-if = { version = "1.0.0", default-features = false }
+tonic = { version = "0.4", optional = true, default-features = false, features = ["transport", "codegen", "prost", "tls"] }
 
 # For WASM
-async-stream = "0.3.1"
+async-stream = "0.3.2"
 lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
@@ -269,6 +271,8 @@ nix = "0.20.0"
 
 [build-dependencies]
 built = { version = "0.5.0", features = ["chrono", "git2"] }
+prost-build = { version = "0.7.0", optional = true }
+tonic-build = { version = "0.4", default-features = false, features = ["transport", "prost"], optional = true }
 
 [dev-dependencies]
 approx = "0.4.0"
@@ -288,6 +292,11 @@ tower-test = "0.4.0"
 walkdir = "2.3.2"
 quickcheck = "1.0.3"
 lookup = { path = "lib/lookup", features = ["arbitrary"] }
+
+
+[patch.crates-io]
+# A patch for lib/vector-core/buffers, addresses Issue 7514
+leveldb-sys = { git = "https://github.com/timberio/leveldb-sys.git", branch = "leveldb_mmap_limit" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -425,7 +434,7 @@ sources-utils-tcp-socket = []
 sources-utils-tls = []
 sources-utils-udp = []
 sources-utils-unix = []
-sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls"]
+sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tcp-socket", "sources-utils-tls", "tonic", "tonic-build", "prost-build"]
 
 # Transforms
 transforms = ["transforms-logs", "transforms-metrics"]
@@ -531,7 +540,7 @@ sinks-logs = [
   "sinks-sematext",
   "sinks-socket",
   "sinks-splunk_hec",
-  "sinks-vector"
+  "sinks-vector",
 ]
 sinks-metrics = [
   "sinks-aws_cloudwatch_metrics",
@@ -544,7 +553,7 @@ sinks-metrics = [
   "sinks-prometheus",
   "sinks-sematext",
   "sinks-statsd",
-  "sinks-vector"
+  "sinks-vector",
 ]
 
 sinks-aws_cloudwatch_logs = ["rusoto", "rusoto_logs"]
@@ -578,7 +587,7 @@ sinks-socket = ["sinks-utils-udp"]
 sinks-splunk_hec = ["bytesize"]
 sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
-sinks-vector = ["sinks-utils-udp"]
+sinks-vector = ["sinks-utils-udp", "tonic", "tonic-build", "prost-build"]
 
 # Identifies that the build is a nightly build
 nightly = []

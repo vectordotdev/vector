@@ -199,7 +199,7 @@ spec:
         app.kubernetes.io/name: vector-agent
         app.kubernetes.io/instance: vector
         vector.dev/exclude: "true"
-    spec:
+    spec:      
       serviceAccountName: vector-agent
       securityContext:
         {}

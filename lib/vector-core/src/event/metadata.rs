@@ -1,13 +1,21 @@
 #![deny(missing_docs)]
 
 use super::{EventFinalizer, EventFinalizers, EventStatus};
+use getset::{Getters, Setters};
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
+use std::sync::Arc;
 
 /// The top-level metadata structure contained by both `struct Metric`
 /// and `struct LogEvent` types.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, PartialOrd, Serialize)]
+#[derive(
+    Clone, Debug, Default, Deserialize, Getters, PartialEq, PartialOrd, Serialize, Setters,
+)]
 pub struct EventMetadata {
+    /// Used to store the datadog API from sources to sinks
+    #[getset(get = "pub", set = "pub")]
+    #[serde(default, skip)]
+    datadog_api_key: Option<Arc<str>>,
     #[serde(default, skip)]
     finalizers: EventFinalizers,
 }
@@ -20,8 +28,12 @@ impl EventMetadata {
     }
 
     /// Merge the other `EventMetadata` into this.
+    /// If a Datadog API key is not set in `self`, the one from `other` will be used.
     pub fn merge(&mut self, other: Self) {
         self.finalizers.merge(other.finalizers);
+        if self.datadog_api_key.is_none() {
+            self.datadog_api_key = other.datadog_api_key
+        }
     }
 
     /// Update the finalizer(s) status.

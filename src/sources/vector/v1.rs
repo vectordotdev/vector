@@ -1,8 +1,11 @@
-use super::util::{SocketListenAddr, TcpSource};
 use crate::{
-    config::{DataType, GenerateConfig, Resource, SourceConfig, SourceContext, SourceDescription},
+    config::{DataType, GenerateConfig, Resource, SourceContext},
     event::{proto, Event},
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
+    sources::{
+        util::{SocketListenAddr, TcpSource},
+        Source,
+    },
     tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
 };
@@ -40,10 +43,6 @@ impl VectorConfig {
     }
 }
 
-inventory::submit! {
-    SourceDescription::new::<VectorConfig>("vector")
-}
-
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self::from_address(SocketListenAddr::SocketAddr(
@@ -53,10 +52,8 @@ impl GenerateConfig for VectorConfig {
     }
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "vector")]
-impl SourceConfig for VectorConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+impl VectorConfig {
+    pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
         let vector = VectorSource;
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         vector.run(
@@ -70,15 +67,15 @@ impl SourceConfig for VectorConfig {
         )
     }
 
-    fn output_type(&self) -> DataType {
+    pub(super) fn output_type(&self) -> DataType {
         DataType::Any
     }
 
-    fn source_type(&self) -> &'static str {
+    pub(super) fn source_type(&self) -> &'static str {
         "vector"
     }
 
-    fn resources(&self) -> Vec<Resource> {
+    pub(super) fn resources(&self) -> Vec<Resource> {
         vec![self.address.into()]
     }
 }
@@ -115,13 +112,13 @@ mod test {
     use super::VectorConfig;
     use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext},
+        config::{GlobalOptions, SinkContext, SourceContext},
         event::Event,
         event::{
             metric::{MetricKind, MetricValue},
             Metric,
         },
-        sinks::vector::VectorSinkConfig,
+        sinks::vector::v1::VectorConfig as SinkConfig,
         test_util::{collect_ready, next_addr, trace_init, wait_for_tcp},
         tls::{TlsConfig, TlsOptions},
         Pipeline,
@@ -149,7 +146,7 @@ mod test {
         crate::test_util::test_generate_config::<VectorConfig>();
     }
 
-    async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: VectorSinkConfig) {
+    async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: SinkConfig) {
         let (tx, rx) = Pipeline::new_test();
 
         let server = source.build(SourceContext::new_test(tx)).await.unwrap();
@@ -189,7 +186,7 @@ mod test {
         stream_test(
             addr,
             VectorConfig::from_address(addr.into()),
-            VectorSinkConfig::from_address(format!("localhost:{}", addr.port())),
+            SinkConfig::from_address(format!("localhost:{}", addr.port())),
         )
         .await;
     }
@@ -205,8 +202,7 @@ mod test {
                 config
             },
             {
-                let mut config =
-                    VectorSinkConfig::from_address(format!("localhost:{}", addr.port()));
+                let mut config = SinkConfig::from_address(format!("localhost:{}", addr.port()));
                 config.set_tls(Some(TlsConfig {
                     enabled: Some(true),
                     options: TlsOptions {

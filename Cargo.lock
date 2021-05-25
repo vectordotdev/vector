@@ -419,9 +419,9 @@ dependencies = [
 
 [[package]]
 name = "async-stream"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a26cb53174ddd320edfff199a853f93d571f48eeb4dde75e67a9a3dbb7b7e5e"
+checksum = "171374e7e3b2504e0e5236e3b59260560f9fe94bfe9ac39ba5e4e929c5590625"
 dependencies = [
  "async-stream-impl",
  "futures-core",
@@ -429,9 +429,9 @@ dependencies = [
 
 [[package]]
 name = "async-stream-impl"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db134ba52475c060f3329a8ef0f8786d6b872ed01515d4b79c162e5798da1340"
+checksum = "648ed8c8d2ce5409ccd57453d9d1b214b342a0d69376a6feda1fd6cae3299308"
 dependencies = [
  "proc-macro2 1.0.26",
  "quote 1.0.9",
@@ -1038,9 +1038,9 @@ dependencies = [
 
 [[package]]
 name = "cidr-utils"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b2b344c64cf961a8f49c371acef86abf758bc292f645bd61779e1bb1edc9d87"
+checksum = "390f6ff81e5cca35a3d60953fcbfe7989162ddcdc6be20a45c5d002a19038c4f"
 dependencies = [
  "debug-helper",
  "num-bigint 0.4.0",
@@ -1086,12 +1086,12 @@ dependencies = [
 
 [[package]]
 name = "clipboard-win"
-version = "4.1.0"
+version = "4.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9dc138eac3ade40f10cb7aee8b27e6aed1342d8788c40e66eb52914009d160ed"
+checksum = "4e4ea1881992efc993e4dc50a324cdbd03216e41bdc8385720ff47efc9bd2ca8"
 dependencies = [
  "error-code",
- "str-buf",
+ "str-buf 1.0.5",
  "winapi 0.3.9",
 ]
 
@@ -2011,7 +2011,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d4871041f3339e2cd4a23c698f89519e1ca62aa73190eddcc18dde4ee11e8ff"
 dependencies = [
  "libc",
- "str-buf",
+ "str-buf 2.0.0",
 ]
 
 [[package]]
@@ -2109,6 +2109,12 @@ dependencies = [
  "libc",
  "winapi 0.3.9",
 ]
+
+[[package]]
+name = "ffi-opaque"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "534be3985e262585e2a8bb8322969e2115f0eff293b5bf522bef397fff54c9bc"
 
 [[package]]
 name = "file-source"
@@ -3367,11 +3373,11 @@ dependencies = [
 
 [[package]]
 name = "leveldb-sys"
-version = "2.0.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "618aee5ba3d32cb8456420a9a454aa71c1af5b3e9c7a2ec20a0f3cbbe47246cb"
+version = "2.0.9"
+source = "git+https://github.com/timberio/leveldb-sys.git?branch=leveldb_mmap_limit#deca67b91b32c77bb5bcd122e306877468520a97"
 dependencies = [
  "cmake",
+ "ffi-opaque",
  "libc",
  "num_cpus",
 ]
@@ -3838,9 +3844,9 @@ dependencies = [
 
 [[package]]
 name = "metrics"
-version = "0.15.1"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c53c23fff9a59f261498953cf41dc9ffc2522fd79723bdf283c1e88dc1633624"
+checksum = "9c0a7fa53d812d26e59d2baf7a6f77442041454ab32908eb304447f00f0dd4de"
 dependencies = [
  "metrics-macros",
  "proc-macro-hack",
@@ -3849,9 +3855,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-macros"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b22572ba9964744e261d34553568683b76db277bcd309ebf7215e28e0982505d"
+checksum = "caa72e4a3d157986dd2565c82ecbddcc23941513669a3766b938f6b72eb87f3f"
 dependencies = [
  "lazy_static",
  "proc-macro-hack",
@@ -3863,9 +3869,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-tracing-context"
-version = "0.4.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9cdacbcb8c51682ff85744e8511bb454574adda00f4104ae6215b1b6eb71788"
+checksum = "c2b0900f96236eaa964bb4b94d5cf300b1455ca3a9f28a5c9ba7dbc7deb633a3"
 dependencies = [
  "itoa",
  "metrics",
@@ -3877,9 +3883,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-util"
-version = "0.7.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6586f4c52af81a3f7832cf0bc86141d2fca7207bedd09fdd3f7da60c8dcd0c4a"
+checksum = "bd2a095cccde5b79bf33556d987688db3d94cb1d75b1f9499a3de3291cb71ebd"
 dependencies = [
  "aho-corasick",
  "atomic-shim",
@@ -3893,6 +3899,7 @@ dependencies = [
  "ordered-float",
  "parking_lot",
  "quanta",
+ "radix_trie",
  "sketches-ddsketch",
  "t1ha",
 ]
@@ -5862,9 +5869,9 @@ dependencies = [
 
 [[package]]
 name = "rust_decimal"
-version = "1.13.0"
+version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72e80c4f9a71b5949e283189c3c3ae35fedddecfe112e75c9d58751c36605b62"
+checksum = "2fd51dfdc79146dc24efbe4626c01ed5cd9f5b3b5742b51b26ea413e7dd7730b"
 dependencies = [
  "arrayvec 0.5.2",
  "num-traits",
@@ -5950,14 +5957,13 @@ dependencies = [
 
 [[package]]
 name = "rustyline"
-version = "8.1.0"
+version = "8.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53e628a0a8e3e278dc96badc1f54492e5c5201037c7df14935c8b9571e9d2923"
+checksum = "fbd4eaf7a7738f76c98e4f0395253ae853be3eb018f7b0bb57fe1b6c17e31874"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
  "clipboard-win",
- "error-code",
  "fd-lock",
  "libc",
  "log",
@@ -6622,6 +6628,12 @@ checksum = "213701ba3370744dcd1a12960caa4843b3d68b4d1c0a5d575e0d65b2ee9d16c0"
 
 [[package]]
 name = "str-buf"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d44a3643b4ff9caf57abcee9c2c621d6c03d9135e0d8b589bd9afb5992cb176a"
+
+[[package]]
+name = "str-buf"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a66ae6a6cd930c97707cb3f1b62aadb8ddddd2fefa9df539564b3bfaa15dd31f"
@@ -6909,18 +6921,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.24"
+version = "1.0.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0f4a65597094d4483ddaed134f409b2cb7c1beccf25201a9f73c719254fa98e"
+checksum = "fa6f76457f59514c7eeb4e59d891395fab0b2fd1d40723ae737d64153392e9c6"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.24"
+version = "1.0.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7765189610d8241a44529806d6fd1f2e0a08734313a35d5b3a556f92b381f3c0"
+checksum = "8a36768c0fbf1bb15eca10defa29526bda730a2376c2ab4393ccfa16fb1a318d"
 dependencies = [
  "proc-macro2 1.0.26",
  "quote 1.0.9",
@@ -7182,6 +7194,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "tonic"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ac42cd97ac6bd2339af5bcabf105540e21e45636ec6fa6aae5e85d44db31be0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "base64 0.13.0",
+ "bytes 1.0.1",
+ "futures-core",
+ "futures-util",
+ "h2",
+ "http",
+ "http-body",
+ "hyper",
+ "percent-encoding",
+ "pin-project 1.0.7",
+ "prost",
+ "prost-derive",
+ "tokio",
+ "tokio-rustls",
+ "tokio-stream",
+ "tokio-util",
+ "tower",
+ "tower-service",
+ "tracing 0.1.26",
+ "tracing-futures 0.2.5",
+]
+
+[[package]]
+name = "tonic-build"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c695de27302f4697191dda1c7178131a8cb805463dda02864acb80fe1322fdcf"
+dependencies = [
+ "proc-macro2 1.0.26",
+ "prost-build",
+ "quote 1.0.9",
+ "syn 1.0.72",
+]
+
+[[package]]
 name = "tower"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7189,8 +7243,12 @@ checksum = "bf0aa6dfc29148c3826708dabbfa83c121eeb84df4d1468220825e3a33651687"
 dependencies = [
  "futures-core",
  "futures-util",
+ "indexmap",
  "pin-project 1.0.7",
+ "rand 0.8.3",
+ "slab",
  "tokio",
+ "tokio-stream",
  "tokio-util",
  "tower-layer",
  "tower-service",
@@ -7800,6 +7858,7 @@ dependencies = [
  "maxminddb",
  "metrics",
  "metrics-tracing-context",
+ "metrics-util",
  "mongodb",
  "nix 0.20.0",
  "nom 6.1.2",
@@ -7819,6 +7878,7 @@ dependencies = [
  "pretty_assertions",
  "prometheus-parser",
  "prost",
+ "prost-build",
  "prost-types",
  "pulsar",
  "quickcheck",
@@ -7864,6 +7924,8 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "toml",
+ "tonic",
+ "tonic-build",
  "tower",
  "tower-layer",
  "tower-test",
@@ -7933,7 +7995,6 @@ dependencies = [
  "bytes 1.0.1",
  "chrono",
  "criterion",
- "dashmap",
  "db-key",
  "derivative 2.2.0",
  "futures 0.3.15",
