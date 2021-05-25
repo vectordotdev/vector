@@ -880,29 +880,47 @@ mod tests {
         QueryParam(&'a str),
     }
 
-    async fn post(address: SocketAddr, api: &str, message: &str) -> u16 {
-        send_with(address, api, message, TOKEN, Channel::Header("channel")).await
+    #[derive(Default)]
+    struct SendWithOpts<'a> {
+        channel: Option<Channel<'a>>,
+        forwarded_for: Option<String>
     }
 
-    async fn send_with(
+    async fn post(address: SocketAddr, api: &str, message: &str) -> u16 {
+        let channel = Channel::Header("channel");
+        let options = SendWithOpts {
+            channel: Some(channel),
+            forwarded_for: None
+        };
+        send_with(address, api, message, TOKEN, &options).await
+    }
+
+    async fn send_with<'a>(
         address: SocketAddr,
         api: &str,
         message: &str,
         token: &str,
-        channel: Channel<'_>,
+        opts: &SendWithOpts<'_>,
     ) -> u16 {
-        let wrap_with_channel =
-            |b: reqwest::RequestBuilder, c: Channel| -> reqwest::RequestBuilder {
+        let mut b = reqwest::Client::new()
+            .post(&format!("http://{}/{}", address, api))
+            .header("Authorization", format!("Splunk {}", token));
+
+        b = match opts.channel {
+            Some(c) => {
                 match c {
                     Channel::Header(v) => b.header("x-splunk-request-channel", v),
                     Channel::QueryParam(v) => b.query(&[("channel", v)]),
                 }
-            };
+            }
+            None => b
+        };
 
-        let mut b = reqwest::Client::new()
-            .post(&format!("http://{}/{}", address, api))
-            .header("Authorization", format!("Splunk {}", token));
-        b = wrap_with_channel(b, channel);
+        b = match &opts.forwarded_for {
+            Some(f) => b.header("X-Forwarded-For", f),
+            None => b
+        };
+
         b.body(message.to_owned())
             .send()
             .await
@@ -1067,6 +1085,11 @@ mod tests {
         let message = "raw";
         let (source, address) = source().await;
 
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: None
+        };
+
         assert_eq!(
             200,
             send_with(
@@ -1074,7 +1097,7 @@ mod tests {
                 "services/collector/raw",
                 message,
                 TOKEN,
-                Channel::Header("guid")
+                &opts
             )
             .await
         );
@@ -1084,11 +1107,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn channel_query_param() {
+    async fn xff_header() {
         trace_init();
 
         let message = "raw";
         let (source, address) = source().await;
+
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: Some(String::from("10.0.0.1"))
+        };
 
         assert_eq!(
             200,
@@ -1097,7 +1125,34 @@ mod tests {
                 "services/collector/raw",
                 message,
                 TOKEN,
-                Channel::QueryParam("guid")
+                &opts
+            )
+            .await
+        );
+
+        let event = collect_n(source, 1).await.remove(0);
+        assert_eq!(event.as_log()[&super::REMOTE_ADDR], "10.0.0.1".into());
+    }
+    #[tokio::test]
+    async fn channel_query_param() {
+        trace_init();
+
+        let message = "raw";
+        let (source, address) = source().await;
+
+        let opts = SendWithOpts {
+            channel: Some(Channel::QueryParam("guid")),
+            forwarded_for: None
+        };
+
+        assert_eq!(
+            200,
+            send_with(
+                address,
+                "services/collector/raw",
+                message,
+                TOKEN,
+                &opts
             )
             .await
         );
@@ -1120,6 +1175,10 @@ mod tests {
         trace_init();
 
         let (_source, address) = source().await;
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("channel")),
+            forwarded_for: None
+        };
 
         assert_eq!(
             401,
@@ -1128,7 +1187,7 @@ mod tests {
                 "services/collector/event",
                 "",
                 "nope",
-                Channel::Header("channel")
+                &opts
             )
             .await
         );
