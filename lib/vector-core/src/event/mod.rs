@@ -6,7 +6,7 @@ pub use finalization::{
 };
 pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
-pub use metadata::EventMetadata;
+pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use prost::{DecodeError, EncodeError, Message};
 use shared::EventDataEq;
