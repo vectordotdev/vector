@@ -98,7 +98,8 @@ if ! [ -x "$(command -v docker)" ]; then
     apt update --yes
     apt install --yes docker-ce docker-ce-cli containerd.io
 
-    usermod --append --groups docker ubuntu
+    # ubuntu user doesn't exist in scripts/environment/Dockerfile which runs this
+    usermod --append --groups docker ubuntu || true
 fi
 
 # Apt cleanup
