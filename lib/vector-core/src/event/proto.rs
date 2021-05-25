@@ -23,100 +23,95 @@ impl From<Metric> for Event {
     }
 }
 
+impl From<Log> for event::LogEvent {
+    fn from(log: Log) -> Self {
+        let fields = log
+            .fields
+            .into_iter()
+            .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
+            .collect::<BTreeMap<_, _>>();
+
+        Self::from(fields)
+    }
+}
+
+impl From<Metric> for event::Metric {
+    fn from(metric: Metric) -> Self {
+        let kind = match metric.kind() {
+            metric::Kind::Incremental => event::MetricKind::Incremental,
+            metric::Kind::Absolute => event::MetricKind::Absolute,
+        };
+
+        let name = metric.name;
+
+        let namespace = if metric.namespace.is_empty() {
+            None
+        } else {
+            Some(metric.namespace)
+        };
+
+        let timestamp = metric
+            .timestamp
+            .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
+
+        let tags = if metric.tags.is_empty() {
+            None
+        } else {
+            Some(metric.tags)
+        };
+
+        let value = match metric.value.unwrap() {
+            MetricValue::Counter(counter) => event::MetricValue::Counter {
+                value: counter.value,
+            },
+            MetricValue::Gauge(gauge) => event::MetricValue::Gauge { value: gauge.value },
+            MetricValue::Set(set) => event::MetricValue::Set {
+                values: set.values.into_iter().collect(),
+            },
+            MetricValue::Distribution1(dist) => event::MetricValue::Distribution {
+                statistic: dist.statistic().into(),
+                samples: event::metric::zip_samples(dist.values, dist.sample_rates),
+            },
+            MetricValue::Distribution2(dist) => event::MetricValue::Distribution {
+                statistic: dist.statistic().into(),
+                samples: dist.samples.into_iter().map(Into::into).collect(),
+            },
+            MetricValue::AggregatedHistogram1(hist) => event::MetricValue::AggregatedHistogram {
+                buckets: event::metric::zip_buckets(hist.buckets, hist.counts),
+                count: hist.count,
+                sum: hist.sum,
+            },
+            MetricValue::AggregatedHistogram2(hist) => event::MetricValue::AggregatedHistogram {
+                buckets: hist.buckets.into_iter().map(Into::into).collect(),
+                count: hist.count,
+                sum: hist.sum,
+            },
+            MetricValue::AggregatedSummary1(summary) => event::MetricValue::AggregatedSummary {
+                quantiles: event::metric::zip_quantiles(summary.quantiles, summary.values),
+                count: summary.count,
+                sum: summary.sum,
+            },
+            MetricValue::AggregatedSummary2(summary) => event::MetricValue::AggregatedSummary {
+                quantiles: summary.quantiles.into_iter().map(Into::into).collect(),
+                count: summary.count,
+                sum: summary.sum,
+            },
+        };
+
+        Self::new(name, kind, value)
+            .with_namespace(namespace)
+            .with_tags(tags)
+            .with_timestamp(timestamp)
+    }
+}
+
 impl From<EventWrapper> for event::Event {
     fn from(proto: EventWrapper) -> Self {
         let event = proto.event.unwrap();
 
         match event {
-            Event::Log(proto) => {
-                let fields = proto
-                    .fields
-                    .into_iter()
-                    .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
-                    .collect::<BTreeMap<_, _>>();
-
-                Self::Log(event::LogEvent::from(fields))
-            }
-            Event::Metric(proto) => {
-                let kind = match proto.kind() {
-                    metric::Kind::Incremental => event::MetricKind::Incremental,
-                    metric::Kind::Absolute => event::MetricKind::Absolute,
-                };
-
-                let name = proto.name;
-
-                let namespace = if proto.namespace.is_empty() {
-                    None
-                } else {
-                    Some(proto.namespace)
-                };
-
-                let timestamp = proto
-                    .timestamp
-                    .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
-
-                let tags = if proto.tags.is_empty() {
-                    None
-                } else {
-                    Some(proto.tags)
-                };
-
-                let value = match proto.value.unwrap() {
-                    MetricValue::Counter(counter) => event::MetricValue::Counter {
-                        value: counter.value,
-                    },
-                    MetricValue::Gauge(gauge) => event::MetricValue::Gauge { value: gauge.value },
-                    MetricValue::Set(set) => event::MetricValue::Set {
-                        values: set.values.into_iter().collect(),
-                    },
-                    MetricValue::Distribution1(dist) => event::MetricValue::Distribution {
-                        statistic: dist.statistic().into(),
-                        samples: event::metric::zip_samples(dist.values, dist.sample_rates),
-                    },
-                    MetricValue::Distribution2(dist) => event::MetricValue::Distribution {
-                        statistic: dist.statistic().into(),
-                        samples: dist.samples.into_iter().map(Into::into).collect(),
-                    },
-                    MetricValue::AggregatedHistogram1(hist) => {
-                        event::MetricValue::AggregatedHistogram {
-                            buckets: event::metric::zip_buckets(hist.buckets, hist.counts),
-                            count: hist.count,
-                            sum: hist.sum,
-                        }
-                    }
-                    MetricValue::AggregatedHistogram2(hist) => {
-                        event::MetricValue::AggregatedHistogram {
-                            buckets: hist.buckets.into_iter().map(Into::into).collect(),
-                            count: hist.count,
-                            sum: hist.sum,
-                        }
-                    }
-                    MetricValue::AggregatedSummary1(summary) => {
-                        event::MetricValue::AggregatedSummary {
-                            quantiles: event::metric::zip_quantiles(
-                                summary.quantiles,
-                                summary.values,
-                            ),
-                            count: summary.count,
-                            sum: summary.sum,
-                        }
-                    }
-                    MetricValue::AggregatedSummary2(summary) => {
-                        event::MetricValue::AggregatedSummary {
-                            quantiles: summary.quantiles.into_iter().map(Into::into).collect(),
-                            count: summary.count,
-                            sum: summary.sum,
-                        }
-                    }
-                };
-
-                Self::Metric(
-                    event::Metric::new(name, kind, value)
-                        .with_namespace(namespace)
-                        .with_tags(tags)
-                        .with_timestamp(timestamp),
-                )
-            }
+            Event::Log(proto) => Self::Log(proto.into()),
+            Event::Metric(proto) => Self::Metric(proto.into()),
         }
     }
 }
