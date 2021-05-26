@@ -2,7 +2,6 @@ use super::{
     grammar,
     node::{Comparison, ComparisonValue, QueryNode},
 };
-use crate::grammar::DEFAULT_FIELD;
 use ordered_float::NotNan;
 use vrl_parser::{
     ast::{self, Opcode},
@@ -45,15 +44,23 @@ impl From<ComparisonValue> for ast::Node<ast::Expr> {
 impl From<QueryNode> for ast::Expr {
     fn from(q: QueryNode) -> Self {
         match q {
-            // Everything
-            QueryNode::MatchAllDocs => {
-                make_function_call("exists", vec![make_query(DEFAULT_FIELD.to_owned())])
-            }
-            // Nothing
+            // Match everything
+            QueryNode::MatchAllDocs => make_function_call(
+                "exists",
+                vec![make_query(grammar::DEFAULT_FIELD.to_owned())],
+            ),
+            // Matching nothing
             QueryNode::MatchNoDocs => make_not(make_function_call(
                 "exists",
-                vec![make_query(DEFAULT_FIELD.to_owned())],
+                vec![make_query(grammar::DEFAULT_FIELD.to_owned())],
             )),
+            // Field existence
+            QueryNode::AttributeExists { attr } => {
+                make_function_call("exists", vec![make_query(attr)])
+            }
+            QueryNode::AttributeMissing { attr } => {
+                make_not(make_function_call("exists", vec![make_query(attr)]))
+            }
             // Equality
             QueryNode::AttributeTerm { attr, value }
             | QueryNode::QuotedAttribute {
@@ -209,10 +216,20 @@ fn make_function_call<T: IntoIterator<Item = ast::Expr>>(tag: &str, arguments: T
 mod tests {
     // Datadog search syntax -> VRL
     static TESTS: &[(&str, &str)] = &[
-        // Match everything
+        // Match everything (empty)
         ("", "exists(.message)"),
+        // Match everything
+        ("*:*", "exists(.message)"),
         // Match nothing
-        ("-*", "!exists(.message)"),
+        ("-*:*", "!exists(.message)"),
+        // Tag exists
+        ("_exists_:a", "exists(.a)"),
+        // Facet exists
+        ("_exists_:@b", "exists(.custom.b)"),
+        // Tag doesn't exist
+        ("_missing_:a", "!exists(.a)"),
+        // Facet doesn't exist
+        ("_missing_:@b", "!exists(.custom.b)"),
         // Keyword
         ("bla", r#"match(.message, r'\bbla\b')"#),
         // Quoted keyword
