@@ -1840,7 +1840,7 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "data-encoding",
- "snafu",
+ "thiserror",
  "trust-dns-proto",
 ]
 
