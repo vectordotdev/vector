@@ -67,6 +67,7 @@ impl<const N: usize> DecodeBytes<Message<N>> for Message<N> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn setup<const N: usize>(
     max_events: usize,
     variant: Variant,
@@ -96,6 +97,7 @@ pub fn setup<const N: usize>(
 // admittedly, is tough to read.
 //
 
+#[allow(clippy::type_complexity)]
 pub fn wtr_measurement<const N: usize>(
     mut input: (
         Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>,
@@ -135,6 +137,7 @@ pub fn wtr_measurement<const N: usize>(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn war_measurement<const N: usize>(
     mut input: (
         Box<dyn Sink<Message<N>, Error = ()> + Unpin + Send>,

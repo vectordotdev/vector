@@ -37,12 +37,12 @@ impl Model for OnDisk {
         let byte_size = EncodeBytes::encoded_size(&item).unwrap();
         match self.when_full {
             WhenFull::DropNewest => {
-                if !self.is_full() {
-                    self.current_bytes += byte_size;
-                    self.inner.push_back(item);
-                } else {
+                if self.is_full() {
                     // DropNewest never blocks, instead it silently drops the
                     // item pushed in when the buffer is too full.
+                } else {
+                    self.current_bytes += byte_size;
+                    self.inner.push_back(item);
                 }
             }
             WhenFull::Block => {
@@ -55,13 +55,11 @@ impl Model for OnDisk {
     }
 
     fn recv(&mut self) -> Option<Message> {
-        if let Some(msg) = self.inner.pop_front() {
+        self.inner.pop_front().map(|msg| {
             let byte_size = EncodeBytes::encoded_size(&msg).unwrap();
             self.current_bytes -= byte_size;
-            Some(msg)
-        } else {
-            None
-        }
+            msg
+        })
     }
 
     fn is_full(&self) -> bool {

@@ -32,11 +32,11 @@ impl Model for InMemory {
     fn send(&mut self, item: Message) {
         match self.when_full {
             WhenFull::DropNewest => {
-                if self.inner.len() != (self.capacity + self.num_senders) {
-                    self.inner.push_back(item);
-                } else {
+                if self.inner.len() == (self.capacity + self.num_senders) {
                     // DropNewest never blocks, instead it silently drops the
                     // item pushed in when the buffer is too full.
+                } else {
+                    self.inner.push_back(item);
                 }
             }
             WhenFull::Block => {

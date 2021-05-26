@@ -39,7 +39,7 @@ fn check(variant: &Variant) -> bool {
     }
 }
 
-/// VariantGuard wraps a `Variant`, allowing a convenient Drop implementation
+/// `VariantGuard` wraps a `Variant`, allowing a convenient Drop implementation
 struct VariantGuard {
     inner: Variant,
 }
@@ -127,7 +127,7 @@ fn model_check() {
         let mut tx = tx.get();
         let sink = tx.as_mut();
 
-        for action in actions.into_iter() {
+        for action in actions {
             match action {
                 // For each send action we attempt to send into the buffer and
                 // if the buffer signals itself ready do the send, then

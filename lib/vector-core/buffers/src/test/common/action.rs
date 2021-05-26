@@ -21,7 +21,7 @@ impl Arbitrary for Action {
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         match self {
-            Action::Send(val) => Box::new(val.shrink().map(|x| Action::Send(x))),
+            Action::Send(val) => Box::new(val.shrink().map(Action::Send)),
             Action::Recv => single_shrinker(Action::Recv),
         }
     }
