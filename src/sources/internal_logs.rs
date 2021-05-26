@@ -76,6 +76,7 @@ mod tests {
     async fn receives_logs() {
         let start = chrono::Utc::now();
         trace::init(false, false, "debug");
+        trace::reset_early_buffer();
         error!(message = "Before source started.");
 
         let rx = start_source().await;
