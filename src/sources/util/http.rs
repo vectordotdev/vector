@@ -1,7 +1,6 @@
 use crate::{
-    event::{BatchNotifier, BatchStatus, Event},
+    config::SourceContext,
     internal_events::{HttpBadRequest, HttpDecompressError, HttpEventsReceived},
-    shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
@@ -16,6 +15,7 @@ use std::{
     collections::HashMap, convert::TryFrom, error::Error, fmt, io::Read, net::SocketAddr, sync::Arc,
 };
 use tracing_futures::Instrument;
+use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event};
 use warp::{
     filters::{path::FullPath, path::Tail, BoxedFilter},
     http::{HeaderMap, StatusCode},
@@ -192,12 +192,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         strict_path: bool,
         tls: &Option<TlsConfig>,
         auth: &Option<HttpSourceAuthConfig>,
-        out: Pipeline,
-        shutdown: ShutdownSignal,
+        cx: SourceContext,
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let path = path.to_owned();
+        let out = cx.out;
+        let shutdown = cx.shutdown;
+        let acknowledgements = cx.acknowledgements;
         Ok(Box::pin(async move {
             let span = crate::trace::current_span();
             let mut filter: BoxedFilter<()> = warp::post().boxed();
@@ -211,12 +213,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         Ok(())
                     } else {
                         debug!(message = "Path rejected.");
-                        Err(warp::reject::custom(
-                            ErrorMessage::new(StatusCode::NOT_FOUND,
-                            "Not found".to_string())
-                        ))
+                        Err(warp::reject::custom(ErrorMessage::new(
+                            StatusCode::NOT_FOUND,
+                            "Not found".to_string(),
+                        )))
                     }
-                }).untuple_one()
+                })
+                .untuple_one()
                 .and(warp::path::full())
                 .and(warp::header::optional::<String>("authorization"))
                 .and(warp::header::optional::<String>("content-encoding"))
@@ -230,10 +233,9 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                           headers: HeaderMap,
                           body: Bytes,
                           query_parameters: HashMap<String, String>| {
-                        let _guard=span.enter();
+                        let _guard = span.enter();
                         debug!(message = "Handling HTTP request.", headers = ?headers);
 
-                        let mut out = out.clone();
                         let events = auth
                             .is_valid(&auth_header)
                             .and_then(|()| decode(&encoding_header, body))
@@ -243,57 +245,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     .map(|events| (events, body_len))
                             });
 
-                        async move {
-                            match events {
-                                Ok((mut events, body_size)) => {
-                                    emit!(HttpEventsReceived {
-                                        events_count: events.len(),
-                                        byte_size: body_size,
-                                    });
-
-                                    let (batch, receiver) = BatchNotifier::new_with_receiver();
-                                    for event in &mut events {
-                                        event.add_batch_notifier(Arc::clone(&batch));
-                                    }
-                                    drop(batch);
-
-                                    out.send_all(&mut futures::stream::iter(events).map(Ok))
-                                        .map_err(move |error: crate::pipeline::ClosedError| {
-                                            // can only fail if receiving end disconnected, so we are shutting down,
-                                            // probably not gracefully.
-                                            error!(message = "Failed to forward events, downstream is closed.");
-                                            error!(message = "Tried to send the following event.", %error);
-                                            warp::reject::custom(RejectShuttingDown)
-                                        })
-                                        .and_then(|_| async move {
-                                            match receiver.await.unwrap_or(BatchStatus::Delivered) {
-                                                BatchStatus::Delivered => Ok(warp::reply()),
-                                                BatchStatus::Errored => Err(warp::reject::custom(
-                                                    ErrorMessage::new(
-                                                        StatusCode::INTERNAL_SERVER_ERROR,
-                                                        "Error delivering contents to sink".into(),
-                                                    ),
-                                                )),
-                                                BatchStatus::Failed => Err(warp::reject::custom(
-                                                    ErrorMessage::new(
-                                                        StatusCode::BAD_REQUEST,
-                                                        "Contents failed to deliver to sink".into(),
-                                                    ),
-                                                )),
-                                            }
-                                        })
-                                        .await
-                                }
-                                Err(error) => {
-                                    emit!(HttpBadRequest {
-                                        error_code: error.code,
-                                        error_message: error.message.as_str(),
-                                    });
-                                    Err(warp::reject::custom(error))
-                                }
-                            }
-                        }
-                        .instrument(span.clone())
+                        handle_request(events, acknowledgements, out.clone())
+                            .instrument(span.clone())
                     },
                 );
 
@@ -323,5 +276,65 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .await;
             Ok(())
         }))
+    }
+}
+
+async fn handle_request(
+    events: Result<(Vec<Event>, usize), ErrorMessage>,
+    acknowledgements: bool,
+    mut out: Pipeline,
+) -> Result<impl warp::Reply, Rejection> {
+    match events {
+        Ok((mut events, body_size)) => {
+            emit!(HttpEventsReceived {
+                events_count: events.len(),
+                byte_size: body_size,
+            });
+
+            let receiver = acknowledgements.then(|| {
+                let (batch, receiver) = BatchNotifier::new_with_receiver();
+                for event in &mut events {
+                    event.add_batch_notifier(Arc::clone(&batch));
+                }
+                receiver
+            });
+
+            out.send_all(&mut futures::stream::iter(events).map(Ok))
+                .map_err(move |error: crate::pipeline::ClosedError| {
+                    // can only fail if receiving end disconnected, so we are shutting down,
+                    // probably not gracefully.
+                    error!(message = "Failed to forward events, downstream is closed.");
+                    error!(message = "Tried to send the following event.", %error);
+                    warp::reject::custom(RejectShuttingDown)
+                })
+                .and_then(|_| handle_batch_status(receiver))
+                .await
+        }
+        Err(error) => {
+            emit!(HttpBadRequest {
+                error_code: error.code,
+                error_message: error.message.as_str(),
+            });
+            Err(warp::reject::custom(error))
+        }
+    }
+}
+
+async fn handle_batch_status(
+    receiver: Option<BatchStatusReceiver>,
+) -> Result<impl warp::Reply, Rejection> {
+    match receiver {
+        None => Ok(warp::reply()),
+        Some(receiver) => match receiver.await.unwrap_or(BatchStatus::Delivered) {
+            BatchStatus::Delivered => Ok(warp::reply()),
+            BatchStatus::Errored => Err(warp::reject::custom(ErrorMessage::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error delivering contents to sink".into(),
+            ))),
+            BatchStatus::Failed => Err(warp::reject::custom(ErrorMessage::new(
+                StatusCode::BAD_REQUEST,
+                "Contents failed to deliver to sink".into(),
+            ))),
+        },
     }
 }

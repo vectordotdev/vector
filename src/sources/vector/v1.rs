@@ -232,6 +232,7 @@ mod test {
                 globals: GlobalOptions::default(),
                 shutdown,
                 out: tx,
+                acknowledgements: true,
             })
             .await
             .unwrap();
@@ -268,6 +269,7 @@ mod test {
                 globals: GlobalOptions::default(),
                 shutdown,
                 out: tx,
+                acknowledgements: true,
             })
             .await
             .unwrap();

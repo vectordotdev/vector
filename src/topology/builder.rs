@@ -56,7 +56,7 @@ pub async fn build_pieces(
         let (tx, rx) = futures::channel::mpsc::channel(1000);
         let pipeline = Pipeline::from_sender(tx, vec![]);
 
-        let typetag = source.source_type();
+        let typetag = source.inner.source_type();
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
@@ -65,8 +65,9 @@ pub async fn build_pieces(
             globals: config.global.clone(),
             shutdown: shutdown_signal,
             out: pipeline,
+            acknowledgements: source.acknowledgements,
         };
-        let server = match source.build(context).await {
+        let server = match source.inner.build(context).await {
             Err(error) => {
                 errors.push(format!("Source \"{}\": {}", name, error));
                 continue;

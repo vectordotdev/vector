@@ -60,6 +60,7 @@ components: sources: http: {
 	}
 
 	configuration: {
+		acknowledgements: configuration._acknowledgements
 		address: {
 			description: "The address to accept connections on. The address _must_ include a port."
 			required:    true
