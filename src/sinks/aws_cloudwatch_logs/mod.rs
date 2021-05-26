@@ -529,7 +529,14 @@ async fn healthcheck(
                     Err(HealthcheckError::GroupNameError.into())
                 }
             }
-            None => Err(HealthcheckError::NoLogGroup.into()),
+            None => {
+                if config.create_missing_group.unwrap() == true {
+                    info!("Cloudwatch group_name will be created at runtime");
+                    return Ok(());
+                } else {
+                    Err(HealthcheckError::NoLogGroup.into())
+                }
+            }
         },
         Err(source) => Err(HealthcheckError::DescribeLogGroupsFailed { source }.into()),
     }
