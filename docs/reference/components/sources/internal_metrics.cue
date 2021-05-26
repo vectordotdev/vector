@@ -682,6 +682,12 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		request_automatic_decode_errors_total: {
+			description:       "The total number of request errors for this component when it attempted to automatically discover and handle the content-encoding of incoming request data."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		requests_completed_total: {
 			description:       "The total number of requests completed by this component."
 			type:              "counter"
