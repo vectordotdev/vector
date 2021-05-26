@@ -32,6 +32,8 @@ impl Default for BufferConfig {
     }
 }
 
+pub(crate) type EventStream = Box<dyn Stream<Item = Event> + Unpin + Send>;
+
 impl BufferConfig {
     #[inline]
     const fn memory_max_events() -> usize {
@@ -43,14 +45,7 @@ impl BufferConfig {
         &self,
         data_dir: &Option<PathBuf>,
         sink_name: &str,
-    ) -> Result<
-        (
-            BufferInputCloner<Event>,
-            Box<dyn Stream<Item = Event> + Send>,
-            Acker,
-        ),
-        String,
-    > {
+    ) -> Result<(BufferInputCloner<Event>, EventStream, Acker), String> {
         let variant = match &self {
             BufferConfig::Memory {
                 max_events,
