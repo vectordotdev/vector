@@ -25,8 +25,25 @@ impl TrackedEnv {
     }
 }
 
+enum ConstantValue {
+    Required(String),
+    Optional(Option<String>),
+}
+
+impl ConstantValue {
+    pub fn as_parts(&self) -> (&'static str, String) {
+        match &self {
+            ConstantValue::Required(value) => ("&str", format!("\"{}\"", value)),
+            ConstantValue::Optional(value) => match value {
+                Some(value) => ("Option<&str>", format!("Some(\"{}\")", value)),
+                None => ("Option<&str>", "None".to_string()),
+            },
+        }
+    }
+}
+
 struct BuildConstants {
-    values: Vec<(String, String, String)>,
+    values: Vec<(String, String, ConstantValue)>,
 }
 
 impl BuildConstants {
@@ -34,19 +51,20 @@ impl BuildConstants {
         Self { values: Vec::new() }
     }
 
-    pub fn add_constant<S1, S2, S3>(&mut self, name: S1, desc: S2, value: Option<S3>)
-    where
-        S1: Into<String>,
-        S2: Into<String>,
-        S3: Into<String>,
-    {
-        if let Some(value) = value {
-            let name = name.into();
-            let desc = desc.into();
-            let value = value.into();
+    pub fn add_required_constant(&mut self, name: &str, desc: &str, value: String) {
+        self.values.push((
+            name.to_string(),
+            desc.to_string(),
+            ConstantValue::Required(value),
+        ));
+    }
 
-            self.values.push((name, desc, value));
-        }
+    pub fn add_optional_constant(&mut self, name: &str, desc: &str, value: Option<String>) {
+        self.values.push((
+            name.to_string(),
+            desc.to_string(),
+            ConstantValue::Optional(value),
+        ));
     }
 
     pub fn write_to_file(self, file_name: impl AsRef<Path>) -> std::io::Result<()> {
@@ -60,9 +78,10 @@ impl BuildConstants {
         )?;
 
         for (name, desc, value) in self.values {
+            let (const_type, const_val) = value.as_parts();
             let full = format!(
-                "#[doc=r#\"{}\"#]\npub const {}: &str = \"{}\";\n",
-                desc, name, value
+                "#[doc=r#\"{}\"#]\npub const {}: {} = {};\n",
+                desc, name, const_type, const_val
             );
             output_file.write_all(full.as_ref())?;
         }
@@ -97,37 +116,47 @@ fn main() {
     // inform Cargo when it needs to rerun this build script.  This allows us to avoid rerunning it
     // every single time unless something _actually_ changes.
     let mut tracker = TrackedEnv::new();
-    let pkg_name = tracker.get_env_var("CARGO_PKG_NAME");
-    let pkg_version = tracker.get_env_var("CARGO_PKG_VERSION");
-    let pkg_description = tracker.get_env_var("CARGO_PKG_DESCRIPTION");
-    let target = tracker.get_env_var("TARGET");
-    let target_arch = tracker.get_env_var("CARGO_CFG_TARGET_ARCH");
+    let pkg_name = tracker
+        .get_env_var("CARGO_PKG_NAME")
+        .expect("Cargo-provided environment variables should always exist!");
+    let pkg_version = tracker
+        .get_env_var("CARGO_PKG_VERSION")
+        .expect("Cargo-provided environment variables should always exist!");
+    let pkg_description = tracker
+        .get_env_var("CARGO_PKG_DESCRIPTION")
+        .expect("Cargo-provided environment variables should always exist!");
+    let target = tracker
+        .get_env_var("TARGET")
+        .expect("Cargo-provided environment variables should always exist!");
+    let target_arch = tracker
+        .get_env_var("CARGO_CFG_TARGET_ARCH")
+        .expect("Cargo-provided environment variables should always exist!");
     let build_desc = tracker.get_env_var("VECTOR_BUILD_DESC");
 
     // Gather up the constants and write them out to our build constants file.
     let mut constants = BuildConstants::new();
-    constants.add_constant("PKG_NAME", "The full name of this package.", pkg_name);
-    constants.add_constant(
+    constants.add_required_constant("PKG_NAME", "The full name of this package.", pkg_name);
+    constants.add_required_constant(
         "PKG_VERSION",
         "The full version of this package.",
         pkg_version,
     );
-    constants.add_constant(
+    constants.add_required_constant(
         "PKG_DESCRIPTION",
         "The description of this package.",
         pkg_description,
     );
-    constants.add_constant(
+    constants.add_required_constant(
         "TARGET",
         "The target triple being compiled for. (e.g. x86_64-pc-windows-msvc)",
         target,
     );
-    constants.add_constant(
+    constants.add_required_constant(
         "TARGET_ARCH",
         "The target architecture being compiled for. (e.g. x86_64)",
         target_arch,
     );
-    constants.add_constant(
+    constants.add_optional_constant(
         "VECTOR_BUILD_DESC",
         "Special build description, related to versioned releases.",
         build_desc,

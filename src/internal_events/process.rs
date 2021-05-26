@@ -8,16 +8,12 @@ pub struct VectorStarted;
 
 impl InternalEvent for VectorStarted {
     fn emit_logs(&self) {
-        let git_version = built_info::get_git_version().unwrap_or_default();
-        let released = built_info::get_built_date().unwrap_or_default();
-
         info!(
             target: "vector",
             message = "Vector has started.",
             version = built_info::PKG_VERSION,
-            git_version = git_version.as_str(),
-            released = released.as_str(),
-            arch = built_info::TARGET_ARCH
+            arch = built_info::TARGET_ARCH,
+            build_id = built_info::VECTOR_BUILD_DESC.unwrap_or("none"),
         );
     }
 
