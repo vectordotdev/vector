@@ -2,6 +2,7 @@ use super::{
     grammar,
     node::{Comparison, ComparisonValue, QueryNode},
 };
+use crate::grammar::DEFAULT_FIELD;
 use ordered_float::NotNan;
 use vrl_parser::{
     ast::{self, Opcode},
@@ -28,9 +29,9 @@ impl From<ComparisonValue> for ast::Literal {
                 .unwrap_or_else(|_| ast::Literal::String(value)),
 
             ComparisonValue::Numeric(value) => {
-                ast::Literal::Float(NotNan::new(value).expect("should be float"))
+                ast::Literal::Float(NotNan::new(value).expect("should be a float"))
             }
-            _ => panic!("unknown comparision value"),
+            ComparisonValue::Unbounded => ast::Literal::Null,
         }
     }
 }
@@ -44,6 +45,15 @@ impl From<ComparisonValue> for ast::Node<ast::Expr> {
 impl From<QueryNode> for ast::Expr {
     fn from(q: QueryNode) -> Self {
         match q {
+            // Everything
+            QueryNode::MatchAllDocs => {
+                make_function_call("exists", vec![make_query(DEFAULT_FIELD.to_owned())])
+            }
+            // Nothing
+            QueryNode::MatchNoDocs => make_not(make_function_call(
+                "exists",
+                vec![make_query(DEFAULT_FIELD.to_owned())],
+            )),
             // Equality
             QueryNode::AttributeTerm { attr, value }
             | QueryNode::QuotedAttribute {
@@ -55,7 +65,7 @@ impl From<QueryNode> for ast::Expr {
                 attr,
                 comparator,
                 value,
-            } => make_op(make_query(attr), comparator.into(), value.into()),
+            } => make_op(make_node(make_query(attr)), comparator.into(), value.into()),
             // Wildcard suffix
             QueryNode::AttributePrefix { attr, prefix } => make_function_call(
                 "match",
@@ -72,27 +82,51 @@ impl From<QueryNode> for ast::Expr {
                 lower_inclusive,
                 upper,
                 upper_inclusive,
-            } => make_op(
-                make_node(make_op(
-                    make_query(attr.clone()),
-                    if lower_inclusive {
-                        ast::Opcode::Ge
-                    } else {
-                        ast::Opcode::Gt
-                    },
-                    make_node(ast::Expr::Literal(make_node(lower.into()))),
-                )),
-                ast::Opcode::And,
-                make_node(make_op(
-                    make_query(attr),
+            } => match (&lower, &upper) {
+                // If both bounds are wildcards, it'll match everything; just check the field exists.
+                (ComparisonValue::Unbounded, ComparisonValue::Unbounded) => {
+                    make_function_call("exists", vec![make_query(attr)])
+                }
+                (ComparisonValue::Unbounded, _) => make_op(
+                    make_node(make_query(attr)),
                     if upper_inclusive {
                         ast::Opcode::Le
                     } else {
                         ast::Opcode::Lt
                     },
                     make_node(ast::Expr::Literal(make_node(upper.into()))),
-                )),
-            ),
+                ),
+                (_, ComparisonValue::Unbounded) => make_op(
+                    make_node(make_query(attr)),
+                    if lower_inclusive {
+                        ast::Opcode::Ge
+                    } else {
+                        ast::Opcode::Gt
+                    },
+                    make_node(ast::Expr::Literal(make_node(lower.into()))),
+                ),
+                _ => make_op(
+                    make_node(make_op(
+                        make_node(make_query(attr.clone())),
+                        if lower_inclusive {
+                            ast::Opcode::Ge
+                        } else {
+                            ast::Opcode::Gt
+                        },
+                        make_node(ast::Expr::Literal(make_node(lower.into()))),
+                    )),
+                    ast::Opcode::And,
+                    make_node(make_op(
+                        make_node(make_query(attr)),
+                        if upper_inclusive {
+                            ast::Opcode::Le
+                        } else {
+                            ast::Opcode::Lt
+                        },
+                        make_node(ast::Expr::Literal(make_node(upper.into()))),
+                    )),
+                ),
+            },
             _ => panic!("unsupported query"),
         }
     }
@@ -121,23 +155,23 @@ fn make_op(expr1: ast::Node<ast::Expr>, op: Opcode, expr2: ast::Node<ast::Expr>)
     )))
 }
 
-fn make_query(field: String) -> ast::Node<ast::Expr> {
-    make_node(ast::Expr::Query(make_node(ast::Query {
+fn make_query(field: String) -> ast::Expr {
+    ast::Expr::Query(make_node(ast::Query {
         target: make_node(ast::QueryTarget::External),
         path: make_node(
             lookup::parser::parse_lookup(&normalize_tag(field))
                 .expect("should parse")
                 .into(),
         ),
-    })))
+    }))
 }
 
 /// Makes a Regex string to be used with the `match`.
-fn make_regex(value: String) -> ast::Node<ast::Expr> {
-    make_node(ast::Expr::Literal(make_node(ast::Literal::Regex(format!(
+fn make_regex(value: String) -> ast::Expr {
+    ast::Expr::Literal(make_node(ast::Literal::Regex(format!(
         "\\b{}\\b",
         regex::escape(&value).replace("\\*", ".*")
-    )))))
+    ))))
 }
 
 /// Makes a container block of expressions.
@@ -147,17 +181,26 @@ fn make_block(exprs: Vec<ast::Node<ast::Expr>>) -> ast::Expr {
     )))))
 }
 
+fn make_not(expr: ast::Expr) -> ast::Expr {
+    ast::Expr::Unary(make_node(ast::Unary::Not(make_node(ast::Not(
+        make_node(()),
+        Box::new(make_node(expr)),
+    )))))
+}
+
 /// A `Expr::FunctionCall` based on a tag and arguments.
-fn make_function_call<T: IntoIterator<Item = ast::Node<ast::Expr>>>(
-    tag: &str,
-    arguments: T,
-) -> ast::Expr {
+fn make_function_call<T: IntoIterator<Item = ast::Expr>>(tag: &str, arguments: T) -> ast::Expr {
     ast::Expr::FunctionCall(make_node(ast::FunctionCall {
         ident: make_node(ast::Ident::new(tag.to_string())),
         abort_on_error: true,
         arguments: arguments
             .into_iter()
-            .map(|expr| make_node(ast::FunctionArgument { ident: None, expr }))
+            .map(|expr| {
+                make_node(ast::FunctionArgument {
+                    ident: None,
+                    expr: make_node(expr),
+                })
+            })
             .collect(),
     }))
 }
@@ -166,6 +209,10 @@ fn make_function_call<T: IntoIterator<Item = ast::Node<ast::Expr>>>(
 mod tests {
     // Datadog search syntax -> VRL
     static TESTS: &[(&str, &str)] = &[
+        // Match everything
+        ("", "exists(.message)"),
+        // Match nothing
+        ("-*", "!exists(.message)"),
         // Keyword
         ("bla", r#"match(.message, r'\bbla\b')"#),
         // Quoted keyword
@@ -196,8 +243,35 @@ mod tests {
         ("@b:bla*", r#"match(.custom.b, r'\bbla.*\b')"#),
         // Multiple wildcards - facet
         ("@c:*b*la*", r#"match(.custom.c, r'\b.*b.*la.*\b')"#),
-        // Range - numeric, exclusive
+        // Range - numeric, inclusive
         ("[1 TO 10]", ".message >= 1 && .message <= 10"),
+        // Range - numeric, inclusive, unbounded (upper)
+        ("[50 TO *]", ".message >= 50"),
+        // Range - numeric, inclusive, unbounded (lower)
+        ("[* TO 50]", ".message <= 50"),
+        // Range - numeric, inclusive, unbounded (both)
+        ("[* TO *]", "exists(.message)"),
+        // Range - numeric, inclusive, tag
+        ("a:[1 TO 10]", ".a >= 1 && .a <= 10"),
+        // Range - numeric, inclusive, unbounded (upper), tag
+        ("a:[50 TO *]", ".a >= 50"),
+        // Range - numeric, inclusive, unbounded (lower), tag
+        ("a:[* TO 50]", ".a <= 50"),
+        // Range - numeric, inclusive, unbounded (both), tag
+        ("a:[* TO *]", "exists(.a)"),
+        // Range - numeric, inclusive, facet
+        ("@b:[1 TO 10]", ".custom.b >= 1 && .custom.b <= 10"),
+        // Range - numeric, inclusive, unbounded (upper), facet
+        ("@b:[50 TO *]", ".custom.b >= 50"),
+        // Range - numeric, inclusive, unbounded (lower), facet
+        ("@b:[* TO 50]", ".custom.b <= 50"),
+        // Range - numeric, inclusive, unbounded (both), facet
+        ("@b:[* TO *]", "exists(.custom.b)"),
+        // TODO: CURRENTLY FAILING TESTS -- needs work in the main grammar and/or VRL to support!
+        // Range - alpha, inclusive
+        //(r#"["a" TO "z"]"#, r#".message >= "a" && .message <= "z""#),
+        // Range - numeric, exclusive
+        //("{1 TO 10}", ".message > 1 && .message < 10"),
     ];
 
     use super::make_node;
