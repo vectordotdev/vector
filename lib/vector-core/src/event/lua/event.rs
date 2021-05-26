@@ -32,21 +32,23 @@ impl<'a> FromLua<'a> for Event {
                 (LuaValue::Nil, LuaValue::Table(metric)) => {
                     Event::Metric(Metric::from_lua(LuaValue::Table(metric), ctx)?)
                 }
-                _ => Err(LuaError::FromLuaConversionError {
+                _ => return Err(LuaError::FromLuaConversionError {
                     from: type_name(&value),
                     to: "Event",
                     message: Some(
                         "Event should contain either \"log\" or \"metric\" key at the top level"
                             .to_string(),
                     ),
-                })?,
+                }),
             },
             LuaValue::String(string) => Event::Frame(string.as_bytes().into(), Default::default()),
-            _ => Err(LuaError::FromLuaConversionError {
-                from: type_name(&value),
-                to: "Event",
-                message: Some("Event should be a Lua table or string".to_string()),
-            })?,
+            _ => {
+                return Err(LuaError::FromLuaConversionError {
+                    from: type_name(&value),
+                    to: "Event",
+                    message: Some("Event should be a Lua table or string".to_string()),
+                })
+            }
         })
     }
 }

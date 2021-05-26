@@ -61,6 +61,22 @@ impl Arbitrary for Event {
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         match self {
+            Event::Chunk(chunk, metadata) => {
+                let metadata = metadata.clone();
+                Box::new(
+                    chunk
+                        .shrink()
+                        .map(move |chunk| Event::Chunk(chunk, metadata.clone())),
+                )
+            }
+            Event::Frame(frame, metadata) => {
+                let metadata = metadata.clone();
+                Box::new(
+                    frame
+                        .shrink()
+                        .map(move |frame| Event::Frame(frame, metadata.clone())),
+                )
+            }
             Event::Log(log_event) => Box::new(log_event.shrink().map(Event::Log)),
             Event::Metric(metric) => Box::new(metric.shrink().map(Event::Metric)),
         }
