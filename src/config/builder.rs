@@ -78,7 +78,7 @@ impl ConfigBuilder {
         source: S,
         codecs: CodecsConfig,
     ) {
-        let source = SourceOuter::new(codecs, Box::new(source));
+        let source = SourceOuter::new(codecs, source);
         self.sources.insert(name.into(), source);
     }
 

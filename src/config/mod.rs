@@ -206,33 +206,27 @@ macro_rules! impl_generate_config_from_default {
     };
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SourceOuter {
     #[serde(flatten)]
     pub codecs: codec::CodecsConfig,
+    #[serde(default = "default_acknowledgements")]
+    pub acknowledgements: bool,
     #[serde(flatten)]
-    pub inner: Box<dyn SourceConfig>,
+    pub(super) inner: Box<dyn SourceConfig>,
+}
+
+fn default_acknowledgements() -> bool {
+    true
 }
 
 impl SourceOuter {
-    pub fn new(codecs: codec::CodecsConfig, inner: Box<dyn SourceConfig>) -> Self {
-        Self { codecs, inner }
-    }
-
-    pub async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        self.inner.build(cx).await
-    }
-
-    pub fn output_type(&self) -> DataType {
-        self.inner.output_type()
-    }
-
-    pub fn source_type(&self) -> &'static str {
-        self.inner.source_type()
-    }
-
-    pub fn resources(&self) -> Vec<Resource> {
-        self.inner.resources()
+    pub(crate) fn new(codecs: codec::CodecsConfig, source: impl SourceConfig + 'static) -> Self {
+        Self {
+            codecs,
+            acknowledgements: default_acknowledgements(),
+            inner: Box::new(source),
+        }
     }
 }
 
@@ -256,6 +250,7 @@ pub struct SourceContext {
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
+    pub acknowledgements: bool,
 }
 
 impl SourceContext {
@@ -272,6 +267,7 @@ impl SourceContext {
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
+                acknowledgements: default_acknowledgements(),
             },
             shutdown,
         )
@@ -284,6 +280,7 @@ impl SourceContext {
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
+            acknowledgements: default_acknowledgements(),
         }
     }
 }

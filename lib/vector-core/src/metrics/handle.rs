@@ -1,6 +1,6 @@
 use metrics::GaugeValue;
-use std::slice;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::{slice, sync::Arc};
 
 #[derive(Debug)]
 struct AtomicF64 {
@@ -36,19 +36,19 @@ impl AtomicF64 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Handle {
-    Gauge(Gauge),
-    Counter(Counter),
-    Histogram(Histogram),
+    Gauge(Arc<Gauge>),
+    Counter(Arc<Counter>),
+    Histogram(Arc<Histogram>),
 }
 
 impl Handle {
     pub(crate) fn counter() -> Self {
-        Handle::Counter(Counter::new())
+        Handle::Counter(Arc::new(Counter::new()))
     }
 
-    pub(crate) fn increment_counter(&mut self, value: u64) {
+    pub(crate) fn increment_counter(&self, value: u64) {
         match self {
             Handle::Counter(counter) => counter.record(value),
             _ => unreachable!(),
@@ -56,10 +56,10 @@ impl Handle {
     }
 
     pub(crate) fn gauge() -> Self {
-        Handle::Gauge(Gauge::new())
+        Handle::Gauge(Arc::new(Gauge::new()))
     }
 
-    pub(crate) fn update_gauge(&mut self, value: GaugeValue) {
+    pub(crate) fn update_gauge(&self, value: GaugeValue) {
         match self {
             Handle::Gauge(gauge) => gauge.record(value),
             _ => unreachable!(),
@@ -67,10 +67,10 @@ impl Handle {
     }
 
     pub(crate) fn histogram() -> Self {
-        Handle::Histogram(Histogram::new())
+        Handle::Histogram(Arc::new(Histogram::new()))
     }
 
-    pub(crate) fn record_histogram(&mut self, value: f64) {
+    pub(crate) fn record_histogram(&self, value: f64) {
         match self {
             Handle::Histogram(h) => h.record(value),
             _ => unreachable!(),
@@ -126,9 +126,9 @@ impl Histogram {
         }
     }
 
-    pub(crate) fn record(&mut self, value: f64) {
+    pub(crate) fn record(&self, value: f64) {
         let mut prev_bound = f64::NEG_INFINITY;
-        for (bound, bucket) in self.buckets.iter_mut() {
+        for (bound, bucket) in self.buckets.iter() {
             if value > prev_bound && value <= *bound {
                 bucket.fetch_add(1, Ordering::Relaxed);
                 break;
@@ -189,7 +189,7 @@ impl Counter {
         }
     }
 
-    pub(crate) fn record(&mut self, value: u64) {
+    pub(crate) fn record(&self, value: u64) {
         self.inner.fetch_add(value, Ordering::Relaxed);
     }
 
@@ -211,7 +211,7 @@ impl Gauge {
     }
 
     #[allow(clippy::needless_pass_by_value)] // see https://github.com/timberio/vector/pull/7341#discussion_r626693005
-    pub(crate) fn record(&mut self, value: GaugeValue) {
+    pub(crate) fn record(&self, value: GaugeValue) {
         // Because Rust lacks an atomic f64 we store gauges as AtomicU64
         // and transmute back and forth to an f64 here. They have the
         // same size so this operation is safe, just don't read the
@@ -256,7 +256,7 @@ mod test {
     #[allow(clippy::needless_pass_by_value)] // `&[T]` does not implement `Arbitrary`
     fn histogram() {
         fn inner(values: Vec<f64>) -> TestResult {
-            let mut sut = Histogram::new();
+            let sut = Histogram::new();
             let mut model_count: u32 = 0;
             let mut model_sum: f64 = 0.0;
 
@@ -284,7 +284,7 @@ mod test {
     #[allow(clippy::needless_pass_by_value)] // `&[T]` does not implement `Arbitrary`
     fn count() {
         fn inner(values: Vec<u64>) -> TestResult {
-            let mut sut = Counter::new();
+            let sut = Counter::new();
             let mut model: u64 = 0;
 
             for val in &values {

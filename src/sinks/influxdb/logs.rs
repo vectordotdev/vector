@@ -709,6 +709,8 @@ mod integration_tests {
         event2.insert("host", "aws.cloud.eur");
         event2.insert("source_type", "file");
 
+        drop(batch);
+
         let events = vec![Event::Log(event1), Event::Log(event2)];
 
         sink.run(stream::iter(events)).await.unwrap();

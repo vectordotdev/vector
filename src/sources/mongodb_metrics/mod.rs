@@ -337,7 +337,7 @@ impl MongoDbMetrics {
         // instance_*
         metrics.push(self.create_metric(
             "instance_local_time",
-            gauge!(status.instance.local_time.timestamp()),
+            gauge!(status.instance.local_time.timestamp_millis() / 1000),
             tags!(self.tags),
         ));
         metrics.push(self.create_metric(

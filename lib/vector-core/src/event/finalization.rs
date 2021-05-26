@@ -3,7 +3,7 @@
 use atomig::{Atom, AtomInteger, Atomic, Ordering};
 use serde::{Deserialize, Serialize};
 use std::iter::{self, ExactSizeIterator};
-use std::{mem, sync::Arc};
+use std::{cmp, mem, sync::Arc};
 use tokio::sync::oneshot;
 
 type ImmutVec<T> = Box<[T]>;
@@ -21,6 +21,16 @@ impl PartialEq for EventFinalizers {
             && (self.0.iter())
                 .zip(other.0.iter())
                 .all(|(a, b)| Arc::ptr_eq(a, b))
+    }
+}
+
+impl PartialOrd for EventFinalizers {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        // There is no partial order defined structurally on
+        // `EventFinalizer`. Partial equality is defined on the equality of
+        // `Arc`s. Therefore, partial ordering of `EventFinalizers` is defined
+        // only on the length of the finalizers.
+        self.0.len().partial_cmp(&other.0.len())
     }
 }
 

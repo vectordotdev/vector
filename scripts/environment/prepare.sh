@@ -8,7 +8,8 @@ rustup default "$(cat rust-toolchain)"
 rustup component add rustfmt
 rustup component add clippy
 rustup target add wasm32-wasi
-rustup run stable cargo install cargo-deb --git https://github.com/mmstick/cargo-deb.git --rev b06dc4e635e07c0566446a0e91faf42ab868e634
+rustup run stable cargo install cargo-deb --version 1.29.2
+rustup run stable cargo install cross --version 0.2.1
 
 cd scripts
 bundle update --bundler

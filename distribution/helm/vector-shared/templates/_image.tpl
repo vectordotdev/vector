@@ -36,3 +36,34 @@ Resolve the full image name to use.
 {{- define "libvector.image" -}}
 {{ include "libvector.imageRepository" . }}:{{ include "libvector.imageTag" . }}
 {{- end }}
+
+{{/*
+Resolve the actual imagePullSecrets to use.
+*/}}
+{{- define "libvector.imagePullSecrets" -}}
+{{- if .Values.global }}
+  {{- if .Values.global.vector }}
+    {{- if .Values.global.vector.imagePullSecrets }}
+imagePullSecrets:
+      {{- range .Values.global.vector.imagePullSecrets }}
+- name: {{ . }}
+      {{- end }}
+    {{- else if .Values.imagePullSecrets }}
+imagePullSecrets:
+      {{- range .Values.imagePullSecrets }}
+- name: {{ . }}
+      {{- end }}
+    {{- end -}}
+  {{- else if .Values.imagePullSecrets }}
+imagePullSecrets:
+    {{- range .Values.imagePullSecrets }}
+- name: {{ . }}
+    {{- end }}
+  {{- end -}}
+{{- else if .Values.imagePullSecrets }}
+imagePullSecrets:
+  {{- range .Values.imagePullSecrets }}
+- name: {{ . }}
+  {{- end }}
+{{- end -}}
+{{- end -}}
