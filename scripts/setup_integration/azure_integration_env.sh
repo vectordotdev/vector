@@ -23,13 +23,13 @@ ACTION=$1
 start_podman() {
   podman pod create --replace --name vector-test-integration-azure -p 10000-10001:10000-10001
   podman run -d --pod=vector-test-integration-azure --name vector_local_azure_blob \
-    mcr.microsoft.com/azure-storage/azurite
+    mcr.microsoft.com/azure-storage/azurite:3.11.0 --blobHost 0.0.0.0 --loose
 }
 
 start_docker() {
   docker network create vector-test-integration-azure
   docker run -d --network=vector-test-integration-azure -v /var/run:/var/run -p 10000-10001:10000-10001 --name vector_local_azure_blob \
-    mcr.microsoft.com/azure-storage/azurite
+    mcr.microsoft.com/azure-storage/azurite:3.11.0 azurite --blobHost 0.0.0.0 --loose
 }
 
 stop_podman() {
