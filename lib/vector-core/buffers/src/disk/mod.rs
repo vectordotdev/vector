@@ -80,7 +80,7 @@ pub fn open<'a, T>(
 ) -> Result<
     (
         Writer<T>,
-        Box<dyn Stream<Item = T> + 'a + Send>,
+        Box<dyn Stream<Item = T> + 'a + Unpin + Send>,
         super::Acker,
     ),
     DataDirError,

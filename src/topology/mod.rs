@@ -12,7 +12,7 @@ pub mod fanout;
 mod task;
 
 use crate::{
-    buffers,
+    buffers::{self, EventStream},
     config::{Config, ConfigDiff, HealthcheckOptions, Resource},
     event::Event,
     shutdown::SourceShutdownCoordinator,
@@ -22,7 +22,7 @@ use crate::{
     },
     trigger::DisabledTrigger,
 };
-use futures::{future, Future, FutureExt, SinkExt, Stream};
+use futures::{future, Future, FutureExt, SinkExt};
 use std::{
     collections::{HashMap, HashSet},
     panic::AssertUnwindSafe,
@@ -39,7 +39,7 @@ type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
 type BuiltBuffer = (
     buffers::BufferInputCloner<Event>,
-    Arc<Mutex<Option<Pin<Box<dyn Stream<Item = Event> + Send>>>>>,
+    Arc<Mutex<Option<Pin<EventStream>>>>,
     buffers::Acker,
 );
 

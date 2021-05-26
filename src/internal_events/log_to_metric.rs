@@ -3,6 +3,26 @@ use crate::template::TemplateParseError;
 use metrics::counter;
 use std::num::ParseFloatError;
 
+pub(crate) struct LogToMetricFieldNull<'a> {
+    pub field: &'a str,
+}
+
+impl<'a> InternalEvent for LogToMetricFieldNull<'a> {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Field is null.",
+            null_field = %self.field,
+            internal_log_rate_secs = 30
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_errors_total", 1,
+                 "error_type" => "field_null",
+        );
+    }
+}
+
 pub(crate) struct LogToMetricFieldNotFound<'a> {
     pub field: &'a str,
 }
