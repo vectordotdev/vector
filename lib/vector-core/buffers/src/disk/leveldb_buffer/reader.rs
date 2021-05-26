@@ -18,22 +18,58 @@ use std::sync::{
     Arc, Mutex,
 };
 use std::task::{Context, Poll, Waker};
+use std::time::{Duration, Instant};
 
+/// How much time needs to pass between compaction to trigger new one.
+const MIN_TIME_UNCOMPACTED: Duration = Duration::from_secs(60);
+
+/// The reader side of N to 1 channel through leveldb.
+///
+/// Reader maintains/manages events thorugh several stages.
+/// Unread -> Read -> Deleted -> Compacted
+///
+/// So the disk buffer (indices/keys) is separated into following regions.
+/// |--Compacted--|--Deleted--|--Read--|--Unread
+///  ^             ^           ^        ^
+///  |             |           |        |
+///  0   `compacted_offset`    |        |
+///                     `delete_offset` |
+///                                `read_offset`
 pub struct Reader<T>
 where
     T: Send + Sync + Unpin,
 {
+    /// Leveldb database.
+    /// Shared with Writers.
     pub(crate) db: Arc<Database<Key>>,
+    /// First unread key
     pub(crate) read_offset: usize,
+    /// First uncompacted key
+    pub(crate) compacted_offset: usize,
+    /// First not deleted key
     pub(crate) delete_offset: usize,
+    /// Reader is notified by Writers through this Waker.
+    /// Shared with Writers.
     pub(crate) write_notifier: Arc<AtomicWaker>,
+    /// Writers blocked by disk being full.
+    /// Shared with Writers.
     pub(crate) blocked_write_tasks: Arc<Mutex<Vec<Waker>>>,
+    /// Size of unread events in bytes.
+    /// Shared with Writers.
     pub(crate) current_size: Arc<AtomicUsize>,
+    /// Number of oldest read, not deleted, events that have been acked by the consumer.
+    /// Shared with consumer.
     pub(crate) ack_counter: Arc<AtomicUsize>,
+    /// Size of deleted, not compacted, events in bytes.
     pub(crate) uncompacted_size: usize,
+    /// Sizes in bytes of read, not acked/deleted, events.
     pub(crate) unacked_sizes: VecDeque<usize>,
+    /// Buffer for internal use.
     pub(crate) buffer: Vec<Vec<u8>>,
+    /// Limit on uncompacted_size after which we trigger compaction.
     pub(crate) max_uncompacted_size: usize,
+    /// Last time that compaction was triggered.
+    pub(crate) last_compaction: Instant,
     pub(crate) phantom: PhantomData<T>,
 }
 
@@ -99,8 +135,6 @@ where
 {
     fn drop(&mut self) {
         self.delete_acked();
-        // Compact on every shutdown
-        self.compact();
     }
 }
 
@@ -129,10 +163,26 @@ where
             self.delete_offset = new_offset;
 
             let size_deleted = self.unacked_sizes.drain(..num_to_delete).sum();
-            self.current_size.fetch_sub(size_deleted, Ordering::Release);
+            let unread_size = self.current_size.fetch_sub(size_deleted, Ordering::Release);
 
             self.uncompacted_size += size_deleted;
-            if self.uncompacted_size > self.max_uncompacted_size {
+
+            // Compaction can be triggered in two ways:
+            //  1. When size of uncompacted is a percentage of total allowed size.
+            //     Managed by MAX_UNCOMPACTED. This is to limit the size of disk buffer
+            //     under configured max size.
+            let max_trigger = self.uncompacted_size > self.max_uncompacted_size;
+            //  2. When the size of uncompacted buffer is larger than unread buffer.
+            //     If the sink is able to keep up with the sources, this will trigger
+            //     with MIN_TIME_UNCOMPACTED interval. And if it's not keeping up,
+            //     this won't trigger hence it won't slow it down, which will allow it
+            //     to grow until it either hits max_uncompacted_size or manages to catch up.
+            //     This is to keep the size of the disk buffer low in idle and up to date
+            //     cases.
+            let timed_trigger = self.last_compaction.elapsed() >= MIN_TIME_UNCOMPACTED
+                && self.uncompacted_size > unread_size;
+
+            if max_trigger || timed_trigger {
                 self.compact();
             }
         }
@@ -147,7 +197,11 @@ where
             self.uncompacted_size = 0;
 
             debug!("Compacting disk buffer.");
-            self.db.compact(&Key(0), &Key(self.delete_offset));
+            self.db
+                .compact(&Key(self.compacted_offset), &Key(self.delete_offset));
+
+            self.compacted_offset = self.delete_offset;
         }
+        self.last_compaction = Instant::now();
     }
 }
