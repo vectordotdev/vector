@@ -1,10 +1,10 @@
 use indoc::indoc;
 use k8s_openapi::{
-    api::core::v1::{Container, Pod, PodSpec},
-    apimachinery::pkg::apis::meta::v1::ObjectMeta,
+    api::core::v1::{Affinity, Container, Pod, PodAffinity, PodAffinityTerm, PodSpec},
+    apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta},
 };
 use k8s_test_framework::{Framework, Interface, Reader};
-use std::env;
+use std::{collections::BTreeMap, env};
 
 pub mod metrics;
 
@@ -71,6 +71,7 @@ pub fn make_test_pod_with_containers<'a>(
     name: &'a str,
     labels: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
     annotations: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
+    affinity: Option<Affinity>,
     containers: Vec<Container>,
 ) -> Pod {
     Pod {
@@ -84,10 +85,54 @@ pub fn make_test_pod_with_containers<'a>(
         spec: Some(PodSpec {
             containers,
             restart_policy: Some("Never".to_owned()),
+            affinity,
             ..PodSpec::default()
         }),
         ..Pod::default()
     }
+}
+
+pub fn make_test_pod_with_affinity<'a>(
+    namespace: &'a str,
+    name: &'a str,
+    command: &'a str,
+    labels: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
+    annotations: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
+    affinity_label: Option<(&'a str, &'a str)>,
+    affinity_namespace: Option<&'a str>,
+) -> Pod {
+    let affinity = affinity_label.map(|(label, value)| {
+        let selector = LabelSelector {
+            match_expressions: None,
+            match_labels: Some({
+                let mut map = BTreeMap::new();
+                map.insert(label.to_string(), value.to_string());
+                map
+            }),
+        };
+
+        Affinity {
+            node_affinity: None,
+            pod_affinity: Some(PodAffinity {
+                preferred_during_scheduling_ignored_during_execution: None,
+                required_during_scheduling_ignored_during_execution: Some(vec![PodAffinityTerm {
+                    label_selector: Some(selector),
+                    namespaces: Some(vec![affinity_namespace.unwrap_or(namespace).to_string()]),
+                    topology_key: "kubernetes.io/hostname".to_string(),
+                }]),
+            }),
+            pod_anti_affinity: None,
+        }
+    });
+
+    make_test_pod_with_containers(
+        namespace,
+        name,
+        labels,
+        annotations,
+        affinity,
+        vec![make_test_container(name, command)],
+    )
 }
 
 pub fn make_test_pod<'a>(
@@ -97,13 +142,7 @@ pub fn make_test_pod<'a>(
     labels: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
     annotations: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
 ) -> Pod {
-    make_test_pod_with_containers(
-        namespace,
-        name,
-        labels,
-        annotations,
-        vec![make_test_container(name, command)],
-    )
+    make_test_pod_with_affinity(namespace, name, command, labels, annotations, None, None)
 }
 
 pub fn parse_json(s: &str) -> Result<serde_json::Value, serde_json::Error> {
