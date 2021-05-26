@@ -67,8 +67,6 @@ pub trait EncodingConfiguration<E> {
                         })
                         .collect::<Vec<_>>();
 
-                    dbg!(&to_remove);
-
                     // reverse sort so that we delete array elements at the end first rather than
                     // the start so that any `nulls` at the end are dropped and empty arrays are
                     // pruned
