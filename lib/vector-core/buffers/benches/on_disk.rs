@@ -4,9 +4,8 @@ use criterion::{
     Criterion, SamplingMode, Throughput,
 };
 use std::mem;
-use std::sync::atomic::AtomicUsize;
+use std::path::PathBuf;
 use std::time::Duration;
-use std::{path::PathBuf, sync::atomic::Ordering};
 
 mod common;
 
@@ -25,7 +24,7 @@ const ROTATION_THRESHOLD: usize = 10_000;
 /// self-destruct when the benchmark drops them while this struct self-destructs
 /// when it is dropped. This keeps disk consumption to a minimum.
 struct DataDir {
-    counter: AtomicUsize,
+    index: usize,
     base: PathBuf,
 }
 
@@ -40,23 +39,23 @@ impl DataDir {
         base_dir.push(name);
         std::fs::create_dir_all(&base_dir).expect("could not make base dir");
         Self {
-            counter: AtomicUsize::new(0),
+            index: 0,
             base: base_dir,
         }
     }
 
     fn next(&mut self) -> PathGuard {
-        let index = self.counter.fetch_add(1, Ordering::Relaxed);
-        if index % ROTATION_THRESHOLD == 0 {
+        self.index += 1;
+        if self.index % ROTATION_THRESHOLD == 0 {
             // Because some filesystems have a limited number of directories
             // that are allowed under another we need to "rotate" as the
             // iterations proceed, that is, create a new sub-tree under the base
             // directory.
-            let multiple = index / ROTATION_THRESHOLD;
+            let multiple = self.index / ROTATION_THRESHOLD;
             self.base.push(multiple.to_string());
         }
         let mut nxt = self.base.clone();
-        nxt.push(&index.to_string());
+        nxt.push(&self.index.to_string());
         std::fs::create_dir_all(&nxt).expect("could not make next dir");
 
         PathGuard { inner: nxt }
