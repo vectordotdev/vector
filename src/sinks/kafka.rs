@@ -290,6 +290,8 @@ impl Sink<Event> for KafkaSink {
         })?;
 
         let timestamp_ms = match &item {
+            Event::Chunk(_, _) => None,
+            Event::Frame(_, _) => None,
             Event::Log(log) => log
                 .get(log_schema().timestamp_key())
                 .and_then(|v| v.as_timestamp()),
@@ -409,6 +411,8 @@ fn encode_event(
     let key = key_field
         .as_ref()
         .and_then(|f| match &event {
+            Event::Chunk(_, _) => None,
+            Event::Frame(_, _) => None,
             Event::Log(log) => log.get(f).map(|value| value.as_bytes().to_vec()),
             Event::Metric(metric) => metric
                 .tags()
@@ -420,6 +424,8 @@ fn encode_event(
     encoding.apply_rules(&mut event);
 
     let body = match event {
+        Event::Chunk(chunk, _) => chunk,
+        Event::Frame(frame, _) => frame,
         Event::Log(log) => match encoding.codec() {
             Encoding::Json => serde_json::to_vec(&log).unwrap(),
             Encoding::Text => log

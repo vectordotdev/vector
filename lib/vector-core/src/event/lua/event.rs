@@ -1,47 +1,53 @@
 use super::util::type_name;
 use crate::event::{Event, LogEvent, Metric};
+use bstr::ByteSlice;
 use rlua::prelude::*;
 
 impl<'a> ToLua<'a> for Event {
     fn to_lua(self, ctx: LuaContext<'a>) -> LuaResult<LuaValue> {
-        let table = ctx.create_table()?;
-        match self {
-            Event::Log(log) => table.set("log", log.to_lua(ctx)?)?,
-            Event::Metric(metric) => table.set("metric", metric.to_lua(ctx)?)?,
-        }
-        Ok(LuaValue::Table(table))
+        Ok(match self {
+            Event::Chunk(chunk, _) => chunk.as_bstr().to_lua(ctx)?,
+            Event::Frame(frame, _) => frame.as_bstr().to_lua(ctx)?,
+            Event::Log(log) => {
+                let table = ctx.create_table()?;
+                table.set("log", log.to_lua(ctx)?)?;
+                LuaValue::Table(table)
+            }
+            Event::Metric(metric) => {
+                let table = ctx.create_table()?;
+                table.set("metric", metric.to_lua(ctx)?)?;
+                LuaValue::Table(table)
+            }
+        })
     }
 }
 
 impl<'a> FromLua<'a> for Event {
     fn from_lua(value: LuaValue<'a>, ctx: LuaContext<'a>) -> LuaResult<Self> {
-        let table = match &value {
-            LuaValue::Table(t) => t,
-            _ => {
-                return Err(LuaError::FromLuaConversionError {
+        Ok(match &value {
+            LuaValue::Table(table) => match (table.get("log")?, table.get("metric")?) {
+                (LuaValue::Table(log), LuaValue::Nil) => {
+                    Event::Log(LogEvent::from_lua(LuaValue::Table(log), ctx)?)
+                }
+                (LuaValue::Nil, LuaValue::Table(metric)) => {
+                    Event::Metric(Metric::from_lua(LuaValue::Table(metric), ctx)?)
+                }
+                _ => Err(LuaError::FromLuaConversionError {
                     from: type_name(&value),
                     to: "Event",
-                    message: Some("Event should be a Lua table".to_string()),
-                })
-            }
-        };
-        match (table.get("log")?, table.get("metric")?) {
-            (LuaValue::Table(log), LuaValue::Nil) => {
-                Ok(Event::Log(LogEvent::from_lua(LuaValue::Table(log), ctx)?))
-            }
-            (LuaValue::Nil, LuaValue::Table(metric)) => Ok(Event::Metric(Metric::from_lua(
-                LuaValue::Table(metric),
-                ctx,
-            )?)),
+                    message: Some(
+                        "Event should contain either \"log\" or \"metric\" key at the top level"
+                            .to_string(),
+                    ),
+                })?,
+            },
+            LuaValue::String(string) => Event::Frame(string.as_bytes().into(), Default::default()),
             _ => Err(LuaError::FromLuaConversionError {
                 from: type_name(&value),
                 to: "Event",
-                message: Some(
-                    "Event should contain either \"log\" or \"metric\" key at the top level"
-                        .to_string(),
-                ),
-            }),
-        }
+                message: Some("Event should be a Lua table or string".to_string()),
+            })?,
+        })
     }
 }
 

@@ -7991,6 +7991,7 @@ version = "0.1.0"
 dependencies = [
  "async-graphql",
  "atomig",
+ "bstr",
  "buffers",
  "bytes 1.0.1",
  "chrono",

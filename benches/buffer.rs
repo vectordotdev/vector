@@ -23,6 +23,7 @@ fn benchmark_buffer(c: &mut Criterion) {
                 config.add_source(
                     "in",
                     sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
+                    vec![].into(),
                 );
                 config.add_sink(
                     "out",
@@ -71,6 +72,7 @@ fn benchmark_buffer(c: &mut Criterion) {
                 config.add_source(
                     "in",
                     sources::socket::SocketConfig::make_basic_tcp_config(in_addr),
+                    vec![].into(),
                 );
                 config.add_sink(
                     "out",

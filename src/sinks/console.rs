@@ -93,8 +93,27 @@ impl SinkConfig for ConsoleSinkConfig {
 
 fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<String> {
     encoding.apply_rules(&mut event);
+    let codec = encoding.codec();
     match event {
-        Event::Log(log) => match encoding.codec() {
+        Event::Chunk(chunk, _) => match codec {
+            Encoding::Json => serde_json::from_slice::<serde_json::Value>(&chunk)
+                .and_then(|value| serde_json::to_string(&value))
+                .map_err(|error| {
+                    error!(message = "Error encoding json.", %error);
+                })
+                .ok(),
+            Encoding::Text => Some(String::from_utf8_lossy(&chunk).to_string()),
+        },
+        Event::Frame(frame, _) => match codec {
+            Encoding::Json => serde_json::from_slice::<serde_json::Value>(&frame)
+                .and_then(|value| serde_json::to_string(&value))
+                .map_err(|error| {
+                    error!(message = "Error encoding json.", %error);
+                })
+                .ok(),
+            Encoding::Text => Some(String::from_utf8_lossy(&frame).to_string()),
+        },
+        Event::Log(log) => match codec {
             Encoding::Json => serde_json::to_string(&log)
                 .map_err(|error| {
                     error!(message = "Error encoding json.", %error);
@@ -113,7 +132,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
                 }
             }
         },
-        Event::Metric(metric) => match encoding.codec() {
+        Event::Metric(metric) => match codec {
             Encoding::Json => serde_json::to_string(&metric)
                 .map_err(|error| {
                     error!(message = "Error encoding json.", %error);

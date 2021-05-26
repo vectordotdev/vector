@@ -90,11 +90,15 @@ impl StreamSink for BlackholeSink {
             }
 
             let message_len = match event {
-                Event::Log(log) => serde_json::to_string(&log),
-                Event::Metric(metric) => serde_json::to_string(&metric),
-            }
-            .map(|v| v.len())
-            .unwrap_or(0);
+                Event::Chunk(chunk, _) => chunk.len(),
+                Event::Frame(frame, _) => frame.len(),
+                Event::Log(log) => serde_json::to_string(&log)
+                    .map(|string| string.len())
+                    .unwrap_or(0),
+                Event::Metric(metric) => serde_json::to_string(&metric)
+                    .map(|string| string.len())
+                    .unwrap_or(0),
+            };
 
             self.total_events += 1;
             self.total_raw_bytes += message_len;
