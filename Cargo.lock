@@ -4495,11 +4495,12 @@ dependencies = [
 
 [[package]]
 name = "ordered-float"
-version = "2.2.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b50b8919aecb97e5ee9aceef27e24f39c46b11831130f4a6b7b091ec5de0de12"
+checksum = "809348965973b261c3e504c8d0434e465274f78c880e10039914f2c5dcf49461"
 dependencies = [
  "num-traits",
+ "rand 0.8.3",
 ]
 
 [[package]]
