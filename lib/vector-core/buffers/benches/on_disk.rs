@@ -1,3 +1,4 @@
+use crate::common::{war_measurement, wtr_measurement};
 use buffers::{self, Variant, WhenFull};
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId,
@@ -74,22 +75,13 @@ impl Drop for PathGuard {
     }
 }
 
-//
-// [DISK] Write Then Read benchmark
-//
-// This benchmark uses the on-disk buffer with a sender/receiver that fully
-// write all messages into the buffer, then fully read all messages. DropNewest
-// is in effect when full condition is hit but sizes are carefully chosen to
-// never fill the buffer.
-//
-
-macro_rules! write_then_read_disk {
-    ($criterion:expr, [$( $width:expr ),*]) => {
-        let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group("buffer-disk");
+macro_rules! experiment {
+    ($criterion:expr, [$( $width:expr ),*], $group_name:expr, $id_slug:expr, $measure_fn:ident) => {
+        let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group($group_name);
         group.sampling_mode(SamplingMode::Auto);
 
         let max_events = 1_000;
-        let mut data_dir = DataDir::new("write-then-read");
+        let mut data_dir = DataDir::new($id_slug);
 
         $(
             // Additional constant factor here is to avoid potential message
@@ -100,7 +92,7 @@ macro_rules! write_then_read_disk {
             let bytes = mem::size_of::<crate::common::Message<$width>>();
             group.throughput(Throughput::Elements(max_events as u64));
             group.bench_with_input(
-                BenchmarkId::new("write-then-read", bytes),
+                BenchmarkId::new($id_slug, bytes),
                 &max_events,
                 |b, max_events| {
                     b.iter_batched(
@@ -116,7 +108,7 @@ macro_rules! write_then_read_disk {
                             (buf, guard)
                         },
                         |(buf, guard)| {
-                            crate::common::wtr_measurement(buf);
+                            $measure_fn(buf);
                             drop(guard)
                         },
                         BatchSize::SmallInput,
@@ -124,12 +116,26 @@ macro_rules! write_then_read_disk {
                 },
             );
         )*
-
     };
 }
 
+//
+// [DISK] Write Then Read benchmark
+//
+// This benchmark uses the on-disk buffer with a sender/receiver that fully
+// write all messages into the buffer, then fully read all messages. DropNewest
+// is in effect when full condition is hit but sizes are carefully chosen to
+// never fill the buffer.
+//
+
 fn write_then_read_disk(c: &mut Criterion) {
-    write_then_read_disk!(c, [32, 64, 128, 256, 512, 1024]);
+    experiment!(
+        c,
+        [32, 64, 128, 256, 512, 1024],
+        "buffer-disk",
+        "write-then-read",
+        wtr_measurement
+    );
 }
 
 //
@@ -140,58 +146,19 @@ fn write_then_read_disk(c: &mut Criterion) {
 // sizes are carefully chosen to never fill the buffer.
 //
 
-macro_rules! write_and_read_disk {
-    ($criterion:expr, [$( $width:expr ),*]) => {
-        let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group("buffer-disk");
-        group.sampling_mode(SamplingMode::Auto);
-
-        let max_events = 1_000;
-        let mut data_dir = DataDir::new("write-and-read");
-
-        $(
-            // Additional constant factor here is to avoid potential message
-            // drops due to reuse of disk buffer's internals between
-            // runs. Tempdir has low entropy compared to the number of
-            // iterations we make in these benchmarks.
-            let max_size = 1_000_000 * max_events * mem::size_of::<crate::common::Message<$width>>();
-            let bytes = mem::size_of::<crate::common::Message<$width>>();
-            group.throughput(Throughput::Elements(max_events as u64));
-            group.bench_with_input(
-                BenchmarkId::new("write-and-read", bytes),
-                &max_events,
-                |b, max_events| {
-                    b.iter_batched(
-                        || {
-                            let guard = data_dir.next();
-                            let variant = Variant::Disk {
-                                max_size,
-                                when_full: WhenFull::DropNewest,
-                                data_dir: guard.inner.clone(),
-                                name: format!("{}", $width),
-                            };
-                            let buf = crate::common::setup::<$width>(*max_events, variant);
-                            (buf, guard)
-                        },
-                        |(buf, guard)| {
-                            crate::common::war_measurement(buf);
-                            drop(guard)
-                        },
-                        BatchSize::SmallInput,
-                    )
-                },
-            );
-        )*
-
-    };
-}
-
 fn write_and_read_disk(c: &mut Criterion) {
-    write_and_read_disk!(c, [32, 64, 128, 256, 512, 1024]);
+    experiment!(
+        c,
+        [32, 64, 128, 256, 512, 1024],
+        "buffer-disk",
+        "write-and-read",
+        war_measurement
+    );
 }
 
 criterion_group!(
     name = on_disk;
-    config = Criterion::default().measurement_time(Duration::from_secs(60)).confidence_level(0.99).nresamples(500_000).sample_size(100);
+    config = Criterion::default().measurement_time(Duration::from_secs(240)).confidence_level(0.99).nresamples(500_000).sample_size(100);
     targets = write_then_read_disk, write_and_read_disk
 );
 criterion_main!(on_disk);
