@@ -6,7 +6,6 @@ edition = "2018"
 publish = false
 
 [dependencies]
-async-graphql = { version = "=2.6.4", default-features = false, features = ["chrono"] }
 serde = { version = "1.0.126", default-features = false, features = ["derive"] }
 tracing = { version = "0.1", default-features = false, features = ["attributes"] }
 snafu = { version = "0.6", default-features = false }

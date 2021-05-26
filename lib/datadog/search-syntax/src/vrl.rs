@@ -3,8 +3,10 @@ use super::{
     node::{Comparison, ComparisonValue, QueryNode},
 };
 use ordered_float::NotNan;
-use vrl_parser::ast::Opcode;
-use vrl_parser::{ast, Span};
+use vrl_parser::{
+    ast::{self, Opcode},
+    Span,
+};
 
 impl From<Comparison> for ast::Opcode {
     fn from(c: Comparison) -> Self {
@@ -20,7 +22,11 @@ impl From<Comparison> for ast::Opcode {
 impl From<ComparisonValue> for ast::Literal {
     fn from(cv: ComparisonValue) -> Self {
         match cv {
-            ComparisonValue::String(value) => ast::Literal::String(value),
+            ComparisonValue::String(value) => value
+                .parse::<i64>()
+                .map(|num| ast::Literal::Integer(num))
+                .unwrap_or_else(|_| ast::Literal::String(value)),
+
             ComparisonValue::Numeric(value) => {
                 ast::Literal::Float(NotNan::new(value).expect("should be float"))
             }
@@ -66,26 +72,27 @@ impl From<QueryNode> for ast::Expr {
                 lower_inclusive,
                 upper,
                 upper_inclusive,
-            } => make_block(vec![
+            } => make_op(
                 make_node(make_op(
                     make_query(attr.clone()),
                     if lower_inclusive {
-                        Opcode::Ge
+                        ast::Opcode::Ge
                     } else {
-                        Opcode::Gt
+                        ast::Opcode::Gt
                     },
-                    lower.into(),
+                    make_node(ast::Expr::Literal(make_node(lower.into()))),
                 )),
+                ast::Opcode::And,
                 make_node(make_op(
                     make_query(attr),
                     if upper_inclusive {
-                        Opcode::Le
+                        ast::Opcode::Le
                     } else {
-                        Opcode::Lt
+                        ast::Opcode::Lt
                     },
-                    upper.into(),
+                    make_node(ast::Expr::Literal(make_node(upper.into()))),
                 )),
-            ]),
+            ),
             _ => panic!("unsupported query"),
         }
     }
@@ -159,9 +166,9 @@ fn make_function_call<T: IntoIterator<Item = ast::Node<ast::Expr>>>(
 mod tests {
     // Datadog search syntax -> VRL
     static TESTS: &[(&str, &str)] = &[
-        // Vanilla keyword
+        // Keyword
         ("bla", r#"match(.message, r'\bbla\b')"#),
-        // Quoted vanilla keyword
+        // Quoted keyword
         (r#""bla""#, r#"match(.message, r'\bbla\b')"#),
         // Tag match
         ("a:bla", r#"match(.a, r'\bbla\b')"#),
@@ -190,7 +197,7 @@ mod tests {
         // Multiple wildcards - facet
         ("@c:*b*la*", r#"match(.custom.c, r'\b.*b.*la.*\b')"#),
         // Range - numeric, exclusive
-        // ("[1 TO 10]", ".message > 1 && .message < 10"),
+        ("[1 TO 10]", ".message >= 1 && .message <= 10"),
     ];
 
     use super::make_node;
