@@ -86,7 +86,7 @@ impl Drop for PathGuard {
 
 macro_rules! write_then_read_disk {
     ($criterion:expr, [$( $width:expr ),*]) => {
-        let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group("buffer");
+        let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group("buffer-disk");
         group.sampling_mode(SamplingMode::Auto);
 
         let max_events = 1_000;
@@ -101,7 +101,7 @@ macro_rules! write_then_read_disk {
             let bytes = mem::size_of::<crate::common::Message<$width>>();
             group.throughput(Throughput::Elements(max_events as u64));
             group.bench_with_input(
-                BenchmarkId::new("disk/write-then-read", bytes),
+                BenchmarkId::new("write-then-read", bytes),
                 &max_events,
                 |b, max_events| {
                     b.iter_batched(
@@ -143,7 +143,7 @@ fn write_then_read_disk(c: &mut Criterion) {
 
 macro_rules! write_and_read_disk {
     ($criterion:expr, [$( $width:expr ),*]) => {
-        let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group("buffer");
+        let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group("buffer-disk");
         group.sampling_mode(SamplingMode::Auto);
 
         let max_events = 1_000;
@@ -158,7 +158,7 @@ macro_rules! write_and_read_disk {
             let bytes = mem::size_of::<crate::common::Message<$width>>();
             group.throughput(Throughput::Elements(max_events as u64));
             group.bench_with_input(
-                BenchmarkId::new("disk/write-and-read", bytes),
+                BenchmarkId::new("write-and-read", bytes),
                 &max_events,
                 |b, max_events| {
                     b.iter_batched(

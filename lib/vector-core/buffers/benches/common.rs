@@ -85,6 +85,30 @@ pub fn setup<const N: usize>(
     (tx.get(), rx, messages)
 }
 
+fn send_msg<const N: usize>(
+    msg: Message<N>,
+    sink: &mut (dyn Sink<Message<N>, Error = ()> + Unpin + Send),
+    context: &mut Context,
+) {
+    match Sink::poll_ready(Pin::new(sink), context) {
+        Poll::Ready(Ok(())) => match Sink::start_send(Pin::new(sink), msg) {
+            Ok(()) => match Sink::poll_flush(Pin::new(sink), context) {
+                Poll::Ready(Ok(())) => {}
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        },
+        _ => unreachable!(),
+    }
+}
+
+fn read_all_msg<const N: usize>(
+    stream: &mut (dyn Stream<Item = Message<N>> + Unpin + Send),
+    context: &mut Context,
+) {
+    while let Poll::Ready(Some(_)) = Stream::poll_next(Pin::new(stream), context) {}
+}
+
 //
 // Measurements
 //
@@ -111,20 +135,7 @@ pub fn wtr_measurement<const N: usize>(
 
         let sink = input.0.as_mut();
         for msg in input.2.into_iter() {
-            loop {
-                match Sink::poll_ready(Pin::new(sink), &mut context) {
-                    Poll::Ready(Ok(())) => match Sink::start_send(Pin::new(sink), msg) {
-                        Ok(()) => match Sink::poll_flush(Pin::new(sink), &mut context) {
-                            Poll::Ready(Ok(())) => {
-                                break;
-                            }
-                            _ => unreachable!(),
-                        },
-                        _ => unreachable!(),
-                    },
-                    _ => unreachable!(),
-                }
-            }
+            send_msg(msg, sink, &mut context)
         }
     }
 
@@ -133,7 +144,7 @@ pub fn wtr_measurement<const N: usize>(
         let mut context = Context::from_waker(&waker);
 
         let stream = input.1.as_mut();
-        while let Poll::Ready(Some(_)) = Stream::poll_next(Pin::new(stream), &mut context) {}
+        read_all_msg(stream, &mut context)
     }
 }
 
@@ -145,33 +156,16 @@ pub fn war_measurement<const N: usize>(
         Vec<Message<N>>,
     ),
 ) {
-    {
-        let snd_waker = noop_waker();
-        let mut snd_context = Context::from_waker(&snd_waker);
+    let snd_waker = noop_waker();
+    let mut snd_context = Context::from_waker(&snd_waker);
 
-        let sink = input.0.as_mut();
-        for msg in input.2.into_iter() {
-            loop {
-                match Sink::poll_ready(Pin::new(sink), &mut snd_context) {
-                    Poll::Ready(Ok(())) => match Sink::start_send(Pin::new(sink), msg) {
-                        Ok(()) => match Sink::poll_flush(Pin::new(sink), &mut snd_context) {
-                            Poll::Ready(Ok(())) => {
-                                break;
-                            }
-                            _ => unreachable!(),
-                        },
-                        _ => unreachable!(),
-                    },
-                    _ => unreachable!(),
-                }
-            }
+    let rcv_waker = noop_waker();
+    let mut rcv_context = Context::from_waker(&rcv_waker);
 
-            let rcv_waker = noop_waker();
-            let mut rcv_context = Context::from_waker(&rcv_waker);
-
-            let stream = input.1.as_mut();
-            while let Poll::Ready(Some(_)) = Stream::poll_next(Pin::new(stream), &mut rcv_context) {
-            }
-        }
+    let stream = input.1.as_mut();
+    let sink = input.0.as_mut();
+    for msg in input.2.into_iter() {
+        send_msg(msg, sink, &mut snd_context);
+        read_all_msg(stream, &mut rcv_context)
     }
 }

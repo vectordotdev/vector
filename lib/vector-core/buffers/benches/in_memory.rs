@@ -19,7 +19,7 @@ mod common;
 
 macro_rules! write_then_read_memory {
     ($criterion:expr, [$( $width:expr ),*]) => {
-        let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group("buffer");
+        let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group("buffer-memory");
         group.sampling_mode(SamplingMode::Auto);
 
         let max_events = 1_000;
@@ -27,7 +27,7 @@ macro_rules! write_then_read_memory {
             let bytes = mem::size_of::<crate::common::Message<$width>>();
             group.throughput(Throughput::Elements(max_events as u64));
             group.bench_with_input(
-                BenchmarkId::new("memory/write-then-read", bytes),
+                BenchmarkId::new("write-then-read", bytes),
                 &max_events,
                 |b, max_events| {
                     b.iter_batched(
@@ -61,7 +61,7 @@ fn write_then_read_memory(c: &mut Criterion) {
 
 macro_rules! write_and_read_memory {
     ($criterion:expr, [$( $width:expr ),*]) => {
-        let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group("buffer");
+        let mut group: BenchmarkGroup<WallTime> = $criterion.benchmark_group("buffer-memory");
         group.sampling_mode(SamplingMode::Auto);
 
         let max_events = 1_000;
@@ -69,7 +69,7 @@ macro_rules! write_and_read_memory {
             let bytes = mem::size_of::<crate::common::Message<$width>>();
             group.throughput(Throughput::Elements(max_events as u64));
             group.bench_with_input(
-                BenchmarkId::new("memory/write-and-read", bytes),
+                BenchmarkId::new("write-and-read", bytes),
                 &max_events,
                 |b, max_events| {
                     b.iter_batched(
