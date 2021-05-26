@@ -574,26 +574,22 @@ dependencies = [
 [[package]]
 name = "azure_core"
 version = "0.1.0"
-source = "git+https://github.com/Azure/azure-sdk-for-rust.git?rev=eb52988af8257c58a009d2f014ddbfd6b49ff65b#eb52988af8257c58a009d2f014ddbfd6b49ff65b"
+source = "git+https://github.com/Azure/azure-sdk-for-rust.git?rev=457bd53107d31f7ccd6cae7128dfaa25f5268679#457bd53107d31f7ccd6cae7128dfaa25f5268679"
 dependencies = [
- "RustyXML",
  "async-trait",
- "base64 0.13.0",
  "bytes 1.0.1",
  "chrono",
- "failure",
+ "dyn-clone",
  "futures 0.3.15",
  "http",
  "log",
- "md5",
  "oauth2",
- "paste",
- "quick-error 1.2.3",
+ "rand 0.7.3",
  "reqwest",
  "serde",
- "serde-xml-rs",
  "serde_derive",
  "serde_json",
+ "thiserror",
  "url",
  "uuid 0.8.2",
 ]
@@ -601,7 +597,7 @@ dependencies = [
 [[package]]
 name = "azure_storage"
 version = "0.1.0"
-source = "git+https://github.com/Azure/azure-sdk-for-rust.git?rev=eb52988af8257c58a009d2f014ddbfd6b49ff65b#eb52988af8257c58a009d2f014ddbfd6b49ff65b"
+source = "git+https://github.com/Azure/azure-sdk-for-rust.git?rev=457bd53107d31f7ccd6cae7128dfaa25f5268679#457bd53107d31f7ccd6cae7128dfaa25f5268679"
 dependencies = [
  "RustyXML",
  "azure_core",
@@ -613,7 +609,6 @@ dependencies = [
  "log",
  "md5",
  "once_cell",
- "quick-error 1.2.3",
  "ring",
  "serde",
  "serde-xml-rs",

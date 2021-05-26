@@ -4,12 +4,11 @@ use metrics::counter;
 #[derive(Debug)]
 pub struct AzureBlobErrorResponse {
     pub code: hyper::StatusCode,
-    pub url: String,
 }
 
 impl InternalEvent for AzureBlobErrorResponse {
     fn emit_logs(&self) {
-        error!(message = "HTTP error response.", url = %self.url, code = %self.code);
+        error!(message = "HTTP error response.", code = %self.code);
     }
 
     fn emit_metrics(&self) {
