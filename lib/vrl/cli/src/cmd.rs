@@ -91,9 +91,7 @@ fn execute(object: &mut impl Target, program: &Program) -> Result<Value, Error> 
     let state = state::Runtime::default();
     let mut runtime = Runtime::new(state);
 
-    runtime
-        .resolve(object, program)
-        .map_err(|err| Error::Runtime(err))
+    runtime.resolve(object, program).map_err(Error::Runtime)
 }
 
 fn read_program(source: Option<&str>, file: Option<&PathBuf>) -> Result<String, Error> {
