@@ -30,17 +30,19 @@ impl From<ComparisonValue> for ast::Literal {
             ComparisonValue::Numeric(value) => {
                 ast::Literal::Float(NotNan::new(value).expect("should be a float"))
             }
-            ComparisonValue::Unbounded => ast::Literal::Null,
+            ComparisonValue::Unbounded => panic!("unbounded values have no equivalent literal"),
         }
     }
 }
 
+/// Wrapper for a comparison value to be converted to a literal, with wrapped nodes.
 impl From<ComparisonValue> for ast::Node<ast::Expr> {
     fn from(cv: ComparisonValue) -> Self {
         make_node(ast::Expr::Literal(make_node(cv.into())))
     }
 }
 
+/// Convert Datadog grammar to VRL.
 impl From<QueryNode> for ast::Expr {
     fn from(q: QueryNode) -> Self {
         match q {
@@ -149,6 +151,8 @@ fn make_node<T>(node: T) -> ast::Node<T> {
     ast::Node::new(Span::default(), node)
 }
 
+/// Converts a field/facet name to the VRL equivalent. Datadog payloads have a `message` field
+/// (which is used whenever the default field is encountered. Facets are hosted on .custom.*.
 fn normalize_tag<T: AsRef<str>>(value: T) -> String {
     let value = value.as_ref();
     if value.eq(grammar::DEFAULT_FIELD) {
@@ -167,6 +171,7 @@ fn make_op(expr1: ast::Node<ast::Expr>, op: Opcode, expr2: ast::Node<ast::Expr>)
     )))
 }
 
+/// An `Expr::Query`, converting a string field to a lookup path.
 fn make_query(field: String) -> ast::Expr {
     ast::Expr::Query(make_node(ast::Query {
         target: make_node(ast::QueryTarget::External),
@@ -186,12 +191,14 @@ fn make_regex(value: String) -> ast::Expr {
     ))))
 }
 
+/// Makes a container group, for wrapping logic for easier negation.
 fn make_container_group(expr: ast::Expr) -> ast::Expr {
     ast::Expr::Container(make_node(ast::Container::Group(Box::new(make_node(
         ast::Group(make_node(expr)),
     )))))
 }
 
+/// Makes a negation wrapper for an inner expression.
 fn make_not(expr: ast::Expr) -> ast::Expr {
     ast::Expr::Unary(make_node(ast::Unary::Not(make_node(ast::Not(
         make_node(()),
