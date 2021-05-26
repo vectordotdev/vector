@@ -530,7 +530,7 @@ async fn healthcheck(
                 }
             }
             None => {
-                if config.create_missing_group.unwrap() == true {
+                if config.create_missing_group.unwrap_or(true) {
                     info!("Cloudwatch group_name will be created at runtime");
                     return Ok(());
                 } else {
