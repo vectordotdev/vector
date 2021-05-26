@@ -312,7 +312,6 @@ mod test {
                 auth: None,
             },
             vec![].into(),
-            vec![].into(),
         );
         config.add_sink(
             "out",
