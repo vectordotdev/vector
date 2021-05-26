@@ -47,15 +47,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
 impl SourceConfig for PrometheusRemoteWriteConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = RemoteWriteSource;
-        source.run(
-            self.address,
-            "",
-            true,
-            &self.tls,
-            &self.auth,
-            cx.out,
-            cx.shutdown,
-        )
+        source.run(self.address, "", true, &self.tls, &self.auth, cx)
     }
 
     fn output_type(&self) -> crate::config::DataType {

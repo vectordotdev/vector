@@ -19,10 +19,9 @@ installation: _interfaces: rpm: {
 
 	role_implementations: [Name=string]: {
 		commands: role_implementations._systemd_commands & {
-			_config_path: paths.config
-			install:      "sudo rpm -i https://packages.timber.io/vector/{version}/vector-{version}-1.{arch}.rpm"
-			uninstall:    "sudo rpm -e vector"
-			upgrade:      null
+			install:   "sudo rpm -i https://packages.timber.io/vector/{version}/vector-{version}-1.{arch}.rpm"
+			uninstall: "sudo rpm -e vector"
+			upgrade:   null
 		}
 
 		tutorials: {
