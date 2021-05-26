@@ -10,8 +10,6 @@ use std::time::Duration;
 
 mod common;
 
-const ROTATION_THRESHOLD: usize = 10_000;
-
 /// A struct to manage the data_dir of an on-disk benchmark
 ///
 /// The way our benchmarks function we have the choice of sharing a data_dir
@@ -39,6 +37,7 @@ impl DataDir {
         base_dir.push(std::env::temp_dir());
         base_dir.push(name);
         std::fs::create_dir_all(&base_dir).expect("could not make base dir");
+
         Self {
             index: 0,
             base: base_dir,
@@ -46,17 +45,9 @@ impl DataDir {
     }
 
     fn next(&mut self) -> PathGuard {
-        self.index += 1;
-        if self.index % ROTATION_THRESHOLD == 0 {
-            // Because some filesystems have a limited number of directories
-            // that are allowed under another we need to "rotate" as the
-            // iterations proceed, that is, create a new sub-tree under the base
-            // directory.
-            let multiple = self.index / ROTATION_THRESHOLD;
-            self.base.push(multiple.to_string());
-        }
         let mut nxt = self.base.clone();
         nxt.push(&self.index.to_string());
+        self.index += 1;
         std::fs::create_dir_all(&nxt).expect("could not make next dir");
 
         PathGuard { inner: nxt }
