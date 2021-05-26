@@ -21,12 +21,11 @@ use std::path::PathBuf;
 
 pub mod api;
 mod builder;
+pub mod codec;
 mod compiler;
 pub mod component;
-pub mod decoding;
 mod diff;
 pub mod format;
-mod framing;
 mod loading;
 pub mod provider;
 mod unit_test;
@@ -209,23 +208,15 @@ macro_rules! impl_generate_config_from_default {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SourceOuter {
-    pub framing: framing::SourceFramers,
-    pub decoding: decoding::DecodingsConfig,
+    #[serde(flatten)]
+    pub codecs: codec::CodecsConfig,
     #[serde(flatten)]
     pub inner: Box<dyn SourceConfig>,
 }
 
 impl SourceOuter {
-    pub fn new(
-        framing: framing::SourceFramers,
-        decoding: decoding::DecodingsConfig,
-        inner: Box<dyn SourceConfig>,
-    ) -> Self {
-        Self {
-            framing,
-            decoding,
-            inner,
-        }
+    pub fn new(codecs: codec::CodecsConfig, inner: Box<dyn SourceConfig>) -> Self {
+        Self { codecs, inner }
     }
 
     pub async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
@@ -262,7 +253,6 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
 
 pub struct SourceContext {
     pub name: String,
-    pub framing: framing::SourceFramers,
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
@@ -279,7 +269,6 @@ impl SourceContext {
         (
             Self {
                 name: name.into(),
-                framing: Default::default(),
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
@@ -292,7 +281,6 @@ impl SourceContext {
     pub fn new_test(out: Pipeline) -> Self {
         Self {
             name: "default".into(),
-            framing: Default::default(),
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,

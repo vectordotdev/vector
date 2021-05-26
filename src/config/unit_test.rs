@@ -79,6 +79,8 @@ struct UnitTestCheck {
 
 fn event_to_string(event: &Event) -> String {
     match event {
+        Event::Chunk(chunk, _) => String::from_utf8_lossy(chunk).into(),
+        Event::Frame(frame, _) => String::from_utf8_lossy(frame).into(),
         Event::Log(log) => serde_json::to_string(&log).unwrap_or_else(|_| "{}".into()),
         Event::Metric(metric) => serde_json::to_string(&metric).unwrap_or_else(|_| "{}".into()),
     }

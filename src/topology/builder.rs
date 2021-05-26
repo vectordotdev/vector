@@ -1,4 +1,5 @@
 use super::{
+    codecs::Codecs,
     fanout::{self, Fanout},
     task::{Task, TaskOutput},
     BuiltBuffer, ConfigDiff,
@@ -57,13 +58,11 @@ pub async fn build_pieces(
         let pipeline = Pipeline::from_sender(tx, vec![]);
 
         let typetag = source.source_type();
-        let decoding = source.decoding.clone();
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
         let context = SourceContext {
             name: name.into(),
-            framing: source.framing.clone(),
             globals: config.global.clone(),
             shutdown: shutdown_signal,
             out: pipeline,
@@ -77,16 +76,8 @@ pub async fn build_pieces(
         };
 
         let (output, control) = Fanout::new();
-        let pump = rx
-            .map(move |event| {
-                decoding
-                    .clone()
-                    .into_iter()
-                    .fold(event, |event, decoder| decoder.decode(event))
-            })
-            .map(Ok)
-            .forward(output)
-            .map_ok(|_| TaskOutput::Source);
+        let pump = Codecs::new(&source.codecs, rx);
+        let pump = pump.map(Ok).forward(output).map_ok(|_| TaskOutput::Source);
         let pump = Task::new(name, typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source

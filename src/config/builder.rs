@@ -1,9 +1,9 @@
 #[cfg(feature = "api")]
 use super::api;
 use super::{
-    compiler, decoding::DecodingsConfig, default_data_dir, framing::SourceFramers, provider,
-    Config, GlobalOptions, HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter,
-    TestDefinition, TransformConfig, TransformOuter,
+    codec::CodecsConfig, compiler, default_data_dir, provider, Config, GlobalOptions,
+    HealthcheckOptions, SinkConfig, SinkOuter, SourceConfig, SourceOuter, TestDefinition,
+    TransformConfig, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -76,11 +76,9 @@ impl ConfigBuilder {
         &mut self,
         name: T,
         source: S,
-        framing: SourceFramers,
-        decoding: DecodingsConfig,
+        codecs: CodecsConfig,
     ) {
-        let source = SourceOuter::new(framing, decoding, Box::new(source));
-
+        let source = SourceOuter::new(codecs, Box::new(source));
         self.sources.insert(name.into(), source);
     }
 

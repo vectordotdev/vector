@@ -198,9 +198,9 @@ mod test {
     #[test]
     fn wildcard_expansion() {
         let mut builder = ConfigBuilder::default();
-        builder.add_source("foo1", MockSourceConfig, vec![].into(), vec![].into());
-        builder.add_source("foo2", MockSourceConfig, vec![].into(), vec![].into());
-        builder.add_source("bar", MockSourceConfig, vec![].into(), vec![].into());
+        builder.add_source("foo1", MockSourceConfig, vec![].into());
+        builder.add_source("foo2", MockSourceConfig, vec![].into());
+        builder.add_source("bar", MockSourceConfig, vec![].into());
         builder.add_transform("foos", &["foo*"], MockTransformConfig);
         builder.add_sink("baz", &["foos*", "b*"], MockSinkConfig);
         builder.add_sink("quux", &["*"], MockSinkConfig);

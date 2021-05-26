@@ -7,6 +7,7 @@
 //! each type of component.
 
 pub mod builder;
+mod codecs;
 pub mod fanout;
 mod task;
 

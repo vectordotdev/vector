@@ -55,6 +55,8 @@ pub trait EncodingConfiguration<E> {
     fn apply_only_fields(&self, event: &mut Event) {
         if let Some(only_fields) = &self.only_fields() {
             match event {
+                Event::Chunk(_, _) => {}
+                Event::Frame(_, _) => {}
                 Event::Log(log_event) => {
                     let to_remove = log_event
                         .keys()
@@ -79,6 +81,8 @@ pub trait EncodingConfiguration<E> {
     fn apply_except_fields(&self, event: &mut Event) {
         if let Some(except_fields) = &self.except_fields() {
             match event {
+                Event::Chunk(_, _) => {}
+                Event::Frame(_, _) => {}
                 Event::Log(log_event) => {
                     for field in except_fields {
                         log_event.remove(field);
@@ -91,6 +95,8 @@ pub trait EncodingConfiguration<E> {
     fn apply_timestamp_format(&self, event: &mut Event) {
         if let Some(timestamp_format) = &self.timestamp_format() {
             match event {
+                Event::Chunk(_, _) => {}
+                Event::Frame(_, _) => {}
                 Event::Log(log_event) => {
                     match timestamp_format {
                         TimestampFormat::Unix => {

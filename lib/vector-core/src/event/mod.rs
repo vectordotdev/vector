@@ -44,6 +44,8 @@ pub const PARTIAL: &str = "_partial";
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Event {
+    Chunk(Vec<u8>, EventMetadata),
+    Frame(Vec<u8>, EventMetadata),
     Log(LogEvent),
     Metric(Metric),
 }
@@ -128,6 +130,7 @@ impl Event {
 
     pub fn metadata(&self) -> &EventMetadata {
         match self {
+            Self::Chunk(_, metadata) | Self::Frame(_, metadata) => metadata,
             Self::Log(log) => log.metadata(),
             Self::Metric(metric) => metric.metadata(),
         }
@@ -135,6 +138,7 @@ impl Event {
 
     pub fn metadata_mut(&mut self) -> &mut EventMetadata {
         match self {
+            Self::Chunk(_, ref mut metadata) | Self::Frame(_, ref mut metadata) => metadata,
             Self::Log(log) => log.metadata_mut(),
             Self::Metric(metric) => metric.metadata_mut(),
         }
@@ -143,6 +147,9 @@ impl Event {
     pub fn add_batch_notifier(&mut self, batch: Arc<BatchNotifier>) {
         let finalizer = EventFinalizer::new(batch);
         match self {
+            Self::Chunk(_, ref mut metadata) | Self::Frame(_, ref mut metadata) => {
+                metadata.add_finalizer(finalizer)
+            }
             Self::Log(log) => log.add_finalizer(finalizer),
             Self::Metric(metric) => metric.add_finalizer(finalizer),
         }
@@ -152,6 +159,10 @@ impl Event {
 impl EventDataEq for Event {
     fn event_data_eq(&self, other: &Self) -> bool {
         match (self, other) {
+            (Self::Chunk(a, metadata_a), Self::Chunk(b, metadata_b))
+            | (Self::Frame(a, metadata_a), Self::Frame(b, metadata_b)) => {
+                a == b && metadata_a.event_data_eq(metadata_b)
+            }
             (Self::Log(a), Self::Log(b)) => a.event_data_eq(b),
             (Self::Metric(a), Self::Metric(b)) => a.event_data_eq(b),
             _ => false,
@@ -303,6 +314,8 @@ impl TryInto<serde_json::Value> for Event {
 
     fn try_into(self) -> Result<serde_json::Value, Self::Error> {
         match self {
+            Event::Chunk(chunk, _) => serde_json::to_value(chunk),
+            Event::Frame(frame, _) => serde_json::to_value(frame),
             Event::Log(fields) => serde_json::to_value(fields),
             Event::Metric(metric) => serde_json::to_value(metric),
         }
@@ -314,6 +327,8 @@ impl From<proto::EventWrapper> for Event {
         let event = proto.event.unwrap();
 
         match event {
+            EventProto::Chunk(proto) => Event::Chunk(proto.bytes, Default::default()),
+            EventProto::Frame(proto) => Event::Frame(proto.bytes, Default::default()),
             EventProto::Log(proto) => {
                 let fields = proto
                     .fields
@@ -432,6 +447,14 @@ fn encode_array(items: Vec<Value>) -> proto::ValueArray {
 impl From<Event> for proto::EventWrapper {
     fn from(event: Event) -> Self {
         match event {
+            Event::Chunk(bytes, _) => {
+                let event = EventProto::Chunk(proto::Chunk { bytes });
+                proto::EventWrapper { event: Some(event) }
+            }
+            Event::Frame(bytes, _) => {
+                let event = EventProto::Frame(proto::Frame { bytes });
+                proto::EventWrapper { event: Some(event) }
+            }
             Event::Log(log_event) => {
                 let (fields, _metadata) = log_event.into_parts();
                 let fields = fields
@@ -610,6 +633,8 @@ impl From<Metric> for Event {
 /// a full `Event` from a `LogEvent` or `Metric` might be inconvenient.
 #[derive(Clone, Copy, Debug)]
 pub enum EventRef<'a> {
+    Chunk(&'a [u8], &'a EventMetadata),
+    Frame(&'a [u8], &'a EventMetadata),
     Log(&'a LogEvent),
     Metric(&'a Metric),
 }
@@ -617,6 +642,8 @@ pub enum EventRef<'a> {
 impl<'a> From<&'a Event> for EventRef<'a> {
     fn from(event: &'a Event) -> Self {
         match event {
+            Event::Chunk(chunk, metadata) => EventRef::Chunk(chunk, metadata),
+            Event::Frame(frame, metadata) => EventRef::Chunk(frame, metadata),
             Event::Log(log) => log.into(),
             Event::Metric(metric) => metric.into(),
         }

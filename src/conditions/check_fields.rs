@@ -54,6 +54,8 @@ impl EqualsPredicate {
 impl CheckFieldsPredicate for EqualsPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
+            Event::Chunk(_, _) => false,
+            Event::Frame(_, _) => false,
             Event::Log(l) => l.get(&self.target).map_or(false, |v| match &self.arg {
                 CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
                 CheckFieldsPredicateArg::VecString(ss) => {
@@ -233,6 +235,8 @@ impl NotEqualsPredicate {
 impl CheckFieldsPredicate for NotEqualsPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
+            Event::Chunk(_, _) => false,
+            Event::Frame(_, _) => false,
             Event::Log(l) => l
                 .get(&self.target)
                 .map(|f| f.as_bytes())
@@ -276,6 +280,8 @@ impl RegexPredicate {
 impl CheckFieldsPredicate for RegexPredicate {
     fn check(&self, event: &Event) -> bool {
         match event {
+            Event::Chunk(_, _) => false,
+            Event::Frame(_, _) => false,
             Event::Log(log) => log
                 .get(&self.target)
                 .map(|field| field.to_string_lossy())
@@ -311,6 +317,8 @@ impl ExistsPredicate {
 impl CheckFieldsPredicate for ExistsPredicate {
     fn check(&self, event: &Event) -> bool {
         (match event {
+            Event::Chunk(_, _) => false,
+            Event::Frame(_, _) => false,
             Event::Log(l) => l.get(&self.target).is_some(),
             Event::Metric(m) => m.tags().map_or(false, |t| t.contains_key(&self.target)),
         }) == self.arg
