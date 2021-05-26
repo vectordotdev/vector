@@ -254,8 +254,8 @@ pub fn update_config(config: &Config) {
             name.to_owned(),
             Component::Source(source::Source(source::Data {
                 name: name.to_owned(),
-                component_type: source.source_type().to_string(),
-                output_type: source.output_type(),
+                component_type: source.inner.source_type().to_string(),
+                output_type: source.inner.output_type(),
             })),
         );
     }

@@ -223,12 +223,13 @@ impl HttpSink for LokiSink {
         }
 
         self.encoding.apply_rules(&mut event);
+        let log = event.into_log();
         let event = match &self.encoding.codec() {
-            Encoding::Json => serde_json::to_string(&event.as_log().all_fields())
-                .expect("json encoding should never fail"),
+            Encoding::Json => {
+                serde_json::to_string(&log.all_fields()).expect("json encoding should never fail")
+            }
 
-            Encoding::Text => event
-                .as_log()
+            Encoding::Text => log
                 .get(log_schema().message_key())
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
@@ -242,14 +243,17 @@ impl HttpSink for LokiSink {
         }
 
         let event = LokiEvent { timestamp, event };
-        Some(EncodedEvent::new(PartitionInnerBuffer::new(
-            LokiRecord {
-                labels,
-                event,
-                partition: key.clone(),
-            },
-            key,
-        )))
+        Some(
+            EncodedEvent::new(PartitionInnerBuffer::new(
+                LokiRecord {
+                    labels,
+                    event,
+                    partition: key.clone(),
+                },
+                key,
+            ))
+            .with_metadata(log),
+        )
     }
 
     async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
@@ -423,27 +427,30 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::SinkConfig, event::Event, sinks::util::test::load_sink, template::Template,
+        config::SinkConfig, sinks::util::test::load_sink, sinks::VectorSink, template::Template,
         test_util::random_lines,
     };
     use bytes::Bytes;
     use chrono::{DateTime, Duration, Utc};
     use futures::{stream, StreamExt};
     use std::convert::TryFrom;
+    use vector_core::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
-    #[tokio::test]
-    async fn text() {
+    async fn build_sink(encoding: &str) -> (uuid::Uuid, VectorSink) {
         let stream = uuid::Uuid::new_v4();
 
-        let (mut config, cx) = load_sink::<LokiConfig>(
+        let config = format!(
             r#"
             endpoint = "http://localhost:3100"
-            labels = {test_name = "placeholder"}
-            encoding = "text"
+            labels = {{test_name = "placeholder"}}
+            encoding = "{}"
+            remove_timestamp = false
             tenant_id = "default"
         "#,
-        )
-        .unwrap();
+            encoding
+        );
+
+        let (mut config, cx) = load_sink::<LokiConfig>(&config).unwrap();
 
         let test_name = config.labels.get_mut("test_name").unwrap();
         assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
@@ -452,14 +459,26 @@ mod integration_tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
 
+        (stream, sink)
+    }
+
+    #[tokio::test]
+    async fn text() {
+        let (stream, sink) = build_sink("text").await;
+
         let lines = random_lines(100).take(10).collect::<Vec<_>>();
 
-        let events = lines.clone().into_iter().map(Event::from);
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let events = lines
+            .clone()
+            .into_iter()
+            .map(move |line| Event::from(LogEvent::from(line).with_batch_notifier(&batch)));
         let _ = sink
             .into_sink()
             .send_all(&mut stream::iter(events).map(Ok))
             .await
             .unwrap();
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
         assert_eq!(lines.len(), outputs.len());
@@ -470,35 +489,21 @@ mod integration_tests {
 
     #[tokio::test]
     async fn json() {
-        let stream = uuid::Uuid::new_v4();
-
-        let (mut config, cx) = load_sink::<LokiConfig>(
-            r#"
-            endpoint = "http://localhost:3100"
-            labels = {test_name = "placeholder"}
-            encoding = "json"
-            remove_timestamp = false
-            tenant_id = "default"
-        "#,
-        )
-        .unwrap();
-
-        let test_name = config.labels.get_mut("test_name").unwrap();
-        assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
-
-        *test_name = Template::try_from(stream.to_string()).unwrap();
-
-        let (sink, _) = config.build(cx).await.unwrap();
+        let (stream, sink) = build_sink("json").await;
 
         let events = random_lines(100)
             .take(10)
             .map(Event::from)
             .collect::<Vec<_>>();
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
         let _ = sink
             .into_sink()
-            .send_all(&mut stream::iter(events.clone()).map(Ok))
+            .send_all(&mut stream::iter(events.clone().into_iter().map(
+                move |event| Ok(event.into_log().with_batch_notifier(&batch).into()),
+            )))
             .await
             .unwrap();
+        assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
 
         let (_, outputs) = fetch_stream(stream.to_string(), "default").await;
         assert_eq!(events.len(), outputs.len());

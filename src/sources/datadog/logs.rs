@@ -14,7 +14,7 @@ use bytes::Bytes;
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use warp::http::HeaderMap;
 
@@ -28,6 +28,8 @@ pub struct DatadogLogsConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
+    #[serde(default = "crate::serde::default_true")]
+    store_api_key: bool,
 }
 
 inventory::submit! {
@@ -40,6 +42,7 @@ impl GenerateConfig for DatadogLogsConfig {
             address: "0.0.0.0:8080".parse().unwrap(),
             tls: None,
             auth: None,
+            store_api_key: true,
         })
         .unwrap()
     }
@@ -49,17 +52,11 @@ impl GenerateConfig for DatadogLogsConfig {
 #[typetag::serde(name = "datadog_logs")]
 impl SourceConfig for DatadogLogsConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = DatadogLogsSource {};
+        let source = DatadogLogsSource {
+            store_api_key: self.store_api_key,
+        };
         // We accept /v1/input & /v1/input/<API_KEY>
-        source.run(
-            self.address,
-            "/v1/input",
-            false,
-            &self.tls,
-            &self.auth,
-            cx.out,
-            cx.shutdown,
-        )
+        source.run(self.address, "/v1/input", false, &self.tls, &self.auth, cx)
     }
 
     fn output_type(&self) -> DataType {
@@ -76,10 +73,12 @@ impl SourceConfig for DatadogLogsConfig {
 }
 
 #[derive(Clone, Default)]
-struct DatadogLogsSource {}
+struct DatadogLogsSource {
+    store_api_key: bool,
+}
 
 impl HttpSource for DatadogLogsSource {
-    fn build_event(
+    fn build_events(
         &self,
         body: Bytes,
         header_map: HeaderMap,
@@ -95,16 +94,20 @@ impl HttpSource for DatadogLogsSource {
             return Ok(Vec::new());
         }
 
-        let api_key = extract_api_key(&header_map, request_path);
+        let api_key = match self.store_api_key {
+            true => extract_api_key(&header_map, request_path),
+            false => None,
+        }
+        .map(Arc::from);
 
         decode_body(body, Encoding::Json).map(|mut events| {
-            // Add source type & Datadog API key
+            // Datadog API key in metadata & source type field
             let key = log_schema().source_type_key();
-            for event in events.iter_mut() {
+            for event in &mut events {
                 let log = event.as_mut_log();
                 log.try_insert(key, Bytes::from("datadog_logs"));
                 if let Some(k) = &api_key {
-                    log.insert("dd_api_key", k.clone());
+                    log.metadata_mut().set_datadog_api_key(Some(Arc::clone(k)));
                 }
             }
             events
@@ -128,11 +131,11 @@ mod tests {
 
     use crate::{
         config::{log_schema, SourceConfig, SourceContext},
-        event::Event,
-        test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
+        event::{Event, EventStatus},
+        test_util::{next_addr, spawn_collect_n, trace_init, wait_for_tcp},
         Pipeline,
     };
-    use futures::channel::mpsc;
+    use futures::Stream;
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
@@ -142,16 +145,23 @@ mod tests {
         crate::test_util::test_generate_config::<DatadogLogsConfig>();
     }
 
-    async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test();
+    async fn source(
+        status: EventStatus,
+        acknowledgements: bool,
+        store_api_key: bool,
+    ) -> (impl Stream<Item = Event>, SocketAddr) {
+        let (sender, recv) = Pipeline::new_test_finalize(status);
         let address = next_addr();
+        let mut context = SourceContext::new_test(sender);
+        context.acknowledgements = acknowledgements;
         tokio::spawn(async move {
             DatadogLogsConfig {
                 address,
                 tls: None,
                 auth: None,
+                store_api_key,
             }
-            .build(SourceContext::new_test(sender))
+            .build(context)
             .await
             .unwrap()
             .await
@@ -181,26 +191,32 @@ mod tests {
     #[tokio::test]
     async fn no_api_key() {
         trace_init();
-        let (rx, addr) = source().await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
 
-        assert_eq!(
-            200,
-            send_with_path(
-                addr,
-                r#"[{"message":"foo", "timestamp": 123}]"#,
-                HeaderMap::new(),
-                "/v1/input/"
-            )
-            .await
-        );
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        r#"[{"message":"foo", "timestamp": 123}]"#,
+                        HeaderMap::new(),
+                        "/v1/input/"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
 
-        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "foo".into());
             assert_eq!(log["timestamp"], 123.into());
-            assert!(log.get("dd_api_key").is_none());
+            assert!(event.metadata().datadog_api_key().is_none());
             assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
         }
     }
@@ -208,34 +224,43 @@ mod tests {
     #[tokio::test]
     async fn api_key_in_url() {
         trace_init();
-        let (rx, addr) = source().await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
 
-        assert_eq!(
-            200,
-            send_with_path(
-                addr,
-                r#"[{"message":"bar", "timestamp": 456}]"#,
-                HeaderMap::new(),
-                "/v1/input/12345678abcdefgh12345678abcdefgh"
-            )
-            .await
-        );
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        r#"[{"message":"bar", "timestamp": 456}]"#,
+                        HeaderMap::new(),
+                        "/v1/input/12345678abcdefgh12345678abcdefgh"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
 
-        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "bar".into());
             assert_eq!(log["timestamp"], 456.into());
-            assert_eq!(log["dd_api_key"], "12345678abcdefgh12345678abcdefgh".into());
             assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
+            assert_eq!(
+                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                "12345678abcdefgh12345678abcdefgh"
+            );
         }
     }
 
     #[tokio::test]
     async fn api_key_in_header() {
         trace_init();
-        let (rx, addr) = source().await;
+        let (rx, addr) = source(EventStatus::Delivered, true, true).await;
 
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -243,25 +268,123 @@ mod tests {
             "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
         );
 
-        assert_eq!(
-            200,
-            send_with_path(
-                addr,
-                r#"[{"message":"baz", "timestamp": 789}]"#,
-                headers,
-                "/v1/input/"
-            )
-            .await
-        );
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        r#"[{"message":"baz", "timestamp": 789}]"#,
+                        headers,
+                        "/v1/input/"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
 
-        let mut events = collect_n(rx, 1).await;
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["message"], "baz".into());
             assert_eq!(log["timestamp"], 789.into());
-            assert_eq!(log["dd_api_key"], "12345678abcdefgh12345678abcdefgh".into());
             assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
+            assert_eq!(
+                &event.metadata().datadog_api_key().as_ref().unwrap()[..],
+                "12345678abcdefgh12345678abcdefgh"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn delivery_failure() {
+        trace_init();
+        let (rx, addr) = source(EventStatus::Failed, true, true).await;
+
+        spawn_collect_n(
+            async move {
+                assert_eq!(
+                    400,
+                    send_with_path(
+                        addr,
+                        r#"[{"message":"foo", "timestamp": 123}]"#,
+                        HeaderMap::new(),
+                        "/v1/input/"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn ignores_disabled_acknowledgements() {
+        trace_init();
+        let (rx, addr) = source(EventStatus::Failed, false, true).await;
+
+        let events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        r#"[{"message":"foo", "timestamp": 123}]"#,
+                        HeaderMap::new(),
+                        "/v1/input/"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
+
+        assert_eq!(events.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn ignores_api_key() {
+        trace_init();
+        let (rx, addr) = source(EventStatus::Delivered, true, false).await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "dd-api-key",
+            "12345678abcdefgh12345678abcdefgh".parse().unwrap(),
+        );
+
+        let mut events = spawn_collect_n(
+            async move {
+                assert_eq!(
+                    200,
+                    send_with_path(
+                        addr,
+                        r#"[{"message":"baz", "timestamp": 789}]"#,
+                        headers,
+                        "/v1/input/12345678abcdefgh12345678abcdefgh"
+                    )
+                    .await
+                );
+            },
+            rx,
+            1,
+        )
+        .await;
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["message"], "baz".into());
+            assert_eq!(log["timestamp"], 789.into());
+            assert_eq!(log[log_schema().source_type_key()], "datadog_logs".into());
+            assert!(event.metadata().datadog_api_key().is_none());
         }
     }
 }

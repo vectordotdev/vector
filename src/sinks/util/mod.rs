@@ -16,7 +16,7 @@ pub mod udp;
 pub mod unix;
 pub mod uri;
 
-use crate::event::{Event, EventMetadata};
+use crate::event::{Event, EventMetadata, LogEvent};
 use bytes::Bytes;
 use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};
@@ -57,6 +57,15 @@ impl<I> EncodedEvent<I> {
         Self {
             item,
             metadata: None,
+        }
+    }
+
+    /// Helper function to set up the metadata.
+    pub fn with_metadata(self, log: LogEvent) -> Self {
+        let (_fields, metadata) = log.into_parts();
+        Self {
+            item: self.item,
+            metadata: Some(metadata),
         }
     }
 

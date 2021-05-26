@@ -2,7 +2,8 @@
 
 use atomig::{Atom, AtomInteger, Atomic, Ordering};
 use serde::{Deserialize, Serialize};
-use std::{mem, sync::Arc};
+use std::iter::{self, ExactSizeIterator};
+use std::{cmp, mem, sync::Arc};
 use tokio::sync::oneshot;
 
 type ImmutVec<T> = Box<[T]>;
@@ -23,25 +24,49 @@ impl PartialEq for EventFinalizers {
     }
 }
 
+impl PartialOrd for EventFinalizers {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        // There is no partial order defined structurally on
+        // `EventFinalizer`. Partial equality is defined on the equality of
+        // `Arc`s. Therefore, partial ordering of `EventFinalizers` is defined
+        // only on the length of the finalizers.
+        self.0.len().partial_cmp(&other.0.len())
+    }
+}
+
 impl EventFinalizers {
     /// Create a new array of event finalizer with the single event.
     pub fn new(finalizer: EventFinalizer) -> Self {
         Self(vec![Arc::new(finalizer)].into())
     }
 
+    /// Add a single finalizer to this array.
+    pub fn add(&mut self, finalizer: EventFinalizer) {
+        self.add_generic(iter::once(Arc::new(finalizer)));
+    }
+
     /// Merge the given list of finalizers into this array.
     pub fn merge(&mut self, other: Self) {
-        if !other.0.is_empty() {
+        // Box<[T]> is missing IntoIterator; this just adds a `capacity` value
+        let other: Vec<_> = other.0.into();
+        self.add_generic(other.into_iter());
+    }
+
+    fn add_generic<I>(&mut self, items: I)
+    where
+        I: ExactSizeIterator<Item = Arc<EventFinalizer>>,
+    {
+        if self.0.is_empty() {
+            self.0 = items.collect::<Vec<_>>().into();
+        } else if items.len() > 0 {
             // This requires a bit of extra work both to avoid cloning
             // the actual elements and because `self.0` cannot be
             // mutated in place.
             let finalizers = mem::replace(&mut self.0, vec![].into());
             let mut result: Vec<_> = finalizers.into();
             // This is the only step that may cause a (re)allocation.
-            result.reserve_exact(other.0.len());
-            // Box<[T]> is missing IntoIterator
-            let other: Vec<_> = other.0.into();
-            for entry in other {
+            result.reserve_exact(items.len());
+            for entry in items {
                 // Deduplicate by hand, assume the list is trivially small
                 if !result.iter().any(|existing| Arc::ptr_eq(existing, &entry)) {
                     result.push(entry);

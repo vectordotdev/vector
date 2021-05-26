@@ -563,5 +563,37 @@ struct S3Bucket {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct S3Object {
+    // S3ObjectKeys are URL encoded
+    // https://docs.aws.amazon.com/AmazonS3/latest/userguide/notification-content-structure.html
+    #[serde(with = "urlencoded_string")]
     key: String,
+}
+
+mod urlencoded_string {
+    use percent_encoding::{percent_decode, utf8_percent_encode};
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<String, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        serde::de::Deserialize::deserialize(deserializer).and_then(|s| {
+            percent_decode(s)
+                .decode_utf8()
+                .map(Into::into)
+                .map_err(|err| {
+                    D::Error::custom(format!("error url decoding S3 object key: {}", err))
+                })
+        })
+    }
+
+    pub fn serialize<S>(s: &str, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        serializer.serialize_str(
+            &utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).collect::<String>(),
+        )
+    }
 }

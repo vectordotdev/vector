@@ -1,17 +1,16 @@
 mod handle;
 mod label_filter;
 mod recorder;
-mod registry;
+
+use std::sync::Arc;
 
 use crate::event::{Event, Metric};
 pub use crate::metrics::handle::{Counter, Handle};
 use crate::metrics::label_filter::VectorLabelFilter;
 use crate::metrics::recorder::VectorRecorder;
-use crate::metrics::registry::VectorRegistry;
-use metrics::{Key, SharedString};
+use metrics::Key;
 use metrics_tracing_context::TracingContextLayer;
-use metrics_util::layers::Layer;
-use metrics_util::{CompositeKey, MetricKind};
+use metrics_util::{layers::Layer, Generational, NotTracked, Registry};
 use once_cell::sync::OnceCell;
 
 static CONTROLLER: OnceCell<Controller> = OnceCell::new();
@@ -19,16 +18,11 @@ static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 // cardinality. Useful for the end users to help understand the characteristics
 // of their environment and how vectors acts in it.
 const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality_total";
-static CARDINALITY_KEY_DATA_NAME: [SharedString; 1] =
-    [SharedString::const_str(&CARDINALITY_KEY_NAME)];
-static CARDINALITY_KEY: CompositeKey = CompositeKey::new(
-    MetricKind::Counter,
-    Key::from_static_name(&CARDINALITY_KEY_DATA_NAME),
-);
+static CARDINALITY_KEY: Key = Key::from_static_name(CARDINALITY_KEY_NAME);
 
 /// Controller allows capturing metric snapshots.
 pub struct Controller {
-    registry: VectorRegistry<CompositeKey, Handle>,
+    registry: Arc<Registry<Key, Handle, NotTracked<Handle>>>,
 }
 
 fn metrics_enabled() -> bool {
@@ -57,7 +51,7 @@ pub fn init() -> crate::Result<()> {
     ////
     //// Prepare the registry
     ////
-    let registry = VectorRegistry::default();
+    let registry = Arc::new(Registry::<Key, Handle, NotTracked<Handle>>::untracked());
 
     ////
     //// Prepare the controller
@@ -98,7 +92,7 @@ pub fn init() -> crate::Result<()> {
 
 /// Clear all metrics from the registry.
 pub fn reset(controller: &Controller) {
-    controller.registry.map.clear()
+    controller.registry.clear()
 }
 
 /// Get a handle to the globally registered controller, if it's initialized.
@@ -116,12 +110,10 @@ pub fn get_controller() -> crate::Result<&'static Controller> {
 /// Take a snapshot of all gathered metrics and expose them as metric
 /// [`Event`]s.
 pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
-    let mut events = controller
-        .registry
-        .map
-        .iter()
-        .map(|kv| Metric::from_metric_kv(kv.key().key(), kv.value()).into())
-        .collect::<Vec<Event>>();
+    let mut events: Vec<Event> = Vec::new();
+    controller.registry.visit(|_kind, (key, handle)| {
+        events.push(Metric::from_metric_kv(key, handle.get_inner()).into());
+    });
 
     // Add alias `events_processed_total` for `events_out_total`.
     for i in 0..events.len() {
@@ -132,8 +124,8 @@ pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
         }
     }
 
-    let handle = Handle::Counter(Counter::with_count(events.len() as u64 + 1));
-    events.push(Metric::from_metric_kv(CARDINALITY_KEY.key(), &handle).into());
+    let handle = Handle::Counter(Arc::new(Counter::with_count(events.len() as u64 + 1)));
+    events.push(Metric::from_metric_kv(&CARDINALITY_KEY, &handle).into());
 
     events.into_iter()
 }

@@ -1,16 +1,108 @@
+//! The Vector Core buffer
+//!
+//! This library implements a channel like functionality, one variant which is
+//! solely in-memory and the other that is on-disk. Both variants are bounded.
+
+#![deny(clippy::all)]
+#![deny(clippy::pedantic)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::type_complexity)] // long-types happen, especially in async code
+
+#[macro_use]
+extern crate tracing;
+
 mod acker;
+pub mod bytes;
 #[cfg(feature = "disk-buffer")]
 pub mod disk;
 
-use crate::event::Event;
+use crate::bytes::{DecodeBytes, EncodeBytes};
 pub use acker::Acker;
-use futures::{channel::mpsc, Sink, SinkExt};
+use futures::{channel::mpsc, Sink, SinkExt, Stream};
 use pin_project::pin_project;
 use serde::{Deserialize, Serialize};
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::fmt::{Debug, Display};
+#[cfg(feature = "disk-buffer")]
+use std::path::Path;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+// NOTE unfortunately because we can't edit out a lifetime based on a feature
+// flag we need two copies of `Variant` else the liftime being unused when
+// 'disk-buffers' is flagged off will ding the build.
+
+#[derive(Debug, Clone, Copy)]
+#[cfg(not(feature = "disk-buffer"))]
+pub enum Variant {
+    Memory {
+        max_events: usize,
+        when_full: WhenFull,
+    },
+}
+
+#[derive(Debug, Clone, Copy)]
+#[cfg(feature = "disk-buffer")]
+pub enum Variant<'a> {
+    Memory {
+        max_events: usize,
+        when_full: WhenFull,
+    },
+    Disk {
+        max_size: usize,
+        when_full: WhenFull,
+        data_dir: &'a Path,
+        name: &'a str,
+    },
+}
+
+/// Build a new buffer based on the passed `Variant`
+///
+/// # Errors
+///
+/// This function will fail only when creating a new disk buffer. Because of
+/// legacy reasons the error is not a type but a `String`.
+pub fn build<'a, T>(
+    variant: Variant,
+) -> Result<
+    (
+        BufferInputCloner<T>,
+        Box<dyn Stream<Item = T> + 'a + Send>,
+        Acker,
+    ),
+    String,
+>
+where
+    T: 'a + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug + Display,
+{
+    match variant {
+        #[cfg(feature = "disk-buffer")]
+        Variant::Disk {
+            max_size,
+            when_full,
+            data_dir,
+            name,
+        } => {
+            let buffer_dir = format!("{}_buffer", name);
+
+            let (tx, rx, acker) =
+                disk::open(data_dir, &buffer_dir, max_size).map_err(|error| error.to_string())?;
+
+            let tx = BufferInputCloner::Disk(tx, when_full);
+            Ok((tx, rx, acker))
+        }
+        Variant::Memory {
+            max_events,
+            when_full,
+        } => {
+            let (tx, rx) = mpsc::channel(max_events);
+            let tx = BufferInputCloner::Memory(tx, when_full);
+            let rx = Box::new(rx);
+            Ok((tx, rx, Acker::Null))
+        }
+    }
+}
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -30,14 +122,25 @@ impl Default for WhenFull {
 // the large fields to reduce the total size.
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
-pub enum BufferInputCloner {
-    Memory(mpsc::Sender<Event>, WhenFull),
+pub enum BufferInputCloner<T>
+where
+    T: Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug,
+{
+    Memory(mpsc::Sender<T>, WhenFull),
     #[cfg(feature = "disk-buffer")]
-    Disk(disk::Writer, WhenFull),
+    Disk(disk::Writer<T>, WhenFull),
 }
 
-impl BufferInputCloner {
-    pub fn get(&self) -> Box<dyn Sink<Event, Error = ()> + Send> {
+impl<'a, T> BufferInputCloner<T>
+where
+    T: 'a + Send + Sync + Unpin + Clone + EncodeBytes<T> + DecodeBytes<T>,
+    <T as EncodeBytes<T>>::Error: Debug,
+    <T as DecodeBytes<T>>::Error: Debug + Display,
+{
+    #[must_use]
+    pub fn get(&self) -> Box<dyn Sink<T, Error = ()> + 'a + Send> {
         match self {
             BufferInputCloner::Memory(tx, when_full) => {
                 let inner = tx
@@ -52,7 +155,7 @@ impl BufferInputCloner {
 
             #[cfg(feature = "disk-buffer")]
             BufferInputCloner::Disk(writer, when_full) => {
-                let inner = writer.clone();
+                let inner: disk::Writer<T> = (*writer).clone();
                 if when_full == &WhenFull::DropNewest {
                     Box::new(DropWhenFull::new(inner))
                 } else {
@@ -90,7 +193,7 @@ impl<T, S: Sink<T> + Unpin> Sink<T> for DropWhenFull<S> {
                 *this.drop = true;
                 Poll::Ready(Ok(()))
             }
-            error => error,
+            error @ std::task::Poll::Ready(..) => error,
         }
     }
 

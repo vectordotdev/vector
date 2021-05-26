@@ -1,5 +1,6 @@
 [build.env]
 passthrough = [
+    "BUILD_DIR",
     "RUST_BACKTRACE",
     "RUST_LOG",
 ]
