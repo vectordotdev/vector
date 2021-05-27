@@ -99,7 +99,7 @@ where
             // This will usually complete instantly, but in the case of a large
             // queue (or a fresh launch of the app), this will have to go to
             // disk.
-            let mut buffer = std::mem::replace(&mut self.buffer, VecDeque::default());
+            let mut buffer = std::mem::take(&mut self.buffer);
             tokio::task::block_in_place(|| {
                 buffer.extend(
                     self.db
