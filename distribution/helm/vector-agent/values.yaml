@@ -153,8 +153,6 @@ kubernetesLogsSource:
   # Additional config to embed at the kubernetes logs source.
   config: {}
     # option: "value"
-  # Raw TOML config to embed at the kubernetes logs source (deprecated).
-  rawConfig: null
 
 # The "built-in" vector sink, to send the logs to the vector aggregator.
 # Disabled by default when using `vector-agent` chart.
@@ -173,8 +171,6 @@ vectorSink:
   # Additional config to embed at the vector sink.
   config: {}
     # option: "value"
-  # Raw TOML config to embed at the vector sink (deprecated).
-  rawConfig: null
 
 # The "built-in" internal metrics source emitting Vector's internal opertaional
 # metrics.
@@ -186,8 +182,6 @@ internalMetricsSource:
   # Additional config to embed at the internal metrics source.
   config: {}
     # option: "value"
-  # Raw TOML config to embed at the internal metrics source (deprecated).
-  rawConfig: null
 
 # The "built-in" host metrics source emitting the metrics gathered from the node
 # that Vector is executing on.
@@ -206,8 +200,6 @@ hostMetricsSource:
       mountpoints:
         excludes: ["*/proc/sys/fs/binfmt_misc"]
     # option: "value"
-  # Raw TOML config to embed at the host metrics source (deprecated).
-  rawConfig: null
 
 # The "built-in" prometheus sink exposing metrics in the Prometheus scraping
 # format.
@@ -235,8 +227,6 @@ prometheusSink:
   # Additional config to embed at the prometheus sink.
   config: {}
     # option: "value"
-  # Raw TOML config to embed at the prometheus sink (deprecated).
-  rawConfig: null
   # Add Prometheus annotations to Pod to opt-in for Prometheus scraping.
   # To be used in clusters that rely on Pod annotations in the form of
   # `prometheus.io/scrape` to discover scrape targets.
@@ -259,8 +249,6 @@ sources: {}
   # source_name:
   #   type: "source_type"
   #   option: "value"
-  #   rawConfig: |
-  #     option = "value"
 
 # Transforms to add to the generated `vector` config.
 transforms: {}
@@ -268,8 +256,6 @@ transforms: {}
   #   type: "transform_type"
   #   inputs: ["input1", "input2"]
   #   option: "value"
-  #   rawConfig: |
-  #     option = "value"
 
 # Sinks to add to the generated `vector` config.
 sinks: {}
@@ -277,5 +263,3 @@ sinks: {}
   #   type: "sink_type"
   #   inputs: ["input1", "input2"]
   #   option: "value"
-  #   rawConfig: |
-  #     option = "value"

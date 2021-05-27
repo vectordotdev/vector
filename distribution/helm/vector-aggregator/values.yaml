@@ -210,8 +210,6 @@ vectorSource:
     # option: "value"
   # Specific node port to bind (useful if `service.type` is set to `NodePort`).
   nodePort: null  # 9090 (must be a number)
-  # Raw TOML config to embed at the vector source (deprecated).
-  rawConfig: null
 
 # The "built-in" internal metrics source emitting Vector's internal opertaional
 # metrics.
@@ -223,8 +221,6 @@ internalMetricsSource:
   # Additional config to embed at the internal metrics source.
   config: {}
     # option: "value"
-  # Raw TOML config to embed at the internal metrics source (deprecated).
-  rawConfig: null
 
 # The "built-in" prometheus sink exposing metrics in the Prometheus scraping
 # format.
@@ -252,8 +248,6 @@ prometheusSink:
   # Additional config to embed at the prometheus sink.
   config: {}
     # option: "value"
-  # Raw TOML config to embed at the prometheus sink (deprecated).
-  rawConfig: null
   # Add Prometheus annotations to Pod to opt-in for Prometheus scraping.
   # To be used in clusters that rely on Pod annotations in the form of
   # `prometheus.io/scrape` to discover scrape targets.
@@ -274,21 +268,15 @@ prometheusSink:
 sources: {}
   # source_name:
   #   type: "source_type"
-  #   rawConfig: |
-  #     option = "value"
 
 # Transforms to add to the generated `vector` config.
 transforms: {}
   # transform_name:
   #   type: "transform_type"
   #   inputs: ["input1", "input2"]
-  #   rawConfig: |
-  #     option = "value"
 
 # Sinks to add to the generated `vector` config.
 sinks: {}
   # sink_name:
   #   type: "sink_type"
   #   inputs: ["input1", "input2"]
-  #   rawConfig: |
-  #     option = "value"

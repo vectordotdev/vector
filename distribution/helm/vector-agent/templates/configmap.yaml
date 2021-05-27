@@ -8,31 +8,23 @@ metadata:
 data:
   # We leave `vector.toml` file name available to let externally managed config
   # maps to provide it.
-  managed.toml: |
+  managed.yaml: |
     {{- include "libvector.vectorConfigHeader" . | nindent 4 -}}
+    {{- if or .Values.sources .Values.kubernetesLogsSource.enabled .Values.internalMetricsSource.enabled .Values.hostMetricsSource.enabled }}
+    sources:
+    {{- if .Values.sources }}
+    {{- toYaml .Values.sources | nindent 6 }}
+    {{- end }}
+    {{- end }}
 
     {{- with .Values.kubernetesLogsSource }}
     {{- if .enabled }}
     # Ingest logs from Kubernetes.
     {{- $value := merge (dict) .config -}}
     {{- $_ := set $value "type" "kubernetes_logs" -}}
-    {{- $_ := set $value "rawConfig" .rawConfig -}}
     {{- tuple .sourceId $value | include "libvector.vectorSourceConfig" | nindent 4 -}}
     {{- end }}
     {{- end }}
-
-    {{- with .Values.vectorSink -}}
-    {{- if .enabled }}
-    # Send logs to the aggregator.
-    {{- $value := merge (dict) .config -}}
-    {{- $_ := set $value "type" "vector" -}}
-    {{- $_ := set $value "inputs" (required "You must specify the `inputs` for the built-in vector sink" .inputs) -}}
-    {{- $_ := set $value "address" (include "vector-agent.vectorSinkAddress" $) -}}
-    {{- $_ := set $value "rawConfig" .rawConfig -}}
-    {{- tuple .sinkId $value | include "libvector.vectorSinkConfig" | nindent 4 -}}
-    {{- end }}
-    {{- end }}
-
     {{- $prometheusInputs := (list) -}}
     {{- with .Values.hostMetricsSource -}}
     {{- if .enabled }}
@@ -40,13 +32,40 @@ data:
     # Capture the metrics from the host.
     {{- $value := merge (dict) .config -}}
     {{- $_ := set $value "type" "host_metrics" -}}
-    {{- $_ := set $value "rawConfig" .rawConfig -}}
     {{- tuple .sourceId $value | include "libvector.vectorSourceConfig" | nindent 4 -}}
     {{- end -}}
     {{- end -}}
+    {{- $values := .Values -}}
+    {{- with $values.internalMetricsSource }}
+    {{- if .enabled }}
+    # Emit internal Vector metrics.
+    {{- $value := merge (dict) .config -}}
+    {{- $_ := set $value "type" "internal_metrics" -}}
+    {{- tuple .sourceId $value | include "libvector.vectorSourceConfig" | nindent 4 -}}
+    {{- end }}
+    {{- end }}
+
+    {{- if .Values.transforms }}
+    transforms:
+    {{- toYaml .Values.transforms | nindent 6 }} 
+    {{- end }}
+
+    {{- if or .Values.sinks .Values.vectorSink.enabled .Values.prometheusSink.enabled }}
+    sinks:
+    {{- if .Values.sinks }}
+    {{- toYaml .Values.sinks | nindent 6 }} 
+    {{- end }}
+    {{- with .Values.vectorSink -}}
+    {{- if .enabled }}
+    # Send logs to the aggregator.
+    {{- $value := merge (dict) .config -}}
+    {{- $_ := set $value "type" "vector" -}}
+    {{- $_ := set $value "inputs" (required "You must specify the `inputs` for the built-in vector sink" .inputs) -}}
+    {{- $_ := set $value "address" (include "vector-agent.vectorSinkAddress" $) -}}
+    {{- tuple .sinkId $value | include "libvector.vectorSinkConfig" | nindent 4 -}}
+    {{- end }}
+    {{- end }}
+    {{- end }}
 
     {{- merge . (dict "prometheusInputs" $prometheusInputs) | include "libvector.metricsConfigPartial" | nindent 4 -}}
-
-    {{- include "libvector.vectorTopology" .Values | nindent 4 -}}
-
 {{- end }}

@@ -9,16 +9,6 @@ Internal metrics are common, so we share and reuse the definition.
 {{- $values := .Values -}}
 
 {{- $prometheusInputs := .prometheusInputs -}}
-{{- with $values.internalMetricsSource }}
-{{- if .enabled }}
-# Emit internal Vector metrics.
-{{- $value := merge (dict) .config -}}
-{{- $_ := set $value "type" "internal_metrics" -}}
-{{- $_ := set $value "rawConfig" .rawConfig -}}
-{{- tuple .sourceId $value | include "libvector.vectorSourceConfig" | nindent 0 -}}
-{{- end }}
-{{- end }}
-
 {{- with $values.prometheusSink }}
 {{- if .enabled }}
 
@@ -34,7 +24,6 @@ Internal metrics are common, so we share and reuse the definition.
 {{- $_ := set $value "type" "prometheus" -}}
 {{- $_ := set $value "inputs" $inputs -}}
 {{- $_ := set $value "address" (printf "%v:%v" .listenAddress .listenPort) -}}
-{{- $_ := set $value "rawConfig" .rawConfig -}}
 {{- tuple .sinkId $value | include "libvector.vectorSinkConfig" | nindent 0 -}}
 {{- end }}
 {{- end }}

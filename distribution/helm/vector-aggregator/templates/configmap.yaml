@@ -8,8 +8,14 @@ metadata:
 data:
   # We leave `vector.toml` file name available to let externally managed config
   # maps to provide it.
-  managed.toml: |
+  managed.yaml: |
     {{- include "libvector.vectorConfigHeader" . | nindent 4 -}}
+    {{- if or .Values.sources .Values.vectorSource.enabled .Values.internalMetricsSource.enabled }}
+    sources:
+    {{- if .Values.sources }}
+    {{- toYaml .Values.sources | nindent 6 }}
+    {{- end }}
+    {{- end }}
 
     {{- with .Values.vectorSource }}
     {{- if .enabled }}
@@ -17,13 +23,29 @@ data:
     {{- $value := merge (dict) .config -}}
     {{- $_ := set $value "type" "vector" -}}
     {{- $_ := set $value "address" (printf "%v:%v" .listenAddress .listenPort) -}}
-    {{- $_ := set $value "rawConfig" .rawConfig -}}
+    {{- tuple .sourceId $value | include "libvector.vectorSourceConfig" | nindent 4 -}}
+    {{- end }}
+    {{- end }}
+    {{- $values := .Values -}}
+    {{- with $values.internalMetricsSource }}
+    {{- if .enabled }}
+    # Emit internal Vector metrics.
+    {{- $value := merge (dict) .config -}}
+    {{- $_ := set $value "type" "internal_metrics" -}}
     {{- tuple .sourceId $value | include "libvector.vectorSourceConfig" | nindent 4 -}}
     {{- end }}
     {{- end }}
 
+    {{- if .Values.transforms }}
+    transforms:
+    {{- toYaml .Values.transforms | nindent 6 }} 
+    {{- end }}
+
+    {{- if or .Values.sinks .Values.prometheusSink.enabled }}
+    sinks:
+    {{- if .Values.sinks }}
+    {{- toYaml .Values.sinks | nindent 6 }} 
+    {{- end }}
+    {{- end }}
     {{- include "libvector.metricsConfigPartial" . | nindent 4  }}
-
-    {{- include "libvector.vectorTopology" .Values | nindent 4 -}}
-
 {{- end }}
