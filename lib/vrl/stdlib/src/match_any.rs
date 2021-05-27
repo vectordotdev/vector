@@ -19,7 +19,7 @@ impl Function for MatchAny {
             Parameter {
                 keyword: "patterns",
                 kind: kind::ARRAY,
-                required: false,
+                required: true,
             },
         ]
     }
