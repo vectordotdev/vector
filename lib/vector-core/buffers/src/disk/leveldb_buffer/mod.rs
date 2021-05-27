@@ -21,6 +21,7 @@ use std::{
     marker::PhantomData,
     path::Path,
     sync::{atomic::AtomicUsize, Arc, Mutex},
+    time::Instant,
 };
 pub use writer::Writer;
 
@@ -124,13 +125,15 @@ where
             write_notifier: Arc::clone(&write_notifier),
             blocked_write_tasks,
             read_offset: head,
+            compacted_offset: 0,
             delete_offset: head,
             current_size,
             ack_counter,
             max_uncompacted_size,
-            uncompacted_size: 1,
+            uncompacted_size: 0,
             unacked_sizes: VecDeque::new(),
             buffer: Vec::new(),
+            last_compaction: Instant::now(),
             phantom: PhantomData,
         };
         // Compact on every start
