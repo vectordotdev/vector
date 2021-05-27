@@ -31,70 +31,73 @@ metadata:
 data:
   # We leave `vector.toml` file name available to let externally managed config
   # maps to provide it.
-  managed.toml: |
+  managed.yaml: |
     # Configuration for vector.
     # Docs: https://vector.dev/docs/
     
-    data_dir = "/vector-data-dir"
+    data_dir: "/vector-data-dir"
     
-    [api]
-      enabled = false
-      address = "0.0.0.0:8686"
-      playground = true
+    api:
+      enabled: false
+      address: "0.0.0.0:8686"
+      playground: true
     
-    [log_schema]
-      host_key = "host"
-      message_key = "message"
-      source_type_key = "source_type"
-      timestamp_key = "timestamp"
+    log_schema:
+      host_key: "host"
+      message_key: "message"
+      source_type_key: "source_type"
+      timestamp_key: "timestamp"
     
+    sources:
     # Ingest logs from Kubernetes.
-    [sources.kubernetes_logs]
-      option1 = "value1"
-      option2 = "value2"
-      type = "kubernetes_logs"
-      arbitrary text 1
-    
-    # Send logs to the aggregator.
-    [sinks.vector_sink]
-      address = "vector.internal:9000"
-      inputs = ["my_input_1", "my_input_2"]
-      option1 = "value1"
-      option2 = "value2"
-      type = "vector"
-      arbitrary text 1
+      kubernetes_logs:
+        option1: value1
+        option2: value2
+        type: kubernetes_logs
     
     # Capture the metrics from the host.
-    [sources.host_metrics]
-      option1 = "value1"
-      option2 = "value2"
-      type = "host_metrics"
-      [sources.host_metrics.filesystem]
-        [sources.host_metrics.filesystem.devices]
-          excludes = ["binfmt_misc"]
-        [sources.host_metrics.filesystem.filesystems]
-          excludes = ["binfmt_misc"]
-        [sources.host_metrics.filesystem.mountpoints]
-          excludes = ["*/proc/sys/fs/binfmt_misc"]
-    [sources.host_metrics]
-      arbitrary text 1
-    
+      host_metrics:
+        filesystem:
+          devices:
+            excludes:
+            - binfmt_misc
+          filesystems:
+            excludes:
+            - binfmt_misc
+          mountpoints:
+            excludes:
+            - '*/proc/sys/fs/binfmt_misc'
+        option1: value1
+        option2: value2
+        type: host_metrics
     
     # Emit internal Vector metrics.
-    [sources.internal_metrics]
-      option1 = "value1"
-      option2 = "value2"
-      type = "internal_metrics"
-      arbitrary text 1
+      internal_metrics:
+        option1: value1
+        option2: value2
+        type: internal_metrics
+    
+    sinks:
+    # Send logs to the aggregator.
+      vector_sink:
+        address: vector.internal:9000
+        inputs:
+        - my_input_1
+        - my_input_2
+        option1: value1
+        option2: value2
+        type: vector
+    
     
     # Expose metrics for scraping in the Prometheus format.
-    [sinks.prometheus_sink]
-      address = "0.0.0.0:9090"
-      inputs = ["internal_metrics", "host_metrics"]
-      option1 = "value1"
-      option2 = "value2"
-      type = "prometheus"
-      arbitrary text 1
+      prometheus_sink:
+        address: 0.0.0.0:9090
+        inputs:
+        - internal_metrics
+        - host_metrics
+        option1: value1
+        option2: value2
+        type: prometheus
 ---
 # Source: vector-agent/templates/rbac.yaml
 # Permissions to use Kubernetes API.

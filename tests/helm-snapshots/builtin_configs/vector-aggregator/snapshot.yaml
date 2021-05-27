@@ -31,47 +31,47 @@ metadata:
 data:
   # We leave `vector.toml` file name available to let externally managed config
   # maps to provide it.
-  managed.toml: |
+  managed.yaml: |
     # Configuration for vector.
     # Docs: https://vector.dev/docs/
     
-    data_dir = "/vector-data-dir"
+    data_dir: "/vector-data-dir"
     
-    [api]
-      enabled = false
-      address = "0.0.0.0:8686"
-      playground = true
+    api:
+      enabled: false
+      address: "0.0.0.0:8686"
+      playground: true
     
-    [log_schema]
-      host_key = "host"
-      message_key = "message"
-      source_type_key = "source_type"
-      timestamp_key = "timestamp"
+    log_schema:
+      host_key: "host"
+      message_key: "message"
+      source_type_key: "source_type"
+      timestamp_key: "timestamp"
     
+    sources:
     # Accept logs from Vector agents.
-    [sources.vector]
-      address = "0.0.0.0:9000"
-      option1 = "value1"
-      option2 = "value2"
-      type = "vector"
-      arbitrary text 1
-    
+      vector:
+        address: 0.0.0.0:9000
+        option1: value1
+        option2: value2
+        type: vector
     
     # Emit internal Vector metrics.
-    [sources.internal_metrics]
-      option1 = "value1"
-      option2 = "value2"
-      type = "internal_metrics"
-      arbitrary text 1
+      internal_metrics:
+        option1: value1
+        option2: value2
+        type: internal_metrics
+    
+    sinks:
     
     # Expose metrics for scraping in the Prometheus format.
-    [sinks.prometheus_sink]
-      address = "0.0.0.0:9090"
-      inputs = ["internal_metrics"]
-      option1 = "value1"
-      option2 = "value2"
-      type = "prometheus"
-      arbitrary text 1
+      prometheus_sink:
+        address: 0.0.0.0:9090
+        inputs:
+        - internal_metrics
+        option1: value1
+        option2: value2
+        type: prometheus
 ---
 # Source: vector-aggregator/templates/service-headless.yaml
 apiVersion: v1
