@@ -37,7 +37,6 @@ env:
   AWS_SECRET_ACCESS_KEY: "dummy"
   CI: true
   AWS_REGION: us-east-1
-  VECTOR_USE_BUILD_DESC: "0"
 
 jobs:
   cancel-previous:
