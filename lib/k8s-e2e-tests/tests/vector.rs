@@ -6,8 +6,19 @@ use k8s_test_framework::{
 
 const HELM_CHART_VECTOR: &str = "vector";
 
-const HELM_VALUES_STDOUT_SINK: &str = indoc! {r#"
+fn helm_values_stdout_sink(aggregator_override_name: &str, agent_override_name: &str) -> String {
+    format!(
+        indoc! {r#"
+    vector-agent:
+      fullnameOverride: "{}"
+      vectorSink:
+        host: "{}"
+      dataVolume:
+        hostPath:
+          path: /var/lib/{}-vector/
+
     vector-aggregator:
+      fullnameOverride: "{}"
       vectorSource:
         sourceId: vector
 
@@ -17,7 +28,13 @@ const HELM_VALUES_STDOUT_SINK: &str = indoc! {r#"
           inputs: ["vector"]
           target: "stdout"
           encoding: "json"
-"#};
+"# },
+        agent_override_name,
+        aggregator_override_name
+        agent_override_name,
+        aggregator_override_name
+    )
+}
 
 /// This test validates that vector picks up logs with an agent and
 /// delivers them to the aggregator out of the box.
@@ -27,13 +44,18 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
+    let aggregator_override_name = get_override_name("vector-aggregator");
+    let agent_override_name = get_override_name("vector-agent");
 
     let vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR,
             VectorConfig {
-                custom_helm_values: HELM_VALUES_STDOUT_SINK,
+                custom_helm_values: &helm_values_stdout_sink(
+                    &aggregator_override_name,
+                    &agent_override_name,
+                ),
                 ..Default::default()
             },
         )
@@ -42,15 +64,15 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("daemonset/{}", "vector-agent"),
-            vec!["--timeout=60s"],
+            &format!("daemonset/{}", agent_override_name),
+            vec!["--timeout=6000s"],
         )
         .await?;
 
     framework
         .wait_for_rollout(
             &namespace,
-            &format!("statefulset/{}", "vector-aggregator"),
+            &format!("statefulset/{}", aggregator_override_name),
             vec!["--timeout=60s"],
         )
         .await?;
@@ -76,8 +98,10 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader =
-        framework.logs(&namespace, &format!("statefulset/{}", "vector-aggregator"))?;
+    let mut log_reader = framework.logs(
+        &namespace,
+        &format!("statefulset/{}", aggregator_override_name),
+    )?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
