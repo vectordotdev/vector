@@ -2,6 +2,8 @@ use crate::test::model::{Message, Model};
 use crate::{EncodeBytes, Variant, WhenFull};
 use std::collections::VecDeque;
 
+use super::Progress;
+
 /// `OnDisk` is the `Model` for on-disk buffer
 #[cfg(feature = "disk-buffer")]
 pub(crate) struct OnDisk {
@@ -33,7 +35,7 @@ impl OnDisk {
 
 #[cfg(feature = "disk-buffer")]
 impl Model for OnDisk {
-    fn send(&mut self, item: Message) {
+    fn send(&mut self, item: Message) -> Progress {
         let byte_size = EncodeBytes::encoded_size(&item).unwrap();
         match self.when_full {
             WhenFull::DropNewest => {
@@ -44,11 +46,15 @@ impl Model for OnDisk {
                     self.current_bytes += byte_size;
                     self.inner.push_back(item);
                 }
+                Progress::Advanced
             }
             WhenFull::Block => {
-                if !self.is_full() {
+                if self.is_full() {
+                    Progress::Blocked(item)
+                } else {
                     self.current_bytes += byte_size;
                     self.inner.push_back(item);
+                    Progress::Advanced
                 }
             }
         }

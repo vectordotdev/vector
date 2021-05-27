@@ -12,10 +12,20 @@ use futures::{Sink, Stream};
 use quickcheck::{QuickCheck, TestResult};
 use std::pin::Pin;
 
+#[derive(Debug)]
+/// For operations that might block whether the operation would or would not
+/// have, as the models should never interrupt program flow.
+enum Progress {
+    /// Operation did "block", passes back the `Message`
+    Blocked(Message),
+    /// Operation did "advance"
+    Advanced,
+}
+
 /// A common trait for our "model", the "obviously correct" counterpart to the
 /// system under test
 trait Model {
-    fn send(&mut self, item: Message);
+    fn send(&mut self, item: Message) -> Progress;
     fn recv(&mut self) -> Option<Message>;
     fn is_full(&self) -> bool;
     fn is_empty(&self) -> bool;
@@ -141,7 +151,7 @@ fn model_check() {
                         // value immediately available to a receiver, something
                         // we elide by immediately flushing.
                         assert_eq!(Ok(()), Sink::start_send(Pin::new(sink), msg.clone()));
-                        model.send(msg.clone());
+                        assert!(matches!(model.send(msg.clone()), Progress::Advanced));
                         match Sink::poll_flush(Pin::new(sink), &mut snd_context) {
                             Poll::Ready(Ok(())) => {}
                             // If the buffer signals Ready/Ok then we're good to

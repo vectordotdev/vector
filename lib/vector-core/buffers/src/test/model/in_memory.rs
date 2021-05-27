@@ -2,6 +2,8 @@ use crate::test::model::{Message, Model};
 use crate::{Variant, WhenFull};
 use std::collections::VecDeque;
 
+use super::Progress;
+
 /// `InMemory` is the `Model` for on-disk buffer
 pub(crate) struct InMemory {
     inner: VecDeque<Message>,
@@ -29,19 +31,23 @@ impl InMemory {
 }
 
 impl Model for InMemory {
-    fn send(&mut self, item: Message) {
+    fn send(&mut self, item: Message) -> Progress {
         match self.when_full {
             WhenFull::DropNewest => {
-                if self.inner.len() == (self.capacity + self.num_senders) {
+                if self.inner.len() >= (self.capacity + self.num_senders) {
                     // DropNewest never blocks, instead it silently drops the
                     // item pushed in when the buffer is too full.
                 } else {
                     self.inner.push_back(item);
                 }
+                Progress::Advanced
             }
             WhenFull::Block => {
-                if self.inner.len() != (self.capacity + self.num_senders) {
+                if self.inner.len() >= (self.capacity + self.num_senders) {
+                    Progress::Blocked(item)
+                } else {
                     self.inner.push_back(item);
+                    Progress::Advanced
                 }
             }
         }
