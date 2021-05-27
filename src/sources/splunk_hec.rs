@@ -20,7 +20,7 @@ use std::{
     collections::HashMap,
     future,
     io::Read,
-    net::{AddrParseError, IpAddr, Ipv4Addr, SocketAddr},
+    net::{Ipv4Addr, SocketAddr},
 };
 
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
@@ -185,19 +185,7 @@ impl SplunkSource {
                             Box::new(body.reader())
                         };
 
-                        // Retain as Option<String>, but only return Some in case where we can parse to IpAddr
-                        let xff_address: Option<String> = match xff {
-                            Some(ref xff_header) => {
-                                let parsed_address: Result<IpAddr, AddrParseError> = xff_header.parse();
-                                match parsed_address {
-                                    Ok(_) => xff,
-                                    Err(_) => None
-                                }
-                            }
-                            None => None
-                        };
-
-                        let events = stream::iter(EventIterator::new(reader, channel, remote, xff_address));
+                        let events = stream::iter(EventIterator::new(reader, channel, remote, xff));
 
                         // `fn send_all` can be used once https://github.com/rust-lang/futures-rs/issues/2402
                         // is resolved.
@@ -631,10 +619,7 @@ fn raw_event(
 
     // Add X-Forwarded-For header as remote_addr, only when it can be parsed to IpAddr
     if let Some(remote_address) = xff {
-        let parsed_address: Result<IpAddr, AddrParseError> = remote_address.parse();
-        if let Ok(_) = parsed_address {
-            log.insert(REMOTE_ADDR, remote_address);
-        }
+        log.insert(REMOTE_ADDR, remote_address);
     }
 
     // Add timestamp
