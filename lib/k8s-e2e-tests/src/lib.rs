@@ -1,3 +1,4 @@
+use indoc::indoc;
 use k8s_openapi::{
     api::core::v1::{Container, Pod, PodSpec},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
@@ -26,7 +27,15 @@ pub fn get_override_name(suffix: &str) -> String {
 /// Adds a fullnameOverride entry to the given config. This allows multiple tests
 /// to be run against the same cluster without the role anmes clashing.
 pub fn config_override_name(config: &str, name: &str) -> String {
-    format!("fullnameOverride: \"{}\"\n{}", name, config)
+    format!(
+        indoc! {r#"
+            fullnameOverride: "{}"
+            dataVolume:
+              hostPath:
+                path: /var/lib/{}-vector/
+            {}"#},
+        name, name, config
+    )
 }
 
 pub fn make_framework() -> Framework {
