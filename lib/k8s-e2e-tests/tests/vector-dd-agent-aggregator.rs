@@ -1,6 +1,7 @@
 use indoc::indoc;
 use k8s_e2e_tests::*;
 use k8s_test_framework::{lock, test_pod, vector::Config as VectorConfig};
+use serde_json::Value;
 
 
 const HELM_CHART_VECTOR_AGGREGATOR: &str = "vector-aggregator";
@@ -113,12 +114,9 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
     // Read the rest of the log lines.
     let mut got_marker = false;
     look_for_log_line(&mut log_reader, |val| {
-        if let Some(service) = val.get("service") {
-            if service != json!("test_service") {
-                fewfew
-            }
-        }
-        else {
+        if val["service"] != Value::Null && val["service"] != "test_service" {
+            panic!("Unexpected logs");
+        } else if val["service"] == Value::Null {
             return FlowControlCommand::GoOn;
         }
 
