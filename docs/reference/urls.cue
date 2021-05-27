@@ -421,6 +421,7 @@ urls: {
 	utf8:                                                     "\(wikipedia)/wiki/UTF-8"
 	uuidv4:                                                   "\(wikipedia)/wiki/Universally_unique_identifier#Version_4_(random)"
 	url:                                                      "https://en.wikipedia.org/wiki/URL"
+	us_social_security_number:                                "https://www.ssa.gov/history/ssn/geocard.html"
 	vector_aggregator_role:                                   "\(vector_website)/docs/setup/deployment/roles/#aggregator"
 	vector_blog:                                              "\(vector_website)/blog/"
 	vector_bug_issues:                                        "\(vector_repo)/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+bug%22"
