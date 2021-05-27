@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 const MIN_TIME_UNCOMPACTED: Duration = Duration::from_secs(60);
 
 /// Minimal size of uncompacted for which a compaction can be triggered.
-const MIN_UNCOMPACTED_SIZE: usize = 2 * 1024 * 1024;
+const MIN_UNCOMPACTED_SIZE: usize = 4 * 1024 * 1024;
 
 /// The reader side of N to 1 channel through leveldb.
 ///
