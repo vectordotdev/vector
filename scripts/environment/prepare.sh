@@ -19,7 +19,7 @@ VECTOR_USE_BUILD_DESC=${VECTOR_USE_BUILD_DESC:-"1"}
 if [[ -f "${GITHUB_ENV}" && "${VECTOR_USE_BUILD_DESC}" == "1" ]]; then
     GIT_SHA=$(git rev-parse --short HEAD)
     CURRENT_DATE=$(date +%Y-%m-%d)
-    echo "VECTOR_BUILD_DESC=\"${GIT_SHA} ${CURRENT_DATE}\"" >> $GITHUB_ENV
+    echo VECTOR_BUILD_DESC="${GIT_SHA} ${CURRENT_DATE}" >> $GITHUB_ENV
 fi
 
 cd scripts
