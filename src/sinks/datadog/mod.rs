@@ -1,5 +1,12 @@
+use crate::{
+    http::HttpClient,
+    sinks::{Healthcheck, HealthcheckError, UriParseError, VectorSink},
+};
+use http::{uri::InvalidUri, Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 
+pub mod events;
 pub mod logs;
 pub mod metrics;
 
@@ -8,4 +15,22 @@ pub mod metrics;
 pub enum Region {
     Us,
     Eu,
+}
+
+async fn healthcheck(endpoint: String, api_key: String, client: HttpClient) -> crate::Result<()> {
+    let uri = format!("{}/api/v1/validate", endpoint)
+        .parse::<Uri>()
+        .context(UriParseError)?;
+
+    let request = Request::get(uri)
+        .header("DD-API-KEY", api_key)
+        .body(hyper::Body::empty())
+        .unwrap();
+
+    let response = client.send(request).await?;
+
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
+    }
 }
