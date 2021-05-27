@@ -21,6 +21,7 @@ jobs:
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
       - env:
           PASS_FEATURES: "default-cmake"
         run: make package-x86_64-unknown-linux-musl-all
@@ -37,6 +38,7 @@ jobs:
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
       - env:
           PASS_FEATURES: "default"
         run: make package-x86_64-unknown-linux-gnu-all
@@ -61,6 +63,7 @@ jobs:
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
       - env:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default-cmake"
@@ -78,6 +81,7 @@ jobs:
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
       - env:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default"
@@ -103,6 +107,7 @@ jobs:
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
       - env:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-gnueabihf-all
@@ -127,6 +132,7 @@ jobs:
       - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - run: bash scripts/environment/prepare.sh
       - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - run: bash scripts/set-build-description.sh
       - env:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-musleabihf
@@ -143,8 +149,11 @@ jobs:
         run: brew install bash
       - name: "Install realpath dependency"
         run: brew install coreutils
-      - name: Add version variable
+      - name: "Add Vector version"
         run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+        shell: bash
+      - name: "Set Vector build description"
+        run: ./scripts/set-build-description.sh
         shell: bash
       - name: "Build archive"
         env:
@@ -164,6 +173,9 @@ jobs:
       - uses: actions/checkout@v2.3.4
       - name: "Add Vector version"
         run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+        shell: bash
+      - name: "Set Vector build description"
+        run: ./scripts/set-build-description.sh
         shell: bash
       - name: "Download Perl"
         shell: bash

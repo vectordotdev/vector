@@ -270,7 +270,6 @@ atty = "0.2.14"
 nix = "0.20.0"
 
 [build-dependencies]
-built = { version = "0.5.0", features = ["chrono", "git2"] }
 prost-build = { version = "0.7.0", optional = true }
 tonic-build = { version = "0.4", default-features = false, features = ["transport", "prost"], optional = true }
 
