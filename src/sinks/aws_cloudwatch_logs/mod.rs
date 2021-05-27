@@ -501,6 +501,11 @@ async fn healthcheck(
         return Ok(());
     }
 
+    if config.create_missing_group.unwrap_or(true) {
+        info!("Cloudwatch group_name will be created if missing; skipping healthcheck.");
+        return Ok(());
+    }
+
     let group_name = config.group_name.get_ref().to_owned();
     let expected_group_name = group_name.clone();
 
@@ -529,14 +534,7 @@ async fn healthcheck(
                     Err(HealthcheckError::GroupNameError.into())
                 }
             }
-            None => {
-                if config.create_missing_group.unwrap_or(true) {
-                    info!("Cloudwatch group_name will be created at runtime");
-                    return Ok(());
-                } else {
-                    Err(HealthcheckError::NoLogGroup.into())
-                }
-            }
+            None => Err(HealthcheckError::NoLogGroup.into()),
         },
         Err(source) => Err(HealthcheckError::DescribeLogGroupsFailed { source }.into()),
     }
