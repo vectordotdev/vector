@@ -35,6 +35,26 @@ impl Framework {
         Ok(manager)
     }
 
+    /// Deploy an external chart into a cluster.
+    pub async fn external_chart(
+        &self,
+        namespace: &str,
+        helm_chart: &str,
+        helm_repo: &str,
+        config: vector::Config<'_>,
+    ) -> Result<up_down::Manager<vector::CommandBuilder>> {
+        let env = vec![("HELM_REPO".to_owned(), helm_repo.to_owned())];
+        let mut manager = vector::manager_with_env(
+            self.interface.deploy_generic_chart_command.as_str(),
+            namespace,
+            helm_chart,
+            config,
+            Some(env)
+        )?;
+        manager.up().await?;
+        Ok(manager)
+    }
+
     /// Create a new namespace.
     pub async fn namespace(
         &self,
