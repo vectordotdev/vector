@@ -38,13 +38,13 @@ data:
 
     {{- if .Values.transforms }}
     transforms:
-    {{- toYaml .Values.transforms | nindent 6 }} 
+    {{- toYaml .Values.transforms | nindent 6 }}
     {{- end }}
 
     {{- if or .Values.sinks .Values.prometheusSink.enabled }}
     sinks:
     {{- if .Values.sinks }}
-    {{- toYaml .Values.sinks | nindent 6 }} 
+    {{- toYaml .Values.sinks | nindent 6 }}
     {{- end }}
     {{- end }}
     {{- include "libvector.metricsConfigPartial" . | nindent 4  }}
