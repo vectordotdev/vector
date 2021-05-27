@@ -30,8 +30,8 @@ const MIN_TIME_UNCOMPACTED: Duration = Duration::from_secs(60);
 ///
 /// So the disk buffer (indices/keys) is separated into following regions.
 /// |--Compacted--|--Deleted--|--Read--|--Unread
-///  ^             ^           ^        ^
-///  |             |           |        |
+///  ^             ^   ^       ^        ^
+///  |             |   |-acked-|        |
 ///  0   `compacted_offset`    |        |
 ///                     `delete_offset` |
 ///                                `read_offset`
@@ -48,6 +48,9 @@ where
     pub(crate) compacted_offset: usize,
     /// First not deleted key
     pub(crate) delete_offset: usize,
+    /// Number of acked events that haven't been deleted from
+    /// database. Used for batching deletes.
+    pub(crate) acked: usize,
     /// Reader is notified by Writers through this Waker.
     /// Shared with Writers.
     pub(crate) write_notifier: Arc<AtomicWaker>,
@@ -65,7 +68,7 @@ where
     /// Sizes in bytes of read, not acked/deleted, events.
     pub(crate) unacked_sizes: VecDeque<usize>,
     /// Buffer for internal use.
-    pub(crate) buffer: Vec<Vec<u8>>,
+    pub(crate) buffer: VecDeque<Vec<u8>>,
     /// Limit on uncompacted_size after which we trigger compaction.
     pub(crate) max_uncompacted_size: usize,
     /// Last time that compaction was triggered.
@@ -135,6 +138,7 @@ where
 {
     fn drop(&mut self) {
         self.delete_acked();
+        self.flush(self.current_size.load(Ordering::Acquire));
     }
 }
 
@@ -146,7 +150,25 @@ where
         let num_to_delete = self.ack_counter.swap(0, Ordering::Relaxed);
 
         if num_to_delete > 0 {
-            let new_offset = self.delete_offset + num_to_delete;
+            let size_deleted = self.unacked_sizes.drain(..num_to_delete).sum();
+            let unread_size = self.current_size.fetch_sub(size_deleted, Ordering::Release);
+
+            self.uncompacted_size += size_deleted;
+            self.acked += num_to_delete;
+
+            if self.acked >= 100 {
+                self.flush(unread_size);
+            }
+        }
+
+        for task in self.blocked_write_tasks.lock().unwrap().drain(..) {
+            task.wake();
+        }
+    }
+
+    fn flush(&mut self, unread_size: usize) {
+        if self.acked > 0 {
+            let new_offset = self.delete_offset + self.acked;
             assert!(
                 new_offset <= self.read_offset,
                 "Tried to ack beyond read offset"
@@ -161,11 +183,7 @@ where
             self.db.write(WriteOptions::new(), &delete_batch).unwrap();
 
             self.delete_offset = new_offset;
-
-            let size_deleted = self.unacked_sizes.drain(..num_to_delete).sum();
-            let unread_size = self.current_size.fetch_sub(size_deleted, Ordering::Release);
-
-            self.uncompacted_size += size_deleted;
+            self.acked = 0;
 
             // Compaction can be triggered in two ways:
             //  1. When size of uncompacted is a percentage of total allowed size.
@@ -185,10 +203,6 @@ where
             if max_trigger || timed_trigger {
                 self.compact();
             }
-        }
-
-        for task in self.blocked_write_tasks.lock().unwrap().drain(..) {
-            task.wake();
         }
     }
 

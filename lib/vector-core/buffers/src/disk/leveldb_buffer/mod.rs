@@ -126,6 +126,7 @@ where
             blocked_write_tasks,
             read_offset: head,
             compacted_offset: 0,
+            acked: 0,
             delete_offset: head,
             current_size,
             ack_counter,
