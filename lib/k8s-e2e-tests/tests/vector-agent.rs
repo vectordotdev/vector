@@ -18,16 +18,6 @@ const HELM_VALUES_STDOUT_SINK: &str = indoc! {r#"
         encoding: "json"
 "#};
 
-const HELM_VALUES_STDOUT_SINK_RAW_CONFIG: &str = indoc! {r#"
-    sinks:
-      stdout:
-        type: "console"
-        inputs: ["kubernetes_logs"]
-        rawConfig: |
-          target = "stdout"
-          encoding = "json"
-"#};
-
 const HELM_VALUES_ADDITIONAL_CONFIGMAP: &str = indoc! {r#"
     extraConfigDirSources:
     - configMap:
@@ -90,96 +80,6 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
         ))?)
         .await?;
 
-    framework
-        .wait(
-            &pod_namespace,
-            vec!["pods/test-pod"],
-            WaitFor::Condition("initialized"),
-            vec!["--timeout=60s"],
-        )
-        .await?;
-
-    let mut log_reader = framework.logs(&namespace, &format!("daemonset/{}", override_name))?;
-    smoke_check_first_line(&mut log_reader).await;
-
-    // Read the rest of the log lines.
-    let mut got_marker = false;
-    look_for_log_line(&mut log_reader, |val| {
-        if val["kubernetes"]["pod_namespace"] != pod_namespace.as_str() {
-            // A log from something other than our test pod, pretend we don't
-            // see it.
-            return FlowControlCommand::GoOn;
-        }
-
-        // Ensure we got the marker.
-        assert_eq!(val["message"], "MARKER");
-
-        if got_marker {
-            // We've already seen one marker! This is not good, we only emitted
-            // one.
-            panic!("Marker seen more than once");
-        }
-
-        // If we did, remember it.
-        got_marker = true;
-
-        // Request to stop the flow.
-        FlowControlCommand::Terminate
-    })
-    .await?;
-
-    assert!(got_marker);
-
-    drop(test_pod);
-    drop(test_namespace);
-    drop(vector);
-    Ok(())
-}
-
-/// This test validates that vector-agent picks up logs at the simplest case
-/// possible - a new pod is deployed and prints to stdout, and we assert that
-/// vector picks that up - but with the legacy `rawConfig` way of passing the
-/// sink configuration.
-#[tokio::test]
-async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
-    let _guard = lock();
-    let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
-    let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
-
-    let vector = framework
-        .vector(
-            &namespace,
-            HELM_CHART_VECTOR_AGENT,
-            VectorConfig {
-                custom_helm_values: &config_override_name(
-                    HELM_VALUES_STDOUT_SINK_RAW_CONFIG,
-                    &override_name,
-                ),
-                ..Default::default()
-            },
-        )
-        .await?;
-    framework
-        .wait_for_rollout(
-            &namespace,
-            &format!("daemonset/{}", override_name),
-            vec!["--timeout=60s"],
-        )
-        .await?;
-
-    let test_namespace = framework.namespace(&pod_namespace).await?;
-
-    let test_pod = framework
-        .test_pod(test_pod::Config::from_pod(&make_test_pod(
-            &pod_namespace,
-            "test-pod",
-            "echo MARKER",
-            vec![],
-            vec![],
-        ))?)
-        .await?;
     framework
         .wait(
             &pod_namespace,
@@ -776,9 +676,9 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
 
     const CONFIG: &str = indoc! {r#"
         kubernetesLogsSource:
-          rawConfig: |
-            extra_label_selector = "my_custom_negative_label_selector!=my_val"
-            extra_field_selector = "metadata.name!=test-pod-excluded-by-name"
+          config:
+            extra_label_selector: "my_custom_negative_label_selector!=my_val"
+            extra_field_selector: "metadata.name!=test-pod-excluded-by-name"
     "#};
 
     let vector = framework
@@ -1111,8 +1011,8 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let config: &str = &format!(
         indoc! {r#"
         kubernetesLogsSource:
-          rawConfig: |
-            exclude_paths_glob_patterns = ["/var/log/pods/{}_test-pod_*/excluded/**"]
+          config:
+            exclude_paths_glob_patterns: ["/var/log/pods/{}_test-pod_*/excluded/**"]
     "#},
         pod_namespace
     );

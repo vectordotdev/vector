@@ -52,15 +52,11 @@ data:
       source1:
         option1: value1
         option2: value2
-        rawConfig: |-
-          option = "value"
-          arbitrary text
         type: type1
       source2:
         optionA: valueA
         optionB:
           suboption: valueB
-        rawConfig: arbitrary text 2
         type: type2
       source3:
         type: type3
@@ -80,9 +76,6 @@ data:
         - input2
         option1: value1
         option2: value2
-        rawConfig: |-
-          option = "value"
-          arbitrary text
         type: type1
       transform2:
         inputs:
@@ -91,7 +84,6 @@ data:
         optionA: valueA
         optionB:
           suboption: valueB
-        rawConfig: arbitrary text 2
         type: type2
       transform3:
         inputs: []
@@ -103,9 +95,6 @@ data:
         - input2
         option1: value1
         option2: value2
-        rawConfig: |-
-          option = "value"
-          arbitrary text
         type: type1
       sink2:
         inputs:
@@ -114,7 +103,6 @@ data:
         optionA: valueA
         optionB:
           suboption: valueB
-        rawConfig: arbitrary text 2
         type: type2
       sink3:
         inputs: []
