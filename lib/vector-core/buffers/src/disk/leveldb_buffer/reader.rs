@@ -99,18 +99,19 @@ where
             // This will usually complete instantly, but in the case of a large
             // queue (or a fresh launch of the app), this will have to go to
             // disk.
-            let new_data = tokio::task::block_in_place(|| {
-                self.db
-                    .value_iter(ReadOptions::new())
-                    .from(&Key(self.read_offset))
-                    .to(&Key(self.read_offset + 100))
-                    .collect()
+            let mut buffer = std::mem::replace(&mut self.buffer, VecDeque::default());
+            tokio::task::block_in_place(|| {
+                buffer.extend(
+                    self.db
+                        .value_iter(ReadOptions::new())
+                        .from(&Key(self.read_offset))
+                        .to(&Key(self.read_offset + 100)),
+                )
             });
-            self.buffer = new_data;
-            self.buffer.reverse(); // so we can pop
+            self.buffer = buffer;
         }
 
-        if let Some(value) = self.buffer.pop() {
+        if let Some(value) = self.buffer.pop_front() {
             self.unacked_sizes.push_back(value.len());
             self.read_offset += 1;
 

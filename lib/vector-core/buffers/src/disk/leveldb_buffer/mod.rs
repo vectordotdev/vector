@@ -133,7 +133,7 @@ where
             max_uncompacted_size,
             uncompacted_size: 0,
             unacked_sizes: VecDeque::new(),
-            buffer: Vec::new(),
+            buffer: VecDeque::new(),
             last_compaction: Instant::now(),
             phantom: PhantomData,
         };
