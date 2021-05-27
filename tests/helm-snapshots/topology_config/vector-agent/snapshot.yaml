@@ -207,7 +207,7 @@ spec:
             []
           args:
             - --config
-            - /etc/vector/*.toml
+            - /etc/vector/*.yaml
           env:
             - name: VECTOR_SELF_NODE_NAME
               valueFrom:

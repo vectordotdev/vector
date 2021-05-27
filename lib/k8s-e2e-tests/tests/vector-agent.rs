@@ -30,12 +30,13 @@ const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = indoc! {r#"
     metadata:
       name: vector-agent-config
     data:
-      vector.toml: |
-        [sinks.stdout]
-            type = "console"
-            inputs = ["kubernetes_logs"]
-            target = "stdout"
-            encoding = "json"
+      vector.yaml: |
+        sinks:
+          stdout:
+            type: "console"
+            inputs: ["kubernetes_logs"]
+            target: "stdout"
+            encoding: "json"
 "#};
 
 /// This test validates that vector-agent picks up logs at the simplest case

@@ -157,7 +157,7 @@ spec:
           imagePullPolicy: "IfNotPresent"
           args:
             - --config
-            - /etc/vector/*.toml
+            - /etc/vector/*.yaml
           env:
             
           ports:

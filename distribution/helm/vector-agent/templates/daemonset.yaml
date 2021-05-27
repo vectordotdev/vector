@@ -43,7 +43,7 @@ spec:
             {{- toYaml .Values.command | nindent 12 }}
           args:
             - --config
-            - /etc/vector/*.toml
+            - /etc/vector/*.yaml
           env:
             - name: VECTOR_SELF_NODE_NAME
               valueFrom:
