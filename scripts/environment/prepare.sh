@@ -16,7 +16,7 @@ rustup run stable cargo install cross --version 0.2.1
 # disable this when running benchmarks to avoid file changes that trigger needless
 # rebuilding/recompilation.
 VECTOR_USE_BUILD_DESC=${VECTOR_USE_BUILD_DESC:-"1"}
-if [ -f "${GITHUB_ENV}" && "${VECTOR_USE_BUILD_DESC}" == "1" ]; then
+if [[ -f "${GITHUB_ENV}" && "${VECTOR_USE_BUILD_DESC}" == "1" ]]; then
     GIT_SHA=$(git rev-parse --short HEAD)
     CURRENT_DATE=$(date +%Y-%m-%d)
     echo "VECTOR_BUILD_DESC=\"${GIT_SHA} ${CURRENT_DATE}\"" >> $GITHUB_ENV
