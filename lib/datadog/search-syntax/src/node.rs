@@ -1,7 +1,7 @@
 use crate::grammar::DEFAULT_FIELD;
 
 /// This enum represents value comparisons that Queries might perform
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Comparison {
     /// Greater than
     GT,
@@ -28,7 +28,7 @@ impl Comparison {
 /// This enum represents the values we might be using in a comparison, whether
 /// they are Strings, Numbers (currently only floating point numbers) or an
 /// Unbounded comparison with no terminating value
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ComparisonValue {
     Unbounded,
     String(String),
@@ -47,7 +47,7 @@ impl ComparisonValue {
 }
 
 /// This enum represents the AND or OR Boolean operations we might perform on QueryNodes
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum BooleanType {
     And,
     Or,
@@ -93,7 +93,7 @@ impl BooleanBuilder {
 }
 
 /// QueryNodes represent specific search criteria to be enforced
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum QueryNode {
     /// Match all documents
     MatchAllDocs,

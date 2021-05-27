@@ -1,12 +1,21 @@
 use super::{
     grammar,
-    node::{Comparison, ComparisonValue, QueryNode},
+    node::{BooleanType, Comparison, ComparisonValue, QueryNode},
 };
 use ordered_float::NotNan;
 use vrl_parser::{
     ast::{self, Opcode},
     Span,
 };
+
+impl From<BooleanType> for ast::Opcode {
+    fn from(b: BooleanType) -> Self {
+        match b {
+            BooleanType::And => ast::Opcode::And,
+            BooleanType::Or => ast::Opcode::Or,
+        }
+    }
+}
 
 impl From<Comparison> for ast::Opcode {
     fn from(c: Comparison) -> Self {
@@ -141,7 +150,10 @@ impl From<QueryNode> for ast::Expr {
             },
             // Negation.
             QueryNode::NegatedNode { node } => make_not(ast::Expr::from(*node)),
-            _ => panic!("unsupported query"),
+            // Compound.
+            QueryNode::Boolean { oper, nodes } => {
+                make_container_group(nest_exprs(nodes.into_iter(), oper))
+            }
         }
     }
 }
@@ -223,8 +235,34 @@ fn make_function_call<T: IntoIterator<Item = ast::Expr>>(tag: &str, arguments: T
     }))
 }
 
+fn nest_exprs<Expr: ExactSizeIterator<Item = impl Into<ast::Expr>>, O: Into<ast::Opcode>>(
+    mut exprs: Expr,
+    op: O,
+) -> ast::Expr {
+    let expr = exprs.next().expect("must contain expression").into();
+    let op = op.into();
+
+    match exprs.len() {
+        0 => expr,
+        1 => make_op(
+            make_node(expr),
+            op,
+            make_node(exprs.next().expect("must contain expression").into()),
+        ),
+        _ => make_op(
+            make_node(expr),
+            op,
+            make_node(make_container_group(nest_exprs(exprs, op))),
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::make_node;
+    use crate::parse;
+    use vrl_parser::ast;
+
     // Datadog search syntax -> VRL
     static TESTS: &[(&str, &str)] = &[
         // Match everything (empty).
@@ -421,16 +459,42 @@ mod tests {
         ("NOT @b:[* TO *]", "!exists(.custom.b)"),
         // Range - numeric, inclusive, unbounded (both), facet (negate w/-).
         ("-@b:[* TO *]", "!exists(.custom.b)"),
+        // AND match, keyword
+        (
+            "this AND that AND the_other",
+            r#"(match(.message, r'\bthis\b') && (match(.message, r'\bthat\b') && match(.message, r'\bthe_other\b')))"#,
+        ),
+        // AND match, keyword (grouped)
+        (
+            "this AND (that AND the_other)",
+            r#"(match(.message, r'\bthis\b') && (match(.message, r'\bthat\b') && match(.message, r'\bthe_other\b')))"#,
+        ),
+        // OR match, keyword
+        (
+            "this OR that OR the_other",
+            r#"(match(.message, r'\bthis\b') || (match(.message, r'\bthat\b') || match(.message, r'\bthe_other\b')))"#,
+        ),
+        // OR match, keyword (grouped)
+        (
+            "this OR (that OR the_other)",
+            r#"(match(.message, r'\bthis\b') || (match(.message, r'\bthat\b') || match(.message, r'\bthe_other\b')))"#,
+        ),
+        // AND and OR match
+        (
+            "this AND (that OR the_other)",
+            r#"(match(.message, r'\bthis\b') && (match(.message, r'\bthat\b') || match(.message, r'\bthe_other\b')))"#,
+        ),
+        // OR and AND match
+        (
+            "this OR (that AND the_other)",
+            r#"(match(.message, r'\bthis\b') || (match(.message, r'\bthat\b') && match(.message, r'\bthe_other\b')))"#,
+        ),
         // TODO: CURRENTLY FAILING TESTS -- needs work in the main grammar and/or VRL to support!
         // Range - alpha, inclusive
         //(r#"["a" TO "z"]"#, r#".message >= "a" && .message <= "z""#),
         // Range - numeric, exclusive
         //("{1 TO 10}", ".message > 1 && .message < 10"),
     ];
-
-    use super::make_node;
-    use crate::parse;
-    use vrl_parser::ast;
 
     #[test]
     /// Compile each Datadog search query -> VRL, and do the same with the equivalent direct
