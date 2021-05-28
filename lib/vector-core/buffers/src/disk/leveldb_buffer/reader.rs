@@ -186,7 +186,10 @@ where
                 && self.uncompacted_size > unread_size;
 
             // Basic requirement to avoid leaving ldb files behind.
-            // See https://github.com/timberio/vector/issues/7425#issuecomment-849522738
+            // See:
+            // Vector  https://github.com/timberio/vector/issues/7425#issuecomment-849522738
+            // leveldb https://github.com/google/leveldb/issues/783
+            //         https://github.com/syndtr/goleveldb/issues/166
             let min_size = self.uncompacted_size >= MIN_UNCOMPACTED_SIZE;
 
             if min_size && (max_trigger || timed_trigger) {
