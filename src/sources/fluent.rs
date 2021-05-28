@@ -859,7 +859,7 @@ mod integration_tests {
 
         let events = collect_ready(out).await;
 
-        //remove_container(&docker, &container.id).await;
+        remove_container(&docker, &container.id).await;
 
         assert!(!events.is_empty());
         assert_eq!(events[0].as_log()["tag"], "dummy.0".into());
@@ -962,7 +962,7 @@ mod integration_tests {
 
         let events = collect_ready(out).await;
 
-        //remove_container(&docker, &container.id).await;
+        remove_container(&docker, &container.id).await;
 
         assert!(!events.is_empty());
         assert_eq!(events[0].as_log()["tag"], "dummy".into());
