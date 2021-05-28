@@ -8,10 +8,12 @@ use crate::{
         util::{
             batch::{Batch, BatchError},
             encode_event,
-            encoding::{EncodingConfig, EncodingConfiguration, TimestampFormat},
+            encoding::{
+                EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat,
+            },
             http::{HttpSink, PartitionHttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, Compression, EncodedEvent, Encoding,
-            JsonArrayBuffer, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, VecBuffer,
+            BatchConfig, BatchSettings, BoxedRawValue, Compression, EncodedEvent, JsonArrayBuffer,
+            PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, VecBuffer,
         },
         Healthcheck, VectorSink,
     },
@@ -27,6 +29,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{io::Write, sync::Arc, time::Duration};
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Json,
+}
+
+impl Default for Encoding {
+    fn default() -> Self {
+        Self::Json
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogEventsConfig {
@@ -35,7 +49,11 @@ pub struct DatadogEventsConfig {
     #[serde(default = "default_site")]
     site: String,
     default_api_key: String,
-    encoding: EncodingConfig<()>,
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
+    encoding: EncodingConfigWithDefault<Encoding>,
 
     tls: Option<TlsConfig>,
 
@@ -179,14 +197,6 @@ impl DatadogEventsConfig {
 #[typetag::serde(name = "datadog_events")]
 impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let mut config = self.clone();
-
-        // We modify encoding to fit DataDog requirements
-        config.encoding.timestamp_format = config
-            .encoding
-            .timestamp_format
-            .or(Some(TimestampFormat::Unix));
-
         let batch_settings = self.batch_settings()?;
         self.build_sink(
             cx,
@@ -241,11 +251,18 @@ impl HttpSink for DatadogEventsService {
             log.insert("host", host);
         }
 
-        self.config.encoding.apply_rules(&mut event);
-
-        if let Some(timestamp) = event.as_mut_log().remove(log_schema().timestamp_key()) {
-            event.as_mut_log().insert("date_happened", timestamp);
+        match log.remove(log_schema().timestamp_key()) {
+            Some(Value::Integer(timestamp)) => Some(timestamp),
+            Some(Value::Timestamp(timestamp)) => Some(timestamp.timestamp()),
+            Some(value) => {
+                log.insert(log_schema().timestamp_key(), value);
+                None
+            }
+            _ => None,
         }
+        .map(|timestamp| log.insert("date_happened", timestamp));
+
+        self.config.encoding.apply_rules(&mut event);
 
         let (fields, metadata) = event.into_log().into_parts();
         let json_event = json!(fields);
@@ -325,13 +342,7 @@ mod tests {
             // The json we send to Datadog is an array of events.
             // As we have set batch.max_events to 1, each entry will be
             // an array containing a single record.
-            let message = json
-                .get(0)
-                .unwrap()
-                .get("message")
-                .unwrap()
-                .as_str()
-                .unwrap();
+            let message = json.get(0).unwrap().get("text").unwrap().as_str().unwrap();
             assert_eq!(message, expected[i]);
         }
     }
@@ -424,13 +435,7 @@ mod tests {
             // The json we send to Datadog is an array of events.
             // As we have set batch.max_events to 1, each entry will be
             // an array containing a single record.
-            let message = json
-                .get(0)
-                .unwrap()
-                .get("message")
-                .unwrap()
-                .as_str()
-                .unwrap();
+            let message = json.get(0).unwrap().get("text").unwrap().as_str().unwrap();
             assert_eq!(message, expected[i]);
         }
     }

@@ -13,11 +13,11 @@ impl InternalEvent for DatadogEventsProcessed {
 }
 
 #[derive(Debug)]
-pub struct DatadogEventsFieldInvalid<'a> {
-    pub field: &'a str,
+pub struct DatadogEventsFieldInvalid {
+    pub field: &'static str,
 }
 
-impl<'a> InternalEvent for DatadogEventsFieldInvalid<'a> {
+impl InternalEvent for DatadogEventsFieldInvalid {
     fn emit_logs(&self) {
         debug!(
             message = "Required field is missing.",
@@ -30,6 +30,6 @@ impl<'a> InternalEvent for DatadogEventsFieldInvalid<'a> {
         counter!(
             "processing_errors_total", 1,
             "error_type" => "field_missing",
-            "field" => self.field.to_owned());
+            "field" => self.field);
     }
 }
