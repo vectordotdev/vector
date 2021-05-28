@@ -48,6 +48,7 @@ criterion_group!(
               length,
               log,
               r#match,
+              match_any,
               md5,
               merge,
               // TODO: value is dynamic so we cannot assert equality
@@ -585,6 +586,15 @@ bench_function! {
 
     simple {
         args: func_args![value: "foo 2 bar", pattern: Regex::new("foo \\d bar").unwrap()],
+        want: Ok(true),
+    }
+}
+
+bench_function! {
+    match_any => vrl_stdlib::MatchAny;
+
+    simple {
+        args: func_args![value: "foo 2 bar", patterns: vec![Regex::new(r"foo \d bar").unwrap()]],
         want: Ok(true),
     }
 }
