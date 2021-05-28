@@ -158,7 +158,7 @@ impl From<QueryNode> for ast::Expr {
     }
 }
 
-/// Creates a VRL node with a default span
+/// Creates a VRL node with a default span.
 fn make_node<T>(node: T) -> ast::Node<T> {
     ast::Node::new(Span::default(), node)
 }

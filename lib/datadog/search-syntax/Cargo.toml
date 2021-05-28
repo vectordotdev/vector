@@ -10,7 +10,7 @@ pest_derive = "2.1.0"
 ordered-float = "2"
 regex = "1"
 
-# Internal
+# Workspace
 vrl = { path = "../../vrl/core" }
 vrl-parser = { path = "../../vrl/parser" }
 vrl-compiler = { path = "../../vrl/compiler" }
