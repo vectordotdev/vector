@@ -606,7 +606,15 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
     let k8s_version = framework.kubernetes_version().await?;
-    let minor = u8::from_str(&k8s_version.minor()).expect("Couldn't get u8 from String!");
+
+    // Replace all non numeric chars from the version number
+    let numeric_regex = regex::Regex::new(r#"[^\d]"#).unwrap();
+    let minor = k8s_version.minor();
+    let numeric_minor = numeric_regex.replace(&minor, "");
+    let minor = u8::from_str(&numeric_minor).expect(&format!(
+        "Couldn't get u8 from String, received {} instead!",
+        k8s_version.minor()
+    ));
 
     // Read the rest of the log lines.
     let mut got_marker = false;
@@ -703,13 +711,17 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
 
     let test_namespace = framework.namespace(&pod_namespace).await?;
 
+    let affinity_pod = create_affinity_pod(&framework, &pod_namespace, &affinity_label).await?;
+
     let excluded_test_pod = framework
-        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+        .test_pod(test_pod::Config::from_pod(&make_test_pod_with_affinity(
             &pod_namespace,
             "test-pod-excluded",
             "echo EXCLUDED_MARKER",
-            vec![("vector.dev/exclude", "true"), (&affinity_label, "yes")],
+            vec![("vector.dev/exclude", "true")],
             vec![],
+            Some((&affinity_label, "yes")),
+            Some(&pod_namespace),
         ))?)
         .await?;
 
@@ -842,6 +854,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(excluded_test_pod);
     drop(control_test_pod);
+    drop(affinity_pod);
     drop(test_namespace);
     drop(vector);
     Ok(())
@@ -1413,23 +1426,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     // Create a pod for our other pods to have an affinity to to ensure they are all deployed on
     // the same node.
     let affinity_ns = framework.namespace(&pod_namespace).await?;
-    let test_pod = framework
-        .test_pod(test_pod::Config::from_pod(&make_test_pod(
-            &pod_namespace,
-            "affinity-pod",
-            "tail -f /dev/null",
-            vec![(affinity_label.as_str(), "yes")],
-            vec![],
-        ))?)
-        .await?;
-    framework
-        .wait(
-            &pod_namespace,
-            vec!["pods/affinity-pod"],
-            WaitFor::Condition("initialized"),
-            vec!["--timeout=60s"],
-        )
-        .await?;
+    let affinity_pod = create_affinity_pod(&framework, &pod_namespace, &affinity_label).await?;
 
     let mut test_pods = vec![];
     for ns in &expected_namespaces {
@@ -1502,7 +1499,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     // Ensure that we have collected messages from all the namespaces.
     assert!(expected_namespaces.is_empty());
 
-    drop(test_pod);
+    drop(affinity_pod);
     drop(affinity_ns);
     drop(test_pods);
     drop(test_namespaces);

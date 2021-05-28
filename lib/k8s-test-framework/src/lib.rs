@@ -45,5 +45,7 @@ use log_lookup::log_lookup;
 use port_forward::port_forward;
 pub use port_forward::PortForwarder;
 pub use reader::Reader;
+pub use test_pod::CommandBuilder;
+pub use up_down::Manager;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;

@@ -30,7 +30,7 @@ fn helm_values_stdout_sink(aggregator_override_name: &str, agent_override_name: 
           encoding: "json"
 "# },
         agent_override_name,
-        aggregator_override_name
+        aggregator_override_name,
         agent_override_name,
         aggregator_override_name
     )

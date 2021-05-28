@@ -3,7 +3,9 @@ use k8s_openapi::{
     api::core::v1::{Affinity, Container, Pod, PodAffinity, PodAffinityTerm, PodSpec},
     apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta},
 };
-use k8s_test_framework::{Framework, Interface, Reader};
+use k8s_test_framework::{
+    test_pod, wait_for_resource::WaitFor, CommandBuilder, Framework, Interface, Manager, Reader,
+};
 use std::{collections::BTreeMap, env};
 
 pub mod metrics;
@@ -235,4 +237,32 @@ where
     log_reader.wait().await.expect("log reader wait failed");
 
     Ok(())
+}
+
+/// Create a pod for our other pods to have an affinity to to ensure they are all deployed on
+/// the same node.
+pub async fn create_affinity_pod(
+    framework: &Framework,
+    namespace: &str,
+    affinity_label: &str,
+) -> Result<Manager<CommandBuilder>, Box<dyn std::error::Error>> {
+    let test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            &namespace,
+            "affinity-pod",
+            "tail -f /dev/null",
+            vec![(affinity_label, "yes")],
+            vec![],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            &namespace,
+            vec!["pods/affinity-pod"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    Ok(test_pod)
 }
