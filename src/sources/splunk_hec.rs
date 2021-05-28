@@ -223,7 +223,13 @@ impl SplunkSource {
             .and(self.gzip())
             .and(warp::body::bytes())
             .and_then(
-                move |_, _, channel: String, remote: Option<SocketAddr>, xff: Option<String>, gzip: bool, body: Bytes| {
+                move |_,
+                      _,
+                      channel: String,
+                      remote: Option<SocketAddr>,
+                      xff: Option<String>,
+                      gzip: bool,
+                      body: Bytes| {
                     let out = out.clone();
                     async move {
                         let event = future::ready(raw_event(body, gzip, channel, remote, xff));
@@ -331,7 +337,12 @@ struct EventIterator<R: Read> {
 }
 
 impl<R: Read> EventIterator<R> {
-    fn new(data: R, channel: Option<String>, remote: Option<SocketAddr>, remote_addr: Option<String>) -> Self {
+    fn new(
+        data: R,
+        channel: Option<String>,
+        remote: Option<SocketAddr>,
+        remote_addr: Option<String>,
+    ) -> Self {
         EventIterator {
             data,
             events: 0,
@@ -585,7 +596,7 @@ fn raw_event(
     gzip: bool,
     channel: String,
     remote: Option<SocketAddr>,
-    xff: Option<String>
+    xff: Option<String>,
 ) -> Result<Event, Rejection> {
     // Process gzip
     let message: Value = if gzip {
@@ -868,14 +879,14 @@ mod tests {
     #[derive(Default)]
     struct SendWithOpts<'a> {
         channel: Option<Channel<'a>>,
-        forwarded_for: Option<String>
+        forwarded_for: Option<String>,
     }
 
     async fn post(address: SocketAddr, api: &str, message: &str) -> u16 {
         let channel = Channel::Header("channel");
         let options = SendWithOpts {
             channel: Some(channel),
-            forwarded_for: None
+            forwarded_for: None,
         };
         send_with(address, api, message, TOKEN, &options).await
     }
@@ -892,18 +903,16 @@ mod tests {
             .header("Authorization", format!("Splunk {}", token));
 
         b = match opts.channel {
-            Some(c) => {
-                match c {
-                    Channel::Header(v) => b.header("x-splunk-request-channel", v),
-                    Channel::QueryParam(v) => b.query(&[("channel", v)]),
-                }
-            }
-            None => b
+            Some(c) => match c {
+                Channel::Header(v) => b.header("x-splunk-request-channel", v),
+                Channel::QueryParam(v) => b.query(&[("channel", v)]),
+            },
+            None => b,
         };
 
         b = match &opts.forwarded_for {
             Some(f) => b.header("X-Forwarded-For", f),
-            None => b
+            None => b,
         };
 
         b.body(message.to_owned())
@@ -1072,19 +1081,12 @@ mod tests {
 
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
-            forwarded_for: None
+            forwarded_for: None,
         };
 
         assert_eq!(
             200,
-            send_with(
-                address,
-                "services/collector/raw",
-                message,
-                TOKEN,
-                &opts
-            )
-            .await
+            send_with(address, "services/collector/raw", message, TOKEN, &opts).await
         );
 
         let event = collect_n(source, 1).await.remove(0);
@@ -1100,19 +1102,12 @@ mod tests {
 
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
-            forwarded_for: Some(String::from("10.0.0.1"))
+            forwarded_for: Some(String::from("10.0.0.1")),
         };
 
         assert_eq!(
             200,
-            send_with(
-                address,
-                "services/collector/raw",
-                message,
-                TOKEN,
-                &opts
-            )
-            .await
+            send_with(address, "services/collector/raw", message, TOKEN, &opts).await
         );
 
         let event = collect_n(source, 1).await.remove(0);
@@ -1127,19 +1122,12 @@ mod tests {
 
         let opts = SendWithOpts {
             channel: Some(Channel::QueryParam("guid")),
-            forwarded_for: None
+            forwarded_for: None,
         };
 
         assert_eq!(
             200,
-            send_with(
-                address,
-                "services/collector/raw",
-                message,
-                TOKEN,
-                &opts
-            )
-            .await
+            send_with(address, "services/collector/raw", message, TOKEN, &opts).await
         );
 
         let event = collect_n(source, 1).await.remove(0);
@@ -1162,19 +1150,12 @@ mod tests {
         let (_source, address) = source().await;
         let opts = SendWithOpts {
             channel: Some(Channel::Header("channel")),
-            forwarded_for: None
+            forwarded_for: None,
         };
 
         assert_eq!(
             401,
-            send_with(
-                address,
-                "services/collector/event",
-                "",
-                "nope",
-                &opts
-            )
-            .await
+            send_with(address, "services/collector/event", "", "nope", &opts).await
         );
     }
 
