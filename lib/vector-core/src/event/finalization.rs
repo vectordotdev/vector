@@ -170,6 +170,11 @@ impl Future for BatchStatusReceiver {
 
 impl BatchStatusReceiver {
     /// Wrapper for the underlying `try_recv` function.
+    ///
+    /// # Errors
+    ///
+    /// - `TryRecvError::Empty` if no value has been sent yet.
+    /// - `TryRecvError::Closed` if the sender has dropped without sending a value.
     pub fn try_recv(&mut self) -> Result<BatchStatus, oneshot::error::TryRecvError> {
         self.0.try_recv()
     }
@@ -316,7 +321,7 @@ impl EventStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::sync::oneshot::{error::TryRecvError::Empty, Receiver};
+    use tokio::sync::oneshot::error::TryRecvError::Empty;
 
     #[test]
     fn defaults() {
