@@ -1,4 +1,4 @@
-use crate::event::{self, BTreeMap};
+use crate::event::{self, BTreeMap, WithMetadata};
 use chrono::TimeZone;
 
 include!(concat!(env!("OUT_DIR"), "/event.rs"));
@@ -118,35 +118,49 @@ impl From<EventWrapper> for event::Event {
 
 impl From<event::LogEvent> for Log {
     fn from(log_event: event::LogEvent) -> Self {
-        let (fields, _metadata) = log_event.into_parts();
+        WithMetadata::<Self>::from(log_event).data
+    }
+}
+
+impl From<event::LogEvent> for WithMetadata<Log> {
+    fn from(log_event: event::LogEvent) -> Self {
+        let (fields, metadata) = log_event.into_parts();
         let fields = fields
             .into_iter()
             .map(|(k, v)| (k, encode_value(v)))
             .collect::<BTreeMap<_, _>>();
 
-        Self { fields }
+        let data = Log { fields };
+        Self { data, metadata }
     }
 }
 
 impl From<event::Metric> for Metric {
     fn from(metric: event::Metric) -> Self {
-        let name = metric.series.name.name;
-        let namespace = metric.series.name.namespace.unwrap_or_default();
+        WithMetadata::<Self>::from(metric).data
+    }
+}
 
-        let timestamp = metric.data.timestamp.map(|ts| prost_types::Timestamp {
+impl From<event::Metric> for WithMetadata<Metric> {
+    fn from(metric: event::Metric) -> Self {
+        let (series, data, metadata) = metric.into_parts();
+        let name = series.name.name;
+        let namespace = series.name.namespace.unwrap_or_default();
+
+        let timestamp = data.timestamp.map(|ts| prost_types::Timestamp {
             seconds: ts.timestamp(),
             nanos: ts.timestamp_subsec_nanos() as i32,
         });
 
-        let tags = metric.series.tags.unwrap_or_default();
+        let tags = series.tags.unwrap_or_default();
 
-        let kind = match metric.data.kind {
+        let kind = match data.kind {
             event::MetricKind::Incremental => metric::Kind::Incremental,
             event::MetricKind::Absolute => metric::Kind::Absolute,
         }
         .into();
 
-        let metric = match metric.data.value {
+        let metric = match data.value {
             event::MetricValue::Counter { value } => MetricValue::Counter(Counter { value }),
             event::MetricValue::Gauge { value } => MetricValue::Gauge(Gauge { value }),
             event::MetricValue::Set { values } => MetricValue::Set(Set {
@@ -182,29 +196,42 @@ impl From<event::Metric> for Metric {
             }),
         };
 
-        Self {
+        let data = Metric {
             name,
             namespace,
             timestamp,
             tags,
             kind,
             value: Some(metric),
-        }
+        };
+        Self { data, metadata }
     }
 }
 
 impl From<event::Event> for Event {
     fn from(event: event::Event) -> Self {
+        WithMetadata::<Self>::from(event).data
+    }
+}
+
+impl From<event::Event> for WithMetadata<Event> {
+    fn from(event: event::Event) -> Self {
         match event {
-            event::Event::Log(log_event) => Log::from(log_event).into(),
-            event::Event::Metric(metric) => Metric::from(metric).into(),
+            event::Event::Log(log_event) => WithMetadata::<Log>::from(log_event).into(),
+            event::Event::Metric(metric) => WithMetadata::<Metric>::from(metric).into(),
         }
     }
 }
 
 impl From<event::Event> for EventWrapper {
     fn from(event: event::Event) -> Self {
-        Event::from(event).into()
+        WithMetadata::<EventWrapper>::from(event).data
+    }
+}
+
+impl From<event::Event> for WithMetadata<EventWrapper> {
+    fn from(event: event::Event) -> Self {
+        WithMetadata::<Event>::from(event).into()
     }
 }
 

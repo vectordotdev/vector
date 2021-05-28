@@ -288,6 +288,18 @@ impl Metric {
         self
     }
 
+    pub fn into_parts(self) -> (MetricSeries, MetricData, EventMetadata) {
+        (self.series, self.data, self.metadata)
+    }
+
+    pub fn from_parts(series: MetricSeries, data: MetricData, metadata: EventMetadata) -> Self {
+        Self {
+            series,
+            data,
+            metadata,
+        }
+    }
+
     /// Rewrite this into a Metric with the data marked as absolute.
     pub fn into_absolute(self) -> Self {
         Self {
