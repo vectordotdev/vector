@@ -623,14 +623,13 @@ fn raw_event(
     // Add channel
     log.insert(CHANNEL, channel);
 
-    // Add host
-    if let Some(remote) = remote {
-        log.insert(log_schema().host_key(), remote.to_string());
-    }
-
-    // Add X-Forwarded-For header as remote_addr, only when it can be parsed to IpAddr
+    // host-field priority for raw endpoint:
+    // - x-forwarded-for is set to `host` field first, if present. If not present:
+    // - set remote addr to host field
     if let Some(remote_address) = xff {
-        log.insert(REMOTE_ADDR, remote_address);
+        log.insert(log_schema().host_key(), remote_address);
+    } else if let Some(remote) = remote {
+        log.insert(log_schema().host_key(), remote.to_string());
     }
 
     // Add timestamp
@@ -1094,7 +1093,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn xff_header() {
+    async fn xff_header_raw_no_host_payload() {
         trace_init();
 
         let message = "raw";
@@ -1111,8 +1110,9 @@ mod tests {
         );
 
         let event = collect_n(source, 1).await.remove(0);
-        assert_eq!(event.as_log()[&super::REMOTE_ADDR], "10.0.0.1".into());
+        assert_eq!(event.as_log()[log_schema().host_key()], "10.0.0.1".into());
     }
+
     #[tokio::test]
     async fn channel_query_param() {
         trace_init();
