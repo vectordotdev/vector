@@ -837,6 +837,7 @@ mod integration_tests {
             image: Some(format!("{}:{}", image, tag)),
             host_config: Some(HostConfig {
                 network_mode: Some(String::from("host")),
+                extra_hosts: Some(vec![String::from("host.docker.internal:host-gateway")]),
                 binds: Some(vec![format!(
                     "{}:{}",
                     dir.path().display(),
@@ -858,7 +859,7 @@ mod integration_tests {
 
         let events = collect_ready(out).await;
 
-        remove_container(&docker, &container.id).await;
+        //remove_container(&docker, &container.id).await;
 
         assert!(!events.is_empty());
         assert_eq!(events[0].as_log()["tag"], "dummy.0".into());
@@ -961,7 +962,7 @@ mod integration_tests {
 
         let events = collect_ready(out).await;
 
-        remove_container(&docker, &container.id).await;
+        //remove_container(&docker, &container.id).await;
 
         assert!(!events.is_empty());
         assert_eq!(events[0].as_log()["tag"], "dummy".into());
