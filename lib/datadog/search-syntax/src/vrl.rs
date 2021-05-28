@@ -235,6 +235,7 @@ fn make_function_call<T: IntoIterator<Item = ast::Expr>>(tag: &str, arguments: T
     }))
 }
 
+/// Recursive, nested expressions, ultimately returning a single `ast::Expr`.
 fn nest_exprs<Expr: ExactSizeIterator<Item = impl Into<ast::Expr>>, O: Into<ast::Opcode>>(
     mut exprs: Expr,
     op: O,
@@ -243,12 +244,15 @@ fn nest_exprs<Expr: ExactSizeIterator<Item = impl Into<ast::Expr>>, O: Into<ast:
     let op = op.into();
 
     match exprs.len() {
+        // If this is the last expression, just return it.
         0 => expr,
+        // If there's one expression remaining, use it as the RHS; no need to wrap.
         1 => make_op(
             make_node(expr),
             op,
             make_node(exprs.next().expect("must contain expression").into()),
         ),
+        // For 2+ expressions, recurse over the RHS.
         _ => make_op(
             make_node(expr),
             op,
