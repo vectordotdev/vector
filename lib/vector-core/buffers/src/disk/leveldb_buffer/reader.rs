@@ -23,6 +23,9 @@ use std::time::{Duration, Instant};
 /// How much time needs to pass between compaction to trigger new one.
 const MIN_TIME_UNCOMPACTED: Duration = Duration::from_secs(60);
 
+/// Minimal size of uncompacted for which a compaction can be triggered.
+const MIN_UNCOMPACTED_SIZE: usize = 4 * 1024 * 1024;
+
 /// The reader side of N to 1 channel through leveldb.
 ///
 /// Reader maintains/manages events thorugh several stages.
@@ -182,7 +185,14 @@ where
             let timed_trigger = self.last_compaction.elapsed() >= MIN_TIME_UNCOMPACTED
                 && self.uncompacted_size > unread_size;
 
-            if max_trigger || timed_trigger {
+            // Basic requirement to avoid leaving ldb files behind.
+            // See:
+            // Vector  https://github.com/timberio/vector/issues/7425#issuecomment-849522738
+            // leveldb https://github.com/google/leveldb/issues/783
+            //         https://github.com/syndtr/goleveldb/issues/166
+            let min_size = self.uncompacted_size >= MIN_UNCOMPACTED_SIZE;
+
+            if min_size && (max_trigger || timed_trigger) {
                 self.compact();
             }
         }
