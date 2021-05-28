@@ -176,7 +176,7 @@ components: sinks: [Name=string]: {
 
 						only_fields: {
 							common:      false
-							description: "Prevent the sink from encoding the specified fields."
+							description: "Makes the sink encode only the specified fields."
 							required:    false
 							type: array: {
 								default: null

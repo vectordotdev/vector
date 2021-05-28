@@ -1010,11 +1010,9 @@ Highlights are not blog posts. They are short one, maybe two, paragraph
 announcements. Highlights should allude to, or link to, a blog post if
 relevant.
 
-For example, [this performance increase announcement][urls.performance_highlight]
+For example, [this adaptive concurrency announcement][urls.adaptive_concurrency]
 is noteworthy, but also deserves an in-depth blog post covering the work that
-resulted in the performance benefit. Notice that the highlight alludes to an
-upcoming blog post. This allows us to communicate a high-value performance
-improvement without being blocked by an in-depth blog post.
+resulted in the performance and reliability benefit.
 
 ## Security
 
@@ -1086,7 +1084,7 @@ contact us at vector@timber.io.
 [urls.github_sign_commits]: https://help.github.com/en/github/authenticating-to-github/signing-commits
 [urls.new_issue]: https://github.com/timberio/vector/issues/new
 [urls.push_it_to_the_limit]: https://www.youtube.com/watch?v=ueRzA9GUj9c
-[urls.performance_highlight]: https://vector.dev/highlights/2020-04-11-overall-performance-increase
+[urls.adaptive_concurrency]: https://vector.dev/highlights/2020-09-18-adaptive-concurrency
 [urls.submit_pr]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
 [urls.watchexec]: https://github.com/watchexec/watchexec
