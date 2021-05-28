@@ -70,7 +70,7 @@ impl<'a> FieldsIter<'a> {
             match path_iter.next() {
                 None => return res,
                 Some(PathComponent::Key(key)) => {
-                    if key.contains(".") {
+                    if key.contains('.') {
                         res.push_str(&key.replace(".", "\\."))
                     } else {
                         res.push_str(&key)
