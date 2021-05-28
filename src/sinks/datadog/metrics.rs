@@ -212,12 +212,7 @@ impl SinkConfig for DatadogConfig {
         let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal datadog metric sink error.", %error))
             .with_flat_map(move |event: Event| {
-                stream::iter(normalizer.apply(event).map(|event| {
-                    let endpoint = DatadogEndpoint::from_metric(&event);
-                    Ok(EncodedEvent::new(PartitionInnerBuffer::new(
-                        event, endpoint,
-                    )))
-                }))
+                stream::iter(normalizer.apply(event).map(encode_metric))
             });
 
         Ok((VectorSink::Sink(Box::new(svc_sink)), healthcheck))
@@ -230,6 +225,20 @@ impl SinkConfig for DatadogConfig {
     fn sink_type(&self) -> &'static str {
         "datadog_metrics"
     }
+}
+
+fn encode_metric(
+    metric: Metric,
+) -> Result<EncodedEvent<PartitionInnerBuffer<Metric, DatadogEndpoint>>, ()> {
+    let endpoint = DatadogEndpoint::from_metric(&metric);
+    // TODO: Avoiding this clone requires rewriting MetricsBuffer to
+    // accept separated MetricSeries and MetricData values, which in
+    // turn requires rewriting all metrics sinks. See Issue #6045
+    let metadata = metric.metadata().clone();
+    Ok(EncodedEvent {
+        item: PartitionInnerBuffer::new(metric, endpoint),
+        metadata: Some(metadata),
+    })
 }
 
 impl DatadogSink {
