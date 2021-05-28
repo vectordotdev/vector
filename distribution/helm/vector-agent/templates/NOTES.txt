@@ -1,0 +1,6 @@
+{{ .Chart.Name }} has been installed. Check it's status by running:
+  $ kubectl --namespace {{ .Release.Namespace}} get pods -l "app.kubernetes.io/instance={{ .Release.Name }}"
+
+WARNING: The `rawConfig` key has been deprecated and will be removed in an upcoming release.
+
+Visit https://vector.dev/ for documentation and guides.
