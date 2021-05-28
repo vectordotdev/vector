@@ -93,7 +93,11 @@ where
         // write.
         self.write_notifier.register(cx.waker());
 
-        self.delete_acked();
+        let unread_size = self.delete_acked();
+
+        if self.acked >= 100 {
+            self.flush(unread_size);
+        }
 
         if self.buffer.is_empty() {
             // This will usually complete instantly, but in the case of a large
@@ -106,7 +110,7 @@ where
                         .value_iter(ReadOptions::new())
                         .from(&Key(self.read_offset))
                         .to(&Key(self.read_offset + 100)),
-                )
+                );
             });
             self.buffer = buffer;
         }
@@ -138,8 +142,8 @@ where
     T: Send + Sync + Unpin,
 {
     fn drop(&mut self) {
-        self.delete_acked();
-        self.flush(self.current_size.load(Ordering::Acquire));
+        let unread_size = self.delete_acked();
+        self.flush(unread_size);
     }
 }
 
@@ -147,24 +151,28 @@ impl<T> Reader<T>
 where
     T: Send + Sync + Unpin,
 {
-    fn delete_acked(&mut self) {
+    /// Returns number of bytes to be read.
+    fn delete_acked(&mut self) -> usize {
         let num_to_delete = self.ack_counter.swap(0, Ordering::Relaxed);
 
-        if num_to_delete > 0 {
+        let unread_size = if num_to_delete > 0 {
             let size_deleted = self.unacked_sizes.drain(..num_to_delete).sum();
-            let unread_size = self.current_size.fetch_sub(size_deleted, Ordering::Release);
+            let unread_size =
+                self.current_size.fetch_sub(size_deleted, Ordering::Release) - size_deleted;
 
             self.uncompacted_size += size_deleted;
             self.acked += num_to_delete;
 
-            if self.acked >= 100 {
-                self.flush(unread_size);
-            }
-        }
+            unread_size
+        } else {
+            self.current_size.load(Ordering::Acquire)
+        };
 
         for task in self.blocked_write_tasks.lock().unwrap().drain(..) {
             task.wake();
         }
+
+        unread_size
     }
 
     fn flush(&mut self, unread_size: usize) {
