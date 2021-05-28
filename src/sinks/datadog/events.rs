@@ -1,33 +1,27 @@
 use super::healthcheck;
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value},
+    event::Event,
     http::HttpClient,
     internal_events::{DatadogEventsFieldInvalid, DatadogEventsProcessed},
     sinks::{
         util::{
-            batch::{Batch, BatchError},
-            encode_event,
-            encoding::{
-                EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat,
-            },
+            batch::Batch,
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat},
             http::{HttpSink, PartitionHttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, Compression, EncodedEvent, JsonArrayBuffer,
-            PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, VecBuffer,
+            BatchConfig, BatchSettings, BoxedRawValue, EncodedEvent, JsonArrayBuffer,
+            PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsConfig},
 };
-use bytes::Bytes;
-use flate2::write::GzEncoder;
 use futures::{FutureExt, SinkExt};
-use http::{Request, StatusCode};
-use hyper::body::Body;
+use http::Request;
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{io::Write, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -49,19 +43,8 @@ pub struct DatadogEventsConfig {
     #[serde(default = "default_site")]
     site: String,
     default_api_key: String,
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
-    encoding: EncodingConfigWithDefault<Encoding>,
 
     tls: Option<TlsConfig>,
-
-    #[serde(default)]
-    compression: Option<Compression>,
-
-    #[serde(default)]
-    batch: BatchConfig,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -91,26 +74,12 @@ impl DatadogEventsConfig {
         format!("{}/api/v1/events", self.get_api_endpoint())
     }
 
-    // The API endpoint is used for healtcheck/API key validation, it is derived from the `site` or `region` option
-    // the same way the offical Datadog Agent does but the `endpoint` option still override both the main and the
-    // API endpoint.
     fn get_api_endpoint(&self) -> String {
         self.endpoint
             .clone()
             .unwrap_or_else(|| format!("https://api.{}", &self.site))
     }
 
-    fn batch_settings<T: Batch>(&self) -> Result<BatchSettings<T>, BatchError> {
-        BatchSettings::default()
-            .bytes(bytesize::kib(100u64))
-            .events(20)
-            .timeout(1)
-            .parse_config(self.batch)
-    }
-
-    /// Builds the required BatchedHttpSink.
-    /// Since the DataDog sink can create one of two different sinks, this
-    /// extracts most of the shared functionality required to create either sink.
     fn build_sink<T, B, O>(
         &self,
         cx: SinkContext,
@@ -154,57 +123,21 @@ impl DatadogEventsConfig {
 
         Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
-
-    /// Build the request, GZipping the contents if the config specifies.
-    fn build_request(
-        &self,
-        uri: &str,
-        api_key: &str,
-        content_type: &str,
-        body: Vec<u8>,
-    ) -> crate::Result<http::Request<Vec<u8>>> {
-        let request = Request::post(uri)
-            .header("Content-Type", content_type)
-            .header("DD-API-KEY", api_key);
-
-        let compression = self.compression.unwrap_or(Compression::Gzip(None));
-
-        let (request, body) = match compression {
-            Compression::None => (request, body),
-            Compression::Gzip(level) => {
-                // Default the compression level to 6, which is similar to datadog agent.
-                // https://docs.datadoghq.com/agent/logs/log_transport/?tab=https#log-compression
-                let level = level.unwrap_or(6);
-                let mut encoder =
-                    GzEncoder::new(Vec::new(), flate2::Compression::new(level as u32));
-
-                encoder.write_all(&body)?;
-                (
-                    request.header("Content-Encoding", "gzip"),
-                    encoder.finish()?,
-                )
-            }
-        };
-
-        request
-            .header("Content-Length", body.len())
-            .body(body)
-            .map_err(Into::into)
-    }
 }
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_events")]
 impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let batch_settings = self.batch_settings()?;
+        let batch_settings = BatchSettings::default()
+            .bytes(bytesize::kib(100u64))
+            .events(1)
+            .timeout(0)
+            .parse_config(BatchConfig::default())?;
+
         self.build_sink(
             cx,
-            DatadogEventsService {
-                config: self.clone(),
-                uri: self.get_uri(),
-                default_api_key: Arc::from(self.default_api_key.clone()),
-            },
+            DatadogEventsService::new(self),
             JsonArrayBuffer::new(batch_settings.size),
             batch_settings.timeout,
         )
@@ -225,6 +158,41 @@ struct DatadogEventsService {
     // Used to store the complete URI and avoid calling `get_uri` for each request
     uri: String,
     default_api_key: ApiKey,
+    encoding: EncodingConfigWithDefault<()>,
+}
+
+impl DatadogEventsService {
+    fn new(config: &DatadogEventsConfig) -> Self {
+        let mut encoding = EncodingConfigWithDefault::default();
+
+        // DataDog Event API allows only some fields, and refuses
+        // to accept event if it contains any other field.
+        encoding.only_fields = Some(vec![
+            vec!["aggregation_key".into()],
+            vec!["alert_type".into()],
+            vec!["date_happened".into()],
+            vec!["device_name".into()],
+            vec!["host".into()],
+            vec!["priority".into()],
+            vec!["related_event_id".into()],
+            vec!["source_type_name".into()],
+            vec!["tags".into()],
+            vec!["text".into()],
+            vec!["title".into()],
+        ]);
+
+        // DataDog Event API requires unix timestamp.
+        encoding.timestamp_format = Some(TimestampFormat::Unix);
+
+        Self {
+            default_api_key: Arc::from(config.default_api_key.clone()),
+
+            uri: config.get_uri(),
+
+            encoding,
+            config: config.clone(),
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -237,32 +205,39 @@ impl HttpSink for DatadogEventsService {
 
         if !log.contains("title") {
             emit!(DatadogEventsFieldInvalid { field: "title" });
+            return None;
         }
 
-        if let Some(message) = log.remove(log_schema().message_key()) {
-            log.insert("text", message);
-        } else if !log.contains("text") {
-            emit!(DatadogEventsFieldInvalid {
-                field: log_schema().message_key()
-            });
-        }
-
-        if let Some(host) = log.remove(log_schema().host_key()) {
-            log.insert("host", host);
-        }
-
-        match log.remove(log_schema().timestamp_key()) {
-            Some(Value::Integer(timestamp)) => Some(timestamp),
-            Some(Value::Timestamp(timestamp)) => Some(timestamp.timestamp()),
-            Some(value) => {
-                log.insert(log_schema().timestamp_key(), value);
-                None
+        if !log.contains("text") {
+            if let Some(message) = log.remove(log_schema().message_key()) {
+                log.insert("text", message);
+            } else {
+                emit!(DatadogEventsFieldInvalid {
+                    field: log_schema().message_key()
+                });
+                return None;
             }
-            _ => None,
         }
-        .map(|timestamp| log.insert("date_happened", timestamp));
 
-        self.config.encoding.apply_rules(&mut event);
+        if !log.contains("host") {
+            if let Some(host) = log.remove(log_schema().host_key()) {
+                log.insert("host", host);
+            }
+        }
+
+        if !log.contains("date_happened") {
+            if let Some(timestamp) = log.remove(log_schema().timestamp_key()) {
+                log.insert("date_happened", timestamp);
+            }
+        }
+
+        if !log.contains("source_type_name") {
+            if let Some(name) = log.remove(log_schema().source_type_key()) {
+                log.insert("source_type_name", name);
+            }
+        }
+
+        self.encoding.apply_rules(&mut event);  
 
         let (fields, metadata) = event.into_log().into_parts();
         let json_event = json!(fields);
@@ -278,17 +253,20 @@ impl HttpSink for DatadogEventsService {
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
-        let (events, api_key) = events.into_parts();
+        let (mut events, api_key) = events.into_parts();
 
-        let body = serde_json::to_vec(&events)?;
-        // check the number of events to ignore health-check requests
-        if !events.is_empty() {
-            emit!(DatadogEventsProcessed {
-                byte_size: body.len(),
-            });
-        }
-        self.config
-            .build_request(self.uri.as_str(), &api_key[..], "application/json", body)
+        let body = serde_json::to_vec(&events.pop().unwrap())?;
+
+        emit!(DatadogEventsProcessed {
+            byte_size: body.len(),
+        });
+
+        Request::post(self.uri.as_str())
+            .header("Content-Type", "application/json")
+            .header("DD-API-KEY", &api_key[..])
+            .header("Content-Length", body.len())
+            .body(body)
+            .map_err(Into::into)
     }
 }
 

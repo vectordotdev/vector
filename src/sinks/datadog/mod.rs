@@ -1,10 +1,10 @@
 use crate::{
     http::HttpClient,
-    sinks::{Healthcheck, HealthcheckError, UriParseError, VectorSink},
+    sinks::{HealthcheckError, UriParseError},
 };
-use http::{uri::InvalidUri, Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
+use snafu::ResultExt;
 
 pub mod events;
 pub mod logs;

@@ -13,12 +13,12 @@ use crate::{
             EncodedEvent, PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
             TowerRequestConfig,
         },
-        Healthcheck, HealthcheckError, UriParseError, VectorSink,
+        Healthcheck, UriParseError, VectorSink,
     },
 };
 use chrono::{DateTime, Utc};
 use futures::{stream, FutureExt, SinkExt};
-use http::{uri::InvalidUri, Request, StatusCode, Uri};
+use http::{uri::InvalidUri, Request, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
