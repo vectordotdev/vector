@@ -420,7 +420,7 @@ mod tests {
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
     }
 
-    fn make_finalizer() -> (EventFinalizers, Receiver<BatchStatus>) {
+    fn make_finalizer() -> (EventFinalizers, BatchStatusReceiver) {
         let (batch, receiver) = BatchNotifier::new_with_receiver();
         let finalizer = EventFinalizers::new(EventFinalizer::new(batch));
         assert_eq!(finalizer.count_finalizers(), 1);
