@@ -526,10 +526,10 @@ async fn healthcheck(
             }
             None => {
                 if config.group_name.is_dynamic() {
-                    info!("Cloudwatch group_name is dynamic");
+                    info!("Cloudwatch group_name is dynamic.");
                     return Ok(());
                 } else if config.create_missing_group.unwrap_or(true) {
-                    info!("Cloudwatch group_name will be created if missing");
+                    info!("Cloudwatch group_name will be created if missing.");
                     return Ok(());
                 } else {
                     Err(HealthcheckError::NoLogGroup.into())
