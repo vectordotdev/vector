@@ -51,7 +51,7 @@ impl proto::Service for Service {
             .map_err(|err| Status::unavailable(err.to_string()))?;
 
         let status = if let Some(receiver) = receiver {
-            receiver.await.unwrap_or(BatchStatus::Errored)
+            receiver.await
         } else {
             BatchStatus::Delivered
         };
