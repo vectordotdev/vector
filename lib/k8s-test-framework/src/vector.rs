@@ -3,7 +3,7 @@
 use crate::{helm_values_file::HelmValuesFile, resource_file::ResourceFile, up_down, Result};
 use std::process::{Command, Stdio};
 
-/// Parameters required to build a `kubectl` command to manage Vector in the
+/// Parameters required to build `kubectl` & `helm` commands to manage charts deployments in the
 /// Kubernetes cluster.
 #[derive(Debug)]
 pub struct CommandBuilder {
@@ -65,15 +65,8 @@ pub fn manager(
     helm_chart: &str,
     config: Config<'_>,
 ) -> Result<up_down::Manager<CommandBuilder>> {
-    manager_with_env(
-        interface_command,
-        namespace,
-        helm_chart,
-        config,
-        None,
-    )
+    manager_with_env(interface_command, namespace, helm_chart, config, None)
 }
-
 
 /// Takes care of deploying Vector into the Kubernetes cluster.
 ///

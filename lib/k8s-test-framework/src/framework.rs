@@ -43,13 +43,13 @@ impl Framework {
         helm_repo: &str,
         config: vector::Config<'_>,
     ) -> Result<up_down::Manager<vector::CommandBuilder>> {
-        let env = vec![("HELM_REPO".to_owned(), helm_repo.to_owned())];
+        let env = vec![("CHART_REPO".to_owned(), helm_repo.to_owned())];
         let mut manager = vector::manager_with_env(
             self.interface.deploy_generic_chart_command.as_str(),
             namespace,
             helm_chart,
             config,
-            Some(env)
+            Some(env),
         )?;
         manager.up().await?;
         Ok(manager)
