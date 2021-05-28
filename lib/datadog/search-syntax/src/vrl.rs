@@ -459,40 +459,67 @@ mod tests {
         ("NOT @b:[* TO *]", "!exists(.custom.b)"),
         // Range - numeric, inclusive, unbounded (both), facet (negate w/-).
         ("-@b:[* TO *]", "!exists(.custom.b)"),
-        // AND match, keyword
+        // AND match, keyword.
         (
             "this AND that AND the_other",
             r#"(match(.message, r'\bthis\b') && (match(.message, r'\bthat\b') && match(.message, r'\bthe_other\b')))"#,
         ),
-        // AND match, keyword (grouped)
+        // AND match, keyword (negate last).
+        (
+            "this AND that AND NOT the_other",
+            r#"(match(.message, r'\bthis\b') && (match(.message, r'\bthat\b') && !match(.message, r'\bthe_other\b')))"#,
+        ),
+        // AND match, keyword (negate last w/-).
+        (
+            "this AND that AND -the_other",
+            r#"(match(.message, r'\bthis\b') && (match(.message, r'\bthat\b') && !match(.message, r'\bthe_other\b')))"#,
+        ),
+        // AND match, keyword (grouped).
         (
             "this AND (that AND the_other)",
             r#"(match(.message, r'\bthis\b') && (match(.message, r'\bthat\b') && match(.message, r'\bthe_other\b')))"#,
         ),
-        // OR match, keyword
+        // OR match, keyword.
         (
             "this OR that OR the_other",
             r#"(match(.message, r'\bthis\b') || (match(.message, r'\bthat\b') || match(.message, r'\bthe_other\b')))"#,
         ),
-        // OR match, keyword (grouped)
+        // OR match, keyword, filter last.
+        (
+            "this OR that OR NOT the_other",
+            r#"(!match(.message, r'\bthe_other\b') && (match(.message, r'\bthis\b') || match(.message, r'\bthat\b')))"#,
+        ),
+        // OR match, keyword, filter last w/-.
+        (
+            "this OR that OR -the_other",
+            r#"(!match(.message, r'\bthe_other\b') && (match(.message, r'\bthis\b') || match(.message, r'\bthat\b')))"#,
+        ),
+        // OR match, keyword (grouped).
         (
             "this OR (that OR the_other)",
             r#"(match(.message, r'\bthis\b') || (match(.message, r'\bthat\b') || match(.message, r'\bthe_other\b')))"#,
         ),
-        // AND and OR match
+        // AND and OR match.
         (
             "this AND (that OR the_other)",
             r#"(match(.message, r'\bthis\b') && (match(.message, r'\bthat\b') || match(.message, r'\bthe_other\b')))"#,
         ),
-        // OR and AND match
+        // OR and AND match.
         (
             "this OR (that AND the_other)",
             r#"(match(.message, r'\bthis\b') || (match(.message, r'\bthat\b') && match(.message, r'\bthe_other\b')))"#,
         ),
+        // A bit of everything.
+        (
+            "@a:this OR ((@b:test* c:that) AND d:the_other [1 TO 5])",
+            r#"(match(.custom.a, r'\bthis\b') || ((match(.custom.b, r'\btest.*\b') && match(.c, r'\bthat\b')) && (match(.d, r'\bthe_other\b') && (.message >= 1 && .message <= 5))))"#,
+        ),
         // TODO: CURRENTLY FAILING TESTS -- needs work in the main grammar and/or VRL to support!
         // Range - alpha, inclusive
+        // TODO: https://github.com/timberio/vector/issues/7539
         //(r#"["a" TO "z"]"#, r#".message >= "a" && .message <= "z""#),
         // Range - numeric, exclusive
+        // TODO: https://github.com/timberio/vector/issues/7629
         //("{1 TO 10}", ".message > 1 && .message < 10"),
     ];
 
