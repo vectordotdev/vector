@@ -1,5 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub struct AzureBlobErrorResponse {
@@ -32,5 +33,20 @@ impl InternalEvent for AzureBlobHttpError {
 
     fn emit_metrics(&self) {
         counter!("http_request_errors_total", 1);
+    }
+}
+
+pub(crate) struct AzureBlobEventSent {
+    pub request_id: Uuid,
+    pub byte_size: usize,
+}
+
+impl InternalEvent for AzureBlobEventSent {
+    fn emit_logs(&self) {
+        trace!(message = "Event sent.", request_id = ?self.request_id);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }

@@ -2,7 +2,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext},
     event::Event,
     internal_events::{
-        azure_blob::{AzureBlobErrorResponse, AzureBlobHttpError},
+        azure_blob::{AzureBlobErrorResponse, AzureBlobEventSent, AzureBlobHttpError},
         TemplateRenderingFailed,
     },
     sinks::{
@@ -227,6 +227,7 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
             .as_blob_client(request.blob_name.as_str());
 
         Box::pin(async move {
+            let byte_size = request.blob_data.len();
             let blob = client
                 .put_block_blob(Bytes::from(request.blob_data))
                 .content_type(request.content_type.unwrap());
@@ -249,6 +250,12 @@ impl Service<AzureBlobSinkRequest> for AzureBlobSink {
                             error: reason.to_string()
                         }),
                     };
+                })
+                .inspect_ok(|result| {
+                    emit!(AzureBlobEventSent {
+                        request_id: result.request_id,
+                        byte_size: byte_size
+                    })
                 })
                 .instrument(info_span!("request"))
                 .await
