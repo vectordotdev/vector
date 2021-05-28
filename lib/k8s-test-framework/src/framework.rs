@@ -30,6 +30,7 @@ impl Framework {
             namespace,
             helm_chart,
             config,
+            None,
         )?;
         manager.up().await?;
         Ok(manager)
@@ -44,7 +45,7 @@ impl Framework {
         config: vector::Config<'_>,
     ) -> Result<up_down::Manager<vector::CommandBuilder>> {
         let env = vec![("CHART_REPO".to_owned(), helm_repo.to_owned())];
-        let mut manager = vector::manager_with_env(
+        let mut manager = vector::manager(
             self.interface.deploy_generic_chart_command.as_str(),
             namespace,
             helm_chart,

@@ -58,20 +58,8 @@ pub struct Config<'a> {
 
 /// Takes care of deploying Vector into the Kubernetes cluster.
 ///
-/// Manages the config file secret accordingly.
-pub fn manager(
-    interface_command: &str,
-    namespace: &str,
-    helm_chart: &str,
-    config: Config<'_>,
-) -> Result<up_down::Manager<CommandBuilder>> {
-    manager_with_env(interface_command, namespace, helm_chart, config, None)
-}
-
-/// Takes care of deploying Vector into the Kubernetes cluster.
-///
 /// Manages the config file secret accordingly, accept additional env var
-pub fn manager_with_env(
+pub fn manager(
     interface_command: &str,
     namespace: &str,
     helm_chart: &str,
