@@ -33,9 +33,14 @@ impl proto::Service for Service {
             .into_inner()
             .message
             .map(|data| {
-                let (batch, receiver) = BatchNotifier::new_with_receiver();
-                let event = Event::from(data).with_batch_notifier(&batch);
-                (event, receiver)
+                let event = Event::from(data);
+                if self.acknowledgements {
+                    let (batch, receiver) = BatchNotifier::new_with_receiver();
+                    let event = event.with_batch_notifier(&batch);
+                    (event, Some(receiver))
+                } else {
+                    (event, None)
+                }
             })
             .ok_or_else(|| Status::invalid_argument("missing event"))?;
 
@@ -45,8 +50,8 @@ impl proto::Service for Service {
             .await
             .map_err(|err| Status::unavailable(err.to_string()))?;
 
-        let status = if self.acknowledgements {
-            receiver.await.unwrap_or(BatchStatus::Delivered)
+        let status = if let Some(receiver) = receiver {
+            receiver.await.unwrap_or(BatchStatus::Errored)
         } else {
             BatchStatus::Delivered
         };
