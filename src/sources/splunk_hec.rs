@@ -30,7 +30,6 @@ pub const CHANNEL: &str = "splunk_channel";
 pub const INDEX: &str = "splunk_index";
 pub const SOURCE: &str = "splunk_source";
 pub const SOURCETYPE: &str = "splunk_sourcetype";
-pub const REMOTE_ADDR: &str = "splunk_remote_addr";
 
 /// Accepts HTTP requests.
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -427,9 +426,9 @@ impl<R: Read> EventIterator<R> {
             log.insert(CHANNEL, guid.clone());
         }
 
-        // Process remote_addr field from X-Forwarded-For header
+        // Add host field from X-Forwarded-For header, if present.
         if let Some(splunk_remote_addr) = self.remote_addr.as_ref() {
-            log.insert(REMOTE_ADDR, splunk_remote_addr.clone());
+            log.insert(log_schema().host_key(), splunk_remote_addr.clone());
         }
 
         // Process fields field
@@ -1093,7 +1092,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn xff_header_raw_no_host_payload() {
+    async fn xff_header_raw() {
         trace_init();
 
         let message = "raw";
@@ -1107,6 +1106,50 @@ mod tests {
         assert_eq!(
             200,
             send_with(address, "services/collector/raw", message, TOKEN, &opts).await
+        );
+
+        let event = collect_n(source, 1).await.remove(0);
+        assert_eq!(event.as_log()[log_schema().host_key()], "10.0.0.1".into());
+    }
+
+    // Test helps to illustrate that a payload's `host` value should override an x-forwarded-for header
+    #[tokio::test]
+    async fn xff_header_event_with_host_field() {
+        trace_init();
+
+        let message = r#"{"event":"first", "host": "10.1.0.2"}"#;
+        let (source, address) = source().await;
+
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: Some(String::from("10.0.0.1")),
+        };
+
+        assert_eq!(
+            200,
+            send_with(address, "services/collector/event", message, TOKEN, &opts).await
+        );
+
+        let event = collect_n(source, 1).await.remove(0);
+        assert_eq!(event.as_log()[log_schema().host_key()], "10.1.0.2".into());
+    }
+
+    // Test helps to illustrate that a payload's `host` value should override an x-forwarded-for header
+    #[tokio::test]
+    async fn xff_header_event_without_host_field() {
+        trace_init();
+
+        let message = r#"{"event":"first", "color": "blue"}"#;
+        let (source, address) = source().await;
+
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: Some(String::from("10.0.0.1")),
+        };
+
+        assert_eq!(
+            200,
+            send_with(address, "services/collector/event", message, TOKEN, &opts).await
         );
 
         let event = collect_n(source, 1).await.remove(0);
