@@ -89,9 +89,11 @@ impl TcpSource for FluentSource {
 
     fn build_event(&self, frame: FluentFrame, host: Bytes) -> Option<Event> {
         let mut log = LogEvent::from(frame);
-        if log.get(log_schema().host_key()).is_none() {
+
+        if !log.contains(log_schema().host_key()) {
             log.insert(log_schema().host_key(), host);
         }
+
         Some(Event::from(log))
     }
 }
@@ -228,8 +230,8 @@ impl Decoder for FluentDecoder {
     type Error = DecodeError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if !self.unread_frames.is_empty() {
-            return Ok(self.unread_frames.pop_front());
+        if let Some(frame) = self.unread_frames.pop_front() {
+            return Ok(Some(frame));
         }
 
         if src.is_empty() {
