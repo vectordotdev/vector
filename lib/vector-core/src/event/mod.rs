@@ -6,7 +6,7 @@ pub use finalization::{
 };
 pub use legacy_lookup::Lookup;
 pub use log_event::LogEvent;
-pub use metadata::EventMetadata;
+pub use metadata::{EventMetadata, WithMetadata};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use prost::{DecodeError, EncodeError, Message};
 use shared::EventDataEq;
@@ -144,6 +144,13 @@ impl Event {
         match self {
             Self::Log(log) => log.add_finalizer(finalizer),
             Self::Metric(metric) => metric.add_finalizer(finalizer),
+        }
+    }
+
+    pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
+        match self {
+            Self::Log(log) => log.with_batch_notifier(batch).into(),
+            Self::Metric(metric) => metric.with_batch_notifier(batch).into(),
         }
     }
 }

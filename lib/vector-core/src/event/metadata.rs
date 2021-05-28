@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-use super::{EventFinalizer, EventFinalizers, EventStatus};
+use super::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus};
 use getset::{Getters, Setters};
 use serde::{Deserialize, Serialize};
 use shared::EventDataEq;
@@ -25,6 +25,11 @@ impl EventMetadata {
     pub fn with_finalizer(mut self, finalizer: EventFinalizer) -> Self {
         self.finalizers = EventFinalizers::new(finalizer);
         self
+    }
+
+    /// Replace the finalizer with a new one created from the given batch notifier.
+    pub fn with_batch_notifier(self, batch: &Arc<BatchNotifier>) -> Self {
+        self.with_finalizer(EventFinalizer::new(Arc::clone(batch)))
     }
 
     /// Merge the other `EventMetadata` into this.
@@ -56,5 +61,28 @@ impl EventDataEq for EventMetadata {
     fn event_data_eq(&self, _other: &Self) -> bool {
         // Don't compare the metadata, it is not "event data".
         true
+    }
+}
+
+/// This is a simple wrapper to allow attaching `EventMetadata` to any
+/// other type. This is primarily used in conversion functions, such as
+/// `impl From<X> for WithMetadata<Y>`.
+pub struct WithMetadata<T> {
+    /// The data item being wrapped.
+    pub data: T,
+    /// The additional metadata sidecar.
+    pub metadata: EventMetadata,
+}
+
+impl<T> WithMetadata<T> {
+    /// Convert from one wrapped type to another, where the underlying
+    /// type allows direct conversion.
+    // We would like to `impl From` instead, but this fails due to
+    // conflicting implementations of `impl<T> From<T> for T`.
+    pub fn into<T1: From<T>>(self) -> WithMetadata<T1> {
+        WithMetadata {
+            data: T1::from(self.data),
+            metadata: self.metadata,
+        }
     }
 }

@@ -1,9 +1,8 @@
 use crate::{
     config::SourceContext,
     config::{DataType, GenerateConfig, Resource},
-    event::Event,
     proto::vector as proto,
-    shutdown::{ShutdownSignal, ShutdownSignalToken},
+    shutdown::ShutdownSignalToken,
     sources::Source,
     Pipeline,
 };
@@ -16,10 +15,12 @@ use tonic::{
     transport::{Certificate, Identity, Server, ServerTlsConfig},
     Request, Response, Status,
 };
+use vector_core::event::{BatchNotifier, BatchStatus, Event};
 
 #[derive(Debug, Clone)]
 pub struct Service {
     pipeline: Pipeline,
+    acknowledgements: bool,
 }
 
 #[tonic::async_trait]
@@ -28,20 +29,37 @@ impl proto::Service for Service {
         &self,
         request: Request<proto::EventRequest>,
     ) -> Result<Response<proto::EventResponse>, Status> {
-        let event = request
+        let (event, receiver) = request
             .into_inner()
             .message
-            .map(Event::from)
+            .map(|data| {
+                let event = Event::from(data);
+                if self.acknowledgements {
+                    let (batch, receiver) = BatchNotifier::new_with_receiver();
+                    let event = event.with_batch_notifier(&batch);
+                    (event, Some(receiver))
+                } else {
+                    (event, None)
+                }
+            })
             .ok_or_else(|| Status::invalid_argument("missing event"))?;
-
-        let response = Response::new(proto::EventResponse {});
 
         self.pipeline
             .clone()
             .send(event)
             .await
-            .map(|_| response)
-            .map_err(|err| Status::unavailable(err.to_string()))
+            .map_err(|err| Status::unavailable(err.to_string()))?;
+
+        let status = if let Some(receiver) = receiver {
+            receiver.await.unwrap_or(BatchStatus::Errored)
+        } else {
+            BatchStatus::Delivered
+        };
+        match status {
+            BatchStatus::Delivered => Ok(Response::new(proto::EventResponse {})),
+            BatchStatus::Errored => Err(Status::internal("Delivery error")),
+            BatchStatus::Failed => Err(Status::data_loss("Delivery failed")),
+        }
     }
 
     // TODO: figure out a way to determine if the current Vector instance is "healthy".
@@ -92,9 +110,7 @@ impl GenerateConfig for VectorConfig {
 
 impl VectorConfig {
     pub(super) async fn build(&self, cx: SourceContext) -> crate::Result<Source> {
-        let SourceContext { shutdown, out, .. } = cx;
-
-        let source = run(self.address, self.tls.clone(), out, shutdown).map_err(|error| {
+        let source = run(self.address, self.tls.clone(), cx).map_err(|error| {
             error!(message = "Source future failed.", %error);
         });
 
@@ -117,12 +133,14 @@ impl VectorConfig {
 async fn run(
     address: SocketAddr,
     tls: Option<GrpcTlsConfig>,
-    out: Pipeline,
-    shutdown: ShutdownSignal,
+    cx: SourceContext,
 ) -> crate::Result<()> {
     let _span = crate::trace::current_span();
 
-    let service = proto::Server::new(Service { pipeline: out });
+    let service = proto::Server::new(Service {
+        pipeline: cx.out,
+        acknowledgements: cx.acknowledgements,
+    });
     let (tx, rx) = tokio::sync::oneshot::channel::<ShutdownSignalToken>();
 
     let mut server = match tls {
@@ -141,7 +159,7 @@ async fn run(
 
     server
         .add_service(service)
-        .serve_with_shutdown(address, shutdown.map(|token| tx.send(token).unwrap()))
+        .serve_with_shutdown(address, cx.shutdown.map(|token| tx.send(token).unwrap()))
         .await?;
 
     drop(rx.await);

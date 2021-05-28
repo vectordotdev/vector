@@ -90,6 +90,8 @@ mod log;
 mod log_util;
 #[cfg(feature = "match")]
 mod r#match;
+#[cfg(feature = "match_any")]
+mod match_any;
 #[cfg(feature = "md5")]
 mod md5;
 #[cfg(feature = "merge")]
@@ -289,6 +291,8 @@ pub use join::Join;
 pub use length::Length;
 #[cfg(feature = "log")]
 pub use log::Log;
+#[cfg(feature = "match_any")]
+pub use match_any::MatchAny;
 #[cfg(feature = "merge")]
 pub use merge::Merge;
 #[cfg(feature = "now")]
@@ -484,6 +488,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Log),
         #[cfg(feature = "match")]
         Box::new(Match),
+        #[cfg(feature = "match")]
+        Box::new(MatchAny),
         #[cfg(feature = "md5")]
         Box::new(Md5),
         #[cfg(feature = "merge")]
@@ -544,6 +550,8 @@ pub fn all() -> Vec<Box<dyn vrl::Function>> {
         Box::new(Push),
         #[cfg(feature = "match")]
         Box::new(Match),
+        #[cfg(feature = "match")]
+        Box::new(MatchAny),
         #[cfg(feature = "redact")]
         Box::new(Redact),
         #[cfg(feature = "replace")]
