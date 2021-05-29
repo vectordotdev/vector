@@ -16,6 +16,8 @@ using configuration provided in the `values.yaml` without converting them for th
 
 ## Upgrade Guide
 
+The values that were in `rawConfig` in TOML format now need to be moved up a level and written as YAML.
+
 Below is an example of how to transition your `values.yaml` file:
 
 ```diff title="values.yaml"
