@@ -109,6 +109,8 @@ urls: {
 	datadog_docs:                                             "https://docs.datadoghq.com"
 	datadog_logs:                                             "\(datadog_docs)/logs/"
 	datadog_logs_endpoints:                                   "\(datadog_docs)/logs/log_collection/?tab=http#datadog-logs-endpoints"
+	datadog_events:                                           "\(datadog_docs)/events/"
+	datadog_events_endpoints:                                 "\(datadog_docs)/api/latest/events/#post-an-event
 	datadog_metrics:                                          "\(datadog_docs)/metrics/"
 	datadog_metrics_endpoints:                                "\(datadog_docs)/api/v1/metrics/"
 	date:                                                     "https://man7.org/linux/man-pages/man1/date.1.html"

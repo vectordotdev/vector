@@ -121,6 +121,7 @@ impl DatadogEventsConfig {
 #[typetag::serde(name = "datadog_events")]
 impl SinkConfig for DatadogEventsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        // Datadog Event API doesn't support batching.
         let batch_settings = BatchSettings::default()
             .bytes(bytesize::kib(100u64))
             .events(1)
