@@ -93,7 +93,7 @@ components: sinks: [Name=string]: {
 								default: "memory"
 								enum: {
 									memory: "Stores the sink's buffer in memory. This is more performant, but less durable. Data will be lost if Vector is restarted forcefully."
-									disk:   """
+									disk: """
 									Stores the sink's buffer on disk. This is less performant, but durable.
 									Data will not be lost between restarts.
 									Will also hold data in memory to enhance performance.
