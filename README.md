@@ -20,9 +20,9 @@ pipeline that puts you in control of your observability data.
 all your logs, metrics, and traces to any vendors you want today and any other
 vendors you may want tomorrow. Vector enables dramatic cost reduction, novel data
 enrichment, and data security where you need it, not where is most convenient for
-your vendors. Open source and up to 10x faster than every alternative.
+your vendors. Additionally, it is open source and up to 10x faster than every alternative in the space. 
 
-To get started, follow our [**quickstart guide**][docs.quickstart]
+As a user, you are excited to get up and running. To get started, follow our [**quickstart guide**][docs.quickstart]
 or [**install Vector**][docs.installation].
 
 ### Principles
