@@ -184,7 +184,7 @@ impl SinkConfig for DatadogConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(None)?;
         let healthcheck = healthcheck(
-            self.get_api_endpoint().clone(),
+            self.get_api_endpoint(),
             self.api_key.clone(),
             client.clone(),
         )

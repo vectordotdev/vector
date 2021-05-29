@@ -85,7 +85,7 @@ impl DatadogEventsConfig {
                 Output = PartitionInnerBuffer<B::Output, ApiKey>,
             > + Clone,
     {
-        let mut request_opts = self.request.clone();
+        let mut request_opts = self.request;
         // Since we are sending only one event per request we should try to send as much
         // requests in parallel as possible.
         request_opts.concurrency = request_opts.concurrency.if_none(Concurrency::Adaptive);
@@ -98,7 +98,7 @@ impl DatadogEventsConfig {
 
         let client = HttpClient::new(tls_settings)?;
         let healthcheck = healthcheck(
-            self.get_api_endpoint().clone(),
+            self.get_api_endpoint(),
             self.default_api_key.clone(),
             client.clone(),
         )
@@ -155,26 +155,26 @@ struct DatadogEventsService {
 
 impl DatadogEventsService {
     fn new(config: &DatadogEventsConfig) -> Self {
-        let mut encoding = EncodingConfigWithDefault::default();
-
-        // DataDog Event API allows only some fields, and refuses
-        // to accept event if it contains any other field.
-        encoding.only_fields = Some(vec![
-            vec!["aggregation_key".into()],
-            vec!["alert_type".into()],
-            vec!["date_happened".into()],
-            vec!["device_name".into()],
-            vec!["host".into()],
-            vec!["priority".into()],
-            vec!["related_event_id".into()],
-            vec!["source_type_name".into()],
-            vec!["tags".into()],
-            vec!["text".into()],
-            vec!["title".into()],
-        ]);
-
-        // DataDog Event API requires unix timestamp.
-        encoding.timestamp_format = Some(TimestampFormat::Unix);
+        let encoding = EncodingConfigWithDefault {
+            // DataDog Event API allows only some fields, and refuses
+            // to accept event if it contains any other field.
+            only_fields: Some(vec![
+                vec!["aggregation_key".into()],
+                vec!["alert_type".into()],
+                vec!["date_happened".into()],
+                vec!["device_name".into()],
+                vec!["host".into()],
+                vec!["priority".into()],
+                vec!["related_event_id".into()],
+                vec!["source_type_name".into()],
+                vec!["tags".into()],
+                vec!["text".into()],
+                vec!["title".into()],
+            ]),
+            // DataDog Event API requires unix timestamp.
+            timestamp_format: Some(TimestampFormat::Unix),
+            ..EncodingConfigWithDefault::default()
+        };
 
         Self {
             default_api_key: Arc::from(config.default_api_key.clone()),
