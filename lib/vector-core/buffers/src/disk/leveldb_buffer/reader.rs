@@ -87,37 +87,37 @@ where
 {
     type Item = T;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+
         // If there's no value at read_offset, we return NotReady and rely on
         // Writer using write_notifier to wake this task up after the next
         // write.
-        self.write_notifier.register(cx.waker());
+        this.write_notifier.register(cx.waker());
 
-        let unread_size = self.delete_acked();
+        let unread_size = this.delete_acked();
 
-        if self.acked >= 100 {
-            self.flush(unread_size);
+        if this.acked >= 100 {
+            this.flush(unread_size);
         }
 
-        if self.buffer.is_empty() {
+        if this.buffer.is_empty() {
             // This will usually complete instantly, but in the case of a large
             // queue (or a fresh launch of the app), this will have to go to
             // disk.
-            let mut buffer = std::mem::take(&mut self.buffer);
             tokio::task::block_in_place(|| {
-                buffer.extend(
-                    self.db
+                this.buffer.extend(
+                    this.db
                         .value_iter(ReadOptions::new())
-                        .from(&Key(self.read_offset))
-                        .to(&Key(self.read_offset + 100)),
+                        .from(&Key(this.read_offset))
+                        .to(&Key(this.read_offset + 100)),
                 );
             });
-            self.buffer = buffer;
         }
 
-        if let Some(value) = self.buffer.pop_front() {
-            self.unacked_sizes.push_back(value.len());
-            self.read_offset += 1;
+        if let Some(value) = this.buffer.pop_front() {
+            this.unacked_sizes.push_back(value.len());
+            this.read_offset += 1;
 
             let buffer: Bytes = Bytes::from(value);
             match T::decode(buffer) {
@@ -125,10 +125,10 @@ where
                 Err(error) => {
                     error!(message = "Error deserializing event.", %error);
                     debug_assert!(false);
-                    self.poll_next(cx)
+                    Pin::new(this).poll_next(cx)
                 }
             }
-        } else if Arc::strong_count(&self.db) == 1 {
+        } else if Arc::strong_count(&this.db) == 1 {
             // There are no writers left
             Poll::Ready(None)
         } else {
