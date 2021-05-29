@@ -9,7 +9,11 @@ components: sinks: datadog_events: {
 		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
-			batch: enabled:       false
+			batch: {
+				enabled:      false
+				common:       false
+				timeout_secs: 0
+			}
 			compression: enabled: false
 			encoding: enabled:    false
 			request: {
