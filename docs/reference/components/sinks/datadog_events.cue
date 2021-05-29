@@ -12,7 +12,17 @@ components: sinks: datadog_events: {
 			batch: enabled:       false
 			compression: enabled: false
 			encoding: enabled:    false
-			request: enabled:     true
+			request: {
+				enabled:                    true
+				adaptive_concurrency:       true
+				concurrency:                5
+				rate_limit_duration_secs:   1
+				rate_limit_num:             5
+				retry_initial_backoff_secs: 1
+				retry_max_duration_secs:    10
+				timeout_secs:               30
+				headers:                    false
+			}
 			tls: {
 				enabled:                true
 				can_enable:             true
