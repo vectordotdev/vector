@@ -9,7 +9,7 @@ use crate::{
             batch::Batch,
             encoding::{EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat},
             http::{HttpSink, PartitionHttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, EncodedEvent, JsonArrayBuffer,
+            BatchConfig, BatchSettings, BoxedRawValue, Concurrency, EncodedEvent, JsonArrayBuffer,
             PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -23,18 +23,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{sync::Arc, time::Duration};
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Json,
-}
-
-impl Default for Encoding {
-    fn default() -> Self {
-        Self::Json
-    }
-}
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogEventsConfig {
@@ -47,7 +35,7 @@ pub struct DatadogEventsConfig {
     tls: Option<TlsConfig>,
 
     #[serde(default)]
-    request: TowerRequestConfig,
+    request: TowerRequestConfig<Concurrency>,
 }
 
 type ApiKey = Arc<str>;
@@ -97,7 +85,11 @@ impl DatadogEventsConfig {
                 Output = PartitionInnerBuffer<B::Output, ApiKey>,
             > + Clone,
     {
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+        let mut request_opts = self.request.clone();
+        // Since we are sending only one event per request we should try to send as much
+        // requests in parallel as possible.
+        request_opts.concurrency = request_opts.concurrency.if_none(Concurrency::Adaptive);
+        let request_settings = request_opts.unwrap_with(&TowerRequestConfig::default());
 
         let tls_settings = MaybeTlsSettings::from_config(
             &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
@@ -155,7 +147,6 @@ impl SinkConfig for DatadogEventsConfig {
 #[derive(Clone)]
 struct DatadogEventsService {
     config: DatadogEventsConfig,
-    // Used to store the complete URI and avoid calling `get_uri` for each request
     uri: String,
     default_api_key: ApiKey,
     encoding: EncodingConfigWithDefault<()>,
@@ -186,9 +177,7 @@ impl DatadogEventsService {
 
         Self {
             default_api_key: Arc::from(config.default_api_key.clone()),
-
             uri: config.get_uri(),
-
             encoding,
             config: config.clone(),
         }
@@ -237,7 +226,7 @@ impl HttpSink for DatadogEventsService {
             }
         }
 
-        self.encoding.apply_rules(&mut event);  
+        self.encoding.apply_rules(&mut event);
 
         let (fields, metadata) = event.into_log().into_parts();
         let json_event = json!(fields);
@@ -255,7 +244,8 @@ impl HttpSink for DatadogEventsService {
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let (mut events, api_key) = events.into_parts();
 
-        let body = serde_json::to_vec(&events.pop().unwrap())?;
+        assert_eq!(events.len(), 1);
+        let body = serde_json::to_vec(&events.pop().expect("One event"))?;
 
         emit!(DatadogEventsProcessed {
             byte_size: body.len(),
@@ -278,9 +268,11 @@ mod tests {
         sinks::util::test::{build_test_server_status, load_sink},
         test_util::{next_addr, random_lines_with_stream},
     };
+    use bytes::Bytes;
     use futures::{
         channel::mpsc::{Receiver, TryRecvError},
-        stream, StreamExt,
+        stream::Stream,
+        StreamExt,
     };
     use hyper::StatusCode;
     use indoc::indoc;
@@ -292,13 +284,52 @@ mod tests {
         crate::test_util::test_generate_config::<DatadogEventsConfig>();
     }
 
-    fn event_with_api_key(msg: &str, key: &str) -> Event {
-        let mut e = Event::from(msg);
-        e.as_mut_log()
-            .metadata_mut()
-            .set_datadog_api_key(Some(Arc::from(key)));
-        e
+    fn random_events_with_stream(
+        len: usize,
+        count: usize,
+        batch: Option<Arc<BatchNotifier>>,
+    ) -> (Vec<String>, impl Stream<Item = Event>) {
+        let (lines, stream) = random_lines_with_stream(len, count, batch);
+        (
+            lines,
+            stream.map(|mut event| {
+                event.as_mut_log().insert("title", "All!");
+                event.as_mut_log().insert("invalid", "Tik");
+                event
+            }),
+        )
     }
+
+    async fn start_test(
+        http_status: StatusCode,
+        batch_status: BatchStatus,
+    ) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
+        let config = indoc! {r#"
+            default_api_key = "atoken"
+        "#};
+        let (mut config, cx) = load_sink::<DatadogEventsConfig>(&config).unwrap();
+
+        let addr = next_addr();
+        // Swap out the endpoint so we can force send it
+        // to our local server
+        let endpoint = format!("http://{}", addr);
+        config.endpoint = Some(endpoint.clone());
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        let (rx, _trigger, server) = build_test_server_status(addr, http_status);
+        tokio::spawn(server);
+
+        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+        let (expected, events) = random_events_with_stream(100, 10, Some(batch));
+
+        let _ = sink.run(events).await.unwrap();
+
+        assert_eq!(receiver.try_recv(), Ok(batch_status));
+
+        (expected, rx)
+    }
+
     #[tokio::test]
     async fn smoke() {
         let (expected, rx) = start_test(StatusCode::OK, BatchStatus::Delivered).await;
@@ -320,7 +351,7 @@ mod tests {
             // The json we send to Datadog is an array of events.
             // As we have set batch.max_events to 1, each entry will be
             // an array containing a single record.
-            let message = json.get(0).unwrap().get("text").unwrap().as_str().unwrap();
+            let message = json.get("text").unwrap().as_str().unwrap();
             assert_eq!(message, expected[i]);
         }
     }
@@ -332,44 +363,10 @@ mod tests {
         assert!(matches!(rx.try_next(), Err(TryRecvError { .. })));
     }
 
-    async fn start_test(
-        http_status: StatusCode,
-        batch_status: BatchStatus,
-    ) -> (Vec<String>, Receiver<(http::request::Parts, Bytes)>) {
-        let config = indoc! {r#"
-            default_api_key = "atoken"
-            compression = "none"
-            batch.max_events = 1
-        "#};
-        let (mut config, cx) = load_sink::<DatadogEventsConfig>(&config).unwrap();
-
-        let addr = next_addr();
-        // Swap out the endpoint so we can force send it
-        // to our local server
-        let endpoint = format!("http://{}", addr);
-        config.endpoint = Some(endpoint.clone());
-
-        let (sink, _) = config.build(cx).await.unwrap();
-
-        let (rx, _trigger, server) = build_test_server_status(addr, http_status);
-        tokio::spawn(server);
-
-        let (batch, mut receiver) = BatchNotifier::new_with_receiver();
-        let (expected, events) = random_lines_with_stream(100, 10, Some(batch));
-
-        let _ = sink.run(events).await.unwrap();
-
-        assert_eq!(receiver.try_recv(), Ok(batch_status));
-
-        (expected, rx)
-    }
-
     #[tokio::test]
     async fn api_key_in_metadata() {
         let (mut config, cx) = load_sink::<DatadogEventsConfig>(indoc! {r#"
             default_api_key = "atoken"
-            compression = "none"
-            batch.max_events = 1
         "#})
         .unwrap();
 
@@ -384,7 +381,7 @@ mod tests {
         let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
         tokio::spawn(server);
 
-        let (expected, events) = random_lines_with_stream(100, 10, None);
+        let (expected, events) = random_events_with_stream(100, 10, None);
 
         let mut events = events.map(|mut e| {
             e.as_mut_log()
@@ -410,49 +407,32 @@ mod tests {
 
             let json = json.next().unwrap();
 
-            // The json we send to Datadog is an array of events.
-            // As we have set batch.max_events to 1, each entry will be
-            // an array containing a single record.
-            let message = json.get(0).unwrap().get("text").unwrap().as_str().unwrap();
+            let message = json.get("text").unwrap().as_str().unwrap();
             assert_eq!(message, expected[i]);
         }
     }
 
     #[tokio::test]
-    async fn multiple_api_keys() {
-        let (mut config, cx) = load_sink::<DatadogEventsConfig>(indoc! {r#"
-            default_api_key = "atoken"
-            compression = "none"
-            batch.max_events = 1
-        "#})
-        .unwrap();
+    async fn filter_out_fields() {
+        let (expected, rx) = start_test(StatusCode::OK, BatchStatus::Delivered).await;
 
-        let addr = next_addr();
-        // Swap out the endpoint so we can force send it
-        // to our local server
-        let endpoint = format!("http://{}", addr);
-        config.endpoint = Some(endpoint.clone());
+        let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
-        let (sink, _) = config.build(cx).await.unwrap();
+        for (i, val) in output.iter().enumerate() {
+            assert_eq!(
+                val.0.headers.get("Content-Type").unwrap(),
+                "application/json"
+            );
 
-        let (rx, _trigger, server) = build_test_server_status(addr, StatusCode::OK);
-        tokio::spawn(server);
+            let mut json = serde_json::Deserializer::from_slice(&val.1[..])
+                .into_iter::<serde_json::Value>()
+                .map(|v| v.expect("decoding json"));
 
-        let events = vec![
-            event_with_api_key("mow", "pkc"),
-            event_with_api_key("pnh", "vvo"),
-            Event::from("no API key in metadata"),
-        ];
+            let json = json.next().unwrap();
 
-        let _ = sink.run(stream::iter(events)).await.unwrap();
-
-        let mut keys = rx
-            .take(3)
-            .map(|r| r.0.headers.get("DD-API-KEY").unwrap().clone())
-            .collect::<Vec<_>>()
-            .await;
-
-        keys.sort();
-        assert_eq!(keys, vec!["atoken", "pkc", "vvo"])
+            let message = json.get("text").unwrap().as_str().unwrap();
+            assert_eq!(message, expected[i]);
+            assert!(json.get("invalid").is_none());
+        }
     }
 }
