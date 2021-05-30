@@ -125,7 +125,7 @@ fn parse_log(mut input: &str) -> Result<Value> {
             log.insert(
                 $name.into(),
                 match get_value!($name, $parser).into() {
-                    Value::Bytes(bytes) if bytes == &"-" => Value::Null,
+                    Value::Bytes(bytes) if bytes == "-" => Value::Null,
                     value => value,
                 },
             )
@@ -159,7 +159,7 @@ fn parse_log(mut input: &str) -> Result<Value> {
     log.insert(
         "request_method".to_owned(),
         match iter.next().unwrap().into() {
-            Value::Bytes(bytes) if bytes == &"-" => Value::Null,
+            Value::Bytes(bytes) if bytes == "-" => Value::Null,
             value => value,
         },
     ); // split always have at least 1 item
@@ -169,7 +169,7 @@ fn parse_log(mut input: &str) -> Result<Value> {
             log.insert(
                 "request_protocol".to_owned(),
                 match iter.next().unwrap().into() {
-                    Value::Bytes(bytes) if bytes == &"-" => Value::Null,
+                    Value::Bytes(bytes) if bytes == "-" => Value::Null,
                     value => value,
                 },
             ); // same as previous one
@@ -249,7 +249,7 @@ fn take_maybe_quoted_list<'a>(
             delimited(tag(" \""), take_while1(cond.clone()), char('"')),
             |v: &str| Ok::<_, std::convert::Infallible>(vec![v]),
         ),
-        map_res(preceded(char(' '), take_while1(cond.clone())), |v: &str| {
+        map_res(preceded(char(' '), take_while1(cond)), |v: &str| {
             Ok::<_, std::convert::Infallible>(vec![v])
         }),
     ))
