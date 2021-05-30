@@ -33,8 +33,8 @@ const MIN_UNCOMPACTED_SIZE: usize = 4 * 1024 * 1024;
 ///
 /// So the disk buffer (indices/keys) is separated into following regions.
 /// |--Compacted--|--Deleted--|--Read--|--Unread
-///  ^             ^           ^        ^
-///  |             |           |        |
+///  ^             ^   ^       ^        ^
+///  |             |   |-acked-|        |
 ///  0   `compacted_offset`    |        |
 ///                     `delete_offset` |
 ///                                `read_offset`
@@ -51,6 +51,9 @@ where
     pub(crate) compacted_offset: usize,
     /// First not deleted key
     pub(crate) delete_offset: usize,
+    /// Number of acked events that haven't been deleted from
+    /// database. Used for batching deletes.
+    pub(crate) acked: usize,
     /// Reader is notified by Writers through this Waker.
     /// Shared with Writers.
     pub(crate) write_notifier: Arc<AtomicWaker>,
@@ -68,7 +71,7 @@ where
     /// Sizes in bytes of read, not acked/deleted, events.
     pub(crate) unacked_sizes: VecDeque<usize>,
     /// Buffer for internal use.
-    pub(crate) buffer: Vec<Vec<u8>>,
+    pub(crate) buffer: VecDeque<Vec<u8>>,
     /// Limit on uncompacted_size after which we trigger compaction.
     pub(crate) max_uncompacted_size: usize,
     /// Last time that compaction was triggered.
@@ -87,32 +90,37 @@ where
 {
     type Item = T;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+
         // If there's no value at read_offset, we return NotReady and rely on
         // Writer using write_notifier to wake this task up after the next
         // write.
-        self.write_notifier.register(cx.waker());
+        this.write_notifier.register(cx.waker());
 
-        self.delete_acked();
+        let unread_size = this.delete_acked();
 
-        if self.buffer.is_empty() {
+        if this.acked >= 100 {
+            this.flush(unread_size);
+        }
+
+        if this.buffer.is_empty() {
             // This will usually complete instantly, but in the case of a large
             // queue (or a fresh launch of the app), this will have to go to
             // disk.
-            let new_data = tokio::task::block_in_place(|| {
-                self.db
-                    .value_iter(ReadOptions::new())
-                    .from(&Key(self.read_offset))
-                    .to(&Key(self.read_offset + 100))
-                    .collect()
+            tokio::task::block_in_place(|| {
+                this.buffer.extend(
+                    this.db
+                        .value_iter(ReadOptions::new())
+                        .from(&Key(this.read_offset))
+                        .to(&Key(this.read_offset + 100)),
+                );
             });
-            self.buffer = new_data;
-            self.buffer.reverse(); // so we can pop
         }
 
-        if let Some(value) = self.buffer.pop() {
-            self.unacked_sizes.push_back(value.len());
-            self.read_offset += 1;
+        if let Some(value) = this.buffer.pop_front() {
+            this.unacked_sizes.push_back(value.len());
+            this.read_offset += 1;
 
             let buffer: Bytes = Bytes::from(value);
             match T::decode(buffer) {
@@ -120,10 +128,10 @@ where
                 Err(error) => {
                     error!(message = "Error deserializing event.", %error);
                     debug_assert!(false);
-                    self.poll_next(cx)
+                    Pin::new(this).poll_next(cx)
                 }
             }
-        } else if Arc::strong_count(&self.db) == 1 {
+        } else if Arc::strong_count(&this.db) == 1 {
             // There are no writers left
             Poll::Ready(None)
         } else {
@@ -137,7 +145,8 @@ where
     T: Send + Sync + Unpin,
 {
     fn drop(&mut self) {
-        self.delete_acked();
+        let unread_size = self.delete_acked();
+        self.flush(unread_size);
     }
 }
 
@@ -145,11 +154,33 @@ impl<T> Reader<T>
 where
     T: Send + Sync + Unpin,
 {
-    fn delete_acked(&mut self) {
+    /// Returns number of bytes to be read.
+    fn delete_acked(&mut self) -> usize {
         let num_to_delete = self.ack_counter.swap(0, Ordering::Relaxed);
 
-        if num_to_delete > 0 {
-            let new_offset = self.delete_offset + num_to_delete;
+        let unread_size = if num_to_delete > 0 {
+            let size_deleted = self.unacked_sizes.drain(..num_to_delete).sum();
+            let unread_size =
+                self.current_size.fetch_sub(size_deleted, Ordering::Release) - size_deleted;
+
+            self.uncompacted_size += size_deleted;
+            self.acked += num_to_delete;
+
+            unread_size
+        } else {
+            self.current_size.load(Ordering::Acquire)
+        };
+
+        for task in self.blocked_write_tasks.lock().unwrap().drain(..) {
+            task.wake();
+        }
+
+        unread_size
+    }
+
+    fn flush(&mut self, unread_size: usize) {
+        if self.acked > 0 {
+            let new_offset = self.delete_offset + self.acked;
             assert!(
                 new_offset <= self.read_offset,
                 "Tried to ack beyond read offset"
@@ -164,11 +195,7 @@ where
             self.db.write(WriteOptions::new(), &delete_batch).unwrap();
 
             self.delete_offset = new_offset;
-
-            let size_deleted = self.unacked_sizes.drain(..num_to_delete).sum();
-            let unread_size = self.current_size.fetch_sub(size_deleted, Ordering::Release);
-
-            self.uncompacted_size += size_deleted;
+            self.acked = 0;
 
             // Compaction can be triggered in two ways:
             //  1. When size of uncompacted is a percentage of total allowed size.
@@ -195,10 +222,6 @@ where
             if min_size && (max_trigger || timed_trigger) {
                 self.compact();
             }
-        }
-
-        for task in self.blocked_write_tasks.lock().unwrap().drain(..) {
-            task.wake();
         }
     }
 
