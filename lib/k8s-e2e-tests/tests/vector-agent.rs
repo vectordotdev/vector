@@ -4,6 +4,7 @@ use k8s_e2e_tests::*;
 use k8s_test_framework::{
     lock, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
 };
+use log::{debug, info};
 use std::collections::HashSet;
 use std::str::FromStr;
 
@@ -54,6 +55,8 @@ const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = indoc! {r#"
 #[tokio::test]
 async fn simple() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
@@ -154,6 +157,8 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
@@ -253,6 +258,8 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
@@ -350,6 +357,8 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let framework = make_framework();
 
     let pod_namespace = get_namespace_appended("test-pod");
@@ -450,6 +459,8 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let override_name = get_override_name("vector-agent");
@@ -549,6 +560,8 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let override_name = get_override_name("vector-agent");
@@ -685,6 +698,8 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let affinity_label = format!("{}-affinity", pod_namespace);
@@ -789,11 +804,11 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        println!("Got line: {:?}", line);
+        debug!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
-            println!("Giving up");
+            info!("Giving up");
             log_reader.kill().await?;
             break;
         }
@@ -840,9 +855,9 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             // logs to appear to have high confidence that Vector has enough
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(120);
-            println!("Starting stop timer, due in {} seconds", duration.as_secs());
+            info!("Starting stop timer, due in {} seconds", duration.as_secs());
             tokio::time::sleep(duration).await;
-            println!("Stop timer complete");
+            info!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
     }
@@ -865,6 +880,8 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
@@ -987,11 +1004,11 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        println!("Got line: {:?}", line);
+        info!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
-            println!("Giving up");
+            info!("Giving up");
             log_reader.kill().await?;
             break;
         }
@@ -1038,9 +1055,9 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             // logs to appear to have high confidence that Vector has enough
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(120);
-            println!("Starting stop timer, due in {} seconds", duration.as_secs());
+            info!("Starting stop timer, due in {} seconds", duration.as_secs());
             tokio::time::sleep(duration).await;
-            println!("Stop timer complete");
+            info!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
     }
@@ -1063,6 +1080,8 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
@@ -1143,11 +1162,11 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        println!("Got line: {:?}", line);
+        info!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
-            println!("Giving up");
+            info!("Giving up");
             log_reader.kill().await?;
             break;
         }
@@ -1198,9 +1217,9 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             // logs to appear to have high confidence that Vector has enough
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(30);
-            println!("Starting stop timer, due in {} seconds", duration.as_secs());
+            info!("Starting stop timer, due in {} seconds", duration.as_secs());
             tokio::time::sleep(duration).await;
-            println!("Stop timer complete");
+            info!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
     }
@@ -1222,6 +1241,8 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
@@ -1314,11 +1335,11 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        println!("Got line: {:?}", line);
+        info!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
-            println!("Giving up");
+            info!("Giving up");
             log_reader.kill().await?;
             break;
         }
@@ -1368,9 +1389,9 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             // logs to appear to have high confidence that Vector has enough
             // time to pick them up and spit them out.
             let duration = std::time::Duration::from_secs(30);
-            println!("Starting stop timer, due in {} seconds", duration.as_secs());
+            info!("Starting stop timer, due in {} seconds", duration.as_secs());
             tokio::time::sleep(duration).await;
-            println!("Stop timer complete");
+            info!("Stop timer complete");
             stop_tx.send(()).await.unwrap();
         });
     }
@@ -1391,6 +1412,8 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let affinity_label = format!("{}-affinity", pod_namespace);
@@ -1430,7 +1453,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut test_pods = vec![];
     for ns in &expected_namespaces {
-        println!("creating {}", ns);
+        debug!("creating {}", ns);
         let test_pod = framework
             .test_pod(test_pod::Config::from_pod(&make_test_pod_with_affinity(
                 ns,
@@ -1513,6 +1536,8 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
@@ -1612,6 +1637,8 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();
@@ -1662,9 +1689,9 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     // the `processed_events` is even defined.
     // We give Vector some reasonable time to perform this initial bootstrap,
     // and capture the `processed_events` value afterwards.
-    println!("Waiting for Vector bootstrap");
+    debug!("Waiting for Vector bootstrap");
     tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-    println!("Done waiting for Vector bootstrap");
+    debug!("Done waiting for Vector bootstrap");
 
     // Capture events processed before deploying the test pod.
     let processed_events_before = metrics::get_processed_events(&vector_metrics_url).await?;
@@ -1733,9 +1760,9 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
 
     // Due to how `internal_metrics` are implemented, we have to wait for it's
     // scraping period to pass before we can observe the updates.
-    println!("Waiting for `internal_metrics` to update");
+    debug!("Waiting for `internal_metrics` to update");
     tokio::time::sleep(std::time::Duration::from_secs(6)).await;
-    println!("Done waiting for `internal_metrics` to update");
+    debug!("Done waiting for `internal_metrics` to update");
 
     // Capture events processed after the test pod has finished.
     let processed_events_after = metrics::get_processed_events(&vector_metrics_url).await?;
@@ -1760,6 +1787,8 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
     let framework = make_framework();
     let override_name = get_override_name("vector-agent");
@@ -1805,9 +1834,9 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
     // We want to capture the value for the host metrics, but the pipeline for
     // collecting them takes some time to boot (15s roughly).
     // We wait twice as much, so the bootstrap is guaranteed.
-    println!("Waiting for Vector bootstrap");
+    debug!("Waiting for Vector bootstrap");
     tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-    println!("Done waiting for Vector bootstrap");
+    debug!("Done waiting for Vector bootstrap");
 
     // Ensure the host metrics are exposed in the Prometheus endpoint.
     metrics::assert_host_metrics_present(&vector_metrics_url).await?;

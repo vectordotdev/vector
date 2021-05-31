@@ -24,6 +24,8 @@ const HELM_VALUES_DUMMY_TOPOLOGY: &str = indoc! {r#"
 /// settings and a dummy topology.
 #[tokio::test]
 async fn dummy_topology() -> Result<(), Box<dyn std::error::Error>> {
+    init();
+
     let _guard = lock();
     let namespace = get_namespace();
     let framework = make_framework();
@@ -58,6 +60,8 @@ async fn dummy_topology() -> Result<(), Box<dyn std::error::Error>> {
 /// a Prometheus scraping format ot of the box.
 #[tokio::test]
 async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
+    init();
+
     let _guard = lock();
     let namespace = get_namespace();
     let framework = make_framework();

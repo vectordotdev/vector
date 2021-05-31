@@ -41,6 +41,8 @@ fn helm_values_stdout_sink(aggregator_override_name: &str, agent_override_name: 
 #[tokio::test]
 async fn logs() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
+    init();
+
     let namespace = get_namespace();
     let pod_namespace = get_namespace_appended("test-pod");
     let framework = make_framework();

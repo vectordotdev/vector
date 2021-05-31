@@ -6,11 +6,19 @@ use k8s_openapi::{
 use k8s_test_framework::{
     test_pod, wait_for_resource::WaitFor, CommandBuilder, Framework, Interface, Manager, Reader,
 };
+use log::{debug, error, info};
 use std::{collections::BTreeMap, env};
 
 pub mod metrics;
 
 pub const BUSYBOX_IMAGE: &str = "busybox:1.28";
+
+pub fn init() {
+    let _ = env_logger::builder()
+        .filter_level(log::LevelFilter::max())
+        .is_test(true)
+        .try_init();
+}
 
 pub fn get_namespace() -> String {
     env::var("NAMESPACE").unwrap_or_else(|_| "test-vector".to_string())
@@ -193,11 +201,11 @@ where
 {
     let mut lines_till_we_give_up = 10000;
     while let Some(line) = log_reader.read_line().await {
-        println!("Got line: {:?}", line);
+        debug!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up <= 0 {
-            println!("Giving up");
+            info!("Giving up");
             log_reader.kill().await?;
             break;
         }
@@ -213,7 +221,7 @@ where
                 // We got an EOF error, this is most likely some very long line,
                 // we don't produce lines this bing is our test cases, so we'll
                 // just skip the error - as if it wasn't a JSON string.
-                println!("The JSON line we just got was incomplete, most likely it was was too long, so we're skipping it");
+                error!("The JSON line we just got was incomplete, most likely it was was too long, so we're skipping it");
                 continue;
             }
             Err(err) => return Err(err.into()),
