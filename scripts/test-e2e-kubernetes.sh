@@ -125,9 +125,11 @@ fi
 # Export the container image to be accessible from the deployment command.
 export CONTAINER_IMAGE
 
-# Set the deployment command for integration tests.
+# Set the deployment commands for integration tests.
 KUBE_TEST_DEPLOY_COMMAND="$(pwd)/scripts/deploy-kubernetes-test.sh"
 export KUBE_TEST_DEPLOY_COMMAND
+KUBE_TEST_DEPLOY_GENERIC_COMMAND="$(pwd)/scripts/deploy-public-chart-test.sh"
+export KUBE_TEST_DEPLOY_GENERIC_COMMAND
 
 # Prepare args.
 CARGO_TEST_ARGS_CARGO=()
