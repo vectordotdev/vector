@@ -1,103 +1,11 @@
-use crate::{
-    event::{
-        metric::{Metric, MetricKind, MetricValue, Sample},
-        Event,
-    },
-    sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
+use crate::sinks::util::batch::{
+    Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
 };
-use std::{
-    cmp::Ordering,
-    collections::HashSet,
-    hash::{Hash, Hasher},
-    marker::PhantomData,
-    mem::discriminant,
-    ops::{Deref, DerefMut},
+use std::{cmp::Ordering, collections::HashMap, marker::PhantomData};
+use vector_core::event::{
+    metric::{Metric, MetricData, MetricKind, MetricSeries, MetricValue, Sample},
+    Event, EventMetadata,
 };
-
-#[derive(Clone, Debug)]
-pub struct MetricEntry(pub Metric);
-
-impl Eq for MetricEntry {}
-
-impl Hash for MetricEntry {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let metric = &self.0;
-        metric.series.hash(state);
-        metric.data.kind.hash(state);
-        discriminant(&metric.data.value).hash(state);
-
-        match &metric.data.value {
-            MetricValue::AggregatedHistogram { buckets, .. } => {
-                for bucket in buckets {
-                    bucket.upper_limit.to_bits().hash(state);
-                }
-            }
-            MetricValue::AggregatedSummary { quantiles, .. } => {
-                for quantile in quantiles {
-                    quantile.upper_limit.to_bits().hash(state);
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-impl PartialEq for MetricEntry {
-    fn eq(&self, other: &Self) -> bool {
-        // This differs from a straightforward implementation of `eq` by
-        // comparing only the "shape" bits (name, tags, and type) while
-        // allowing the contained values to be different.
-        self.series == other.series
-            && self.data.kind == other.data.kind
-            && discriminant(&self.data.value) == discriminant(&other.data.value)
-            && match (&self.data.value, &other.data.value) {
-                (
-                    MetricValue::AggregatedHistogram {
-                        buckets: buckets1, ..
-                    },
-                    MetricValue::AggregatedHistogram {
-                        buckets: buckets2, ..
-                    },
-                ) => {
-                    buckets1.len() == buckets2.len()
-                        && buckets1
-                            .iter()
-                            .zip(buckets2.iter())
-                            .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
-                }
-                (
-                    MetricValue::AggregatedSummary {
-                        quantiles: quantiles1,
-                        ..
-                    },
-                    MetricValue::AggregatedSummary {
-                        quantiles: quantiles2,
-                        ..
-                    },
-                ) => {
-                    quantiles1.len() == quantiles2.len()
-                        && quantiles1
-                            .iter()
-                            .zip(quantiles2.iter())
-                            .all(|(q1, q2)| q1.upper_limit == q2.upper_limit)
-                }
-                _ => true,
-            }
-    }
-}
-
-impl Deref for MetricEntry {
-    type Target = Metric;
-    fn deref(&self) -> &Metric {
-        &self.0
-    }
-}
-
-impl DerefMut for MetricEntry {
-    fn deref_mut(&mut self) -> &mut Metric {
-        &mut self.0
-    }
-}
 
 /// The metrics buffer is a data structure for collecting a flow of data
 /// points into a batch.
@@ -147,24 +55,9 @@ impl Batch for MetricsBuffer {
             PushResult::Overflow(item)
         } else {
             let max_events = self.max_events;
-            let metrics = self
-                .metrics
-                .get_or_insert_with(|| MetricSet::with_capacity(max_events));
-            let new_entry = match item.data.kind {
-                MetricKind::Absolute => MetricEntry(item),
-                MetricKind::Incremental => {
-                    // Incremental metrics update existing entries, if present
-                    let entry = MetricEntry(item);
-                    metrics
-                        .take(&entry)
-                        .map(|mut existing| {
-                            existing.data.update(&entry.data);
-                            existing
-                        })
-                        .unwrap_or(entry)
-                }
-            };
-            metrics.replace(new_entry);
+            self.metrics
+                .get_or_insert_with(|| MetricSet::with_capacity(max_events))
+                .insert_update(item);
             PushResult::Ok(self.num_items() >= self.max_events)
         }
     }
@@ -239,27 +132,16 @@ pub trait MetricNormalize {
     fn apply_state(state: &mut MetricSet, metric: Metric) -> Option<Metric>;
 }
 
-/// This is a convenience newtype wrapper for HashSet<MetricEntry> that
-/// provides some extra functionality.
+type MetricEntry = (MetricData, EventMetadata);
+
+/// This is a convenience wrapper for HashMap<MetricSeries, MetricData>
+/// that provides some extra functionality.
 #[derive(Clone, Default)]
-pub struct MetricSet(HashSet<MetricEntry>);
-
-impl Deref for MetricSet {
-    type Target = HashSet<MetricEntry>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for MetricSet {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
+pub struct MetricSet(HashMap<MetricSeries, MetricEntry>);
 
 impl MetricSet {
     fn with_capacity(capacity: usize) -> Self {
-        Self(HashSet::with_capacity(capacity))
+        Self(HashMap::with_capacity(capacity))
     }
 
     /// Either pass the metric through as-is if absolute, or convert it
@@ -283,47 +165,71 @@ impl MetricSet {
     /// Convert the incremental metric into an absolute one, using the
     /// state buffer to keep track of the value throughout the entire
     /// application uptime.
-    fn incremental_to_absolute(&mut self, metric: Metric) -> Metric {
-        let mut entry = MetricEntry(metric.into_absolute());
-        let mut existing = self.0.take(&entry).unwrap_or_else(|| {
-            // Start from zero value if the entry is not found.
-            MetricEntry(entry.zero())
-        });
-        existing.data.value.add(&entry.data.value);
-        entry.data.value = existing.data.value.clone();
-        self.0.insert(existing);
-        entry.0
+    fn incremental_to_absolute(&mut self, mut metric: Metric) -> Metric {
+        match self.0.get_mut(&metric.series) {
+            Some(existing) => {
+                existing.0.value.add(&metric.data.value);
+                metric.data.value = existing.0.value.clone();
+            }
+            None => {
+                self.0.insert(
+                    metric.series.clone(),
+                    (metric.data.clone(), EventMetadata::default()),
+                );
+            }
+        }
+        metric.into_absolute()
     }
 
     /// Convert the absolute metric into an incremental by calculating
     /// the increment from the last saved absolute state.
-    fn absolute_to_incremental(&mut self, metric: Metric) -> Option<Metric> {
-        let mut entry = MetricEntry(metric);
-        match self.0.take(&entry) {
-            Some(mut reference) => {
-                let new_value = entry.data.value.clone();
+    fn absolute_to_incremental(&mut self, mut metric: Metric) -> Option<Metric> {
+        match self.0.get_mut(&metric.series) {
+            Some(reference) => {
+                let new_value = metric.data.value.clone();
                 // From the stored reference value, emit an increment
-                entry.data.value.subtract(&reference.data.value);
-                reference.data.value = new_value;
-                self.0.insert(reference);
-                Some(entry.0.into_incremental())
+                metric.data.value.subtract(&reference.0.value);
+                reference.0.value = new_value;
+                Some(metric.into_incremental())
             }
             None => {
                 // No reference so store this and emit nothing
-                self.0.insert(entry);
+                self.insert(metric);
                 None
+            }
+        }
+    }
+
+    fn insert(&mut self, metric: Metric) {
+        let (series, data, metadata) = metric.into_parts();
+        self.0.insert(series, (data, metadata));
+    }
+
+    fn insert_update(&mut self, metric: Metric) {
+        match metric.data.kind {
+            MetricKind::Absolute => self.insert(metric),
+            MetricKind::Incremental => {
+                // Incremental metrics update existing entries, if present
+                match self.0.get_mut(&metric.series) {
+                    Some(existing) => {
+                        let (_series, data, metadata) = metric.into_parts();
+                        existing.0.update(&data);
+                        existing.1.merge(metadata);
+                    }
+                    None => self.insert(metric),
+                }
             }
         }
     }
 }
 
-fn finish_metric(metric: MetricEntry) -> Metric {
-    let mut metric = metric.0;
-    if let MetricValue::Distribution { samples, statistic } = metric.data.value {
+fn finish_metric(item: (MetricSeries, MetricEntry)) -> Metric {
+    let (series, (mut data, metadata)) = item;
+    if let MetricValue::Distribution { samples, statistic } = data.value {
         let samples = compress_distribution(samples);
-        metric.data.value = MetricValue::Distribution { samples, statistic };
+        data.value = MetricValue::Distribution { samples, statistic };
     }
-    metric
+    Metric::from_parts(series, data, metadata)
 }
 
 fn compress_distribution(mut samples: Vec<Sample>) -> Vec<Sample> {
