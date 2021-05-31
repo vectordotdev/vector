@@ -74,7 +74,7 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
         vector_endpoint
     );
 
-    let vector = framework
+    let _vector = framework
         .vector(
             &namespace,
             HELM_CHART_VECTOR_AGGREGATOR,
@@ -95,7 +95,7 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let datadog_agent = framework
+    let _datadog_agent = framework
         .external_chart(
             &datadog_namespace,
             "datadog",
@@ -118,8 +118,8 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let test_namespace = framework.namespace(&pod_namespace).await?;
-    let test_pod = framework
+    let _test_namespace = framework.namespace(&pod_namespace).await?;
+    let _test_pod = framework
         .test_pod(test_pod::Config::from_pod(&make_test_pod(
             &pod_namespace,
             "test-pod",
@@ -165,9 +165,5 @@ async fn datadog_to_vector() -> Result<(), Box<dyn std::error::Error>> {
 
     assert!(got_marker);
 
-    drop(test_pod);
-    drop(test_namespace);
-    drop(datadog_agent);
-    drop(vector);
     Ok(())
 }

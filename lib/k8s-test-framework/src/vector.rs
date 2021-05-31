@@ -35,8 +35,7 @@ impl up_down::CommandBuilder for CommandBuilder {
             command.env("CUSTOM_RESOURCE_CONFIGS_FILE", custom_resource_file.path());
         }
         if let Some(env) = &self.custom_env {
-            let iter = env.iter();
-            for envvar in iter {
+            for envvar in env {
                 command.env(envvar.0.clone(), envvar.1.clone());
             }
         }
