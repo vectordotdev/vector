@@ -4,9 +4,9 @@ use k8s_e2e_tests::*;
 use k8s_test_framework::{
     lock, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
 };
-use log::{debug, info};
 use std::collections::HashSet;
 use std::str::FromStr;
+use tracing::{debug, info};
 
 const HELM_CHART_VECTOR_AGENT: &str = "vector-agent";
 
@@ -1003,7 +1003,7 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        info!("Got line: {:?}", line);
+        debug!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
@@ -1161,7 +1161,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        info!("Got line: {:?}", line);
+        debug!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {
@@ -1334,7 +1334,7 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        info!("Got line: {:?}", line);
+        debug!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up == 0 {

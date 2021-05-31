@@ -6,28 +6,27 @@ use k8s_openapi::{
 use k8s_test_framework::{
     test_pod, wait_for_resource::WaitFor, CommandBuilder, Framework, Interface, Manager, Reader,
 };
-use log::{debug, error, info};
 use std::collections::BTreeMap;
+use tracing::{debug, error, info};
 
 pub mod metrics;
 
 pub const BUSYBOX_IMAGE: &str = "busybox:1.28";
 
 pub fn init() {
-    let _ = env_logger::builder()
-        .filter_level(log::LevelFilter::max())
-        .is_test(true)
-        .try_init();
+    let _ = env_logger::builder().is_test(true).try_init();
 }
 
 pub fn get_namespace() -> String {
-    //env::var("NAMESPACE").unwrap_or_else(|_| "test-vector".to_string())
     use rand::Rng;
 
+    // Generate a random alphanumeric (lowercase) string to ensure each test is run with unique
+    // names.
+    // There is a 36 ^ 5 chance of a name collision, which is likely to be an acceptable risk.
     let id: String = rand::thread_rng()
         .sample_iter(&rand::distributions::Alphanumeric)
         .take(5)
-        .map(|num| num as char)
+        .map(|num| (num as char).to_ascii_lowercase())
         .collect();
 
     format!("test-vector-{}", id.to_string())

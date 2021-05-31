@@ -3230,12 +3230,12 @@ dependencies = [
  "indoc",
  "k8s-openapi",
  "k8s-test-framework",
- "log",
  "rand 0.8.3",
  "regex",
  "reqwest",
  "serde_json",
  "tokio",
+ "tracing 0.1.26",
 ]
 
 [[package]]
