@@ -30,7 +30,7 @@ jobs:
           })
 
     - name: Check user permissions
-      uses: lannonbr/repo-permission-check-action@2.0.1
+      uses: lannonbr/repo-permission-check-action@2.0.2
       with:
         permission: write
       env:
