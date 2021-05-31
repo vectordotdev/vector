@@ -1701,6 +1701,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 
 [[package]]
+name = "datadog-grok"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "grok",
+ "lalrpop",
+ "lalrpop-util",
+ "lazy_static",
+ "lookup",
+ "regex",
+ "serde",
+ "serde_yaml",
+ "shared",
+ "thiserror",
+ "tokio",
+ "vector_core",
+ "vrl",
+ "vrl-compiler",
+ "vrl-parser",
+ "vrl-stdlib",
+]
+
+[[package]]
 name = "db-key"
 version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7002,9 +7025,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.5.0"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83f0c8e7c0addab50b663055baf787d0af7f413a46e6e7fb9559a4e4db7137a5"
+checksum = "bd3076b5c8cc18138b8f8814895c11eb4de37114a5d127bafdc5e55798ceef37"
 dependencies = [
  "autocfg 1.0.1",
  "bytes 1.0.1",

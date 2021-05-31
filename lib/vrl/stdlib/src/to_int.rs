@@ -93,8 +93,8 @@ impl Function for ToInt {
 }
 
 #[derive(Debug, Clone)]
-struct ToIntFn {
-    value: Box<dyn Expression>,
+pub struct ToIntFn {
+    pub value: Box<dyn Expression>,
 }
 
 impl Expression for ToIntFn {

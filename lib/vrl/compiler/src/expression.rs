@@ -1,4 +1,4 @@
-use crate::{Context, Span, State, TypeDef, Value};
+use crate::{Context, Function, Span, State, TypeDef, Value};
 use diagnostic::{DiagnosticError, Label, Note};
 use dyn_clone::{clone_trait_object, DynClone};
 use std::fmt;
@@ -17,9 +17,10 @@ mod op;
 mod unary;
 mod variable;
 
-pub(crate) mod assignment;
+pub mod assignment;
 pub(crate) mod container;
 pub(crate) mod function_call;
+pub(crate) mod internal_expression;
 pub(crate) mod literal;
 pub(crate) mod predicate;
 pub(crate) mod query;
@@ -34,6 +35,7 @@ pub use function_argument::FunctionArgument;
 pub use function_call::FunctionCall;
 pub use group::Group;
 pub use if_statement::IfStatement;
+pub use internal_expression::InternalExpression;
 pub use literal::Literal;
 pub use noop::Noop;
 pub use not::Not;
@@ -88,6 +90,7 @@ pub enum Expr {
     Assignment(Assignment),
     Query(Query),
     FunctionCall(FunctionCall),
+    InternalExpression(InternalExpression),
     Variable(Variable),
     Noop(Noop),
     Unary(Unary),
@@ -112,6 +115,7 @@ impl Expr {
             Assignment(..) => "assignment",
             Query(..) => "query",
             FunctionCall(..) => "function call",
+            InternalExpression(..) => "internal expression",
             Variable(..) => "variable call",
             Noop(..) => "noop",
             Unary(..) => "unary operation",
@@ -132,6 +136,7 @@ impl Expression for Expr {
             Assignment(v) => v.resolve(ctx),
             Query(v) => v.resolve(ctx),
             FunctionCall(v) => v.resolve(ctx),
+            InternalExpression(v) => v.resolve(ctx),
             Variable(v) => v.resolve(ctx),
             Noop(v) => v.resolve(ctx),
             Unary(v) => v.resolve(ctx),
@@ -150,6 +155,7 @@ impl Expression for Expr {
             Assignment(v) => Expression::as_value(v),
             Query(v) => Expression::as_value(v),
             FunctionCall(v) => Expression::as_value(v),
+            InternalExpression(v) => Expression::as_value(v),
             Variable(v) => Expression::as_value(v),
             Noop(v) => Expression::as_value(v),
             Unary(v) => Expression::as_value(v),
@@ -168,6 +174,7 @@ impl Expression for Expr {
             Assignment(v) => v.type_def(state),
             Query(v) => v.type_def(state),
             FunctionCall(v) => v.type_def(state),
+            InternalExpression(v) => v.type_def(state),
             Variable(v) => v.type_def(state),
             Noop(v) => v.type_def(state),
             Unary(v) => v.type_def(state),
@@ -188,6 +195,7 @@ impl fmt::Display for Expr {
             Assignment(v) => v.fmt(f),
             Query(v) => v.fmt(f),
             FunctionCall(v) => v.fmt(f),
+            InternalExpression(v) => v.fmt(f),
             Variable(v) => v.fmt(f),
             Noop(v) => v.fmt(f),
             Unary(v) => v.fmt(f),

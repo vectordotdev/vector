@@ -44,8 +44,8 @@ impl Function for Length {
 }
 
 #[derive(Debug, Clone)]
-struct LengthFn {
-    value: Box<dyn Expression>,
+pub struct LengthFn {
+    pub value: Box<dyn Expression>,
 }
 
 impl Expression for LengthFn {
