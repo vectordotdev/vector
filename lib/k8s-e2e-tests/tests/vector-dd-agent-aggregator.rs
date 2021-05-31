@@ -7,7 +7,7 @@ const HELM_CHART_VECTOR_AGGREGATOR: &str = "vector-aggregator";
 
 const HELM_VALUES_DDOG_AGG_TOPOLOGY: &str = indoc! {r#"
     service:
-      type: "ClusterIP"
+      type: ClusterIP
       ports:
         - name: datadog
           port: 8080
@@ -15,16 +15,15 @@ const HELM_VALUES_DDOG_AGG_TOPOLOGY: &str = indoc! {r#"
           targetPort: 8080
     sources:
       datadog-agent:
-        type: "datadog_logs"
-        rawConfig: |
-          address = "0.0.0.0:8080"
+        type: datadog_logs
+        address: 0.0.0.0:8080
 
     sinks:
       stdout:
-        type: "console"
+        type: console
         inputs: ["datadog-agent"]
-        target: "stdout"
-        encoding: "json"
+        target: stdout
+        encoding: json
 "#};
 
 /// This test validates that vector-aggregator can deploy with the default
