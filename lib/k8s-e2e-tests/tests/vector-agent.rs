@@ -58,9 +58,9 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
     init();
 
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
@@ -160,9 +160,9 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
     init();
 
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
@@ -261,9 +261,9 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     init();
 
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
@@ -361,8 +361,9 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
 
     let framework = make_framework();
 
-    let pod_namespace = get_namespace_appended("test-pod");
-    let override_name = get_override_name("vector-agent");
+    let namespace = get_namespace();
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
+    let override_name = get_override_name(&namespace, "vector-agent");
     let test_namespace = framework.namespace(&pod_namespace).await?;
 
     let test_pod = framework
@@ -385,8 +386,6 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
 
     // Wait for some extra time to ensure pod completes.
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-
-    let namespace = get_namespace();
 
     let vector = framework
         .vector(
@@ -462,8 +461,8 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     init();
 
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
-    let override_name = get_override_name("vector-agent");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let framework = make_framework();
 
@@ -563,8 +562,8 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     init();
 
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
-    let override_name = get_override_name("vector-agent");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
+    let override_name = get_override_name(&namespace, "vector-agent");
     let framework = make_framework();
 
     let vector = framework
@@ -701,10 +700,10 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     init();
 
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let affinity_label = format!("{}-affinity", pod_namespace);
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
@@ -883,9 +882,9 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
     init();
 
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     const CONFIG: &str = indoc! {r#"
         kubernetesLogsSource:
@@ -1083,9 +1082,9 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
     init();
 
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
@@ -1244,9 +1243,9 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
     init();
 
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let config: &str = &format!(
         indoc! {r#"
@@ -1415,10 +1414,10 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     init();
 
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let affinity_label = format!("{}-affinity", pod_namespace);
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
@@ -1539,9 +1538,9 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
     init();
 
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
@@ -1640,9 +1639,9 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     init();
 
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(
@@ -1791,7 +1790,7 @@ async fn host_metrics() -> Result<(), Box<dyn std::error::Error>> {
 
     let namespace = get_namespace();
     let framework = make_framework();
-    let override_name = get_override_name("vector-agent");
+    let override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(

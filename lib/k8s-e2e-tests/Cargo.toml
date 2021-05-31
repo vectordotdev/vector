@@ -18,6 +18,7 @@ tokio = { version = "1.5.0", features = ["full"] }
 indoc = "1.0.3"
 env_logger = "0.8"
 log = "0.4"
+rand = "0.8"
 
 [features]
 e2e-tests = []

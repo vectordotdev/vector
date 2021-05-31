@@ -7,7 +7,7 @@ use k8s_test_framework::{
     test_pod, wait_for_resource::WaitFor, CommandBuilder, Framework, Interface, Manager, Reader,
 };
 use log::{debug, error, info};
-use std::{collections::BTreeMap, env};
+use std::collections::BTreeMap;
 
 pub mod metrics;
 
@@ -21,17 +21,26 @@ pub fn init() {
 }
 
 pub fn get_namespace() -> String {
-    env::var("NAMESPACE").unwrap_or_else(|_| "test-vector".to_string())
+    //env::var("NAMESPACE").unwrap_or_else(|_| "test-vector".to_string())
+    use rand::Rng;
+
+    let id: String = rand::thread_rng()
+        .sample_iter(&rand::distributions::Alphanumeric)
+        .take(5)
+        .map(|num| num as char)
+        .collect();
+
+    format!("test-vector-{}", id.to_string())
 }
 
-pub fn get_namespace_appended(suffix: &str) -> String {
-    format!("{}-{}", get_namespace(), suffix)
+pub fn get_namespace_appended(namespace: &str, suffix: &str) -> String {
+    format!("{}-{}", namespace, suffix)
 }
 
 /// Gets a name we can use for roles to prevent them conflicting with other tests.
 /// Uses the provided namespace as the root.
-pub fn get_override_name(suffix: &str) -> String {
-    format!("{}-{}", get_namespace(), suffix)
+pub fn get_override_name(namespace: &str, suffix: &str) -> String {
+    format!("{}-{}", namespace, suffix)
 }
 
 /// Adds a fullnameOverride entry to the given config. This allows multiple tests

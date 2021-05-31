@@ -44,10 +44,10 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
     init();
 
     let namespace = get_namespace();
-    let pod_namespace = get_namespace_appended("test-pod");
+    let pod_namespace = get_namespace_appended(&namespace, "test-pod");
     let framework = make_framework();
-    let aggregator_override_name = get_override_name("vector-aggregator");
-    let agent_override_name = get_override_name("vector-agent");
+    let aggregator_override_name = get_override_name(&namespace, "vector-aggregator");
+    let agent_override_name = get_override_name(&namespace, "vector-agent");
 
     let vector = framework
         .vector(

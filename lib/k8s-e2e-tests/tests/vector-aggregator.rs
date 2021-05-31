@@ -29,7 +29,7 @@ async fn dummy_topology() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let namespace = get_namespace();
     let framework = make_framework();
-    let override_name = get_override_name("vector-aggregator");
+    let override_name = get_override_name(&namespace, "vector-aggregator");
 
     let vector = framework
         .vector(
@@ -65,7 +65,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let namespace = get_namespace();
     let framework = make_framework();
-    let override_name = get_override_name("vector-aggregator");
+    let override_name = get_override_name(&namespace, "vector-aggregator");
 
     let vector = framework
         .vector(
