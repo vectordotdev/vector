@@ -13,6 +13,7 @@ image:
 
 # Image pull secrets to use at the `Pod`s managed by `DaemonSet`.
 imagePullSecrets: []
+#  - myRegistryCredentialSecretName
 
 # Command to use at the pods managed by DaemonSet
 command: []
@@ -198,8 +199,12 @@ hostMetricsSource:
   # Additional config to embed at the host metrics source.
   config:
     filesystem:
+      devices:
+        excludes: [binfmt_misc]
       filesystems:
         excludes: [binfmt_misc]
+      mountpoints:
+        excludes: ["*/proc/sys/fs/binfmt_misc"]
     # option: "value"
   # Raw TOML config to embed at the host metrics source (deprecated).
   rawConfig: null

@@ -1,7 +1,7 @@
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::{proto, Event},
+    config::{DataType, GenerateConfig, Resource, SinkContext},
     sinks::util::{tcp::TcpSinkConfig, EncodedEvent},
+    sinks::{Healthcheck, VectorSink},
     tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
@@ -10,10 +10,11 @@ use getset::Setters;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use vector_core::event::{proto, Event, WithMetadata};
 
-#[derive(Deserialize, Serialize, Debug, Setters)]
+#[derive(Deserialize, Serialize, Debug, Clone, Setters)]
 #[serde(deny_unknown_fields)]
-pub struct VectorSinkConfig {
+pub struct VectorConfig {
     address: String,
     keepalive: Option<TcpKeepaliveConfig>,
     #[set = "pub"]
@@ -21,7 +22,7 @@ pub struct VectorSinkConfig {
     send_buffer_bytes: Option<usize>,
 }
 
-impl VectorSinkConfig {
+impl VectorConfig {
     pub fn new(
         address: String,
         keepalive: Option<TcpKeepaliveConfig>,
@@ -49,23 +50,14 @@ enum BuildError {
     MissingPort,
 }
 
-inventory::submit! {
-    SinkDescription::new::<VectorSinkConfig>("vector")
-}
-
-impl GenerateConfig for VectorSinkConfig {
+impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self::new("127.0.0.1:5000".to_string(), None, None, None)).unwrap()
     }
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "vector")]
-impl SinkConfig for VectorSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+impl VectorConfig {
+    pub(crate) async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink_config = TcpSinkConfig::new(
             self.address.clone(),
             self.keepalive,
@@ -76,12 +68,16 @@ impl SinkConfig for VectorSinkConfig {
         sink_config.build(cx, |event| Some(encode_event(event)))
     }
 
-    fn input_type(&self) -> DataType {
+    pub(super) fn input_type(&self) -> DataType {
         DataType::Any
     }
 
-    fn sink_type(&self) -> &'static str {
+    pub(super) fn sink_type(&self) -> &'static str {
         "vector"
+    }
+
+    pub(super) fn resources(&self) -> Vec<Resource> {
+        Vec::new()
     }
 }
 
@@ -92,21 +88,25 @@ enum HealthcheckError {
 }
 
 fn encode_event(event: Event) -> EncodedEvent<Bytes> {
-    let event = proto::EventWrapper::from(event);
-    let event_len = event.encoded_len();
+    let event: WithMetadata<proto::EventWrapper> = event.into();
+    let WithMetadata { data, metadata } = event;
+    let event_len = data.encoded_len();
     let full_len = event_len + 4;
 
     let mut out = BytesMut::with_capacity(full_len);
     out.put_u32(event_len as u32);
-    event.encode(&mut out).unwrap();
+    data.encode(&mut out).unwrap();
 
-    EncodedEvent::new(out.into())
+    EncodedEvent {
+        item: out.into(),
+        metadata: Some(metadata),
+    }
 }
 
 #[cfg(test)]
 mod test {
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<super::VectorSinkConfig>();
+        crate::test_util::test_generate_config::<super::VectorConfig>();
     }
 }

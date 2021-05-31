@@ -66,7 +66,7 @@ pub struct Config {
     #[cfg(feature = "api")]
     pub api: api::Options,
     pub healthchecks: HealthcheckOptions,
-    pub sources: IndexMap<String, Box<dyn SourceConfig>>,
+    pub sources: IndexMap<String, SourceOuter>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
     tests: Vec<TestDefinition>,
@@ -205,6 +205,27 @@ macro_rules! impl_generate_config_from_default {
     };
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SourceOuter {
+    #[serde(default = "default_acknowledgements")]
+    pub acknowledgements: bool,
+    #[serde(flatten)]
+    pub(super) inner: Box<dyn SourceConfig>,
+}
+
+fn default_acknowledgements() -> bool {
+    true
+}
+
+impl SourceOuter {
+    pub(crate) fn new(source: impl SourceConfig + 'static) -> Self {
+        Self {
+            acknowledgements: default_acknowledgements(),
+            inner: Box::new(source),
+        }
+    }
+}
+
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
@@ -225,6 +246,7 @@ pub struct SourceContext {
     pub globals: GlobalOptions,
     pub shutdown: ShutdownSignal,
     pub out: Pipeline,
+    pub acknowledgements: bool,
 }
 
 impl SourceContext {
@@ -241,6 +263,7 @@ impl SourceContext {
                 globals: GlobalOptions::default(),
                 shutdown: shutdown_signal,
                 out,
+                acknowledgements: default_acknowledgements(),
             },
             shutdown,
         )
@@ -253,6 +276,7 @@ impl SourceContext {
             globals: GlobalOptions::default(),
             shutdown: ShutdownSignal::noop(),
             out,
+            acknowledgements: default_acknowledgements(),
         }
     }
 }

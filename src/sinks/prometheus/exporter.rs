@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
-    event::metric::MetricKind,
+    event::metric::{MetricKind, MetricValue},
     event::Event,
     internal_events::PrometheusServerRequestComplete,
     sinks::{
@@ -317,7 +317,7 @@ impl StreamSink for PrometheusExporter {
                         existing.data.update(&entry.data);
                         entry = MetricEntry(existing);
                     }
-                    let is_set = entry.data.value.is_set();
+                    let is_set = matches!(entry.data.value, MetricValue::Set { .. });
                     metrics.map.insert(entry, is_set);
                 }
                 MetricKind::Absolute => {

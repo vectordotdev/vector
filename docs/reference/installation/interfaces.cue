@@ -1,46 +1,8 @@
 package metadata
 
 installation: {
-	#Commands: {
-		{[Name=string]: string | null}
-	} & {
-		_config_path: string | *null
-		let ConfigPath = _config_path
-
-		_shell: string | *null
-		let Shell = _shell
-
-		configure: string | null | *"none"
-		install:   string | null
-		logs:      string | null
-		reload:    string | null
-		restart:   string | null
-		start:     string | null
-		stop:      string | null
-		top:       string | null | *"vector top"
-		uninstall: string
-		upgrade:   string | null
-
-		if Shell == "bash" {
-			configure: string | *#"""
-					cat <<-'VECTORCFG' > \#(ConfigPath)
-					{config}
-					VECTORCFG
-					"""#
-		}
-
-		if Shell == "powershell" {
-			configure: string | *#"""
-					@"
-					{config}
-					"@ | Out-File -FilePath \#(ConfigPath)
-					"""#
-		}
-	}
-
 	#Interface: {
-		_shell: string | *null
-		let Shell = _shell
+		_shell: string
 
 		archs: [#Arch, ...#Arch]
 		description: string
@@ -58,29 +20,59 @@ installation: {
 				stop:    "sudo systemctl stop vector"
 			}
 		}
-		role_implementations:  #RoleImplementations & {_shell: Shell}
+		role_implementations:  #RoleImplementations
 		name:                  string
 		package_manager_name?: string
 		platform_name?:        string
 		title:                 string
+
+		#RoleImplementation: {
+			commands:    #Commands
+			description: string
+			name:        string
+			title:       string
+			tutorials:   #Tutorials
+			variables:   #Variables
+		}
+
+		#RoleImplementations: [Name=string]: #RoleImplementation & {
+			name: Name
+		}
+
+		#Commands: {
+			{[Name=string]: string | null}
+		} & {
+			configure: string | null
+			install:   string | null
+			logs:      string | null
+			reload:    string | null
+			restart:   string | null
+			start:     string | null
+			stop:      string | null
+			top:       string | null | *"vector top"
+			uninstall: string
+			upgrade:   string | null
+
+			if _shell == "bash" {
+				configure: string | *#"""
+					cat <<-'VECTORCFG' > \#(paths.config)
+					{config}
+					VECTORCFG
+					"""#
+			}
+
+			if _shell == "powershell" {
+				configure: string | *#"""
+					@"
+					{config}
+					"@ | Out-File -FilePath \#(paths.config)
+					"""#
+			}
+		}
+
 	}
 
 	#Interfaces: [Name=string]: #Interface & {
-		name: Name
-	}
-
-	#RoleImplementation: {
-		_shell: string | *null
-		let Shell = _shell
-		commands:    #Commands & {_shell: Shell}
-		description: string
-		name:        string
-		title:       string
-		tutorials:   #Tutorials
-		variables:   #Variables
-	}
-
-	#RoleImplementations: [Name=string]: #RoleImplementation & {
 		name: Name
 	}
 

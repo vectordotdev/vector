@@ -54,9 +54,7 @@ where
                                 item
                             })
                             .map_err(|error| {
-                                emit!(internal_events::WatchRequestInvocationFailed {
-                                    error: &error
-                                });
+                                emit!(internal_events::WatchStreamFailed { error: &error });
                                 error
                             })
                     })) as BoxStream<'static, _>

@@ -62,10 +62,10 @@ apt install --yes \
 # Cue
 TEMP=$(mktemp -d)
 curl \
-    -L https://github.com/cuelang/cue/releases/download/v0.3.2/cue_v0.3.2_linux_amd64.tar.gz \
-    -o "${TEMP}/cue_v0.3.2_linux_amd64.tar.gz"
+    -L https://github.com/cuelang/cue/releases/download/v0.4.0/cue_v0.4.0_linux_amd64.tar.gz \
+    -o "${TEMP}/cue_v0.4.0_linux_amd64.tar.gz"
 tar \
-    -xvf "${TEMP}/cue_v0.3.2_linux_amd64.tar.gz" \
+    -xvf "${TEMP}/cue_v0.4.0_linux_amd64.tar.gz" \
     -C "${TEMP}"
 cp "${TEMP}/cue" /usr/bin/cue
 
@@ -97,6 +97,9 @@ if ! [ -x "$(command -v docker)" ]; then
     # Install those new things
     apt update --yes
     apt install --yes docker-ce docker-ce-cli containerd.io
+
+    # ubuntu user doesn't exist in scripts/environment/Dockerfile which runs this
+    usermod --append --groups docker ubuntu || true
 fi
 
 # Apt cleanup

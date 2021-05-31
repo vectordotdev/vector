@@ -2,7 +2,7 @@
 use super::api;
 use super::{
     compiler, default_data_dir, provider, Config, GlobalOptions, HealthcheckOptions, SinkConfig,
-    SinkOuter, SourceConfig, TestDefinition, TransformConfig, TransformOuter,
+    SinkOuter, SourceConfig, SourceOuter, TestDefinition, TransformConfig, TransformOuter,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ pub struct ConfigBuilder {
     #[serde(default)]
     pub healthchecks: HealthcheckOptions,
     #[serde(default)]
-    pub sources: IndexMap<String, Box<dyn SourceConfig>>,
+    pub sources: IndexMap<String, SourceOuter>,
     #[serde(default)]
     pub sinks: IndexMap<String, SinkOuter>,
     #[serde(default)]
@@ -72,7 +72,7 @@ impl ConfigBuilder {
     }
 
     pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, name: T, source: S) {
-        self.sources.insert(name.into(), Box::new(source));
+        self.sources.insert(name.into(), SourceOuter::new(source));
     }
 
     pub fn add_sink<S: SinkConfig + 'static, T: Into<String>>(

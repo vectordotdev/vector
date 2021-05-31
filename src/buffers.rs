@@ -32,6 +32,8 @@ impl Default for BufferConfig {
     }
 }
 
+pub(crate) type EventStream = Box<dyn Stream<Item = Event> + Unpin + Send>;
+
 impl BufferConfig {
     #[inline]
     const fn memory_max_events() -> usize {
@@ -43,14 +45,7 @@ impl BufferConfig {
         &self,
         data_dir: &Option<PathBuf>,
         sink_name: &str,
-    ) -> Result<
-        (
-            BufferInputCloner,
-            Box<dyn Stream<Item = Event> + Send>,
-            Acker,
-        ),
-        String,
-    > {
+    ) -> Result<(BufferInputCloner<Event>, EventStream, Acker), String> {
         let variant = match &self {
             BufferConfig::Memory {
                 max_events,
@@ -68,8 +63,9 @@ impl BufferConfig {
                 when_full: *when_full,
                 data_dir: data_dir
                     .as_ref()
-                    .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?,
-                name: sink_name,
+                    .ok_or_else(|| "Must set data_dir to use on-disk buffering.".to_string())?
+                    .to_path_buf(),
+                name: sink_name.to_string(),
             },
         };
         build(variant)

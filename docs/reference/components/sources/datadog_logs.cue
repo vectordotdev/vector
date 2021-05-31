@@ -62,7 +62,14 @@ components: sources: datadog_logs: {
 	}
 
 	configuration: {
-		address: sources.http.configuration.address
+		acknowledgements: configuration._acknowledgements
+		address:          sources.http.configuration.address
+		store_api_key: {
+			common:      false
+			description: "When incoming events contain a Datadog API key, if this setting is set to `true` the key will kept in the event metadata and will be used if the event is sent to a Datadog sink."
+			required:    false
+			type: bool: default: true
+		}
 	}
 
 	output: logs: line: {
@@ -91,18 +98,6 @@ components: sources: datadog_logs: {
 				required:    true
 				type: string: {
 					examples: ["backend"]
-					syntax: "literal"
-				}
-			}
-
-			dd_api_key: {
-				description: """
-					The Datadog API key extracted from the event. This sensitive field may be removed
-					or obfuscated using the `remap` transform.
-					"""
-				required: true
-				type: string: {
-					examples: ["abcdefgh13245678abcdefgh13245678"]
 					syntax: "literal"
 				}
 			}
