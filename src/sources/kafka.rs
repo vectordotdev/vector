@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, SourceConfig, SourceContext, SourceDescription},
-    event::{Event, Value},
+    event::{LogEvent, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::{KafkaAuthConfig, KafkaStatisticsContext},
     shutdown::ShutdownSignal,
@@ -157,8 +157,7 @@ async fn kafka_source(
                     None => continue, // skip messages with empty payload
                     Some(payload) => payload,
                 };
-                let mut event = Event::new_empty_log();
-                let log = event.as_mut_log();
+                let mut log = LogEvent::default();
 
                 log.insert(
                     log_schema().message_key(),
@@ -203,7 +202,7 @@ async fn kafka_source(
                 }
                 log.insert(&headers_key, Value::from(headers_map));
 
-                match out.send(event).await {
+                match out.send(log.into()).await {
                     Err(error) => error!(message = "Error sending to sink.", %error),
                     Ok(_) => {
                         if let Err(error) = consumer.store_offset(&msg) {
