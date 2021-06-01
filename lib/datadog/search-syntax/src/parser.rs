@@ -31,7 +31,7 @@ mod tests {
     fn parses_whitespace() {
         let cases = [" ", "    ", "\t"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", &query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res, QueryNode::MatchAllDocs),
                 "Failed to parse MatchAllDocs query out of empty input"
@@ -43,7 +43,7 @@ mod tests {
     fn parses_unquoted_default_field_query() {
         let cases = ["foo"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeTerm { ref attr, ref value }
@@ -59,7 +59,7 @@ mod tests {
     fn parses_quoted_default_field_query() {
         let cases = ["\"foo bar\""];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::QuotedAttribute { ref attr, ref phrase }
@@ -75,7 +75,7 @@ mod tests {
     fn parses_attribute_term_query() {
         let cases = ["foo:bar", "foo:(bar)", "foo:b\\ar", "foo:(b\\ar)"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeTerm { ref attr, ref value }
@@ -91,7 +91,7 @@ mod tests {
     fn parses_numeric_attribute_term_query() {
         let cases = ["foo:10"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeTerm { ref attr, ref value }
@@ -107,7 +107,7 @@ mod tests {
     fn parses_attribute_term_query_with_escapes() {
         let cases = ["foo:bar\\:baz", "fo\\o:bar\\:baz"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeTerm { ref attr, ref value }
@@ -123,11 +123,11 @@ mod tests {
     fn parses_attribute_comparison_query_with_escapes() {
         let cases = ["foo:<4.12345E-4", "foo:<4.12345E\\-4"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeComparison { ref attr, value: ComparisonValue::Numeric(ref compvalue), comparator: Comparison::Lt }
-                if attr == "foo" && *compvalue == 4.12345E-4),
+                if attr == "foo" && (*compvalue - 4.12345E-4).abs() < 0.001),
                 "Unable to properly parse '{:?}' - got {:?}",
                 query,
                 res
@@ -139,7 +139,7 @@ mod tests {
     fn parses_and_normalizes_multiterm_query() {
         let cases = ["foo bar", "foo        bar"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeTerm { ref attr, ref value }
@@ -155,7 +155,7 @@ mod tests {
     fn parses_multiple_multiterm_query() {
         let cases = ["foo bar baz AND qux quux quuz"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             if let QueryNode::Boolean {
                 oper: BooleanType::And,
                 ref nodes,
@@ -180,7 +180,7 @@ mod tests {
     fn parses_negated_attribute_term_query() {
         let cases = ["-foo:bar", "- foo:bar", "NOT foo:bar"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             if let QueryNode::NegatedNode { ref node } = res {
                 if let QueryNode::AttributeTerm {
                     ref attr,
@@ -200,7 +200,7 @@ mod tests {
     fn parses_quoted_attribute_term_query() {
         let cases = ["foo:\"bar baz\""];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::QuotedAttribute { ref attr, ref phrase }
@@ -216,7 +216,7 @@ mod tests {
     fn parses_attribute_prefix_query() {
         let cases = ["foo:ba*"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributePrefix { ref attr, ref prefix }
@@ -232,7 +232,7 @@ mod tests {
     fn parses_attribute_wildcard_query() {
         let cases = ["foo:b*r"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeWildcard { ref attr, ref wildcard }
@@ -248,7 +248,7 @@ mod tests {
     fn parses_attribute_wildcard_query_with_trailing_question_mark() {
         let cases = ["foo:ba?"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeWildcard { ref attr, ref wildcard }
@@ -264,7 +264,7 @@ mod tests {
     fn parses_attribute_wildcard_query_with_leading_wildcard() {
         let cases = ["foo:*ar"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeWildcard { ref attr, ref wildcard }
@@ -280,7 +280,7 @@ mod tests {
     fn parses_non_numeric_attribute_comparison_query() {
         let cases = ["foo:>=bar"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeComparison {
@@ -299,7 +299,7 @@ mod tests {
     fn parses_numeric_attribute_range_query() {
         let cases = ["foo:[10 TO 20]"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeRange {
@@ -320,7 +320,7 @@ mod tests {
     fn parses_non_numeric_attribute_range_query() {
         let cases = ["foo:{bar TO baz}"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeRange {
@@ -341,7 +341,7 @@ mod tests {
     fn parses_attribute_range_query_with_open_endpoints() {
         let cases = ["foo:[* TO *]"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeRange {
@@ -362,7 +362,7 @@ mod tests {
     fn parses_attribute_range_query_with_fake_wildcards() {
         let cases = ["foo:[ba* TO b*z]"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeRange {
@@ -383,7 +383,7 @@ mod tests {
     fn parses_attribute_exists_query() {
         let cases = ["_exists_:foo", "_exists_:\"foo\""];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeExists { ref attr }
@@ -399,7 +399,7 @@ mod tests {
     fn parses_attribute_exists_query_with_escapes() {
         let cases = ["_exists_:foo\\ bar"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeExists { ref attr }
@@ -415,7 +415,7 @@ mod tests {
     fn parses_star_as_wildcard_not_exists() {
         let cases = ["foo:*"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeWildcard { ref attr, ref wildcard }
@@ -431,7 +431,7 @@ mod tests {
     fn parses_attribute_missing_query() {
         let cases = ["_missing_:foo", "_missing_:\"foo\""];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeMissing { ref attr }
@@ -447,7 +447,7 @@ mod tests {
     fn parses_attribute_missing_query_with_escapes() {
         let cases = ["_missing_:foo\\ bar"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeMissing { ref attr }
@@ -463,7 +463,7 @@ mod tests {
     fn parses_match_all_docs_query() {
         let cases = ["*:*", "*", "_default_:*", "foo:(*:*)"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res, QueryNode::MatchAllDocs),
                 "Failed to parse '{:?}' as MatchAllDocs, got {:?}",
@@ -477,7 +477,7 @@ mod tests {
     fn parses_all_as_wildcard() {
         let cases = ["_all:*"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res,
                 QueryNode::AttributeWildcard { ref attr, ref wildcard }
@@ -499,7 +499,7 @@ mod tests {
             "foo:(NOT *:*)",
         ];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             assert!(
                 matches!(res, QueryNode::MatchNoDocs),
                 "Failed to parse '{:?}' as MatchNoDocs, got {:?}",
@@ -513,7 +513,7 @@ mod tests {
     fn parses_boolean_nodes_with_implicit_operators() {
         let cases = ["foo:bar baz:qux quux:quuz"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             if let QueryNode::Boolean {
                 oper: BooleanType::And,
                 ref nodes,
@@ -542,7 +542,7 @@ mod tests {
             "-foo:bar baz:qux -quux:quuz",
         ];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             if let QueryNode::Boolean {
                 oper: BooleanType::And,
                 ref nodes,
@@ -566,7 +566,7 @@ mod tests {
     fn parses_boolean_nodes_with_explicit_operators() {
         let cases = ["foo:bar OR baz:qux AND quux:quuz"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             if let QueryNode::Boolean {
                 oper: BooleanType::And,
                 ref nodes,
@@ -589,7 +589,7 @@ mod tests {
     fn parses_boolean_nodes_with_implicit_and_explicit_operators() {
         let cases = ["foo:bar OR baz:qux quux:quuz"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             if let QueryNode::Boolean {
                 oper: BooleanType::And,
                 ref nodes,
@@ -611,7 +611,7 @@ mod tests {
     fn parses_nested_boolean_query_node() {
         let cases = ["foo:bar (baz:qux quux:quuz)"];
         for query in cases.iter() {
-            let res = parse(query).expect(&format!("Unable to parse query {:?}", query));
+            let res = parse(query).unwrap_or_else(|_| panic!("Unable to parse query {:?}", query));
             if let QueryNode::Boolean {
                 oper: BooleanType::And,
                 ref nodes,

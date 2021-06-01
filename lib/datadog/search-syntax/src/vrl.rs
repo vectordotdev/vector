@@ -532,10 +532,11 @@ mod tests {
     /// VRL syntax, and then compare the results.
     fn to_vrl() {
         for (dd, vrl) in TESTS.iter() {
-            let node = parse(dd).expect(&format!("invalid Datadog search syntax: {}", dd));
+            let node =
+                parse(dd).unwrap_or_else(|_| panic!("invalid Datadog search syntax: {}", dd));
             let root = ast::RootExpr::Expr(make_node(ast::Expr::from(node)));
 
-            let program = vrl_parser::parse(vrl).expect(&format!("invalid VRL: {}", vrl));
+            let program = vrl_parser::parse(vrl).unwrap_or_else(|_| panic!("invalid VRL: {}", vrl));
 
             assert_eq!(
                 format!("{:?}", vec![make_node(root)]),
