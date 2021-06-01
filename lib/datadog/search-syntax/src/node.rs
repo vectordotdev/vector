@@ -3,18 +3,18 @@ use crate::grammar::DEFAULT_FIELD;
 /// This enum represents value comparisons that Queries might perform
 #[derive(Debug, Copy, Clone)]
 pub enum Comparison {
-    /// Greater than
+    /// Greater than.
     Gt,
-    /// Less than
+    /// Less than.
     Lt,
-    /// Greater-or-equal-to
+    /// Greater-or-equal-to.
     Gte,
-    /// Less-or-equal-to
+    /// Less-or-equal-to.
     Lte,
 }
 
 impl Comparison {
-    /// Returns a string representing this comparison in Lucene query formatting
+    /// Returns a string representing this comparison in Lucene query formatting.
     pub fn to_lucene(&self) -> String {
         match self {
             Comparison::Gt => String::from(">"),
@@ -27,7 +27,7 @@ impl Comparison {
 
 /// This enum represents the values we might be using in a comparison, whether
 /// they are Strings, Numbers (currently only floating point numbers) or an
-/// Unbounded comparison with no terminating value
+/// Unbounded comparison with no terminating value.
 #[derive(Debug, Clone)]
 pub enum ComparisonValue {
     Unbounded,
@@ -46,7 +46,15 @@ impl ComparisonValue {
     }
 }
 
-/// This enum represents the AND or OR Boolean operations we might perform on QueryNodes
+/// This enum represents the tokens in a range, including "greater than (or equal to)"
+/// for the left bracket, "less than (or equal to) in the right bracket, and range values.
+#[derive(Debug, Clone)]
+pub enum Range {
+    Comparison(Comparison),
+    Value(ComparisonValue),
+}
+
+/// This enum represents the AND or OR Boolean operations we might perform on QueryNodes.
 #[derive(Debug, Copy, Clone)]
 pub enum BooleanType {
     And,
@@ -55,16 +63,16 @@ pub enum BooleanType {
 
 /// Builder structure to create Boolean QueryNodes.  Not strictly necessary,
 /// however they're a bit more ergonomic to manipulate than reaching into
-/// enums all the time
+/// enums all the time.
 pub struct BooleanBuilder {
-    /// The type of Boolean operation this node will represent
+    /// The type of Boolean operation this node will represent.
     oper: BooleanType,
-    /// A list of QueryNodes involved in this boolean operation
+    /// A list of QueryNodes involved in this boolean operation.
     nodes: Vec<QueryNode>,
 }
 
 impl BooleanBuilder {
-    /// Create a BooleanBuilder to produce an AND-type Boolean QueryNode
+    /// Create a BooleanBuilder to produce an AND-type Boolean QueryNode.
     pub fn and() -> Self {
         Self {
             oper: BooleanType::And,
@@ -72,7 +80,7 @@ impl BooleanBuilder {
         }
     }
 
-    /// Create a BooleanBuilder to produce an OR-type Boolean QueryNode
+    /// Create a BooleanBuilder to produce an OR-type Boolean QueryNode.
     pub fn or() -> Self {
         Self {
             oper: BooleanType::Or,
@@ -80,30 +88,30 @@ impl BooleanBuilder {
         }
     }
 
-    /// Add a QueryNode to this boolean conjunction
+    /// Add a QueryNode to this boolean conjunction.
     pub fn add_node(&mut self, node: QueryNode) {
         self.nodes.push(node);
     }
 
-    /// Consume this builder and output the finished QueryNode
+    /// Consume this builder and output the finished QueryNode.
     pub fn build(self) -> QueryNode {
         let Self { oper, nodes } = self;
         QueryNode::Boolean { oper, nodes }
     }
 }
 
-/// QueryNodes represent specific search criteria to be enforced
+/// QueryNodes represent specific search criteria to be enforced.
 #[derive(Debug, Clone)]
 pub enum QueryNode {
-    /// Match all documents
+    /// Match all documents.
     MatchAllDocs,
-    /// Match no documents
+    /// Match no documents.
     MatchNoDocs,
-    /// Validate existance of an attribute within a document
+    /// Validate existance of an attribute within a document.
     AttributeExists { attr: String },
-    /// Validate lack of an attribute within a document
+    /// Validate lack of an attribute within a document.
     AttributeMissing { attr: String },
-    /// Match an attribute against a specific range of values
+    /// Match an attribute against a specific range of values.
     AttributeRange {
         attr: String,
         lower: ComparisonValue,
@@ -111,23 +119,23 @@ pub enum QueryNode {
         upper: ComparisonValue,
         upper_inclusive: bool,
     },
-    /// Compare an attribute against a single value (greater/less than operations)
+    /// Compare an attribute against a single value (greater/less than operations).
     AttributeComparison {
         attr: String,
         comparator: Comparison,
         value: ComparisonValue,
     },
-    /// Search for an attribute that matches a specific term
+    /// Search for an attribute that matches a specific term.
     AttributeTerm { attr: String, value: String },
-    /// Search for an attribute that matches a specific quoted phrase
+    /// Search for an attribute that matches a specific quoted phrase.
     QuotedAttribute { attr: String, phrase: String },
-    /// Search for an attribute whose value matches against a specific prefix
+    /// Search for an attribute whose value matches against a specific prefix.
     AttributePrefix { attr: String, prefix: String },
-    /// Search for an attribute that matches a wildcard or glob string
+    /// Search for an attribute that matches a wildcard or glob string.
     AttributeWildcard { attr: String, wildcard: String },
-    /// Container node denoting negation of the QueryNode within
+    /// Container node denoting negation of the QueryNode within.
     NegatedNode { node: Box<QueryNode> },
-    /// Container node for compound Boolean operations
+    /// Container node for compound Boolean operations.
     Boolean {
         oper: BooleanType,
         nodes: Vec<QueryNode>,
@@ -135,7 +143,7 @@ pub enum QueryNode {
 }
 
 impl QueryNode {
-    /// Returns a string representing this node in Lucene query formatting
+    /// Returns a string representing this node in Lucene query formatting.
     pub fn to_lucene(&self) -> String {
         // TODO:  I'm using push_string here and there are more efficient string building methods if we care about performance here (we won't)
         match self {
@@ -304,7 +312,7 @@ impl QueryNode {
     }
 }
 
-/// Enum representing Lucene's concept of qu
+/// Enum representing Lucene's concept of whether a node should occur.
 #[derive(Debug)]
 pub enum LuceneOccur {
     Must,

@@ -1,7 +1,8 @@
 #![allow(clippy::upper_case_acronyms)]
 use crate::node::{
-    BooleanBuilder, Comparison, ComparisonValue, LuceneClause, LuceneOccur, QueryNode,
+    BooleanBuilder, Comparison, ComparisonValue, LuceneClause, LuceneOccur, QueryNode, Range,
 };
+use itertools::Itertools;
 use pest::iterators::Pair;
 #[derive(Debug, Parser)]
 #[grammar = "grammar.pest"]
@@ -225,11 +226,28 @@ impl QueryVisitor {
                             }
                         }
                         (f, Rule::range) => {
-                            let mut range_values = value_contents.into_inner();
-                            let lower = Self::visit_range_value(range_values.next().unwrap());
-                            let lower_inclusive = true;
-                            let upper = Self::visit_range_value(range_values.next().unwrap());
-                            let upper_inclusive = true;
+                            let range_values = value_contents.into_inner();
+
+                            // There should always be 4; brackets + 2 range values.
+                            let (lower_inclusive, lower, upper, upper_inclusive) =
+                                match range_values
+                                    .map(Self::visit_range_value)
+                                    .collect_tuple()
+                                    .expect("should be exactly 4 range values")
+                                {
+                                    (
+                                        Range::Comparison(lc),
+                                        Range::Value(lv),
+                                        Range::Value(rv),
+                                        Range::Comparison(rc),
+                                    ) => match (lc, rc) {
+                                        (Comparison::Gte, Comparison::Lte) => (true, lv, rv, true),
+                                        (Comparison::Gt, Comparison::Lt) => (false, lv, rv, false),
+                                        _ => panic!("invalid range comparison"),
+                                    },
+                                    _ => panic!("invalid range value"),
+                                };
+
                             return QueryNode::AttributeRange {
                                 attr: unescape(f),
                                 lower,
@@ -282,19 +300,23 @@ impl QueryVisitor {
             Rule::GT_EQ => Comparison::Gte,
             Rule::LT => Comparison::Lt,
             Rule::LT_EQ => Comparison::Lte,
+            Rule::LBRACKET => Comparison::Gt,
+            Rule::RBRACKET => Comparison::Lt,
             _ => unreachable!(),
         }
     }
 
-    fn visit_range_value(token: Pair<Rule>) -> ComparisonValue {
+    fn visit_range_value(token: Pair<Rule>) -> Range {
         match token.as_rule() {
-            Rule::RANGE_VALUE => {
-                if token.as_str() == "*" {
-                    ComparisonValue::Unbounded
-                } else {
-                    ComparisonValue::String(unescape(token.as_str()))
-                }
-            }
+            Rule::RANGE_VALUE => Range::Value(if token.as_str() == "*" {
+                ComparisonValue::Unbounded
+            } else {
+                ComparisonValue::String(unescape(token.as_str()))
+            }),
+            Rule::LBRACKET => Range::Comparison(Comparison::Gt),
+            Rule::LSQRBRACKET => Range::Comparison(Comparison::Gte),
+            Rule::RBRACKET => Range::Comparison(Comparison::Lt),
+            Rule::RSQRBRACKET => Range::Comparison(Comparison::Lte),
             _ => unreachable!(),
         }
     }

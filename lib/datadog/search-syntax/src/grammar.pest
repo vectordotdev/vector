@@ -4,10 +4,10 @@ LT = { "<" }
 LT_EQ = { "<=" }
 GT = { ">" }
 GT_EQ = { ">=" }
-LSQRBRACKET = _{ "[" }
-LBRACKET = _{ "{" }
-RSQRBRACKET = _{ "]" }
-RBRACKET = _{ "}" }
+LSQRBRACKET = { "[" }
+LBRACKET = { "{" }
+RSQRBRACKET = { "]" }
+RBRACKET = { "}" }
 COLON = _{ ":" }
 STAR = { "*" }
 QUESTIONMARK = { "?" }

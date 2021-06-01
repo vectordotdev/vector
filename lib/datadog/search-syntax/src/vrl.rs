@@ -518,13 +518,12 @@ mod tests {
             "@a:this OR ((@b:test* c:that) AND d:the_other [1 TO 5])",
             r#"(match(.custom.a, r'\bthis\b') || ((match(.custom.b, r'\btest.*\b') && match(.c, r'\bthat\b')) && (match(.d, r'\bthe_other\b') && (.message >= 1 && .message <= 5))))"#,
         ),
+        // Range - numeric, exclusive
+        ("{1 TO 10}", "(.message > 1 && .message < 10)"),
         // TODO: CURRENTLY FAILING TESTS -- needs work in the main grammar and/or VRL to support!
         // Range - alpha, inclusive
         // TODO: https://github.com/timberio/vector/issues/7539
         //(r#"["a" TO "z"]"#, r#".message >= "a" && .message <= "z""#),
-        // Range - numeric, exclusive
-        // TODO: https://github.com/timberio/vector/issues/7629
-        //("{1 TO 10}", ".message > 1 && .message < 10"),
     ];
 
     #[test]

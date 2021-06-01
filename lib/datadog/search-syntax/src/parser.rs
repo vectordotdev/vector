@@ -326,9 +326,9 @@ mod tests {
                 QueryNode::AttributeRange {
                     ref attr,
                     lower: ComparisonValue::String(ref lstr),
-                    lower_inclusive: true,
+                    lower_inclusive: false,
                     upper: ComparisonValue::String(ref ustr),
-                    upper_inclusive: true
+                    upper_inclusive: false
                 } if attr == "foo" && lstr == "bar" && ustr == "baz"),
                 "Unable to properly parse '{:?}' - got {:?}'",
                 query,
