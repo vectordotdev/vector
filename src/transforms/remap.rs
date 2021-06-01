@@ -125,9 +125,12 @@ impl FunctionTransform for Remap {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{
-        metric::{MetricKind, MetricValue},
-        LogEvent, Metric, Value,
+    use crate::{
+        event::{
+            metric::{MetricKind, MetricValue},
+            LogEvent, Metric, Value,
+        },
+        transforms::test::transform_one,
     };
     use indoc::{formatdoc, indoc};
     use shared::btreemap;
@@ -162,7 +165,7 @@ mod tests {
         };
         let mut tform = Remap::new(conf).unwrap();
 
-        let result = tform.transform_one(event).unwrap();
+        let result = transform_one(&mut tform, event).unwrap();
         assert_eq!(get_field_string(&result, "message"), "augment me");
         assert_eq!(get_field_string(&result, "copy_from"), "buz");
         assert_eq!(get_field_string(&result, "foo"), "bar");
@@ -221,7 +224,7 @@ mod tests {
         };
         let mut tform = Remap::new(conf).unwrap();
 
-        let event = tform.transform_one(event).unwrap();
+        let event = transform_one(&mut tform, event).unwrap();
 
         assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
         assert!(event.as_log().get("foo").is_none());
@@ -247,7 +250,7 @@ mod tests {
         };
         let mut tform = Remap::new(conf).unwrap();
 
-        assert!(tform.transform_one(event).is_none())
+        assert!(transform_one(&mut tform, event).is_none())
     }
 
     #[test]
@@ -268,7 +271,7 @@ mod tests {
         };
         let mut tform = Remap::new(conf).unwrap();
 
-        let event = tform.transform_one(event).unwrap();
+        let event = transform_one(&mut tform, event).unwrap();
 
         assert_eq!(event.as_log().get("foo"), Some(&Value::from("foo")));
         assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
@@ -294,7 +297,7 @@ mod tests {
         };
         let mut tform = Remap::new(conf).unwrap();
 
-        let event = tform.transform_one(event).unwrap();
+        let event = transform_one(&mut tform, event).unwrap();
 
         assert_eq!(event.as_log().get("bar"), Some(&Value::from("is a string")));
         assert!(event.as_log().get("foo").is_none());
@@ -320,7 +323,7 @@ mod tests {
         };
         let mut tform = Remap::new(conf).unwrap();
 
-        assert!(tform.transform_one(event).is_none())
+        assert!(transform_one(&mut tform, event).is_none())
     }
 
     #[test]
@@ -343,7 +346,7 @@ mod tests {
         };
         let mut tform = Remap::new(conf).unwrap();
 
-        let result = tform.transform_one(metric).unwrap();
+        let result = transform_one(&mut tform, metric).unwrap();
         assert_eq!(
             result,
             Event::Metric(

@@ -75,6 +75,7 @@ impl FunctionTransform for RemoveTags {
 mod tests {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::transforms::test::transform_one;
     use shared::btreemap;
 
     #[test]
@@ -99,8 +100,7 @@ mod tests {
             .with_tags(Some(btreemap! {"env" => "production"}));
 
         let mut transform = RemoveTags::new(vec!["region".into(), "host".into()]);
-        let metric = transform
-            .transform_one(metric.into())
+        let metric = transform_one(&mut transform, metric.into())
             .unwrap()
             .into_metric();
 
@@ -118,8 +118,7 @@ mod tests {
         let expected = metric.clone().with_tags(None);
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
-        let metric = transform
-            .transform_one(metric.into())
+        let metric = transform_one(&mut transform, metric.into())
             .unwrap()
             .into_metric();
 
@@ -138,8 +137,7 @@ mod tests {
         let expected = metric.clone().with_tags(None);
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
-        let metric = transform
-            .transform_one(metric.into())
+        let metric = transform_one(&mut transform, metric.into())
             .unwrap()
             .into_metric();
 
