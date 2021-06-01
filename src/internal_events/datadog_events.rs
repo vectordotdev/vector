@@ -19,7 +19,7 @@ pub struct DatadogEventsFieldInvalid {
 
 impl InternalEvent for DatadogEventsFieldInvalid {
     fn emit_logs(&self) {
-        debug!(
+        error!(
             message = "Required field is missing.",
             field = %self.field,
             internal_log_rate_secs = 10

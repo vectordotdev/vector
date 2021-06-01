@@ -1,7 +1,7 @@
 use super::healthcheck;
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
+    event::{Event, PathComponent},
     http::HttpClient,
     internal_events::{DatadogEventsFieldInvalid, DatadogEventsProcessed},
     sinks::{
@@ -158,19 +158,24 @@ impl DatadogEventsService {
         let encoding = EncodingConfigWithDefault {
             // DataDog Event API allows only some fields, and refuses
             // to accept event if it contains any other field.
-            only_fields: Some(vec![
-                vec!["aggregation_key".into()],
-                vec!["alert_type".into()],
-                vec!["date_happened".into()],
-                vec!["device_name".into()],
-                vec!["host".into()],
-                vec!["priority".into()],
-                vec!["related_event_id".into()],
-                vec!["source_type_name".into()],
-                vec!["tags".into()],
-                vec!["text".into()],
-                vec!["title".into()],
-            ]),
+            only_fields: Some(
+                [
+                    "aggregation_key",
+                    "alert_type",
+                    "date_happened",
+                    "device_name",
+                    "host",
+                    "priority",
+                    "related_event_id",
+                    "source_type_name",
+                    "tags",
+                    "text",
+                    "title",
+                ]
+                .iter()
+                .map(|field| vec![PathComponent::Key(field.to_string())])
+                .collect(),
+            ),
             // DataDog Event API requires unix timestamp.
             timestamp_format: Some(TimestampFormat::Unix),
             ..EncodingConfigWithDefault::default()

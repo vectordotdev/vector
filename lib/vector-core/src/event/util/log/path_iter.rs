@@ -17,12 +17,6 @@ pub enum PathComponent {
     Invalid,
 }
 
-impl<'a> From<&'a str> for PathComponent {
-    fn from(key: &'a str) -> Self {
-        Self::Key(key.to_string())
-    }
-}
-
 /// Iterator over components of paths specified in form `a.b[0].c[2]`.
 pub struct PathIter<'a> {
     path: &'a str,
