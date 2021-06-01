@@ -19,11 +19,13 @@ The plan of attack is multi-faceted, focusing both on improving the build perfor
 the groundwork for understanding the performance over time in the future.
 
 ### More granular compilation units
+
 @blt is already tackling this through his continued work on [RFC 7027](https://github.com/timberio/vector/issues/7027).  This RFC seeks to break up the project structure of Vector such that changes in a far-off part of the codebase don’t force recompilation of unrelated parts where possible.
 
 This will speed up the development phase, as developers are often working in narrow areas of the codebase.
 
 ### Cached compilation results
+
 While the linker time typically dominates compiling Vector – due to its single-threaded nature – we can extract value by caching the compilation of crates where possible.  Crate-level caching is useful across the board: development, performance testing, and CI.
 
 Using the existing [sccache](https://github.com/mozilla/sccache) project, we could begin caching compilation results with relative ease.  This project wraps `rustc` directly, handling the logic of caching compilation results and retrieving them when requested in the future.
@@ -33,16 +35,19 @@ As many of Vector’s dependencies don’t often change, developers could provid
 Further, in the case of CI, systems like GitHub Actions are not contextually aware of the Rust build system.  While they may be able to naively cache outputs that land on disk, they are not aware of things like compiler flags, or compiler versions, and so could lead to confusing mismatch issues that waste time and effort to debug.
 
 ### Rework “release” profile for non-versioned releases
+
 We currently utilize the same Cargo “release” profile whether we’re minting a versioned release or simply running a release build locally for performance testing.  While a boon for our users, our usage of LTO and modified “codegen-units” represents a significant increase in compilation time.  On a standard-issue laptop used by Vector engineers, it can take upwards of 40 minutes to build a release binary with these settings enabled.  With the settings disabled, the same build takes around 27 minutes, or 35% less time.
 
 These settings can be added back during the build process, when building versioned releases, without much effort.
 
 ### Add system telemetry to Github Actions runners
+
 As Github Actions natively provides no telemetry of any kind about runners, or even basic metrics (how long did a job sit before running? etc), we’re often in the dark when it comes to CI and runner performance as a whole.
 
 We should be running the Datadog agent on every runner possible, collecting both high-level system metrics as well as more fine-grained metrics, such as Docker metrics on a per-container basis.  These metrics will, I believe, prove invaluable to debugging issues with the overall CI pipeline and its performance over time.  While understanding the build performance will likely come down to more advanced tooling used directly by engineers, we can’t optimize things like “use all the cores available” or “we’re using too much memory during CI runs” unless we actually have some data, any data, from those runs.
 
 ### Manually instrument CI to report build performance
+
 Once we were properly utilizing Datadog on our CI runners, we could then instrument CI builds
 directly to report the build time to Datadog, allowing us to track the build performance over time.
 
