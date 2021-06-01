@@ -45,7 +45,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         let svc = filters::firehose(
             self.access_key.clone(),
-            self.record_compression.unwrap_or_default().clone(),
+            self.record_compression.unwrap_or_default(),
             cx.out,
         );
 

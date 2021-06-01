@@ -39,7 +39,7 @@ pub fn firehose(
                 .untuple_one(),
         )
         .and(parse_body())
-        .and(warp::any().map(move || record_compression.clone()))
+        .and(warp::any().map(move || record_compression))
         .and(warp::any().map(move || out.clone()))
         .and_then(handlers::firehose)
         .recover(handle_firehose_rejection)

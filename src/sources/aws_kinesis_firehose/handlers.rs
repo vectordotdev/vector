@@ -135,7 +135,7 @@ fn decode_record(
 fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
     let mut decoded = Vec::new();
 
-    let mut gz = MultiGzDecoder::new(&data[..]);
+    let mut gz = MultiGzDecoder::new(data);
     gz.read_to_end(&mut decoded)?;
 
     Ok(Bytes::from(decoded))
