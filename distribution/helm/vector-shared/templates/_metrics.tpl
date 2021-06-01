@@ -82,6 +82,9 @@ metadata:
   name: {{ include "libvector.fullname" . }}
   labels:
     {{- include "libvector.labels" . | nindent 4 }}
+    {{- with .Values.prometheusSink.podMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   jobLabel: app.kubernetes.io/name
 
