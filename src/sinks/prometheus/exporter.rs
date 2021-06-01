@@ -317,8 +317,11 @@ impl StreamSink for PrometheusExporter {
                 MetricKind::Incremental => {
                     let mut entry = MetricEntry(item.into_absolute());
                     if let Some((MetricEntry(mut existing), _)) = metrics.map.remove_entry(&entry) {
-                        existing.data.update(&entry.data);
-                        entry = MetricEntry(existing);
+                        if existing.data.update(&entry.data) {
+                            entry = MetricEntry(existing);
+                        } else {
+                            warn!(message = "Metric changed type, dropping old value.", series = %entry.series);
+                        }
                     }
                     let is_set = matches!(entry.data.value, MetricValue::Set { .. });
                     metrics.map.insert(entry, is_set);

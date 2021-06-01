@@ -168,8 +168,15 @@ impl MetricSet {
     fn incremental_to_absolute(&mut self, mut metric: Metric) -> Metric {
         match self.0.get_mut(&metric.series) {
             Some(existing) => {
-                existing.0.value.add(&metric.data.value);
-                metric.data.value = existing.0.value.clone();
+                if existing.0.value.add(&metric.data.value) {
+                    metric.data.value = existing.0.value.clone();
+                } else {
+                    // Metric changed type, store this as the new reference value
+                    self.0.insert(
+                        metric.series.clone(),
+                        (metric.data.clone(), EventMetadata::default()),
+                    );
+                }
             }
             None => {
                 self.0.insert(
@@ -188,9 +195,14 @@ impl MetricSet {
             Some(reference) => {
                 let new_value = metric.data.value.clone();
                 // From the stored reference value, emit an increment
-                metric.data.value.subtract(&reference.0.value);
-                reference.0.value = new_value;
-                Some(metric.into_incremental())
+                if metric.data.value.subtract(&reference.0.value) {
+                    reference.0.value = new_value;
+                    Some(metric.into_incremental())
+                } else {
+                    // Metric changed type, store this and emit nothing
+                    self.insert(metric);
+                    None
+                }
             }
             None => {
                 // No reference so store this and emit nothing
@@ -206,19 +218,27 @@ impl MetricSet {
     }
 
     fn insert_update(&mut self, metric: Metric) {
-        match metric.data.kind {
-            MetricKind::Absolute => self.insert(metric),
+        let update = match metric.data.kind {
+            MetricKind::Absolute => Some(metric),
             MetricKind::Incremental => {
                 // Incremental metrics update existing entries, if present
                 match self.0.get_mut(&metric.series) {
                     Some(existing) => {
-                        let (_series, data, metadata) = metric.into_parts();
-                        existing.0.update(&data);
-                        existing.1.merge(metadata);
+                        let (series, data, metadata) = metric.into_parts();
+                        if existing.0.update(&data) {
+                            existing.1.merge(metadata);
+                            None
+                        } else {
+                            warn!(message = "Metric changed type, dropping old value.", %series);
+                            Some(Metric::from_parts(series, data, metadata))
+                        }
                     }
-                    None => self.insert(metric),
+                    None => Some(metric),
                 }
             }
+        };
+        if let Some(metric) = update {
+            self.insert(metric);
         }
     }
 }
@@ -706,10 +726,7 @@ mod test {
     }
 
     fn rebuffer_incremental_aggregated_histograms<State: MetricNormalize>() -> Buffer {
-        let mut events = Vec::new();
-        for _ in 0..3 {
-            events.push(sample_aggregated_histogram(2, Incremental, 1.0, 1, 10.0));
-        }
+        let mut events = vec![sample_aggregated_histogram(2, Incremental, 1.0, 1, 10.0)];
 
         for i in 1..4 {
             events.push(sample_aggregated_histogram(2, Incremental, 2.0, i, 10.0));
@@ -724,10 +741,7 @@ mod test {
 
         assert_eq!(
             buffer[0],
-            [
-                sample_aggregated_histogram(2, Absolute, 1.0, 3, 30.0),
-                sample_aggregated_histogram(2, Absolute, 2.0, 6, 30.0),
-            ]
+            [sample_aggregated_histogram(2, Absolute, 2.0, 6, 30.0)]
         );
 
         assert_eq!(buffer.len(), 1);
@@ -739,10 +753,7 @@ mod test {
 
         assert_eq!(
             buffer[0],
-            [
-                sample_aggregated_histogram(2, Incremental, 1.0, 3, 30.0),
-                sample_aggregated_histogram(2, Incremental, 2.0, 6, 30.0),
-            ]
+            [sample_aggregated_histogram(2, Incremental, 2.0, 6, 30.0)]
         );
 
         assert_eq!(buffer.len(), 1);
