@@ -701,25 +701,11 @@ impl Display for Metric {
         if let Some(timestamp) = &self.data.timestamp {
             write!(fmt, "{:?} ", timestamp)?;
         }
-        if let Some(namespace) = &self.namespace() {
-            write_word(fmt, namespace)?;
-            write!(fmt, "_")?;
-        }
-        write_word(fmt, &self.name())?;
-        write!(fmt, "{{")?;
-        if let Some(tags) = &self.tags() {
-            write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
-                write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
-            })?;
-        }
-        write!(
-            fmt,
-            "}} {} ",
-            match self.data.kind {
-                MetricKind::Absolute => '=',
-                MetricKind::Incremental => '+',
-            }
-        )?;
+        let kind = match self.data.kind {
+            MetricKind::Absolute => '=',
+            MetricKind::Incremental => '+',
+        };
+        write!(fmt, "{} {} ", &self.series, kind)?;
         match &self.data.value {
             MetricValue::Counter { value } | MetricValue::Gauge { value } => {
                 write!(fmt, "{}", value)
@@ -761,6 +747,28 @@ impl Display for Metric {
                 })
             }
         }
+    }
+}
+
+impl Display for MetricSeries {
+    /// Display a metric series name using something like Prometheus' text format:
+    ///
+    /// ```text
+    /// NAMESPACE_NAME{TAGS}
+    /// ```
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        if let Some(namespace) = &self.name.namespace {
+            write_word(fmt, namespace)?;
+            write!(fmt, "_")?;
+        }
+        write_word(fmt, &self.name.name)?;
+        write!(fmt, "{{")?;
+        if let Some(tags) = &self.tags {
+            write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
+                write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
+            })?;
+        }
+        write!(fmt, "}}")
     }
 }
 
