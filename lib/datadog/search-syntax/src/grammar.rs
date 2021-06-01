@@ -1,3 +1,4 @@
+#![allow(clippy::upper_case_acronyms)]
 use crate::node::{
     BooleanBuilder, Comparison, ComparisonValue, LuceneClause, LuceneOccur, QueryNode,
 };
@@ -90,17 +91,15 @@ impl QueryVisitor {
                 LuceneClause {
                     occur: LuceneOccur::MustNot,
                     node: QueryNode::MatchAllDocs,
-                } => return QueryNode::MatchNoDocs,
+                } => QueryNode::MatchNoDocs,
                 // I hate Boxing!  Every allocation is a personal failing :(
                 LuceneClause {
                     occur: LuceneOccur::MustNot,
                     node,
-                } => {
-                    return QueryNode::NegatedNode {
-                        node: Box::new(node),
-                    }
-                }
-                LuceneClause { occur: _, node } => return node,
+                } => QueryNode::NegatedNode {
+                    node: Box::new(node),
+                },
+                LuceneClause { occur: _, node } => node,
             }
         } else {
             let mut and_builder = BooleanBuilder::and();
@@ -126,12 +125,12 @@ impl QueryVisitor {
                 }
             }
             if has_must || !has_should {
-                return and_builder.build();
+                and_builder.build()
             } else if !has_must_not {
-                return or_builder.build();
+                or_builder.build()
             } else {
                 and_builder.add_node(or_builder.build());
-                return and_builder.build();
+                and_builder.build()
             }
         }
     }
@@ -195,37 +194,37 @@ impl QueryVisitor {
                             }
                         }
                         (DEFAULT_FIELD, Rule::STAR) => return QueryNode::MatchAllDocs,
-                        (f @ _, Rule::STAR) => {
+                        (f, Rule::STAR) => {
                             return QueryNode::AttributeWildcard {
                                 attr: unescape(f),
                                 wildcard: String::from("*"),
                             }
                         }
-                        (f @ _, Rule::TERM) => {
+                        (f, Rule::TERM) => {
                             return QueryNode::AttributeTerm {
                                 attr: unescape(f),
                                 value: Self::visit_term(value_contents),
                             }
                         }
-                        (f @ _, Rule::PHRASE) => {
+                        (f, Rule::PHRASE) => {
                             return QueryNode::QuotedAttribute {
                                 attr: unescape(f),
                                 phrase: Self::visit_phrase(value_contents),
                             }
                         }
-                        (f @ _, Rule::TERM_PREFIX) => {
+                        (f, Rule::TERM_PREFIX) => {
                             return QueryNode::AttributePrefix {
                                 attr: unescape(f),
                                 prefix: Self::visit_prefix(value_contents),
                             }
                         }
-                        (f @ _, Rule::TERM_GLOB) => {
+                        (f, Rule::TERM_GLOB) => {
                             return QueryNode::AttributeWildcard {
                                 attr: unescape(f),
                                 wildcard: Self::visit_wildcard(value_contents),
                             }
                         }
-                        (f @ _, Rule::range) => {
+                        (f, Rule::range) => {
                             let mut range_values = value_contents.into_inner();
                             let lower = Self::visit_range_value(range_values.next().unwrap());
                             let lower_inclusive = true;
@@ -239,7 +238,7 @@ impl QueryVisitor {
                                 upper_inclusive,
                             };
                         }
-                        (f @ _, Rule::comparison) => {
+                        (f, Rule::comparison) => {
                             let mut compiter = value_contents.into_inner();
                             let comparator = Self::visit_operator(
                                 compiter.next().unwrap().into_inner().next().unwrap(),
@@ -279,10 +278,10 @@ impl QueryVisitor {
 
     fn visit_operator(token: Pair<Rule>) -> Comparison {
         match token.as_rule() {
-            Rule::GT => Comparison::GT,
-            Rule::GT_EQ => Comparison::GTE,
-            Rule::LT => Comparison::LT,
-            Rule::LT_EQ => Comparison::LTE,
+            Rule::GT => Comparison::Gt,
+            Rule::GT_EQ => Comparison::Gte,
+            Rule::LT => Comparison::Lt,
+            Rule::LT_EQ => Comparison::Lte,
             _ => unreachable!(),
         }
     }
@@ -328,7 +327,7 @@ impl QueryVisitor {
         if let Rule::TERM = inner.as_rule() {
             return inner.as_str();
         }
-        return "BROKEN";
+        "BROKEN"
     }
 }
 

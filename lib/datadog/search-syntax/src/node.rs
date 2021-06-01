@@ -4,23 +4,23 @@ use crate::grammar::DEFAULT_FIELD;
 #[derive(Debug, Copy, Clone)]
 pub enum Comparison {
     /// Greater than
-    GT,
+    Gt,
     /// Less than
-    LT,
+    Lt,
     /// Greater-or-equal-to
-    GTE,
+    Gte,
     /// Less-or-equal-to
-    LTE,
+    Lte,
 }
 
 impl Comparison {
     /// Returns a string representing this comparison in Lucene query formatting
     pub fn to_lucene(&self) -> String {
         match self {
-            Comparison::GT => String::from(">"),
-            Comparison::LT => String::from("<"),
-            Comparison::GTE => String::from(">="),
-            Comparison::LTE => String::from("<="),
+            Comparison::Gt => String::from(">"),
+            Comparison::Lt => String::from("<"),
+            Comparison::Gte => String::from(">="),
+            Comparison::Lte => String::from("<="),
         }
     }
 }
@@ -139,10 +139,10 @@ impl QueryNode {
     pub fn to_lucene(&self) -> String {
         // TODO:  I'm using push_string here and there are more efficient string building methods if we care about performance here (we won't)
         match self {
-            QueryNode::MatchAllDocs => return String::from("*:*"),
-            QueryNode::MatchNoDocs => return String::from("-*:*"),
-            QueryNode::AttributeExists { attr } => return format!("_exists_:{}", attr),
-            QueryNode::AttributeMissing { attr } => return format!("_missing_:{}", attr),
+            QueryNode::MatchAllDocs => String::from("*:*"),
+            QueryNode::MatchNoDocs => String::from("-*:*"),
+            QueryNode::AttributeExists { attr } => format!("_exists_:{}", attr),
+            QueryNode::AttributeMissing { attr } => format!("_missing_:{}", attr),
             QueryNode::AttributeRange {
                 attr,
                 lower,
@@ -152,44 +152,43 @@ impl QueryNode {
             } => {
                 let lower_bracket = if *lower_inclusive { "[" } else { "{" };
                 let upper_bracket = if *upper_inclusive { "]" } else { "}" };
-                return Self::is_default_attr(attr)
+                Self::is_default_attr(attr)
                     + &format!(
                         "{}{} TO {}{}",
                         lower_bracket,
                         lower.to_lucene(),
                         upper.to_lucene(),
                         upper_bracket
-                    );
+                    )
             }
             QueryNode::AttributeComparison {
                 attr,
                 comparator,
                 value,
             } => {
-                return Self::is_default_attr(attr)
-                    + &format!("{}{}", comparator.to_lucene(), value.to_lucene());
+                Self::is_default_attr(attr)
+                    + &format!("{}{}", comparator.to_lucene(), value.to_lucene())
             }
             QueryNode::AttributeTerm { attr, value } => {
-                return Self::is_default_attr(attr) + &Self::lucene_escape(value)
+                Self::is_default_attr(attr) + &Self::lucene_escape(value)
             }
             QueryNode::QuotedAttribute { attr, phrase } => {
-                return Self::is_default_attr(attr)
-                    + &format!("\"{}\"", &Self::quoted_escape(phrase))
+                Self::is_default_attr(attr) + &format!("\"{}\"", &Self::quoted_escape(phrase))
             }
             QueryNode::AttributePrefix { attr, prefix } => {
-                return Self::is_default_attr(attr) + &format!("{}*", &Self::lucene_escape(prefix))
+                Self::is_default_attr(attr) + &format!("{}*", &Self::lucene_escape(prefix))
             }
             QueryNode::AttributeWildcard { attr, wildcard } => {
-                return Self::is_default_attr(attr) + &format!("{}", wildcard)
+                Self::is_default_attr(attr) + wildcard
             }
             QueryNode::NegatedNode { ref node } => {
                 if matches!(
                     **node,
                     QueryNode::NegatedNode { .. } | QueryNode::Boolean { .. }
                 ) {
-                    return format!("NOT ({})", node.to_lucene());
+                    format!("NOT ({})", node.to_lucene())
                 } else {
-                    return format!("NOT {}", node.to_lucene());
+                    format!("NOT {}", node.to_lucene())
                 }
             }
             QueryNode::Boolean {
@@ -197,7 +196,7 @@ impl QueryNode {
                 nodes,
                 ..
             } => {
-                if nodes.len() == 0 {
+                if nodes.is_empty() {
                     return String::from("*:*");
                 }
                 let mut output = String::new();
@@ -230,7 +229,7 @@ impl QueryNode {
                 nodes,
                 ..
             } => {
-                if nodes.len() == 0 {
+                if nodes.is_empty() {
                     return String::from("-*:*");
                 }
                 let mut output = String::new();

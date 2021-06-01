@@ -10,4 +10,4 @@ pub use node::QueryNode;
 pub use parser::parse;
 
 // Export traits for conversion to VRL.
-pub use vrl::*;
+pub use crate::vrl::*;

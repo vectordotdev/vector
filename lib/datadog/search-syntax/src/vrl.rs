@@ -20,10 +20,10 @@ impl From<BooleanType> for ast::Opcode {
 impl From<Comparison> for ast::Opcode {
     fn from(c: Comparison) -> Self {
         match c {
-            Comparison::GT => ast::Opcode::Gt,
-            Comparison::LT => ast::Opcode::Lt,
-            Comparison::GTE => ast::Opcode::Ge,
-            Comparison::LTE => ast::Opcode::Le,
+            Comparison::Gt => ast::Opcode::Gt,
+            Comparison::Lt => ast::Opcode::Lt,
+            Comparison::Gte => ast::Opcode::Ge,
+            Comparison::Lte => ast::Opcode::Le,
         }
     }
 }
@@ -33,7 +33,7 @@ impl From<ComparisonValue> for ast::Literal {
         match cv {
             ComparisonValue::String(value) => value
                 .parse::<i64>()
-                .map(|num| ast::Literal::Integer(num))
+                .map(ast::Literal::Integer)
                 .unwrap_or_else(|_| ast::Literal::String(value)),
 
             ComparisonValue::Numeric(value) => {
