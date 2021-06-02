@@ -220,13 +220,13 @@ components: sources: kubernetes_logs: {
 				unit:    "bytes"
 			}
 		}
-		glob_minimum_cooldown_ms {
-			common: 	false
+		glob_minimum_cooldown_ms: {
+			common:      false
 			description: "Delay between file discovery calls. This controls the interval at which Vector searches for files within a single pod."
-			required: 	false
+			required:    false
 			type: uint: {
 				default: 1_000
-				unit: "milliseconds"
+				unit:    "milliseconds"
 			}
 		}
 		timezone: configuration._timezone
