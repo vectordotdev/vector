@@ -105,7 +105,6 @@ impl<'a> Display for Lookup<'a> {
 }
 
 impl<'a> Lookup<'a> {
-    #[cfg(test)]
     /// Creates a lookup to the root
     pub fn root() -> Self {
         Self {
