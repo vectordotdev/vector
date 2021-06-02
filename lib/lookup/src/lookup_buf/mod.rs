@@ -138,10 +138,6 @@ impl LookupBuf {
         self.segments.iter()
     }
 
-    pub fn to_lookup(&self) -> Lookup {
-        Lookup::from(self)
-    }
-
     pub fn is_empty(&self) -> bool {
         self.segments.is_empty()
     }
@@ -155,11 +151,6 @@ impl LookupBuf {
     /// Return a borrow of the SegmentBuf set.
     pub fn as_segments(&self) -> &VecDeque<SegmentBuf> {
         &self.segments
-    }
-
-    /// Return the SegmentBuf set.
-    pub fn into_segments(self) -> VecDeque<SegmentBuf> {
-        self.segments
     }
 
     /// Create the possible fields that can be followed by this lookup.

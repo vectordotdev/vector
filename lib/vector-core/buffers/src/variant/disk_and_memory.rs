@@ -25,6 +25,7 @@ pub enum Variant {
     },
 }
 
+#[cfg(test)]
 #[derive(Debug, Clone)]
 struct Name {
     inner: String,

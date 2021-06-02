@@ -105,13 +105,6 @@ impl<'a> Display for Lookup<'a> {
 }
 
 impl<'a> Lookup<'a> {
-    /// Creates a lookup to the root
-    pub fn root() -> Self {
-        Self {
-            segments: VecDeque::new(),
-        }
-    }
-
     pub fn iter(&self) -> std::collections::vec_deque::Iter<'_, Segment<'a>> {
         self.segments.iter()
     }
@@ -119,16 +112,6 @@ impl<'a> Lookup<'a> {
     /// Become a `LookupBuf` (by allocating).
     pub fn into_buf(self) -> LookupBuf {
         LookupBuf::from(self)
-    }
-
-    /// Return a borrow of the Segment set.
-    pub fn as_segments(&self) -> &VecDeque<Segment<'_>> {
-        &self.segments
-    }
-
-    /// Return the Segment set.
-    pub fn into_segments(self) -> VecDeque<Segment<'a>> {
-        self.segments
     }
 }
 
