@@ -79,9 +79,16 @@ mod test {
     use crate::event::Event;
     use vector_core::transform::FunctionTransform;
 
+    /// Transform a single `Event` through the `FunctionTransform`
+    ///
+    /// # Panics
+    ///
+    /// If `ft` attempts to emit more than one `Event` on transform this
+    /// function will panic.
     pub(crate) fn transform_one(ft: &mut dyn FunctionTransform, event: Event) -> Option<Event> {
         let mut buf = Vec::with_capacity(1);
         ft.transform(&mut buf, event);
+        assert!(buf.len() < 2);
         buf.into_iter().next()
     }
 }
