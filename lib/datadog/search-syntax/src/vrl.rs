@@ -8,6 +8,15 @@ use vrl_parser::{
     Span,
 };
 
+/// Default fields that represent the search path when a Datadog tag/facet is not provided.
+static DEFAULT_FIELDS: &'static [&str] = &[
+    "message",
+    "custom.error.message",
+    "custom.error.stack",
+    "custom.title",
+    "_default_",
+];
+
 impl From<BooleanType> for ast::Opcode {
     fn from(b: BooleanType) -> Self {
         match b {
@@ -56,15 +65,19 @@ impl From<QueryNode> for ast::Expr {
     fn from(q: QueryNode) -> Self {
         match q {
             // Match everything.
-            QueryNode::MatchAllDocs => make_function_call(
-                "exists",
-                vec![make_query(grammar::DEFAULT_FIELD.to_owned())],
+            QueryNode::MatchAllDocs => nest_exprs(
+                make_queries(grammar::DEFAULT_FIELD)
+                    .into_iter()
+                    .map(|query| make_function_call("exists", vec![query])),
+                Opcode::Or,
             ),
             // Matching nothing.
-            QueryNode::MatchNoDocs => make_not(make_function_call(
-                "exists",
-                vec![make_query(grammar::DEFAULT_FIELD.to_owned())],
-            )),
+            QueryNode::MatchNoDocs => nest_exprs(
+                make_queries(grammar::DEFAULT_FIELD)
+                    .into_iter()
+                    .map(|query| make_not(make_function_call("exists", vec![query]))),
+                Opcode::Or,
+            ),
             // Field existence.
             QueryNode::AttributeExists { attr } => {
                 make_function_call("exists", vec![make_query(attr)])
@@ -168,10 +181,24 @@ fn make_node<T>(node: T) -> ast::Node<T> {
 fn normalize_tag<T: AsRef<str>>(value: T) -> String {
     let value = value.as_ref();
     if value.eq(grammar::DEFAULT_FIELD) {
-        return "message".to_string();
+        return "message".to_owned();
     }
 
     value.replace("@", "custom.")
+}
+
+/// Converts a field/facet name to the VRL equivalent. Datadog payloads have a `message` field
+/// (which is used whenever the default field is encountered. Facets are hosted on .custom.*.
+fn normalize_tags<'a, T: AsRef<str>>(value: T) -> Vec<String> {
+    let value = value.as_ref();
+    if value.eq(grammar::DEFAULT_FIELD) {
+        return DEFAULT_FIELDS
+            .into_iter()
+            .map(|s| (*s).to_owned())
+            .collect();
+    }
+
+    vec![value.replace("@", "custom.")]
 }
 
 /// An `Expr::Op` from two expressions, and a separating operator.
@@ -183,7 +210,6 @@ fn make_op(expr1: ast::Node<ast::Expr>, op: Opcode, expr2: ast::Node<ast::Expr>)
     )))
 }
 
-/// An `Expr::Query`, converting a string field to a lookup path.
 fn make_query(field: String) -> ast::Expr {
     ast::Expr::Query(make_node(ast::Query {
         target: make_node(ast::QueryTarget::External),
@@ -193,6 +219,23 @@ fn make_query(field: String) -> ast::Expr {
                 .into(),
         ),
     }))
+}
+
+/// An `Expr::Query`, converting a string field to a lookup path.
+fn make_queries(field: &str) -> Vec<ast::Expr> {
+    normalize_tags(field)
+        .into_iter()
+        .map(|field| {
+            ast::Expr::Query(make_node(ast::Query {
+                target: make_node(ast::QueryTarget::External),
+                path: make_node(
+                    lookup::parser::parse_lookup(&field)
+                        .expect("should parse lookup")
+                        .into(),
+                ),
+            }))
+        })
+        .collect()
 }
 
 /// Makes a Regex string to be used with the `match`.
@@ -270,13 +313,13 @@ mod tests {
     // Datadog search syntax -> VRL
     static TESTS: &[(&str, &str)] = &[
         // Match everything (empty).
-        ("", "exists(.message)"),
+        ("", "exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_))))"),
         // Match everything.
-        ("*:*", "exists(.message)"),
+        ("*:*", "exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_))))"),
         // Match everything (negate).
-        ("NOT(*:*)", "!exists(.message)"),
+        ("NOT(*:*)", "!exists(.message) || (!exists(.custom.error.message) || (!exists(.custom.error.stack) || (!exists(.custom.title) || !exists(._default_))))"),
         // Match nothing.
-        ("-*:*", "!exists(.message)"),
+        ("-*:*", "!exists(.message) || (!exists(.custom.error.message) || (!exists(.custom.error.stack) || (!exists(.custom.title) || !exists(._default_))))"),
         // Tag exists.
         ("_exists_:a", "exists(.a)"),
         // Tag exists (negate).
@@ -530,7 +573,7 @@ mod tests {
     /// Compile each Datadog search query -> VRL, and do the same with the equivalent direct
     /// VRL syntax, and then compare the results.
     fn to_vrl() {
-        for (dd, vrl) in TESTS.iter() {
+        for (dd, vrl) in TESTS.into_iter() {
             let node =
                 parse(dd).unwrap_or_else(|_| panic!("invalid Datadog search syntax: {}", dd));
             let root = ast::RootExpr::Expr(make_node(ast::Expr::from(node)));
