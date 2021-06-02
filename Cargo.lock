@@ -344,9 +344,9 @@ dependencies = [
 
 [[package]]
 name = "async-nats"
-version = "0.9.17"
+version = "0.9.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40573171e8ee967a21def8b765ead77fd452bf51fbd32f92bebae1b65a97e9df"
+checksum = "baee5c52a335d4ced7f7f8913516a17f663ab7d707cda0b399e1920ef9459171"
 dependencies = [
  "blocking",
  "nats",
@@ -4060,9 +4060,9 @@ dependencies = [
 
 [[package]]
 name = "nats"
-version = "0.9.17"
+version = "0.9.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dddfc75930159fd0a7cc9910b88a6ef3396c910a40bab7a62c21e1329420ba88"
+checksum = "ffcf29146fe0d7954a0f35f299ea01a44589a984c94255441f10de9e3becd630"
 dependencies = [
  "base64 0.13.0",
  "base64-url",
