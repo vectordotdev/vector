@@ -1318,6 +1318,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "crc"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10c2722795460108a7872e1cd933a85d6ec38abc4baecad51028f702da28889f"
+dependencies = [
+ "crc-catalog",
+]
+
+[[package]]
+name = "crc-catalog"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ccaeedb56da03b09f598226e25e80088cb4cd25f316e6e4df7d695f0feeb1403"
+
+[[package]]
 name = "crc32fast"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2103,7 +2118,7 @@ dependencies = [
  "bstr",
  "bytes 1.0.1",
  "chrono",
- "crc",
+ "crc 2.0.0",
  "criterion",
  "dashmap",
  "flate2",
@@ -5069,7 +5084,7 @@ dependencies = [
  "bit-vec 0.6.3",
  "bytes 1.0.1",
  "chrono",
- "crc",
+ "crc 1.8.1",
  "futures 0.3.15",
  "futures-io",
  "futures-timer",
