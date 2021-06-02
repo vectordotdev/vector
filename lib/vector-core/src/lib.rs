@@ -29,7 +29,7 @@ pub mod mapping;
 pub mod metrics;
 #[cfg(test)]
 mod test_util;
-pub mod transforms;
+pub mod transform;
 
 pub use buffers;
 

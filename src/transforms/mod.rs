@@ -63,7 +63,7 @@ pub mod tokenizer;
 #[cfg(feature = "wasm")]
 pub mod wasm;
 
-pub use vector_core::transforms::{FunctionTransform, TaskTransform, Transform};
+pub use vector_core::transform::{FunctionTransform, TaskTransform, Transform};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -77,7 +77,7 @@ enum BuildError {
 #[cfg(test)]
 mod test {
     use crate::event::Event;
-    use vector_core::transforms::FunctionTransform;
+    use vector_core::transform::FunctionTransform;
 
     pub(crate) fn transform_one(ft: &mut dyn FunctionTransform, event: Event) -> Option<Event> {
         let mut buf = Vec::with_capacity(1);

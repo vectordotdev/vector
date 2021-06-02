@@ -8,8 +8,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::path::PathBuf;
 pub use vector_core::event::lua;
-use vector_core::transforms::runtime_transform::RuntimeTransform;
-use vector_core::transforms::runtime_transform::Timer;
+use vector_core::transform::runtime_transform::{RuntimeTransform, Timer};
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {

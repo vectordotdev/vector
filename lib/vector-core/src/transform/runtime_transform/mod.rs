@@ -1,6 +1,6 @@
 mod vec_stream;
 
-use crate::{event::Event, transforms::TaskTransform};
+use crate::{event::Event, transform::TaskTransform};
 use futures::{
     stream::{self, BoxStream},
     FutureExt, Stream, StreamExt,
