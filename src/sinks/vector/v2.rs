@@ -196,12 +196,16 @@ impl tower::Service<Vec<EventWrapper>> for Client {
     }
 
     fn call(&mut self, events: Vec<EventWrapper>) -> Self::Future {
+        let mut client = self.clone();
+
         let request = proto::PushEventsRequest { events };
-        let future = self
-            .clone()
-            .push_events(request.into_request())
-            .map_ok(|_| ())
-            .map_err(|source| Error::Request { source });
+        let future = async move {
+            client
+                .push_events(request.into_request())
+                .map_ok(|_| ())
+                .map_err(|source| Error::Request { source })
+                .await
+        };
 
         Box::pin(future)
     }
