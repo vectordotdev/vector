@@ -1,5 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, Resource, SinkContext, SinkHealthcheckOptions},
+    event::proto::EventWrapper,
     proto::vector as proto,
     sinks::util::{
         retries::RetryLogic, sink, BatchConfig, BatchSettings, BatchSink, EncodedEvent,
@@ -7,10 +8,7 @@ use crate::{
     },
     sinks::{Healthcheck, VectorSink},
 };
-use futures::{
-    future::{self, BoxFuture},
-    stream, SinkExt, StreamExt,
-};
+use futures::{future::BoxFuture, stream, SinkExt, StreamExt, TryFutureExt};
 use http::uri::Uri;
 use lazy_static::lazy_static;
 use prost::Message;
@@ -23,10 +21,10 @@ use tonic::{
     IntoRequest,
 };
 use tower::ServiceBuilder;
-use vector_core::event::{self, Event, WithMetadata};
+use vector_core::event::{Event, WithMetadata};
 
 type Client = proto::Client<Channel>;
-type Response = Result<tonic::Response<proto::EventResponse>, tonic::Status>;
+type Response = Result<tonic::Response<proto::PushEventsResponse>, tonic::Status>;
 
 // TODO: rename
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -183,7 +181,7 @@ fn get_authority(url: &str) -> Result<String, Error> {
         .ok_or(Error::NoHost)
 }
 
-impl tower::Service<Vec<proto::EventRequest>> for Client {
+impl tower::Service<Vec<EventWrapper>> for Client {
     type Response = ();
     type Error = Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -197,40 +195,28 @@ impl tower::Service<Vec<proto::EventRequest>> for Client {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, requests: Vec<proto::EventRequest>) -> Self::Future {
-        let mut futures = Vec::with_capacity(requests.len());
+    fn call(&mut self, events: Vec<EventWrapper>) -> Self::Future {
+        let request = proto::PushEventsRequest { events };
+        let future = self
+            .clone()
+            .push_events(request.into_request())
+            .map_ok(|_| ())
+            .map_err(|source| Error::Request { source });
 
-        // TODO: Instead of firing off multiple requests, have the server accept
-        // more than one event per request (i.e. bulk endpoint).
-        for request in requests {
-            let mut client = self.clone();
-            futures.push(async move { client.push_events(request.into_request()).await })
-        }
-
-        Box::pin(async move {
-            future::join_all(futures)
-                .await
-                .into_iter()
-                .try_for_each(|v| match v {
-                    Ok(..) => Ok(()),
-                    Err(err) => Err(Error::Request { source: err }),
-                })
-        })
+        Box::pin(future)
     }
 }
 
-fn encode_event(event: Event) -> EncodedEvent<proto::EventRequest> {
-    let event: WithMetadata<event::proto::EventWrapper> = event.into();
+fn encode_event(event: Event) -> EncodedEvent<EventWrapper> {
+    let event: WithMetadata<EventWrapper> = event.into();
 
     EncodedEvent {
-        item: proto::EventRequest {
-            message: Some(event.data),
-        },
+        item: event.data,
         metadata: Some(event.metadata),
     }
 }
 
-impl EncodedLength for proto::EventRequest {
+impl EncodedLength for EventWrapper {
     fn encoded_length(&self) -> usize {
         self.encoded_len()
     }
