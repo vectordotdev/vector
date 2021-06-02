@@ -2,6 +2,7 @@ use super::{
     errors::{Parse, RequestError},
     handlers,
     models::{FirehoseRequest, FirehoseResponse},
+    Compression,
 };
 use crate::{
     internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
@@ -17,6 +18,7 @@ use warp::{http::StatusCode, Filter};
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
 pub fn firehose(
     access_key: Option<String>,
+    record_compression: Compression,
     out: Pipeline,
 ) -> impl Filter<Extract = impl warp::Reply, Error = Infallible> + Clone {
     warp::post()
@@ -37,6 +39,7 @@ pub fn firehose(
                 .untuple_one(),
         )
         .and(parse_body())
+        .and(warp::any().map(move || record_compression))
         .and(warp::any().map(move || out.clone()))
         .and_then(handlers::firehose)
         .recover(handle_firehose_rejection)

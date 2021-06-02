@@ -3016,6 +3016,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "infer"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea70330449622910e0edebab230734569516269fb32342fb0a8956340fa48c6c"
+
+[[package]]
 name = "inherent"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7822,6 +7828,7 @@ dependencies = [
  "hyper-openssl",
  "indexmap",
  "indoc",
+ "infer",
  "inventory",
  "itertools 0.10.0",
  "k8s-openapi",

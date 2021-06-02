@@ -201,6 +201,7 @@ hostname = { version = "0.3.1", default-features = false }
 http = { version = "0.2.4", default-features = false }
 hyper = { version = "0.14.8", default-features = false, features = ["stream"] }
 hyper-openssl = { version = "0.9.1", default-features = false }
+infer = { version = "0.5.0", default-features = false, optional = true}
 indexmap = { version = "1.6.2", default-features = false, features = ["serde"] }
 indoc = { version = "1.0.3", default-features = false }
 inventory = { version = "0.1.10", default-features = false }
@@ -403,7 +404,7 @@ sources-metrics = [
 
 sources-apache_metrics = []
 sources-aws_ecs_metrics = []
-sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
+sources-aws_kinesis_firehose = ["base64", "infer", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto", "rusoto_s3", "rusoto_sqs", "semver", "uuid"]
 sources-datadog = ["sources-utils-http"]
 sources-docker_logs = ["bollard", "dirs-next"]
