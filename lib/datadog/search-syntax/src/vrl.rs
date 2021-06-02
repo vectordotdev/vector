@@ -158,6 +158,24 @@ impl From<QueryNode> for ast::Expr {
     }
 }
 
+impl From<QueryNode> for ast::Node<ast::Expr> {
+    fn from(node: QueryNode) -> Self {
+        make_node(node.into())
+    }
+}
+
+impl From<QueryNode> for ast::RootExpr {
+    fn from(node: QueryNode) -> Self {
+        ast::RootExpr::Expr(make_node(node.into()))
+    }
+}
+
+impl From<QueryNode> for ast::Node<ast::RootExpr> {
+    fn from(node: QueryNode) -> Self {
+        make_node(node.into())
+    }
+}
+
 /// Creates a VRL node with a default span.
 fn make_node<T>(node: T) -> ast::Node<T> {
     ast::Node::new(Span::default(), node)

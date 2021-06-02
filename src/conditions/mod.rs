@@ -3,6 +3,7 @@ use crate::event::Event;
 use serde::{Deserialize, Serialize};
 
 pub mod check_fields;
+pub mod datadog;
 pub mod is_log;
 pub mod is_metric;
 pub mod remap;
