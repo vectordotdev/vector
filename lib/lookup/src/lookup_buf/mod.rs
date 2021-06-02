@@ -138,6 +138,10 @@ impl LookupBuf {
         self.segments.iter()
     }
 
+    pub fn to_lookup(&self) -> Lookup {
+        Lookup::from(self)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.segments.is_empty()
     }
