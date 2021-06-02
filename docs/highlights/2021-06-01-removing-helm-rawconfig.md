@@ -4,7 +4,7 @@ $schema: ".schema.json"
 title: "Deprecating Helm `rawConfig` option"
 description: "The `rawConfig` option in the Vector Helm charts will be fully deprecated in an upcoming release"
 author_github: "https://github.com/spencergilbert"
-pr_numbers: []
+pr_numbers: [7671]
 release: "0.14.0"
 hide_on_release_notes: false
 tags: ["type: announcement", "platform: kubernetes", "domain: config"]
