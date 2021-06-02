@@ -13,7 +13,7 @@ use crate::{
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use codec::BytesDelimitedCodec;
-use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt, stream};
+use futures::{stream, FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{GetObjectError, GetObjectRequest, S3Client, S3};
@@ -142,7 +142,7 @@ pub struct State {
 }
 
 pub(super) struct Ingestor {
-    state: Arc<State>
+    state: Arc<State>,
 }
 
 impl Ingestor {
@@ -172,9 +172,7 @@ impl Ingestor {
             delete_message: config.delete_message,
         });
 
-        Ok(Ingestor {
-            state,
-        })
+        Ok(Ingestor { state })
     }
 
     pub(super) async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
@@ -188,7 +186,7 @@ impl Ingestor {
         for handle in handles.drain(..) {
             if let Err(_) = handle.await {
                 // TODO: probably emit the error as an internal event but then just return Err(())?
-                return Err(())
+                return Err(());
             }
         }
 
@@ -226,7 +224,7 @@ impl IngestorProcess {
     async fn run_once(&mut self) {
         let messages = self.receive_messages().await;
         let messages = messages
-            .and_then(|messages|{
+            .and_then(|messages| {
                 emit!(SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
@@ -289,10 +287,7 @@ impl IngestorProcess {
         }
     }
 
-    async fn handle_sqs_message(
-        &mut self,
-        message: Message,
-    ) -> Result<(), ProcessingError> {
+    async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
         let s3_event: S3Event = serde_json::from_str(message.body.unwrap_or_default().as_ref())
             .context(InvalidSqsMessage {
                 message_id: message.message_id.unwrap_or_else(|| "<empty>".to_owned()),
@@ -301,10 +296,7 @@ impl IngestorProcess {
         self.handle_s3_event(s3_event).await
     }
 
-    async fn handle_s3_event(
-        &mut self,
-        s3_event: S3Event,
-    ) -> Result<(), ProcessingError> {
+    async fn handle_s3_event(&mut self, s3_event: S3Event) -> Result<(), ProcessingError> {
         for record in s3_event.records {
             self.handle_s3_event_record(record).await?
         }
@@ -440,7 +432,7 @@ impl IngestorProcess {
                     let mut events = stream::iter(events);
                     if let Err(_) = self.out.send_all(&mut events).await {
                         send_error = Some(crate::pipeline::ClosedError);
-                        break
+                        break;
                     }
                 }
 
@@ -473,7 +465,8 @@ impl IngestorProcess {
     }
 
     async fn receive_messages(&mut self) -> Result<Vec<Message>, RusotoError<ReceiveMessageError>> {
-        self.state.sqs_client
+        self.state
+            .sqs_client
             .receive_message(ReceiveMessageRequest {
                 queue_url: self.state.queue_url.clone(),
                 max_number_of_messages: Some(10),
@@ -489,7 +482,8 @@ impl IngestorProcess {
         &mut self,
         receipt_handle: String,
     ) -> Result<(), RusotoError<DeleteMessageError>> {
-        self.state.sqs_client
+        self.state
+            .sqs_client
             .delete_message(DeleteMessageRequest {
                 queue_url: self.state.queue_url.clone(),
                 receipt_handle,
