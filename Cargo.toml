@@ -104,6 +104,7 @@ tracing-limit = { path = "lib/tracing-limit" }
 vector-api-client = { path = "lib/vector-api-client", optional = true }
 vector_core = { path = "lib/vector-core", default-features = false, features = ["vrl"] }
 vrl-cli = { path = "lib/vrl/cli", optional = true }
+datadog-search-syntax = { path = "lib/datadog/search-syntax", optional = true }
 
 # Tokio / Futures
 async-trait = "0.1.50"
@@ -177,6 +178,8 @@ tui = { version = "0.15.0", optional = true, default-features = false, features 
 # VRL Lang
 vrl = { path = "lib/vrl/core" }
 vrl-stdlib = { path = "lib/vrl/stdlib" }
+vrl-parser = { path = "lib/vrl/parser", optional = true }
+vrl-compiler = { path = "lib/vrl/compiler", optional = true }
 
 # Lookup
 lookup = { path = "lib/lookup" }
@@ -503,7 +506,7 @@ transforms-coercer = []
 transforms-concat = []
 transforms-dedupe = ["lru"]
 transforms-field_filter = []
-transforms-filter = []
+transforms-filter = ["datadog-search-syntax", "vrl-parser", "vrl-compiler"]
 transforms-geoip = ["maxminddb"]
 transforms-grok_parser = ["grok"]
 transforms-json_parser = []

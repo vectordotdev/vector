@@ -48,7 +48,7 @@ impl ConditionConfig for RemapConfig {
                 .to_string()
         })?;
 
-        Ok(Box::new(Remap { program }))
+        Ok(Box::new(Remap::new(program)))
     }
 }
 
@@ -60,6 +60,10 @@ pub struct Remap {
 }
 
 impl Remap {
+    pub fn new(program: Program) -> Self {
+        Self { program }
+    }
+
     fn run(&self, event: &Event) -> vrl::RuntimeResult {
         // TODO(jean): This clone exists until vrl-lang has an "immutable"
         // mode.
