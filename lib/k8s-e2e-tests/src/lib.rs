@@ -7,6 +7,7 @@ use k8s_test_framework::{
     test_pod, wait_for_resource::WaitFor, CommandBuilder, Framework, Interface, Manager, Reader,
 };
 use std::collections::BTreeMap;
+use std::env;
 use tracing::{debug, error, info};
 
 pub mod metrics;
@@ -45,15 +46,24 @@ pub fn get_override_name(namespace: &str, suffix: &str) -> String {
 /// Adds a fullnameOverride entry to the given config. This allows multiple tests
 /// to be run against the same cluster without the role anmes clashing.
 pub fn config_override_name(config: &str, name: &str) -> String {
-    format!(
-        indoc! {r#"
+    if env::var("multinode".to_string()) == Ok("yes".to_string()) {
+        format!(
+            indoc! {r#"
             fullnameOverride: "{}"
             dataVolume:
               hostPath:
                 path: /var/lib/{}-vector/
             {}"#},
-        name, name, config
-    )
+            name, name, config
+        )
+    } else {
+        format!(
+            indoc! {r#"
+            fullnameOverride: "{}"
+            {}"#},
+            name, config
+        )
+    }
 }
 
 pub fn make_framework() -> Framework {

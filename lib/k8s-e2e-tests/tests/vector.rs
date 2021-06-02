@@ -3,12 +3,14 @@ use k8s_e2e_tests::*;
 use k8s_test_framework::{
     lock, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
 };
+use std::env;
 
 const HELM_CHART_VECTOR: &str = "vector";
 
 fn helm_values_stdout_sink(aggregator_override_name: &str, agent_override_name: &str) -> String {
-    format!(
-        indoc! {r#"
+    if env::var("multinode".to_string()) == Ok("yes".to_string()) {
+        format!(
+            indoc! {r#"
     vector-agent:
       fullnameOverride: "{}"
       vectorSink:
@@ -29,11 +31,34 @@ fn helm_values_stdout_sink(aggregator_override_name: &str, agent_override_name: 
           target: "stdout"
           encoding: "json"
 "# },
-        agent_override_name,
-        aggregator_override_name,
-        agent_override_name,
-        aggregator_override_name
-    )
+            agent_override_name,
+            aggregator_override_name,
+            agent_override_name,
+            aggregator_override_name
+        )
+    } else {
+        format!(
+            indoc! {r#"
+    vector-agent:
+      fullnameOverride: "{}"
+      vectorSink:
+        host: "{}"
+
+    vector-aggregator:
+      fullnameOverride: "{}"
+      vectorSource:
+        sourceId: vector
+
+      sinks:
+        stdout:
+          type: "console"
+          inputs: ["vector"]
+          target: "stdout"
+          encoding: "json"
+"# },
+            agent_override_name, aggregator_override_name, aggregator_override_name
+        )
+    }
 }
 
 /// This test validates that vector picks up logs with an agent and
@@ -67,7 +92,7 @@ async fn logs() -> Result<(), Box<dyn std::error::Error>> {
         .wait_for_rollout(
             &namespace,
             &format!("daemonset/{}", agent_override_name),
-            vec!["--timeout=6000s"],
+            vec!["--timeout=60s"],
         )
         .await?;
 
