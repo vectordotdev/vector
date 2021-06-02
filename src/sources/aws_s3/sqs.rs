@@ -178,13 +178,14 @@ impl Ingestor {
     pub(super) async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut handles = Vec::new();
         for _ in 0..self.state.client_concurrency {
-            let process = IngestorProcess::new(self.state.clone(), out.clone(), shutdown.clone());
+            let process =
+                IngestorProcess::new(Arc::clone(&self.state), out.clone(), shutdown.clone());
             let handle = tokio::spawn(async move { process.run().await });
             handles.push(handle);
         }
 
         for handle in handles.drain(..) {
-            if let Err(_) = handle.await {
+            if handle.await.is_err() {
                 // TODO: probably emit the error as an internal event but then just return Err(())?
                 return Err(());
             }
@@ -224,15 +225,15 @@ impl IngestorProcess {
     async fn run_once(&mut self) {
         let messages = self.receive_messages().await;
         let messages = messages
-            .and_then(|messages| {
+            .map(|messages| {
                 emit!(SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
-                Ok(messages)
+                messages
             })
-            .or_else(|err| {
+            .map_err(|err| {
                 emit!(SqsMessageReceiveFailed { error: &err });
-                Err(err)
+                err
             })
             .unwrap_or_default();
 
@@ -430,7 +431,7 @@ impl IngestorProcess {
                 let mut chunked = stream.ready_chunks(32);
                 while let Some(events) = chunked.next().await {
                     let mut events = stream::iter(events);
-                    if let Err(_) = self.out.send_all(&mut events).await {
+                    if self.out.send_all(&mut events).await.is_err() {
                         send_error = Some(crate::pipeline::ClosedError);
                         break;
                     }

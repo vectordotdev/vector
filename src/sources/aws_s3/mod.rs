@@ -374,7 +374,7 @@ mod integration_tests {
             multiline,
             sqs: Some(sqs::Config {
                 queue_url: queue_url.to_string(),
-                poll_secs: 1,
+                poll_timeout_secs: 1,
                 ..Default::default()
             }),
             ..Default::default()
