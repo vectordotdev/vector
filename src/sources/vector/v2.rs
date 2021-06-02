@@ -15,7 +15,7 @@ use tonic::{
     transport::{Certificate, Identity, Server, ServerTlsConfig},
     Request, Response, Status,
 };
-use vector_core::event::{BatchNotifier, BatchStatus, Event};
+use vector_core::event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event};
 
 #[derive(Debug, Clone)]
 pub struct Service {
@@ -27,11 +27,12 @@ pub struct Service {
 impl proto::Service for Service {
     async fn push_events(
         &self,
-        request: Request<proto::EventRequest>,
-    ) -> Result<Response<proto::EventResponse>, Status> {
-        let (event, receiver) = request
+        request: Request<proto::PushEventsRequest>,
+    ) -> Result<Response<proto::PushEventsResponse>, Status> {
+        let items: Vec<(Event, Option<BatchStatusReceiver>)> = request
             .into_inner()
-            .message
+            .events
+            .into_iter()
             .map(|data| {
                 let event = Event::from(data);
                 if self.acknowledgements {
@@ -42,24 +43,28 @@ impl proto::Service for Service {
                     (event, None)
                 }
             })
-            .ok_or_else(|| Status::invalid_argument("missing event"))?;
+            .collect();
 
-        self.pipeline
-            .clone()
-            .send(event)
-            .await
-            .map_err(|err| Status::unavailable(err.to_string()))?;
+        for (event, receiver) in items {
+            self.pipeline
+                .clone()
+                .send(event)
+                .await
+                .map_err(|err| Status::unavailable(err.to_string()))?;
 
-        let status = if let Some(receiver) = receiver {
-            receiver.await
-        } else {
-            BatchStatus::Delivered
-        };
-        match status {
-            BatchStatus::Delivered => Ok(Response::new(proto::EventResponse {})),
-            BatchStatus::Errored => Err(Status::internal("Delivery error")),
-            BatchStatus::Failed => Err(Status::data_loss("Delivery failed")),
+            let status = match receiver {
+                Some(receiver) => receiver.await,
+                None => BatchStatus::Delivered,
+            };
+
+            match status {
+                BatchStatus::Errored => return Err(Status::internal("Delivery error")),
+                BatchStatus::Failed => return Err(Status::data_loss("Delivery failed")),
+                BatchStatus::Delivered => (),
+            }
         }
+
+        Ok(Response::new(proto::PushEventsResponse {}))
     }
 
     // TODO: figure out a way to determine if the current Vector instance is "healthy".
