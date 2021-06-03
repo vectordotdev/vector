@@ -7,8 +7,12 @@
 # Note: these values are also respected by all charts, so you can keep using
 # them if you switch from the `vector` chart the specific role oriented charts.
 #
-# global:
-#   vector:
+global:
+  vector:
+    # Additional labels to add to all resources
+    commonLabels: #{}
+      app: vector
+
 #     image:
 #       repository: <docker repo>
 #       # Overrides the image tag, the default is `{image.version}-{image.base}`.
@@ -18,8 +22,8 @@
 #       # Overrides the image flavor, the default is `debian`.
 #       base: <base>
 #     # Sets common environment variables for use in all `Pod`s.
-#     commonEnvKV:
-#       LOG: info
+    commonEnvKV:
+      LOG: info
 #     # Add an annotation with a random value generated at Helm Chart template
 #     # evaluation time to the managed `Pod`s.
 #     # Enabling this will cause the `Pod`s to be recreated every time the value
