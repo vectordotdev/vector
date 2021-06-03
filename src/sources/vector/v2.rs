@@ -7,10 +7,11 @@ use crate::{
     Pipeline,
 };
 
-use futures::{FutureExt, SinkExt, TryFutureExt};
+use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tonic::{
     transport::{Certificate, Identity, Server, ServerTlsConfig},
     Request, Response, Status,
@@ -29,40 +30,28 @@ impl proto::Service for Service {
         &self,
         request: Request<proto::PushEventsRequest>,
     ) -> Result<Response<proto::PushEventsResponse>, Status> {
-        let items: Vec<(Event, Option<BatchStatusReceiver>)> = request
+        let mut events: Vec<Event> = request
             .into_inner()
             .events
             .into_iter()
-            .map(|data| {
-                let event = Event::from(data);
-                if self.acknowledgements {
-                    let (batch, receiver) = BatchNotifier::new_with_receiver();
-                    let event = event.with_batch_notifier(&batch);
-                    (event, Some(receiver))
-                } else {
-                    (event, None)
-                }
-            })
+            .map(Event::from)
             .collect();
 
-        for (event, receiver) in items {
-            self.pipeline
-                .clone()
-                .send(event)
-                .await
-                .map_err(|err| Status::unavailable(err.to_string()))?;
-
-            let status = match receiver {
-                Some(receiver) => receiver.await,
-                None => BatchStatus::Delivered,
-            };
-
-            match status {
-                BatchStatus::Errored => return Err(Status::internal("Delivery error")),
-                BatchStatus::Failed => return Err(Status::data_loss("Delivery failed")),
-                BatchStatus::Delivered => (),
+        let receiver = self.acknowledgements.then(|| {
+            let (batch, receiver) = BatchNotifier::new_with_receiver();
+            for event in &mut events {
+                event.add_batch_notifier(Arc::clone(&batch));
             }
-        }
+
+            receiver
+        });
+
+        self.pipeline
+            .clone()
+            .send_all(&mut futures::stream::iter(events).map(Ok))
+            .map_err(|err| Status::unavailable(err.to_string()))
+            .and_then(|_| handle_batch_status(receiver))
+            .await?;
 
         Ok(Response::new(proto::PushEventsResponse {}))
     }
@@ -77,6 +66,19 @@ impl proto::Service for Service {
         };
 
         Ok(Response::new(message))
+    }
+}
+
+async fn handle_batch_status(receiver: Option<BatchStatusReceiver>) -> Result<(), Status> {
+    let status = match receiver {
+        Some(receiver) => receiver.await,
+        None => BatchStatus::Delivered,
+    };
+
+    match status {
+        BatchStatus::Errored => Err(Status::internal("Delivery error")),
+        BatchStatus::Failed => Err(Status::data_loss("Delivery failed")),
+        BatchStatus::Delivered => Ok(()),
     }
 }
 
