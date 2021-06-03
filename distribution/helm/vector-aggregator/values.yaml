@@ -2,8 +2,10 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-# Additional labels to add to all resources
-customLabels: {}
+global:
+  # Additional labels to add to all resources
+  commonLabels: {}
+    # app.kubernetes.io/component: logging
 
 image:
   repository: timberio/vector
