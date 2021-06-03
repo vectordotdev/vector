@@ -218,7 +218,7 @@ impl From<QueryNode> for ast::Expr {
             QueryNode::NegatedNode { node } => {
                 let node = match ast::Expr::from(*node) {
                     n @ ast::Expr::Op(_) => make_container_group(n),
-                    n @ _ => n,
+                    n => n,
                 };
 
                 vec![make_not(node)]
