@@ -52,6 +52,7 @@ impl Reader {
     }
 }
 
+#[cfg(unix)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -64,7 +65,6 @@ mod tests {
         list
     }
 
-    #[cfg(unix)]
     #[tokio::test]
     async fn test_reader_finite() {
         let mut command = Command::new("echo");
@@ -82,7 +82,6 @@ mod tests {
         assert!(exit_status.success());
     }
 
-    #[cfg(unix)]
     #[tokio::test]
     async fn test_reader_infinite() {
         let mut command = Command::new("bash");
