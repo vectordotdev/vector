@@ -444,6 +444,7 @@ urls: {
 	vector_download:                                          "\(vector_website)/releases/latest/download/"
 	vector_download_nightly:                                  "\(vector_website)/releases/nightly/download/"
 	vector_enriching_transforms:                              "\(vector_website)/components/?functions%5B%5D=enrich"
+	vector_exec_source:                                       "\(vector_website)/docs/reference/configuration/sources/exec"
 	vector_file_source:                                       "\(vector_website)/docs/reference/configuration/sources/file/"
 	vector_generate_arguments_issue:                          "\(vector_repo)/issues/1966"
 	vector_guides:                                            "\(vector_website)/guides/"
