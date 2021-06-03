@@ -1,4 +1,4 @@
-use indoc::indoc;
+use indoc::formatdoc;
 use k8s_openapi::{
     api::core::v1::{Affinity, Container, Pod, PodAffinity, PodAffinityTerm, PodSpec},
     apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta},
@@ -43,25 +43,33 @@ pub fn get_override_name(namespace: &str, suffix: &str) -> String {
     format!("{}-{}", namespace, suffix)
 }
 
+/// Is the MULTINODE environment variable set?
+pub fn is_multinode() -> bool {
+    env::var("MULTINODE".to_string()).is_ok()
+}
+
 /// Adds a fullnameOverride entry to the given config. This allows multiple tests
 /// to be run against the same cluster without the role anmes clashing.
 pub fn config_override_name(config: &str, name: &str) -> String {
-    if env::var("multinode".to_string()) == Ok("yes".to_string()) {
-        format!(
-            indoc! {r#"
+    if is_multinode() {
+        formatdoc!(
+            r#"
             fullnameOverride: "{}"
             dataVolume:
               hostPath:
                 path: /var/lib/{}-vector/
-            {}"#},
-            name, name, config
+            {}"#,
+            name,
+            name,
+            config
         )
     } else {
-        format!(
-            indoc! {r#"
+        formatdoc!(
+            r#"
             fullnameOverride: "{}"
-            {}"#},
-            name, config
+            {}"#,
+            name,
+            config
         )
     }
 }
@@ -120,6 +128,8 @@ pub fn make_test_pod_with_containers<'a>(
     }
 }
 
+/// Since the tests only scan the logs from an agent on a single node, we want to make sure that all the test pods are on
+/// the same node so the agent picks them all.
 pub fn make_test_pod_with_affinity<'a>(
     namespace: &'a str,
     name: &'a str,

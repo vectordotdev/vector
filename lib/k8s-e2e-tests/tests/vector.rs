@@ -1,16 +1,15 @@
-use indoc::indoc;
+use indoc::formatdoc;
 use k8s_e2e_tests::*;
 use k8s_test_framework::{
     lock, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
 };
-use std::env;
 
 const HELM_CHART_VECTOR: &str = "vector";
 
 fn helm_values_stdout_sink(aggregator_override_name: &str, agent_override_name: &str) -> String {
-    if env::var("multinode".to_string()) == Ok("yes".to_string()) {
-        format!(
-            indoc! {r#"
+    if is_multinode() {
+        formatdoc!(
+            r#"
     vector-agent:
       fullnameOverride: "{}"
       vectorSink:
@@ -30,15 +29,15 @@ fn helm_values_stdout_sink(aggregator_override_name: &str, agent_override_name: 
           inputs: ["vector"]
           target: "stdout"
           encoding: "json"
-"# },
+    "#,
             agent_override_name,
             aggregator_override_name,
             agent_override_name,
             aggregator_override_name
         )
     } else {
-        format!(
-            indoc! {r#"
+        formatdoc!(
+            r#"
     vector-agent:
       fullnameOverride: "{}"
       vectorSink:
@@ -55,8 +54,10 @@ fn helm_values_stdout_sink(aggregator_override_name: &str, agent_override_name: 
           inputs: ["vector"]
           target: "stdout"
           encoding: "json"
-"# },
-            agent_override_name, aggregator_override_name, aggregator_override_name
+    "#,
+            agent_override_name,
+            aggregator_override_name,
+            aggregator_override_name
         )
     }
 }

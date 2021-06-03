@@ -103,15 +103,9 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Make sure we read the correct nodes logs.
-    let node = framework
-        .get_node_for_pod(&pod_namespace, "test-pod")
-        .await
-        .expect("need the node name");
-
     let vector_pod = framework
-        .get_pod_on_node(&namespace, &node, &override_name)
-        .await
-        .expect("cant get the vector pod running on the test node");
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
 
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
@@ -206,15 +200,9 @@ async fn simple_raw_config() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Make sure we read the correct nodes logs.
-    let node = framework
-        .get_node_for_pod(&pod_namespace, "test-pod")
-        .await
-        .expect("need the node name");
-
     let vector_pod = framework
-        .get_pod_on_node(&namespace, &node, &override_name)
-        .await
-        .expect("cant get the vector pod running on the test node");
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
 
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
@@ -305,15 +293,9 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Make sure we read the correct nodes logs.
-    let node = framework
-        .get_node_for_pod(&pod_namespace, "test-pod")
-        .await
-        .expect("need the node name");
-
     let vector_pod = framework
-        .get_pod_on_node(&namespace, &node, &override_name)
-        .await
-        .expect("cant get the vector pod running on the test node");
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
 
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
@@ -406,15 +388,9 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Make sure we read the correct nodes logs.
-    let node = framework
-        .get_node_for_pod(&pod_namespace, "test-pod")
-        .await
-        .expect("need the node name");
-
     let vector_pod = framework
-        .get_pod_on_node(&namespace, &node, &override_name)
-        .await
-        .expect("cant get the vector pod running on the test node");
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
 
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
@@ -506,15 +482,9 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Make sure we read the correct nodes logs.
-    let node = framework
-        .get_node_for_pod(&pod_namespace, "test-pod")
-        .await
-        .expect("need the node name");
-
     let vector_pod = framework
-        .get_pod_on_node(&namespace, &node, &override_name)
-        .await
-        .expect("cant get the vector pod running on the test node");
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
 
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
@@ -605,15 +575,9 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Make sure we read the correct nodes logs.
-    let node = framework
-        .get_node_for_pod(&pod_namespace, "test-pod")
-        .await
-        .expect("need the node name");
-
     let vector_pod = framework
-        .get_pod_on_node(&namespace, &node, &override_name)
-        .await
-        .expect("cant get the vector pod running on the test node");
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
 
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
@@ -771,15 +735,14 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Make sure we read the correct nodes logs.
-    let node = framework
-        .get_node_for_pod(&pod_namespace, "test-pod-control")
-        .await
-        .expect("need the node name");
-
     let vector_pod = framework
-        .get_pod_on_node(&namespace, &node, &override_name)
-        .await
-        .expect("cant get the vector pod running on the test node");
+        .get_vector_pod_with_pod(
+            &pod_namespace,
+            "test-pod-control",
+            &namespace,
+            &override_name,
+        )
+        .await?;
 
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
@@ -971,15 +934,14 @@ async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Make sure we read the correct nodes logs.
-    let node = framework
-        .get_node_for_pod(&pod_namespace, "test-pod-control")
-        .await
-        .expect("need the node name");
-
     let vector_pod = framework
-        .get_pod_on_node(&namespace, &node, &override_name)
-        .await
-        .expect("cant get the vector pod running on the test node");
+        .get_vector_pod_with_pod(
+            &pod_namespace,
+            "test-pod-control",
+            &namespace,
+            &override_name,
+        )
+        .await?;
 
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
@@ -1129,15 +1091,9 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Make sure we read the correct nodes logs.
-    let node = framework
-        .get_node_for_pod(&pod_namespace, "test-pod")
-        .await
-        .expect("need the node name");
-
     let vector_pod = framework
-        .get_pod_on_node(&namespace, &node, &override_name)
-        .await
-        .expect("cant get the vector pod running on the test node");
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
 
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
@@ -1302,15 +1258,9 @@ async fn glob_pattern_filtering() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Make sure we read the correct nodes logs.
-    let node = framework
-        .get_node_for_pod(&pod_namespace, "test-pod")
-        .await
-        .expect("need the node name");
-
     let vector_pod = framework
-        .get_pod_on_node(&namespace, &node, &override_name)
-        .await
-        .expect("cant get the vector pod running on the test node");
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
 
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
@@ -1476,15 +1426,9 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Make sure we read the correct nodes logs.
-    let node = framework
-        .get_node_for_pod(&pod_namespace, "affinity-pod")
-        .await
-        .expect("need the node name");
-
     let vector_pod = framework
-        .get_pod_on_node(&namespace, &node, &override_name)
-        .await
-        .expect("cant get the vector pod running on the test node");
+        .get_vector_pod_with_pod(&pod_namespace, "affinity-pod", &namespace, &override_name)
+        .await?;
 
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
@@ -1584,15 +1528,9 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Make sure we read the correct nodes logs.
-    let node = framework
-        .get_node_for_pod(&pod_namespace, "test-pod")
-        .await
-        .expect("need the node name");
-
     let vector_pod = framework
-        .get_pod_on_node(&namespace, &node, &override_name)
-        .await
-        .expect("cant get the vector pod running on the test node");
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
 
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
@@ -1716,15 +1654,9 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Make sure we read the correct nodes logs.
-    let node = framework
-        .get_node_for_pod(&pod_namespace, "test-pod")
-        .await
-        .expect("need the node name");
-
     let vector_pod = framework
-        .get_pod_on_node(&namespace, &node, &override_name)
-        .await
-        .expect("cant get the vector pod running on the test node");
+        .get_vector_pod_with_pod(&pod_namespace, "test-pod", &namespace, &override_name)
+        .await?;
 
     let mut log_reader = framework.logs(&namespace, &format!("pod/{}", vector_pod))?;
     smoke_check_first_line(&mut log_reader).await;
