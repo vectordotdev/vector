@@ -5,6 +5,7 @@ import "strings"
 #Member: {
 	id:        strings.ToLower(name)
 	name:      !=""
+	active:    bool | *true
 	_github:   !=""
 	_twitter?: !=""
 	_keybase?: !=""
@@ -46,6 +47,7 @@ team: [#Member, ...#Member] & [
 		bio: """
 			James was the VP of Engineering at Timber.io.
 			"""
+		active: false
 	},
 	{
 		name:     "Jean Mertz"
@@ -72,6 +74,7 @@ team: [#Member, ...#Member] & [
 		bio: """
 			Kirill was is an engineer at Timber.io.
 			"""
+		active: false
 	},
 	{
 		name:    "Kruno Tomola Fabro"
@@ -117,6 +120,7 @@ team: [#Member, ...#Member] & [
 		bio: """
 			Mike was a senior engineer at Timber.io.
 			"""
+		active: false
 	},
 	{
 		name:     "Steve Hall"
