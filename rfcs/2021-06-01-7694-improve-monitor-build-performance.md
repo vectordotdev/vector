@@ -52,7 +52,7 @@ system.  While they may be able to naively cache outputs that land on disk, they
 things like compiler flags, or compiler versions, and so could lead to confusing mismatch issues
 that waste time and effort to debug.
 
-### Use of an better linker
+### Use of a better linker
 
 As mentioned above, much time is spenting in the linker phase of building Vector, where the many
 dependent crates that make up Vector are bundled together to produce a final executable.  For most
