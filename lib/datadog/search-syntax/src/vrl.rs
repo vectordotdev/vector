@@ -9,7 +9,7 @@ use vrl_parser::{
 };
 
 /// Default fields that represent the search path when a Datadog tag/facet is not provided.
-static DEFAULT_FIELDS: &'static [&str] = &[
+static DEFAULT_FIELDS: &[&str] = &[
     "message",
     "custom.error.message",
     "custom.error.stack",
@@ -63,77 +63,104 @@ impl From<ComparisonValue> for ast::Node<ast::Expr> {
 /// Convert Datadog grammar to VRL.
 impl From<QueryNode> for ast::Expr {
     fn from(q: QueryNode) -> Self {
-        nest_exprs(
-            (match q {
-                // Match everything.
-                QueryNode::MatchAllDocs => make_queries(grammar::DEFAULT_FIELD)
-                    .into_iter()
-                    .map(|query| make_function_call("exists", vec![query]))
-                    .collect(),
-                // Matching nothing.
-                QueryNode::MatchNoDocs => make_queries(grammar::DEFAULT_FIELD)
-                    .into_iter()
-                    .map(|query| make_not(make_function_call("exists", vec![query])))
-                    .collect(),
-                // Field existence.
-                QueryNode::AttributeExists { attr } => make_queries(&attr)
-                    .into_iter()
-                    .map(|query| make_function_call("exists", vec![query]))
-                    .collect(),
-                QueryNode::AttributeMissing { attr } => make_queries(&attr)
-                    .into_iter()
-                    .map(|query| make_not(make_function_call("exists", vec![query])))
-                    .collect(),
-                // Equality.
-                QueryNode::AttributeTerm { attr, value }
-                | QueryNode::QuotedAttribute {
-                    attr,
-                    phrase: value,
-                } => make_queries(&attr)
-                    .into_iter()
-                    .map(|query| make_function_call("match", vec![query, make_regex(&value)]))
-                    .collect(),
-                // Comparison.
-                QueryNode::AttributeComparison {
-                    attr,
-                    comparator,
-                    value,
-                } => make_queries(&attr)
-                    .into_iter()
-                    .map(|query| make_op(make_node(query), comparator.into(), value.clone().into()))
-                    .collect(),
-                // Wildcard suffix.
-                QueryNode::AttributePrefix { attr, prefix } => make_queries(&attr)
-                    .into_iter()
-                    .map(|query| {
-                        make_function_call(
-                            "match",
-                            vec![query, make_regex(&format!("{}*", &prefix))],
-                        )
-                    })
-                    .collect(),
-                // Arbitrary wildcard.
-                QueryNode::AttributeWildcard { attr, wildcard } => make_queries(&attr)
-                    .into_iter()
-                    .map(|query| make_function_call("match", vec![query, make_regex(&wildcard)]))
-                    .collect(),
-                // Range.
-                QueryNode::AttributeRange {
-                    attr,
-                    lower,
-                    lower_inclusive,
-                    upper,
-                    upper_inclusive,
-                } => make_queries(&attr)
-                    .into_iter()
-                    .map(|query| {
-                        match (&lower, &upper) {
-                            // If both bounds are wildcards, it'll match everything; just check the field exists.
-                            (ComparisonValue::Unbounded, ComparisonValue::Unbounded) => {
-                                make_function_call("exists", vec![query])
-                            }
-                            // Unbounded lower. Wrapped in a container group for negation compatibility.
-                            (ComparisonValue::Unbounded, _) => make_container_group(make_op(
+        let exprs = match q {
+            // Match everything.
+            QueryNode::MatchAllDocs => make_queries(grammar::DEFAULT_FIELD)
+                .into_iter()
+                .map(|query| make_function_call("exists", vec![query]))
+                .collect(),
+            // Matching nothing.
+            QueryNode::MatchNoDocs => make_queries(grammar::DEFAULT_FIELD)
+                .into_iter()
+                .map(|query| make_not(make_function_call("exists", vec![query])))
+                .collect(),
+            // Field existence.
+            QueryNode::AttributeExists { attr } => make_queries(&attr)
+                .into_iter()
+                .map(|query| make_function_call("exists", vec![query]))
+                .collect(),
+            QueryNode::AttributeMissing { attr } => make_queries(&attr)
+                .into_iter()
+                .map(|query| make_not(make_function_call("exists", vec![query])))
+                .collect(),
+            // Equality.
+            QueryNode::AttributeTerm { attr, value }
+            | QueryNode::QuotedAttribute {
+                attr,
+                phrase: value,
+            } => make_queries(&attr)
+                .into_iter()
+                .map(|query| make_function_call("match", vec![query, make_regex(&value)]))
+                .collect(),
+            // Comparison.
+            QueryNode::AttributeComparison {
+                attr,
+                comparator,
+                value,
+            } => make_queries(&attr)
+                .into_iter()
+                .map(|query| make_op(make_node(query), comparator.into(), value.clone().into()))
+                .collect(),
+            // Wildcard suffix.
+            QueryNode::AttributePrefix { attr, prefix } => make_queries(&attr)
+                .into_iter()
+                .map(|query| {
+                    make_function_call("match", vec![query, make_regex(&format!("{}*", &prefix))])
+                })
+                .collect(),
+            // Arbitrary wildcard.
+            QueryNode::AttributeWildcard { attr, wildcard } => make_queries(&attr)
+                .into_iter()
+                .map(|query| make_function_call("match", vec![query, make_regex(&wildcard)]))
+                .collect(),
+            // Range.
+            QueryNode::AttributeRange {
+                attr,
+                lower,
+                lower_inclusive,
+                upper,
+                upper_inclusive,
+            } => make_queries(&attr)
+                .into_iter()
+                .map(|query| {
+                    match (&lower, &upper) {
+                        // If both bounds are wildcards, it'll match everything; just check the field exists.
+                        (ComparisonValue::Unbounded, ComparisonValue::Unbounded) => {
+                            make_function_call("exists", vec![query])
+                        }
+                        // Unbounded lower. Wrapped in a container group for negation compatibility.
+                        (ComparisonValue::Unbounded, _) => make_container_group(make_op(
+                            make_node(query),
+                            if upper_inclusive {
+                                ast::Opcode::Le
+                            } else {
+                                ast::Opcode::Lt
+                            },
+                            make_node(ast::Expr::Literal(make_node(upper.clone().into()))),
+                        )),
+                        // Unbounded upper. Wrapped in a container group for negation compatibility.
+                        (_, ComparisonValue::Unbounded) => make_container_group(make_op(
+                            make_node(query),
+                            if lower_inclusive {
+                                ast::Opcode::Ge
+                            } else {
+                                ast::Opcode::Gt
+                            },
+                            make_node(ast::Expr::Literal(make_node(lower.clone().into()))),
+                        )),
+                        // Definitive range.
+                        _ => make_container_group(make_op(
+                            make_node(make_op(
+                                make_node(query.clone()),
+                                if lower_inclusive {
+                                    ast::Opcode::Ge
+                                } else {
+                                    ast::Opcode::Gt
+                                },
+                                make_node(ast::Expr::Literal(make_node(lower.clone().into()))),
+                            )),
+                            ast::Opcode::And,
+                            make_node(make_op(
                                 make_node(query),
                                 if upper_inclusive {
                                     ast::Opcode::Le
@@ -142,53 +169,21 @@ impl From<QueryNode> for ast::Expr {
                                 },
                                 make_node(ast::Expr::Literal(make_node(upper.clone().into()))),
                             )),
-                            // Unbounded upper. Wrapped in a container group for negation compatibility.
-                            (_, ComparisonValue::Unbounded) => make_container_group(make_op(
-                                make_node(query),
-                                if lower_inclusive {
-                                    ast::Opcode::Ge
-                                } else {
-                                    ast::Opcode::Gt
-                                },
-                                make_node(ast::Expr::Literal(make_node(lower.clone().into()))),
-                            )),
-                            // Definitive range.
-                            _ => make_container_group(make_op(
-                                make_node(make_op(
-                                    make_node(query.clone()),
-                                    if lower_inclusive {
-                                        ast::Opcode::Ge
-                                    } else {
-                                        ast::Opcode::Gt
-                                    },
-                                    make_node(ast::Expr::Literal(make_node(lower.clone().into()))),
-                                )),
-                                ast::Opcode::And,
-                                make_node(make_op(
-                                    make_node(query),
-                                    if upper_inclusive {
-                                        ast::Opcode::Le
-                                    } else {
-                                        ast::Opcode::Lt
-                                    },
-                                    make_node(ast::Expr::Literal(make_node(upper.clone().into()))),
-                                )),
-                            )),
-                        }
-                    })
-                    .collect(),
-                // Negation.
-                QueryNode::NegatedNode { node } => {
-                    vec![make_not(make_container_group(ast::Expr::from(*node)))]
-                }
-                // Compound.
-                QueryNode::Boolean { oper, nodes } => {
-                    vec![make_container_group(nest_exprs(nodes.into_iter(), oper))]
-                }
-            })
-            .into_iter(),
-            Opcode::Or,
-        )
+                        )),
+                    }
+                })
+                .collect(),
+            // Negation.
+            QueryNode::NegatedNode { node } => {
+                vec![make_not(ast::Expr::from(*node))]
+            }
+            // Compound.
+            QueryNode::Boolean { oper, nodes } => {
+                vec![nest_exprs(nodes.into_iter(), oper)]
+            }
+        };
+
+        nest_exprs(exprs.into_iter(), Opcode::Or)
     }
 }
 
@@ -199,13 +194,10 @@ fn make_node<T>(node: T) -> ast::Node<T> {
 
 /// Converts a field/facet name to the VRL equivalent. Datadog payloads have a `message` field
 /// (which is used whenever the default field is encountered. Facets are hosted on .custom.*.
-fn normalize_tags<'a, T: AsRef<str>>(value: T) -> Vec<String> {
+fn normalize_tags<T: AsRef<str>>(value: T) -> Vec<String> {
     let value = value.as_ref();
     if value.eq(grammar::DEFAULT_FIELD) {
-        return DEFAULT_FIELDS
-            .into_iter()
-            .map(|s| (*s).to_owned())
-            .collect();
+        return DEFAULT_FIELDS.iter().map(|s| (*s).to_owned()).collect();
     }
 
     vec![value.replace("@", "custom.")]
@@ -289,17 +281,17 @@ fn nest_exprs<Expr: ExactSizeIterator<Item = impl Into<ast::Expr>>, O: Into<ast:
         // If this is the last expression, just return it.
         0 => expr,
         // If there's one expression remaining, use it as the RHS; no need to wrap.
-        1 => make_op(
+        1 => make_container_group(make_op(
             make_node(expr),
             op,
             make_node(exprs.next().expect("must contain expression").into()),
-        ),
+        )),
         // For 2+ expressions, recurse over the RHS.
-        _ => make_op(
+        _ => make_container_group(make_op(
             make_node(expr),
             op,
-            make_node(make_container_group(nest_exprs(exprs, op))),
-        ),
+            make_node(nest_exprs(exprs, op)),
+        )),
     }
 }
 
@@ -312,45 +304,45 @@ mod tests {
     // Datadog search syntax -> VRL
     static TESTS: &[(&str, &str)] = &[
         // Match everything (empty).
-        ("", "exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_))))"),
+        ("", "(exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_)))))"),
         // Match everything.
-        ("*:*", "exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_))))"),
+        ("*:*", "(exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_)))))"),
         // Match everything (negate).
-        ("NOT(*:*)", "!exists(.message) || (!exists(.custom.error.message) || (!exists(.custom.error.stack) || (!exists(.custom.title) || !exists(._default_))))"),
+        ("NOT(*:*)", "(!exists(.message) || (!exists(.custom.error.message) || (!exists(.custom.error.stack) || (!exists(.custom.title) || !exists(._default_)))))"),
         // Match nothing.
-        ("-*:*", "!exists(.message) || (!exists(.custom.error.message) || (!exists(.custom.error.stack) || (!exists(.custom.title) || !exists(._default_))))"),
+        ("-*:*", "(!exists(.message) || (!exists(.custom.error.message) || (!exists(.custom.error.stack) || (!exists(.custom.title) || !exists(._default_)))))"),
         // Tag exists.
         ("_exists_:a", "exists(.a)"),
         // Tag exists (negate).
-        ("NOT _exists_:a", "!(exists(.a))"),
+        ("NOT _exists_:a", "!exists(.a)"),
         // Tag exists (negate w/-).
-        ("-_exists_:a", "!(exists(.a))"),
+        ("-_exists_:a", "!exists(.a)"),
         // Facet exists.
         ("_exists_:@b", "exists(.custom.b)"),
         // Facet exists (negate).
-        ("NOT _exists_:@b", "!(exists(.custom.b))"),
+        ("NOT _exists_:@b", "!exists(.custom.b)"),
         // Facet exists (negate w/-).
-        ("-_exists_:@b", "!(exists(.custom.b))"),
+        ("-_exists_:@b", "!exists(.custom.b)"),
         // Tag doesn't exist.
         ("_missing_:a", "!exists(.a)"),
         // Tag doesn't exist (negate).
-        ("NOT _missing_:a", "!(!exists(.a))"),
+        ("NOT _missing_:a", "!!exists(.a)"),
         // Tag doesn't exist (negate w/-).
-        ("-_missing_:a", "!(!exists(.a))"),
+        ("-_missing_:a", "!!exists(.a)"),
         // Facet doesn't exist.
         ("_missing_:@b", "!exists(.custom.b)"),
         // Facet doesn't exist (negate).
-        ("NOT _missing_:@b", "!(!exists(.custom.b))"),
+        ("NOT _missing_:@b", "!!exists(.custom.b)"),
         // Facet doesn't exist (negate w/-).
-        ("-_missing_:@b", "!(!exists(.custom.b))"),
+        ("-_missing_:@b", "!!exists(.custom.b)"),
         // Keyword.
-        ("bla", r#"match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b'))))"#),
+        ("bla", r#"(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b')))))"#),
         // Keyword (negate).
         ("NOT bla", r#"!(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b')))))"#),
         // Keyword (negate w/-).
         ("-bla", r#"!(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b')))))"#),
         // Quoted keyword.
-        (r#""bla""#, r#"match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b'))))"#),
+        (r#""bla""#, r#"(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b')))))"#),
         // Quoted keyword (negate).
         (r#"NOT "bla""#, r#"!(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b')))))"#),
         // Quoted keyword (negate w/-).
@@ -358,41 +350,41 @@ mod tests {
         // Tag match.
         ("a:bla", r#"match(.a, r'\bbla\b')"#),
         // Tag match (negate).
-        ("NOT a:bla", r#"!(match(.a, r'\bbla\b'))"#),
+        ("NOT a:bla", r#"!match(.a, r'\bbla\b')"#),
         // Tag match (negate w/-).
-        ("-a:bla", r#"!(match(.a, r'\bbla\b'))"#),
+        ("-a:bla", r#"!match(.a, r'\bbla\b')"#),
         // Quoted tag match.
         (r#"a:"bla""#, r#"match(.a, r'\bbla\b')"#),
         // Quoted tag match (negate).
-        (r#"NOT a:"bla""#, r#"!(match(.a, r'\bbla\b'))"#),
+        (r#"NOT a:"bla""#, r#"!match(.a, r'\bbla\b')"#),
         // Quoted tag match (negate).
-        (r#"-a:"bla""#, r#"!(match(.a, r'\bbla\b'))"#),
+        (r#"-a:"bla""#, r#"!match(.a, r'\bbla\b')"#),
         // Facet match.
         ("@a:bla", r#"match(.custom.a, r'\bbla\b')"#),
         // Facet match (negate).
-        ("NOT @a:bla", r#"!(match(.custom.a, r'\bbla\b'))"#),
+        ("NOT @a:bla", r#"!match(.custom.a, r'\bbla\b')"#),
         // Facet match (negate w/-).
-        ("-@a:bla", r#"!(match(.custom.a, r'\bbla\b'))"#),
+        ("-@a:bla", r#"!match(.custom.a, r'\bbla\b')"#),
         // Quoted facet match.
         (r#"@a:"bla""#, r#"match(.custom.a, r'\bbla\b')"#),
         // Quoted facet match (negate).
-        (r#"NOT @a:"bla""#, r#"!(match(.custom.a, r'\bbla\b'))"#),
+        (r#"NOT @a:"bla""#, r#"!match(.custom.a, r'\bbla\b')"#),
         // Quoted facet match (negate w/-).
-        (r#"-@a:"bla""#, r#"!(match(.custom.a, r'\bbla\b'))"#),
+        (r#"-@a:"bla""#, r#"!match(.custom.a, r'\bbla\b')"#),
         // Wildcard prefix.
-        ("*bla", r#"match(.message, r'\b.*bla\b') || (match(.custom.error.message, r'\b.*bla\b') || (match(.custom.error.stack, r'\b.*bla\b') || (match(.custom.title, r'\b.*bla\b') || match(._default_, r'\b.*bla\b'))))"#),
+        ("*bla", r#"(match(.message, r'\b.*bla\b') || (match(.custom.error.message, r'\b.*bla\b') || (match(.custom.error.stack, r'\b.*bla\b') || (match(.custom.title, r'\b.*bla\b') || match(._default_, r'\b.*bla\b')))))"#),
         // Wildcard prefix (negate).
         ("NOT *bla", r#"!(match(.message, r'\b.*bla\b') || (match(.custom.error.message, r'\b.*bla\b') || (match(.custom.error.stack, r'\b.*bla\b') || (match(.custom.title, r'\b.*bla\b') || match(._default_, r'\b.*bla\b')))))"#),
         // Wildcard prefix (negate w/-).
         ("-*bla", r#"!(match(.message, r'\b.*bla\b') || (match(.custom.error.message, r'\b.*bla\b') || (match(.custom.error.stack, r'\b.*bla\b') || (match(.custom.title, r'\b.*bla\b') || match(._default_, r'\b.*bla\b')))))"#),
         // Wildcard suffix.
-        ("bla*", r#"match(.message, r'\bbla.*\b') || (match(.custom.error.message, r'\bbla.*\b') || (match(.custom.error.stack, r'\bbla.*\b') || (match(.custom.title, r'\bbla.*\b') || match(._default_, r'\bbla.*\b'))))"#),
+        ("bla*", r#"(match(.message, r'\bbla.*\b') || (match(.custom.error.message, r'\bbla.*\b') || (match(.custom.error.stack, r'\bbla.*\b') || (match(.custom.title, r'\bbla.*\b') || match(._default_, r'\bbla.*\b')))))"#),
         // Wildcard suffix (negate).
         ("NOT bla*", r#"!(match(.message, r'\bbla.*\b') || (match(.custom.error.message, r'\bbla.*\b') || (match(.custom.error.stack, r'\bbla.*\b') || (match(.custom.title, r'\bbla.*\b') || match(._default_, r'\bbla.*\b')))))"#),
         // Wildcard suffix (negate w/-).
         ("-bla*", r#"!(match(.message, r'\bbla.*\b') || (match(.custom.error.message, r'\bbla.*\b') || (match(.custom.error.stack, r'\bbla.*\b') || (match(.custom.title, r'\bbla.*\b') || match(._default_, r'\bbla.*\b')))))"#),
         // Multiple wildcards.
-        ("*b*la*", r#"match(.message, r'\b.*b.*la.*\b') || (match(.custom.error.message, r'\b.*b.*la.*\b') || (match(.custom.error.stack, r'\b.*b.*la.*\b') || (match(.custom.title, r'\b.*b.*la.*\b') || match(._default_, r'\b.*b.*la.*\b'))))"#),
+        ("*b*la*", r#"(match(.message, r'\b.*b.*la.*\b') || (match(.custom.error.message, r'\b.*b.*la.*\b') || (match(.custom.error.stack, r'\b.*b.*la.*\b') || (match(.custom.title, r'\b.*b.*la.*\b') || match(._default_, r'\b.*b.*la.*\b')))))"#),
         // Multiple wildcards (negate).
         ("NOT *b*la*", r#"!(match(.message, r'\b.*b.*la.*\b') || (match(.custom.error.message, r'\b.*b.*la.*\b') || (match(.custom.error.stack, r'\b.*b.*la.*\b') || (match(.custom.title, r'\b.*b.*la.*\b') || match(._default_, r'\b.*b.*la.*\b')))))"#),
         // Multiple wildcards (negate w/-).
@@ -400,59 +392,59 @@ mod tests {
         // Wildcard prefix - tag.
         ("a:*bla", r#"match(.a, r'\b.*bla\b')"#),
         // Wildcard prefix - tag (negate).
-        ("NOT a:*bla", r#"!(match(.a, r'\b.*bla\b'))"#),
+        ("NOT a:*bla", r#"!match(.a, r'\b.*bla\b')"#),
         // Wildcard prefix - tag (negate w/-).
-        ("-a:*bla", r#"!(match(.a, r'\b.*bla\b'))"#),
+        ("-a:*bla", r#"!match(.a, r'\b.*bla\b')"#),
         // Wildcard suffix - tag.
         ("b:bla*", r#"match(.b, r'\bbla.*\b')"#),
         // Wildcard suffix - tag (negate).
-        ("NOT b:bla*", r#"!(match(.b, r'\bbla.*\b'))"#),
+        ("NOT b:bla*", r#"!match(.b, r'\bbla.*\b')"#),
         // Wildcard suffix - tag (negate w/-).
-        ("-b:bla*", r#"!(match(.b, r'\bbla.*\b'))"#),
+        ("-b:bla*", r#"!match(.b, r'\bbla.*\b')"#),
         // Multiple wildcards - tag.
         ("c:*b*la*", r#"match(.c, r'\b.*b.*la.*\b')"#),
         // Multiple wildcards - tag (negate).
-        ("NOT c:*b*la*", r#"!(match(.c, r'\b.*b.*la.*\b'))"#),
+        ("NOT c:*b*la*", r#"!match(.c, r'\b.*b.*la.*\b')"#),
         // Multiple wildcards - tag (negate w/-).
-        ("-c:*b*la*", r#"!(match(.c, r'\b.*b.*la.*\b'))"#),
+        ("-c:*b*la*", r#"!match(.c, r'\b.*b.*la.*\b')"#),
         // Wildcard prefix - facet.
         ("@a:*bla", r#"match(.custom.a, r'\b.*bla\b')"#),
         // Wildcard prefix - facet (negate).
-        ("NOT @a:*bla", r#"!(match(.custom.a, r'\b.*bla\b'))"#),
+        ("NOT @a:*bla", r#"!match(.custom.a, r'\b.*bla\b')"#),
         // Wildcard prefix - facet (negate w/-).
-        ("-@a:*bla", r#"!(match(.custom.a, r'\b.*bla\b'))"#),
+        ("-@a:*bla", r#"!match(.custom.a, r'\b.*bla\b')"#),
         // Wildcard suffix - facet.
         ("@b:bla*", r#"match(.custom.b, r'\bbla.*\b')"#),
         // Wildcard suffix - facet (negate).
-        ("NOT @b:bla*", r#"!(match(.custom.b, r'\bbla.*\b'))"#),
+        ("NOT @b:bla*", r#"!match(.custom.b, r'\bbla.*\b')"#),
         // Wildcard suffix - facet (negate w/-).
-        ("-@b:bla*", r#"!(match(.custom.b, r'\bbla.*\b'))"#),
+        ("-@b:bla*", r#"!match(.custom.b, r'\bbla.*\b')"#),
         // Multiple wildcards - facet.
         ("@c:*b*la*", r#"match(.custom.c, r'\b.*b.*la.*\b')"#),
         // Multiple wildcards - facet (negate).
-        ("NOT @c:*b*la*", r#"!(match(.custom.c, r'\b.*b.*la.*\b'))"#),
+        ("NOT @c:*b*la*", r#"!match(.custom.c, r'\b.*b.*la.*\b')"#),
         // Multiple wildcards - facet (negate w/-).
-        ("-@c:*b*la*", r#"!(match(.custom.c, r'\b.*b.*la.*\b'))"#),
+        ("-@c:*b*la*", r#"!match(.custom.c, r'\b.*b.*la.*\b')"#),
         // Range - numeric, inclusive.
-        ("[1 TO 10]", "(.message >= 1 && .message <= 10) || ((.custom.error.message >= 1 && .custom.error.message <= 10) || ((.custom.error.stack >= 1 && .custom.error.stack <= 10) || ((.custom.title >= 1 && .custom.title <= 10) || (._default_ >= 1 && ._default_ <= 10))))"),
+        ("[1 TO 10]", "((.message >= 1 && .message <= 10) || ((.custom.error.message >= 1 && .custom.error.message <= 10) || ((.custom.error.stack >= 1 && .custom.error.stack <= 10) || ((.custom.title >= 1 && .custom.title <= 10) || (._default_ >= 1 && ._default_ <= 10)))))"),
         // Range - numeric, inclusive (negate).
         ("NOT [1 TO 10]", "!((.message >= 1 && .message <= 10) || ((.custom.error.message >= 1 && .custom.error.message <= 10) || ((.custom.error.stack >= 1 && .custom.error.stack <= 10) || ((.custom.title >= 1 && .custom.title <= 10) || (._default_ >= 1 && ._default_ <= 10)))))"),
         // Range - numeric, inclusive (negate w/-).
         ("-[1 TO 10]", "!((.message >= 1 && .message <= 10) || ((.custom.error.message >= 1 && .custom.error.message <= 10) || ((.custom.error.stack >= 1 && .custom.error.stack <= 10) || ((.custom.title >= 1 && .custom.title <= 10) || (._default_ >= 1 && ._default_ <= 10)))))"),
         // Range - numeric, inclusive, unbounded (upper).
-        ("[50 TO *]", "(.message >= 50) || ((.custom.error.message >= 50) || ((.custom.error.stack >= 50) || ((.custom.title >= 50) || (._default_ >= 50))))"),
+        ("[50 TO *]", "((.message >= 50) || ((.custom.error.message >= 50) || ((.custom.error.stack >= 50) || ((.custom.title >= 50) || (._default_ >= 50)))))"),
         // Range - numeric, inclusive, unbounded (upper) (negate).
         ("NOT [50 TO *]", "!((.message >= 50) || ((.custom.error.message >= 50) || ((.custom.error.stack >= 50) || ((.custom.title >= 50) || (._default_ >= 50)))))"),
         // Range - numeric, inclusive, unbounded (upper) (negate w/-).
         ("-[50 TO *]", "!((.message >= 50) || ((.custom.error.message >= 50) || ((.custom.error.stack >= 50) || ((.custom.title >= 50) || (._default_ >= 50)))))"),
         // Range - numeric, inclusive, unbounded (lower).
-        ("[* TO 50]", "(.message <= 50) || ((.custom.error.message <= 50) || ((.custom.error.stack <= 50) || ((.custom.title <= 50) || (._default_ <= 50))))"),
+        ("[* TO 50]", "((.message <= 50) || ((.custom.error.message <= 50) || ((.custom.error.stack <= 50) || ((.custom.title <= 50) || (._default_ <= 50)))))"),
         // Range - numeric, inclusive, unbounded (lower) (negate).
         ("NOT [* TO 50]", "!((.message <= 50) || ((.custom.error.message <= 50) || ((.custom.error.stack <= 50) || ((.custom.title <= 50) || (._default_ <= 50)))))"),
         // Range - numeric, inclusive, unbounded (lower) (negate w/-).
         ("-[* TO 50]", "!((.message <= 50) || ((.custom.error.message <= 50) || ((.custom.error.stack <= 50) || ((.custom.title <= 50) || (._default_ <= 50)))))"),
         // Range - numeric, inclusive, unbounded (both).
-        ("[* TO *]", "exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_))))"),
+        ("[* TO *]", "(exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_)))))"),
         // Range - numeric, inclusive, unbounded (both) (negate).
         ("NOT [* TO *]", "!(exists(.message) || (exists(.custom.error.message) || (exists(.custom.error.stack) || (exists(.custom.title) || exists(._default_)))))"),
         // Range - numeric, inclusive, unbounded (both) (negate w/-).
@@ -460,108 +452,88 @@ mod tests {
         // Range - numeric, inclusive, tag.
         ("a:[1 TO 10]", "(.a >= 1 && .a <= 10)"),
         // Range - numeric, inclusive, tag (negate).
-        ("NOT a:[1 TO 10]", "!((.a >= 1 && .a <= 10))"),
+        ("NOT a:[1 TO 10]", "!(.a >= 1 && .a <= 10)"),
         // Range - numeric, inclusive, tag (negate w/-).
-        ("-a:[1 TO 10]", "!((.a >= 1 && .a <= 10))"),
+        ("-a:[1 TO 10]", "!(.a >= 1 && .a <= 10)"),
         // Range - numeric, inclusive, unbounded (upper), tag.
         ("a:[50 TO *]", "(.a >= 50)"),
         // Range - numeric, inclusive, unbounded (upper), tag (negate).
-        ("NOT a:[50 TO *]", "!((.a >= 50))"),
+        ("NOT a:[50 TO *]", "!(.a >= 50)"),
         // Range - numeric, inclusive, unbounded (upper), tag (negate w/-).
-        ("-a:[50 TO *]", "!((.a >= 50))"),
+        ("-a:[50 TO *]", "!(.a >= 50)"),
         // Range - numeric, inclusive, unbounded (lower), tag.
         ("a:[* TO 50]", "(.a <= 50)"),
         // Range - numeric, inclusive, unbounded (lower), tag (negate).
-        ("NOT a:[* TO 50]", "!((.a <= 50))"),
+        ("NOT a:[* TO 50]", "!(.a <= 50)"),
         // Range - numeric, inclusive, unbounded (lower), tag (negate w/-).
-        ("-a:[* TO 50]", "!((.a <= 50))"),
+        ("-a:[* TO 50]", "!(.a <= 50)"),
         // Range - numeric, inclusive, unbounded (both), tag.
         ("a:[* TO *]", "exists(.a)"),
         // Range - numeric, inclusive, unbounded (both), tag (negate).
-        ("NOT a:[* TO *]", "!(exists(.a))"),
+        ("NOT a:[* TO *]", "!exists(.a)"),
         // Range - numeric, inclusive, unbounded (both), tag (negate).
-        ("-a:[* TO *]", "!(exists(.a))"),
+        ("-a:[* TO *]", "!exists(.a)"),
         // Range - numeric, inclusive, facet.
         ("@b:[1 TO 10]", "(.custom.b >= 1 && .custom.b <= 10)"),
         // Range - numeric, inclusive, facet (negate).
-        ("NOT @b:[1 TO 10]", "!((.custom.b >= 1 && .custom.b <= 10))"),
+        ("NOT @b:[1 TO 10]", "!(.custom.b >= 1 && .custom.b <= 10)"),
         // Range - numeric, inclusive, facet (negate w/-).
-        ("-@b:[1 TO 10]", "!((.custom.b >= 1 && .custom.b <= 10))"),
+        ("-@b:[1 TO 10]", "!(.custom.b >= 1 && .custom.b <= 10)"),
         // Range - numeric, inclusive, unbounded (upper), facet.
         ("@b:[50 TO *]", "(.custom.b >= 50)"),
         // Range - numeric, inclusive, unbounded (upper), facet (negate).
-        ("NOT @b:[50 TO *]", "!((.custom.b >= 50))"),
+        ("NOT @b:[50 TO *]", "!(.custom.b >= 50)"),
         // Range - numeric, inclusive, unbounded (upper), facet (negate w/-).
-        ("-@b:[50 TO *]", "!((.custom.b >= 50))"),
+        ("-@b:[50 TO *]", "!(.custom.b >= 50)"),
         // Range - numeric, inclusive, unbounded (lower), facet.
         ("@b:[* TO 50]", "(.custom.b <= 50)"),
         // Range - numeric, inclusive, unbounded (lower), facet (negate).
-        ("NOT @b:[* TO 50]", "!((.custom.b <= 50))"),
+        ("NOT @b:[* TO 50]", "!(.custom.b <= 50)"),
         // Range - numeric, inclusive, unbounded (lower), facet (negate w/-).
-        ("-@b:[* TO 50]", "!((.custom.b <= 50))"),
+        ("-@b:[* TO 50]", "!(.custom.b <= 50)"),
         // Range - numeric, inclusive, unbounded (both), facet.
         ("@b:[* TO *]", "exists(.custom.b)"),
         // Range - numeric, inclusive, unbounded (both), facet (negate).
-        ("NOT @b:[* TO *]", "!(exists(.custom.b))"),
+        ("NOT @b:[* TO *]", "!exists(.custom.b)"),
         // Range - numeric, inclusive, unbounded (both), facet (negate w/-).
-        ("-@b:[* TO *]", "!(exists(.custom.b))"),
+        ("-@b:[* TO *]", "!exists(.custom.b)"),
         // AND match, keyword.
         (
-            "this AND that AND the_other",
-            r#"(match(.message, r'\bthis\b') && (match(.message, r'\bthat\b') && match(.message, r'\bthe_other\b')))"#,
+            "this AND that",
+            r#"((match(.message, r'\bthis\b') || (match(.custom.error.message, r'\bthis\b') || (match(.custom.error.stack, r'\bthis\b') || (match(.custom.title, r'\bthis\b') || match(._default_, r'\bthis\b'))))) && (match(.message, r'\bthat\b') || (match(.custom.error.message, r'\bthat\b') || (match(.custom.error.stack, r'\bthat\b') || (match(.custom.title, r'\bthat\b') || match(._default_, r'\bthat\b'))))))"#,
         ),
         // AND match, keyword (negate last).
         (
-            "this AND that AND NOT the_other",
-            r#"(match(.message, r'\bthis\b') && (match(.message, r'\bthat\b') && !match(.message, r'\bthe_other\b')))"#,
+            "this AND NOT that",
+            r#"((match(.message, r'\bthis\b') || (match(.custom.error.message, r'\bthis\b') || (match(.custom.error.stack, r'\bthis\b') || (match(.custom.title, r'\bthis\b') || match(._default_, r'\bthis\b'))))) && !(match(.message, r'\bthat\b') || (match(.custom.error.message, r'\bthat\b') || (match(.custom.error.stack, r'\bthat\b') || (match(.custom.title, r'\bthat\b') || match(._default_, r'\bthat\b'))))))"#,
         ),
         // AND match, keyword (negate last w/-).
         (
-            "this AND that AND -the_other",
-            r#"(match(.message, r'\bthis\b') && (match(.message, r'\bthat\b') && !match(.message, r'\bthe_other\b')))"#,
+            "this AND -that",
+            r#"((match(.message, r'\bthis\b') || (match(.custom.error.message, r'\bthis\b') || (match(.custom.error.stack, r'\bthis\b') || (match(.custom.title, r'\bthis\b') || match(._default_, r'\bthis\b'))))) && !(match(.message, r'\bthat\b') || (match(.custom.error.message, r'\bthat\b') || (match(.custom.error.stack, r'\bthat\b') || (match(.custom.title, r'\bthat\b') || match(._default_, r'\bthat\b'))))))"#,
         ),
-        // AND match, keyword (grouped).
+        // OR match, keyword, explicit.
         (
-            "this AND (that AND the_other)",
-            r#"(match(.message, r'\bthis\b') && (match(.message, r'\bthat\b') && match(.message, r'\bthe_other\b')))"#,
-        ),
-        // OR match, keyword.
-        (
-            "this OR that OR the_other",
-            r#"(match(.message, r'\bthis\b') || (match(.message, r'\bthat\b') || match(.message, r'\bthe_other\b')))"#,
-        ),
-        // OR match, keyword, filter last.
-        (
-            "this OR that OR NOT the_other",
-            r#"(!match(.message, r'\bthe_other\b') && (match(.message, r'\bthis\b') || match(.message, r'\bthat\b')))"#,
-        ),
-        // OR match, keyword, filter last w/-.
-        (
-            "this OR that OR -the_other",
-            r#"(!match(.message, r'\bthe_other\b') && (match(.message, r'\bthis\b') || match(.message, r'\bthat\b')))"#,
-        ),
-        // OR match, keyword (grouped).
-        (
-            "this OR (that OR the_other)",
-            r#"(match(.message, r'\bthis\b') || (match(.message, r'\bthat\b') || match(.message, r'\bthe_other\b')))"#,
+            "this OR that",
+            r#"((match(.message, r'\bthis\b') || (match(.custom.error.message, r'\bthis\b') || (match(.custom.error.stack, r'\bthis\b') || (match(.custom.title, r'\bthis\b') || match(._default_, r'\bthis\b'))))) || (match(.message, r'\bthat\b') || (match(.custom.error.message, r'\bthat\b') || (match(.custom.error.stack, r'\bthat\b') || (match(.custom.title, r'\bthat\b') || match(._default_, r'\bthat\b'))))))"#,
         ),
         // AND and OR match.
         (
             "this AND (that OR the_other)",
-            r#"(match(.message, r'\bthis\b') && (match(.message, r'\bthat\b') || match(.message, r'\bthe_other\b')))"#,
+            r#"((match(.message, r'\bthis\b') || (match(.custom.error.message, r'\bthis\b') || (match(.custom.error.stack, r'\bthis\b') || (match(.custom.title, r'\bthis\b') || match(._default_, r'\bthis\b'))))) && ((match(.message, r'\bthat\b') || (match(.custom.error.message, r'\bthat\b') || (match(.custom.error.stack, r'\bthat\b') || (match(.custom.title, r'\bthat\b') || match(._default_, r'\bthat\b'))))) || (match(.message, r'\bthe_other\b') || (match(.custom.error.message, r'\bthe_other\b') || (match(.custom.error.stack, r'\bthe_other\b') || (match(.custom.title, r'\bthe_other\b') || match(._default_, r'\bthe_other\b')))))))"#,
         ),
         // OR and AND match.
         (
             "this OR (that AND the_other)",
-            r#"(match(.message, r'\bthis\b') || (match(.message, r'\bthat\b') && match(.message, r'\bthe_other\b')))"#,
+            r#"((match(.message, r'\bthis\b') || (match(.custom.error.message, r'\bthis\b') || (match(.custom.error.stack, r'\bthis\b') || (match(.custom.title, r'\bthis\b') || match(._default_, r'\bthis\b'))))) || ((match(.message, r'\bthat\b') || (match(.custom.error.message, r'\bthat\b') || (match(.custom.error.stack, r'\bthat\b') || (match(.custom.title, r'\bthat\b') || match(._default_, r'\bthat\b'))))) && (match(.message, r'\bthe_other\b') || (match(.custom.error.message, r'\bthe_other\b') || (match(.custom.error.stack, r'\bthe_other\b') || (match(.custom.title, r'\bthe_other\b') || match(._default_, r'\bthe_other\b')))))))"#,
         ),
         // A bit of everything.
         (
-            "@a:this OR ((@b:test* c:that) AND d:the_other [1 TO 5])",
-            r#"(match(.custom.a, r'\bthis\b') || ((match(.custom.b, r'\btest.*\b') && match(.c, r'\bthat\b')) && (match(.d, r'\bthe_other\b') && (.message >= 1 && .message <= 5))))"#,
+            "@a:this OR ((@b:test* c:that) AND d:the_other e:[1 TO 5])",
+            r#"(match(.custom.a, r'\bthis\b') || ((match(.custom.b, r'\btest.*\b') && match(.c, r'\bthat\b')) && (match(.d, r'\bthe_other\b') && (.e >= 1 && .e <= 5))))"#,
         ),
         // Range - numeric, exclusive
-        ("{1 TO 10}", "(.message > 1 && .message < 10)"),
+        ("f:{1 TO 10}", "(.f > 1 && .f < 10)"),
         // TODO: CURRENTLY FAILING TESTS -- needs work in the main grammar and/or VRL to support!
         // Range - alpha, inclusive
         // TODO: https://github.com/timberio/vector/issues/7539
@@ -572,7 +544,7 @@ mod tests {
     /// Compile each Datadog search query -> VRL, and do the same with the equivalent direct
     /// VRL syntax, and then compare the results.
     fn to_vrl() {
-        for (dd, vrl) in TESTS.into_iter() {
+        for (dd, vrl) in TESTS.iter() {
             let node =
                 parse(dd).unwrap_or_else(|_| panic!("invalid Datadog search syntax: {}", dd));
             let root = ast::RootExpr::Expr(make_node(ast::Expr::from(node)));
