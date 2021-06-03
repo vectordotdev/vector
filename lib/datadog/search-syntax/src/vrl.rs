@@ -124,7 +124,12 @@ impl From<QueryNode> for ast::Expr {
                 phrase: value,
             } => make_queries(&attr)
                 .into_iter()
-                .map(|(_, query)| make_function_call("match", vec![query, make_regex(&value)]))
+                .map(|(field, query)| match field {
+                    Field::Default(_) => {
+                        make_function_call("match", vec![query, make_regex(&value)])
+                    }
+                    _ => make_container_group(make_string_comparison(query, Opcode::Eq, &value)),
+                })
                 .collect(),
             // Comparison.
             QueryNode::AttributeComparison {
@@ -258,7 +263,7 @@ fn make_op(expr1: ast::Node<ast::Expr>, op: Opcode, expr2: ast::Node<ast::Expr>)
 }
 
 /// An `Expr::Query`, converting a string field to a lookup path.
-fn make_queries(field: &str) -> Vec<(Field, ast::Expr)> {
+fn make_queries<T: AsRef<str>>(field: T) -> Vec<(Field, ast::Expr)> {
     normalize_fields(field)
         .into_iter()
         .map(|field| {
@@ -277,11 +282,22 @@ fn make_queries(field: &str) -> Vec<(Field, ast::Expr)> {
 }
 
 /// Makes a Regex string to be used with the `match`.
-fn make_regex(value: &str) -> ast::Expr {
+fn make_regex<T: AsRef<str>>(value: T) -> ast::Expr {
     ast::Expr::Literal(make_node(ast::Literal::Regex(format!(
         "\\b{}\\b",
-        regex::escape(value).replace("\\*", ".*")
+        regex::escape(value.as_ref()).replace("\\*", ".*")
     ))))
+}
+
+/// Makes a string comparison expression.
+fn make_string_comparison<T: AsRef<str>>(expr: ast::Expr, op: Opcode, value: T) -> ast::Expr {
+    make_op(
+        make_node(expr),
+        op,
+        make_node(ast::Expr::Literal(make_node(ast::Literal::String(
+            String::from(value.as_ref()),
+        )))),
+    )
 }
 
 /// Makes a container group, for wrapping logic for easier negation.
@@ -395,29 +411,29 @@ mod tests {
         // Quoted keyword (negate w/-).
         (r#"-"bla""#, r#"!(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b')))))"#),
         // Tag match.
-        ("a:bla", r#"match(.a, r'\bbla\b')"#),
+        ("a:bla", r#"(.a == "bla")"#),
         // Tag match (negate).
-        ("NOT a:bla", r#"!match(.a, r'\bbla\b')"#),
+        ("NOT a:bla", r#"!(.a == "bla")"#),
         // Tag match (negate w/-).
-        ("-a:bla", r#"!match(.a, r'\bbla\b')"#),
+        ("-a:bla", r#"!(.a == "bla")"#),
         // Quoted tag match.
-        (r#"a:"bla""#, r#"match(.a, r'\bbla\b')"#),
+        (r#"a:"bla""#, r#"(.a == "bla")"#),
         // Quoted tag match (negate).
-        (r#"NOT a:"bla""#, r#"!match(.a, r'\bbla\b')"#),
+        (r#"NOT a:"bla""#, r#"!(.a == "bla")"#),
         // Quoted tag match (negate).
-        (r#"-a:"bla""#, r#"!match(.a, r'\bbla\b')"#),
+        (r#"-a:"bla""#, r#"!(.a == "bla")"#),
         // Facet match.
-        ("@a:bla", r#"match(.custom.a, r'\bbla\b')"#),
+        ("@a:bla", r#"(.custom.a == "bla")"#),
         // Facet match (negate).
-        ("NOT @a:bla", r#"!match(.custom.a, r'\bbla\b')"#),
+        ("NOT @a:bla", r#"!(.custom.a == "bla")"#),
         // Facet match (negate w/-).
-        ("-@a:bla", r#"!match(.custom.a, r'\bbla\b')"#),
+        ("-@a:bla", r#"!(.custom.a == "bla")"#),
         // Quoted facet match.
-        (r#"@a:"bla""#, r#"match(.custom.a, r'\bbla\b')"#),
+        (r#"@a:"bla""#, r#"(.custom.a == "bla")"#),
         // Quoted facet match (negate).
-        (r#"NOT @a:"bla""#, r#"!match(.custom.a, r'\bbla\b')"#),
+        (r#"NOT @a:"bla""#, r#"!(.custom.a == "bla")"#),
         // Quoted facet match (negate w/-).
-        (r#"-@a:"bla""#, r#"!match(.custom.a, r'\bbla\b')"#),
+        (r#"-@a:"bla""#, r#"!(.custom.a == "bla")"#),
         // Wildcard prefix.
         ("*bla", r#"(match(.message, r'\b.*bla\b') || (match(.custom.error.message, r'\b.*bla\b') || (match(.custom.error.stack, r'\b.*bla\b') || (match(.custom.title, r'\b.*bla\b') || match(._default_, r'\b.*bla\b')))))"#),
         // Wildcard prefix (negate).
@@ -577,7 +593,7 @@ mod tests {
         // A bit of everything.
         (
             "@a:this OR ((@b:test* c:that) AND d:the_other e:[1 TO 5])",
-            r#"(match(.custom.a, r'\bthis\b') || ((match(.custom.b, r'\btest.*\b') && match(.c, r'\bthat\b')) && (match(.d, r'\bthe_other\b') && (.e >= 1 && .e <= 5))))"#,
+            r#"((.custom.a == "this") || ((match(.custom.b, r'\btest.*\b') && (.c == "that")) && ((.d == "the_other") && (.e >= 1 && .e <= 5))))"#,
         ),
         // Range - numeric, exclusive
         ("f:{1 TO 10}", "(.f > 1 && .f < 10)"),
