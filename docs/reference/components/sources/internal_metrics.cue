@@ -412,8 +412,7 @@ components: sources: internal_metrics: {
 			description: """
 				The total number of events processed by this component.
 				This metric is deprecated in place of using
-				[`events_in_total`][docs.sources.internal_metrics.events_in_total] and
-				[`events_out_total`][docs.sources.internal_metrics.events_out_total] metrics.
+				`events_in_total` and `events_out_total` metrics.
 				"""
 			type:              "counter"
 			default_namespace: "vector"
