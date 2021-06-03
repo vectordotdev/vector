@@ -205,13 +205,12 @@ fn merge_tags(
     event: &Metric,
     tags: Option<&HashMap<String, String>>,
 ) -> Option<BTreeMap<String, String>> {
-    match (&event.series.tags, tags) {
-        (Some(ref event_tags), Some(ref config_tags)) => {
-            let mut event_tags = event_tags.clone();
+    match (event.tags().cloned(), tags) {
+        (Some(mut event_tags), Some(ref config_tags)) => {
             event_tags.extend(config_tags.iter().map(|(k, v)| (k.clone(), v.clone())));
             Some(event_tags)
         }
-        (Some(ref event_tags), None) => Some(event_tags.clone()),
+        (Some(event_tags), None) => Some(event_tags),
         (None, Some(config_tags)) => Some(
             config_tags
                 .iter()

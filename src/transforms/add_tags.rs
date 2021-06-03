@@ -68,7 +68,8 @@ impl AddTags {
 impl FunctionTransform for AddTags {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         if !self.tags.is_empty() {
-            let tags = &mut event.as_mut_metric().series.tags;
+            // TODO Replace this with a method on `struct Metric`
+            let tags = event.as_mut_metric().tags_mut();
 
             if tags.is_none() {
                 *tags = Some(BTreeMap::new());

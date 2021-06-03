@@ -177,11 +177,9 @@ fn render_metric_field(key: &str, metric: &Metric) -> Option<String> {
     match key {
         "name" => Some(metric.name().into()),
         "namespace" => metric.namespace().map(Into::into),
-        _ if key.starts_with("tags.") => metric
-            .series
-            .tags
-            .as_ref()
-            .and_then(|tags| tags.get(&key[5..]).cloned()),
+        _ if key.starts_with("tags.") => {
+            metric.tags().and_then(|tags| tags.get(&key[5..]).cloned())
+        }
         _ => None,
     }
 }

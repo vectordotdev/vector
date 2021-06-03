@@ -152,9 +152,7 @@ impl CloudWatchMetricsSvc {
             .with_flat_map(move |event: Event| {
                 stream::iter(normalizer.apply(event).map(|mut metric| {
                     let namespace = metric
-                        .series
-                        .name
-                        .namespace
+                        .take_namespace()
                         .take()
                         .unwrap_or_else(|| default_namespace.clone());
                     Ok(EncodedEvent::new(PartitionInnerBuffer::new(
@@ -172,7 +170,7 @@ impl CloudWatchMetricsSvc {
             .filter_map(|event| {
                 let metric_name = event.name().to_string();
                 let timestamp = event.timestamp().map(timestamp_to_string);
-                let dimensions = event.series.tags.clone().map(tags_to_dimensions);
+                let dimensions = event.tags().map(tags_to_dimensions);
                 // AwsCloudwatchMetricNormalize converts these to the right MetricKind
                 match event.value() {
                     MetricValue::Counter { value } => Some(MetricDatum {
@@ -271,7 +269,7 @@ fn timestamp_to_string(timestamp: DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
-fn tags_to_dimensions(tags: BTreeMap<String, String>) -> Vec<Dimension> {
+fn tags_to_dimensions(tags: &BTreeMap<String, String>) -> Vec<Dimension> {
     // according to the API, up to 10 dimensions per metric can be provided
     tags.iter()
         .take(10)

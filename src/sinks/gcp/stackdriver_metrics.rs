@@ -123,18 +123,19 @@ impl HttpSink for HttpEventSink {
         mut metrics: Self::Output,
     ) -> crate::Result<hyper::Request<Vec<u8>>> {
         let metric = metrics.pop().expect("only one metric");
-        let namespace = metric
-            .namespace()
-            .unwrap_or_else(|| self.config.default_namespace.as_ref());
+        let (series, data, _metadata) = metric.into_parts();
+        let namespace = series
+            .name
+            .namespace
+            .unwrap_or_else(|| self.config.default_namespace.clone());
         let metric_type = format!(
             "custom.googleapis.com/{}/metrics/{}",
-            namespace,
-            metric.name()
+            namespace, series.name.name
         );
 
-        let end_time = metric.timestamp().unwrap_or_else(chrono::Utc::now);
+        let end_time = data.timestamp.unwrap_or_else(chrono::Utc::now);
 
-        let (point_value, interval, metric_kind) = match metric.value() {
+        let (point_value, interval, metric_kind) = match &data.value {
             MetricValue::Counter { value } => {
                 let interval = gcp::GcpInterval {
                     start_time: Some(self.started),
@@ -154,8 +155,7 @@ impl HttpSink for HttpEventSink {
             _ => unreachable!(),
         };
 
-        let metric_labels = metric
-            .series
+        let metric_labels = series
             .tags
             .unwrap_or_default()
             .into_iter()

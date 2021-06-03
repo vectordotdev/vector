@@ -54,16 +54,12 @@ impl RemoveTags {
 
 impl FunctionTransform for RemoveTags {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        let tags = &mut event.as_mut_metric().series.tags;
+        let metric = event.as_mut_metric();
 
-        if let Some(map) = tags {
-            for tag in &self.tags {
-                map.remove(tag);
-
-                if map.is_empty() {
-                    *tags = None;
-                    break;
-                }
+        for tag in &self.tags {
+            metric.remove_tag(tag);
+            if metric.tags().is_none() {
+                break;
             }
         }
 

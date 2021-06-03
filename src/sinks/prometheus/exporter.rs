@@ -320,7 +320,7 @@ impl StreamSink for PrometheusExporter {
                         if existing.update(&entry) {
                             entry = MetricEntry(existing);
                         } else {
-                            warn!(message = "Metric changed type, dropping old value.", series = %entry.series);
+                            warn!(message = "Metric changed type, dropping old value.", series = %entry.series());
                         }
                     }
                     let is_set = matches!(entry.value(), MetricValue::Set { .. });
@@ -365,7 +365,7 @@ impl Eq for MetricEntry {}
 impl Hash for MetricEntry {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let metric = &self.0;
-        metric.series.hash(state);
+        metric.series().hash(state);
         metric.kind().hash(state);
         discriminant(metric.value()).hash(state);
 
@@ -390,7 +390,7 @@ impl PartialEq for MetricEntry {
         // This differs from a straightforward implementation of `eq` by
         // comparing only the "shape" bits (name, tags, and type) while
         // allowing the contained values to be different.
-        self.series == other.series
+        self.series() == other.series()
             && self.kind() == other.kind()
             && discriminant(self.value()) == discriminant(other.value())
             && match (self.value(), other.value()) {

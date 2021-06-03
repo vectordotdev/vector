@@ -166,21 +166,21 @@ impl MetricSet {
     /// state buffer to keep track of the value throughout the entire
     /// application uptime.
     fn incremental_to_absolute(&mut self, mut metric: Metric) -> Metric {
-        match self.0.get_mut(&metric.series) {
+        match self.0.get_mut(metric.series()) {
             Some(existing) => {
                 if existing.0.value.add(metric.value()) {
                     metric = metric.with_value(existing.0.value.clone());
                 } else {
                     // Metric changed type, store this as the new reference value
                     self.0.insert(
-                        metric.series.clone(),
+                        metric.series().clone(),
                         (metric.data().clone(), EventMetadata::default()),
                     );
                 }
             }
             None => {
                 self.0.insert(
-                    metric.series.clone(),
+                    metric.series().clone(),
                     (metric.data().clone(), EventMetadata::default()),
                 );
             }
@@ -191,7 +191,7 @@ impl MetricSet {
     /// Convert the absolute metric into an incremental by calculating
     /// the increment from the last saved absolute state.
     fn absolute_to_incremental(&mut self, mut metric: Metric) -> Option<Metric> {
-        match self.0.get_mut(&metric.series) {
+        match self.0.get_mut(metric.series()) {
             Some(reference) => {
                 let new_value = metric.value().clone();
                 // From the stored reference value, emit an increment
@@ -222,7 +222,7 @@ impl MetricSet {
             MetricKind::Absolute => Some(metric),
             MetricKind::Incremental => {
                 // Incremental metrics update existing entries, if present
-                match self.0.get_mut(&metric.series) {
+                match self.0.get_mut(metric.series()) {
                     Some(existing) => {
                         let (series, data, metadata) = metric.into_parts();
                         if existing.0.update(&data) {

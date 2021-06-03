@@ -15,8 +15,9 @@ use std::{
 
 #[derive(Clone, Debug, Deserialize, Getters, MutGetters, PartialEq, PartialOrd, Serialize)]
 pub struct Metric {
+    #[getset(get = "pub")]
     #[serde(flatten)]
-    pub series: MetricSeries,
+    pub(super) series: MetricSeries,
 
     #[getset(get = "pub")]
     #[serde(flatten)]
@@ -402,6 +403,11 @@ impl Metric {
     }
 
     #[inline]
+    pub fn take_namespace(&mut self) -> Option<String> {
+        self.series.name.namespace.take()
+    }
+
+    #[inline]
     pub fn tags(&self) -> Option<&MetricTags> {
         self.series.tags.as_ref()
     }
@@ -424,6 +430,18 @@ impl Metric {
     #[inline]
     pub fn kind(&self) -> MetricKind {
         self.data.kind
+    }
+
+    pub fn insert_tag(
+        &mut self,
+        key: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Option<String> {
+        self.series.insert_tag(key, value)
+    }
+
+    pub fn remove_tag(&mut self, key: &str) -> Option<String> {
+        self.series.remove_tag(key)
     }
 
     /// Returns `true` if `name` tag is present, and matches the provided `value`
@@ -481,6 +499,29 @@ impl EventDataEq for Metric {
         self.series == other.series
             && self.data == other.data
             && self.metadata.event_data_eq(&other.metadata)
+    }
+}
+
+impl MetricSeries {
+    pub fn insert_tag(
+        &mut self,
+        key: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Option<String> {
+        (self.tags.get_or_insert_with(Default::default)).insert(key.into(), value.into())
+    }
+
+    pub fn remove_tag(&mut self, key: &str) -> Option<String> {
+        match &mut self.tags {
+            None => None,
+            Some(tags) => {
+                let result = tags.remove(key);
+                if tags.is_empty() {
+                    self.tags = None;
+                }
+                result
+            }
+        }
     }
 }
 
