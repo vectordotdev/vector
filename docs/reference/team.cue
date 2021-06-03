@@ -32,6 +32,13 @@ team: [#Member, ...#Member] & [
 			Vector team.
 			"""
 	},
+        {
+                name:    "Brian"
+                _github: "blt"
+                bio: """
+                        Brian is a staff engineer at Datadog and a member of the Vector team.
+                        """
+        },
 	{
 		name:    "Bruce"
 		_github: "bruceg"
