@@ -7,8 +7,8 @@ releases: "0.14.0": {
 	description: """
 		The Vector team is pleased to announce version 0.14.0!
 
-		This release a new `exec` source that can be used to execute arbitrary programs and use their output to generate
-		events in Vector along with a number of enhancements.
+		This release includes a new `exec` source that can be used to execute arbitrary programs and use their output to
+		generate events in Vector along with a number of enhancements.
 
 		Check out the [highlights](#highlights) and [changelog](#changelog) for more details.
 		"""

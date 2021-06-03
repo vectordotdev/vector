@@ -7,7 +7,7 @@ author_github: "https://github.com/jszwedko"
 pr_numbers: [7373]
 release: "0.14.0"
 hide_on_release_notes: false
-tags: ["type: announcement", "domain: metrics"]
+tags: ["type: breaking change", "domain: metrics"]
 ---
 
 The following internal histogram metrics, accessible via the `internal_metrics` source were incorrectly suffixed with
