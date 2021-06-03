@@ -38,9 +38,9 @@ pub(super) struct Config {
     pub(super) queue_url: String,
 
     // restricted to u32 for safe conversion to i64 later
-    #[serde(default = "default_poll_timeout_secs")]
-    #[derivative(Default(value = "default_poll_timeout_secs()"))]
-    pub(super) poll_timeout_secs: u32,
+    #[serde(default = "default_poll_secs")]
+    #[derivative(Default(value = "default_poll_secs()"))]
+    pub(super) poll_secs: u32,
 
     // restricted to u32 for safe conversion to i64 later
     #[serde(default = "default_visibility_timeout_secs")]
@@ -57,13 +57,14 @@ pub(super) struct Config {
     pub(super) client_concurrency: u32,
 }
 
-const fn default_poll_timeout_secs() -> u32 {
+const fn default_poll_secs() -> u32 {
     15
 }
 
 const fn default_visibility_timeout_secs() -> u32 {
     300
 }
+
 const fn default_true() -> bool {
     true
 }
@@ -135,7 +136,7 @@ pub struct State {
     compression: super::Compression,
 
     queue_url: String,
-    poll_timeout_secs: u32,
+    poll_secs: u32,
     client_concurrency: u32,
     visibility_timeout_secs: i64,
     delete_message: bool,
@@ -166,7 +167,7 @@ impl Ingestor {
             multiline,
 
             queue_url: config.queue_url,
-            poll_timeout_secs: config.poll_timeout_secs,
+            poll_secs: config.poll_secs,
             client_concurrency: config.client_concurrency,
             visibility_timeout_secs,
             delete_message: config.delete_message,
@@ -467,7 +468,7 @@ impl IngestorProcess {
                 queue_url: self.state.queue_url.clone(),
                 max_number_of_messages: Some(10),
                 visibility_timeout: Some(self.state.visibility_timeout_secs),
-                wait_time_seconds: Some(i64::from(self.state.poll_timeout_secs)),
+                wait_time_seconds: Some(i64::from(self.state.poll_secs)),
                 ..Default::default()
             })
             .map_ok(|res| res.messages.unwrap_or_default())
