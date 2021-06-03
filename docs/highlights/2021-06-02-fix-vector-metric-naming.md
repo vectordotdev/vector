@@ -20,3 +20,8 @@ These have been renamed to:
 
 - `request_duration_seconds`
 - `collect_duration_seconds`
+
+## Upgrade Guide
+
+If you were consuming these metrics, you will need to update any dashboards or
+queries to use their new name.
