@@ -444,22 +444,24 @@ impl MetricData {
     }
 
     /// Update this `MetricData` by adding the value from another.
-    pub fn update(&mut self, other: &Self) {
-        self.value.add(&other.value);
-        // Update the timestamp to the latest one
-        self.timestamp = match (self.timestamp, other.timestamp) {
-            (None, None) => None,
-            (Some(t), None) | (None, Some(t)) => Some(t),
-            (Some(t1), Some(t2)) => Some(t1.max(t2)),
-        };
+    #[must_use]
+    pub fn update(&mut self, other: &Self) -> bool {
+        self.value.add(&other.value) && {
+            // Update the timestamp to the latest one
+            self.timestamp = match (self.timestamp, other.timestamp) {
+                (None, None) => None,
+                (Some(t), None) | (None, Some(t)) => Some(t),
+                (Some(t1), Some(t2)) => Some(t1.max(t2)),
+            };
+            true
+        }
     }
 
     /// Add the data from the other metric to this one. The `other` must
-    /// be relative and contain the same value type as this one.
-    pub fn add(&mut self, other: &Self) {
-        if other.kind == MetricKind::Incremental {
-            self.update(other);
-        }
+    /// be incremental and contain the same value type as this one.
+    #[must_use]
+    pub fn add(&mut self, other: &Self) -> bool {
+        other.kind == MetricKind::Incremental && self.update(other)
     }
 
     /// Create a new metric data from this with a zero value.
@@ -514,14 +516,17 @@ impl MetricValue {
     }
 
     /// Add another same value to this.
-    pub fn add(&mut self, other: &Self) {
+    #[must_use]
+    pub fn add(&mut self, other: &Self) -> bool {
         match (self, other) {
             (Self::Counter { ref mut value }, Self::Counter { value: value2 })
             | (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
                 *value += value2;
+                true
             }
             (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
                 values.extend(values2.iter().map(Into::into));
+                true
             }
             (
                 Self::Distribution {
@@ -534,6 +539,7 @@ impl MetricValue {
                 },
             ) if statistic_a == statistic_b => {
                 samples.extend_from_slice(&samples2);
+                true
             }
             (
                 Self::AggregatedHistogram {
@@ -546,20 +552,20 @@ impl MetricValue {
                     count: count2,
                     sum: sum2,
                 },
-            ) => {
-                if buckets.len() == buckets2.len()
-                    && buckets
-                        .iter()
-                        .zip(buckets2.iter())
-                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
-                {
-                    for (b1, b2) in buckets.iter_mut().zip(buckets2) {
-                        b1.count += b2.count;
-                    }
-                    *count += count2;
-                    *sum += sum2;
+            ) if buckets.len() == buckets2.len()
+                && buckets
+                    .iter()
+                    .zip(buckets2.iter())
+                    .all(|(b1, b2)| b1.upper_limit == b2.upper_limit) =>
+            {
+                for (b1, b2) in buckets.iter_mut().zip(buckets2) {
+                    b1.count += b2.count;
                 }
+                *count += count2;
+                *sum += sum2;
+                true
             }
+
             (
                 Self::AggregatedSummary {
                     ref mut quantiles,
@@ -571,35 +577,38 @@ impl MetricValue {
                     count: count2,
                     sum: sum2,
                 },
-            ) => {
-                if quantiles.len() == quantiles2.len()
-                    && quantiles
-                        .iter()
-                        .zip(quantiles2.iter())
-                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
-                {
-                    for (b1, b2) in quantiles.iter_mut().zip(quantiles2) {
-                        b1.value += b2.value;
-                    }
-                    *count += count2;
-                    *sum += sum2;
+            ) if quantiles.len() == quantiles2.len()
+                && quantiles
+                    .iter()
+                    .zip(quantiles2.iter())
+                    .all(|(b1, b2)| b1.upper_limit == b2.upper_limit) =>
+            {
+                for (b1, b2) in quantiles.iter_mut().zip(quantiles2) {
+                    b1.value += b2.value;
                 }
+                *count += count2;
+                *sum += sum2;
+                true
             }
-            _ => {}
+
+            _ => false,
         }
     }
 
     /// Subtract another (same type) value from this.
-    pub fn subtract(&mut self, other: &Self) {
+    #[must_use]
+    pub fn subtract(&mut self, other: &Self) -> bool {
         match (self, other) {
             (Self::Counter { ref mut value }, Self::Counter { value: value2 })
             | (Self::Gauge { ref mut value }, Self::Gauge { value: value2 }) => {
                 *value -= value2;
+                true
             }
             (Self::Set { ref mut values }, Self::Set { values: values2 }) => {
                 for item in values2 {
                     values.remove(item);
                 }
+                true
             }
             (
                 Self::Distribution {
@@ -619,6 +628,7 @@ impl MetricValue {
                     .copied()
                     .filter(|sample| samples2.iter().all(|sample2| sample != sample2))
                     .collect();
+                true
             }
             (
                 Self::AggregatedHistogram {
@@ -631,19 +641,18 @@ impl MetricValue {
                     count: count2,
                     sum: sum2,
                 },
-            ) => {
-                if buckets.len() == buckets2.len()
-                    && buckets
-                        .iter()
-                        .zip(buckets2.iter())
-                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
-                {
-                    for (b1, b2) in buckets.iter_mut().zip(buckets2) {
-                        b1.count -= b2.count;
-                    }
-                    *count -= count2;
-                    *sum -= sum2;
+            ) if buckets.len() == buckets2.len()
+                && buckets
+                    .iter()
+                    .zip(buckets2.iter())
+                    .all(|(b1, b2)| b1.upper_limit == b2.upper_limit) =>
+            {
+                for (b1, b2) in buckets.iter_mut().zip(buckets2) {
+                    b1.count -= b2.count;
                 }
+                *count -= count2;
+                *sum -= sum2;
+                true
             }
             (
                 Self::AggregatedSummary {
@@ -656,21 +665,20 @@ impl MetricValue {
                     count: count2,
                     sum: sum2,
                 },
-            ) => {
-                if quantiles.len() == quantiles2.len()
-                    && quantiles
-                        .iter()
-                        .zip(quantiles2.iter())
-                        .all(|(b1, b2)| b1.upper_limit == b2.upper_limit)
-                {
-                    for (b1, b2) in quantiles.iter_mut().zip(quantiles2) {
-                        b1.value -= b2.value;
-                    }
-                    *count -= count2;
-                    *sum -= sum2;
+            ) if quantiles.len() == quantiles2.len()
+                && quantiles
+                    .iter()
+                    .zip(quantiles2.iter())
+                    .all(|(b1, b2)| b1.upper_limit == b2.upper_limit) =>
+            {
+                for (b1, b2) in quantiles.iter_mut().zip(quantiles2) {
+                    b1.value -= b2.value;
                 }
+                *count -= count2;
+                *sum -= sum2;
+                true
             }
-            _ => {}
+            _ => false,
         }
     }
 }
@@ -701,25 +709,11 @@ impl Display for Metric {
         if let Some(timestamp) = &self.data.timestamp {
             write!(fmt, "{:?} ", timestamp)?;
         }
-        if let Some(namespace) = &self.namespace() {
-            write_word(fmt, namespace)?;
-            write!(fmt, "_")?;
-        }
-        write_word(fmt, &self.name())?;
-        write!(fmt, "{{")?;
-        if let Some(tags) = &self.tags() {
-            write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
-                write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
-            })?;
-        }
-        write!(
-            fmt,
-            "}} {} ",
-            match self.data.kind {
-                MetricKind::Absolute => '=',
-                MetricKind::Incremental => '+',
-            }
-        )?;
+        let kind = match self.data.kind {
+            MetricKind::Absolute => '=',
+            MetricKind::Incremental => '+',
+        };
+        write!(fmt, "{} {} ", &self.series, kind)?;
         match &self.data.value {
             MetricValue::Counter { value } | MetricValue::Gauge { value } => {
                 write!(fmt, "{}", value)
@@ -761,6 +755,28 @@ impl Display for Metric {
                 })
             }
         }
+    }
+}
+
+impl Display for MetricSeries {
+    /// Display a metric series name using something like Prometheus' text format:
+    ///
+    /// ```text
+    /// NAMESPACE_NAME{TAGS}
+    /// ```
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        if let Some(namespace) = &self.name.namespace {
+            write_word(fmt, namespace)?;
+            write!(fmt, "_")?;
+        }
+        write_word(fmt, &self.name.name)?;
+        write!(fmt, "{{")?;
+        if let Some(tags) = &self.tags {
+            write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
+                write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
+            })?;
+        }
+        write!(fmt, "}}")
     }
 }
 
@@ -833,7 +849,7 @@ mod test {
             .with_value(MetricValue::Counter { value: 3.0 })
             .with_timestamp(Some(ts()));
 
-        counter.data.add(&delta.data);
+        assert!(counter.data.add(&delta.data));
         assert_eq!(counter, expected);
     }
 
@@ -859,7 +875,7 @@ mod test {
             .with_value(MetricValue::Gauge { value: -1.0 })
             .with_timestamp(Some(ts()));
 
-        gauge.data.add(&delta.data);
+        assert!(gauge.data.add(&delta.data));
         assert_eq!(gauge, expected);
     }
 
@@ -891,7 +907,7 @@ mod test {
             })
             .with_timestamp(Some(ts()));
 
-        set.data.add(&delta.data);
+        assert!(set.data.add(&delta.data));
         assert_eq!(set, expected);
     }
 
@@ -926,7 +942,7 @@ mod test {
             })
             .with_timestamp(Some(ts()));
 
-        dist.data.add(&delta.data);
+        assert!(dist.data.add(&delta.data));
         assert_eq!(dist, expected);
     }
 

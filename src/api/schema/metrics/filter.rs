@@ -14,16 +14,37 @@ lazy_static! {
         Arc::new(get_controller().expect("Metrics system not initialized. Please report."));
 }
 
-/// Sums an iteratable of `Metric`, by folding metric values. Convenience function typically
+/// Sums an iteratable of `&Metric`, by folding metric values. Convenience function typically
 /// used to get aggregate metrics.
 fn sum_metrics<'a, I: IntoIterator<Item = &'a Metric>>(metrics: I) -> Option<Metric> {
     let mut iter = metrics.into_iter();
     let m = iter.next()?;
 
     Some(iter.fold(m.clone(), |mut m1, m2| {
-        m1.data.update(&m2.data);
-        m1
+        if m1.data.update(&m2.data) {
+            m1
+        } else {
+            m2.clone()
+        }
     }))
+}
+
+/// Sums an iteratable of `Metric`, by folding metric values. Convenience function typically
+/// used to get aggregate metrics.
+fn sum_metrics_owned<I: IntoIterator<Item = Metric>>(metrics: I) -> Option<Metric> {
+    let mut iter = metrics.into_iter();
+    let m = iter.next()?;
+
+    Some(iter.fold(
+        m,
+        |mut m1, m2| {
+            if m1.data.update(&m2.data) {
+                m1
+            } else {
+                m2
+            }
+        },
+    ))
 }
 
 pub trait MetricsFilter<'a> {
@@ -168,13 +189,7 @@ pub fn component_counter_metrics(
             })
             .into_iter()
             .filter_map(|(name, metrics)| {
-                let mut iter = metrics.into_iter();
-                let mut m = iter.next()?;
-                m = iter.fold(m, |mut m1, m2| {
-                    m1.data.update(&m2.data);
-                    m1
-                });
-
+                let m = sum_metrics_owned(metrics)?;
                 match m.data.value {
                     MetricValue::Counter { value }
                         if cache.insert(name, value).unwrap_or(0.00) < value =>
@@ -229,13 +244,7 @@ pub fn component_counter_throughputs(
                 })
                 .into_iter()
                 .filter_map(|(name, metrics)| {
-                    let mut iter = metrics.into_iter();
-                    let mut m = iter.next()?;
-                    m = iter.fold(m, |mut m1, m2| {
-                        m1.data.update(&m2.data);
-                        m1
-                    });
-
+                    let m = sum_metrics_owned(metrics)?;
                     match m.data.value {
                         MetricValue::Counter { value } => {
                             let last = cache.insert(name, value).unwrap_or(0.00);
