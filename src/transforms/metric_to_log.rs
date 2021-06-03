@@ -121,6 +121,7 @@ mod tests {
         metric::{MetricKind, MetricValue, StatisticKind},
         Metric, Value,
     };
+    use crate::transforms::test::transform_one;
     use chrono::{offset::TimeZone, DateTime, Utc};
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
@@ -132,11 +133,9 @@ mod tests {
 
     fn do_transform(metric: Metric) -> Option<LogEvent> {
         let event = Event::Metric(metric);
-        let mut transformer = MetricToLog::new(Some("host".into()), Default::default());
+        let mut transform = MetricToLog::new(Some("host".into()), Default::default());
 
-        transformer
-            .transform_one(event)
-            .map(|event| event.into_log())
+        transform_one(&mut transform, event).map(|event| event.into_log())
     }
 
     fn ts() -> DateTime<Utc> {

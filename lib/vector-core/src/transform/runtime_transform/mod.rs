@@ -1,4 +1,6 @@
-use crate::{event::Event, stream::VecStreamExt, transforms::TaskTransform};
+mod vec_stream;
+
+use crate::{event::Event, transform::TaskTransform};
 use futures::{
     stream::{self, BoxStream},
     FutureExt, Stream, StreamExt,
@@ -6,6 +8,7 @@ use futures::{
 use std::{future::ready, pin::Pin};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
+use vec_stream::VecStreamExt;
 
 /// A structure representing user-defined timer.
 #[derive(Clone, Copy, Debug)]
