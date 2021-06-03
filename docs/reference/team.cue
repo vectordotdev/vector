@@ -23,7 +23,7 @@ import "strings"
 
 team: [#Member, ...#Member] & [
 	{
-		name:     "Ben"
+		name:     "Ben Johnson"
 		_github:  "binarylogic"
 		_keybase: "binarylogic"
 		_twitter: "binarylogic"
@@ -32,14 +32,14 @@ team: [#Member, ...#Member] & [
 			"""
 	},
 	{
-		name:    "Bruce"
+		name:    "Bruce Guenter"
 		_github: "bruceg"
 		bio: """
 			Bruce is a software engineer at Datadog on the Vector project (formely part of Timber.io).
 			"""
 	},
 	{
-		name:     "James"
+		name:     "James Turnball"
 		_github:  "jamtur01"
 		_keybase: "jamtur01"
 		_twitter: "kartar"
@@ -48,7 +48,7 @@ team: [#Member, ...#Member] & [
 			"""
 	},
 	{
-		name:     "Jean"
+		name:     "Jean Mertz"
 		_github:  "JeanMertz"
 		_keybase: "JeanMertz"
 		_twitter: "JeanMertz"
@@ -57,7 +57,7 @@ team: [#Member, ...#Member] & [
 			"""
 	},
 	{
-		name:     "Jesse"
+		name:     "Jesse Szwedko"
 		_github:  "jszwedko"
 		_keybase: "jszwedko"
 		_twitter: "jszwedko"
@@ -66,7 +66,7 @@ team: [#Member, ...#Member] & [
 			"""
 	},
 	{
-		name:     "Kirill"
+		name:     "Kirill Fomichev"
 		_github:  "fanatid"
 		_keybase: "fanatid"
 		bio: """
@@ -74,14 +74,14 @@ team: [#Member, ...#Member] & [
 			"""
 	},
 	{
-		name:    "Kruno"
+		name:    "Kruno Tomola Fabro"
 		_github: "ktff"
 		bio: """
-			Kruno is an engineer at Timber.io and a member of the Vector team.
+			Kruno is a contractor for Datadog on the Vector project (formerly contracted with at Timber.io).
 			"""
 	},
 	{
-		name:     "Lee"
+		name:     "Lee Benson"
 		_github:  "leebenson"
 		_keybase: "leebenson"
 		_twitter: "leebenson"
@@ -90,7 +90,7 @@ team: [#Member, ...#Member] & [
 			"""
 	},
 	{
-		name:     "Luc"
+		name:     "Luc Perkins"
 		_github:  "lucperkins"
 		_keybase: "lucperkins"
 		_twitter: "lucperkins"
@@ -99,7 +99,7 @@ team: [#Member, ...#Member] & [
 			"""
 	},
 	{
-		name:     "Luke"
+		name:     "Luke Steensen"
 		_github:  "lukesteensen"
 		_keybase: "lukesteensen"
 		_twitter: "lukesteensen"
@@ -119,7 +119,7 @@ team: [#Member, ...#Member] & [
 			"""
 	},
 	{
-		name:     "Steve"
+		name:     "Steve Hall"
 		_github:  "sghall"
 		_keybase: "sghall"
 		_twitter: "sghall"
@@ -135,7 +135,7 @@ team: [#Member, ...#Member] & [
 			"""
 	},
 	{
-		name:     "Zach"
+		name:     "Zach Sherman"
 		_github:  "zsherman"
 		_keybase: "zsherman"
 		_twitter: "zsherman"
