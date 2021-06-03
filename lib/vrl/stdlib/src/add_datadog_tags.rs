@@ -28,20 +28,15 @@ impl Function for AddDatadogTags {
         let value = arguments.required("value");
         let tags = arguments.required("tags");
 
-        Ok(Box::new(AddDatadogTagsFn {
-            value,
-            tags
-        }))
+        Ok(Box::new(AddDatadogTagsFn { value, tags }))
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[
-            Example {
-                title: "add datadog tags",
-                source: r#"add_datadog_tags!("env:beta,platform:windows", ["arch:amd64", "relay:vector"])"#,
-                result: Ok("env:beta,platform:windows,arch:amd64,relay:vector"),
-            },
-        ]
+        &[Example {
+            title: "add datadog tags",
+            source: r#"add_datadog_tags!("env:beta,platform:windows", ["arch:amd64", "relay:vector"])"#,
+            result: Ok("arch:amd64,env:beta,platform:windows,relay:vector"),
+        }]
     }
 }
 
@@ -60,12 +55,12 @@ impl Expression for AddDatadogTagsFn {
             .collect::<Result<Vec<Cow<'_, str>>>>()
             .map_err(|_| "all tags items must be strings")?;
 
-
         let value = self.value.resolve(ctx)?;
         let current_tags = value.try_bytes_utf8_lossy()?;
-        let mut current_tags_vec = current_tags.split(',')
+        let mut current_tags_vec = current_tags
+            .split(',')
             .filter(|&s| !s.is_empty())
-            .map(|s| Cow::from(s))
+            .map(Cow::from)
             .collect::<Vec<_>>();
 
         current_tags_vec.append(&mut new_tags_vec);
@@ -73,14 +68,13 @@ impl Expression for AddDatadogTagsFn {
         current_tags_vec.sort();
         current_tags_vec.dedup();
 
-        let final_tags =  current_tags_vec
-            .join(",");
+        let final_tags = current_tags_vec.join(",");
 
         Ok(Value::from(final_tags))
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::new().infallible().bytes()
+        TypeDef::new().fallible().bytes()
     }
 }
 
@@ -96,15 +90,14 @@ mod tests {
             with_reordering {
                 args: func_args![value: "env:prod", tags: value!(["arch:arm64", "os:windows"])],
                 want: Ok(value!("arch:arm64,env:prod,os:windows")),
-                tdef: TypeDef::new().infallible().bytes(),
+                tdef: TypeDef::new().fallible().bytes(),
             }
 
             with_duplicate {
                 args: func_args![value: "env:prod", tags: value!(["env:prod"])],
                 want: Ok(value!("env:prod")),
-                tdef: TypeDef::new().infallible().bytes(),
+                tdef: TypeDef::new().fallible().bytes(),
             }
         ];
     }
-
 }
