@@ -128,7 +128,7 @@ impl From<QueryNode> for ast::Expr {
                     Field::Default(_) => {
                         make_function_call("match", vec![query, make_regex(&value)])
                     }
-                    _ => make_container_group(make_string_comparison(query, Opcode::Eq, &value)),
+                    _ => make_string_comparison(query, Opcode::Eq, &value),
                 })
                 .collect(),
             // Comparison.
@@ -214,9 +214,14 @@ impl From<QueryNode> for ast::Expr {
                     }
                 })
                 .collect(),
-            // Negation.
+            // Negation. If the node is an operation type, wrap in a container before negating.
             QueryNode::NegatedNode { node } => {
-                vec![make_not(ast::Expr::from(*node))]
+                let node = match ast::Expr::from(*node) {
+                    n @ ast::Expr::Op(_) => make_container_group(n),
+                    n @ _ => n,
+                };
+
+                vec![make_not(node)]
             }
             // Compound.
             QueryNode::Boolean { oper, nodes } => {
@@ -411,25 +416,25 @@ mod tests {
         // Quoted keyword (negate w/-).
         (r#"-"bla""#, r#"!(match(.message, r'\bbla\b') || (match(.custom.error.message, r'\bbla\b') || (match(.custom.error.stack, r'\bbla\b') || (match(.custom.title, r'\bbla\b') || match(._default_, r'\bbla\b')))))"#),
         // Tag match.
-        ("a:bla", r#"(.a == "bla")"#),
+        ("a:bla", r#".a == "bla""#),
         // Tag match (negate).
         ("NOT a:bla", r#"!(.a == "bla")"#),
         // Tag match (negate w/-).
         ("-a:bla", r#"!(.a == "bla")"#),
         // Quoted tag match.
-        (r#"a:"bla""#, r#"(.a == "bla")"#),
+        (r#"a:"bla""#, r#".a == "bla""#),
         // Quoted tag match (negate).
         (r#"NOT a:"bla""#, r#"!(.a == "bla")"#),
         // Quoted tag match (negate).
         (r#"-a:"bla""#, r#"!(.a == "bla")"#),
         // Facet match.
-        ("@a:bla", r#"(.custom.a == "bla")"#),
+        ("@a:bla", r#".custom.a == "bla""#),
         // Facet match (negate).
         ("NOT @a:bla", r#"!(.custom.a == "bla")"#),
         // Facet match (negate w/-).
         ("-@a:bla", r#"!(.custom.a == "bla")"#),
         // Quoted facet match.
-        (r#"@a:"bla""#, r#"(.custom.a == "bla")"#),
+        (r#"@a:"bla""#, r#".custom.a == "bla""#),
         // Quoted facet match (negate).
         (r#"NOT @a:"bla""#, r#"!(.custom.a == "bla")"#),
         // Quoted facet match (negate w/-).
@@ -593,7 +598,7 @@ mod tests {
         // A bit of everything.
         (
             "@a:this OR ((@b:test* c:that) AND d:the_other e:[1 TO 5])",
-            r#"((.custom.a == "this") || ((match(.custom.b, r'\btest.*\b') && (.c == "that")) && ((.d == "the_other") && (.e >= 1 && .e <= 5))))"#,
+            r#"(.custom.a == "this" || ((match(.custom.b, r'\btest.*\b') && .c == "that") && (.d == "the_other" && (.e >= 1 && .e <= 5))))"#,
         ),
         // Range - numeric, exclusive
         ("f:{1 TO 10}", "(.f > 1 && .f < 10)"),
