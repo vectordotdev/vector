@@ -17,6 +17,40 @@ static DEFAULT_FIELDS: &[&str] = &[
     "_default_",
 ];
 
+/// Attributes that represent special fields in Datadog.
+static RESERVED_ATTRIBUTES: &[&str] = &[
+    "host",
+    "source",
+    "status",
+    "service",
+    "trace_id",
+    "message",
+    "timestamp",
+    "tags",
+];
+
+/// Describes a field to search on.
+enum Field {
+    /// Default field (when tag/facet isn't provided)
+    Default(String),
+
+    /// Reserved field that receives special treatment in Datadog.
+    Reserved(String),
+
+    /// Custom field type not described elsewhere.
+    Custom(String),
+}
+
+impl Field {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Default(ref s) => s,
+            Self::Reserved(ref s) => s,
+            Self::Custom(ref s) => s,
+        }
+    }
+}
+
 impl From<BooleanType> for ast::Opcode {
     fn from(b: BooleanType) -> Self {
         match b {
@@ -67,21 +101,21 @@ impl From<QueryNode> for ast::Expr {
             // Match everything.
             QueryNode::MatchAllDocs => make_queries(grammar::DEFAULT_FIELD)
                 .into_iter()
-                .map(|query| make_function_call("exists", vec![query]))
+                .map(|(_, query)| make_function_call("exists", vec![query]))
                 .collect(),
             // Matching nothing.
             QueryNode::MatchNoDocs => make_queries(grammar::DEFAULT_FIELD)
                 .into_iter()
-                .map(|query| make_not(make_function_call("exists", vec![query])))
+                .map(|(_, query)| make_not(make_function_call("exists", vec![query])))
                 .collect(),
             // Field existence.
             QueryNode::AttributeExists { attr } => make_queries(&attr)
                 .into_iter()
-                .map(|query| make_function_call("exists", vec![query]))
+                .map(|(_, query)| make_function_call("exists", vec![query]))
                 .collect(),
             QueryNode::AttributeMissing { attr } => make_queries(&attr)
                 .into_iter()
-                .map(|query| make_not(make_function_call("exists", vec![query])))
+                .map(|(_, query)| make_not(make_function_call("exists", vec![query])))
                 .collect(),
             // Equality.
             QueryNode::AttributeTerm { attr, value }
@@ -90,7 +124,7 @@ impl From<QueryNode> for ast::Expr {
                 phrase: value,
             } => make_queries(&attr)
                 .into_iter()
-                .map(|query| make_function_call("match", vec![query, make_regex(&value)]))
+                .map(|(_, query)| make_function_call("match", vec![query, make_regex(&value)]))
                 .collect(),
             // Comparison.
             QueryNode::AttributeComparison {
@@ -99,19 +133,21 @@ impl From<QueryNode> for ast::Expr {
                 value,
             } => make_queries(&attr)
                 .into_iter()
-                .map(|query| make_op(make_node(query), comparator.into(), value.clone().into()))
+                .map(|(_, query)| {
+                    make_op(make_node(query), comparator.into(), value.clone().into())
+                })
                 .collect(),
             // Wildcard suffix.
             QueryNode::AttributePrefix { attr, prefix } => make_queries(&attr)
                 .into_iter()
-                .map(|query| {
+                .map(|(_, query)| {
                     make_function_call("match", vec![query, make_regex(&format!("{}*", &prefix))])
                 })
                 .collect(),
             // Arbitrary wildcard.
             QueryNode::AttributeWildcard { attr, wildcard } => make_queries(&attr)
                 .into_iter()
-                .map(|query| make_function_call("match", vec![query, make_regex(&wildcard)]))
+                .map(|(_, query)| make_function_call("match", vec![query, make_regex(&wildcard)]))
                 .collect(),
             // Range.
             QueryNode::AttributeRange {
@@ -122,7 +158,7 @@ impl From<QueryNode> for ast::Expr {
                 upper_inclusive,
             } => make_queries(&attr)
                 .into_iter()
-                .map(|query| {
+                .map(|(_, query)| {
                     match (&lower, &upper) {
                         // If both bounds are wildcards, it'll match everything; just check the field exists.
                         (ComparisonValue::Unbounded, ComparisonValue::Unbounded) => {
@@ -194,13 +230,22 @@ fn make_node<T>(node: T) -> ast::Node<T> {
 
 /// Converts a field/facet name to the VRL equivalent. Datadog payloads have a `message` field
 /// (which is used whenever the default field is encountered. Facets are hosted on .custom.*.
-fn normalize_tags<T: AsRef<str>>(value: T) -> Vec<String> {
+fn normalize_fields<T: AsRef<str>>(value: T) -> Vec<Field> {
     let value = value.as_ref();
     if value.eq(grammar::DEFAULT_FIELD) {
-        return DEFAULT_FIELDS.iter().map(|s| (*s).to_owned()).collect();
+        return DEFAULT_FIELDS
+            .iter()
+            .map(|s| Field::Default((*s).to_owned()))
+            .collect();
     }
 
-    vec![value.replace("@", "custom.")]
+    let field = match value.replace("@", "custom.") {
+        v if DEFAULT_FIELDS.contains(&v.as_ref()) => Field::Default(v),
+        v if RESERVED_ATTRIBUTES.contains(&v.as_ref()) => Field::Reserved(v),
+        v => Field::Custom(v),
+    };
+
+    vec![field]
 }
 
 /// An `Expr::Op` from two expressions, and a separating operator.
@@ -213,18 +258,20 @@ fn make_op(expr1: ast::Node<ast::Expr>, op: Opcode, expr2: ast::Node<ast::Expr>)
 }
 
 /// An `Expr::Query`, converting a string field to a lookup path.
-fn make_queries(field: &str) -> Vec<ast::Expr> {
-    normalize_tags(field)
+fn make_queries(field: &str) -> Vec<(Field, ast::Expr)> {
+    normalize_fields(field)
         .into_iter()
         .map(|field| {
-            ast::Expr::Query(make_node(ast::Query {
+            let query = ast::Expr::Query(make_node(ast::Query {
                 target: make_node(ast::QueryTarget::External),
                 path: make_node(
-                    lookup::parser::parse_lookup(&field)
+                    lookup::parser::parse_lookup(field.as_str())
                         .expect("should parse lookup")
                         .into(),
                 ),
-            }))
+            }));
+
+            (field, query)
         })
         .collect()
 }
