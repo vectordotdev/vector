@@ -18,6 +18,8 @@ metadata:
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: vector-agent
+    app: vector
+    app.kubernetes.io/component: agent
 automountServiceAccountToken: true
 ---
 # Source: vector/charts/vector-aggregator/templates/serviceaccount.yaml
@@ -32,6 +34,8 @@ metadata:
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: vector-aggregator
+    app: vector
+    app.kubernetes.io/component: aggregator
 automountServiceAccountToken: true
 ---
 # Source: vector/charts/vector-agent/templates/configmap.yaml
@@ -46,6 +50,8 @@ metadata:
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: vector-agent
+    app: vector
+    app.kubernetes.io/component: agent
 data:
   # We leave `vector.toml` file name available to let externally managed config
   # maps to provide it.
@@ -106,6 +112,8 @@ metadata:
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: vector-aggregator
+    app: vector
+    app.kubernetes.io/component: aggregator
 data:
   # We leave `vector.toml` file name available to let externally managed config
   # maps to provide it.
@@ -169,6 +177,8 @@ metadata:
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: vector-agent
+    app: vector
+    app.kubernetes.io/component: agent
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -190,6 +200,8 @@ metadata:
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: vector-aggregator
+    app: vector
+    app.kubernetes.io/component: aggregator
 spec:
   clusterIP: None
   ports:
@@ -212,6 +224,8 @@ metadata:
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: vector-aggregator
+    app: vector
+    app.kubernetes.io/component: aggregator
 spec:
   type: ClusterIP
   ports:
@@ -235,6 +249,8 @@ metadata:
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: vector-agent
+    app: vector
+    app.kubernetes.io/component: agent
 spec:
   selector:
     matchLabels:
@@ -368,6 +384,8 @@ metadata:
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/part-of: vector-aggregator
+    app: vector
+    app.kubernetes.io/component: aggregator
 spec:
   serviceName: vector-aggregator-headless
   selector:
