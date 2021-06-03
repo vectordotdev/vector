@@ -7,7 +7,7 @@ author_github: "https://github.com/jszwedko"
 pr_numbers: [6876]
 release: "0.14.0"
 hide_on_release_notes: false
-tags: ["type: announcement", "domain: sources"]
+tags: ["type: new feature", "domain: sources"]
 ---
 
 This release includes a new `exec` source that can be used to run programs outside of Vector to generate log events by

@@ -7,7 +7,7 @@ author_github: "https://github.com/spencergilbert"
 pr_numbers: [7671]
 release: "0.14.0"
 hide_on_release_notes: false
-tags: ["type: announcement", "platform: kubernetes", "domain: config"]
+tags: ["type: deprecation", "platform: kubernetes", "domain: config"]
 ---
 
 With the release of Vector 0.14.0, we are announcing the planned deprecation of the `rawConfig` option
