@@ -13,7 +13,7 @@ use crate::{
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use codec::BytesDelimitedCodec;
-use futures::{stream, FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
+use futures::{FutureExt, SinkExt, Stream, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{GetObjectError, GetObjectRequest, S3Client, S3};
@@ -405,7 +405,7 @@ impl IngestorProcess {
                     None => lines,
                 };
 
-                let stream = lines.filter_map(|line| {
+                let mut stream = lines.filter_map(|line| {
                     emit!(SqsS3EventReceived {
                         byte_size: line.len()
                     });
@@ -427,19 +427,14 @@ impl IngestorProcess {
                     ready(Some(Ok(event)))
                 });
 
-                let mut send_error: Option<crate::pipeline::ClosedError> = None;
-                let mut chunked = stream.ready_chunks(32);
-                while let Some(events) = chunked.next().await {
-                    let mut events = stream::iter(events);
-                    if self.out.send_all(&mut events).await.is_err() {
-                        send_error = Some(crate::pipeline::ClosedError);
-                        break;
-                    }
-                }
+                let send_error = match self.out.send_all(&mut stream).await {
+                    Ok(_) => None,
+                    Err(_) => Some(crate::pipeline::ClosedError),
+                };
 
-                // Up above, `lines` captures `read_error`, and eventually is captured by `chunked`,
+                // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,
                 // so we explicitly drop it so that we can again utilize `read_error` below.
-                drop(chunked);
+                drop(stream);
 
                 read_error
                     .map(|error| {
